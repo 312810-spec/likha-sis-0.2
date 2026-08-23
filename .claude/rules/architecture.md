@@ -6,8 +6,9 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 Enforced rules:
 
-- `src/ui/**` and `src/domain/**` must never import from `src/infrastructure/**`
-  or `@tauri-apps/*` directly. Only `src/composition.ts` is allowed to
+- `src/ui/**`, `src/domain/**`, and `src/application/**` must never import
+  from `src/infrastructure/**` or `@tauri-apps/*` directly. Only
+  `src/composition.ts` is allowed to
   import concrete `infrastructure/tauri/*` classes (see
   `docs/adr/0005-app-shell-and-first-ui-slice.md`). UI screens receive
   their `*ApplicationService`s as constructor/props args, not by importing

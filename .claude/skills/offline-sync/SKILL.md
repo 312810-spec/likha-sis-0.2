@@ -18,7 +18,7 @@ Rules that still apply today even with no sync implementation:
   specific cloud provider (Cloudflare or otherwise), stop; that belongs
   behind a port, implemented later in `src/infrastructure/`, matching the
   `UI → Application Services → Domain → Repository Ports →
-  Infrastructure/Platform Adapters → SyncProvider → Cloud` layering in
+Infrastructure/Platform Adapters → SyncProvider → Cloud` layering in
   `CLAUDE.md`.
 - Do not scaffold speculative sync infrastructure ("just in case") —
   YAGNI applies; wait for an actual milestone that needs it.

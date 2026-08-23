@@ -1,0 +1,64 @@
+# OSV-Scanner config. See docs/SOURCE-REGISTRY.md for why each entry is
+# accepted rather than fixed.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+reason = "glib 0.18.5, transitive via Tauri's WRY/GTK Linux backend. Only reachable on a Linux build target; LIKHA-SIS currently only builds for Windows. No safe upgrade path within Tauri's own current dependency pin. Revisit if Linux desktop support is ever added."
+
+# The following are the same 16 transitive unmaintained-crate advisories
+# already documented and accepted in src-tauri/deny.toml's
+# [advisories].ignore (unic-*, gtk-rs GTK3 bindings, proc-macro-error) —
+# all pulled in by Tauri's own dependency tree, no fix available
+# upstream. cargo-deny is the authoritative, target-aware gate for these;
+# listed again here only so OSV-Scanner's report matches the same
+# accepted state instead of perpetually reporting "failed" for findings
+# already reviewed and accepted. See src-tauri/deny.toml for the
+# per-crate reasoning.
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "proc-macro-error unmaintained, transitive via tauri. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0411"
+reason = "unic-common unmaintained, transitive via tauri-utils/urlpattern. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0412"
+reason = "unic-char-property unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0413"
+reason = "gtk-rs GTK3 bindings unmaintained, transitive via wry. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0414"
+reason = "unic-char-range unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0415"
+reason = "unic-segment unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0416"
+reason = "atk/gdk/gtk (gtk-rs) unmaintained, transitive via wry. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0417"
+reason = "unic-ucd-version unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0418"
+reason = "unic-ucd-category unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0419"
+reason = "unic-ucd-ident unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0420"
+reason = "unic-ucd-common unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0075"
+reason = "unic-* unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0080"
+reason = "unic-* unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0081"
+reason = "unic-* unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0098"
+reason = "unic-ucd-ident unmaintained, same chain. See src-tauri/deny.toml."
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0100"
+reason = "unic-* unmaintained, same chain. See src-tauri/deny.toml."

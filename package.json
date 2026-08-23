@@ -15,7 +15,11 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run test"
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run check:architecture && npm run test",
+    "quality:security": "node scripts/check-security.mjs",
+    "quality:ui": "echo \"quality:ui: no automated Playwright UI-smoke suite exists yet - use the playwright-cli skill on demand. This is a placeholder, not real coverage.\"",
+    "quality:full": "npm run quality && cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
@@ -24,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/cli": "0.1.18",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",

@@ -1,0 +1,21 @@
+title = "LIKHA-SIS gitleaks config"
+
+# Extend the default ruleset rather than replacing it.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic fixtures and known-safe project patterns"
+regexTarget = "match"
+regexes = [
+  # Marks a literal as an intentional synthetic fixture, e.g.:
+  #   const password = "not-a-real-secret-fixture"; # gitleaks:allow
+  '''gitleaks:allow''',
+]
+paths = [
+  '''\.planning/''',
+  '''node_modules/''',
+  '''src-tauri/target/''',
+  '''src-tauri/gen/''',
+  '''dist/''',
+]

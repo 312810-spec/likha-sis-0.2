@@ -17,7 +17,7 @@ changes):
 - `npm run quality:ui` — Playwright CLI renderer/accessibility checks
   where applicable. Does not substitute for a human visual/screen-reader
   pass — this environment has no browser/screenshot tool by default for
-  the *native Tauri binary*; state that limitation plainly rather than
+  the _native Tauri binary_; state that limitation plainly rather than
   implying it was covered.
 - `npm run quality:full` — milestone/release gate: everything above plus
   `cargo test` and `cargo clippy --all-targets -- -D warnings`.

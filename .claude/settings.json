@@ -1,4 +1,11 @@
 {
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true
+  },
+  "env": {
+    "ENABLE_STOP_REVIEW": "0",
+    "ENABLE_COMMIT_REVIEW": "0"
+  },
   "hooks": {
     "SessionStart": [
       {

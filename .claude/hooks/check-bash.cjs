@@ -19,7 +19,10 @@ process.stdin.on("end", () => {
   // Order matters: check narrow/safe patterns are not accidentally
   // caught by a broader one below them.
   const destructive = [
-    [/\bgit\s+push\b/, "git push (this project prohibits pushing without explicit user approval right now)"],
+    [
+      /\bgit\s+push\b/,
+      "git push (this project prohibits pushing without explicit user approval right now)",
+    ],
     [/\bgit\s+reset\s+--hard\b/, "git reset --hard (discards uncommitted work irreversibly)"],
     [/\bgit\s+clean\s+-[a-z]*f/, "git clean -f (irreversibly deletes untracked files)"],
     [/\bgit\s+branch\s+-D\b/, "git branch -D (force-deletes a branch)"],

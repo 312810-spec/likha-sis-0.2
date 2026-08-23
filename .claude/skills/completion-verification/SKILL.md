@@ -16,7 +16,7 @@ Before claiming complete:
 
 - Run the actual checks — `npm run quality` (or the tier that applies,
   see `.claude/rules/testing.md`), `cargo test`, `cargo clippy -D
-  warnings` for Rust changes. Never write "tests pass" without having run
+warnings` for Rust changes. Never write "tests pass" without having run
   them in this session.
 - Inspect edge/error states, not just the happy path.
 - State plainly what could NOT be verified (no browser tool, no device,

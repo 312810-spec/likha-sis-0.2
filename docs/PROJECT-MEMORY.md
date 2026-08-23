@@ -91,6 +91,40 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## Claude Code Development Harness
+
+A one-time harness upgrade (2026-08-24) built the project-local Claude
+Code operating system: `.claude/rules/` (architecture, security-privacy,
+testing, project-state), `.claude/skills/` (16, task-triggered),
+`.claude/agents/` (8, read-only reviewers/researchers — `evaluator`,
+`security-reviewer`, `architecture-reviewer`, `reliability-reviewer`,
+`teacher-ux-reviewer`, `accessibility-reviewer`, `deped-researcher`,
+`dependency-researcher`), and `.claude/settings.json` +
+`.claude/hooks/*.cjs` (deterministic SessionStart/PreToolUse/PostToolUse/
+PreCompact/SubagentStop/Stop hooks — no auto-commit, no auto-loop).
+Decision record: `docs/adr/0007-claude-code-harness-architecture.md`.
+`CLAUDE.md` stays small by design (~90 lines); durable third-party
+tooling decisions live in `docs/SOURCE-REGISTRY.md`, known-pending
+verification in `docs/VERIFICATION-DEBT.md`. Security/dependency tooling
+(Gitleaks, cargo-deny, OSV-Scanner) is installed and wired into
+`npm run quality:security` (`scripts/check-security.mjs`, which
+distinguishes "tool missing" from "tool ran, found nothing" — a plain
+`&&` chain of the three tools can't, since all three exit 1 for both
+cases). A new deterministic `scripts/check-architecture.mjs` enforces the
+UI/domain/application → infrastructure import-direction boundary as part
+of `npm run quality`. For a substantial multi-phase task, working memory
+lives in `.planning/<task>/{task_plan,findings,progress}.md`
+(gitignored, disposable — see the `planning-with-files` skill); this
+harness upgrade itself used that pattern under
+`.planning/harness-upgrade/`.
+
+Third-party dev-tooling gets a supply-chain trust check before
+installation, not just a feature-fit check — `Graphify-Labs/graphify`
+(a code-graph accelerator) was rejected on independently-verified
+anomalous GitHub star/fork counts and an unaddressed PyPI typosquat
+vector before any code from it was ever run on this machine. See
+`docs/SOURCE-REGISTRY.md` and `.planning/graphify-eval/findings.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

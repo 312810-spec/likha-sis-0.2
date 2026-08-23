@@ -1,0 +1,74 @@
+# cargo-deny policy for LIKHA-SIS's Rust workspace.
+# Run: cargo deny check   (from src-tauri/)
+# First run needs network to clone the RustSec advisory-db; after that,
+# `cargo deny check --offline` works until the local clone goes stale.
+
+[graph]
+targets = []
+
+[advisories]
+db-path = "~/.cargo/advisory-dbs"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+# All entries below are transitive dependencies pulled in by tauri/tauri-
+# runtime-wry itself (unic-* via urlpattern via tauri-utils; gtk-rs GTK3
+# bindings and proc-macro-error via the Linux/WRY runtime chain) — not
+# something LIKHA-SIS depends on directly or can upgrade independently of
+# Tauri's own dependency tree, and cargo-deny confirmed no safe upgrade
+# is available for any of them as of first `cargo deny check` run
+# (2026-08-24). Re-run without this ignore list occasionally to check
+# whether upstream Tauri has moved off them.
+ignore = [
+  "RUSTSEC-2024-0370", # proc-macro-error unmaintained, transitive via tauri
+  "RUSTSEC-2024-0411", # unic-common unmaintained, transitive via tauri-utils/urlpattern
+  "RUSTSEC-2024-0412", # unic-char-property unmaintained, same chain
+  "RUSTSEC-2024-0413", # gtk-rs GTK3 bindings unmaintained, transitive via wry
+  "RUSTSEC-2024-0414", # unic-char-range unmaintained, same chain
+  "RUSTSEC-2024-0415", # unic-segment unmaintained, same chain
+  "RUSTSEC-2024-0416", # atk/gdk/gtk (gtk-rs) unmaintained, transitive via wry
+  "RUSTSEC-2024-0417", # unic-ucd-version unmaintained, same chain
+  "RUSTSEC-2024-0418", # unic-ucd-category unmaintained, same chain
+  "RUSTSEC-2024-0419", # unic-ucd-ident unmaintained, same chain
+  "RUSTSEC-2024-0420", # unic-ucd-common unmaintained, same chain
+  "RUSTSEC-2025-0075", # unic-* unmaintained, same chain
+  "RUSTSEC-2025-0080", # unic-* unmaintained, same chain
+  "RUSTSEC-2025-0081", # unic-* unmaintained, same chain
+  "RUSTSEC-2025-0098", # unic-ucd-ident unmaintained, same chain
+  "RUSTSEC-2025-0100", # unic-* unmaintained, same chain
+]
+
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "Zlib",
+  "MPL-2.0",
+]
+confidence-threshold = 0.8
+# `app` (this crate) is never published to a registry — see `publish =
+# false` in Cargo.toml — so it legitimately has no SPDX license field.
+private = { ignore = true }
+
+[bans]
+# Deliberately permissive on duplicate versions by default — a modern
+# Cargo dependency graph routinely carries a few duplicated minor
+# versions of common crates (windows-sys, syn, etc.) with no real
+# problem. Only ban specific crates/versions here, with a reason, when
+# something concrete justifies it (known vulnerability without a fixed
+# version bump available yet, a license-incompatible fork, etc.).
+multiple-versions = "warn"
+wildcards = "deny"
+deny = [
+  # { name = "openssl", reason = "use rustls / vendored via rusqlite's bundled feature instead" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -195,17 +195,18 @@ school/membership to exist, but nothing could create them. Decision
 record: `docs/adr/0006-first-run-bootstrap.md`.
 
 Delivered: `auth::bootstrap_installation` (one atomic transaction: school
-+ first user + membership + session, all-or-nothing),
-`repository::installation` (the one-time-only guard),
-`commands::setup::{installation_status,bootstrap_installation}`,
-migration 3 (`installation_state`), `AppError::AlreadyInitialized`. TS:
-`src/ui/FirstRunSetupScreen.tsx` (single form, "Your school"/"Your
-account" sections, shared password show/hide, teacher-facing copy — no
-jargon), `src/application/setup-service.ts`,
-`src/domain/ports/setup-repository.ts`,
-`src/infrastructure/tauri/setup-repository.ts`,
-`src/domain/password-policy.ts` (shared min-password-length constant).
-`App.tsx` now checks `installationStatus()` before anything else.
+
+- first user + membership + session, all-or-nothing),
+  `repository::installation` (the one-time-only guard),
+  `commands::setup::{installation_status,bootstrap_installation}`,
+  migration 3 (`installation_state`), `AppError::AlreadyInitialized`. TS:
+  `src/ui/FirstRunSetupScreen.tsx` (single form, "Your school"/"Your
+  account" sections, shared password show/hide, teacher-facing copy — no
+  jargon), `src/application/setup-service.ts`,
+  `src/domain/ports/setup-repository.ts`,
+  `src/infrastructure/tauri/setup-repository.ts`,
+  `src/domain/password-policy.ts` (shared min-password-length constant).
+  `App.tsx` now checks `installationStatus()` before anything else.
 
 Independently reviewed (design/teacher-comfort, accessibility — both
 completed; a planned independent security/reliability review hit a
@@ -231,7 +232,7 @@ wording softened for a first-time, possibly-nervous user.
 
 One **accepted residual risk**, documented not fixed: a narrower race
 remains between `bootstrap_installation` and the older
-`register_user`/`add_user_to_school` commands racing *each other*
+`register_user`/`add_user_to_school` commands racing _each other_
 specifically (both still use `SELECT`-based gates with the same
 snapshot-staleness property) — requires two different UI flows driven by
 two separate processes simultaneously, and the worst case is duplicate
@@ -247,6 +248,77 @@ none of "database/migration/credential hash/tenant/cryptography/
 repository." `npm run build` clean. Relaunched the actual compiled
 `app.exe` after the Rust changes and confirmed clean startup via logs
 (same real-binary check used in M5).
+
+## Claude Code Harness Upgrade — Complete (2026-08-24)
+
+Goal: a one-time development-process infrastructure upgrade (not an
+application milestone) — a lean, project-local Claude Code operating
+system per the 31-section spec given for this session. Decision record:
+`docs/adr/0007-claude-code-harness-architecture.md`. Full working log:
+`.planning/harness-upgrade/{task_plan,findings,progress}.md`.
+
+Delivered: `.claude/rules/*.md` (4), `.claude/skills/*/SKILL.md` (16),
+`.claude/agents/*.md` (8, all read-only), `.claude/settings.json` +
+`.claude/hooks/*.cjs` (3 hook scripts), `scripts/check-architecture.mjs`
+(+ test), `scripts/check-security.mjs`, `.gitleaks.toml`,
+`src-tauri/deny.toml`, `osv-scanner.toml`, `docs/VERIFICATION-DEBT.md`,
+`docs/SOURCE-REGISTRY.md`. Installed and verified: Gitleaks 8.30.1
+(winget), OSV-Scanner 2.4.0 (winget), cargo-deny (`cargo install
+--locked`), `@playwright/cli@0.1.18` (npm, exact-pinned) with its
+official skill. One real app-adjacent fix: `src-tauri/Cargo.toml` gained
+`publish = false` (the crate is never published; this was a genuine
+`cargo deny` finding, not a stylistic change).
+
+Independently reviewed by three fresh agents (security, architecture,
+reliability) against the harness itself, plus a final `evaluator` pass.
+Findings and fixes: (1) `format-write-edit.cjs` used `spawnSync` with
+`shell: true` on a filesystem path taken from tool input — fixed with an
+explicit in-repo/safe-characters check before the path ever reaches the
+shell; (2) `.claude/rules/architecture.md` didn't mention
+`src/application` even though the checker script correctly restricts it
+— wording fixed to match; (3) the original `quality:security` script
+chained three tools with `&&`, which can't distinguish "tool not
+installed" from "tool ran and found something" (both exit 1) — rewritten
+as `scripts/check-security.mjs` with an explicit per-tool presence probe,
+verified against both a tools-missing and a tools-present shell state.
+
+Verified: `npm run quality` clean (17 test files / 81 tests, up from 76 —
+5 new tests for the architecture checker), `npm run quality:security`
+clean (Gitleaks 0 leaks, `cargo deny check` clean across
+advisories/bans/licenses/sources, OSV-Scanner clean with 17 accepted
+findings documented and filtered — 16 transitive unmaintained-crate
+RUSTSEC ids from Tauri's own dependency tree with no upstream fix, plus
+one Linux-only glib CVE not reachable on this project's Windows-only
+build target), `cargo test` 72/72, `cargo clippy --all-targets -D
+warnings` clean.
+
+**Known, disclosed gap**: `.claude/settings.json` did not exist when this
+session started, so its hooks were pipe-tested with synthesized stdin
+(confirmed correct input/output behavior) but were not observed live in
+this same session — the settings-file watcher only watches directories
+that existed at session start. A `/hooks` reload or session restart
+activates them.
+
+## Graphify Code-Graph Evaluation — Rejected, No Change (2026-08-24)
+
+Goal: evaluate `Graphify-Labs/graphify` as a possible CLI+skill
+accelerator for architecture exploration, per an explicit follow-up
+harness task. Full writeup: `docs/SOURCE-REGISTRY.md` and
+`.planning/graphify-eval/findings.md`.
+
+**Rejected at the security-review gate, before any installation.**
+Independently verified (`gh api`, not just a research summary):
+109,806 stars / 10,675 forks on a repo created 4.5 months earlier — a
+~245x gap over the next most-starred same-named project, matching
+documented fake-star reputation-laundering patterns — plus the
+maintainers explicitly declining to fix a live, self-acknowledged PyPI
+typosquat vector on their own install path (issue #280, read in full,
+closed `not_planned`). A cluster of similarly-named satellite repos
+appeared in the same narrow window. No code from this project was
+downloaded, cloned, or executed; no dependency was added; no `.claude/`
+skill/agent/hook was created for it. `npm run quality` re-verified clean
+afterward (81/81 tests) — this task made no application-affecting
+change.
 
 ## Out of Scope (current milestones)
 

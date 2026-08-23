@@ -64,14 +64,14 @@ been created through the separate `register_user` path, a case the
 `bootstrap_installation` against races with itself).
 
 **Accepted residual risk, not fixed.** A narrower race remains between
-`bootstrap_installation` and the *older* `register_user`/
+`bootstrap_installation` and the _older_ `register_user`/
 `add_user_to_school` commands racing each other specifically (not
 `bootstrap_installation` racing itself) — both are gated by their own
 `any_users_exist`/`school_has_any_members` SELECT-based checks, which
 have the same snapshot-staleness property as the original bug. Closing
 this fully would mean migrating those M4 gates onto the same
 write-based singleton-claim pattern. Not done here: it requires two
-*different* UI flows to be driven by two separate processes
+_different_ UI flows to be driven by two separate processes
 simultaneously — a materially narrower window than "the same install
 wizard gets double-clicked" — and the worst case is data-integrity
 oddity (two independent accounts/schools created), not a privilege
