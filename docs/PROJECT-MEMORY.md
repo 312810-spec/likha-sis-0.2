@@ -38,7 +38,10 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 ## Current Foundation
 
-Greenfield repository. No old implementation is authoritative.
+Greenfield repository. No old implementation is authoritative. M0
+Workspace Foundation (React + TypeScript + Vite + Tauri 2, strict
+TypeScript, ESLint, Prettier, Vitest, `npm run quality`) is complete and
+committed to git.
 
 ## Current Milestone
 

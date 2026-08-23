@@ -2,25 +2,40 @@
 
 ## Status
 
-Greenfield LIKHA-SIS 0.2 repository setup.
+M0 Workspace Foundation is complete and verified (2026-08-23). First git
+commit made (`M0: initialize React + TypeScript + Vite + Tauri 2
+workspace`).
 
 ## Current Goal
 
-Complete M0 Workspace Foundation in `ACTIVE-PLAN.md`.
+Begin M1 Windows LocalDatabase Foundation per `ACTIVE-PLAN.md`.
 
 ## Constraints
 
 - Do not import or depend on old application code.
 - Use synthetic data only.
 - Keep dependencies minimal.
-- Do not start feature development during M0.
 - Do not add paid services or billing-enabled infrastructure.
 - Preserve architecture boundaries from `PROJECT-MEMORY.md`.
 
+## Environment Notes
+
+- Rust `stable-x86_64-pc-windows-msvc` and Visual Studio Build Tools 2022
+  (C++ workload) are now installed on this machine via winget.
+- `tauri.conf.json` uses a placeholder identifier `org.likhasis.app` —
+  fine for local development; revisit before any real distribution or
+  code signing.
+- `npm run quality` is the canonical local check (typecheck, lint,
+  format:check, test).
+
 ## Next Action
 
-Inspect the repository state, then initialize the smallest production-quality React + TypeScript + Vite + Tauri 2 workspace needed to complete M0.
+Define a provider-independent `LocalDatabase` repository port and prove
+ordinary SQLite behind it (see M1 objectives in `ACTIVE-PLAN.md`), using
+migrations, transactions, and synthetic data. TDD applies to this work.
 
 ## Completion Gate
 
-M0 is complete only when the repository's declared quality checks actually run successfully and the result is recorded.
+M1 is complete only when persistence-across-restart, rollback behavior,
+and school-scope isolation are each verified by a passing test, and the
+result is recorded here.
