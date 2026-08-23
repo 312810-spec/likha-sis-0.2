@@ -42,6 +42,11 @@ At session start read:
 3. `docs/ACTIVE-PLAN.md`
 4. only ADRs/docs relevant to the current task
 
+Detailed, topic-specific rules live in `.claude/rules/` (architecture,
+security-privacy, testing, project-state) and narrowly-triggered
+procedures live in `.claude/skills/` — read the relevant one when the
+task matches it rather than expecting this file to contain everything.
+
 Inspect code before changing it.
 
 Method:
@@ -56,6 +61,12 @@ Rules:
 - Never add paid infrastructure/APIs without explicit approval.
 - Record durable decisions in ADRs.
 - Keep this file concise.
+- After completing a milestone with an unambiguous, safe next step
+  already recorded in `docs/CURRENT-HANDOFF.md`/`docs/ACTIVE-PLAN.md`,
+  continue to it automatically rather than stopping to ask — unless it's
+  genuinely blocked, requires a product decision only the user can make,
+  or session/usage limits are reached. Never reopen a milestone already
+  marked complete without a new instruction to do so.
 
 ## Completion
 

@@ -1,0 +1,240 @@
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f6f7f9;
+  /* --color-border draws every input/button/divider outline and is often
+     the only visible cue a control exists (fill matches the background).
+     Keep this at >=3:1 against both --color-bg and --color-surface in
+     both light and dark palettes (WCAG 1.4.11 non-text contrast) — do
+     not lighten/darken this without recomputing. */
+  --color-border: #828a98;
+  --color-text: #1a1d23;
+  --color-text-muted: #5b6472;
+  --color-primary: #1d5fa8;
+  --color-primary-text: #ffffff;
+  --color-danger: #a3271f;
+  --color-danger-surface: #fbeceb;
+  --color-success: #1e7a34;
+  --color-success-surface: #e8f5ea;
+  --color-focus: #1d5fa8;
+
+  --spacing-unit: 12px;
+  --font-size-base: 15px;
+  --font-size-large: 1.25rem;
+  --control-height: 40px;
+  --radius: 6px;
+
+  color-scheme: light;
+}
+
+:root[data-teacher-mode="efficient"] {
+  --spacing-unit: 8px;
+  --font-size-base: 14px;
+  --control-height: 34px;
+}
+
+:root[data-teacher-mode="guided"] {
+  --spacing-unit: 18px;
+  --font-size-base: 17px;
+  --control-height: 48px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #14161a;
+    --color-surface: #1c1f26;
+    --color-border: #6b7480;
+    --color-text: #e9ebef;
+    --color-text-muted: #a0a7b2;
+    --color-primary: #7fb1e8;
+    --color-primary-text: #0b1520;
+    --color-danger: #ff9c94;
+    --color-danger-surface: #3a1f1d;
+    --color-success: #8fd19e;
+    --color-success-surface: #173a20;
+    --color-focus: #7fb1e8;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-height: var(--control-height);
+  padding: 0 calc(var(--spacing-unit) * 1.5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.97);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.button-primary {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select {
+  min-height: var(--control-height);
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  /* WCAG 2.2 SC 2.5.8 (Target Size, Minimum, AA) wants >=24x24px
+     regardless of teacher mode density — do not let this shrink below
+     that floor the way --control-height's other scaling does. */
+  width: max(24px, calc(var(--control-height) * 0.5));
+  height: max(24px, calc(var(--control-height) * 0.5));
+}
+
+label {
+  display: block;
+  margin-bottom: calc(var(--spacing-unit) * 0.35);
+  font-weight: 600;
+}
+
+.field {
+  margin-bottom: var(--spacing-unit);
+}
+
+.field-hint {
+  margin-top: calc(var(--spacing-unit) * 0.35);
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+.error-banner {
+  padding: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.confirmation-banner {
+  padding: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius);
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.app-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.app-shell-title {
+  margin: 0;
+  font-size: var(--font-size-large);
+}
+
+.app-shell-main {
+  flex: 1;
+  padding: calc(var(--spacing-unit) * 1.5);
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.mode-switcher {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.mode-switcher button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Non-color cue for the pressed mode, alongside the color change above —
+   WCAG 1.4.1 (Use of Color): sighted low-vision/colorblind users without
+   a screen reader still need a way to tell which mode is active. */
+.mode-switcher button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.learner-list {
+  list-style: none;
+  margin: 0 0 var(--spacing-unit) 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.learner-list li {
+  padding: var(--spacing-unit);
+}
+
+.learner-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.form-row {
+  display: flex;
+  gap: var(--spacing-unit);
+}
+
+.form-row .field {
+  flex: 1;
+}

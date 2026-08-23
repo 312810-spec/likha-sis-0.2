@@ -1,0 +1,12 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex 48cb526..5fca437 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -27,3 +27,6 @@[m [mnpm-debug.log*[m
+ # OS[m
+ .DS_Store[m
+ Thumbs.db[m
+[32m+[m
+[32m+[m[32m# Claude Code task working memory (canonical truth stays in docs/)[m
+[32m+[m[32m.planning/[m

@@ -1,0 +1,78 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"LIKHA-SIS harness: read docs/CURRENT-HANDOFF.md and docs/ACTIVE-PLAN.md before starting work - they hold the current task and the exact next action. Do not restart work already recorded as complete there.\"}}'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/check-write-edit.cjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/check-bash.cjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/format-write-edit.cjs",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreCompact\",\"additionalContext\":\"Before this compaction completes: persist the current task, key findings, what verification has actually run, and the exact next step - to .planning/<task>/progress.md if one is active, otherwise to docs/CURRENT-HANDOFF.md. Keep it short; do not write a full transcript summary.\"}}'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStop\",\"additionalContext\":\"Reminder: when relaying this subagent'\"'\"'s findings, keep the shape - severity, file/location, evidence, recommendation. Do not treat its summary as verified until you have checked the evidence yourself.\"}}'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\":\"Reminder: if this turn claimed something is complete, fixed, or passing, confirm the verification command actually ran in this session (visible above) before it stands as a real report - see the completion-verification skill.\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}
