@@ -11,6 +11,7 @@ use std::path::Path;
 
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
+use app_lib::export::learner_roster::{self, LearnerRosterExport};
 use app_lib::export::sf2::{self, Sf2Export};
 use app_lib::repository::{attendance, learner, school, section, section_membership, user};
 
@@ -50,6 +51,21 @@ fn export_as_current_session(
         attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
 
     Ok(Some(sf2::build_sf2_export(&school, &section, &report)))
+}
+
+/// Standing in for the non-I/O portion of `commands::export::export_learner_roster`.
+fn export_learner_roster_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+) -> app_lib::error::AppResult<Option<LearnerRosterExport>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+    let learners = learner::list_by_school(conn, &school_id)?;
+
+    Ok(Some(learner_roster::build_learner_roster_export(&school, &learners)))
 }
 
 fn setup_enrolled_learner_with_session(
@@ -117,6 +133,42 @@ fn the_export_never_includes_another_schools_learners() {
     let export = export_as_current_session(&conn, &sessions, &section_a, 2026, 8)
         .unwrap()
         .unwrap();
+
+    assert!(!export.csv.contains("Maria"));
+    assert!(!export.csv.contains("Santos"));
+}
+
+#[test]
+fn a_teacher_can_export_their_own_schools_learner_roster() {
+    let conn = open_test_db();
+    let (_school_id, _section_id, sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+
+    let export = export_learner_roster_as_current_session(&conn, &sessions).unwrap().unwrap();
+
+    assert!(export.csv.contains("Juan"));
+    assert!(export.csv.contains("Dela Cruz"));
+}
+
+#[test]
+fn exporting_the_learner_roster_requires_a_session() {
+    let conn = open_test_db();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = export_learner_roster_as_current_session(&conn, &sessions);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn the_learner_roster_export_never_includes_another_schools_learners() {
+    let conn = open_test_db();
+    let school_b = school::create(&conn, "School B").unwrap();
+    learner::create(&conn, &school_b.id, "Maria", "Santos", None, None).unwrap();
+    let (_school_a, _section_a, sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+
+    let export = export_learner_roster_as_current_session(&conn, &sessions).unwrap().unwrap();
 
     assert!(!export.csv.contains("Maria"));
     assert!(!export.csv.contains("Santos"));

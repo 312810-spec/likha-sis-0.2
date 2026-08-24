@@ -15,6 +15,8 @@
   --color-danger-surface: #fbeceb;
   --color-success: #1e7a34;
   --color-success-surface: #e8f5ea;
+  --color-warning: #8a5a00;
+  --color-warning-surface: #fbf1de;
   --color-focus: #1d5fa8;
 
   --spacing-unit: 12px;
@@ -51,6 +53,8 @@
     --color-danger-surface: #3a1f1d;
     --color-success: #8fd19e;
     --color-success-surface: #173a20;
+    --color-warning: #e8c07d;
+    --color-warning-surface: #3a2f14;
     --color-focus: #7fb1e8;
     color-scheme: dark;
   }
@@ -163,6 +167,24 @@ label {
   border-radius: var(--radius);
   background: var(--color-success-surface);
   color: var(--color-success);
+}
+
+.idle-timeout-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
+  padding: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
+.idle-timeout-warning p {
+  margin: 0;
+  flex: 1 1 auto;
 }
 
 .app-shell {

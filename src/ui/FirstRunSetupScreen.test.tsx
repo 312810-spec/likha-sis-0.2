@@ -38,6 +38,7 @@ class FakeSetupRepository implements SetupRepository {
       schoolId: "s1",
       schoolName,
       expiresAtUnixMs: 1_000_000,
+      idleExpiresAtUnixMs: 1_000_000,
     };
   }
 }

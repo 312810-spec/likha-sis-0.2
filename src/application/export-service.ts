@@ -1,5 +1,9 @@
 import { ValidationError } from "../domain/errors";
-import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 
 /**
@@ -41,5 +45,9 @@ export class ExportApplicationService {
     }
 
     return this.exports.exportClassRecordReportCard(trimmedRecordId);
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    return this.exports.exportLearnerRoster();
   }
 }

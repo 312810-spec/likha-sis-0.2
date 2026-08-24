@@ -7,11 +7,12 @@ use tauri::{AppHandle, Manager, State};
 use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
+use crate::export::learner_roster;
 use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
 use crate::export::sf2;
 use crate::export::FieldDisclosure;
-use crate::repository::{attendance, class_record, grading_computation, school, section, section_membership};
+use crate::repository::{attendance, class_record, grading_computation, learner, school, section, section_membership};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -147,6 +148,56 @@ pub fn export_class_record_report_card(
     std::fs::write(&file_path, export.csv)?;
 
     Ok(Some(ReportCardExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerRosterExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
+
+/// Writes a school-wide learner roster export to `<Documents>/LIKHA-SIS/`
+/// -- one row per learner currently enrolled at the caller's school, for a
+/// teacher's own records or manual backup. `school_id` is derived from the
+/// session, never a parameter -- same convention as every other command
+/// here. Deliberately scoped to already-visible data only, not a database/
+/// encryption-key backup -- see
+/// `docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md`.
+#[tauri::command]
+pub fn export_learner_roster(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Option<LearnerRosterExportResult>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+    let learners = learner::list_by_school(&conn, &school_id)?;
+
+    let export = learner_roster::build_learner_roster_export(&school, &learners);
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "LearnerRoster_{}.csv",
+        sanitize_filename_component(&school.name.replace(' ', "_"))
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(LearnerRosterExportResult {
         file_path: file_path.to_string_lossy().to_string(),
         disclosure: export.disclosure,
     }))

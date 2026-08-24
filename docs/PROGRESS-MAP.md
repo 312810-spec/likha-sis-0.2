@@ -113,18 +113,54 @@ Account Lockout After Failed Logins ✓ (Autonomous Continuous
 Idle-Timeout Session Hardening ✓ (deps: none new — closes the other
   half of the shared-computer threat model ADR-0004 deferred, alongside
   account lockout) — see docs/adr/0020-idle-timeout-session-hardening.md
+  ↓
+User-directed sequence (2026-08-25): Audit Log → Global Session Expiry
+  Handling → Learner Search → Teacher Workspace → reassess
+  ↓
+Audit Log (authentication events) ✓ — see
+  docs/adr/0021-authentication-audit-log.md
+  ↓
+Global Session Expiry Handling ✓ (deps: none new — identified by
+  ADR-0020's own "not implemented" note) — see
+  docs/adr/0022-global-session-expiry-handling.md
+  ↓
+Learner Search / filter for large rosters ✓ (deps: none new) — see
+  docs/adr/0023-learner-search.md
+  ↓
+Teacher Workspace / home screen ✓ (deps: none new — final named item
+  in the directed sequence) — see docs/adr/0024-teacher-workspace.md
+  ↓
+REASSESS (evidence-based 20-scenario-style scoring pass — see
+  docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md)
+  ↓
+Learner Roster CSV Export ✓ (deps: none new — winner, score 8.10) —
+  see docs/adr/0025-learner-roster-export.md
+  ↓
+Idle-Timeout Warning Before Logout ✓ (deps: none new — runner-up, score
+  6.30) — see docs/adr/0026-idle-timeout-warning.md
+
+teacher-ux-reviewer/accessibility-reviewer dispatch ✓ (5.75 — both hit
+  the recurring agent-resume failure; self-reviews substituted, found
+  and fixed two real gaps: raw ISO timestamps shown to teachers, and
+  IdleTimeoutWarning's role="alertdialog" overclaiming modal semantics)
+  — see docs/adr/0027-audit-timestamp-readability-fix.md
+
+Grading-period-aware Teacher Workspace enhancement ✓ (5.70) — see
+  docs/adr/0028-workspace-grading-period-status.md
+
+CURRENT ← next pick per the same scoring pass's ranking
+  (docs/CURRENT-HANDOFF.md's Next Action): proptest pilot on
+  auth/lockout invariants (4.85)
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and
   Grade 12 DO 8 carryover (re-investigated 2026-08-24: weights are now
   known, but DO 8's own transmutation table differs from DO 015's and
   needs its own research pass plus an architecture decision, not a
-  purely-additive change like the SHS groups — deps: M16); audit
-  log/activity trail, learner search/filter, teacher dashboard, data
-  export/backup, password reset (all from the same original 20-scenario
-  list, not yet built); a global session-expiry UI redirect (identified
-  by ADR-0020 — this app has never told a teacher plainly their session
-  expired for any reason, it just fails the next action generically)
+  purely-additive change like the SHS groups — deps: M16); password
+  reset (scored 4.20 this pass — blocked on a real product/security
+  decision, not just effort, since this app has no out-of-band recovery
+  channel)
 LearnerListScreen edit affordance for M17's disclosed LRN/Sex gap ✓
   (2026-08-24, same session as M18)
 ```
@@ -236,6 +272,11 @@ LearnerListScreen edit affordance for M17's disclosed LRN/Sex gap ✓
   completely unaffected. First milestone selected entirely
   autonomously (not from the user's directed roadmap) once Roles &
   Permissions was resolved.
+- Audit Log: `audit_log` table records login success/failure/lockout/
+  logout only, scoped to the caller's own school, capped at 200 recent
+  rows. A "Sign-in Activity" tab renders it. A real millisecond-tie
+  ordering bug was caught by an actual test failure and fixed (`id
+DESC` as a UUIDv7 tiebreaker), not assumed correct.
 
 ## Next unlock
 

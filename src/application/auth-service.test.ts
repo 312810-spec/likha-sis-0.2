@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type { AuthRepository } from "../domain/ports/auth-repository";
-import type { CurrentSession } from "../domain/session";
+import type { AuditLogEntry, CurrentSession } from "../domain/session";
 import { AuthApplicationService } from "./auth-service";
 
 class FakeAuthRepository implements AuthRepository {
   loginCalls: Array<{ username: string; password: string; schoolId: string }> = [];
+  auditLogToReturn: AuditLogEntry[] = [];
   private session: CurrentSession | null = null;
 
   async login(username: string, password: string, schoolId: string): Promise<CurrentSession> {
@@ -17,6 +18,7 @@ class FakeAuthRepository implements AuthRepository {
       schoolId,
       schoolName: "Rizal Elementary",
       expiresAtUnixMs: 1_000_000,
+      idleExpiresAtUnixMs: 1_000_000,
     };
     return this.session;
   }
@@ -27,6 +29,18 @@ class FakeAuthRepository implements AuthRepository {
 
   async currentSession(): Promise<CurrentSession | null> {
     return this.session;
+  }
+
+  extendSessionCalls = 0;
+
+  async extendSession(): Promise<CurrentSession> {
+    this.extendSessionCalls += 1;
+    if (!this.session) throw new Error("no active session");
+    return this.session;
+  }
+
+  async listAuditLog(): Promise<AuditLogEntry[]> {
+    return this.auditLogToReturn;
   }
 }
 
@@ -88,5 +102,35 @@ describe("AuthApplicationService", () => {
     await service.logout();
 
     expect(await service.currentSession()).toBeNull();
+  });
+
+  it("extendSession delegates to the repository", async () => {
+    const repo = new FakeAuthRepository();
+    const service = new AuthApplicationService(repo);
+    await service.login("ana.cruz", "hunter2", "s1");
+
+    const result = await service.extendSession();
+
+    expect(result).not.toBeNull();
+    expect(repo.extendSessionCalls).toBe(1);
+  });
+
+  it("listAuditLog delegates to the repository", async () => {
+    const repo = new FakeAuthRepository();
+    repo.auditLogToReturn = [
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        eventType: "login_success",
+        createdAt: "now",
+      },
+    ];
+    const service = new AuthApplicationService(repo);
+
+    const entries = await service.listAuditLog();
+
+    expect(entries).toBe(repo.auditLogToReturn);
   });
 });

@@ -1,18 +1,37 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerApplicationService } from "../application/learner-service";
 import { ValidationError } from "../domain/errors";
+import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface LearnerListScreenProps {
   learnerService: LearnerApplicationService;
+  exportService: ExportApplicationService;
 }
 
-export function LearnerListScreen({ learnerService }: LearnerListScreenProps) {
+/** Case-insensitive substring match against given name, family name, or
+ * LRN — client-side, since the full roster is already loaded (proven to
+ * stay fast at 500 rows by `LearnerApplicationService`'s own test suite)
+ * and this is a "find one learner in a long list" filter, not a new
+ * query surface. */
+function matchesSearch(learner: Learner, query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed === "") return true;
+  return (
+    learner.givenName.toLowerCase().includes(trimmed) ||
+    learner.familyName.toLowerCase().includes(trimmed) ||
+    (learner.lrn?.includes(trimmed) ?? false)
+  );
+}
+
+export function LearnerListScreen({ learnerService, exportService }: LearnerListScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editFirstFieldRef = useRef<HTMLInputElement>(null);
   const [learners, setLearners] = useState<Learner[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [lrn, setLrn] = useState("");
@@ -27,6 +46,9 @@ export function LearnerListScreen({ learnerService }: LearnerListScreenProps) {
   const [editLrn, setEditLrn] = useState("");
   const [editSex, setEditSex] = useState<"" | "M" | "F">("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<LearnerRosterExportResult | null>(null);
+  const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
 
   useEffect(() => {
     // See LoginScreen's equivalent effect — moves focus here whenever
@@ -102,6 +124,25 @@ export function LearnerListScreen({ learnerService }: LearnerListScreenProps) {
     setEditingId(null);
   }
 
+  async function handleExportRoster() {
+    setError(null);
+    setConfirmation(null);
+    setExportResult(null);
+    setExporting(true);
+    try {
+      const result = await exportService.exportLearnerRoster();
+      if (result === null) {
+        setError("Could not export — this school could not be found.");
+      } else {
+        setExportResult(result);
+      }
+    } catch {
+      setError("Could not export the learner list.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handleSaveEdit(event: FormEvent) {
     event.preventDefault();
     if (!editingId) return;
@@ -149,13 +190,51 @@ export function LearnerListScreen({ learnerService }: LearnerListScreenProps) {
         </div>
       )}
 
+      {!loading && learners.length > 0 && (
+        <>
+          <div className="field">
+            <label htmlFor="learner-search">Search learners</label>
+            <input
+              id="learner-search"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Name or LRN"
+              disabled={editingId !== null}
+            />
+          </div>
+
+          <button type="button" disabled={exporting} onClick={handleExportRoster}>
+            {exporting ? "Exporting…" : "Export learner list (CSV)"}
+          </button>
+
+          {exportResult && (
+            <div className="confirmation-banner" role="status">
+              <p>
+                Saved to <code>{exportResult.filePath}</code>.
+              </p>
+              <p>This file is for your own records — it does not include:</p>
+              <ul>
+                {exportResult.disclosure.omittedFields.map((omitted) => (
+                  <li key={omitted.field}>
+                    <strong>{omitted.field}</strong> — {omitted.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+
       {loading ? (
         <p role="status">Loading learners…</p>
       ) : learners.length === 0 ? (
         <p>No learners enrolled yet.</p>
+      ) : filteredLearners.length === 0 ? (
+        <p>No learners match &ldquo;{searchQuery.trim()}&rdquo;.</p>
       ) : (
         <ul className="learner-list">
-          {learners.map((learner) =>
+          {filteredLearners.map((learner) =>
             editingId === learner.id ? (
               <li key={learner.id}>
                 <form

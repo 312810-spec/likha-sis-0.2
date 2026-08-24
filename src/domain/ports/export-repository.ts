@@ -1,4 +1,4 @@
-import type { ReportCardExportResult, Sf2ExportResult } from "../export";
+import type { LearnerRosterExportResult, ReportCardExportResult, Sf2ExportResult } from "../export";
 
 /**
  * Repository port for official-form exports. School scope is never a
@@ -12,4 +12,5 @@ export interface ExportRepository {
     month: number,
   ): Promise<Sf2ExportResult | null>;
   exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null>;
+  exportLearnerRoster(): Promise<LearnerRosterExportResult | null>;
 }

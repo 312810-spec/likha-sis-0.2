@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { UserRepository } from "../../domain/ports/user-repository";
 import type { User } from "../../domain/user";
 

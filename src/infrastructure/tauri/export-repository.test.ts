@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
-import type { ReportCardExportResult, Sf2ExportResult } from "../../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../../domain/export";
 import { TauriExportRepository } from "./export-repository";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -60,6 +64,30 @@ describe("TauriExportRepository", () => {
     mockInvoke.mockResolvedValueOnce(null);
 
     const result = await new TauriExportRepository().exportClassRecordReportCard("unknown");
+
+    expect(result).toBeNull();
+  });
+
+  it("exportLearnerRoster invokes export_learner_roster with no arguments", async () => {
+    const result: LearnerRosterExportResult = {
+      filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\LearnerRoster_Rizal_Elementary.csv",
+      disclosure: {
+        populatedFields: ["Given Name"],
+        omittedFields: [{ field: "Birthdate", reason: "not collected" }],
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const returned = await new TauriExportRepository().exportLearnerRoster();
+
+    expect(mockInvoke).toHaveBeenCalledWith("export_learner_roster");
+    expect(returned).toEqual(result);
+  });
+
+  it("exportLearnerRoster returns null when the school could not be resolved", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    const result = await new TauriExportRepository().exportLearnerRoster();
 
     expect(result).toBeNull();
   });

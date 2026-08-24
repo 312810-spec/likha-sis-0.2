@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Learner } from "../../domain/learner";
 import type { LearnerRepository } from "../../domain/ports/learner-repository";
 

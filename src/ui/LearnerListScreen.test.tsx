@@ -1,8 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
+import { ExportApplicationService } from "../application/export-service";
 import { LearnerApplicationService } from "../application/learner-service";
+import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
@@ -54,14 +57,42 @@ class FakeLearnerRepository implements LearnerRepository {
   }
 }
 
+class FakeExportRepository implements ExportRepository {
+  exportLearnerRosterCalls = 0;
+  resultToReturn: LearnerRosterExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\LearnerRoster_Rizal_Elementary.csv",
+    disclosure: {
+      populatedFields: [],
+      omittedFields: [{ field: "Birthdate", reason: "not collected" }],
+    },
+  };
+
+  async exportSectionMonthlySf2(): Promise<import("../domain/export").Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+  async exportClassRecordReportCard(): Promise<
+    import("../domain/export").ReportCardExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    this.exportLearnerRosterCalls += 1;
+    return this.resultToReturn;
+  }
+}
+
 function renderScreen(learners: Learner[] = []) {
   const repo = new FakeLearnerRepository(learners);
+  const exportRepo = new FakeExportRepository();
   const result = render(
     <ModeProvider>
-      <LearnerListScreen learnerService={new LearnerApplicationService(repo)} />
+      <LearnerListScreen
+        learnerService={new LearnerApplicationService(repo)}
+        exportService={new ExportApplicationService(exportRepo)}
+      />
     </ModeProvider>,
   );
-  return { ...result, repo };
+  return { ...result, repo, exportRepo };
 }
 
 beforeEach(() => {
@@ -89,6 +120,189 @@ describe("LearnerListScreen", () => {
     ]);
 
     expect(await screen.findByText("Ana Santos")).toBeInTheDocument();
+  });
+
+  it("filters the list by name as the search box is typed", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+      {
+        id: "l2",
+        schoolId: "s1",
+        givenName: "Ben",
+        familyName: "Reyes",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.type(screen.getByLabelText("Search learners"), "ben");
+
+    expect(screen.getByText("Ben Reyes")).toBeInTheDocument();
+    expect(screen.queryByText("Ana Santos")).not.toBeInTheDocument();
+  });
+
+  it("does not show the export button when there are no learners yet", async () => {
+    renderScreen([]);
+    await screen.findByText("No learners enrolled yet.");
+
+    expect(
+      screen.queryByRole("button", { name: "Export learner list (CSV)" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("exports the learner roster and shows where it was saved", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export learner list (CSV)" }));
+
+    expect(exportRepo.exportLearnerRosterCalls).toBe(1);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "LearnerRoster_Rizal_Elementary.csv",
+    );
+    expect(screen.getByText("Birthdate")).toBeInTheDocument();
+  });
+
+  it("shows an error banner when the export fails to resolve a school", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.resultToReturn = null;
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export learner list (CSV)" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be found/i);
+  });
+
+  it("matches a search query against LRN as well as name", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: "123456789012",
+        sex: null,
+        createdAt: "now",
+      },
+      {
+        id: "l2",
+        schoolId: "s1",
+        givenName: "Ben",
+        familyName: "Reyes",
+        lrn: "999999999999",
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.type(screen.getByLabelText("Search learners"), "123456789012");
+
+    expect(screen.getByText("Ana Santos")).toBeInTheDocument();
+    expect(screen.queryByText("Ben Reyes")).not.toBeInTheDocument();
+  });
+
+  it("shows a no-matches message distinct from the no-learners-yet message", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.type(screen.getByLabelText("Search learners"), "nonexistent");
+
+    expect(screen.getByText(/no learners match/i)).toBeInTheDocument();
+    expect(screen.queryByText("No learners enrolled yet.")).not.toBeInTheDocument();
+  });
+
+  it("search is case-insensitive", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.type(screen.getByLabelText("Search learners"), "SANTOS");
+
+    expect(screen.getByText("Ana Santos")).toBeInTheDocument();
+  });
+
+  it("does not show a search box when there are no learners yet", async () => {
+    renderScreen([]);
+
+    await screen.findByText("No learners enrolled yet.");
+
+    expect(screen.queryByLabelText("Search learners")).not.toBeInTheDocument();
+  });
+
+  it("disables the search box while an edit is in progress", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+
+    expect(screen.getByLabelText("Search learners")).toBeDisabled();
   });
 
   it("edits an existing learner's LRN and Sex without a fresh enrollment", async () => {

@@ -1,5 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { ReportCardExportResult, Sf2ExportResult } from "../../domain/export";
+import { invoke } from "./invoke";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../../domain/export";
 import type { ExportRepository } from "../../domain/ports/export-repository";
 
 /** Tauri/SQLite implementation of {@link ExportRepository}. */
@@ -20,5 +24,9 @@ export class TauriExportRepository implements ExportRepository {
     return invoke<ReportCardExportResult | null>("export_class_record_report_card", {
       classRecordId,
     });
+  }
+
+  exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    return invoke<LearnerRosterExportResult | null>("export_learner_roster");
   }
 }

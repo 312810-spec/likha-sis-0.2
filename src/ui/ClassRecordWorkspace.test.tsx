@@ -10,7 +10,11 @@ import type {
   AssessmentItem,
   AssessmentItemDetail,
 } from "../domain/assessment";
-import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type {
   ComputedTermGrade,
   LearnerScore,
@@ -185,6 +189,10 @@ class FakeExportRepository implements ExportRepository {
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     this.reportCardCalls.push({ classRecordId });
     return this.reportCardResult;
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("not used in this test");
   }
 }
 

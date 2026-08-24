@@ -24,3 +24,8 @@ export interface ReportCardExportResult {
   filePath: string;
   disclosure: FieldDisclosure;
 }
+
+export interface LearnerRosterExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}

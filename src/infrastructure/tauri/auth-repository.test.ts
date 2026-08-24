@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
-import type { CurrentSession } from "../../domain/session";
+import type { AuditLogEntry, CurrentSession } from "../../domain/session";
 import { TauriAuthRepository } from "./auth-repository";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -16,6 +16,7 @@ const session: CurrentSession = {
   schoolId: "s1",
   schoolName: "Rizal Elementary",
   expiresAtUnixMs: 1_000_000,
+  idleExpiresAtUnixMs: 1_000_000,
 };
 
 describe("TauriAuthRepository", () => {
@@ -47,5 +48,33 @@ describe("TauriAuthRepository", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("current_session");
     expect(result).toBeNull();
+  });
+
+  it("extendSession invokes extend_session with no arguments", async () => {
+    mockInvoke.mockResolvedValueOnce(session);
+
+    const result = await new TauriAuthRepository().extendSession();
+
+    expect(mockInvoke).toHaveBeenCalledWith("extend_session");
+    expect(result).toEqual(session);
+  });
+
+  it("listAuditLog invokes list_audit_log with no arguments (school scope comes from the session)", async () => {
+    const entries: AuditLogEntry[] = [
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        eventType: "login_success",
+        createdAt: "now",
+      },
+    ];
+    mockInvoke.mockResolvedValueOnce(entries);
+
+    const result = await new TauriAuthRepository().listAuditLog();
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_audit_log");
+    expect(result).toEqual(entries);
   });
 });

@@ -2,21 +2,162 @@
 
 ## Status
 
-**In progress (2026-08-25): Audit Log (authentication events).** User
-directed sequence: Audit Log → Global Session Expiry Handling → Learner
-Search → Teacher Workspace → reassess. Migration 15 (`audit_log` table
-— `login_success`/`login_failed`/`account_locked`/`logout` events,
-scoped to authentication only, not a general data-mutation trail — see
-its own migration comment for the full scope rationale) is in and
-tested (5 new migration tests, `cargo nextest run` 288/288 green).
-**Not yet wired to `auth::login`/`auth::logout`, no repository module,
-no command, no UI** — paused at this safe checkpoint (schema-only,
-nothing depends on it yet, verified not to break anything) because the
-user asked to commit and sync at this point. Resume by: writing
-`repository::audit_log` (record + list-for-school), instrumenting
-`auth::login`'s three outcomes (success, failed, locked) and
-`auth::logout`, a `list_audit_log` command (session-scoped like every
-other command), and a simple `AuditLogScreen.tsx`.
+**Teacher Workspace: currently-open grading period per section —
+complete (2026-08-25)**, third pick from the post-sequence scoring pass
+(score 5.70, see `docs/adr/0028-workspace-grading-period-status.md`).
+Closes the deliberate gap ADR-0024 disclosed: each section on the
+Workspace screen now shows its own currently-open grading period (e.g.
+"1st Term is open") or "no grading period currently open," resolved per
+section's own school year — no new Rust command, purely a frontend join
+of `listSections()` and `listPeriodsBySchoolYear()`, both already used
+elsewhere. `npm run quality` 316 TS tests (up from 313) green,
+typecheck/lint/format/architecture clean; `npm run build` succeeds;
+`npx knip` shows the same 5 pre-existing findings, zero new; no Rust
+change. No independent-review dispatch — self-review only, reasoning in
+the ADR (re-dispatching immediately after two failed retrieval attempts
+this session wasn't a good use of the review budget for a small,
+read-only, no-new-authorization-surface change).
+
+**M12c-M26 UI review pass — complete (2026-08-25)**: both
+teacher-ux-reviewer and accessibility-reviewer were dispatched, and both
+attempted and failed to return retrievable findings (the same recurring
+agent-resume issue documented since M7) — one resume attempt each, per
+the established escalation rule, before falling back to self-review.
+The two self-reviews together found and fixed two real gaps: (1) raw
+ISO timestamps shown to teachers in `AuditLogScreen`/
+`TeacherWorkspaceScreen`; (2) `IdleTimeoutWarning`'s `role="alertdialog"`
+overclaiming modal semantics it doesn't have, fixed to `role="alert"`.
+Full detail: `docs/adr/0027-audit-timestamp-readability-fix.md`. Real,
+non-self review debt for this UI sweep remains open — see "Next Action"
+below.
+
+**Idle-Timeout Warning Before Logout — complete (2026-08-25)**, second
+pick from the post-sequence evidence-based scoring pass (score 6.30 —
+see `docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md` and
+`docs/adr/0026-idle-timeout-warning.md`). Closes the disclosed gap
+ADR-0020 left: a teacher's session now warns 2 minutes before ADR-0020's
+30-minute idle timeout, with a one-click "Stay signed in" button, instead
+of silently expiring on the next click. `CurrentSession` gained
+`idleExpiresAtUnixMs` (a pure peek — computed, never itself slides the
+idle window); a new `extend_session` command lets a teacher explicitly
+renew without needing to navigate anywhere; the new
+`IdleTimeoutWarning.tsx` component polls the peek every 30 seconds and
+shares the same "return to sign-in with a clear reason" path
+(`onExpired`) ADR-0022's `onSessionExpired` handler already uses. `cargo
+nextest run` 310/310 (up from 308), `cargo clippy -D warnings` clean;
+`npm run quality` 310 TS tests (up from 302) green, typecheck/lint/
+format/architecture clean; `npm run build` succeeds; `npx knip` shows
+the same 5 pre-existing findings, zero new. Browser-pane visual
+verification attempted and unavailable this session (navigation denied
+even on retry) — disclosed, not glossed over, same standing gap since
+M5/M12c. No independent-review dispatch (standing agent-resume note
+below); self-review performed instead, full checklist in ADR-0026.
+
+**Learner Roster CSV Export — complete (2026-08-25)**, selected by a
+fresh evidence-based 20-scenario-style scoring pass run after the
+user-directed sequence's own "reassess" checkpoint (see
+`docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md` for the full
+scoring table, and `docs/adr/0025-learner-roster-export.md` for the
+implementation). Closes item #15 ("data export/backup") from
+`docs/product/M8-DECISION.md`'s original candidate list — deliberately
+scoped to a CSV export of already-visible learner data (Given Name,
+Family Name, LRN, Sex, Enrolled On) via a new "Export learner list
+(CSV)" button on `LearnerListScreen`, reusing M10/M14's `export::csv`/
+`FieldDisclosure` architecture exactly. **Not** a raw database/
+encryption-key backup — that interpretation was considered and
+deliberately rejected this pass as its own unresolved security design
+question (SQLCipher's key is DPAPI machine/user-bound; see the ADR's
+"Decision" section). `cargo nextest run` 308/308 (up from 305), `cargo
+clippy -D warnings` clean; `npm run quality` 302 TS tests (up from 295)
+green, typecheck/lint/format/architecture clean; `npm run build`
+succeeds; `npx knip` shows the same 5 pre-existing findings, zero new.
+No independent-review dispatch (standing agent-resume note below);
+self-review performed instead, full checklist in ADR-0025.
+
+**Teacher Workspace / home screen — complete (2026-08-25)**, fourth and
+final named item in the user-directed sequence. See
+`docs/adr/0024-teacher-workspace.md`. `TeacherWorkspaceScreen.tsx` is
+now the default landing tab after sign-in — a greeting, learner/section
+counts, today's attendance-marking status per section ("not yet marked
+today" / "N of M marked" / "all M marked," the single most useful
+at-a-glance fact for a teacher's morning), and recent sign-in activity
+(reusing the audit log from earlier this session). Built entirely from
+data other screens already fetch — no new Rust command, no new
+migration. Deliberately did not attempt showing "currently open grading
+period(s)": correctly resolving that per section would need a
+non-trivial school-year-aware join this session had no evidence was
+worth building yet — recorded as a real, deliberate gap. `npm run
+quality` 295 TS tests (up from 286) green, typecheck/lint/format/
+architecture clean; `npm run build` succeeds; `npx knip` shows the same
+5 pre-existing findings, zero new (confirms the wiring is real); no
+Rust change. No independent-review dispatch (standing agent-resume
+note below); self-review performed instead, full checklist in
+ADR-0024.
+
+**This closes the user-directed sequence (Audit Log → Global Session
+Expiry Handling → Learner Search → Teacher Workspace → reassess).**
+Per the user's own instruction, the next step is to reassess rather
+than autonomously picking a fifth item — see "Next Action" below.
+
+**Learner Search / filter for large rosters — complete (2026-08-25)**,
+third item in the user-directed sequence. See
+`docs/adr/0023-learner-search.md`. A client-side search box above
+`LearnerListScreen`'s roster filters by given name, family name, or LRN
+— case-insensitive substring match, no new backend query (M17's own
+test already proves the data layer stays correct at 500 rows, so this
+is purely a UI filtering problem). Three deliberate small choices: the
+search box only appears once a learner exists, "no matches" is a
+distinct message from "no learners enrolled yet," and the search box
+disables while an edit is in progress (so it can never filter the
+row being edited out of view, leaving the edit orphaned). `npm run
+quality` 286 TS tests (up from 280) green, typecheck/lint/format/
+architecture clean; `npm run build` succeeds; no Rust change. No
+independent-review dispatch (standing agent-resume note below);
+self-review performed instead, full checklist in ADR-0023.
+
+**Global Session Expiry Handling — complete (2026-08-25)**, second item
+in the user-directed sequence (Audit Log → Global Session Expiry
+Handling → Learner Search → Teacher Workspace → reassess). See
+`docs/adr/0022-global-session-expiry-handling.md`. Closed the exact gap
+ADR-0020 flagged: every screen used to fail its own in-flight request
+with a generic error when a session expired for any reason (idle,
+absolute TTL, revocation) — a teacher had no idea why. A centralized
+`invoke` wrapper (`src/infrastructure/tauri/invoke.ts`, all 13
+repository files now import through it) notices any `Unauthorized`
+rejection (except `login`'s own, a different, already-handled case) and
+returns the app to `LoginScreen` with a clear "Your session has expired.
+Please sign in again." banner. A real bug was caught mid-implementation
+by the test suite itself: the wrapper's first draft always forwarded
+`args` even as `undefined`, an observably different call shape than
+omitting it, breaking 12 existing tests — fixed and recorded as a
+durable lesson (`docs/learning/ERROR-PATTERNS.md`). `npm run quality`
+280 TS tests (up from 271) green, typecheck/lint/format/architecture
+clean; `npm run build` succeeds; `npx knip` shows no new dead code
+(confirms the wiring is real); `cargo nextest run` 299/299 unaffected
+(TS-only change). No independent-review dispatch (standing agent-resume
+note below); self-review performed instead, full checklist in
+ADR-0022.
+
+**Audit Log (authentication events) — complete (2026-08-25)**, first
+item in the user-directed sequence: Audit Log → Global Session Expiry
+Handling → Learner Search → Teacher Workspace → reassess. See
+`docs/adr/0021-authentication-audit-log.md`. Scoped tightly to
+authentication events only (`login_success`/`login_failed`/
+`account_locked`/`logout`) — not a general data-mutation trail, a
+separate future milestone. Migration 15 (`audit_log` table),
+`repository::audit_log` (`record`/`list_for_school`),
+`auth::login`/`auth::logout` instrumented to record every real outcome,
+`commands::auth::list_audit_log` (session-scoped, 200-row cap, same
+convention as every other command), and a new "Sign-in Activity" tab
+(`AuditLogScreen.tsx`). A real ordering bug was caught by a genuine test
+failure during development (millisecond-precision `created_at` ties
+among rows written in the same test), fixed with `id DESC` as a
+UUIDv7-based tiebreaker — not assumed correct, verified. `cargo nextest
+run` 299/299 green (up from 288), `cargo clippy -D warnings` clean;
+`npm run quality` 271 TS tests (up from 262) green; `npm run build`
+succeeds. No independent-review dispatch (same standing agent-resume
+note below); self-review performed instead, full checklist in
+ADR-0021.
 
 **Compounding Engineering tooling pass complete (2026-08-25)** — see
 `docs/product/COMPOUNDING-ENGINEERING-DECISION.md` for the full
@@ -745,45 +886,105 @@ quality:ui` (currently an honest placeholder — no Playwright UI-smoke
 
 ## Next Action
 
-**Roles & Permissions — resolved (2026-08-24): deferred, not built.**
-The directed roadmap (M15→M18→Roles&Permissions) is complete. Work
-since then is autonomously selected from `docs/product/M8-DECISION.md`'s
-existing 20-scenario candidate list plus current evidence, per
-`.claude/rules/autonomous-development.md` — continue this way rather
-than waiting for a fresh user directive.
+**Post-sequence evidence-based scoring pass complete (2026-08-25)** —
+see `docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md` for the full
+table. Top two picks are both implemented: Learner Roster CSV Export
+(8.10, ADR-0025) and Idle-Timeout Warning Before Logout (6.30,
+ADR-0026). Per the user's own standing preference ("just select the
+recommended automatically, will adjust after all milestone has
+achieved"), the next-highest-scoring runner-up remains the default next
+pick:
 
-**Immediately next**: dispatch a fresh `teacher-ux-reviewer` and
-`accessibility-reviewer` pass on the M12c-M18 UI sweep once
-agent-resume behavior is confirmed working — this is real, undischarged
-review debt (see "Status" above), distinct from the two specific fixes
-a self-review already caught while working on something else.
+1. **teacher-ux-reviewer/accessibility-reviewer dispatched (2026-08-25)**
+   on the M12c-M26 UI sweep. **`teacher-ux-reviewer` outcome**: hit the
+   same recurring agent-resume/retrieval failure this project has
+   documented since M7 — real work done (26 tool uses, ~94k tokens
+   across the initial run and one resume attempt), but no findings text
+   ever retrievable, even after the one resume this project's
+   escalation rule allows. Per that rule, a careful self-review was
+   performed instead — see `docs/adr/0027-audit-timestamp-readability-fix.md`.
+   It found and fixed one real, concrete gap: `AuditLogScreen.tsx` and
+   `TeacherWorkspaceScreen.tsx` were both showing a teacher a raw ISO
+   timestamp (`2026-08-25T08:00:00.000Z`) instead of a readable date,
+   the same class of bug M12c already fixed once for
+   `ClassRecordWorkspace.tsx`'s "Saved HH:MM" note but never carried
+   forward to the screens added after it. Fixed in both places; 4 new
+   tests. **`accessibility-reviewer` outcome**: hit the identical
+   agent-resume/retrieval failure (real work, 31 tool uses, ~124k
+   tokens across the initial run and one resume, no retrievable
+   findings text either time). Per the same escalation rule, another
+   self-review was performed, covering contrast, focus management,
+   keyboard operability, ARIA correctness, and touch-target sizing. It
+   found and fixed one real issue: `IdleTimeoutWarning.tsx` used
+   `role="alertdialog"`, which per ARIA authoring practices implies
+   modal focus-trapping behavior the component never actually provides
+   (it's a dismissible, non-blocking banner, same as every other banner
+   in this app) — changed to `role="alert"`, matching the
+   `error-banner`/`confirmation-banner` convention already established.
+   Hand-computed contrast for the new `--color-warning` tokens passed
+   comfortably in both light (≈5.3:1) and dark (≈7.7:1) mode — no fix
+   needed there. `npm run quality` 313 TS tests (up from 302 before
+   this dispatch) green throughout. **Both `teacher-ux-reviewer` and
+   `accessibility-reviewer` remain owed a real (non-self) pass** on
+   this UI sweep once agent-resume behavior is confirmed reliably
+   working in a future session — recorded as standing debt, not
+   discharged by the self-reviews above.
+2. **Grading-period-aware Teacher Workspace enhancement — complete
+   (5.70)**. See `docs/adr/0028-workspace-grading-period-status.md`.
+3. **Next pick**: Proptest pilot on auth/lockout invariants (4.85) —
+   the Compounding Engineering pass's own already-identified Phase B
+   pilot target.
+
+Still-standing context, unchanged since the last reassessment:
+
+- The shared-computer/session-security thread (Account Lockout →
+  Idle-Timeout → Audit Log → Global Session Expiry) remains coherent
+  and closed — no known open gap.
+- Password reset/account recovery (scored 4.20 — low specifically
+  because this local-only, no-email/SMS app has no safe out-of-band
+  recovery channel without either an admin-reset flow, which needs the
+  still-deferred Roles & Permissions decision, or a weak
+  security-question mechanism this project's posture shouldn't adopt)
+  needs a genuine product/security decision before it's actionable.
+- DepEd weight-group work remains genuinely blocked, not deprioritized:
+  Key Stage 1 descriptive grading and Grade 12's DO 8 carryover both
+  still lack a usable primary source — see "Remaining DepEd weight-group
+  work" below before attempting either again.
+- The Compounding Engineering tooling pass
+  (`docs/product/COMPOUNDING-ENGINEERING-DECISION.md`) deliberately
+  deferred Phases B-H (proptest — scored 4.85 this pass, cargo-mutants,
+  UI regression testing, agent-regression suite, Trail of Bits second
+  opinion — scored 3.25 this pass, Beads/Serena piloting) with
+  documented resumption criteria.
 
 Other done/available items, none blocking:
 
 - **Done (2026-08-24)**: Account Lockout After Failed Logins — see
-  `docs/adr/0019-account-lockout.md` and "Status" above.
+  `docs/adr/0019-account-lockout.md`.
 - **Done (2026-08-24)**: Idle-Timeout Session Hardening — see
-  `docs/adr/0020-idle-timeout-session-hardening.md` and "Status" above.
-  Closes both shared-computer threat-model gaps ADR-0004 originally
-  deferred (lockout for the login step, idle timeout for an
-  already-authenticated abandoned session).
+  `docs/adr/0020-idle-timeout-session-hardening.md`. Closes both
+  shared-computer threat-model gaps ADR-0004 originally deferred
+  (lockout for the login step, idle timeout for an already-authenticated
+  abandoned session).
+- **Done (2026-08-25)**: Audit Log — see
+  `docs/adr/0021-authentication-audit-log.md`.
+- **Done (2026-08-25)**: Global Session Expiry Handling — see
+  `docs/adr/0022-global-session-expiry-handling.md`.
+- **Done (2026-08-25)**: Learner Search / filter for large rosters —
+  see `docs/adr/0023-learner-search.md`.
 - **Done (2026-08-24)**: a `LearnerListScreen` edit affordance closing
   M17's disclosed gap, plus two self-review-caught fixes (focus
   management entering edit mode; a second "Edit" click could silently
-  discard a first learner's unsaved changes) — see "Status" above.
+  discard a first learner's unsaved changes).
+- Dispatch a fresh `teacher-ux-reviewer` and `accessibility-reviewer`
+  pass on the M12c-M21 UI sweep once agent-resume behavior is confirmed
+  working — real, undischarged review debt, not blocking.
 - Other candidates from `docs/product/M8-DECISION.md`'s original
-  20-scenario list, not yet built: audit log/activity trail (#11),
-  learner search/filter for large rosters (#5), a teacher dashboard/
-  home screen (#6), data export/backup (#15), password reset/account
-  recovery (#17). Also newly identified (ADR-0020's own "not
-  implemented" note): a global session-expiry UI redirect — this app
-  has never told a teacher plainly "your session expired, please sign
-  in again" for any reason (idle, absolute TTL, or revocation); it just
-  fails the next action with a generic error. Arguably higher teacher-
-  usability value than the backend hardening itself. Evaluate each
-  against current evidence before picking, same as account lockout
-  was — don't just take the next-highest score without checking it's
-  still the right call.
+  20-scenario list, not yet built and not in the current directed
+  sequence: a teacher dashboard/home screen (#6, though this overlaps
+  with the directed "Teacher Workspace" item — reconcile when reached
+  rather than building twice), data export/backup (#15), password
+  reset/account recovery (#17).
 - Remaining DepEd weight-group work, **not** purely additive after
   further research (2026-08-24): Key Stage 1 descriptive grading (a
   structurally different computation — rubric evidence, not weighted

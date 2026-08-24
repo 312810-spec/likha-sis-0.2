@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Section, SectionMembership, SectionRosterMember } from "../../domain/section";
 import type { SectionRepository } from "../../domain/ports/section-repository";
 

@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { AuthRepository } from "../../domain/ports/auth-repository";
-import type { CurrentSession } from "../../domain/session";
+import type { AuditLogEntry, CurrentSession } from "../../domain/session";
 
 /** Tauri implementation of {@link AuthRepository}. */
 export class TauriAuthRepository implements AuthRepository {
@@ -14,5 +14,13 @@ export class TauriAuthRepository implements AuthRepository {
 
   currentSession(): Promise<CurrentSession | null> {
     return invoke<CurrentSession | null>("current_session");
+  }
+
+  extendSession(): Promise<CurrentSession> {
+    return invoke<CurrentSession>("extend_session");
+  }
+
+  listAuditLog(): Promise<AuditLogEntry[]> {
+    return invoke<AuditLogEntry[]>("list_audit_log");
   }
 }

@@ -8,6 +8,7 @@ use std::path::Path;
 
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
+use app_lib::repository::audit_log::{self, AuditLogEntry};
 use app_lib::repository::{learner, school, user};
 
 fn open_test_db() -> rusqlite::Connection {
@@ -203,4 +204,82 @@ fn an_unauthenticated_caller_cannot_self_grant_membership_in_an_already_populate
         &school_a.id,
     );
     assert!(matches!(grant, Err(AppError::Unauthorized)));
+}
+
+/// Standing in for `commands::auth::extend_session`.
+fn extend_session_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+) -> app_lib::error::AppResult<()> {
+    sessions.require_active_school_scope(conn)?;
+    Ok(())
+}
+
+#[test]
+fn extending_a_session_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = extend_session_as_current_session(&conn, &sessions);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn extending_a_session_slides_the_idle_window_forward() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let teacher = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &school_a.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "teacher.a", "password", &school_a.id).unwrap();
+    let before = sessions.current().unwrap().last_activity_at;
+
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    extend_session_as_current_session(&conn, &sessions).unwrap();
+
+    let after = sessions.current().unwrap().last_activity_at;
+    assert!(after > before, "extend_session must slide last_activity_at forward");
+}
+
+/// Standing in for `commands::auth::list_audit_log`.
+fn list_audit_log_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+) -> app_lib::error::AppResult<Vec<AuditLogEntry>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    audit_log::list_for_school(conn, &school_id, 200)
+}
+
+#[test]
+fn viewing_the_audit_log_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = list_audit_log_as_current_session(&conn, &sessions);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_teachers_audit_log_never_includes_another_schools_events() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let teacher_a = user::create_user(&conn, "teacher.a", "password-a", "Teacher A").unwrap();
+    user::add_school_membership(&conn, &teacher_a.id, &school_a.id).unwrap();
+    let sessions_a = SessionManager::new();
+    auth::login(&conn, &sessions_a, "teacher.a", "password-a", &school_a.id).unwrap();
+    // A login attempt against school B (whether it would succeed or not
+    // is irrelevant here) generates its own audit event scoped to B.
+    let other_sessions = SessionManager::new();
+    let _ = auth::login(&conn, &other_sessions, "nobody", "wrong", &school_b.id);
+
+    let entries = list_audit_log_as_current_session(&conn, &sessions_a).unwrap();
+
+    assert!(
+        entries.iter().all(|e| e.school_id == school_a.id),
+        "must never include another school's audit events"
+    );
+    assert!(entries.iter().any(|e| e.username == "teacher.a"));
 }

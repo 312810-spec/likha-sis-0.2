@@ -387,6 +387,135 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## Teacher Workspace: Currently-Open Grading Period Per Section (added 2026-08-25)
+
+Third pick from the scoring pass (5.70). Closes ADR-0024's own
+deliberate gap: each section on the Workspace screen now shows its
+currently-open grading period (or "no grading period currently open"),
+resolved per section's own school year — a real join across
+`listSections()` and `listPeriodsBySchoolYear()`, both pre-existing
+calls, dedicated by distinct school year so sections sharing one don't
+trigger redundant fetches. No new Rust command. See
+`docs/adr/0028-workspace-grading-period-status.md`.
+
+## M12c-M26 Independent Review Dispatch and Self-Review Finding (added 2026-08-25)
+
+Next pick after the scoring pass's top two (5.75, teacher-ux-reviewer/
+accessibility-reviewer dispatch on real, previously-owed review debt).
+`teacher-ux-reviewer` hit the same recurring agent-resume/retrieval
+failure documented since M7 — real work done, no findings text
+retrievable even after the one allowed resume attempt. A self-review
+substituted and found one real, concrete gap: `AuditLogScreen.tsx` and
+`TeacherWorkspaceScreen.tsx` both showed a teacher a raw ISO timestamp
+(e.g. `2026-08-25T08:00:00.000Z`) instead of a readable date — the same
+class of bug M12c already fixed once for `ClassRecordWorkspace.tsx`'s
+"Saved HH:MM" note, but never carried forward to screens added after it.
+Fixed in both places. `accessibility-reviewer` (dispatched in parallel)
+hit the identical failure; a second self-review found and fixed
+`IdleTimeoutWarning.tsx`'s `role="alertdialog"` overclaiming modal
+focus-trapping behavior it doesn't actually have — changed to
+`role="alert"`, matching every other banner in this app. Hand-computed
+contrast for the new `--color-warning` tokens passed comfortably in both
+themes. Both reviewers remain owed a real (non-self) pass once
+agent-resume behavior is confirmed reliably working. See
+`docs/adr/0027-audit-timestamp-readability-fix.md`.
+
+## Idle-Timeout Warning Before Logout (added 2026-08-25)
+
+Second pick from the post-sequence scoring pass (score 6.30, see below).
+Closes ADR-0020's disclosed gap: a session used to silently idle-time-out
+with no warning. `CurrentSession.idleExpiresAtUnixMs` (a pure peek — the
+existing `current_session` command already computes it without sliding
+the window, matching ADR-0020's own peek-vs-activity contract) plus a
+new `extend_session` command a teacher can trigger directly. A new
+`IdleTimeoutWarning.tsx` component polls the peek every 30 seconds and
+shows a "Stay signed in" banner inside the last 2 minutes of the
+30-minute window; if a poll ever finds the session already gone, it
+reuses the exact same `onExpired`/`onSessionExpired` "return to sign-in"
+path ADR-0022 already established, rather than a second, divergent one.
+See `docs/adr/0026-idle-timeout-warning.md`.
+
+## Post-Sequence Reassessment and Learner Roster CSV Export (added 2026-08-25)
+
+After the user-directed sequence's own "reassess" checkpoint, the user
+confirmed: "run a fresh evidence-based scoring pass now rather than
+choosing a fifth item ad hoc." A full 20-scenario-style weighted scoring
+pass was run over the real remaining candidate set — full table and
+rationale in `docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md`.
+Winner (score 8.10, next-best 6.30): a CSV export of the learner roster,
+implemented as `export_learner_roster` — see
+`docs/adr/0025-learner-roster-export.md`. Deliberately scoped narrowly:
+"data export/backup" (#15 from the original 20-scenario list) is
+ambiguous between a raw encrypted-database backup and a CSV export of
+already-visible data; the former was explicitly rejected for this pass
+since the DPAPI-protected SQLCipher key is machine/user-bound and
+exporting it safely is its own unresolved security design question, not
+something to bundle into a routine feature pass. Per the user's own
+standing preference ("just select the recommended automatically, will
+adjust after all milestone has achieved"), the scoring pass's own
+runner-up ranking is now the default next-pick order recorded in
+`docs/CURRENT-HANDOFF.md`, rather than reopening the question each time.
+
+## Teacher Workspace (added 2026-08-25)
+
+Fourth and final named item in the user-directed sequence (Audit Log →
+Global Session Expiry Handling → Learner Search → Teacher Workspace →
+reassess). `TeacherWorkspaceScreen.tsx` is now the default landing tab
+after sign-in: learner/section counts, today's attendance-marking
+status per section, and recent sign-in activity — built entirely from
+data other screens already fetch, no new Rust command. Deliberately
+did not show "currently open grading period(s)" — would need a
+non-trivial school-year-aware join with no evidenced need yet. See
+`docs/adr/0024-teacher-workspace.md`. **This closes the user-directed
+sequence** — the next step is the "reassess" point the user named
+explicitly, recorded in `docs/CURRENT-HANDOFF.md`'s Next Action
+section, not an automatic fifth autonomous pick.
+
+## Learner Search (added 2026-08-25)
+
+Third item in the user-directed sequence. `LearnerListScreen` gained a
+client-side search box (given name/family name/LRN, case-insensitive
+substring) above the roster — no new backend query, since the full
+roster was already fetched in one call and M17's own test already
+proves the data layer stays correct at 500 rows. The search box
+disables while an edit is in progress, so it can never filter the
+currently-edited row out of view. See
+`docs/adr/0023-learner-search.md`.
+
+## Global Session Expiry Handling (added 2026-08-25)
+
+Second item in the user-directed sequence. `src/infrastructure/tauri/invoke.ts`
+centrally wraps Tauri's own `invoke` (all 13 repository files now
+import through it) and notifies `App.tsx` on any `Unauthorized`
+rejection except `login`'s own (a different, already-handled case) —
+the app returns to `LoginScreen` with a clear "your session expired"
+notice instead of each screen failing generically. Re-exported from
+`composition.ts` for a single consistent entry point. A real bug (the
+wrapper's first draft always forwarded `args` even as `undefined`, an
+observably different call shape than omitting it) was caught by the
+existing test suite itself and fixed — see
+`docs/learning/ERROR-PATTERNS.md`. See
+`docs/adr/0022-global-session-expiry-handling.md`.
+
+## Authentication Audit Log (added 2026-08-25)
+
+User-directed sequence: Audit Log → Global Session Expiry Handling →
+Learner Search → Teacher Workspace → reassess. Audit Log is complete:
+`audit_log` table (migration 15) records `login_success`/
+`login_failed`/`account_locked`/`logout` events only — deliberately not
+a general data-mutation trail, which would be a separate, much larger
+milestone. `auth::login`/`auth::logout` record every real outcome;
+`commands::auth::list_audit_log` follows the same session-derived-scope
+convention as every other command (no new privilege tier — this app
+still has one role). New "Sign-in Activity" tab. See
+`docs/adr/0021-authentication-audit-log.md`. A commit-and-push happened
+mid-session at the user's explicit request (`306f880` on `main`,
+covering M7-M20 plus the harness/tooling work) — the standing
+"do not commit" note in this file's own constraints section reflects
+the _default_, not an absolute; it was correctly overridden once by
+explicit instruction and the repo returned to its normal
+uncommitted-until-asked posture afterward.
+
 ## Compounding Engineering Tooling (added 2026-08-25)
 
 Evaluated a large external-tooling shortlist against LIKHA's priorities;

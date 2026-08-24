@@ -25,6 +25,8 @@ import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
+export { onSessionExpired } from "./infrastructure/tauri/invoke";
+
 /**
  * The one place TS code is allowed to know about the concrete Tauri
  * adapters. UI code imports these pre-wired services, never the

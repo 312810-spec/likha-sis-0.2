@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import { ExportApplicationService } from "./export-service";
 
@@ -29,6 +33,17 @@ class FakeExportRepository implements ExportRepository {
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     this.reportCardCalls.push({ classRecordId });
     return this.reportCardResultToReturn;
+  }
+
+  learnerRosterCalls = 0;
+  learnerRosterResultToReturn: LearnerRosterExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\LearnerRoster_Rizal_Elementary.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    this.learnerRosterCalls += 1;
+    return this.learnerRosterResultToReturn;
   }
 }
 
@@ -110,6 +125,26 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportClassRecordReportCard("cr-1");
+
+    expect(result).toBeNull();
+  });
+
+  it("exportLearnerRoster delegates to the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportLearnerRoster();
+
+    expect(result).toEqual(repo.learnerRosterResultToReturn);
+    expect(repo.learnerRosterCalls).toBe(1);
+  });
+
+  it("exportLearnerRoster returns null when the school could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.learnerRosterResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportLearnerRoster();
 
     expect(result).toBeNull();
   });

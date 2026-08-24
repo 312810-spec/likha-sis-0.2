@@ -1,6 +1,6 @@
 import { ValidationError } from "../domain/errors";
 import type { AuthRepository } from "../domain/ports/auth-repository";
-import type { CurrentSession } from "../domain/session";
+import type { AuditLogEntry, CurrentSession } from "../domain/session";
 
 /**
  * Orchestrates login/logout/session-lookup. This layer's checks are a
@@ -32,5 +32,13 @@ export class AuthApplicationService {
 
   currentSession(): Promise<CurrentSession | null> {
     return this.auth.currentSession();
+  }
+
+  extendSession(): Promise<CurrentSession> {
+    return this.auth.extendSession();
+  }
+
+  listAuditLog(): Promise<AuditLogEntry[]> {
+    return this.auth.listAuditLog();
   }
 }

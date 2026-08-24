@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { CurrentSession } from "./domain/session";
@@ -17,6 +18,11 @@ const session: CurrentSession = {
   schoolId: "s1",
   schoolName: "Rizal Elementary",
   expiresAtUnixMs: 1_000_000,
+  // Far in the future, not the same magic-past-timestamp convention as
+  // expiresAtUnixMs above -- IdleTimeoutWarning polls this on mount and
+  // would otherwise immediately treat every signed-in test as idle-
+  // expired (see ADR-0026).
+  idleExpiresAtUnixMs: Date.now() + 30 * 60_000,
 };
 
 beforeEach(() => {
@@ -51,18 +57,59 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "LIKHA-SIS" })).toBeInTheDocument();
   });
 
-  it("shows the learner screen when there is an active session", async () => {
+  it("shows the workspace overview by default when there is an active session", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
       if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
       return Promise.reject(new Error(`unexpected command: ${String(command)}`));
     });
 
     render(<App />);
 
-    expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
-    expect(screen.getByText(/Ana Cruz/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toBeInTheDocument();
     expect(screen.getByText(/Rizal Elementary/)).toBeInTheDocument();
+  });
+
+  it("shows the learner screen after switching to the Learners tab", async () => {
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByRole("region", { name: "Workspace" });
+    await user.click(screen.getByRole("button", { name: "Learners" }));
+
+    expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
+  });
+
+  it("returns to sign-in with a clear notice when a command fails because the session expired", async () => {
+    // The client believed it had an active session (current_session
+    // returned one), but the backend has since idle-timed it out, been
+    // revoked, or hit its absolute TTL — the first real protected
+    // command discovers this. See ADR-0022 / src/infrastructure/tauri/invoke.ts.
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_learners_by_school") return Promise.reject("unauthorized");
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      if (command === "list_schools") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole("form", { name: "Sign in" })).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(/session has expired/i);
   });
 });

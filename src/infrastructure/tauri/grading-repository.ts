@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../../domain/grading";
 import type { GradingRepository } from "../../domain/ports/grading-repository";
 

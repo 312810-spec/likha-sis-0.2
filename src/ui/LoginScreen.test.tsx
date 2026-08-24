@@ -6,7 +6,7 @@ import { SchoolApplicationService } from "../application/school-service";
 import type { AuthRepository } from "../domain/ports/auth-repository";
 import type { SchoolRepository } from "../domain/ports/school-repository";
 import type { School } from "../domain/school";
-import type { CurrentSession } from "../domain/session";
+import type { AuditLogEntry, CurrentSession } from "../domain/session";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { LoginScreen } from "./LoginScreen";
@@ -45,6 +45,7 @@ class FakeAuthRepository implements AuthRepository {
       schoolId,
       schoolName: "Rizal Elementary",
       expiresAtUnixMs: 1_000_000,
+      idleExpiresAtUnixMs: 1_000_000,
     };
   }
 
@@ -52,6 +53,14 @@ class FakeAuthRepository implements AuthRepository {
 
   async currentSession(): Promise<CurrentSession | null> {
     return null;
+  }
+
+  async extendSession(): Promise<CurrentSession> {
+    throw new Error("not used in this test");
+  }
+
+  async listAuditLog(): Promise<AuditLogEntry[]> {
+    return [];
   }
 }
 
@@ -64,6 +73,7 @@ function renderLoginScreen(props: {
   authRepo?: FakeAuthRepository;
   schoolRepo?: FakeSchoolRepository;
   onLoggedIn?: (session: CurrentSession) => void;
+  notice?: string | null;
 }) {
   const authRepo = props.authRepo ?? new FakeAuthRepository();
   const schoolRepo = props.schoolRepo ?? new FakeSchoolRepository(seedSchools());
@@ -73,6 +83,7 @@ function renderLoginScreen(props: {
         authService={new AuthApplicationService(authRepo)}
         schoolService={new SchoolApplicationService(schoolRepo)}
         onLoggedIn={props.onLoggedIn ?? (() => {})}
+        notice={props.notice}
       />
     </ModeProvider>,
   );
@@ -144,6 +155,19 @@ describe("LoginScreen", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/temporarily locked/i);
     expect(onLoggedIn).not.toHaveBeenCalled();
+  });
+
+  it("shows a notice above the form when one is provided", async () => {
+    renderLoginScreen({ notice: "Your session has expired. Please sign in again." });
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/session has expired/i);
+  });
+
+  it("shows no notice banner when none is provided", async () => {
+    renderLoginScreen({});
+    await waitFor(() => expect(screen.getByLabelText("School")).toHaveValue("s1"));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("shows the specific validation message rather than the generic one", async () => {

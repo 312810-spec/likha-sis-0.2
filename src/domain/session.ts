@@ -11,4 +11,29 @@ export interface CurrentSession {
   schoolId: string;
   schoolName: string;
   expiresAtUnixMs: number;
+  /**
+   * When this session will be idle-timed-out if no further protected
+   * command is made before then — see ADR-0020's 30-minute idle window.
+   * A fresh peek (`currentSession()`), not something that advances just
+   * by reading it — only a real protected call (e.g. `extendSession()`)
+   * pushes this forward. Used to show an advance warning before the
+   * session silently expires — see ADR-0026.
+   */
+  idleExpiresAtUnixMs: number;
+}
+
+/**
+ * Authentication events only (login/logout/lockout) — not a general
+ * data-mutation audit trail. See `docs/adr/0021-authentication-audit-log.md`
+ * for why this is scoped narrower than "audit everything."
+ */
+export type AuditEventType = "login_success" | "login_failed" | "account_locked" | "logout";
+
+export interface AuditLogEntry {
+  id: string;
+  schoolId: string;
+  userId: string | null;
+  username: string;
+  eventType: AuditEventType;
+  createdAt: string;
 }

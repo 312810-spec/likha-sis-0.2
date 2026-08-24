@@ -89,7 +89,7 @@ fn find_with_credentials_by_username(
 /// Authentication Cheat Sheet's general guidance for a lockout policy),
 /// not a DepEd or school-specific policy choice -- see
 /// `docs/adr/0019-account-lockout.md`.
-const MAX_FAILED_LOGIN_ATTEMPTS: i64 = 5;
+pub(crate) const MAX_FAILED_LOGIN_ATTEMPTS: i64 = 5;
 const LOCKOUT_DURATION_SECS: i64 = 15 * 60;
 
 /// Verifies a username/password pair. Returns the user's public data on

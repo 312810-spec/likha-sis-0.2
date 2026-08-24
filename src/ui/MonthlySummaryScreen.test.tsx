@@ -10,7 +10,11 @@ import type {
   AttendanceStatus,
   MonthlyAttendanceReport,
 } from "../domain/attendance";
-import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
@@ -95,6 +99,10 @@ class FakeExportRepository implements ExportRepository {
   }
 
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
   }
 }

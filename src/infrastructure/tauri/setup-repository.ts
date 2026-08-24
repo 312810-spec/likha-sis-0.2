@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { InstallationStatus, SetupRepository } from "../../domain/ports/setup-repository";
 import type { CurrentSession } from "../../domain/session";
 

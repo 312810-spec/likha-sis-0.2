@@ -1,6 +1,7 @@
 pub mod assessment_category;
 pub mod assessment_item;
 pub mod attendance;
+pub mod audit_log;
 pub mod class_record;
 pub mod grading;
 pub mod grading_computation;

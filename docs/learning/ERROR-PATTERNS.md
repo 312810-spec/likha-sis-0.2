@@ -136,6 +136,30 @@ only injecting the service's `now`. **Reference**:
 `docs/product/COMPOUNDING-ENGINEERING-DECISION.md`'s verification notes
 (2026-08-25).
 
+## Wrapping a function: forwarding `undefined` is not the same as omitting the argument
+
+**Issue**: `src/infrastructure/tauri/invoke.ts` wraps Tauri's own
+`invoke(command, args?)` to add a side effect (notify a listener on an
+authorization failure). Its first draft always called
+`tauriInvoke(command, args)`, even when a caller omitted `args`
+entirely (so `args` was `undefined`). Wiring the wrapper in immediately
+broke 12 tests across 9 repository files — every test asserting the
+exact arguments the mocked `invoke` was called with. **Root cause**:
+`fn(command, undefined)` and `fn(command)` are observably different
+calls (`arguments.length`/call-shape differs), even though both pass
+`undefined` for the missing parameter conceptually — a caller-inspectable
+difference, not just a style preference. **Rule**: when wrapping a
+function that has an optional parameter, forward exactly as many
+arguments as the actual caller passed, rather than always passing the
+full arity with `undefined` filled in — don't assume "optional
+parameter with value `undefined`" and "parameter omitted" are
+interchangeable for whatever you're forwarding to. **Prevention**: the
+wrapper now branches (`args === undefined ? fn(command) : fn(command, args)`);
+covered by a dedicated test asserting the mocked call's argument count,
+not just its resolved value. **Reference**:
+`docs/adr/0022-global-session-expiry-handling.md`,
+`src/infrastructure/tauri/invoke.ts`, `src/infrastructure/tauri/invoke.test.ts`.
+
 ## Independent-review agent-resume unreliability
 
 **Issue**: dispatching `security-reviewer`/`architecture-reviewer`/

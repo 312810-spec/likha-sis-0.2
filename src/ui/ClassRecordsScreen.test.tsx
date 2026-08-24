@@ -15,7 +15,11 @@ import type {
   AssessmentItemDetail,
 } from "../domain/assessment";
 import type { ClassRecord, ClassRecordDetail, GradingWeightPolicy } from "../domain/class-record";
-import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type {
   ComputedTermGrade,
@@ -55,6 +59,9 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
   }
 }

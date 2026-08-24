@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 import type { Subject } from "../../domain/subject";
 import type { SubjectRepository } from "../../domain/ports/subject-repository";
 

@@ -13,6 +13,7 @@ const session: CurrentSession = {
   schoolId: "s1",
   schoolName: "Rizal Elementary",
   expiresAtUnixMs: 1_000_000,
+  idleExpiresAtUnixMs: 1_000_000,
 };
 
 function renderShell(sessionValue: CurrentSession | null, onLogout = vi.fn()) {

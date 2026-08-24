@@ -8,9 +8,10 @@ use std::time::{Duration, SystemTime};
 use rusqlite::Connection;
 
 use crate::error::{AppError, AppResult};
+use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    installation as installation_repo, school as school_repo, session as session_repo,
-    user as user_repo,
+    audit_log as audit_log_repo, installation as installation_repo, school as school_repo,
+    session as session_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -153,6 +154,13 @@ impl Default for SessionManager {
 /// current session. Fails with `AuthenticationFailed` for a bad
 /// username/password and `Unauthorized` for a real user not belonging to
 /// the requested school.
+///
+/// Every outcome is recorded to `repository::audit_log` (see migration
+/// 15 and ADR-0021): a successful login, a failed one (bad credentials
+/// or a real user not belonging to `school_id`), or an account-locked
+/// rejection. Audit writes never replace the real error being returned —
+/// they happen alongside it, via `?` after the write, so a logging
+/// failure surfaces honestly rather than being swallowed.
 pub fn login(
     conn: &Connection,
     sessions: &SessionManager,
@@ -160,14 +168,40 @@ pub fn login(
     password: &str,
     school_id: &str,
 ) -> AppResult<Session> {
-    let user = user_repo::verify_credentials(conn, username, password)?;
+    let user = match user_repo::verify_credentials(conn, username, password) {
+        Ok(user) => user,
+        Err(AppError::AccountLocked) => {
+            audit_log_repo::record(conn, school_id, None, username, AuditEventType::AccountLocked)?;
+            return Err(AppError::AccountLocked);
+        }
+        Err(AppError::AuthenticationFailed) => {
+            audit_log_repo::record(conn, school_id, None, username, AuditEventType::LoginFailed)?;
+            return Err(AppError::AuthenticationFailed);
+        }
+        Err(e) => return Err(e),
+    };
 
     if !user_repo::is_member_of_school(conn, &user.id, school_id)? {
+        audit_log_repo::record(
+            conn,
+            school_id,
+            Some(&user.id),
+            &user.username,
+            AuditEventType::LoginFailed,
+        )?;
         return Err(AppError::Unauthorized);
     }
 
     let duration_modifier = format!("+{} seconds", SESSION_DURATION.as_secs());
     let session_id = session_repo::insert(conn, &user.id, school_id, &duration_modifier)?;
+
+    audit_log_repo::record(
+        conn,
+        school_id,
+        Some(&user.id),
+        &user.username,
+        AuditEventType::LoginSuccess,
+    )?;
 
     let session = new_session(session_id, user.id, school_id.to_string());
     sessions.set(session.clone());
@@ -176,9 +210,22 @@ pub fn login(
 
 /// Revokes the current session (if any) in the persisted table and clears
 /// the in-memory session. A no-op, not an error, if nothing is logged in.
+/// Records a `Logout` audit event when there was a session to revoke; if
+/// the user row has since been deleted (should not happen in practice —
+/// nothing deletes users today — but not assumed), the revoke/clear
+/// still proceeds and only the audit write is skipped.
 pub fn logout(conn: &Connection, sessions: &SessionManager) -> AppResult<()> {
     if let Some(session) = sessions.current() {
         session_repo::revoke(conn, &session.id)?;
+        if let Some(user) = user_repo::find_by_id(conn, &session.user_id)? {
+            audit_log_repo::record(
+                conn,
+                &session.school_id,
+                Some(&user.id),
+                &user.username,
+                AuditEventType::Logout,
+            )?;
+        }
     }
     sessions.clear();
     Ok(())
@@ -347,6 +394,76 @@ mod tests {
 
         assert!(matches!(result, Err(AppError::AuthenticationFailed)));
         assert_eq!(sessions.current(), None);
+    }
+
+    #[test]
+    fn a_successful_login_is_recorded_in_the_audit_log() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
+            .unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+
+        login(&conn, &sessions, "ana.cruz", "correct horse battery staple", &s.id).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].event_type, AuditEventType::LoginSuccess);
+        assert_eq!(entries[0].user_id, Some(u.id));
+        assert_eq!(entries[0].username, "ana.cruz");
+    }
+
+    #[test]
+    fn a_failed_login_is_recorded_with_no_known_user_id() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let sessions = SessionManager::new();
+
+        let _ = login(&conn, &sessions, "does.not.exist", "anything", &s.id);
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].event_type, AuditEventType::LoginFailed);
+        assert_eq!(entries[0].user_id, None);
+        assert_eq!(entries[0].username, "does.not.exist");
+    }
+
+    #[test]
+    fn a_locked_account_login_attempt_is_recorded_as_account_locked_not_login_failed() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
+            .unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+        for _ in 0..user::MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = login(&conn, &sessions, "ana.cruz", "wrong password", &s.id);
+        }
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(
+            entries[0].event_type,
+            AuditEventType::AccountLocked,
+            "the attempt that actually triggers the lock must be recorded as such, not as a plain failure"
+        );
+    }
+
+    #[test]
+    fn a_logout_is_recorded_in_the_audit_log() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
+            .unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "correct horse battery staple", &s.id).unwrap();
+
+        logout(&conn, &sessions).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries[0].event_type, AuditEventType::Logout);
+        assert_eq!(entries[0].username, "ana.cruz");
     }
 
     #[test]

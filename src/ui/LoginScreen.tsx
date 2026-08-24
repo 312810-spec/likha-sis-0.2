@@ -10,9 +10,15 @@ interface LoginScreenProps {
   authService: AuthApplicationService;
   schoolService: SchoolApplicationService;
   onLoggedIn: (session: CurrentSession) => void;
+  /** An informational message to show above the form — e.g. "your
+   * session expired, please sign in again" (see ADR-0022). Distinct
+   * from `error`, which is this screen's own sign-in-attempt failure:
+   * a `notice` describes why the teacher landed here, not something
+   * they did wrong just now. */
+  notice?: string | null;
 }
 
-export function LoginScreen({ authService, schoolService, onLoggedIn }: LoginScreenProps) {
+export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: LoginScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [schools, setSchools] = useState<School[]>([]);
@@ -86,6 +92,11 @@ export function LoginScreen({ authService, schoolService, onLoggedIn }: LoginScr
         Sign in
       </h2>
 
+      {notice && (
+        <div className="confirmation-banner" role="status">
+          {notice}
+        </div>
+      )}
       {error && (
         <div className="error-banner" role="alert">
           {error}
