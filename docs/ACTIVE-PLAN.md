@@ -1,5 +1,90 @@
 # ACTIVE PLAN
 
+## UI-First Tranche (added 2026-08-25) — current work, read this section first
+
+**Drift repair note**: this file previously listed only M0 onward in
+chronological order and had not kept pace with `docs/PROGRESS-MAP.md`,
+`docs/CURRENT-HANDOFF.md`, or ADR-0021 through ADR-0029 (all of which
+cover real, completed work this file never recorded: Authentication
+Audit Log, Global Session Expiry Handling, Learner Search, Teacher
+Workspace, Learner Roster CSV Export, Idle-Timeout Warning, the
+audit-timestamp/ARIA self-review fixes, the Workspace grading-period
+status, and the proptest lockout pilot). Per the directing prompt for
+this UI-first program ("Known planning drift... Repair this at the
+first UI milestone; do not propagate the inconsistency"), this section
+is the repair: `docs/PROGRESS-MAP.md` and `docs/adr/*` are the
+authoritative record for that already-completed work going forward,
+not this file's stale M-number listing below (left intact as historical
+record — see "Historical M0-M20 detail" further down, unchanged).
+
+Full direction and Impeccable/visual-verification decisions:
+`docs/adr/0030-ui-first-program-and-ux00.md`.
+
+### UX-00 — Progress Map Repair + Impeccable Pilot + Visual Baseline
+
+Teacher outcome: none directly yet — this establishes the reliable
+design/verification foundation the rest of the UI program depends on.
+
+Baseline SHA (verified via `git log`/`git fetch`, matched the user's
+own supplied checkpoint exactly): `5b6e4d1`.
+
+Checklist:
+
+- [x] Verify git state (fetch, compare local/origin, confirm clean
+      fast-forward-able tree) before any action.
+- [x] Read `CLAUDE.md`, `docs/PROJECT-MEMORY.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/PROGRESS-MAP.md`,
+      `docs/SOURCE-REGISTRY.md`, `docs/VERIFICATION-DEBT.md`, the
+      autonomous-development/architecture/security-privacy/testing
+      rules, and the `premium-teacher-ui`/`accessibility` skills.
+- [x] Verify the `impeccable` npm package is real before installing
+      (registry check: maintainer, repo, license — matches
+      `pbakaus/impeccable`).
+- [x] Install Impeccable project-local; catch and correct the
+      installer's unrequested hook write (see ADR-0030).
+- [x] Investigate the visual-verification path: found and fixed a real
+      bug (`.claude/launch.json` port `5173` → actual `1420`); confirmed
+      Browser-pane DOM/text/console verification now genuinely works;
+      confirmed pixel screenshot capture is blocked by a client-side
+      pane-display state, disclosed rather than worked around; formally
+      selected the three-layer strategy in ADR-0030.
+- [x] Repair `docs/PROGRESS-MAP.md`: add the UI-First Tranche table,
+      mark UX-00 in progress, UX-01–UX-08 queued.
+- [x] Repair `docs/ACTIVE-PLAN.md` (this section).
+- [x] Put the active task at the top of `docs/CURRENT-HANDOFF.md`.
+- [ ] Create `PRODUCT.md` (teacher jobs, product voice, operating
+      context, privacy/offline constraints) via `/impeccable init` in
+      "operate" mode, reconciled against `CLAUDE.md`/`PROJECT-MEMORY.md`
+      so nothing contradicts existing project truth.
+- [ ] Create `DESIGN.md` (visual thesis, tokens, typography,
+      composition, components, responsive rules, motion, accessibility,
+      anti-patterns) — select "Calm Civic Classroom" or a stronger
+      Impeccable-recommended alternative, with recorded rationale
+      against LIKHA's priority order.
+- [ ] Inventory every current screen, shared pattern, token, state,
+      breakpoint, icon pattern, and motion behavior actually in the
+      codebase (not assumed from memory).
+- [ ] Capture a synthetic-data visual baseline at representative sizes
+      to the extent this session's verification path allows; record
+      exactly what was and wasn't captured.
+- [ ] Establish measurable UI baselines (task steps for key flows,
+      viewport coverage, contrast, focus, touch targets, reduced
+      motion, loading/empty/error coverage) for later milestones to
+      compare against.
+- [ ] Run `npm run quality`, `npm run build`, `npm run check:architecture`,
+      `npx knip` as the milestone's baseline checks.
+- [ ] Push the UX-00 completion commit; verify remote sync.
+
+### UX-01 through UX-08 — Queued
+
+See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
+ordered list and dependencies. Each gets its own detailed checklist in
+this section once its own start checkpoint is pushed — not written in
+advance, since UX-00's screen inventory and chosen design direction
+will shape exactly what each later milestone's checklist should say.
+
+## Historical M0-M20 detail (unchanged, chronological, pre-dates the UI-first direction)
+
 ## M0 Workspace Foundation — Complete
 
 Goal: create a clean, reproducible, production-oriented development baseline before feature work.

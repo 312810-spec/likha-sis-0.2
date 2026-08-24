@@ -387,6 +387,32 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## UI-First World-Class Product Program (added 2026-08-25)
+
+Explicit new user direction, superseding autonomous feature-list
+selection until an 8-item UI tranche (UX-00 through UX-08) completes:
+prioritize UI/teacher-experience polish before expanding the feature
+set further. Extends the "commit after every milestone" standing
+instruction to "commit and push at both the START and COMPLETION of
+every milestone." `pbakaus/impeccable` (npm `impeccable`, v3.6.0,
+skill-declared internal version 4.1.1) is adopted as a project-local,
+hook-free critique lens — LIKHA's own `premium-teacher-ui`/
+`accessibility` skills remain the authoritative design/accessibility
+source of truth throughout; Impeccable is a lens, never a competing
+one. Full record: `docs/adr/0030-ui-first-program-and-ux00.md`.
+
+Two real, concrete fixes came out of starting UX-00, not just process:
+(1) the Impeccable installer wrote an unrequested hook into
+`.claude/settings.local.json` despite the explicit hook-free
+requirement — caught and removed immediately; (2) `.claude/launch.json`
+had the wrong dev-server port (`5173` instead of the actual `1420`),
+which had been silently breaking Browser-pane visual verification
+attempts in this and at least one prior session — fixed, and Browser-
+pane DOM/text/console verification now genuinely works against the
+real `vite dev` server. Pixel-level screenshot capture remains blocked
+by a client-side pane-display state this session, disclosed rather
+than worked around.
+
 ## Proptest Pilot on Account Lockout (added 2026-08-25)
 
 Fourth pick from the scoring pass (4.85), resuming Compounding

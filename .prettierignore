@@ -3,3 +3,7 @@ src-tauri/target
 src-tauri/gen
 node_modules
 package-lock.json
+# Vendored Impeccable skill plumbing (docs/adr/0030-ui-first-program-and-ux00.md)
+# -- third-party script files, not reformatted per its own "don't edit the
+# hook scripts themselves" convention.
+.claude/skills/impeccable

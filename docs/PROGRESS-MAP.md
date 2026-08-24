@@ -4,8 +4,10 @@ Operational map, not a project diary — see `docs/ACTIVE-PLAN.md` for full
 verification detail per milestone, `docs/product/M8-DECISION.md` for the
 current product-decision rationale.
 
-Status legend: ✓ Complete · ◐ In Progress · ○ Candidate · ⚠ Blocked ·
-↺ Review Required
+Status legend: ✓ Complete · ◐ In Progress · ○ Queued (historically
+labeled "Candidate" in earlier sections below — same meaning, not
+rewritten to avoid touching completed history) · ⚠ Blocked ·
+↺ Review Required · — Deferred
 
 ```
 FOUNDATION
@@ -151,12 +153,46 @@ Grading-period-aware Teacher Workspace enhancement ✓ (5.70) — see
 Proptest pilot on auth/lockout invariants ✓ (4.85) — see
   docs/adr/0029-proptest-lockout-pilot.md
 
-REASSESS ← CURRENT (all scored candidates above ~4.0 from
+REASSESS (all scored candidates above ~4.0 from
   docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md are complete;
   the two remaining entries, password reset and a Trail of Bits pilot,
-  are both blocked on something other than raw effort — see
-  docs/CURRENT-HANDOFF.md's Next Action for what a fresh pass should
-  weigh)
+  are both blocked on something other than raw effort)
+  ↓
+UI-FIRST WORLD-CLASS PRODUCT PROGRAM (directed 2026-08-25, explicit user
+  instruction — supersedes autonomous feature-list selection until
+  UX-08 completes; see docs/CURRENT-HANDOFF.md and the new ADR recording
+  this direction)
+```
+
+## UI-First Tranche (UX-00 → UX-08)
+
+Directed 2026-08-25: prioritize UI/teacher-experience polish over
+further feature expansion, using `pbakaus/impeccable` (npm package
+`impeccable`, skill-declared version 4.1.1, installed project-local and
+hook-free) as a critique lens. LIKHA's own priority order and the
+existing `premium-teacher-ui`/`accessibility` skills remain the
+authoritative source of truth — Impeccable is a lens, never a competing
+one. Exactly one row may be ◐ at a time.
+
+| ID    | Milestone                                                     | Status | Depends on | Start SHA     | Completion SHA | ADR/Decision                               | Verification                 |
+| ----- | ------------------------------------------------------------- | ------ | ---------- | ------------- | -------------- | ------------------------------------------ | ---------------------------- |
+| UX-00 | Progress Map Repair + Impeccable Pilot + Visual Baseline      | ◐      | none       | (this commit) | —              | docs/adr/0030-ui-first-program-and-ux00.md | in progress, see ACTIVE-PLAN |
+| UX-01 | Design Tokens, Shared Components, and App Shell               | ○      | UX-00      | —             | —              | —                                          | —                            |
+| UX-02 | Teacher Workspace polish                                      | ○      | UX-01      | —             | —              | —                                          | —                            |
+| UX-03 | Daily Attendance + Monthly Summary                            | ○      | UX-01      | —             | —              | —                                          | —                            |
+| UX-04 | Class Records, Assessments, Score Entry, Grade Output         | ○      | UX-01      | —             | —              | —                                          | —                            |
+| UX-05 | Learners, Search, Sections, Editing, Export                   | ○      | UX-01      | —             | —              | —                                          | —                            |
+| UX-06 | Authentication, First Run, Session, Audit, Trust States       | ○      | UX-01      | —             | —              | —                                          | —                            |
+| UX-07 | Android-Specific Adaptation and Native Verification           | ○      | UX-02..06  | —             | —              | —                                          | —                            |
+| UX-08 | Cross-App Finish, Accessibility, Performance, Regression Gate | ○      | UX-02..07  | —             | —              | —                                          | —                            |
+
+Full checklists live in `docs/ACTIVE-PLAN.md`'s "UI-First Tranche"
+section; durable direction and decisions in `docs/PROJECT-MEMORY.md`
+and the ADR above; immediate resumption state in
+`docs/CURRENT-HANDOFF.md`.
+
+```
+CURRENT ← UX-00 (see table above and docs/ACTIVE-PLAN.md)
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and
