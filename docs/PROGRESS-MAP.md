@@ -147,10 +147,16 @@ teacher-ux-reviewer/accessibility-reviewer dispatch ✓ (5.75 — both hit
 
 Grading-period-aware Teacher Workspace enhancement ✓ (5.70) — see
   docs/adr/0028-workspace-grading-period-status.md
+  ↓
+Proptest pilot on auth/lockout invariants ✓ (4.85) — see
+  docs/adr/0029-proptest-lockout-pilot.md
 
-CURRENT ← next pick per the same scoring pass's ranking
-  (docs/CURRENT-HANDOFF.md's Next Action): proptest pilot on
-  auth/lockout invariants (4.85)
+REASSESS ← CURRENT (all scored candidates above ~4.0 from
+  docs/product/POST-SEQUENCE-REASSESSMENT-DECISION.md are complete;
+  the two remaining entries, password reset and a Trail of Bits pilot,
+  are both blocked on something other than raw effort — see
+  docs/CURRENT-HANDOFF.md's Next Action for what a fresh pass should
+  weigh)
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and

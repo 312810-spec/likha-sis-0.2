@@ -35,3 +35,4 @@ password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"
+proptest = "1"

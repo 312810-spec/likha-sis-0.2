@@ -387,6 +387,24 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## Proptest Pilot on Account Lockout (added 2026-08-25)
+
+Fourth pick from the scoring pass (4.85), resuming Compounding
+Engineering's deferred Phase B. Two `proptest` properties in
+`repository::user`'s `lockout_properties` module generalize the
+lockout example tests into real invariants (lock state matches the
+threshold for any attempt count; an unknown username never locks
+regardless of content or attempt count). Deliberately kept to 8 cases
+per property, not proptest's 256 default, since every case runs real
+Argon2id hashing — measured ~20-25s combined. Dev-dependency only, no
+production code changed. See `docs/adr/0029-proptest-lockout-pilot.md`
+and `docs/SOURCE-REGISTRY.md`. **All scored candidates from the
+post-sequence pass above ~4.0 are now complete** — the two remaining
+low-scored entries (password reset, Trail of Bits pilot) are both
+blocked on something other than raw effort; the next step is another
+fresh scoring pass or user direction, not defaulting to whatever's left
+on the old list.
+
 ## Teacher Workspace: Currently-Open Grading Period Per Section (added 2026-08-25)
 
 Third pick from the scoring pass (5.70). Closes ADR-0024's own

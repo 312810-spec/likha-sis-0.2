@@ -2,6 +2,25 @@
 
 ## Status
 
+**Proptest pilot on the account-lockout invariant — complete
+(2026-08-25)**, fourth pick from the post-sequence scoring pass (score
+4.85, see `docs/adr/0029-proptest-lockout-pilot.md`). Resumes
+Compounding Engineering's own deferred Phase B: two property tests in
+`repository::user`'s `lockout_properties` module generalize the
+existing example-based lockout tests into real invariants — lock state
+exactly matches the threshold for any attempt count, and an unknown
+username never locks regardless of content or attempt count. Kept to 8
+cases per property (proptest's default is 256) since every case runs
+real, deliberately-expensive Argon2id verification, not a mocked
+lighter one — measured ~20-25s combined, not assumed. `cargo nextest
+run` 312/312 (up from 310), `cargo clippy -D warnings` clean, plain
+`cargo test` (the stable-checkpoint gate) also green with 0 doctest
+failures. `cargo deny check` unavailable on this machine's PATH this
+session — same disclosed per-machine gap noted in prior sessions, not
+new. No independent-review dispatch — reasoning in the ADR (dev-
+dependency-only test code, no production-code or authorization-surface
+change).
+
 **Teacher Workspace: currently-open grading period per section —
 complete (2026-08-25)**, third pick from the post-sequence scoring pass
 (score 5.70, see `docs/adr/0028-workspace-grading-period-status.md`).
@@ -822,8 +841,12 @@ direction.
 - Keep dependencies minimal.
 - Do not add paid services or billing-enabled infrastructure.
 - Preserve architecture boundaries from `PROJECT-MEMORY.md`.
-- Do not commit or push (holds for this autonomous run; re-check before
-  assuming it still applies in a later session).
+- **Commit and push after every completed milestone (2026-08-25,
+  standing instruction, supersedes the prior "do not commit" default)**:
+  once a milestone is verified and its ADR/handoff docs are updated,
+  commit it with a descriptive message and push before continuing to
+  the next autonomously-selected milestone — not a separately-requested
+  action anymore.
 
 ## Environment Notes
 
@@ -931,9 +954,29 @@ pick:
    discharged by the self-reviews above.
 2. **Grading-period-aware Teacher Workspace enhancement — complete
    (5.70)**. See `docs/adr/0028-workspace-grading-period-status.md`.
-3. **Next pick**: Proptest pilot on auth/lockout invariants (4.85) —
-   the Compounding Engineering pass's own already-identified Phase B
-   pilot target.
+3. **Proptest pilot on auth/lockout invariants — complete (4.85)**. See
+   `docs/adr/0029-proptest-lockout-pilot.md`.
+
+**All scored candidates from the post-sequence pass above the ~4.0
+threshold are now complete.** The two remaining entries in that pass's
+table — password reset/account recovery (4.20) and a Trail of Bits
+second-opinion pilot (3.25) — both scored low specifically because
+they're blocked on something other than raw implementation effort
+(password reset needs a genuine product/security decision this app has
+no out-of-band recovery channel for yet; the Trail of Bits pilot needs
+external-tool research this session didn't do). Per the same "reassess
+rather than default to whatever's next on a now-stale list" discipline
+this project has used at every real checkpoint, this is another
+legitimate point to run a fresh evidence-based scoring pass (or ask the
+user for direction) before picking a fifth item, rather than reaching
+for password reset or Trail of Bits just because they're what's left on
+an old list. Real candidates worth weighing in that fresh pass: the
+still-open `teacher-ux-reviewer`/`accessibility-reviewer` review debt
+(once agent-resume behavior can be spot-checked as healthy first), the
+remaining Compounding Engineering Phase B/C/E/F/G items, data
+export/backup's original raw-database-backup interpretation (explicitly
+deferred as its own security-design question in ADR-0025), and any
+newly-relevant DepEd research if a primary source for KS1/DO 8 surfaces.
 
 Still-standing context, unchanged since the last reassessment:
 

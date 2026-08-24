@@ -463,4 +463,85 @@ mod tests {
         assert!(school_has_any_members(&conn, &school_a.id).unwrap());
         assert!(!school_has_any_members(&conn, &school_b.id).unwrap());
     }
+
+    /// Property-based tests for the account-lockout invariant (ADR-0019),
+    /// piloting `proptest` per the Compounding Engineering tooling pass
+    /// (`docs/product/COMPOUNDING-ENGINEERING-DECISION.md` -- "Next best:
+    /// Phase A + a Phase B proptest pilot scoped to `repository::user`'s
+    /// lockout logic, given it's the newest security-critical invariant").
+    ///
+    /// The example-based tests above already prove the exact
+    /// `MAX_FAILED_LOGIN_ATTEMPTS` boundary and a couple of specific
+    /// attempt counts. What they don't generalize over is "for ANY
+    /// number of consecutive wrong attempts, is lockout state exactly
+    /// what the threshold predicts" -- a property, not a handful of
+    /// examples, and exactly proptest's stated strength over
+    /// example-based unit tests.
+    mod lockout_properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            // Deliberately few cases (proptest's default is 256): every
+            // case here runs real Argon2id verification (`auth::verify_password`/
+            // `verify_dummy_password_for_timing_safety` are never mocked
+            // or test-tuned lighter -- this app's security posture
+            // requires the real, deliberately-expensive parameters even
+            // in tests), so a high case count would make this pilot slow
+            // without adding coverage proportional to the cost. A pilot
+            // proving proptest's value on a real invariant, not a
+            // production-scale fuzzing budget.
+            #![proptest_config(ProptestConfig::with_cases(8))]
+
+            /// After exactly `attempts` consecutive wrong-password
+            /// attempts against one known account, the account must be
+            /// locked if and only if `attempts >= MAX_FAILED_LOGIN_ATTEMPTS`.
+            /// Bounded to a reasonable range (not an unbounded generator)
+            /// since each case opens a fresh in-memory DB and runs real
+            /// Argon2id verification -- unbounded would make the pilot
+            /// slow without adding coverage beyond this range, given the
+            /// lockout counter resets to 0 the moment it locks (so
+            /// behavior beyond the threshold is already covered by the
+            /// existing `a_locked_account_rejects_even_the_correct_password`
+            /// example test).
+            #[test]
+            fn lock_state_matches_the_threshold_for_any_attempt_count(attempts in 0i64..=15) {
+                let conn = open_test_db();
+                create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+
+                for _ in 0..attempts {
+                    let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
+                }
+
+                let result = verify_credentials(&conn, "ana.cruz", "correct horse battery staple");
+                if attempts >= MAX_FAILED_LOGIN_ATTEMPTS {
+                    prop_assert!(matches!(result, Err(AppError::AccountLocked)));
+                } else {
+                    prop_assert!(result.is_ok());
+                }
+            }
+
+            /// An unknown username must never lock, and must always
+            /// return the same generic `AuthenticationFailed`, regardless
+            /// of the username's actual content or how many attempts are
+            /// made against it -- the property behind
+            /// `verify_credentials`'s own documented guarantee that an
+            /// unknown username never reaches the lockout branch at all.
+            #[test]
+            fn an_unknown_username_never_locks_for_any_username_or_attempt_count(
+                username in "[a-z][a-z0-9._]{0,20}",
+                attempts in 1i64..=10,
+            ) {
+                let conn = open_test_db();
+                // Deliberately do NOT create this user -- proving the
+                // property for a genuinely unknown username each time,
+                // not a fixed one.
+
+                for _ in 0..attempts {
+                    let result = verify_credentials(&conn, &username, "anything");
+                    prop_assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+                }
+            }
+        }
+    }
 }
