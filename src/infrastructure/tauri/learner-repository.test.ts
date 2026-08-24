@@ -12,7 +12,15 @@ const mockInvoke = vi.mocked(invoke);
 describe("TauriLearnerRepository", () => {
   it("list invokes list_learners_by_school with no arguments (scope comes from the session)", async () => {
     const learners: Learner[] = [
-      { id: "1", schoolId: "s1", givenName: "Ana", familyName: "Santos", createdAt: "now" },
+      {
+        id: "1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
     ];
     mockInvoke.mockResolvedValueOnce(learners);
 
@@ -22,12 +30,14 @@ describe("TauriLearnerRepository", () => {
     expect(result).toEqual(learners);
   });
 
-  it("create invokes create_learner with only givenName/familyName", async () => {
+  it("create invokes create_learner with givenName/familyName and null lrn/sex when omitted", async () => {
     const learner: Learner = {
       id: "1",
       schoolId: "s1",
       givenName: "Ana",
       familyName: "Santos",
+      lrn: null,
+      sex: null,
       createdAt: "now",
     };
     mockInvoke.mockResolvedValueOnce(learner);
@@ -37,6 +47,60 @@ describe("TauriLearnerRepository", () => {
     expect(mockInvoke).toHaveBeenCalledWith("create_learner", {
       givenName: "Ana",
       familyName: "Santos",
+      lrn: null,
+      sex: null,
+    });
+    expect(result).toEqual(learner);
+  });
+
+  it("create passes lrn/sex through when provided", async () => {
+    const learner: Learner = {
+      id: "1",
+      schoolId: "s1",
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: "123456789012",
+      sex: "F",
+      createdAt: "now",
+    };
+    mockInvoke.mockResolvedValueOnce(learner);
+
+    await new TauriLearnerRepository().create("Ana", "Santos", "123456789012", "F");
+
+    expect(mockInvoke).toHaveBeenCalledWith("create_learner", {
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: "123456789012",
+      sex: "F",
+    });
+  });
+
+  it("updateProfile invokes update_learner with all fields", async () => {
+    const learner: Learner = {
+      id: "1",
+      schoolId: "s1",
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: "123456789012",
+      sex: "F",
+      createdAt: "now",
+    };
+    mockInvoke.mockResolvedValueOnce(learner);
+
+    const result = await new TauriLearnerRepository().updateProfile(
+      "1",
+      "Ana",
+      "Santos",
+      "123456789012",
+      "F",
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("update_learner", {
+      learnerId: "1",
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: "123456789012",
+      sex: "F",
     });
     expect(result).toEqual(learner);
   });

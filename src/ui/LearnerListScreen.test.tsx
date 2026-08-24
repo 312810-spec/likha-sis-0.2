@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LearnerApplicationService } from "../application/learner-service";
@@ -9,25 +9,48 @@ import { ModeProvider } from "./theme/ModeContext";
 import { LearnerListScreen } from "./LearnerListScreen";
 
 class FakeLearnerRepository implements LearnerRepository {
-  createCalls: Array<{ givenName: string; familyName: string }> = [];
+  createCalls: Array<{ givenName: string; familyName: string; lrn?: string; sex?: "M" | "F" }> = [];
 
-  constructor(private learners: Learner[] = []) {}
+  constructor(public learners: Learner[] = []) {}
 
   async list(): Promise<Learner[]> {
     return [...this.learners];
   }
 
-  async create(givenName: string, familyName: string): Promise<Learner> {
-    this.createCalls.push({ givenName, familyName });
+  async create(
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner> {
+    this.createCalls.push({ givenName, familyName, lrn, sex });
     const learner: Learner = {
       id: `l${this.learners.length + 1}`,
       schoolId: "s1",
       givenName,
       familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
       createdAt: "now",
     };
     this.learners.push(learner);
     return learner;
+  }
+
+  async updateProfile(
+    learnerId: string,
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner | null> {
+    const existing = this.learners.find((l) => l.id === learnerId);
+    if (!existing) return null;
+    existing.givenName = givenName;
+    existing.familyName = familyName;
+    existing.lrn = lrn ?? null;
+    existing.sex = sex ?? null;
+    return existing;
   }
 }
 
@@ -54,10 +77,120 @@ describe("LearnerListScreen", () => {
 
   it("lists existing learners", async () => {
     renderScreen([
-      { id: "l1", schoolId: "s1", givenName: "Ana", familyName: "Santos", createdAt: "now" },
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
     ]);
 
     expect(await screen.findByText("Ana Santos")).toBeInTheDocument();
+  });
+
+  it("edits an existing learner's LRN and Sex without a fresh enrollment", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+    const editForm = screen.getByRole("form", { name: "Edit Ana Santos" });
+    await user.type(within(editForm).getByLabelText("LRN (optional)"), "123456789012");
+    await user.selectOptions(within(editForm).getByLabelText("Sex (optional)"), "F");
+    await user.click(within(editForm).getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/— LRN 123456789012/)).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Ana Santos's profile was updated.",
+    );
+    expect(repo.learners[0]).toMatchObject({ lrn: "123456789012", sex: "F" });
+  });
+
+  it("cancel discards edits and leaves the learner unchanged", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+    const editForm = screen.getByRole("form", { name: "Edit Ana Santos" });
+    await user.type(within(editForm).getByLabelText("LRN (optional)"), "123456789012");
+    await user.click(within(editForm).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("form", { name: "Edit Ana Santos" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/— LRN/)).not.toBeInTheDocument();
+  });
+
+  it("moves focus into the edit form when editing starts", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+
+    const editForm = screen.getByRole("form", { name: "Edit Ana Santos" });
+    await waitFor(() => expect(within(editForm).getByLabelText("Given name")).toHaveFocus());
+  });
+
+  it("disables editing another learner while one edit is already in progress", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+      {
+        id: "l2",
+        schoolId: "s1",
+        givenName: "Ben",
+        familyName: "Reyes",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+
+    expect(screen.getByRole("button", { name: "Edit Ben Reyes" })).toBeDisabled();
   });
 
   it("enrolls a learner, adds them to the visible list, and confirms it", async () => {
@@ -71,7 +204,9 @@ describe("LearnerListScreen", () => {
 
     expect(await screen.findByText("Ben Reyes")).toBeInTheDocument();
     expect(await screen.findByRole("status")).toHaveTextContent("Ben Reyes was enrolled.");
-    expect(repo.createCalls).toEqual([{ givenName: "Ben", familyName: "Reyes" }]);
+    expect(repo.createCalls).toEqual([
+      { givenName: "Ben", familyName: "Reyes", lrn: undefined, sex: undefined },
+    ]);
   });
 
   it("shows a validation message and does not call the repository for an empty name", async () => {
@@ -110,9 +245,38 @@ describe("LearnerListScreen", () => {
 
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen([
-      { id: "l1", schoolId: "s1", givenName: "Ana", familyName: "Santos", createdAt: "now" },
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
     ]);
     await waitFor(() => screen.getByText("Ana Santos"));
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations while editing a learner", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+    await screen.findByRole("form", { name: "Edit Ana Santos" });
 
     await expectNoAccessibilityViolations(container);
   });

@@ -13,10 +13,20 @@ use crate::repository::{
     user as user_repo,
 };
 
-/// Fixed session lifetime. Not an idle timeout — a session is valid for
-/// this long after login regardless of activity. See ADR-0004 for why a
-/// fixed TTL was chosen over idle tracking for this milestone.
+/// Fixed session lifetime — an absolute cap regardless of activity. See
+/// ADR-0004 for why a fixed TTL was chosen over idle tracking for that
+/// milestone, and ADR-0020 for why idle tracking was added on top of it
+/// (not instead of it) once account lockout closed the other half of
+/// this app's shared-computer threat model.
 pub const SESSION_DURATION: Duration = Duration::from_secs(8 * 60 * 60);
+
+/// A session with no protected-command activity for this long is treated
+/// as expired, even though `SESSION_DURATION`'s absolute cap hasn't been
+/// reached. Standard engineering default for a moderate-risk application
+/// (OWASP Session Management Cheat Sheet's general guidance), not a
+/// DepEd/school-specific policy choice — same reasoning as
+/// `user::MAX_FAILED_LOGIN_ATTEMPTS`. See ADR-0020.
+pub const IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {
@@ -25,11 +35,27 @@ pub struct Session {
     pub school_id: String,
     pub created_at: SystemTime,
     pub expires_at: SystemTime,
+    /// Updated to "now" by every `require_active_session`/
+    /// `require_active_school_scope` call that succeeds — a sliding
+    /// window, not a fixed point. A peek-only check like
+    /// `commands::auth::current_session` must NOT touch this: it should
+    /// observe idle state, not extend it, or "is anyone still logged
+    /// in?" polling would itself defeat the idle timeout.
+    pub last_activity_at: SystemTime,
 }
 
 impl Session {
+    /// Active only if BOTH the absolute cap and the idle window are
+    /// unexpired — either one alone is not enough. `duration_since`
+    /// returns `Err` if `now` is somehow before `last_activity_at` (clock
+    /// skew); treated as "not idle" (the safer default: don't spuriously
+    /// log someone out because of a clock anomaly) rather than erroring.
     pub fn is_active(&self, now: SystemTime) -> bool {
         now < self.expires_at
+            && now
+                .duration_since(self.last_activity_at)
+                .map(|idle_for| idle_for < IDLE_TIMEOUT)
+                .unwrap_or(true)
     }
 }
 
@@ -44,6 +70,7 @@ fn new_session(id: String, user_id: String, school_id: String) -> Session {
         school_id,
         created_at,
         expires_at: created_at + SESSION_DURATION,
+        last_activity_at: created_at,
     }
 }
 
@@ -81,6 +108,20 @@ impl SessionManager {
     /// that forgets to do that still cannot leave a revoked session
     /// usable — see `repository::session::is_revoked`.
     pub fn require_active_school_scope(&self, conn: &Connection) -> AppResult<String> {
+        self.require_active_session(conn).map(|(_, school_id)| school_id)
+    }
+
+    /// The same check as `require_active_school_scope`, but also returns
+    /// the session's `user_id` — for commands that need to attribute a
+    /// write to who made it (e.g. `learner_scores.recorded_by_user_id`),
+    /// not just which school it belongs to.
+    ///
+    /// A successful call slides the idle-timeout window forward to now —
+    /// this IS the "activity" `Session::last_activity_at` tracks, since
+    /// every protected command goes through here. A peek-only check
+    /// (`current()`/`Session::is_active` called directly, as
+    /// `commands::auth::current_session` does) must never do this.
+    pub fn require_active_session(&self, conn: &Connection) -> AppResult<(String, String)> {
         let session = match self.lock().as_ref() {
             Some(session) if session.is_active(SystemTime::now()) => session.clone(),
             _ => return Err(AppError::Unauthorized),
@@ -88,7 +129,10 @@ impl SessionManager {
         if session_repo::is_revoked(conn, &session.id)? {
             return Err(AppError::Unauthorized);
         }
-        Ok(session.school_id)
+        if let Some(current) = self.lock().as_mut() {
+            current.last_activity_at = SystemTime::now();
+        }
+        Ok((session.user_id, session.school_id))
     }
 
     fn lock(&self) -> MutexGuard<'_, Option<Session>> {
@@ -346,6 +390,7 @@ mod tests {
             school_id: s.id,
             created_at: past - SESSION_DURATION,
             expires_at: past,
+            last_activity_at: past,
         });
 
         assert!(matches!(
@@ -369,9 +414,94 @@ mod tests {
             school_id: s.id.clone(),
             created_at: now,
             expires_at: now + SESSION_DURATION,
+            last_activity_at: now,
         });
 
         assert_eq!(sessions.require_active_school_scope(&conn).unwrap(), s.id);
+    }
+
+    #[test]
+    fn require_active_school_scope_fails_closed_for_a_session_idle_too_long_even_within_the_absolute_ttl() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let session_id = session_repo::insert(&conn, &u.id, &s.id, "+8 hours").unwrap();
+        let now = SystemTime::now();
+        sessions.set(Session {
+            id: session_id,
+            user_id: u.id,
+            school_id: s.id,
+            created_at: now - Duration::from_secs(60 * 60), // logged in an hour ago
+            expires_at: now + Duration::from_secs(7 * 60 * 60), // absolute TTL far from expiring
+            last_activity_at: now - IDLE_TIMEOUT - Duration::from_secs(1), // idle just past the window
+        });
+
+        assert!(matches!(
+            sessions.require_active_school_scope(&conn),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn a_successful_check_slides_the_idle_window_forward_so_continued_activity_stays_logged_in() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let session_id = session_repo::insert(&conn, &u.id, &s.id, "+8 hours").unwrap();
+        let now = SystemTime::now();
+        sessions.set(Session {
+            id: session_id,
+            user_id: u.id,
+            school_id: s.id.clone(),
+            created_at: now,
+            expires_at: now + SESSION_DURATION,
+            // Idle for nearly the whole window, but not past it yet.
+            last_activity_at: now - IDLE_TIMEOUT + Duration::from_secs(5),
+        });
+
+        // This call succeeds and, per its own contract, resets
+        // last_activity_at to "now" -- proven by checking the in-memory
+        // session directly afterward rather than trusting the call's own
+        // success alone.
+        assert!(sessions.require_active_school_scope(&conn).is_ok());
+
+        let after = sessions.current().unwrap();
+        assert!(
+            after.last_activity_at >= now,
+            "a successful check must slide last_activity_at forward, not leave the old value"
+        );
+    }
+
+    #[test]
+    fn current_session_peek_does_not_itself_slide_the_idle_window() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let session_id = session_repo::insert(&conn, &u.id, &s.id, "+8 hours").unwrap();
+        let now = SystemTime::now();
+        let stale_activity = now - Duration::from_secs(60);
+        sessions.set(Session {
+            id: session_id,
+            user_id: u.id,
+            school_id: s.id,
+            created_at: now,
+            expires_at: now + SESSION_DURATION,
+            last_activity_at: stale_activity,
+        });
+
+        // A peek via `current()` (what `commands::auth::current_session`
+        // does) must not extend the idle window -- only
+        // `require_active_session`/`require_active_school_scope` count as
+        // activity.
+        let _ = sessions.current();
+
+        assert_eq!(sessions.current().unwrap().last_activity_at, stale_activity);
     }
 
     /// The scenario `require_active_school_scope`'s DB-revocation check
@@ -393,6 +523,7 @@ mod tests {
             school_id: s.id,
             created_at: now,
             expires_at: now + SESSION_DURATION,
+            last_activity_at: now,
         });
         assert!(sessions.require_active_school_scope(&conn).is_ok());
 
@@ -651,7 +782,7 @@ mod tests {
             "Legit Teacher",
         )
         .unwrap();
-        learner::create(&conn, &legitimate.school_id, "Ana", "Santos").unwrap();
+        learner::create(&conn, &legitimate.school_id, "Ana", "Santos", None, None).unwrap();
 
         let attacker_sessions = SessionManager::new();
         let attacker_bootstrap = bootstrap_installation(

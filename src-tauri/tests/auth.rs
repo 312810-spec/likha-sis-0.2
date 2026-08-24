@@ -53,8 +53,8 @@ fn a_logged_in_teacher_can_only_ever_see_their_own_school_learners() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
-    learner::create(&conn, &school_b.id, "Ben", "Reyes").unwrap();
+    learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
+    learner::create(&conn, &school_b.id, "Ben", "Reyes", None, None).unwrap();
 
     let teacher_a = user::create_user(&conn, "teacher.a", "password-a", "Teacher A").unwrap();
     user::add_school_membership(&conn, &teacher_a.id, &school_a.id).unwrap();
@@ -74,7 +74,7 @@ fn a_logged_in_teacher_can_only_ever_see_their_own_school_learners() {
 fn operations_are_rejected_with_no_session_even_if_a_caller_tries_to_bypass_ui_checks() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
-    learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
+    learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
     let result = list_learners_as_current_session(&conn, &sessions);
@@ -178,7 +178,7 @@ fn an_unauthenticated_caller_cannot_self_grant_membership_in_an_already_populate
     let legitimate_teacher =
         user::create_user(&conn, "legit.teacher", "password", "Legit Teacher").unwrap();
     user::add_school_membership(&conn, &legitimate_teacher.id, &school_a.id).unwrap();
-    learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
+    learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
 
     let attacker_sessions = SessionManager::new(); // no credentials at all
 

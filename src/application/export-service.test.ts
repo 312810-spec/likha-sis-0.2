@@ -1,0 +1,116 @@
+import { describe, expect, it } from "vitest";
+import { ValidationError } from "../domain/errors";
+import type { ReportCardExportResult, Sf2ExportResult } from "../domain/export";
+import type { ExportRepository } from "../domain/ports/export-repository";
+import { ExportApplicationService } from "./export-service";
+
+class FakeExportRepository implements ExportRepository {
+  calls: Array<{ sectionId: string; year: number; month: number }> = [];
+  resultToReturn: Sf2ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportSectionMonthlySf2(
+    sectionId: string,
+    year: number,
+    month: number,
+  ): Promise<Sf2ExportResult | null> {
+    this.calls.push({ sectionId, year, month });
+    return this.resultToReturn;
+  }
+
+  reportCardCalls: Array<{ classRecordId: string }> = [];
+  reportCardResultToReturn: ReportCardExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ReportCard_Mabini_Science_1st_Term.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
+    this.reportCardCalls.push({ classRecordId });
+    return this.reportCardResultToReturn;
+  }
+}
+
+describe("ExportApplicationService", () => {
+  it("exports with a trimmed section id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSectionMonthlySf2(" sec-1 ", 2026, 8);
+
+    expect(result).toBe(repo.resultToReturn);
+    expect(repo.calls).toEqual([{ sectionId: "sec-1", year: 2026, month: 8 }]);
+  });
+
+  it("rejects an empty section id without calling the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSectionMonthlySf2("  ", 2026, 8)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("rejects a month outside 1-12 without calling the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSectionMonthlySf2("sec-1", 2026, 13)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    await expect(service.exportSectionMonthlySf2("sec-1", 2026, 0)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("rejects a year out of range without calling the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSectionMonthlySf2("sec-1", 1999, 8)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("returns null when the section could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.resultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSectionMonthlySf2("sec-1", 2026, 8);
+
+    expect(result).toBeNull();
+  });
+
+  it("exportClassRecordReportCard delegates to the repository with a trimmed id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportClassRecordReportCard(" cr-1 ");
+
+    expect(result).toEqual(repo.reportCardResultToReturn);
+    expect(repo.reportCardCalls).toEqual([{ classRecordId: "cr-1" }]);
+  });
+
+  it("exportClassRecordReportCard rejects an empty class record id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportClassRecordReportCard("  ")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.reportCardCalls).toEqual([]);
+  });
+
+  it("exportClassRecordReportCard returns null when the class record could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.reportCardResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportClassRecordReportCard("cr-1");
+
+    expect(result).toBeNull();
+  });
+});

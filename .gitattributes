@@ -1,0 +1,21 @@
+# Deterministic line endings regardless of a clone's core.autocrlf setting.
+# Without this file, Windows clones with the common global default
+# core.autocrlf=true convert LF source files to CRLF on checkout, which
+# then fails `prettier --check` (part of `npm run quality`) across nearly
+# the whole repository. Text files are normalized to LF in the repo and
+# on checkout; the one Windows-native exception is listed explicitly.
+
+* text=auto eol=lf
+
+# Windows batch files genuinely require CRLF to run reliably.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets: never touch, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary

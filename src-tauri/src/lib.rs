@@ -3,6 +3,7 @@ mod commands;
 pub mod crypto;
 pub mod db;
 pub mod error;
+pub mod export;
 pub mod repository;
 
 use std::sync::Mutex;
@@ -41,6 +42,32 @@ pub fn run() {
             commands::auth::login,
             commands::auth::logout,
             commands::auth::current_session,
+            commands::attendance::attendance_roster_for_date,
+            commands::attendance::record_attendance,
+            commands::attendance::bulk_mark_attendance_present,
+            commands::attendance::monthly_attendance_summary,
+            commands::section::list_sections_by_school,
+            commands::section::create_section,
+            commands::section::enroll_learner_in_section,
+            commands::section::section_roster,
+            commands::export::export_section_monthly_sf2,
+            commands::export::export_class_record_report_card,
+            commands::grading::list_grading_policies,
+            commands::grading::list_grading_policy_periods,
+            commands::grading::list_grading_periods_by_school_year,
+            commands::grading::create_grading_period,
+            commands::subject::list_subjects_by_school,
+            commands::subject::create_subject,
+            commands::class_record::list_class_records_by_school,
+            commands::class_record::create_class_record,
+            commands::class_record::list_grading_weight_policies,
+            commands::assessment_category::list_assessment_category_sets,
+            commands::assessment_category::list_assessment_categories_for_set,
+            commands::assessment_item::list_assessment_items_by_class_record,
+            commands::assessment_item::create_assessment_item,
+            commands::learner_score::roster_for_assessment_item,
+            commands::learner_score::record_learner_score,
+            commands::learner_score::compute_learner_term_grade,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

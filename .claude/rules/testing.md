@@ -25,6 +25,27 @@ changes):
 Do not invent a slower "run everything" command as the default for small
 edits — match the tier to the change.
 
+**Rust test runner — fast inner loop vs. stable checkpoint.**
+`cargo-nextest` (adopted 2026-08-25, see `docs/SOURCE-REGISTRY.md`) runs
+tests in parallel, isolated processes; measured ~26% faster wall-clock
+than `cargo test` on this crate's post-build suite (17.5s → 13.0s,
+283 tests). Use it for the fast inner loop while iterating on Rust
+changes:
+
+```bash
+cargo nextest run                          # whole crate
+cargo nextest run -p app --lib auth::      # filter to one module
+```
+
+`cargo nextest` does **not** run doctests (there are currently none in
+this crate — verified via `cargo test --doc`, 0 tests — so this is not
+yet a real gap, but don't assume it stays that way). For a stable
+checkpoint (milestone completion, `npm run quality:full`), still run
+plain `cargo test` at least once — it is the one command guaranteed to
+cover everything nextest does, plus doctests if any are ever added.
+Nextest speeds up iteration; it does not replace the checkpoint-gate
+command.
+
 Accessibility: use `expectNoAccessibilityViolations(container)` from
 `src/test/a11y.ts` (a direct `axe-core` wrapper — `vitest-axe` was tried
 and dropped as unmaintained) for structural checks on new screens.

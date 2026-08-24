@@ -18,8 +18,8 @@ fn a_rolled_back_transaction_persists_nothing() {
 
     {
         let tx = conn.transaction().unwrap();
-        learner::create(&tx, &s.id, "Emilio", "Aguinaldo").unwrap();
-        learner::create(&tx, &s.id, "Melchora", "Aquino").unwrap();
+        learner::create(&tx, &s.id, "Emilio", "Aguinaldo", None, None).unwrap();
+        learner::create(&tx, &s.id, "Melchora", "Aquino", None, None).unwrap();
         tx.rollback().unwrap();
     }
 
@@ -33,8 +33,8 @@ fn a_committed_transaction_persists_all_statements() {
 
     {
         let tx = conn.transaction().unwrap();
-        learner::create(&tx, &s.id, "Emilio", "Aguinaldo").unwrap();
-        learner::create(&tx, &s.id, "Melchora", "Aquino").unwrap();
+        learner::create(&tx, &s.id, "Emilio", "Aguinaldo", None, None).unwrap();
+        learner::create(&tx, &s.id, "Melchora", "Aquino", None, None).unwrap();
         tx.commit().unwrap();
     }
 
@@ -48,9 +48,9 @@ fn a_failed_statement_inside_a_transaction_rolls_back_the_whole_batch() {
 
     let outcome = (|| -> app_lib::error::AppResult<()> {
         let tx = conn.transaction().unwrap();
-        learner::create(&tx, &s.id, "Emilio", "Aguinaldo").unwrap();
+        learner::create(&tx, &s.id, "Emilio", "Aguinaldo", None, None).unwrap();
         // Violates the school_id foreign key: the whole batch must not land.
-        learner::create(&tx, "missing-school", "Bad", "Record")?;
+        learner::create(&tx, "missing-school", "Bad", "Record", None, None)?;
         tx.commit().unwrap();
         Ok(())
     })();
@@ -65,9 +65,9 @@ fn learners_are_isolated_by_school() {
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
 
-    learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
-    learner::create(&conn, &school_a.id, "Ben", "Reyes").unwrap();
-    learner::create(&conn, &school_b.id, "Cora", "Ramos").unwrap();
+    learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
+    learner::create(&conn, &school_a.id, "Ben", "Reyes", None, None).unwrap();
+    learner::create(&conn, &school_b.id, "Cora", "Ramos", None, None).unwrap();
 
     let a_learners = learner::list_by_school(&conn, &school_a.id).unwrap();
     let b_learners = learner::list_by_school(&conn, &school_b.id).unwrap();

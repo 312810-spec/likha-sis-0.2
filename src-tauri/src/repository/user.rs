@@ -84,26 +84,108 @@ fn find_with_credentials_by_username(
     })
 }
 
+/// Failed attempts allowed (against one account) before it locks, and how
+/// long the resulting lock lasts. Standard engineering defaults (OWASP
+/// Authentication Cheat Sheet's general guidance for a lockout policy),
+/// not a DepEd or school-specific policy choice -- see
+/// `docs/adr/0019-account-lockout.md`.
+const MAX_FAILED_LOGIN_ATTEMPTS: i64 = 5;
+const LOCKOUT_DURATION_SECS: i64 = 15 * 60;
+
 /// Verifies a username/password pair. Returns the user's public data on
 /// success. Deliberately returns the exact same `AuthenticationFailed`
 /// error whether the username doesn't exist or the password is wrong, and
 /// runs a real Argon2id verification either way (see
 /// `auth::verify_dummy_password_for_timing_safety`) so neither the error
 /// message nor response time reveals which case occurred.
+///
+/// A known username that is currently locked out returns `AccountLocked`
+/// instead, without attempting password verification -- a deliberate,
+/// disclosed exception to the above: it does reveal that the username
+/// exists, but only after `MAX_FAILED_LOGIN_ATTEMPTS` wrong guesses were
+/// already made against that specific username, a real cost an attacker
+/// has to pay first. An unknown username never reaches this branch and
+/// always returns the same `AuthenticationFailed` it always has.
 pub fn verify_credentials(conn: &Connection, username: &str, password: &str) -> AppResult<User> {
     match find_with_credentials_by_username(conn, username)? {
-        Some(user) if auth::verify_password(password, &user.password_hash) => Ok(User {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name,
-            created_at: user.created_at,
-        }),
-        Some(_) => Err(AppError::AuthenticationFailed),
+        Some(user) => {
+            if is_locked(conn, &user.id)? {
+                return Err(AppError::AccountLocked);
+            }
+            if auth::verify_password(password, &user.password_hash) {
+                reset_failed_login_attempts(conn, &user.id)?;
+                Ok(User {
+                    id: user.id,
+                    username: user.username,
+                    display_name: user.display_name,
+                    created_at: user.created_at,
+                })
+            } else {
+                record_failed_login_attempt(conn, &user.id)?;
+                // If this specific attempt is the one that just crossed
+                // the threshold, say so immediately rather than making
+                // the teacher guess why a subsequent, correct-password
+                // attempt is still being rejected.
+                if is_locked(conn, &user.id)? {
+                    Err(AppError::AccountLocked)
+                } else {
+                    Err(AppError::AuthenticationFailed)
+                }
+            }
+        }
         None => {
             auth::verify_dummy_password_for_timing_safety(password);
             Err(AppError::AuthenticationFailed)
         }
     }
+}
+
+/// True if `user_id` is currently within an active lockout window. Done
+/// entirely in SQL (comparing `locked_until` against the DB's own `now`)
+/// rather than parsing the timestamp in Rust, matching this codebase's
+/// established convention for ISO8601 date-range checks (see
+/// `section_membership::is_active_member`).
+fn is_locked(conn: &Connection, user_id: &str) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT locked_until IS NOT NULL AND locked_until > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+         FROM users WHERE id = ?1",
+        [user_id],
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
+/// Increments the failed-attempt counter; once it reaches
+/// `MAX_FAILED_LOGIN_ATTEMPTS`, sets `locked_until` `LOCKOUT_DURATION_SECS`
+/// from now and resets the counter to 0, so the account starts with a
+/// fresh full set of attempts once the lock expires rather than
+/// immediately re-triggering on the next single failure.
+fn record_failed_login_attempt(conn: &Connection, user_id: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = ?1",
+        [user_id],
+    )?;
+    let attempts: i64 = conn.query_row(
+        "SELECT failed_login_attempts FROM users WHERE id = ?1",
+        [user_id],
+        |row| row.get(0),
+    )?;
+    if attempts >= MAX_FAILED_LOGIN_ATTEMPTS {
+        conn.execute(
+            "UPDATE users SET locked_until = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?2), \
+             failed_login_attempts = 0 WHERE id = ?1",
+            (user_id, format!("+{LOCKOUT_DURATION_SECS} seconds")),
+        )?;
+    }
+    Ok(())
+}
+
+fn reset_failed_login_attempts(conn: &Connection, user_id: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?1",
+        [user_id],
+    )?;
+    Ok(())
 }
 
 pub fn add_school_membership(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<()> {
@@ -235,6 +317,90 @@ mod tests {
             wrong_password_result,
             Err(AppError::AuthenticationFailed)
         ));
+    }
+
+    #[test]
+    fn account_locks_after_the_maximum_number_of_wrong_passwords() {
+        let conn = open_test_db();
+        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS - 1 {
+            let result = verify_credentials(&conn, "ana.cruz", "wrong password");
+            assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+        }
+        // The attempt that reaches the threshold locks the account
+        // immediately rather than waiting for a subsequent attempt to
+        // reveal it, so the teacher gets clear feedback right away.
+        let final_result = verify_credentials(&conn, "ana.cruz", "wrong password");
+        assert!(matches!(final_result, Err(AppError::AccountLocked)));
+    }
+
+    #[test]
+    fn a_locked_account_rejects_even_the_correct_password() {
+        let conn = open_test_db();
+        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
+        }
+
+        let result = verify_credentials(&conn, "ana.cruz", "correct horse battery staple");
+
+        assert!(matches!(result, Err(AppError::AccountLocked)));
+    }
+
+    #[test]
+    fn a_successful_login_resets_the_failed_attempt_counter() {
+        let conn = open_test_db();
+        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS - 2 {
+            let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
+        }
+
+        let recovered = verify_credentials(&conn, "ana.cruz", "correct horse battery staple");
+        assert!(recovered.is_ok());
+
+        // The counter reset, so this account can withstand a fresh full
+        // run of wrong attempts without immediately locking again.
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS - 1 {
+            let result = verify_credentials(&conn, "ana.cruz", "wrong password");
+            assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+        }
+    }
+
+    #[test]
+    fn an_unknown_username_never_locks_and_always_returns_authentication_failed() {
+        let conn = open_test_db();
+
+        for _ in 0..(MAX_FAILED_LOGIN_ATTEMPTS * 2) {
+            let result = verify_credentials(&conn, "does.not.exist", "anything");
+            assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+        }
+    }
+
+    #[test]
+    fn a_locked_account_unlocks_after_the_lockout_window_and_a_fresh_attempt() {
+        let conn = open_test_db();
+        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
+        }
+        assert!(matches!(
+            verify_credentials(&conn, "ana.cruz", "correct horse battery staple"),
+            Err(AppError::AccountLocked)
+        ));
+
+        // Simulate the lockout window having already elapsed by moving
+        // locked_until into the past directly, rather than sleeping the
+        // test for real minutes.
+        conn.execute(
+            "UPDATE users SET locked_until = '2000-01-01T00:00:00.000Z' WHERE username = 'ana.cruz'",
+            [],
+        )
+        .unwrap();
+
+        let result = verify_credentials(&conn, "ana.cruz", "correct horse battery staple");
+
+        assert!(result.is_ok());
     }
 
     #[test]

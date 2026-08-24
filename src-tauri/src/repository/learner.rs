@@ -11,6 +11,20 @@ pub struct Learner {
     pub school_id: String,
     pub given_name: String,
     pub family_name: String,
+    /// DepEd's national Learner Reference Number, 12 digits. `None` for a
+    /// learner not yet given one (enrolled before this field existed, or
+    /// simply not yet recorded) -- see migration 13's own comment and
+    /// `docs/adr/0017-learner-reference-number-and-sex.md` for why this
+    /// field and `sex` exist but birthdate/guardian contact do not: both
+    /// are required by this app's own already-shipped SF2/report-card
+    /// exports, verified against DepEd's actual official templates,
+    /// rather than added speculatively. Format (exactly 12 digits) and
+    /// per-school uniqueness are enforced by the database, not just here.
+    pub lrn: Option<String>,
+    /// DepEd's own two-value Sex field ('M'/'F'), required by SF2's
+    /// per-learner roster and its gender-based dropout/transfer
+    /// statistics. `None` when not yet recorded.
+    pub sex: Option<String>,
     pub created_at: String,
 }
 
@@ -19,11 +33,14 @@ pub fn create(
     school_id: &str,
     given_name: &str,
     family_name: &str,
+    lrn: Option<&str>,
+    sex: Option<&str>,
 ) -> AppResult<Learner> {
     let id = Uuid::now_v7().to_string();
     conn.execute(
-        "INSERT INTO learners (id, school_id, given_name, family_name) VALUES (?1, ?2, ?3, ?4)",
-        (&id, school_id, given_name, family_name),
+        "INSERT INTO learners (id, school_id, given_name, family_name, lrn, sex) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (&id, school_id, given_name, family_name, lrn, sex),
     )?;
     find_by_id(conn, &id).map(|l| l.expect("row just inserted must exist"))
 }
@@ -34,7 +51,8 @@ pub fn create(
 /// one school read another school's learner by guessing/enumerating ids.
 fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<Learner>> {
     conn.query_row(
-        "SELECT id, school_id, given_name, family_name, created_at FROM learners WHERE id = ?1",
+        "SELECT id, school_id, given_name, family_name, lrn, sex, created_at \
+         FROM learners WHERE id = ?1",
         [id],
         row_to_learner,
     )
@@ -50,7 +68,7 @@ fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<Learner>> {
 /// at the query, not by hiding rows in the UI.
 pub fn list_by_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Learner>> {
     let mut stmt = conn.prepare(
-        "SELECT id, school_id, given_name, family_name, created_at \
+        "SELECT id, school_id, given_name, family_name, lrn, sex, created_at \
          FROM learners WHERE school_id = ?1 ORDER BY family_name, given_name",
     )?;
     let rows = stmt.query_map([school_id], row_to_learner)?;
@@ -69,7 +87,7 @@ pub fn find_by_id_in_school(
     learner_id: &str,
 ) -> AppResult<Option<Learner>> {
     conn.query_row(
-        "SELECT id, school_id, given_name, family_name, created_at \
+        "SELECT id, school_id, given_name, family_name, lrn, sex, created_at \
          FROM learners WHERE id = ?1 AND school_id = ?2",
         (learner_id, school_id),
         row_to_learner,
@@ -95,11 +113,13 @@ pub fn update(
     learner_id: &str,
     given_name: &str,
     family_name: &str,
+    lrn: Option<&str>,
+    sex: Option<&str>,
 ) -> AppResult<Option<Learner>> {
     let rows_affected = conn.execute(
-        "UPDATE learners SET given_name = ?1, family_name = ?2 \
-         WHERE id = ?3 AND school_id = ?4",
-        (given_name, family_name, learner_id, school_id),
+        "UPDATE learners SET given_name = ?1, family_name = ?2, lrn = ?3, sex = ?4 \
+         WHERE id = ?5 AND school_id = ?6",
+        (given_name, family_name, lrn, sex, learner_id, school_id),
     )?;
     if rows_affected == 0 {
         return Ok(None);
@@ -113,7 +133,9 @@ fn row_to_learner(row: &rusqlite::Row) -> rusqlite::Result<Learner> {
         school_id: row.get(1)?,
         given_name: row.get(2)?,
         family_name: row.get(3)?,
-        created_at: row.get(4)?,
+        lrn: row.get(4)?,
+        sex: row.get(5)?,
+        created_at: row.get(6)?,
     })
 }
 
@@ -132,7 +154,7 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let created = create(&conn, &s.id, "Juan", "Dela Cruz").unwrap();
+        let created = create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
         let found = find_by_id(&conn, &created.id).unwrap();
 
         assert_eq!(found, Some(created));
@@ -142,7 +164,7 @@ mod tests {
     fn create_rejects_unknown_school() {
         let conn = open_test_db();
 
-        let result = create(&conn, "missing-school", "Juan", "Dela Cruz");
+        let result = create(&conn, "missing-school", "Juan", "Dela Cruz", None, None);
 
         assert!(result.is_err());
     }
@@ -151,7 +173,7 @@ mod tests {
     fn find_by_id_in_school_returns_the_learner_for_the_correct_school() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let created = create(&conn, &s.id, "Juan", "Dela Cruz").unwrap();
+        let created = create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
 
         let found = find_by_id_in_school(&conn, &s.id, &created.id).unwrap();
 
@@ -163,7 +185,7 @@ mod tests {
         let conn = open_test_db();
         let school_a = school::create(&conn, "School A").unwrap();
         let school_b = school::create(&conn, "School B").unwrap();
-        let learner = create(&conn, &school_a.id, "Juan", "Dela Cruz").unwrap();
+        let learner = create(&conn, &school_a.id, "Juan", "Dela Cruz", None, None).unwrap();
 
         let found = find_by_id_in_school(&conn, &school_b.id, &learner.id).unwrap();
 
@@ -185,9 +207,9 @@ mod tests {
     fn update_changes_the_name_within_the_correct_school() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let created = create(&conn, &s.id, "Juan", "Dela Cruz").unwrap();
+        let created = create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
 
-        let updated = update(&conn, &s.id, &created.id, "Juana", "Dela Cruz").unwrap();
+        let updated = update(&conn, &s.id, &created.id, "Juana", "Dela Cruz", None, None).unwrap();
 
         assert_eq!(
             updated,
@@ -199,13 +221,51 @@ mod tests {
     }
 
     #[test]
+    fn update_sets_lrn_and_sex() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let created = create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+
+        let updated = update(
+            &conn,
+            &s.id,
+            &created.id,
+            "Juan",
+            "Dela Cruz",
+            Some("123456789012"),
+            Some("M"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            updated,
+            Some(Learner {
+                lrn: Some("123456789012".to_string()),
+                sex: Some("M".to_string()),
+                ..created
+            })
+        );
+    }
+
+    #[test]
+    fn create_rejects_an_lrn_already_used_by_another_learner_in_the_same_school() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        create(&conn, &s.id, "Juan", "Dela Cruz", Some("123456789012"), None).unwrap();
+
+        let result = create(&conn, &s.id, "Maria", "Santos", Some("123456789012"), None);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn update_does_not_affect_a_learner_in_a_different_school() {
         let conn = open_test_db();
         let school_a = school::create(&conn, "School A").unwrap();
         let school_b = school::create(&conn, "School B").unwrap();
-        let learner = create(&conn, &school_a.id, "Juan", "Dela Cruz").unwrap();
+        let learner = create(&conn, &school_a.id, "Juan", "Dela Cruz", None, None).unwrap();
 
-        let result = update(&conn, &school_b.id, &learner.id, "Someone", "Else").unwrap();
+        let result = update(&conn, &school_b.id, &learner.id, "Someone", "Else", None, None).unwrap();
 
         assert_eq!(result, None);
         // The original learner, in its real school, is untouched.
@@ -218,7 +278,7 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let result = update(&conn, &s.id, "does-not-exist", "Someone", "Else").unwrap();
+        let result = update(&conn, &s.id, "does-not-exist", "Someone", "Else", None, None).unwrap();
 
         assert_eq!(result, None);
     }

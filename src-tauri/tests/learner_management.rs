@@ -33,7 +33,7 @@ fn update_learner_as_current_session(
     family_name: &str,
 ) -> app_lib::error::AppResult<Option<learner::Learner>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    learner::update(conn, &school_id, learner_id, given_name, family_name)
+    learner::update(conn, &school_id, learner_id, given_name, family_name, None, None)
 }
 
 fn login_as_a_teacher_at(
@@ -53,7 +53,7 @@ fn a_teacher_can_view_and_update_their_own_schools_learner() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
-    let created = learner::create(&conn, &school_a.id, "Juan", "Dela Cruz").unwrap();
+    let created = learner::create(&conn, &school_a.id, "Juan", "Dela Cruz", None, None).unwrap();
 
     let fetched = get_learner_as_current_session(&conn, &sessions, &created.id)
         .unwrap()
@@ -72,7 +72,7 @@ fn a_teacher_cannot_view_another_schools_learner_by_id() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos").unwrap();
+    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     let result =
@@ -89,7 +89,7 @@ fn a_teacher_cannot_update_another_schools_learner_by_id() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos").unwrap();
+    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     let result = update_learner_as_current_session(
@@ -115,7 +115,7 @@ fn a_teacher_cannot_update_another_schools_learner_by_id() {
 fn getting_a_learner_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
-    let learner_row = learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
+    let learner_row = learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
     let result = get_learner_as_current_session(&conn, &sessions, &learner_row.id);
@@ -127,7 +127,7 @@ fn getting_a_learner_requires_a_session_even_if_a_caller_tries_to_bypass_ui_chec
 fn updating_a_learner_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
-    let learner_row = learner::create(&conn, &school_a.id, "Ana", "Santos").unwrap();
+    let learner_row = learner::create(&conn, &school_a.id, "Ana", "Santos", None, None).unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
     let result = update_learner_as_current_session(&conn, &sessions, &learner_row.id, "X", "Y");
@@ -158,10 +158,10 @@ fn the_learner_list_remains_correct_with_a_large_synthetic_roster() {
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     for i in 0..500 {
-        learner::create(&conn, &school_a.id, "Maria", &format!("Santos {i}")).unwrap();
+        learner::create(&conn, &school_a.id, "Maria", &format!("Santos {i}"), None, None).unwrap();
     }
     for i in 0..50 {
-        learner::create(&conn, &school_b.id, "Other", &format!("School {i}")).unwrap();
+        learner::create(&conn, &school_b.id, "Other", &format!("School {i}"), None, None).unwrap();
     }
 
     let start = std::time::Instant::now();

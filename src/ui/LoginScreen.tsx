@@ -59,11 +59,22 @@ export function LoginScreen({ authService, schoolService, onLoggedIn }: LoginScr
       const session = await authService.login(username, password, schoolId);
       onLoggedIn(session);
     } catch (err) {
-      setError(
-        err instanceof ValidationError
-          ? err.message
-          : "We couldn't sign you in. Check your username, password, and school, then try again.",
-      );
+      if (err instanceof ValidationError) {
+        setError(err.message);
+      } else if (String(err).includes("account_locked")) {
+        // See repository::user::verify_credentials on the Rust side —
+        // this only ever fires for a known username after
+        // MAX_FAILED_LOGIN_ATTEMPTS wrong guesses, never for an unknown
+        // one, so it's safe to tell the teacher plainly rather than
+        // folding it into the generic message below.
+        setError(
+          "Too many failed sign-in attempts. This account is temporarily locked — please wait a while and try again, or ask your school's admin for help.",
+        );
+      } else {
+        setError(
+          "We couldn't sign you in. Check your username, password, and school, then try again.",
+        );
+      }
     } finally {
       setSubmitting(false);
     }

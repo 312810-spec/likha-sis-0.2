@@ -1,7 +1,16 @@
+pub mod assessment_category;
+pub mod assessment_item;
+pub mod attendance;
 pub mod auth;
+pub mod class_record;
+pub mod export;
+pub mod grading;
 pub mod learner;
+pub mod learner_score;
 pub mod school;
+pub mod section;
 pub mod setup;
+pub mod subject;
 pub mod user;
 
 use std::sync::{Mutex, MutexGuard};

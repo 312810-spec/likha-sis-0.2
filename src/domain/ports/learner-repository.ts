@@ -10,5 +10,12 @@ import type { Learner } from "../learner";
  */
 export interface LearnerRepository {
   list(): Promise<Learner[]>;
-  create(givenName: string, familyName: string): Promise<Learner>;
+  create(givenName: string, familyName: string, lrn?: string, sex?: "M" | "F"): Promise<Learner>;
+  updateProfile(
+    learnerId: string,
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner | null>;
 }

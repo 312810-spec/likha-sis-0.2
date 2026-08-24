@@ -8,7 +8,28 @@ export class TauriLearnerRepository implements LearnerRepository {
     return invoke<Learner[]>("list_learners_by_school");
   }
 
-  create(givenName: string, familyName: string): Promise<Learner> {
-    return invoke<Learner>("create_learner", { givenName, familyName });
+  create(givenName: string, familyName: string, lrn?: string, sex?: "M" | "F"): Promise<Learner> {
+    return invoke<Learner>("create_learner", {
+      givenName,
+      familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
+    });
+  }
+
+  updateProfile(
+    learnerId: string,
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner | null> {
+    return invoke<Learner | null>("update_learner", {
+      learnerId,
+      givenName,
+      familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
+    });
   }
 }

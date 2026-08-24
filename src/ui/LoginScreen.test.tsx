@@ -28,9 +28,13 @@ class FakeSchoolRepository implements SchoolRepository {
 class FakeAuthRepository implements AuthRepository {
   loginCalls: Array<{ username: string; password: string; schoolId: string }> = [];
   shouldFail = false;
+  shouldLock = false;
 
   async login(username: string, password: string, schoolId: string): Promise<CurrentSession> {
     this.loginCalls.push({ username, password, schoolId });
+    if (this.shouldLock) {
+      throw new Error("account_locked");
+    }
     if (this.shouldFail) {
       throw new Error("authentication_failed");
     }
@@ -123,6 +127,22 @@ describe("LoginScreen", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't sign you in/i);
+    expect(onLoggedIn).not.toHaveBeenCalled();
+  });
+
+  it("shows a specific locked-account message, distinct from the generic failure message", async () => {
+    const user = userEvent.setup();
+    const authRepo = new FakeAuthRepository();
+    authRepo.shouldLock = true;
+    const onLoggedIn = vi.fn();
+    renderLoginScreen({ authRepo, onLoggedIn });
+
+    await waitFor(() => expect(screen.getByLabelText("School")).toHaveValue("s1"));
+    await user.type(screen.getByLabelText("Username"), "ana.cruz");
+    await user.type(screen.getByLabelText("Password"), "wrong");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/temporarily locked/i);
     expect(onLoggedIn).not.toHaveBeenCalled();
   });
 

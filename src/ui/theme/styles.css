@@ -213,6 +213,168 @@ label {
   content: "✓ ";
 }
 
+.monthly-summary-scroll {
+  overflow-x: auto;
+  margin-bottom: var(--spacing-unit);
+}
+
+.monthly-summary {
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.monthly-summary caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.monthly-summary th,
+.monthly-summary td {
+  padding: calc(var(--spacing-unit) * 0.35) calc(var(--spacing-unit) * 0.5);
+  text-align: center;
+  border: 1px solid var(--color-border);
+}
+
+.monthly-summary th[scope="row"] {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.section-switcher {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  margin-bottom: var(--spacing-unit);
+}
+
+.section-switcher button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
+.section-switcher button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.attendance-roster {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--spacing-unit);
+}
+
+.attendance-roster th,
+.attendance-roster td {
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+}
+
+.attendance-roster [role="group"] {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-wrap: wrap;
+}
+
+.attendance-roster button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
+.attendance-roster button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.term-grades {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+}
+
+.score-entry-scroll {
+  overflow-x: auto;
+  margin-bottom: var(--spacing-unit);
+}
+
+.score-entry-input {
+  width: 5rem;
+}
+
+.field-error {
+  margin: calc(var(--spacing-unit) * 0.25) 0 0 0;
+  color: var(--color-danger);
+  font-size: 0.9em;
+}
+
+.score-saved-note {
+  margin: calc(var(--spacing-unit) * 0.25) 0 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+/* Narrow (phone-width) layout: a dense multi-column grid becomes hard to
+   scan and hard to hit accurately with a finger. Rather than shrinking the
+   desktop table further (tiny cells nobody can tap reliably), each roster
+   row becomes its own labeled block — same data, same score-entry
+   interaction model (Enter/blur still saves), stacked instead of tabular
+   so every touch target stays full-width and thumb-sized. This is the one
+   deliberately mobile-specific layout in the app so far; row order and
+   keyboard behavior are unchanged; only the tag semantics -> visual
+   presentation are overridden. */
+@media (max-width: 640px) {
+  .score-entry thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .score-entry,
+  .score-entry tbody,
+  .score-entry tr,
+  .score-entry th,
+  .score-entry td {
+    display: block;
+    width: 100%;
+  }
+
+  .score-entry tr {
+    padding: var(--spacing-unit) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .score-entry tr:first-child {
+    border-top: none;
+  }
+
+  .score-entry th[scope="row"] {
+    font-size: var(--font-size-large);
+    padding: 0 0 calc(var(--spacing-unit) * 0.5) 0;
+    border-top: none;
+  }
+
+  .score-entry td {
+    padding: calc(var(--spacing-unit) * 0.5) 0;
+    border-top: none;
+  }
+
+  .score-entry-input {
+    width: 100%;
+    min-height: 44px;
+    font-size: var(--font-size-large);
+  }
+
+  .score-entry [role="group"] button {
+    min-height: 44px;
+    flex: 1;
+  }
+}
+
 .learner-list {
   list-style: none;
   margin: 0 0 var(--spacing-unit) 0;
@@ -237,4 +399,21 @@ label {
 
 .form-row .field {
   flex: 1;
+}
+
+/* Standard "hidden visually, present for screen readers" pattern — for a
+   label whose text is redundant on screen (e.g. a table column header
+   already says what the cell's input is for) but still required for an
+   accessible name. Never use `display: none`/`visibility: hidden` for
+   this, since those remove the element from the accessibility tree too. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

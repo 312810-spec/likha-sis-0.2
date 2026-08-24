@@ -43,9 +43,10 @@ At session start read:
 4. only ADRs/docs relevant to the current task
 
 Detailed, topic-specific rules live in `.claude/rules/` (architecture,
-security-privacy, testing, project-state) and narrowly-triggered
-procedures live in `.claude/skills/` — read the relevant one when the
-task matches it rather than expecting this file to contain everything.
+security-privacy, testing, project-state, autonomous-development) and
+narrowly-triggered procedures live in `.claude/skills/` — read the
+relevant one when the task matches it rather than expecting this file to
+contain everything.
 
 Inspect code before changing it.
 
@@ -61,12 +62,20 @@ Rules:
 - Never add paid infrastructure/APIs without explicit approval.
 - Record durable decisions in ADRs.
 - Keep this file concise.
-- After completing a milestone with an unambiguous, safe next step
-  already recorded in `docs/CURRENT-HANDOFF.md`/`docs/ACTIVE-PLAN.md`,
-  continue to it automatically rather than stopping to ask — unless it's
-  genuinely blocked, requires a product decision only the user can make,
-  or session/usage limits are reached. Never reopen a milestone already
-  marked complete without a new instruction to do so.
+- Never reopen a milestone already marked complete without a new
+  instruction to do so.
+
+**Default mode is Autonomous Continuous Development** — see
+`.claude/rules/autonomous-development.md` for the full loop and rules.
+In short: a completed milestone is a checkpoint, not a stopping point.
+Verify it, record it, then autonomously select and continue to the next
+highest-value work using LIKHA's priority order above. Stop only for a
+genuine human approval gate (irreducible product-policy choice, external
+material only the user can provide, paid infrastructure, a production
+PII/security gate, a destructive/irreversible operation, unresolvable
+missing compliance evidence, explicit user instruction to stop) or a
+practical session/context boundary — never merely because an M-number
+completed.
 
 ## Completion
 

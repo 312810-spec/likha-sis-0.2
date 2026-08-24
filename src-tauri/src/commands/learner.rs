@@ -29,10 +29,19 @@ pub fn create_learner(
     sessions: State<'_, SessionManager>,
     given_name: String,
     family_name: String,
+    lrn: Option<String>,
+    sex: Option<String>,
 ) -> AppResult<Learner> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    learner::create(&conn, &school_id, &given_name, &family_name)
+    learner::create(
+        &conn,
+        &school_id,
+        &given_name,
+        &family_name,
+        lrn.as_deref(),
+        sex.as_deref(),
+    )
 }
 
 /// `learner_id` identifies WHICH learner; `school_id` (which one it must
@@ -59,8 +68,18 @@ pub fn update_learner(
     learner_id: String,
     given_name: String,
     family_name: String,
+    lrn: Option<String>,
+    sex: Option<String>,
 ) -> AppResult<Option<Learner>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    learner::update(&conn, &school_id, &learner_id, &given_name, &family_name)
+    learner::update(
+        &conn,
+        &school_id,
+        &learner_id,
+        &given_name,
+        &family_name,
+        lrn.as_deref(),
+        sex.as_deref(),
+    )
 }

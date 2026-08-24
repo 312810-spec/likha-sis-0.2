@@ -16,6 +16,15 @@ pub enum AppError {
     /// cases are intentionally indistinguishable here — see `auth::password`
     /// for why — never add a variant that lets a caller tell them apart.
     AuthenticationFailed,
+    /// A login attempt was made against a known username currently within
+    /// its lockout window (see `repository::user::verify_credentials` and
+    /// `docs/adr/0019-account-lockout.md`). Deliberately distinct from
+    /// `AuthenticationFailed` — a disclosed exception to the rule above,
+    /// not a violation of it: this only ever fires for a username that
+    /// already required `MAX_FAILED_LOGIN_ATTEMPTS` wrong guesses to
+    /// reach, a real cost paid first, and it never reveals a correct vs.
+    /// incorrect password for that attempt.
+    AccountLocked,
     /// A protected operation was attempted with no session, an expired
     /// session, or a session scoped to a different school than the data
     /// being requested. Fail closed: this must never be bypassed by a
@@ -36,6 +45,7 @@ impl std::fmt::Display for AppError {
             AppError::Io(e) => write!(f, "io error: {e}"),
             AppError::KeyStore(msg) => write!(f, "key store error: {msg}"),
             AppError::AuthenticationFailed => write!(f, "authentication failed"),
+            AppError::AccountLocked => write!(f, "account locked"),
             AppError::Unauthorized => write!(f, "unauthorized"),
             AppError::AlreadyInitialized => write!(f, "already initialized"),
         }
@@ -88,6 +98,7 @@ impl Serialize for AppError {
             AppError::Io(_) => "io_error",
             AppError::KeyStore(_) => "key_store_error",
             AppError::AuthenticationFailed => "authentication_failed",
+            AppError::AccountLocked => "account_locked",
             AppError::Unauthorized => "unauthorized",
             AppError::AlreadyInitialized => "already_initialized",
         };

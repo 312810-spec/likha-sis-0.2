@@ -6,23 +6,54 @@ import { LearnerApplicationService } from "./learner-service";
 
 class FakeLearnerRepository implements LearnerRepository {
   private learners: Learner[] = [];
-  createCalls: Array<{ givenName: string; familyName: string }> = [];
+  createCalls: Array<{ givenName: string; familyName: string; lrn?: string; sex?: "M" | "F" }> = [];
+  updateProfileCalls: Array<{
+    learnerId: string;
+    givenName: string;
+    familyName: string;
+    lrn?: string;
+    sex?: "M" | "F";
+  }> = [];
 
   async list(): Promise<Learner[]> {
     return [...this.learners];
   }
 
-  async create(givenName: string, familyName: string): Promise<Learner> {
-    this.createCalls.push({ givenName, familyName });
+  async create(
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner> {
+    this.createCalls.push({ givenName, familyName, lrn, sex });
     const learner: Learner = {
       id: `learner-${this.learners.length + 1}`,
       schoolId: "current-session-school",
       givenName,
       familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
       createdAt: "now",
     };
     this.learners.push(learner);
     return learner;
+  }
+
+  async updateProfile(
+    learnerId: string,
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+  ): Promise<Learner | null> {
+    this.updateProfileCalls.push({ learnerId, givenName, familyName, lrn, sex });
+    const existing = this.learners.find((l) => l.id === learnerId);
+    if (!existing) return null;
+    existing.givenName = givenName;
+    existing.familyName = familyName;
+    existing.lrn = lrn ?? null;
+    existing.sex = sex ?? null;
+    return existing;
   }
 }
 
@@ -34,7 +65,9 @@ describe("LearnerApplicationService", () => {
     const learner = await service.enrollLearner("  Ana  ", "  Santos  ");
 
     expect(learner).toMatchObject({ givenName: "Ana", familyName: "Santos" });
-    expect(repo.createCalls).toEqual([{ givenName: "Ana", familyName: "Santos" }]);
+    expect(repo.createCalls).toEqual([
+      { givenName: "Ana", familyName: "Santos", lrn: undefined, sex: undefined },
+    ]);
   });
 
   it("rejects an empty given name without calling the repository", async () => {
@@ -63,6 +96,35 @@ describe("LearnerApplicationService", () => {
     expect(repo.createCalls).toEqual([]);
   });
 
+  it("accepts a valid 12-digit LRN and sex", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    const learner = await service.enrollLearner("Ana", "Santos", "123456789012", "F");
+
+    expect(learner.lrn).toBe("123456789012");
+    expect(learner.sex).toBe("F");
+  });
+
+  it("rejects an LRN that is not exactly 12 digits without calling the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    await expect(service.enrollLearner("Ana", "Santos", "12345")).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.createCalls).toEqual([]);
+  });
+
+  it("treats an empty/whitespace LRN as not provided rather than invalid", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    const learner = await service.enrollLearner("Ana", "Santos", "   ");
+
+    expect(learner.lrn).toBeNull();
+  });
+
   it("listLearners delegates to the repository", async () => {
     const repo = new FakeLearnerRepository();
     await repo.create("Ana", "Santos");
@@ -71,5 +133,32 @@ describe("LearnerApplicationService", () => {
     const learners = await service.listLearners();
 
     expect(learners.map((l) => l.givenName)).toEqual(["Ana"]);
+  });
+
+  it("updateLearnerProfile validates and delegates to the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const created = await repo.create("Ana", "Santos");
+    const service = new LearnerApplicationService(repo);
+
+    const updated = await service.updateLearnerProfile(
+      created.id,
+      "Ana",
+      "Santos",
+      "123456789012",
+      "F",
+    );
+
+    expect(updated).toMatchObject({ lrn: "123456789012", sex: "F" });
+  });
+
+  it("updateLearnerProfile rejects a malformed LRN without calling the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const created = await repo.create("Ana", "Santos");
+    const service = new LearnerApplicationService(repo);
+
+    await expect(
+      service.updateLearnerProfile(created.id, "Ana", "Santos", "not-an-lrn"),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.updateProfileCalls).toEqual([]);
   });
 });

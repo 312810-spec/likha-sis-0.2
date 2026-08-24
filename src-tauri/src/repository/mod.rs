@@ -1,5 +1,15 @@
+pub mod assessment_category;
+pub mod assessment_item;
+pub mod attendance;
+pub mod class_record;
+pub mod grading;
+pub mod grading_computation;
+pub mod learner_score;
 pub mod installation;
 pub mod learner;
 pub mod school;
+pub mod section;
+pub mod section_membership;
 pub mod session;
+pub mod subject;
 pub mod user;
