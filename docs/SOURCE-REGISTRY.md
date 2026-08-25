@@ -87,3 +87,36 @@ evidence.
 | `cargo-nextest`      | Faster Rust test feedback                              | **Already ADOPT** (unchanged) | Recorded ADOPT in an earlier session/machine (see the Compounding Engineering entry above); **not installed in this session's environment**, and not installed now — `cargo check` cannot even compile this crate here (see `docs/VERIFICATION-DEBT.md`'s `windows-future`/`windows-core` conflict), so installing a test-runner ahead of a compiling toolchain would be premature. Per-machine tooling gap, not a decision change.                                                                                                                                                                                                                                                                                                                                                                           |
 | `cargo-mutants`      | Mutation testing for CRITICAL authorization code       | **BLOCKED, not run**          | Genuinely the right kind of target for RBAC's school-scope/capability-denial logic per this milestone's own guidance, but requires `cargo` to compile first — currently blocked by the same pre-existing dependency conflict. Recorded as future pilot work once the Rust toolchain issue is resolved, not skipped by choice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `knip`               | Unused TS files/exports/dependencies                   | **Already ADOPT** (unchanged) | Reused as-is at this milestone's stable checkpoint (`npm run check:deadcode`); no change needed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+
+## Curriculum / Key-Stage Versioning Foundation — DepEd sources actually used (added 2026-08-25)
+
+- **DepEd Order No. 015, s. 2026** (Key Stage grade bands: KS1 Grades
+  1-3, KS2 4-6, KS3 7-10, KS4 11-12/SHS) — already primary-source-PDF-
+  verified by a prior milestone (`docs/adr/0013-deped-grade-computation.md`);
+  reused directly, not re-fetched. VERIFIED.
+- **MATATAG curriculum phased rollout** (SY 2024-2025: K, 1, 4, 7;
+  SY 2025-2026: 2, 3, 5, 8; SY 2026-2027: 6, 9, 10) — triangulated across
+  `matatagcurriculum.ph`, `teachpinas.com`, `depedlibre.com`,
+  `jandhpublications.com` (via `WebSearch`), consistent with a
+  `deped.gov.ph/matatagcurriculumk147/` page title returned by the same
+  search ("Curriculum Phase 1 SY 2024-2025"). LIKELY, well-triangulated
+  across independent secondary sources — **not** primary-source-verified:
+  direct `WebFetch` of `deped.gov.ph` itself (both the FAQ PDF and the
+  revised-K-to-10-curriculum page) was blocked by this environment's
+  network egress policy (`EGRESS_BLOCKED`), so this falls short of
+  ADR-0013's primary-source-PDF bar. Senior High School's MATATAG
+  transition schedule: UNKNOWN/NOT FOUND — sources agree DepEd has not
+  yet released one.
+- **Learning-area/subject-name differences between the prior K to 12
+  curriculum and MATATAG**: UNKNOWN/NOT FOUND this session — not
+  encoded as a difference in `curriculum_learning_areas` seed data (both
+  versions seeded identically); disclosed as a known research gap in
+  `docs/adr/0037-curriculum-key-stage-versioning.md`, not guessed at.
+- **`deped-researcher` dispatch**: attempted once, retried once via
+  `SendMessage` per this project's established agent-resume-failure
+  protocol — both attempts returned "No new content" (the same recurring
+  agent-resume/retrieval failure documented since M7, now also confirmed
+  on this agent type). Direct `WebSearch`/`WebFetch` was substituted
+  rather than retrying a third time, consistent with the established
+  "retry once, then self-review" fallback rule. Recorded in
+  `docs/VERIFICATION-DEBT.md`.

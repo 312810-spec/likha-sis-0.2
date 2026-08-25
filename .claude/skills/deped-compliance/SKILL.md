@@ -20,3 +20,13 @@ guess.
 If no authoritative current source can be found, say so explicitly and
 flag it rather than implementing a plausible-looking guess. Synthetic
 data only for any fixture/test resembling DepEd forms or learner records.
+
+**Known environment limits, don't rediscover these each session**: direct
+`WebFetch` of `deped.gov.ph` is blocked by this environment's network
+egress policy (confirmed 2026-08-25) — triangulated `WebSearch` results
+plus secondary sources are the fallback, and must be disclosed as
+secondary-sourced (not primary-source-verified) rather than upgraded to
+"confirmed" in an ADR. `deped-researcher` has hit this project's
+recurring agent-resume/retrieval failure (documented since M7) on
+multiple occasions — retry once via `SendMessage`, then substitute direct
+`WebSearch`/`WebFetch` yourself rather than retrying further.

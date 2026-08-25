@@ -73,25 +73,31 @@ teacher's session?) — do not implement from assumption; this needs its
 own short scoping pass when RBAC is actually built, using the confirmed
 three-role starting point as the anchor, not a blank slate.
 
-## 4. Curriculum / Key Stage versioning — DIRECTION SET, not yet implemented
+## 4. Curriculum / Key Stage versioning — BUILT (foundation), narrower than the full cohort model
 
-No `curriculum_version`, `key_stage`, or cohort concept exists in the
-schema; `sections.grade_level` is a plain string today. **Decision**:
-shared architecture must not hard-code `grade == 11/12 → one SHS
-curriculum`. Model curriculum as versioned and cohort-aware: school
-year + grade + curriculum version + cohort + implementation status +
-applicable grading policy + applicable subjects + applicable
-form/template, so different SHS cohorts under the same three-term
-calendar can carry different curricula simultaneously. This directly
-generalizes the pattern this codebase already uses for grading policy
-versioning (`grading_weight_policies`, ADR-0013/0015/0016) — apply the
-same "named, versioned, explicitly pinned per record" shape, not a new
-pattern. Do not invent specific current-year policy details without
-authoritative research (`deped-researcher` + `deped-compliance` skill);
-Key Stage 1 descriptive grading and the Grade 12 DO 8, s. 2015 carryover
-remain **blocked on missing primary sources**, per
-`docs/CURRENT-HANDOFF.md`'s existing note — do not re-attempt from a web
-search alone.
+**Built** (2026-08-25, see `docs/adr/0037-curriculum-key-stage-versioning.md`):
+`key_stages` (KS1-KS4 grade bands, global reference data, curriculum-
+independent) and `curriculum_versions` ("K to 12 Basic Education
+Curriculum," default; "MATATAG Curriculum") exist as versioned reference
+data, and `class_records.curriculum_version_id` pins which version
+applies per record — mirroring `grading_weight_policies`/
+`class_records.weight_policy_id`'s already-proven "named, versioned,
+explicitly pinned per record" shape exactly. `school_year` is never
+treated as the curriculum itself.
+
+**Not yet built, narrower scope than this section originally described**:
+the full "school year + grade + curriculum version + **cohort** +
+implementation status + applicable subjects + applicable form/template"
+model. This foundation proves the versioning/pinning/historical-stability
+mechanism; it does not yet model per-cohort rollout tracking, does not
+join `curriculum_learning_areas` to a school's actual `subjects`, and
+does not auto-select a curriculum version by grade level (blocked on
+`sections.grade_level` still being unconstrained free text — building
+grade-level-based auto-resolution now would require exactly the
+"infer from label" shortcut this project avoids). Key Stage 1 descriptive
+grading and the Grade 12 DO 8, s. 2015 carryover remain **blocked on
+missing primary sources**, unchanged from before this milestone — do not
+re-attempt from a web search alone.
 
 ## 5. School Forms — relationships and per-form status
 

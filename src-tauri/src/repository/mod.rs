@@ -3,6 +3,7 @@ pub mod assessment_item;
 pub mod attendance;
 pub mod audit_log;
 pub mod class_record;
+pub mod curriculum;
 pub mod grading;
 pub mod grading_computation;
 pub mod learner_score;

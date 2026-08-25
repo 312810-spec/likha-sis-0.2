@@ -1,5 +1,81 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Curriculum / Key-Stage Versioning Foundation, complete)
+
+**Curriculum / Key-Stage Versioning Foundation is complete.** Full
+record: `docs/adr/0037-curriculum-key-stage-versioning.md`,
+`docs/VERIFICATION-DEBT.md`'s new top entry, `docs/SOURCE-REGISTRY.md`'s
+new curriculum-sources section.
+
+**Architecture**: two deliberately un-joined reference axes — `key_stages`
+(KS1 Grades 1-3, KS2 4-6, KS3 7-10, KS4 11-12; global, curriculum-
+independent, since Key Stage banding is a stable K-12 structural concern,
+not a curriculum-content one) and `curriculum_versions` (two seeded rows:
+"K to 12 Basic Education Curriculum," sole default, and "MATATAG
+Curriculum," not default). `curriculum_learning_areas` lists named
+learning areas per curriculum version — deliberately not joined to
+`subjects` (a school's own freeform subject list still has no DepEd
+classification, the same gap ADR-0015 left open for weight groups; not
+widened here either). `class_records.curriculum_version_id` pins which
+version applies, mirroring `weight_policy_id`'s exact nullable-for-
+migration-safety/COALESCE-to-default shape — with one deliberate
+deviation: it auto-resolves to the default rather than requiring an
+always-visible picker, since nothing yet reads which version is pinned
+to make a different decision (no learning-area validation, no grade-
+computation difference). **Zero UI/TypeScript change** — the same "does
+a normal teacher actually need to configure this" reasoning RBAC already
+established; a teacher never sees an internal curriculum-version id.
+
+**Representative proof**: two curriculum versions are explicitly pinned
+to two different class records; flipping which one is the system-wide
+default (simulating a newer curriculum becoming active) leaves both
+already-pinned records' resolved curriculum unchanged, while a
+never-pinned legacy row correctly follows the new default — proving
+historical stability and coexistence with zero string-based branching
+(`class_record.rs`'s
+`two_curriculum_versions_coexist_and_changing_the_default_does_not_rewrite_an_already_pinned_record`).
+
+**Research**: Key Stage grade bands were already primary-source-verified
+by a prior milestone (ADR-0013, DepEd Order No. 015, s. 2026's own PDF)
+and reused directly. MATATAG's phased rollout (SY 2024-2025 → 2026-2027,
+completing K-10; SHS on a separate, not-yet-released schedule) was
+triangulated across multiple independent secondary sources — `deped.gov.ph`
+itself was unreachable (`WebFetch` blocked by this environment's network
+egress policy), so this falls short of ADR-0013's primary-source bar and
+is disclosed as such, not overstated. No specific MATATAG-vs-prior
+learning-area-name difference was confirmed — none is encoded; both
+curriculum versions seed identical learning-area names.
+
+**Verification**: `npm run quality` (390/390), `check:architecture`,
+`check:dev-preview-isolation`, `knip` all actually re-run clean (Rust-
+only change, so this is a real but partial signal). `cargo check --lib`/
+`cargo test --lib` reconfirmed **BLOCKED**, identical to every prior
+session — this milestone's new Rust is written and manually reviewed,
+not compiler-verified. `deped-researcher` hit this project's recurring
+agent-resume failure on both the initial attempt and one retry (now
+confirmed on this agent type too); direct `WebSearch`/`WebFetch` was
+substituted per the established fallback rule. `architecture-reviewer`
+was dispatched for architecture/data-integrity review — see
+`docs/VERIFICATION-DEBT.md` for the outcome.
+
+**Explicit durable clarification (per this milestone's own instruction)**:
+`school_year` is never treated as the curriculum itself — a curriculum
+can span multiple years, overlap during transition, or cover only part
+of the school (SHS stays on the K to 12 curriculum while K-10 phases
+into MATATAG). Automatic curriculum selection by grade level is
+deliberately not attempted — `sections.grade_level` remains unconstrained
+free text, so any `if grade_level >= 7`-style resolution would be exactly
+the "infer from label" mistake this milestone was told to avoid; that is
+a disclosed prerequisite for a future milestone, not solved here.
+
+**Per explicit instruction: do not begin the next milestone
+automatically.** Recommended next milestone, awaiting approval: see
+`docs/ACTIVE-PLAN.md`'s new top section for the full evaluation — **Teacher
+Load / Class Schedule Foundation** is the leading candidate per the Wave
+1 sequence, but repository evidence should be re-checked before assuming
+it automatically wins over closing the RBAC `add_user_to_school`
+role-authorization gap first.
+
 ## Active Task (2026-08-25, this session — Wave 1A: RBAC Foundation, complete)
 
 **RBAC Foundation (Teacher / Registrar / School Head) is complete.**

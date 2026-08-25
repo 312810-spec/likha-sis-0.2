@@ -74,7 +74,7 @@ fn setup_school(
     let period = grading::create(conn, &school.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
         .unwrap()
         .unwrap();
-    let cr = class_record::create(conn, &school.id, &sec.id, &sub.id, &period.id, K10_POLICY)
+    let cr = class_record::create(conn, &school.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
         .unwrap()
         .unwrap();
     let l = learner::create(conn, &school.id, "Ana", "Cruz", None, None).unwrap();

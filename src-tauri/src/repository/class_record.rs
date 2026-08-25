@@ -3,7 +3,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::error::AppResult;
-use crate::repository::{grading, section, section_membership, subject};
+use crate::repository::{curriculum, grading, section, section_membership, subject};
 
 /// The workspace a teacher opens to record scores for one section, one
 /// subject, one grading period. Carries no `school_year` of its own on
@@ -21,6 +21,14 @@ pub struct ClassRecord {
     pub subject_id: String,
     pub grading_period_id: String,
     pub weight_policy_id: Option<String>,
+    /// `None` only for a class record created before the Curriculum /
+    /// Key-Stage Versioning Foundation milestone — every record created
+    /// since always has one, auto-resolved to the current default when
+    /// not explicitly given (see `create`'s doc comment).
+    /// `resolved_curriculum_version_id_in_school` is the COALESCE-to-
+    /// default lookup, mirroring `resolved_weight_policy_id_in_school`'s
+    /// own shape exactly (docs/adr/0037-curriculum-key-stage-versioning.md).
+    pub curriculum_version_id: Option<String>,
     pub created_at: String,
 }
 
@@ -87,6 +95,14 @@ pub struct ClassRecordDetail {
 /// `UNIQUE (section_id, subject_id, grading_period_id)` constraint (no
 /// duplicate class record for the same combination) is enforced by the
 /// schema itself and surfaces as an `Err`, not a `None` — see migration 7.
+/// `curriculum_version_id`: `None` auto-resolves to the current default
+/// curriculum version — unlike `weight_policy_id`, this is not required to
+/// be explicit, since no behavior yet differs by which curriculum version
+/// is pinned (see `docs/adr/0037-curriculum-key-stage-versioning.md` for
+/// why this is a deliberate deviation from `weight_policy_id`'s
+/// always-explicit convention, not an oversight). `Some(id)` is validated
+/// to exist the same way `weight_policy_id` already is, and rejected the
+/// same way (`Ok(None)`) if it doesn't.
 pub fn create(
     conn: &Connection,
     school_id: &str,
@@ -94,6 +110,7 @@ pub fn create(
     subject_id: &str,
     grading_period_id: &str,
     weight_policy_id: &str,
+    curriculum_version_id: Option<&str>,
 ) -> AppResult<Option<ClassRecord>> {
     let Some(section) = section::find_by_id_in_school(conn, school_id, section_id)? else {
         return Ok(None);
@@ -115,13 +132,30 @@ pub fn create(
     if !policy_exists {
         return Ok(None);
     }
+    let curriculum_version_id = match curriculum_version_id {
+        Some(id) => {
+            if !curriculum::version_exists(conn, id)? {
+                return Ok(None);
+            }
+            id.to_string()
+        }
+        None => curriculum::default_version_id(conn)?,
+    };
 
     let id = Uuid::now_v7().to_string();
     conn.execute(
         "INSERT INTO class_records \
-             (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (&id, school_id, section_id, subject_id, grading_period_id, weight_policy_id),
+             (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id, curriculum_version_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        (
+            &id,
+            school_id,
+            section_id,
+            subject_id,
+            grading_period_id,
+            weight_policy_id,
+            &curriculum_version_id,
+        ),
     )?;
 
     find_by_id_in_school(conn, school_id, &id)
@@ -135,7 +169,8 @@ pub fn find_by_id_in_school(
     id: &str,
 ) -> AppResult<Option<ClassRecord>> {
     conn.query_row(
-        "SELECT id, school_id, section_id, subject_id, grading_period_id, weight_policy_id, created_at \
+        "SELECT id, school_id, section_id, subject_id, grading_period_id, weight_policy_id, \
+             curriculum_version_id, created_at \
          FROM class_records WHERE id = ?1 AND school_id = ?2",
         (id, school_id),
         row_to_class_record,
@@ -350,7 +385,34 @@ fn row_to_class_record(row: &rusqlite::Row) -> rusqlite::Result<ClassRecord> {
         subject_id: row.get(3)?,
         grading_period_id: row.get(4)?,
         weight_policy_id: row.get(5)?,
-        created_at: row.get(6)?,
+        curriculum_version_id: row.get(6)?,
+        created_at: row.get(7)?,
+    })
+}
+
+/// `class_record_id`'s curriculum version, resolved: its own pinned
+/// `curriculum_version_id` (every record created since this milestone
+/// always has one — see `create`), or the current default if it predates
+/// this migration and was left `NULL`. Mirrors
+/// `resolved_weight_policy_id_in_school` exactly. Returns `Ok(None)` only
+/// if `class_record_id` doesn't resolve in `school_id`.
+pub fn resolved_curriculum_version_id_in_school(
+    conn: &Connection,
+    school_id: &str,
+    class_record_id: &str,
+) -> AppResult<Option<String>> {
+    conn.query_row(
+        "SELECT COALESCE(cr.curriculum_version_id, dcv.id) \
+         FROM class_records cr \
+         JOIN curriculum_versions dcv ON dcv.is_default = 1 \
+         WHERE cr.id = ?1 AND cr.school_id = ?2",
+        (class_record_id, school_id),
+        |row| row.get(0),
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
     })
 }
 
@@ -390,7 +452,7 @@ mod tests {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
 
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
             .unwrap()
             .unwrap();
         let found = find_by_id_in_school(&conn, &school_id, &created.id).unwrap();
@@ -408,7 +470,7 @@ mod tests {
             section::create(&conn, &other_school.id, "2026-2027", "7", "Bonifacio").unwrap();
 
         let result =
-            create(&conn, &school_id, &other_section.id, &subject_id, &period_id, K10_POLICY)
+            create(&conn, &school_id, &other_section.id, &subject_id, &period_id, K10_POLICY, None)
                 .unwrap();
 
         assert_eq!(result, None);
@@ -422,7 +484,7 @@ mod tests {
         let other_subject = subject::create(&conn, &other_school.id, "Science").unwrap();
 
         let result =
-            create(&conn, &school_id, &section_id, &other_subject.id, &period_id, K10_POLICY)
+            create(&conn, &school_id, &section_id, &other_subject.id, &period_id, K10_POLICY, None)
                 .unwrap();
 
         assert_eq!(result, None);
@@ -439,7 +501,7 @@ mod tests {
                 .unwrap();
 
         let result =
-            create(&conn, &school_id, &section_id, &subject_id, &other_period.id, K10_POLICY)
+            create(&conn, &school_id, &section_id, &subject_id, &other_period.id, K10_POLICY, None)
                 .unwrap();
 
         assert_eq!(result, None);
@@ -459,6 +521,7 @@ mod tests {
             &subject_id,
             &period_id,
             K10_POLICY,
+            None,
         )
         .unwrap();
 
@@ -474,7 +537,7 @@ mod tests {
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
 
         let result =
-            create(&conn, &school_id, &section_id, &subject_id, &period_id, "does-not-exist")
+            create(&conn, &school_id, &section_id, &subject_id, &period_id, "does-not-exist", None)
                 .unwrap();
 
         assert_eq!(result, None);
@@ -492,6 +555,7 @@ mod tests {
             &subject_id,
             &period_id,
             EPP_TLE_MAPEH_POLICY,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -503,9 +567,9 @@ mod tests {
     fn create_rejects_a_duplicate_combination() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY).unwrap();
+        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None).unwrap();
 
-        let result = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY);
+        let result = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None);
 
         assert!(result.is_err());
     }
@@ -521,6 +585,7 @@ mod tests {
             &subject_id,
             &period_id,
             EPP_TLE_MAPEH_POLICY,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -539,7 +604,7 @@ mod tests {
     fn find_detail_by_id_in_school_returns_none_for_a_different_school() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
             .unwrap()
             .unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
@@ -553,7 +618,7 @@ mod tests {
     fn list_by_school_only_returns_that_schools_class_records_with_joined_names() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY).unwrap();
+        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None).unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let records = list_by_school(&conn, &school_id).unwrap();
@@ -572,7 +637,7 @@ mod tests {
     fn list_and_find_detail_report_item_recorded_and_eligible_counts() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
             .unwrap()
             .unwrap();
         let learner_a =
@@ -621,7 +686,7 @@ mod tests {
     fn list_and_find_detail_report_zero_counts_for_a_class_record_with_no_items_yet() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
             .unwrap()
             .unwrap();
 
@@ -643,6 +708,7 @@ mod tests {
             &subject_id,
             &period_id,
             EPP_TLE_MAPEH_POLICY,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -672,5 +738,190 @@ mod tests {
         assert_eq!(resolved, Some(K10_POLICY.to_string()), "must fall back to the current default policy");
         assert_eq!(detail.weight_policy_id, K10_POLICY);
         assert_eq!(detail.weight_policy_name, "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)");
+    }
+
+    // ---- Curriculum / Key-Stage Versioning Foundation: curriculum_version_id ----
+
+    const K_TO_12_CURRICULUM: &str = "00000000-0000-7000-8000-000000005001";
+    const MATATAG_CURRICULUM: &str = "00000000-0000-7000-8000-000000005002";
+
+    #[test]
+    fn create_auto_resolves_curriculum_version_to_the_current_default_when_not_given() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(created.curriculum_version_id, Some(K_TO_12_CURRICULUM.to_string()));
+    }
+
+    #[test]
+    fn create_accepts_an_explicit_curriculum_version() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            Some(MATATAG_CURRICULUM),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(created.curriculum_version_id, Some(MATATAG_CURRICULUM.to_string()));
+    }
+
+    #[test]
+    fn create_rejects_an_unknown_curriculum_version_id() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+
+        let result = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            Some("does-not-exist"),
+        )
+        .unwrap();
+
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resolved_curriculum_version_id_in_school_falls_back_to_the_default_for_a_legacy_null_row() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        // Simulate a class record predating this milestone: insert
+        // directly, bypassing `create`'s auto-resolution.
+        conn.execute(
+            "INSERT INTO class_records \
+                 (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
+             VALUES ('legacy-cr', ?1, ?2, ?3, ?4, ?5)",
+            (&school_id, &section_id, &subject_id, &period_id, K10_POLICY),
+        )
+        .unwrap();
+
+        let resolved =
+            resolved_curriculum_version_id_in_school(&conn, &school_id, "legacy-cr").unwrap();
+
+        assert_eq!(
+            resolved,
+            Some(K_TO_12_CURRICULUM.to_string()),
+            "must fall back to the current default curriculum version"
+        );
+    }
+
+    /// The representative proof that two curriculum versions genuinely
+    /// coexist without corrupting historical meaning: one class record is
+    /// explicitly pinned to the K to 12 curriculum, a second to MATATAG.
+    /// Flipping which version is system-wide default (simulating "a newer
+    /// curriculum version becomes available/active") must not change
+    /// either already-pinned record's resolved curriculum — only a
+    /// legacy, never-pinned row would follow the new default. No
+    /// string-based special case is involved anywhere in this path: both
+    /// records are resolved by the exact same
+    /// `resolved_curriculum_version_id_in_school` COALESCE lookup.
+    #[test]
+    fn two_curriculum_versions_coexist_and_changing_the_default_does_not_rewrite_an_already_pinned_record()
+    {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        let other_subject = subject::create(&conn, &school_id, "Science").unwrap();
+
+        let record_on_k_to_12 = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            Some(K_TO_12_CURRICULUM),
+        )
+        .unwrap()
+        .unwrap();
+        let record_on_matatag = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &other_subject.id,
+            &period_id,
+            K10_POLICY,
+            Some(MATATAG_CURRICULUM),
+        )
+        .unwrap()
+        .unwrap();
+
+        // A newer curriculum version becomes the system-wide default.
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 0 WHERE id = ?1",
+            [K_TO_12_CURRICULUM],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 1 WHERE id = ?1",
+            [MATATAG_CURRICULUM],
+        )
+        .unwrap();
+
+        let resolved_k_to_12 =
+            resolved_curriculum_version_id_in_school(&conn, &school_id, &record_on_k_to_12.id)
+                .unwrap();
+        let resolved_matatag =
+            resolved_curriculum_version_id_in_school(&conn, &school_id, &record_on_matatag.id)
+                .unwrap();
+
+        assert_eq!(
+            resolved_k_to_12,
+            Some(K_TO_12_CURRICULUM.to_string()),
+            "an explicitly pinned historical record must keep its own curriculum even after the default changes"
+        );
+        assert_eq!(
+            resolved_matatag,
+            Some(MATATAG_CURRICULUM.to_string()),
+            "the two pinned records must coexist independently, not collapse to whichever is now default"
+        );
+    }
+
+    #[test]
+    fn changing_the_default_curriculum_does_change_an_unpinned_legacy_records_resolution() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        conn.execute(
+            "INSERT INTO class_records \
+                 (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
+             VALUES ('legacy-cr', ?1, ?2, ?3, ?4, ?5)",
+            (&school_id, &section_id, &subject_id, &period_id, K10_POLICY),
+        )
+        .unwrap();
+        assert_eq!(
+            resolved_curriculum_version_id_in_school(&conn, &school_id, "legacy-cr").unwrap(),
+            Some(K_TO_12_CURRICULUM.to_string())
+        );
+
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 0 WHERE id = ?1",
+            [K_TO_12_CURRICULUM],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE curriculum_versions SET is_default = 1 WHERE id = ?1",
+            [MATATAG_CURRICULUM],
+        )
+        .unwrap();
+
+        assert_eq!(
+            resolved_curriculum_version_id_in_school(&conn, &school_id, "legacy-cr").unwrap(),
+            Some(MATATAG_CURRICULUM.to_string()),
+            "only a never-pinned legacy row follows whichever curriculum is currently default"
+        );
     }
 }

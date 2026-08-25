@@ -745,6 +745,157 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- Curriculum / Key-Stage Versioning Foundation. See
+        -- docs/adr/0037-curriculum-key-stage-versioning.md for the full
+        -- research record and architecture decision.
+        --
+        -- Two independent, deliberately un-joined reference axes, per this
+        -- milestone's own explicit rule that school_year/grade is not the
+        -- curriculum itself:
+        --   1. `key_stages` -- DepEd's Key Stage grade-banding (KS1-KS4).
+        --      Already primary-source-verified in this codebase without
+        --      being modeled as data: docs/adr/0013-deped-grade-computation.md
+        --      read DepEd Order No. 015, s. 2026's own PDF text directly
+        --      (Annex D "Guidelines on Numeric Grading System for Key Stage
+        --      2 to 4"; Table 9 "KS2-KS3/Grades 4-10"; "Key Stage 4 (SHS)";
+        --      "Key Stage 1's descriptive-grading conversion"). This
+        --      banding is part of the K to 12 system's own grading
+        --      structure, not something that changes between curriculum
+        --      *content* revisions -- it does not vary by curriculum
+        --      version, so it is NOT foreign-keyed to curriculum_versions.
+        --      Kindergarten's placement relative to Key Stage numbering was
+        --      not confirmed by this milestone's research and is
+        --      deliberately left unmapped rather than guessed.
+        --   2. `curriculum_versions` -- which named curriculum's content/
+        --      competencies apply. Two real, named versions are seeded:
+        --      "K to 12 Basic Education Curriculum" (the baseline
+        --      curriculum; still in effect for Senior High School, Grades
+        --      11-12, whose own MATATAG transition schedule DepEd has not
+        --      yet released) and "MATATAG Curriculum" (the revised K-10
+        --      curriculum, phased in by grade level SY 2024-2025 through
+        --      SY 2026-2027 -- triangulated across multiple independent
+        --      secondary sources reporting the same phase schedule, plus
+        --      DepEd's own deped.gov.ph/matatagcurriculumk147/ phase-1
+        --      page). The K to 12 curriculum is seeded as the sole
+        --      default: with no grade-level normalization yet (`sections.
+        --      grade_level` remains free text -- see below) there is no
+        --      safe way to auto-resolve "MATATAG for K-10, K-12 for SHS"
+        --      per record, and Senior High School unambiguously still
+        --      needs the older curriculum, so the version that already
+        --      covers the whole school without guessing is the safer
+        --      system-wide default. Mirrors the `grading_policies` (M11)/
+        --      `grading_weight_policies` (M13) versioned-reference-data
+        --      shape exactly, including the same "at most one default"
+        --      structural guard.
+        --
+        -- `curriculum_learning_areas` records which named learning areas a
+        -- curriculum version defines -- reference data a future milestone
+        -- can read, not yet joined to `subjects` (a school's own freeform
+        -- subject list already has no DepEd classification, the same
+        -- deliberate gap ADR-0015 disclosed for weight groups; forcing a
+        -- new required relationship onto `subjects` now would be exactly
+        -- the "full curriculum administration product" this milestone is
+        -- not building). This session's research did not confirm any
+        -- specific learning-area *name* difference between the two
+        -- versions (MATATAG subject-structure specifics were not
+        -- verifiable against a primary source this session), so both
+        -- versions are seeded with the same already-verified DepEd
+        -- learning-area names this codebase already cites elsewhere
+        -- (grading_weight_policies' own source citations) -- the
+        -- structure supports two versions diverging later; today's
+        -- content does not yet encode a known difference, and none is
+        -- invented.
+        CREATE TABLE key_stages (
+            id TEXT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            min_grade_level INTEGER NOT NULL,
+            max_grade_level INTEGER NOT NULL,
+            source_citation TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            CHECK (min_grade_level <= max_grade_level)
+        );
+
+        CREATE TABLE curriculum_versions (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            source_citation TEXT NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        -- At most one default curriculum version -- the same structural
+        -- guard as migrations 6/9/13's own default-reference-data indexes
+        -- (a SELECT-then-act check has already caused two real races in
+        -- this project's history, M4 and M6).
+        CREATE UNIQUE INDEX idx_one_default_curriculum_version
+            ON curriculum_versions(is_default) WHERE is_default = 1;
+
+        CREATE TABLE curriculum_learning_areas (
+            id TEXT PRIMARY KEY,
+            curriculum_version_id TEXT NOT NULL REFERENCES curriculum_versions(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            UNIQUE (curriculum_version_id, name)
+        );
+
+        -- A class record now pins which curriculum version applied when it
+        -- was created -- mirroring `class_records.weight_policy_id`'s exact
+        -- shape (M15): nullable only for migration safety (an existing
+        -- row predates this column and is left NULL, resolved to the
+        -- current default by `resolved_curriculum_version_id_in_school`,
+        -- never rewritten in place). Unlike `weight_policy_id`, this is
+        -- deliberately auto-resolved to the default rather than requiring
+        -- an always-visible picker: today exactly one curriculum version
+        -- is meaningfully in effect for any given class record (this
+        -- milestone does not yet drive any different behavior --
+        -- learning-area validation, grade computation -- off which
+        -- version is pinned), so forcing a teacher to choose between two
+        -- internal curriculum identifiers would be exactly the
+        -- unnecessary configuration this milestone's own design principle
+        -- warns against. See docs/adr/0037-curriculum-key-stage-versioning.md.
+        ALTER TABLE class_records ADD COLUMN curriculum_version_id TEXT REFERENCES curriculum_versions(id);
+
+        INSERT INTO key_stages (id, code, label, min_grade_level, max_grade_level, source_citation) VALUES
+            ('00000000-0000-7000-8000-000000005011', 'KS1', 'Key Stage 1', 1, 3,
+             'DepEd Order No. 015, s. 2026, Annex D: Key Stage 1 uses a separate descriptive-grading conversion, not the numeric system this Order defines for Key Stages 2-4. Kindergarten''s placement relative to this numbering was not confirmed and is deliberately left unmapped.'),
+            ('00000000-0000-7000-8000-000000005012', 'KS2', 'Key Stage 2', 4, 6,
+             'DepEd Order No. 015, s. 2026, Annex D "Guidelines on Numeric Grading System for Key Stage 2 to 4"; Table 9 covers "KS2-KS3/Grades 4-10" for the core subject-weighting group.'),
+            ('00000000-0000-7000-8000-000000005013', 'KS3', 'Key Stage 3', 7, 10,
+             'DepEd Order No. 015, s. 2026, Annex D "Guidelines on Numeric Grading System for Key Stage 2 to 4"; Table 9 covers "KS2-KS3/Grades 4-10" for the core subject-weighting group.'),
+            ('00000000-0000-7000-8000-000000005014', 'KS4', 'Key Stage 4', 11, 12,
+             'DepEd Order No. 015, s. 2026, Annex D: "Key Stage 4 (SHS)" -- Table 10''s six Senior High School subject-group weighting variants, not yet implemented by this application (see docs/adr/0016-shs-and-exceptional-grading-policies.md).');
+
+        INSERT INTO curriculum_versions (id, name, source_citation, is_default) VALUES
+            ('00000000-0000-7000-8000-000000005001',
+             'K to 12 Basic Education Curriculum',
+             'The baseline curriculum this application''s existing grading-policy research already cites (DepEd Order No. 015, s. 2026 and predecessors). Remains in effect for Senior High School (Grades 11-12), whose own MATATAG transition schedule DepEd has not yet released as of this milestone''s research. Seeded as the sole default: this application has no grade-level normalization yet (sections.grade_level remains free text), so there is no safe way to auto-resolve which curriculum applies per record, and this is the curriculum that unambiguously still covers the whole school without guessing.',
+             1),
+            ('00000000-0000-7000-8000-000000005002',
+             'MATATAG Curriculum',
+             'DepEd''s revised K to 10 curriculum ("MATATAG" -- Makabansa, Matatag na Pagkatao, Aktibong Pag-aaral, Tapat na Pagkamamamayan, Angkop na Kurikulum, Guro at Paaralan; see deped.gov.ph/revised-k-to-10-curriculum/). Phased implementation confirmed by school year across multiple independent secondary sources (matatagcurriculum.ph, teachpinas.com, depedlibre.com) plus DepEd''s own deped.gov.ph/matatagcurriculumk147/ phase-1 page: SY 2024-2025 (Kindergarten, Grades 1, 4, 7); SY 2025-2026 (Grades 2, 3, 5, 8); SY 2026-2027 (Grades 6, 9, 10), completing K-10. Senior High School (Grades 11-12) has a separate implementation schedule DepEd has not yet released -- not modeled as transitioning under this version. Specific learning-area/subject-name differences from the prior K to 12 curriculum were not confirmed against a primary source this session and are not encoded as a difference in curriculum_learning_areas.',
+             0);
+
+        INSERT INTO curriculum_learning_areas (id, curriculum_version_id, name) VALUES
+            ('00000000-0000-7000-8000-000000005101', '00000000-0000-7000-8000-000000005001', 'English'),
+            ('00000000-0000-7000-8000-000000005102', '00000000-0000-7000-8000-000000005001', 'Filipino'),
+            ('00000000-0000-7000-8000-000000005103', '00000000-0000-7000-8000-000000005001', 'Mathematics'),
+            ('00000000-0000-7000-8000-000000005104', '00000000-0000-7000-8000-000000005001', 'Science'),
+            ('00000000-0000-7000-8000-000000005105', '00000000-0000-7000-8000-000000005001', 'Araling Panlipunan'),
+            ('00000000-0000-7000-8000-000000005106', '00000000-0000-7000-8000-000000005001', 'GMRC/Values Education'),
+            ('00000000-0000-7000-8000-000000005107', '00000000-0000-7000-8000-000000005001', 'EPP/TLE'),
+            ('00000000-0000-7000-8000-000000005108', '00000000-0000-7000-8000-000000005001', 'MAPEH'),
+            ('00000000-0000-7000-8000-000000005201', '00000000-0000-7000-8000-000000005002', 'English'),
+            ('00000000-0000-7000-8000-000000005202', '00000000-0000-7000-8000-000000005002', 'Filipino'),
+            ('00000000-0000-7000-8000-000000005203', '00000000-0000-7000-8000-000000005002', 'Mathematics'),
+            ('00000000-0000-7000-8000-000000005204', '00000000-0000-7000-8000-000000005002', 'Science'),
+            ('00000000-0000-7000-8000-000000005205', '00000000-0000-7000-8000-000000005002', 'Araling Panlipunan'),
+            ('00000000-0000-7000-8000-000000005206', '00000000-0000-7000-8000-000000005002', 'GMRC/Values Education'),
+            ('00000000-0000-7000-8000-000000005207', '00000000-0000-7000-8000-000000005002', 'EPP/TLE'),
+            ('00000000-0000-7000-8000-000000005208', '00000000-0000-7000-8000-000000005002', 'MAPEH');
+        "#,
+        ),
     ])
 }
 
@@ -1804,5 +1955,236 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM user_school_roles", [], |r| r.get(0))
             .unwrap();
         assert_eq!(count, 0, "a role row must not outlive the membership it depends on");
+    }
+
+    #[test]
+    fn migration_17_seeds_exactly_two_curriculum_versions_with_k_to_12_as_sole_default() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM curriculum_versions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(total, 2);
+
+        let default_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(default_count, 1, "exactly one curriculum version must be the default");
+
+        let default_name: String = conn
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(default_name, "K to 12 Basic Education Curriculum");
+    }
+
+    #[test]
+    fn migration_17_rejects_a_second_default_curriculum_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let result = conn.execute(
+            "UPDATE curriculum_versions SET is_default = 1 \
+             WHERE name = 'MATATAG Curriculum'",
+            [],
+        );
+
+        assert!(result.is_err(), "a second default curriculum version must be rejected");
+    }
+
+    #[test]
+    fn migration_17_seeds_four_key_stages_with_non_overlapping_grade_bands() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT code, min_grade_level, max_grade_level FROM key_stages ORDER BY min_grade_level",
+            )
+            .unwrap();
+        let bands: Vec<(String, i64, i64)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            bands,
+            vec![
+                ("KS1".to_string(), 1, 3),
+                ("KS2".to_string(), 4, 6),
+                ("KS3".to_string(), 7, 10),
+                ("KS4".to_string(), 11, 12),
+            ]
+        );
+    }
+
+    #[test]
+    fn migration_17_rejects_a_key_stage_with_min_grade_level_above_max() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO key_stages (id, code, label, min_grade_level, max_grade_level, source_citation) \
+             VALUES ('bad', 'KSX', 'Bad Stage', 5, 4, 'test')",
+            [],
+        );
+
+        assert!(result.is_err(), "min_grade_level must never exceed max_grade_level");
+    }
+
+    #[test]
+    fn migration_17_seeds_the_same_eight_learning_areas_for_each_curriculum_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT cv.name, COUNT(*) FROM curriculum_learning_areas cla \
+                 JOIN curriculum_versions cv ON cv.id = cla.curriculum_version_id \
+                 GROUP BY cv.name ORDER BY cv.name",
+            )
+            .unwrap();
+        let counts: Vec<(String, i64)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            counts,
+            vec![
+                ("K to 12 Basic Education Curriculum".to_string(), 8),
+                ("MATATAG Curriculum".to_string(), 8),
+            ]
+        );
+    }
+
+    #[test]
+    fn migration_17_rejects_a_learning_area_for_an_unknown_curriculum_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO curriculum_learning_areas (id, curriculum_version_id, name) \
+             VALUES ('bad', 'does-not-exist', 'Made Up Subject')",
+            [],
+        );
+
+        assert!(result.is_err(), "a learning area must reference a real curriculum version");
+    }
+
+    #[test]
+    fn migration_17_rejects_a_duplicate_learning_area_name_within_the_same_curriculum_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO curriculum_learning_areas (id, curriculum_version_id, name) \
+             VALUES ('dup', '00000000-0000-7000-8000-000000005001', 'English')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "the same learning area name must not be duplicated within one curriculum version"
+        );
+    }
+
+    #[test]
+    fn migration_17_class_records_curriculum_version_id_is_nullable_for_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+
+        // Apply only migrations 1-16 to create a class record the way a
+        // pre-M17 database would have -- with no curriculum_version_id
+        // column at all yet.
+        migrations().to_version(&mut conn, 16).unwrap();
+        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2025-2026', 'Grade 7', 'Rizal')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grading_periods (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
+             VALUES ('gp1', 's1', '2025-2026', '00000000-0000-7000-8000-000000000011', '2025-06-01', '2025-10-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO class_records (id, school_id, section_id, subject_id, grading_period_id) \
+             VALUES ('cr1', 's1', 'sec1', 'sub1', 'gp1')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let curriculum_version_id: Option<String> = conn
+            .query_row(
+                "SELECT curriculum_version_id FROM class_records WHERE id = 'cr1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            curriculum_version_id, None,
+            "a class record predating this migration must be left NULL, never backfilled with a guess"
+        );
+    }
+
+    #[test]
+    fn migration_17_rejects_a_class_record_pinning_an_unknown_curriculum_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2025-2026', 'Grade 7', 'Rizal')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grading_periods (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
+             VALUES ('gp1', 's1', '2025-2026', '00000000-0000-7000-8000-000000000011', '2025-06-01', '2025-10-01')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO class_records (id, school_id, section_id, subject_id, grading_period_id, curriculum_version_id) \
+             VALUES ('cr1', 's1', 'sec1', 'sub1', 'gp1', 'does-not-exist')",
+            [],
+        );
+
+        assert!(result.is_err(), "a class record must not pin a curriculum version that doesn't exist");
     }
 }

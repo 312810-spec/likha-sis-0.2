@@ -971,6 +971,48 @@ Durable facts worth remembering without re-reading the ADR:
   dependency-cruiser, repomix, cargo-mutants all evaluated and rejected
   for now against actual repo evidence) — see `docs/SOURCE-REGISTRY.md`.
 
+## Curriculum / Key-Stage Versioning Foundation (added 2026-08-25)
+
+**Complete** — see `docs/adr/0037-curriculum-key-stage-versioning.md`
+for the full decision record. Durable facts worth remembering without
+re-reading the ADR:
+
+- Two deliberately un-joined reference axes: `key_stages` (KS1-KS4 grade
+  bands, global, curriculum-independent — Key Stage banding is a stable
+  K-12 grading-structure concept, not a curriculum-content one) and
+  `curriculum_versions` ("K to 12 Basic Education Curriculum," sole
+  default; "MATATAG Curriculum," not default). `school_year` is never
+  the curriculum itself — a curriculum can span years, overlap during
+  transition, or cover only part of the school (SHS stays on K to 12
+  while K-10 phases into MATATAG).
+- `class_records.curriculum_version_id` pins which version applies per
+  record, mirroring `weight_policy_id`'s exact nullable/COALESCE-to-
+  default shape, with one deliberate deviation: auto-resolved to the
+  default rather than requiring an always-visible picker, since nothing
+  yet reads which version is pinned to make a different decision. Zero
+  UI/TypeScript change was needed.
+- `curriculum_learning_areas` lists learning areas per curriculum
+  version, deliberately not joined to `subjects` (which still has no
+  DepEd classification at all — an existing, unresolved gap from
+  ADR-0015, not widened here).
+- Automatic curriculum selection by grade level is **not** implemented —
+  `sections.grade_level` remains unconstrained free text; building
+  grade-level-based auto-resolution now would require the exact
+  "infer from label" shortcut this milestone was told to avoid. A
+  disclosed prerequisite for future work, not solved here.
+- MATATAG's phased rollout (SY 2024-2025 → 2026-2027) was triangulated
+  from secondary sources, not primary-source-verified — `deped.gov.ph`
+  itself is unreachable from this environment (network egress blocked).
+  Key Stage grade bands, by contrast, were already primary-source-
+  verified by ADR-0013 and reused directly.
+- `deped-researcher` hit the same recurring agent-resume/retrieval
+  failure documented since M7 (now confirmed on this agent type too);
+  direct `WebSearch`/`WebFetch` substituted successfully.
+- `cargo check`/`test` remain blocked by the pre-existing
+  `windows-future`/`windows-core` conflict (unchanged root cause,
+  reconfirmed identical) — this milestone's Rust is manually reviewed,
+  not compiler-verified.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

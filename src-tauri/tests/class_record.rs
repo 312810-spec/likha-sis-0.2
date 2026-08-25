@@ -36,7 +36,7 @@ fn create_as_current_session(
     grading_period_id: &str,
 ) -> app_lib::error::AppResult<Option<class_record::ClassRecord>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    class_record::create(conn, &school_id, section_id, subject_id, grading_period_id, K10_POLICY)
+    class_record::create(conn, &school_id, section_id, subject_id, grading_period_id, K10_POLICY, None)
 }
 
 /// Standing in for `commands::class_record::list_class_records_by_school`.

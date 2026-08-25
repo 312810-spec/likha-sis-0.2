@@ -1,5 +1,40 @@
 # ACTIVE PLAN
 
+## Curriculum / Key-Stage Versioning Foundation (added 2026-08-25) — complete, read this section first
+
+**Complete.** Full decision record: `docs/adr/0037-curriculum-key-stage-versioning.md`.
+Verification record:
+
+- `npm run quality` — PASS, 390/390 (typecheck, lint, format:check,
+  `check:architecture`, vitest), unaffected since this milestone's
+  application changes are Rust-only.
+- `npx knip` — PASS, same pre-existing findings, zero new.
+- `npm run check:dev-preview-isolation` — PASS.
+- `cargo check --lib` / `cargo test --lib` — **BLOCKED**, reconfirmed
+  identical to every prior session's reproduction (`windows-future`
+  0.3.2 vs. `windows-core` 0.62.2, unchanged root cause — see
+  `docs/VERIFICATION-DEBT.md`). This milestone's new migration
+  (`key_stages`/`curriculum_versions`/`curriculum_learning_areas`,
+  `class_records.curriculum_version_id`), `repository/curriculum.rs`,
+  and `class_record.rs`'s new tests are written and manually reviewed
+  against established conventions, not compiler-verified.
+- `cargo clippy`/`cargo nextest` — NOT RUN, same blocker.
+- Independent `architecture-reviewer` — dispatched for architecture/
+  data-integrity review; outcome recorded in `docs/VERIFICATION-DEBT.md`.
+- `deped-researcher` — dispatched for MATATAG/Key-Stage research; hit
+  this project's recurring agent-resume failure on both the initial
+  attempt and one retry (now confirmed on this agent type too); direct
+  `WebSearch`/`WebFetch` substituted successfully, with one real
+  limitation disclosed (`deped.gov.ph` itself unreachable — network
+  egress blocked in this environment) — see `docs/SOURCE-REGISTRY.md`.
+
+**Explicit non-goals honored**: no curriculum administration UI; no
+required relationship forced onto `subjects`; no grade-level
+normalization or automatic curriculum selection by grade level; no
+school-level curriculum activation (no repository evidence this
+milestone showed it was required); no Teacher Load/Schedule, SF1, sync,
+or other Wave 1+ item.
+
 ## Wave 1A: RBAC Foundation (added 2026-08-25) — complete, read this section first
 
 **Complete.** Full decision record: `docs/adr/0036-rbac-foundation.md`.

@@ -1,5 +1,78 @@
 # Verification Debt
 
+## Curriculum / Key-Stage Versioning Foundation: `architecture-reviewer` retrieval failure, self-review substituted (2026-08-25)
+
+`architecture-reviewer` was dispatched to review the new curriculum
+schema/repository code for architecture leakage and data-integrity
+correctness. It completed real work (33 tool uses, ~67K tokens) but
+returned no retrievable findings text — the same recurring agent-resume/
+retrieval failure documented since M7 (also hit this session by
+`deped-researcher`, see below). One retry via `SendMessage` was sent per
+this project's established protocol; per the same protocol, a rigorous
+self-review was performed rather than waiting further or retrying again.
+
+Self-review covered exactly what the dispatched review was asked to
+check: (1) confirmed via `git diff --stat` that zero files under `src/`
+(TS/UI) were touched this milestone — no curriculum/key-stage hardcoding
+is possible in the frontend because there is no frontend code touching
+this concept at all yet. (2) Re-read `resolved_curriculum_version_id_in_school`
+directly: a single generic `COALESCE(cr.curriculum_version_id, dcv.id)`
+lookup with no branching on curriculum name/id anywhere — the same shape
+`resolved_weight_policy_id_in_school` already uses. (3) Confirmed
+`key_stages` has no foreign key to `curriculum_versions` at all (deliberate,
+per the ADR's reasoning that Key Stage banding is curriculum-independent).
+(4) Re-read the migration SQL literally: `CHECK (min_grade_level <=
+max_grade_level)` on `key_stages`, `curriculum_learning_areas.curriculum_version_id`
+is `NOT NULL REFERENCES curriculum_versions(id)`, `idx_one_default_curriculum_version`
+is a `UNIQUE INDEX ... WHERE is_default = 1` (the same structural pattern
+already proven for `grading_policies`/`grading_weight_policies`, not a
+new mechanism). (5) Traced historical-stability directly: `create()`
+always resolves `curriculum_version_id` to a concrete, non-null value
+before insert (explicit-and-validated, or auto-resolved-then-stored) —
+so `COALESCE` never falls through to `dcv.id` (today's default) for any
+row created via `create()`, only for a genuinely pre-existing/legacy row
+with a literal `NULL` column value; confirmed no code path can rewrite an
+already-stored `curriculum_version_id` after creation. (6) Grepped for
+`OR IGNORE` in the new migration/repository code — zero occurrences (the
+RBAC-milestone lesson was not repeated). (7) Confirmed `curriculum_versions`/
+`key_stages`/`curriculum_learning_areas` carry no `school_id` column at
+all (global reference data, matching `grading_weight_policies`), and that
+`class_record::create`'s new parameter follows the exact same "not
+tenant data, existence-check only" pattern already established for
+`weight_policy_id` — no cross-school leak path exists.
+
+**No blocking findings.** Real, non-self independent-review debt for this
+milestone remains open — re-run `architecture-reviewer` once agent-resume
+behavior is confirmed reliably working in a future session.
+
+## Curriculum / Key-Stage Versioning Foundation: Rust unverified by compiler, `deped-researcher` failure (2026-08-25)
+
+`cargo check --lib` was re-run against this milestone's new migration/
+repository code and failed identically to every prior session's
+reproduction (`windows-future` 0.3.2 vs. `windows-core` 0.62.2 — see the
+entry below, unchanged root cause). This milestone's new Rust
+(`key_stages`/`curriculum_versions`/`curriculum_learning_areas` migration
+and tests, `repository/curriculum.rs`, `class_record.rs`'s
+`curriculum_version_id` plumbing) is therefore **written and manually
+reviewed, not compiler-verified or test-run**. `npm run quality`
+(390/390), `check:architecture`, `check:dev-preview-isolation`, and
+`knip` were all actually re-run and are clean — this milestone's changes
+are Rust-only, so TS-side verification is a real, if partial, signal.
+
+`deped-researcher` was dispatched to verify MATATAG curriculum
+rollout/Key-Stage facts and returned no retrievable findings on the
+initial attempt; one retry via `SendMessage` (this project's established
+protocol) also returned "No new content" — the same recurring
+agent-resume/retrieval failure documented since M7, now confirmed on
+this agent type too. Direct `WebSearch`/`WebFetch` was substituted
+instead of a third attempt, and produced usable, triangulated (though not
+fully primary-source-verified — `deped.gov.ph` itself is blocked by this
+environment's network egress policy) findings — see
+`docs/SOURCE-REGISTRY.md`'s new entry for exactly what was and wasn't
+confirmed. Periodically retry `deped-researcher` in a future session once
+the harness appears healthy, per the project's standing reviewer-failure
+rule.
+
 ## Wave 1A RBAC Foundation: `security-reviewer` findings — one fixed, one pre-existing gap recorded (2026-08-25)
 
 Independent `security-reviewer` review of the new RBAC gate was dispatched

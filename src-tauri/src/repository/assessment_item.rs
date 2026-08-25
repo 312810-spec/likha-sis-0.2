@@ -297,7 +297,7 @@ mod tests {
         let period = grading::create(conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
             .unwrap()
             .unwrap();
-        let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, K10_POLICY)
+        let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
             .unwrap()
             .unwrap();
         (s.id, cr.id)

@@ -420,7 +420,7 @@ mod tests {
         let period = grading::create(conn, &s.id, school_year, TERM_1, "2026-06-08", "2026-09-15")
             .unwrap()
             .unwrap();
-        let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, weight_policy_id)
+        let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, weight_policy_id, None)
             .unwrap()
             .unwrap();
         let l = learner::create(conn, &s.id, "Ana", "Cruz", None, None).unwrap();

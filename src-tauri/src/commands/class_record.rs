@@ -41,7 +41,13 @@ pub fn list_grading_weight_policies(
 /// `enroll_learner_in_section` — `class_record::create` verifies each
 /// resolves within the caller's own school (and that the section and
 /// grading period share a school year) before writing; `school_id` still
-/// comes only from the session.
+/// comes only from the session. `curriculum_version_id` is deliberately
+/// not yet a parameter here — this command always requests the current
+/// default (see `class_record::create`'s doc comment for why that's a
+/// deliberate deviation from `weight_policy_id`'s always-explicit
+/// convention). Exposing an explicit choice is future work for when a
+/// teacher genuinely needs one — see
+/// `docs/adr/0037-curriculum-key-stage-versioning.md`.
 #[tauri::command]
 pub fn create_class_record(
     db: State<'_, Mutex<Connection>>,
@@ -60,5 +66,6 @@ pub fn create_class_record(
         &subject_id,
         &grading_period_id,
         &weight_policy_id,
+        None,
     )
 }
