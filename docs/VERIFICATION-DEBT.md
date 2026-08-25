@@ -1,5 +1,49 @@
 # Verification Debt
 
+## RBAC Authorization Corrective Gate: `security-reviewer` retrieval failure, self-review substituted (2026-08-25)
+
+`security-reviewer` was dispatched for an adversarial pass on the
+`add_user_to_school` fix (see the entry below). It completed real work
+(7 tool uses, ~61K tokens) but returned no retrievable findings text —
+the same recurring agent-resume/retrieval failure documented since M7,
+hit twice already this session (Curriculum Foundation's
+`architecture-reviewer`, Codex-plugin-cc research's `deped-researcher`).
+One retry via `SendMessage` was sent per this project's established
+protocol; per the same protocol, a rigorous self-review was performed
+rather than waiting further.
+
+Self-review traced exactly the 10 adversarial questions the dispatched
+review was asked: (1) `add_user_to_school` never reads or writes the
+caller's own roles, only the target `user_id`'s — no self-escalation
+path. (2) `role::grant(&conn, &user_id, &school_id, role::TEACHER)`
+passes the literal `TEACHER` constant, not a parameter — no path to
+grant a different role via this command. (3) The cross-school
+`current_school != school_id` check is unchanged, downstream of the new
+capability check. (4) The whole command holds one `Mutex<Connection>`
+guard for its full duration (`lock_db(&db)` at the top, held to the end
+of the function) — no TOCTOU window, consistent with every other command
+in this codebase. (5) `school_id` is checked against the trusted
+session, never blindly accepted; `user_id`'s lack of restriction is
+unchanged, pre-existing, intentional design (an FK-enforced existence
+check only), not part of this defect. (6) Grepped every production
+caller of `user::add_school_membership`/`role::grant` in
+`src-tauri/src` — only `bootstrap_installation` (already correct) and
+`add_user_to_school` (the fixed defect) — no bypass path exists
+elsewhere. (7) The `Capability::ManageLearners` match arm is untouched;
+only a new arm was added. (8) Re-read the new/updated test bodies:
+`..._blocks_a_session_scoped_to_a_different_school` now grants the
+caller School Head in their own school before attempting the
+cross-school call, correctly isolating that check from the role check;
+`..._denies_a_registrar_only_session` correctly isolates the role check
+alone. (9) No other membership/role-mutating command exists in this
+codebase at all (confirmed via a full grep of `src-tauri/src/commands/`).
+(10) The legitimate School Head case is explicitly tested and asserted
+`.is_ok()`.
+
+**No blocking findings.** Real, non-self independent-review debt for
+this specific fix remains open — re-run `security-reviewer` once
+agent-resume behavior is confirmed reliably working in a future session.
+
 ## Curriculum / Key-Stage Versioning Foundation: `architecture-reviewer` retrieval failure, self-review substituted (2026-08-25)
 
 `architecture-reviewer` was dispatched to review the new curriculum
@@ -97,21 +141,38 @@ NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
    entry below) — verified instead by reproducing the exact SQLite
    semantics in isolation, and the fix is a one-line, easily-inspectable
    change.
-2. **Pre-existing gap, recorded not fixed.** `commands::user::add_user_to_school`
-   only checks that the caller has an active session scoped to the same
+2. **Fixed (2026-08-25, RBAC authorization corrective gate)** —
+   originally: `commands::user::add_user_to_school`
+   only checked that the caller has an active session scoped to the same
    `school_id` being granted into (`auth::authorize_school_membership_grant`)
-   — it does not check the caller's _role_ at all, so today any
+   — it did not check the caller's _role_ at all, so any
    authenticated member of a school (Teacher included) could add a new
-   colleague. This predates Wave 1A (the check itself wasn't touched this
-   milestone, only the new `role::grant(.., TEACHER)` call after it) and is
-   not currently reachable from any UI — `userService`/`add_user_to_school`
-   have no calling screen (confirmed via `npx knip` and a source grep this
-   session). Deciding who should be allowed to grant school membership
-   (School Head only? Registrar too?) is exactly the kind of authority-
-   boundary decision Wave 1A's own scope explicitly deferred beyond its one
-   representative proof (`ManageLearners` on `create_learner`/
-   `update_learner`) — recorded here as real, open debt rather than
-   expanded into an unplanned second capability this milestone.
+   colleague. **Confirmed exploitable end-to-end**, not merely
+   theoretical: any authenticated session could call `register_user`
+   (itself only requires an active session, any role — returns the new
+   account's `user_id`) then `add_user_to_school` (same school, any
+   role) to self-grant that fresh account membership. Grepped every
+   production caller of `user::add_school_membership`/`role::grant`
+   (`src-tauri/src/auth/mod.rs`'s `bootstrap_installation` and
+   `src-tauri/src/commands/user.rs`'s `add_user_to_school` — the only
+   two; `bootstrap_installation` was already correctly gated, reviewed
+   under ADR-0036) — no other vulnerable path existed. Fixed by adding
+   `Capability::ManageSchoolMembership` (School Head only, deliberately
+   excluding Registrar as the conservative choice — onboarding a new
+   school member is treated as a School Head personnel responsibility,
+   not bundled into Registrar's enrollment/records scope) and routing
+   `authorize_school_membership_grant` through the existing
+   `authorize_capability` gate, the same pattern every other
+   capability-checked command already uses. Six regression tests added/
+   updated in `src-tauri/src/auth/mod.rs` proving: School Head succeeds;
+   Teacher-only denied (the exact defect); no-role-at-all denied;
+   Registrar-only denied; cross-school denied (fixture corrected to
+   grant the caller School Head first, isolating the cross-school check
+   from the role check); role revoked mid-session denied on the very
+   next call. Not yet re-verified by `cargo test` — blocked by the
+   unrelated pre-existing `windows-future` conflict below; independent
+   `security-reviewer` dispatched for an adversarial pass. Still not
+   reachable from any UI (unchanged).
 
 ## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 

@@ -1041,6 +1041,31 @@ re-reading the ADR:
   whether credentials exist. A real pilot task requires a machine
   without that restriction.
 
+## RBAC Authorization Corrective Gate (added 2026-08-25)
+
+**`add_user_to_school`'s reported role-authorization gap: CONFIRMED and
+fixed.** Full record: `docs/VERIFICATION-DEBT.md`'s updated RBAC entry.
+Durable facts:
+
+- The gate (`auth::authorize_school_membership_grant`) checked only
+  session/school scope, never role — any authenticated Teacher could add
+  a new member to their own school. Confirmed exploitable end-to-end via
+  `register_user` (mints an account, any role) then the unguarded
+  `add_user_to_school`.
+- Fixed with `Capability::ManageSchoolMembership`, School Head only
+  (Registrar deliberately excluded — a conservative product-policy
+  choice, not just a technical fix; broadening to include Registrar is a
+  separate future decision if evidence emerges).
+- Grepped every production caller of `user::add_school_membership`/
+  `role::grant` — only `bootstrap_installation` (already correct) and
+  `add_user_to_school` (the fixed defect) exist. No remove-membership/
+  change-role/deactivate command exists anywhere in this codebase yet,
+  and `user_school_memberships` has no active/revoked flag — those
+  authorization-family questions don't yet apply to anything real.
+- No new ADR — this is an ordinary bug fix inside the architecture
+  ADR-0036 already specified (a capability-oriented gate), not a new
+  architectural decision.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

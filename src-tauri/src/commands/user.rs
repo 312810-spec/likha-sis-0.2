@@ -29,13 +29,18 @@ pub fn register_user(
     result
 }
 
-/// Always requires an active session scoped to `school_id` — see
-/// `register_user`'s doc comment above and ADR-0006. Grants the new
-/// member the Teacher role by default -- the least-privilege starting
-/// point (see `docs/adr/0036-rbac-foundation.md`); this milestone builds
-/// no UI/command to grant Registrar/School Head to anyone other than a
+/// Requires an active session scoped to `school_id` AND that the caller
+/// holds the School-Head-only `ManageSchoolMembership` capability in
+/// that school -- see `register_user`'s doc comment above, ADR-0006, and
+/// `auth::authorize_school_membership_grant`'s doc comment for the
+/// RBAC-corrective-gate fix (this command previously let any
+/// authenticated Teacher add a new member; confirmed exploitable and
+/// closed). Grants the new member the Teacher role by default -- the
+/// least-privilege starting point (see
+/// `docs/adr/0036-rbac-foundation.md`); this codebase still builds no
+/// UI/command to grant Registrar/School Head to anyone other than a
 /// fresh installation's founding user (`auth::bootstrap_installation`),
-/// deliberately out of scope for WAVE 1A.
+/// deliberately out of scope here too.
 #[tauri::command]
 pub fn add_user_to_school(
     db: State<'_, Mutex<Connection>>,

@@ -1,5 +1,56 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — RBAC Authorization Corrective Gate, complete)
+
+**Reported `add_user_to_school` gap: CONFIRMED and fixed.** Full record:
+`docs/VERIFICATION-DEBT.md`'s updated RBAC entry (no new ADR — this is
+an ordinary bug fix, the existing ADR-0036 capability architecture
+already specified the correct shape, just applied incompletely).
+
+**Confirmed, not assumed**: `authorize_school_membership_grant`
+(`src-tauri/src/auth/mod.rs`) checked only "an active session scoped to
+the same school" — no role check. Traced a real, complete exploit chain
+using only two already-existing commands: any authenticated session
+(any role) calls `register_user` to mint a fresh account, then
+`add_user_to_school` (same school, any role accepted) to self-grant that
+account membership. Grepped every production caller of
+`user::add_school_membership`/`role::grant` — only two exist
+(`bootstrap_installation`, already correctly gated; and
+`add_user_to_school`, the confirmed defect) — no sibling vulnerability
+found elsewhere in the authorization family (there is no remove-
+membership, change-role, or deactivate command in this codebase at all
+yet, and `user_school_memberships` has no active/revoked flag — those
+authorization-family questions don't yet apply to anything that exists).
+
+**Fix**: new `Capability::ManageSchoolMembership`, School Head only
+(deliberately excludes Registrar — the conservative choice; onboarding a
+new school member is treated as a School Head personnel matter, not
+Registrar's enrollment/records scope). `authorize_school_membership_grant`
+now routes through the existing `authorize_capability` gate — same
+pattern as every other capability check, no new mechanism. Six
+regression tests prove: School Head succeeds; Teacher-only denied (the
+exact defect); no-role-at-all denied; Registrar-only denied; cross-school
+denied (with a corrected fixture that now isolates the cross-school
+check from the role check); role revoked mid-session denied on the very
+next call (no caching). TOCTOU: none introduced or found — the whole
+command runs under one held `Mutex<Connection>` lock, same as every
+other command in this codebase.
+
+**Verification**: `npm run quality` 390/390, `check:dev-preview-isolation`,
+`knip` all re-run clean (unaffected — Rust-only fix). `cargo check --lib`
+reconfirmed **BLOCKED**, identical pre-existing `windows-future` conflict
+— this fix is written and manually reviewed, not compiler-verified.
+Independent `security-reviewer` dispatched for an adversarial pass
+attempting to break the fix; outcome recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Codex remains PILOT** — not promoted; no live Codex task was run this
+milestone (network/credential blockers unchanged, not re-probed per
+explicit instruction not to re-test a known condition).
+
+**RBAC gate decision and next milestone**: see this session's final
+report. Per explicit instruction, do not begin Teacher Load / Class
+Schedule until that decision is delivered and approved.
+
 ## Active Task (2026-08-25, this session — Codex Delegation Harness, complete, PILOT)
 
 **Harness-only milestone, no product code changed.** Full record:

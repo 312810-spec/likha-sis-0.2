@@ -324,21 +324,36 @@ pub fn authorize_user_registration(conn: &Connection, sessions: &SessionManager)
     Ok(())
 }
 
-/// Gate for the `add_user_to_school` command. Always requires an active
-/// session scoped to the SAME school being granted membership — never a
-/// different school's session, never no session at all. See
-/// `authorize_user_registration`'s doc comment: the previous
-/// unauthenticated exception for a school's very first member had the
-/// same TOCTOU flaw as the original `bootstrap_installation` bug, and is
-/// removed for the same reason, not ported to a write-based guard.
-/// Bootstrapping a school's first member now happens exclusively through
-/// `bootstrap_installation`.
+/// Gate for the `add_user_to_school` command. Requires an active session
+/// scoped to the SAME school being granted membership — never a
+/// different school's session, never no session at all — AND that the
+/// caller holds the `ManageSchoolMembership` capability (School Head
+/// only) in that school. See `authorize_user_registration`'s doc
+/// comment: the previous unauthenticated exception for a school's very
+/// first member had the same TOCTOU flaw as the original
+/// `bootstrap_installation` bug, and is removed for the same reason, not
+/// ported to a write-based guard. Bootstrapping a school's first member
+/// now happens exclusively through `bootstrap_installation`.
+///
+/// **Corrective fix (RBAC authorization gate, post-Wave-1A)**: this
+/// function previously checked only "an active session scoped to this
+/// school," with no role check at all — meaning any authenticated
+/// Teacher could add an arbitrary user as a new member of their own
+/// school. This was a known, disclosed gap recorded as debt in
+/// `docs/adr/0036-rbac-foundation.md` (`add_user_to_school`'s own doc
+/// comment already flagged it), not a silent regression. Confirmed
+/// exploitable end-to-end via two already-existing commands
+/// (`register_user` to obtain a fresh `user_id`, then the unguarded
+/// `add_user_to_school` to self-grant that account membership) before
+/// this fix. Now routed through `authorize_capability`, the same
+/// trusted gate every other capability-checked command in this codebase
+/// uses — reusing the existing pattern, not inventing a new one.
 pub fn authorize_school_membership_grant(
     conn: &Connection,
     sessions: &SessionManager,
     school_id: &str,
 ) -> AppResult<()> {
-    let current_school = sessions.require_active_school_scope(conn)?;
+    let current_school = authorize_capability(conn, sessions, Capability::ManageSchoolMembership)?;
     if current_school != school_id {
         return Err(AppError::Unauthorized);
     }
@@ -362,12 +377,23 @@ pub enum Capability {
     /// authorization proof for this milestone -- see
     /// `docs/adr/0036-rbac-foundation.md`.
     ManageLearners,
+    /// Add an existing user account as a member of a school (and grant
+    /// them a role -- currently always the least-privilege Teacher role,
+    /// see `commands::user::add_user_to_school`). School Head only --
+    /// see `authorize_school_membership_grant`'s doc comment for why
+    /// this was tightened from "any authenticated session in the same
+    /// school" (the RBAC Foundation milestone's disclosed, deliberately
+    /// deferred gap) to a real role check, and why School-Head-only was
+    /// chosen as the conservative fix rather than also including
+    /// Registrar.
+    ManageSchoolMembership,
 }
 
 impl Capability {
     fn allowed_roles(self) -> &'static [&'static str] {
         match self {
             Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -825,6 +851,9 @@ mod tests {
         let school_b = school::create(&conn, "School B").unwrap();
         let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
         user::add_school_membership(&conn, &teacher_a.id, &school_a.id).unwrap();
+        // A School Head in School A -- so this test isolates the
+        // cross-school check, not the (separately tested) role check.
+        role_repo::grant(&conn, &teacher_a.id, &school_a.id, role_repo::SCHOOL_HEAD).unwrap();
         // School B already has its own first (different) member.
         let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &teacher_b.id, &school_b.id).unwrap();
@@ -837,15 +866,113 @@ mod tests {
     }
 
     #[test]
-    fn authorize_school_membership_grant_allows_a_session_scoped_to_the_same_school() {
+    fn authorize_school_membership_grant_allows_a_school_head_session_in_the_same_school() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let existing = user::create_user(&conn, "teacher.one", "password", "Teacher One").unwrap();
+        let existing = user::create_user(&conn, "principal.one", "password", "Principal One")
+            .unwrap();
         user::add_school_membership(&conn, &existing.id, &s.id).unwrap();
+        role_repo::grant(&conn, &existing.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
         let sessions = SessionManager::new();
-        login(&conn, &sessions, "teacher.one", "password", &s.id).unwrap();
+        login(&conn, &sessions, "principal.one", "password", &s.id).unwrap();
 
         assert!(authorize_school_membership_grant(&conn, &sessions, &s.id).is_ok());
+    }
+
+    // ---- RBAC authorization corrective gate: add_user_to_school ----
+    //
+    // `authorize_school_membership_grant` previously checked only "an
+    // active session scoped to this school" -- no role check at all. Any
+    // authenticated Teacher could add an arbitrary user as a new member
+    // of their own school. Confirmed exploitable end-to-end via two
+    // already-existing commands: `register_user` (any active session,
+    // any role -- returns the new account's id) then the unguarded
+    // `add_user_to_school` (same school, any role) to self-grant that
+    // account membership. Fixed by routing through `authorize_capability`
+    // with a new `ManageSchoolMembership` capability restricted to
+    // School Head, the same trusted-gate pattern every other
+    // capability-checked command in this codebase already uses.
+
+    #[test]
+    fn authorize_school_membership_grant_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::TEACHER).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+
+        let result = authorize_school_membership_grant(&conn, &sessions, &s.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "an ordinary Teacher must not be able to add a new member to their own school -- \
+             this is the exact defect this corrective gate closes"
+        );
+    }
+
+    #[test]
+    fn authorize_school_membership_grant_denies_a_session_with_no_role_granted_at_all() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        // A member with a session but zero role grants -- distinct from
+        // "no session at all", already covered by the unauthenticated
+        // tests above.
+        let member = user::create_user(&conn, "member.a", "password", "Member A").unwrap();
+        user::add_school_membership(&conn, &member.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "member.a", "password", &s.id).unwrap();
+
+        let result = authorize_school_membership_grant(&conn, &sessions, &s.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_school_membership_grant_denies_a_registrar_only_session() {
+        // Registrar is deliberately NOT in ManageSchoolMembership's
+        // allowed-roles list -- onboarding a new school member is a
+        // School Head responsibility, not bundled into Registrar's
+        // enrollment/records scope. See the Capability doc comment.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let registrar = user::create_user(&conn, "registrar.a", "password", "Registrar A")
+            .unwrap();
+        user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
+        role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "registrar.a", "password", &s.id).unwrap();
+
+        let result = authorize_school_membership_grant(&conn, &sessions, &s.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_school_membership_grant_denies_once_the_school_head_role_is_removed_mid_session() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let principal = user::create_user(&conn, "principal.a", "password", "Principal A")
+            .unwrap();
+        user::add_school_membership(&conn, &principal.id, &s.id).unwrap();
+        role_repo::grant(&conn, &principal.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "principal.a", "password", &s.id).unwrap();
+        assert!(authorize_school_membership_grant(&conn, &sessions, &s.id).is_ok());
+
+        conn.execute(
+            "DELETE FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2",
+            (&principal.id, &s.id),
+        )
+        .unwrap();
+
+        let result = authorize_school_membership_grant(&conn, &sessions, &s.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a role revoked mid-session must take effect on the very next call -- no caching"
+        );
     }
 
     #[test]
