@@ -7,5 +7,6 @@
       "runtimeArgs": ["run", "dev"],
       "port": 1420
     }
-  ]
+  ],
+  "autoVerify": false
 }

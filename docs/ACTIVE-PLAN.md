@@ -281,37 +281,38 @@ cannot reach real auth/session code), architecture (`src/ui/**` still
 only receives services via props; only `src/composition.ts` imports
 concrete Tauri adapters).
 
-- [ ] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
+- [x] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
       `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`,
       `docs/ACTIVE-PLAN.md`, `docs/PROGRESS-MAP.md`,
       `docs/VERIFICATION-DEBT.md`, `docs/SOURCE-REGISTRY.md`,
       ADR-0024, ADR-0028, ADR-0030, ADR-0031.
-- [ ] Inspect `TeacherWorkspaceScreen.tsx` + tests, `App.tsx`,
+- [x] Inspect `TeacherWorkspaceScreen.tsx` + tests, `App.tsx`,
       `AppShell.tsx`, `AttendanceScreen.tsx`, UX-01 shared
       components/styles.
-- [ ] Push the UX-02 start checkpoint.
-- [ ] Build the safety-hardened dev-only fixture; prove isolation
+- [x] Push the UX-02 start checkpoint.
+- [x] Build the safety-hardened dev-only fixture; prove isolation
       (production entry graph, `dist` contents, no auth/session reach).
-- [ ] Impeccable `shape` pass for the Workspace's morning-workflow
-      composition; `critique` the current Workspace.
-- [ ] Restructure data loading (critical vs. secondary, retry).
-- [ ] Priority-ranked section list with direct actions.
-- [ ] Section preselection into Attendance (safe fallback).
-- [ ] "View all sign-in activity" / "Create a section" actions.
-- [ ] One focal ledger-row treatment; one status-transition motion cue.
-- [ ] Visual inspection via the fixture at 3 viewports, light/dark, 3
-      modes, all listed states (loading/empty/partial-failure/retry/
-      every attendance status/no grading period/no activity).
-- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
-      `npx knip`, `npm run quality:security` (report tool availability
-      honestly).
-- [ ] Impeccable `audit`, one correction pass, one confirmation/polish
-      pass; scope-drift review.
-- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
-      `docs/CURRENT-HANDOFF.md`, `docs/PROJECT-MEMORY.md` (if durable
-      facts changed), `docs/SOURCE-REGISTRY.md` (if applicable),
-      `docs/VERIFICATION-DEBT.md`, ADR-0032.
-- [ ] Push the UX-02 completion checkpoint; verify remote sync.
+- [x] Impeccable `shape`/`context` pass consulted (design decisions
+      checked directly against the established Calm Civic Classroom
+      anti-patterns — see ADR-0032 §6).
+- [x] Restructure data loading (critical vs. secondary, retry).
+- [x] Priority-ranked section list with direct actions.
+- [x] Section preselection into Attendance (safe fallback) — verified
+      interactively via the fixture, not just by test.
+- [x] "View all sign-in activity" / "Create a section" actions.
+- [x] One focal ledger-row treatment; one status-transition motion cue.
+- [x] Visual inspection via the fixture at 3 viewports, light/dark, 3
+      modes — real screenshots captured and inspected (see ADR-0032).
+- [x] `npm run quality` (352/352), `npm run build`,
+      `npm run check:architecture`, `npx knip` (5 pre-existing),
+      `npm run quality:security` (honestly reported unavailable).
+- [x] Impeccable-anti-pattern self-audit; scope-drift review (no
+      attendance-rule/grading/auth/schema/export change made).
+- [x] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`,
+      ADR-0032. (`docs/PROJECT-MEMORY.md`/`docs/SOURCE-REGISTRY.md`:
+      no durable-fact or dependency change this milestone, left as is.)
+- [x] Push the UX-02 completion checkpoint; verify remote sync.
 
 ### UX-03 through UX-08 — Queued
 

@@ -12,6 +12,16 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface AttendanceScreenProps {
   attendanceService: AttendanceApplicationService;
   sectionService: SectionApplicationService;
+  /** A section to select by default instead of the first loaded section
+   * -- set when a teacher arrives here via TeacherWorkspaceScreen's
+   * "mark/continue/review attendance" action for a specific section.
+   * Verified against the actually-loaded section list before use (never
+   * trusted blindly): if this section no longer exists, this screen
+   * falls back to its ordinary default (the first loaded section) exactly
+   * as if no value had been supplied, rather than silently selecting the
+   * wrong section or leaving nothing selected. See
+   * docs/adr/0032-teacher-workspace-polish.md. */
+  initialSectionId?: string;
 }
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -28,7 +38,11 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-export function AttendanceScreen({ attendanceService, sectionService }: AttendanceScreenProps) {
+export function AttendanceScreen({
+  attendanceService,
+  sectionService,
+  initialSectionId,
+}: AttendanceScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [date, setDate] = useState(todayAsIsoDate);
@@ -53,7 +67,14 @@ export function AttendanceScreen({ attendanceService, sectionService }: Attendan
       .then((result) => {
         if (cancelled) return;
         setSections(result);
-        if (result[0]) setSectionId(result[0].id);
+        // Prefer the workspace-supplied section, but only if it's still
+        // real -- never trust it blindly, and never leave the screen
+        // silently on the wrong section if it was deleted/renamed since.
+        const preselected =
+          initialSectionId && result.some((section) => section.id === initialSectionId)
+            ? initialSectionId
+            : result[0]?.id;
+        if (preselected) setSectionId(preselected);
       })
       .catch(() => {
         if (!cancelled) setError("Could not load sections.");
@@ -64,6 +85,11 @@ export function AttendanceScreen({ attendanceService, sectionService }: Attendan
     return () => {
       cancelled = true;
     };
+    // initialSectionId is intentionally a mount-time-only default, not a
+    // live binding: if a teacher changes the section dropdown by hand, a
+    // later change to initialSectionId (e.g. a stale prop from a parent
+    // re-render) must not silently override their own choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionService]);
 
   useEffect(() => {

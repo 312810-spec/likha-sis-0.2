@@ -8,6 +8,7 @@ import type { GradingPeriod } from "../domain/grading";
 import type { AuditEventType, AuditLogEntry } from "../domain/session";
 import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
+import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { PageHeader } from "./components/PageHeader";
 import { StatusChip, type StatusChipTone } from "./components/StatusChip";
@@ -20,6 +21,15 @@ interface TeacherWorkspaceScreenProps {
   gradingService: GradingApplicationService;
   learnerService: LearnerApplicationService;
   sectionService: SectionApplicationService;
+  /** Opens Attendance with this section already selected -- narrowly
+   * typed, owned by `App.tsx`'s own tab/selection state, not a router or
+   * URL param. See docs/adr/0032-teacher-workspace-polish.md. */
+  onOpenAttendance: (sectionId: string) => void;
+  /** Opens Sections -- used both for "no sections yet" and "this
+   * section has no learners enrolled" (enrollment happens there). */
+  onManageSections: () => void;
+  /** Opens Sign-in Activity. */
+  onViewAuditLog: () => void;
 }
 
 interface SectionAttendanceSummary {
@@ -70,11 +80,52 @@ function formatWhen(createdAt: string): string {
   });
 }
 
-function attendanceStatusTone(markedCount: number, totalCount: number): StatusChipTone {
-  if (totalCount === 0) return "neutral";
-  if (markedCount === 0) return "warning";
-  if (markedCount === totalCount) return "success";
-  return "productive";
+type AttendanceState = "not-started" | "partial" | "complete" | "no-learners";
+
+function attendanceState(markedCount: number, totalCount: number): AttendanceState {
+  if (totalCount === 0) return "no-learners";
+  if (markedCount === 0) return "not-started";
+  if (markedCount < totalCount) return "partial";
+  return "complete";
+}
+
+const ATTENDANCE_STATE_TONE: Record<AttendanceState, StatusChipTone> = {
+  "not-started": "warning",
+  partial: "productive",
+  complete: "success",
+  "no-learners": "neutral",
+};
+
+const ATTENDANCE_STATE_LABEL: Record<AttendanceState, (marked: number, total: number) => string> = {
+  "not-started": () => "not yet marked today",
+  partial: (marked, total) => `${marked} of ${total} marked`,
+  complete: (_marked, total) => `all ${total} marked`,
+  "no-learners": () => "no learners enrolled",
+};
+
+/** Today's-priority ordering: the state a teacher most needs to act on
+ * first sorts first. Not started is the most urgent (nothing done yet);
+ * partial still needs finishing; complete needs nothing further;
+ * no-learners has no attendance task at all yet, so it sorts last.
+ * Ties break alphabetically by section name so the order is fully
+ * deterministic, not incidental to fetch order. This ordering was a
+ * deliberate choice for UX-02 (docs/adr/0032-teacher-workspace-polish.md),
+ * not the default "whatever the backend returned" order the screen used
+ * before it. */
+const ATTENDANCE_STATE_PRIORITY: Record<AttendanceState, number> = {
+  "not-started": 0,
+  partial: 1,
+  complete: 2,
+  "no-learners": 3,
+};
+
+function sortByPriority(summaries: SectionAttendanceSummary[]): SectionAttendanceSummary[] {
+  return [...summaries].sort((a, b) => {
+    const rankDiff =
+      ATTENDANCE_STATE_PRIORITY[attendanceState(a.markedCount, a.totalCount)] -
+      ATTENDANCE_STATE_PRIORITY[attendanceState(b.markedCount, b.totalCount)];
+    return rankDiff !== 0 ? rankDiff : a.section.name.localeCompare(b.section.name);
+  });
 }
 
 function todayAsIsoDate(): string {
@@ -86,14 +137,22 @@ function todayAsIsoDate(): string {
 }
 
 /**
- * A teacher's at-a-glance landing view — today's attendance-marking
- * status per section, each section's currently-open grading period (if
- * any), roster/section counts, and recent sign-in activity.
- * Deliberately built entirely from data every other screen already
- * fetches (sections, today's roster per section, grading periods per
- * school year, the learner list, the audit log) rather than a new
- * backend query — see `docs/adr/0024-teacher-workspace.md` and
- * `docs/adr/0028-workspace-grading-period-status.md`.
+ * A teacher's at-a-glance landing view — a priority-ranked "Today's
+ * attendance" rail (which sections need marking, in what order),
+ * currently-open grading period per section, roster/section counts,
+ * one-click actions into the real workflow, and recent sign-in
+ * activity. Deliberately built entirely from data every other screen
+ * already fetches (sections, today's roster per section, grading
+ * periods per school year, the learner list, the audit log) rather
+ * than a new backend query — see `docs/adr/0024-teacher-workspace.md`,
+ * `docs/adr/0028-workspace-grading-period-status.md`, and
+ * `docs/adr/0032-teacher-workspace-polish.md`.
+ *
+ * Loading is split into two independent paths on purpose: the critical
+ * attendance/grading overview, and the secondary recent-activity list.
+ * A failure in the secondary path must never discard a successfully
+ * loaded critical overview (or vice versa) — each has its own error
+ * state and its own retry.
  */
 export function TeacherWorkspaceScreen({
   displayName,
@@ -102,28 +161,35 @@ export function TeacherWorkspaceScreen({
   gradingService,
   learnerService,
   sectionService,
+  onOpenAttendance,
+  onManageSections,
+  onViewAuditLog,
 }: TeacherWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
   const [learnerCount, setLearnerCount] = useState<number | null>(null);
   const [sectionSummaries, setSectionSummaries] = useState<SectionAttendanceSummary[]>([]);
-  const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [overviewRetryKey, setOverviewRetryKey] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityRetryKey, setActivityRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const today = todayAsIsoDate();
 
-    async function load() {
+    async function loadOverview() {
+      setError(null);
+      setLoading(true);
       try {
-        const [learners, sections, activity] = await Promise.all([
+        const [learners, sections] = await Promise.all([
           learnerService.listLearners(),
           sectionService.listSections(),
-          authService.listAuditLog(),
         ]);
         if (cancelled) return;
         setLearnerCount(learners.length);
-        setRecentActivity(activity.slice(0, RECENT_ACTIVITY_LIMIT));
 
         // Fetch each distinct school year's periods once, not once per
         // section -- sections commonly share a school year, and a
@@ -149,7 +215,7 @@ export function TeacherWorkspaceScreen({
             };
           }),
         );
-        if (!cancelled) setSectionSummaries(summaries);
+        if (!cancelled) setSectionSummaries(sortByPriority(summaries));
       } catch {
         if (!cancelled) setError("Could not load your workspace overview.");
       } finally {
@@ -157,11 +223,33 @@ export function TeacherWorkspaceScreen({
       }
     }
 
-    load();
+    loadOverview();
     return () => {
       cancelled = true;
     };
-  }, [attendanceService, authService, gradingService, learnerService, sectionService]);
+  }, [attendanceService, gradingService, learnerService, sectionService, overviewRetryKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadActivity() {
+      setActivityError(null);
+      setActivityLoading(true);
+      try {
+        const activity = await authService.listAuditLog();
+        if (!cancelled) setRecentActivity(activity.slice(0, RECENT_ACTIVITY_LIMIT));
+      } catch {
+        if (!cancelled) setActivityError("Could not load recent sign-in activity.");
+      } finally {
+        if (!cancelled) setActivityLoading(false);
+      }
+    }
+
+    loadActivity();
+    return () => {
+      cancelled = true;
+    };
+  }, [authService, activityRetryKey]);
 
   return (
     <section aria-label="Workspace">
@@ -171,64 +259,110 @@ export function TeacherWorkspaceScreen({
           mode === "guided" && (
             <p className="field-hint">
               This is your workspace overview — today's attendance-marking status for each of your
-              sections, and recent sign-in activity for your school.
+              sections, in the order that needs your attention first, plus recent sign-in activity
+              for your school.
             </p>
           )
         }
       />
 
-      {error && <Alert tone="error">{error}</Alert>}
-
-      {loading ? (
+      {error ? (
+        <Alert tone="error">
+          <p>{error}</p>
+          <button type="button" onClick={() => setOverviewRetryKey((key) => key + 1)}>
+            Try again
+          </button>
+        </Alert>
+      ) : loading ? (
         <Loading label="Loading your workspace…" />
       ) : (
         <>
-          <p>
+          <p className="workspace-summary">
             {learnerCount} learner{learnerCount === 1 ? "" : "s"} across {sectionSummaries.length}{" "}
             section{sectionSummaries.length === 1 ? "" : "s"}.
           </p>
 
           <h3>Today's attendance</h3>
           {sectionSummaries.length === 0 ? (
-            <p>No sections created yet.</p>
+            <EmptyState>
+              No sections created yet.{" "}
+              <button type="button" onClick={onManageSections}>
+                Create a section
+              </button>
+            </EmptyState>
           ) : (
-            <ul className="learner-list">
-              {sectionSummaries.map(({ section, markedCount, totalCount, openGradingPeriod }) => (
-                <li key={section.id}>
-                  {section.name} — Grade {section.gradeLevel}:{" "}
-                  <StatusChip tone={attendanceStatusTone(markedCount, totalCount)}>
-                    {totalCount === 0
-                      ? "no learners enrolled"
-                      : markedCount === 0
-                        ? "not yet marked today"
-                        : markedCount === totalCount
-                          ? `all ${totalCount} marked`
-                          : `${markedCount} of ${totalCount} marked`}
-                  </StatusChip>
-                  <span className="field-hint">
-                    {" "}
-                    —{" "}
-                    {openGradingPeriod
-                      ? `${openGradingPeriod.label} is open`
-                      : "no grading period currently open"}
-                  </span>
-                </li>
-              ))}
+            <ul className="workspace-priority-rail">
+              {sectionSummaries.map(({ section, markedCount, totalCount, openGradingPeriod }) => {
+                const state = attendanceState(markedCount, totalCount);
+                return (
+                  <li key={section.id} className={`workspace-priority-item is-${state}`}>
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {section.name} — Grade {section.gradeLevel}
+                      </span>
+                      <StatusChip tone={ATTENDANCE_STATE_TONE[state]}>
+                        {ATTENDANCE_STATE_LABEL[state](markedCount, totalCount)}
+                      </StatusChip>
+                      <span className="field-hint workspace-priority-period">
+                        {openGradingPeriod
+                          ? `${openGradingPeriod.label} is open`
+                          : "no grading period currently open"}
+                      </span>
+                    </div>
+                    {state === "no-learners" ? (
+                      <button type="button" onClick={onManageSections}>
+                        Manage sections
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="button-primary"
+                        onClick={() => onOpenAttendance(section.id)}
+                      >
+                        {state === "not-started"
+                          ? "Mark attendance"
+                          : state === "partial"
+                            ? "Continue attendance"
+                            : "Review attendance"}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
+        </>
+      )}
 
-          <h3>Recent sign-in activity</h3>
-          {recentActivity.length === 0 ? (
-            <p>No sign-in activity recorded yet.</p>
-          ) : (
-            <ul className="learner-list">
-              {recentActivity.map((entry) => (
-                <li key={entry.id}>
-                  {entry.username} {EVENT_LABELS[entry.eventType]} — {formatWhen(entry.createdAt)}
-                </li>
-              ))}
-            </ul>
-          )}
+      {/* Rendered as a sibling of the overview block above, not nested
+       * inside it -- a failed/loading overview must not hide a
+       * successfully-loaded activity list, matching this screen's own
+       * split-loading independence guarantee in both directions. See
+       * docs/adr/0032-teacher-workspace-polish.md. */}
+      <h3>Recent sign-in activity</h3>
+      {activityError ? (
+        <Alert tone="error">
+          <p>{activityError}</p>
+          <button type="button" onClick={() => setActivityRetryKey((key) => key + 1)}>
+            Try again
+          </button>
+        </Alert>
+      ) : activityLoading ? (
+        <Loading label="Loading recent activity…" />
+      ) : recentActivity.length === 0 ? (
+        <EmptyState>No sign-in activity recorded yet.</EmptyState>
+      ) : (
+        <>
+          <ul className="learner-list workspace-activity-list">
+            {recentActivity.map((entry) => (
+              <li key={entry.id}>
+                {entry.username} {EVENT_LABELS[entry.eventType]} — {formatWhen(entry.createdAt)}
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={onViewAuditLog}>
+            View all sign-in activity
+          </button>
         </>
       )}
     </section>

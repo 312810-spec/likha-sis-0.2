@@ -6,6 +6,22 @@ or hardware. This is **not** a bug backlog; move an item here only when
 the underlying work is otherwise done and reviewed, and remove it once
 the missing verification actually happens (record what ran and when).
 
+## UX-02 accessibility-reviewer independent review not retrievable (open)
+
+`accessibility-reviewer` was dispatched against UX-02's rewritten
+`TeacherWorkspaceScreen.tsx` (2026-08-25) and hit the same recurring
+agent-resume/retrieval failure first documented in
+`docs/adr/0027-audit-timestamp-readability-fix.md`: both the initial
+dispatch and one permitted retry (asking it directly to resend its
+findings) returned only an empty completion notice, never any actual
+findings content. A rigorous self-review was substituted (recorded in
+`docs/adr/0032-teacher-workspace-polish.md`'s "Independent review"
+section) and found no blocking issue, so this did not block completing
+UX-02, but the owed independent accessibility review itself is still
+open debt. Retry in a future session once there's reason to believe the
+harness issue is fixed; remove this entry once a real review actually
+completes and its findings are recorded.
+
 ## Native visual / screen-reader inspection (open)
 
 No browser/screenshot/rendering tool was available in the sessions that
@@ -32,23 +48,30 @@ pane panel client-side — pixel-level screenshot capture works too
 screenshotted at three viewports, two color schemes, three teacher
 modes).
 
-## Authenticated (post-login) screens are not pixel-verified (open)
+## Authenticated (post-login) screens are pixel-verified via a dev-only fixture — closed 2026-08-25 (closed)
 
 The browser-only `vite dev` server has no live Tauri IPC bridge, so
-nothing past `LoginScreen` can be reached through a real login. UX-01
+nothing past `LoginScreen` could be reached through a real login. UX-01
 (`docs/adr/0031-design-system-and-app-shell.md`) ran a 10-scenario
-decision on how to close this: a dev-only synthetic fixture (rendering
-`AppShell`+nav with a directly-supplied fake session prop, in a
-separate entry point never imported by production code, never touching
-real auth) scored highest, but building it was deliberately deferred
-rather than rushed under time pressure, given the directing prompt's
-explicit "never create a production authentication bypass" warning.
-Structure/ARIA/behavior of authenticated screens (the new grouped nav,
-`AppShell`'s header) IS verified via the passing jsdom test suite;
-pixel rendering is not. Build the fixture (safety-hardened, isolated
-entry point) in whichever of UX-02 through UX-06 first genuinely needs
-authenticated-screen pixel verification, or resume the native
-`@wdio/tauri-service` pilot below if that becomes more tractable first.
+decision on how to close this and selected a dev-only synthetic
+fixture, deferring its construction to whichever milestone first
+genuinely needed it. UX-02
+(`docs/adr/0032-teacher-workspace-polish.md`) built it as its first
+implementation slice: `src/dev-preview/` — a fully separate Vite entry
+never registered in the production build input, a production
+throw-guard in its `main.tsx`, and fixture repositories whose
+auth-related methods throw unconditionally, with two independent
+automated isolation proofs (a fast source-text test plus a built-`dist`
+scan). `TeacherWorkspaceScreen` and `AttendanceScreen` were genuinely
+screenshotted and interacted with through it at three viewports, two
+color schemes, and all three teacher modes this session — the first
+real pixel evidence of an authenticated LIKHA-SIS screen in this
+program. This closes the gap for the screens the fixture wires
+(Workspace, Attendance, Sign-in Activity); each remaining UX milestone
+(UX-03 through UX-06) should extend the same fixture to wire its own
+screens rather than rebuilding the safety architecture, and should
+still consider the native `@wdio/tauri-service` pilot below for the
+Tauri-IPC-specific behavior no browser-only fixture can prove.
 
 ## Playwright CLI coverage is browser-only, not native-binary (open)
 

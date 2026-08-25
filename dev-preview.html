@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>LIKHA-SIS — Dev Preview (NOT the production app)</title>
+  </head>
+  <body>
+    <!--
+      Development-only visual fixture. Not built into the production
+      bundle -- deliberately absent from vite.config.ts's build entry
+      list, so `npm run build` never touches this file. See
+      src/dev-preview/DevPreviewApp.tsx and
+      docs/adr/0032-teacher-workspace-polish.md.
+    -->
+    <div id="dev-preview-root"></div>
+    <script type="module" src="/src/dev-preview/main.tsx"></script>
+  </body>
+</html>

@@ -2,21 +2,19 @@
 
 ## Active Task (2026-08-25)
 
-**UX-02 — Teacher Workspace Polish — in progress.** Start SHA `826bf7d`
-(UX-01's completion commit, verified against actual `git log`/
-`git fetch` before acting — matched the explicit checkpoint given for
-this milestone). Full scope/checklist: `docs/ACTIVE-PLAN.md`'s "UX-02"
-section. First slice: a safety-hardened dev-only visual fixture (per
-ADR-0031's own selected approach) so authenticated screens can finally
-be pixel-verified. Then: a priority-ranked "Today's attendance" rail
-with direct one-click actions (open Attendance pre-selected, manage
-sections, view all sign-in activity), resilient data loading (a
-secondary/audit-log failure must not erase valid attendance info), and
-one authored motion/visual treatment.
-
-**If resuming mid-UX-02**: check `docs/ACTIVE-PLAN.md`'s UX-02
-checklist for exactly which items are done vs. still open before
-continuing.
+**UX-02 — Teacher Workspace Polish — complete.** Start SHA `826bf7d`
+(UX-01's completion commit). See `docs/adr/0032-teacher-workspace-polish.md`
+for full decisions and verification record. Built the safety-hardened
+dev-only visual fixture (`src/dev-preview/`) as the first slice, then
+redesigned `TeacherWorkspaceScreen` into a three-level hierarchy
+(priority-ranked "Today's attendance" rail with direct one-click
+actions, compact overview line, quiet recent-activity list), split
+resilient data loading (secondary-activity failure never erases a
+loaded overview), and section preselection into Attendance. `npm run
+quality` 351/351, real browser-rendered visual verification performed
+across 3 viewports/2 color schemes/3 teacher modes via the fixture.
+**Next queued milestone: UX-03 — Daily Attendance + Monthly Summary**
+(not yet started).
 
 **Previously completed**: UX-01 — Design Tokens, Shared Components, and
 App Shell (start `cb644ef`, completion `826bf7d`) — see

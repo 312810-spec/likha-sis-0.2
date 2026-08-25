@@ -670,6 +670,92 @@ label {
   border-top: 1px solid var(--color-border);
 }
 
+/* Teacher Workspace's "Today's priority" rail (UX-02) -- the one
+   authored focal treatment for this screen: a ledger-row list, not
+   cards, with a left accent bar naming each section's attendance state
+   at a glance. See docs/adr/0032-teacher-workspace-polish.md. */
+.workspace-summary {
+  color: var(--color-text-muted);
+}
+
+.workspace-priority-rail {
+  list-style: none;
+  margin: 0 0 var(--spacing-unit) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.workspace-priority-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-unit);
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.25);
+  background: var(--color-bg);
+  border-left: 4px solid transparent;
+  /* The one motion cue on this screen: the accent bar eases to its new
+     color when attendance state changes (e.g. after marking, then
+     returning here), rather than jumping instantly -- collapses to
+     instant under prefers-reduced-motion via the shared token override. */
+  transition: border-left-color var(--motion-duration-routine) var(--motion-easing-standard);
+}
+
+.workspace-priority-item.is-not-started {
+  border-left-color: var(--color-warning);
+}
+
+.workspace-priority-item.is-partial {
+  border-left-color: var(--color-productive);
+}
+
+.workspace-priority-item.is-complete {
+  border-left-color: var(--color-success);
+}
+
+.workspace-priority-item.is-no-learners {
+  border-left-color: var(--color-border);
+}
+
+.workspace-priority-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.workspace-priority-section {
+  font-weight: 600;
+}
+
+.workspace-priority-period {
+  flex-basis: 100%;
+}
+
+.workspace-activity-list {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .workspace-priority-item {
+    align-items: stretch;
+  }
+
+  .workspace-priority-item > button {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+
 .form-row {
   display: flex;
   gap: var(--spacing-unit);

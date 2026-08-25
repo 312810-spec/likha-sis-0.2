@@ -1,0 +1,95 @@
+import { useState } from "react";
+import { AttendanceApplicationService } from "../application/attendance-service";
+import { AuthApplicationService } from "../application/auth-service";
+import { GradingApplicationService } from "../application/grading-service";
+import { LearnerApplicationService } from "../application/learner-service";
+import { SectionApplicationService } from "../application/section-service";
+import { AppShell } from "../ui/AppShell";
+import { AttendanceScreen } from "../ui/AttendanceScreen";
+import { AuditLogScreen } from "../ui/AuditLogScreen";
+import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
+import { WorkbenchNav } from "../ui/components/WorkbenchNav";
+import type { SignedInTab } from "../ui/components/workbench-nav-data";
+import { ModeProvider } from "../ui/theme/ModeContext";
+import "../ui/theme/styles.css";
+import {
+  FIXTURE_SESSION,
+  FixtureAttendanceRepository,
+  FixtureAuthRepository,
+  FixtureGradingRepository,
+  FixtureLearnerRepository,
+  FixtureSectionRepository,
+} from "./fixtures";
+
+/**
+ * Development-only visual fixture. See `docs/adr/0032-teacher-workspace-polish.md`
+ * for the full safety contract this file and its siblings satisfy:
+ *
+ * - never imported by `src/main.tsx`, `src/App.tsx`, or `src/composition.ts`;
+ * - `npm run build`'s `dist/` output does not contain this fixture
+ *   (proven by `src/dev-preview/isolation.test.ts`, not just asserted);
+ * - constructs only the fixture repositories in `./fixtures.ts`, whose
+ *   `login`/`logout`/`extendSession`/`currentSession` methods throw
+ *   unconditionally -- there is no path from this file to real
+ *   authentication, a real session, Tauri, or SQLite.
+ *
+ * Renders the exact same `AppShell`, `WorkbenchNav`, and screen
+ * components production uses (reused, not duplicated), only three
+ * destinations wired (Workspace, Attendance, Sign-in Activity -- enough
+ * to visually verify UX-02's own changes and the section-preselection
+ * flow between them) so this stays a narrow verification tool, not a
+ * second app shell to maintain.
+ */
+const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
+const authService = new AuthApplicationService(new FixtureAuthRepository());
+const gradingService = new GradingApplicationService(new FixtureGradingRepository());
+const learnerService = new LearnerApplicationService(new FixtureLearnerRepository());
+const sectionService = new SectionApplicationService(new FixtureSectionRepository());
+
+export function DevPreviewApp() {
+  const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
+  const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
+
+  return (
+    <ModeProvider>
+      <AppShell session={FIXTURE_SESSION} onLogout={() => {}}>
+        <div className="alert alert-info" role="status">
+          <p>
+            <strong>Development preview — synthetic data, not the production app.</strong> No real
+            session, no Tauri, no SQLite. See <code>docs/adr/0032-teacher-workspace-polish.md</code>
+            .
+          </p>
+        </div>
+        <WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />
+        {activeTab === "workspace" ? (
+          <TeacherWorkspaceScreen
+            displayName={FIXTURE_SESSION.displayName}
+            attendanceService={attendanceService}
+            authService={authService}
+            gradingService={gradingService}
+            learnerService={learnerService}
+            sectionService={sectionService}
+            onOpenAttendance={(sectionId) => {
+              setAttendanceSectionId(sectionId);
+              setActiveTab("attendance");
+            }}
+            onManageSections={() => setActiveTab("sections")}
+            onViewAuditLog={() => setActiveTab("audit-log")}
+          />
+        ) : activeTab === "attendance" ? (
+          <AttendanceScreen
+            attendanceService={attendanceService}
+            sectionService={sectionService}
+            initialSectionId={attendanceSectionId ?? undefined}
+          />
+        ) : activeTab === "audit-log" ? (
+          <AuditLogScreen authService={authService} />
+        ) : (
+          <div className="alert alert-info" role="status">
+            <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
+          </div>
+        )}
+      </AppShell>
+    </ModeProvider>
+  );
+}

@@ -4,10 +4,12 @@
 Program (ADR-0030), written at UX-00. **As of UX-01 (ADR-0031), the
 token palette, typography, and shared component set below are
 implemented** in `src/ui/theme/styles.css` and `src/ui/components/` —
-not just a target anymore. What's still target-only, not yet applied to
-every screen: the per-screen visual polish of Workspace/Attendance/
-Gradebook/Learner/Section/Auth/Audit belongs to UX-02 through UX-06,
-which have not started.
+not just a target anymore. **As of UX-02 (ADR-0032), the Teacher
+Workspace screen's own information hierarchy and visual treatment are
+implemented and pixel-verified** through a dev-only fixture
+(`src/dev-preview/`). What's still target-only: the per-screen visual
+polish of Attendance/Gradebook/Learner/Section/Auth/Audit belongs to
+UX-03 through UX-06, which have not started.
 
 ## Chosen direction: Calm Civic Classroom
 
@@ -123,6 +125,24 @@ list in ADR-0031's table) without redesigning any screen's own
 information architecture. `Button` was deliberately left as the
 existing CSS-class pattern (`.button-primary` etc.) rather than wrapped
 in a new component — no markup duplication existed to consolidate.
+
+## Teacher Workspace (implemented, UX-02 — see ADR-0032)
+
+The first screen-level application of the direction above, and the
+first authenticated screen this program has pixel-verified end to end
+(via the new `src/dev-preview/` fixture — see ADR-0032 §1). A
+three-level hierarchy, not a second dashboard: a dominant "Today's
+priority" ledger rail (one bordered list, left-accent-bar per row by
+attendance state — not N separate cards), a single-sentence "useful
+overview" (no KPI-card decoration), and a visually secondary "quiet"
+recent-activity list. Status is always conveyed by a text `StatusChip`
+label alongside its color, never color alone. The only content
+reordering in this program so far — sections sorted by a documented
+deterministic attendance-priority rank — carries its rationale in code,
+not just in this doc. Confirmed at three viewports, two color schemes,
+and all three teacher modes: no card-spam, no SaaS-dashboard framing,
+full functional parity across modes (Guided mode's extra copy pushes
+content below the fold but never removes it).
 
 ## Responsive Rules
 

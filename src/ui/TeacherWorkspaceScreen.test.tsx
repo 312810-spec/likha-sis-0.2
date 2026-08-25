@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceApplicationService } from "../application/attendance-service";
 import { AuthApplicationService } from "../application/auth-service";
@@ -41,9 +42,12 @@ class FakeLearnerRepository implements LearnerRepository {
 }
 
 class FakeSectionRepository implements SectionRepository {
+  shouldFail = false;
+
   constructor(private sections: Section[] = []) {}
 
   async list(): Promise<Section[]> {
+    if (this.shouldFail) throw new Error("boom");
     return this.sections;
   }
 
@@ -81,6 +85,8 @@ class FakeAttendanceRepository implements AttendanceRepository {
 }
 
 class FakeAuthRepository implements AuthRepository {
+  shouldFail = false;
+
   constructor(private entries: AuditLogEntry[] = []) {}
 
   async login(): Promise<CurrentSession> {
@@ -98,6 +104,7 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   async listAuditLog(): Promise<AuditLogEntry[]> {
+    if (this.shouldFail) throw new Error("boom");
     return this.entries;
   }
 }
@@ -163,23 +170,32 @@ function renderScreen(options: {
   rostersBySectionId?: Record<string, AttendanceRosterEntry[]>;
   auditLog?: AuditLogEntry[];
   periodsBySchoolYear?: Record<string, GradingPeriod[]>;
+  onOpenAttendance?: (sectionId: string) => void;
+  onManageSections?: () => void;
+  onViewAuditLog?: () => void;
 }) {
-  return render(
+  const sectionRepo = new FakeSectionRepository(options.sections);
+  const authRepo = new FakeAuthRepository(options.auditLog);
+  const result = render(
     <ModeProvider>
       <TeacherWorkspaceScreen
         displayName="Ana Cruz"
         learnerService={new LearnerApplicationService(new FakeLearnerRepository(options.learners))}
-        sectionService={new SectionApplicationService(new FakeSectionRepository(options.sections))}
+        sectionService={new SectionApplicationService(sectionRepo)}
         attendanceService={
           new AttendanceApplicationService(new FakeAttendanceRepository(options.rostersBySectionId))
         }
-        authService={new AuthApplicationService(new FakeAuthRepository(options.auditLog))}
+        authService={new AuthApplicationService(authRepo)}
         gradingService={
           new GradingApplicationService(new FakeGradingRepository(options.periodsBySchoolYear))
         }
+        onOpenAttendance={options.onOpenAttendance ?? vi.fn()}
+        onManageSections={options.onManageSections ?? vi.fn()}
+        onViewAuditLog={options.onViewAuditLog ?? vi.fn()}
       />
     </ModeProvider>,
   );
+  return { ...result, sectionRepo, authRepo };
 }
 
 beforeEach(() => {
@@ -411,7 +427,316 @@ describe("TeacherWorkspaceScreen", () => {
   it("shows a message when there are no sections yet", async () => {
     renderScreen({});
 
-    expect(await screen.findByText("No sections created yet.")).toBeInTheDocument();
+    expect(await screen.findByText(/No sections created yet\./)).toBeInTheDocument();
+  });
+
+  it("offers to create a section from the empty state", async () => {
+    const user = userEvent.setup();
+    const onManageSections = vi.fn();
+    renderScreen({ onManageSections });
+    await screen.findByText(/No sections created yet\./);
+
+    await user.click(screen.getByRole("button", { name: "Create a section" }));
+
+    expect(onManageSections).toHaveBeenCalledTimes(1);
+  });
+
+  it("ranks sections by attention priority: not-started, then partial, then complete, then no-learners", async () => {
+    const complete: Section = {
+      id: "complete",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Zamora",
+      createdAt: "now",
+    };
+    const notStarted: Section = {
+      id: "not-started",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Aguinaldo",
+      createdAt: "now",
+    };
+    const partial: Section = {
+      id: "partial",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const noLearners: Section = {
+      id: "no-learners",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Bonifacio",
+      createdAt: "now",
+    };
+    renderScreen({
+      // Deliberately supplied out of priority order, to prove the
+      // screen re-orders them rather than just reflecting fetch order.
+      sections: [complete, noLearners, partial, notStarted],
+      rostersBySectionId: {
+        complete: [anEntry("present"), anEntry("absent")],
+        "not-started": [anEntry(null), anEntry(null)],
+        partial: [anEntry("present"), anEntry(null)],
+        "no-learners": [],
+      },
+    });
+    await findSectionListItem(/Mabini/);
+
+    const items = screen.getAllByRole("listitem");
+    const names = items.map((item) => item.textContent);
+    expect(names[0]).toContain("Aguinaldo"); // not-started
+    expect(names[1]).toContain("Mabini"); // partial
+    expect(names[2]).toContain("Zamora"); // complete
+    expect(names[3]).toContain("Bonifacio"); // no-learners, sorts last
+  });
+
+  it("opens Attendance for the right section when 'Mark attendance' is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenAttendance = vi.fn();
+    const section: Section = {
+      id: "sec1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    renderScreen({
+      sections: [section],
+      rostersBySectionId: { sec1: [anEntry(null)] },
+      onOpenAttendance,
+    });
+    await findSectionListItem(/Mabini/);
+
+    await user.click(screen.getByRole("button", { name: "Mark attendance" }));
+
+    expect(onOpenAttendance).toHaveBeenCalledWith("sec1");
+  });
+
+  it("labels the action 'Continue attendance' when partially marked and 'Review attendance' when complete", async () => {
+    const partial: Section = {
+      id: "partial",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const complete: Section = {
+      id: "complete",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Rizal",
+      createdAt: "now",
+    };
+    renderScreen({
+      sections: [partial, complete],
+      rostersBySectionId: {
+        partial: [anEntry("present"), anEntry(null)],
+        complete: [anEntry("present")],
+      },
+    });
+    await findSectionListItem(/Mabini/);
+
+    expect(screen.getByRole("button", { name: "Continue attendance" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Review attendance" })).toBeInTheDocument();
+  });
+
+  it("offers 'Manage sections' instead of an attendance action when a section has no learners", async () => {
+    const user = userEvent.setup();
+    const onManageSections = vi.fn();
+    const section: Section = {
+      id: "sec1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    renderScreen({ sections: [section], rostersBySectionId: { sec1: [] }, onManageSections });
+    await findSectionListItem(/Mabini/);
+
+    await user.click(screen.getByRole("button", { name: "Manage sections" }));
+
+    expect(onManageSections).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a 'View all sign-in activity' action when activity exists", async () => {
+    const user = userEvent.setup();
+    const onViewAuditLog = vi.fn();
+    renderScreen({
+      auditLog: [
+        {
+          id: "a1",
+          schoolId: "s1",
+          userId: "u1",
+          username: "ana.cruz",
+          eventType: "login_success",
+          createdAt: "2026-08-25T08:00:00.000Z",
+        },
+      ],
+      onViewAuditLog,
+    });
+    await screen.findByText(/ana.cruz signed in/);
+
+    await user.click(screen.getByRole("button", { name: "View all sign-in activity" }));
+
+    expect(onViewAuditLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an error with retry when the workspace overview fails, and recovers on retry", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const sectionRepo = new FakeSectionRepository([section]);
+    sectionRepo.shouldFail = true;
+    const authRepo = new FakeAuthRepository([]);
+    render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(sectionRepo)}
+          attendanceService={
+            new AttendanceApplicationService(new FakeAttendanceRepository({ sec1: [] }))
+          }
+          authService={new AuthApplicationService(authRepo)}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+
+    expect(await screen.findByText("Could not load your workspace overview.")).toBeInTheDocument();
+
+    sectionRepo.shouldFail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await findSectionListItem(/Mabini/)).toBeInTheDocument();
+    expect(screen.queryByText("Could not load your workspace overview.")).not.toBeInTheDocument();
+  });
+
+  it("shows an error with retry when recent activity fails, without erasing a successfully loaded overview", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const authRepo = new FakeAuthRepository([
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        eventType: "login_success",
+        createdAt: "2026-08-25T08:00:00.000Z",
+      },
+    ]);
+    authRepo.shouldFail = true;
+    render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(new FakeSectionRepository([section]))}
+          attendanceService={
+            new AttendanceApplicationService(
+              new FakeAttendanceRepository({ sec1: [anEntry("present")] }),
+            )
+          }
+          authService={new AuthApplicationService(authRepo)}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+
+    // The critical attendance overview still renders correctly even
+    // though the secondary activity feed is about to fail.
+    expect(await findSectionListItem(/Mabini/)).toBeInTheDocument();
+    expect(await screen.findByText("Could not load recent sign-in activity.")).toBeInTheDocument();
+
+    authRepo.shouldFail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText(/ana.cruz signed in/)).toBeInTheDocument();
+    // The overview data was never touched by the activity failure/retry.
+    expect(await findSectionListItem(/Mabini/)).toBeInTheDocument();
+  });
+
+  it("shows an error with retry when the overview fails, without erasing a successfully loaded activity list", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const sectionRepo = new FakeSectionRepository([section]);
+    sectionRepo.shouldFail = true;
+    const authRepo = new FakeAuthRepository([
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        eventType: "login_success",
+        createdAt: "2026-08-25T08:00:00.000Z",
+      },
+    ]);
+    render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(sectionRepo)}
+          attendanceService={
+            new AttendanceApplicationService(new FakeAttendanceRepository({ sec1: [] }))
+          }
+          authService={new AuthApplicationService(authRepo)}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+
+    // The secondary activity list still renders correctly even though
+    // the critical overview is about to fail -- an overview failure
+    // must not hide already-successfully-loaded activity data, the
+    // same guarantee the reverse-direction test above proves.
+    expect(await screen.findByText("Could not load your workspace overview.")).toBeInTheDocument();
+    expect(await screen.findByText(/ana.cruz signed in/)).toBeInTheDocument();
+
+    sectionRepo.shouldFail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await findSectionListItem(/Mabini/)).toBeInTheDocument();
+    // The activity data was never touched by the overview failure/retry.
+    expect(await screen.findByText(/ana.cruz signed in/)).toBeInTheDocument();
   });
 
   it("has no detectable accessibility violations", async () => {

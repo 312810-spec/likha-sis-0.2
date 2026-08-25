@@ -27,60 +27,10 @@ import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
-import { NavItem } from "./ui/components/NavItem";
+import { WorkbenchNav } from "./ui/components/WorkbenchNav";
+import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
 import "./ui/theme/styles.css";
-
-type SignedInTab =
-  | "workspace"
-  | "learners"
-  | "sections"
-  | "attendance"
-  | "monthly-summary"
-  | "grading-periods"
-  | "class-records"
-  | "audit-log";
-
-interface NavGroup {
-  label: string;
-  tabs: readonly { id: SignedInTab; label: string }[];
-}
-
-/** Groups every existing destination (none removed, none renamed) into
- * the teacher's actual daily rhythm instead of one flat 8-button row --
- * see docs/adr/0031-design-system-and-app-shell.md. */
-const NAV_GROUPS: readonly NavGroup[] = [
-  {
-    label: "Daily Teaching",
-    tabs: [
-      { id: "workspace", label: "Workspace" },
-      { id: "attendance", label: "Attendance" },
-      { id: "monthly-summary", label: "Monthly Summary" },
-    ],
-  },
-  {
-    label: "Learner Records",
-    tabs: [
-      { id: "learners", label: "Learners" },
-      { id: "sections", label: "Sections" },
-    ],
-  },
-  {
-    label: "Grading",
-    tabs: [
-      { id: "grading-periods", label: "Grading Periods" },
-      { id: "class-records", label: "Class Records" },
-    ],
-  },
-  {
-    label: "Security",
-    tabs: [{ id: "audit-log", label: "Sign-in Activity" }],
-  },
-];
-
-const TAB_LABELS: Record<SignedInTab, string> = Object.fromEntries(
-  NAV_GROUPS.flatMap((group) => group.tabs.map((tab) => [tab.id, tab.label])),
-) as Record<SignedInTab, string>;
 
 function App() {
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -88,6 +38,11 @@ function App() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
+  // Set only by TeacherWorkspaceScreen's "mark/continue/review attendance"
+  // action, so AttendanceScreen can open with that section already
+  // selected -- a narrowly-typed prop, not a router/URL param/global
+  // store. See docs/adr/0032-teacher-workspace-polish.md.
+  const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
 
   function handleSessionExpired() {
     setSession(null);
@@ -155,23 +110,7 @@ function App() {
         ) : session ? (
           <>
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
-            <nav aria-label="Teacher workbench" className="workbench-nav">
-              {NAV_GROUPS.map((group) => (
-                <div className="nav-group" key={group.label} role="group" aria-label={group.label}>
-                  <span className="nav-group-label" aria-hidden="true">
-                    {group.label}
-                  </span>
-                  {group.tabs.map((tab) => (
-                    <NavItem
-                      key={tab.id}
-                      label={tab.label}
-                      active={activeTab === tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                    />
-                  ))}
-                </div>
-              ))}
-            </nav>
+            <WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />
             {activeTab === "workspace" ? (
               <TeacherWorkspaceScreen
                 displayName={session.displayName}
@@ -180,6 +119,12 @@ function App() {
                 gradingService={gradingService}
                 learnerService={learnerService}
                 sectionService={sectionService}
+                onOpenAttendance={(sectionId) => {
+                  setAttendanceSectionId(sectionId);
+                  setActiveTab("attendance");
+                }}
+                onManageSections={() => setActiveTab("sections")}
+                onViewAuditLog={() => setActiveTab("audit-log")}
               />
             ) : activeTab === "learners" ? (
               <LearnerListScreen learnerService={learnerService} exportService={exportService} />
@@ -189,6 +134,7 @@ function App() {
               <AttendanceScreen
                 attendanceService={attendanceService}
                 sectionService={sectionService}
+                initialSectionId={attendanceSectionId ?? undefined}
               />
             ) : activeTab === "monthly-summary" ? (
               <MonthlySummaryScreen
