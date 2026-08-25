@@ -2,21 +2,25 @@
 
 ## Active Task (2026-08-25)
 
-**UX-00 — Progress Map Repair + Impeccable Pilot + Visual Baseline —
-complete.** Start SHA `603863b`, completion SHA is this commit. New
-explicit user direction: the "LIKHA-SIS 0.2 — UI-First World-Class
-Product Program," prioritizing UI/teacher-experience polish over
-further feature expansion through a UX-00 → UX-08 tranche, using
-`pbakaus/impeccable` as a critique lens. Full decision record:
-`docs/adr/0030-ui-first-program-and-ux00.md`. Full checklist (all
-items checked): `docs/ACTIVE-PLAN.md`'s "UI-First Tranche" section.
-`PRODUCT.md` and `DESIGN.md` now exist at the repo root — read both
-before starting UX-01.
+**UX-01 — Design Tokens, Shared Components, and App Shell — in
+progress.** Start SHA `fcf26ca` (UX-00's completion commit, verified
+against actual `git log`/`git fetch` before acting — matched the
+explicit checkpoint given for this milestone). Full scope/checklist:
+`docs/ACTIVE-PLAN.md`'s "UX-01" section. Evolves the existing token
+system to Calm Civic Classroom, builds real shared components (Button,
+Alert, Loading, Empty, Status chip, Page header, Nav item), redesigns
+`AppShell`'s navigation, adds one restrained ledger-continuity motion
+treatment. Explicitly does **not** redesign the individual Workspace/
+Attendance/Gradebook/Learner/Section/Auth/Audit screens — those are
+UX-02 through UX-06.
 
-**Next**: UX-01 — Design Tokens, Shared Components, and App Shell (○
-Queued, not started — its own start checkpoint must be pushed before
-any implementation begins, per the milestone contract). See
-`docs/PROGRESS-MAP.md`'s UI-First Tranche table.
+**If resuming mid-UX-01**: check `docs/ACTIVE-PLAN.md`'s UX-01
+checklist for exactly which items are done vs. still open before
+continuing.
+
+**Previously completed**: UX-00 (start `603863b`, completion `fcf26ca`)
+— see `docs/adr/0030-ui-first-program-and-ux00.md`. `PRODUCT.md` and
+`DESIGN.md` exist at the repo root.
 
 ## Status
 

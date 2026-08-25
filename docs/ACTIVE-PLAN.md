@@ -99,13 +99,109 @@ Checklist:
       baseline checks.
 - [x] Push the UX-00 completion commit; verify remote sync.
 
-### UX-01 through UX-08 — Queued
+### UX-01 — Design Tokens, Shared Components, and App Shell
+
+Teacher outcome: opening LIKHA-SIS, a teacher immediately understands
+where they are, where each major task lives, which school/account and
+interface mode are active, which actions are primary, and whether
+something is loading/saved/successful/warning/failed — one coherent
+teacher workbench, not screens sharing a stylesheet.
+
+Baseline SHA: `fcf26ca` (UX-00's completion commit).
+
+Scope:
+
+- Evolve `src/ui/theme/styles.css`'s existing token mechanism to the
+  Calm Civic Classroom palette (warm paper neutrals, deep ink/navy
+  structural color, restrained teal/jade productive state, sunrise/
+  amber attention, red reserved for error/destructive), recomputing
+  contrast for the actual final hex values.
+- Select and locally bundle one permissively-licensed typeface suited
+  to long sessions and tabular data (names, LRNs, dates, grades);
+  record source/license in `docs/SOURCE-REGISTRY.md`. No runtime
+  webfont fetch.
+- New shared components backed by real, already-repeated markup:
+  Button (variants), Alert/Banner (error/confirmation/warning/info
+  tones, consolidating the existing three near-identical banner
+  patterns without weakening ARIA semantics), Loading state, Empty
+  state, Status chip, Page header, Nav item. Migrate enough real call
+  sites to prove reuse — not a big-bang rewrite of every screen.
+- Redesign `AppShell`'s navigation from the flat 8-button row into an
+  intentional teacher workbench: LIKHA-SIS identity, clear current
+  location, logical grouping (daily teaching / learner records /
+  grading / security-audit), teacher name + school, accessible mode
+  switcher, sign-out, session warnings — every existing destination
+  preserved, none renamed away silently.
+- One restrained "ledger continuity" motion treatment (CSS only, no
+  new dependency), full `prefers-reduced-motion` behavior.
+
+Non-goals (explicitly out of scope, belong to UX-02 through UX-06):
+Workspace/Attendance/Gradebook/Learner/Section/Auth/Audit screens' own
+focused redesigns. Only shared/app-shell-level elements migrate here.
+
+Affected: `src/ui/theme/styles.css` (and new token additions),
+`src/ui/AppShell.tsx`, `src/App.tsx` (nav composition only), new
+`src/ui/components/` (or equivalent) shared component files, `LoginScreen`/
+`IdleTimeoutWarning`/error-banner call sites where migrating to the new
+Alert component.
+
+Acceptance criteria: functional (no regression in auth/session/nav
+routing, every tab still reachable, all three teacher modes retain full
+capability), visual (inspected, not inferred — see verification below),
+accessibility (WCAG 2.2 AA contrast recomputed for new colors, focus
+visible, no color-only meaning, touch targets ≥44px on narrow layouts),
+responsive (1366×768, 1024×768, 390×844 all intentional, not just
+"doesn't overflow"), motion (timing/easing policy honored, reduced-
+motion preserves confirmation), architecture (no new UI framework/
+animation/icon dependency without a 10-scenario decision; `src/ui/**`
+still only receives services via props; only `src/composition.ts`
+imports concrete Tauri adapters).
+
+Known risks: pixel-screenshot verification depends on the Browser pane
+being visibly displayed client-side (per the user's own instruction
+this time — confirmed required, not optional); native Tauri WebView2
+verification remains a separate, still-unbuilt path — a 10-scenario
+decision this milestone must make explicitly (native pilot vs.
+dev-only synthetic fixture) rather than deferring again.
+
+- [ ] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
+      `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`,
+      `docs/ACTIVE-PLAN.md`, `docs/PROGRESS-MAP.md`,
+      `docs/VERIFICATION-DEBT.md`, `docs/SOURCE-REGISTRY.md`,
+      `docs/adr/0030-ui-first-program-and-ux00.md`.
+- [ ] Inspect `src/App.tsx`, `src/ui/AppShell.tsx`,
+      `src/ui/theme/styles.css`, teacher-mode implementation
+      (`ModeContext.tsx`/`modes.ts`/`useTeacherMode.ts`), and repeated
+      screen patterns across all 13 screens.
+- [ ] Push the UX-01 start checkpoint.
+- [ ] Impeccable `shape` pass for the app-shell/navigation composition.
+- [ ] Compare fonts; select one; record in `docs/SOURCE-REGISTRY.md`.
+- [ ] Evolve tokens to the Calm Civic Classroom palette; recompute
+      contrast for real hex values.
+- [ ] Build shared components (Button, Alert, Loading, Empty, Status
+      chip, Page header, Nav item); migrate real call sites.
+- [ ] Redesign `AppShell` navigation/identity/session-status.
+- [ ] One ledger-continuity motion treatment; reduced-motion handling.
+- [ ] 10-scenario decision: native `@wdio/tauri-service` pilot vs.
+      dev-only synthetic visual fixture.
+- [ ] Visual inspection at 1366×768, 1024×768, 390×844; light/dark;
+      all 3 teacher modes; keyboard focus; loading/empty/warning/
+      success/error states; reduced motion; long/dense synthetic data.
+- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
+      `npx knip`, `npm run quality:security` (if tools available).
+- [ ] Impeccable `audit`/`critique` pass, fix findings, one
+      confirmation/polish pass.
+- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/PROJECT-MEMORY.md`,
+      `docs/SOURCE-REGISTRY.md`, `docs/VERIFICATION-DEBT.md`,
+      ADR-0031.
+- [ ] Push the UX-01 completion checkpoint; verify remote sync.
+
+### UX-02 through UX-08 — Queued
 
 See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
 ordered list and dependencies. Each gets its own detailed checklist in
-this section once its own start checkpoint is pushed — not written in
-advance, since UX-00's screen inventory and chosen design direction
-will shape exactly what each later milestone's checklist should say.
+this section once its own start checkpoint is pushed.
 
 ## Historical M0-M20 detail (unchanged, chronological, pre-dates the UI-first direction)
 
