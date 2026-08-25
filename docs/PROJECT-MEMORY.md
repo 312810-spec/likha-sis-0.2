@@ -1013,6 +1013,34 @@ re-reading the ADR:
   reconfirmed identical) — this milestone's Rust is manually reviewed,
   not compiler-verified.
 
+## Codex Delegation Harness (added 2026-08-25)
+
+**PILOT, not ADOPT.** Full record: `docs/adr/0038-codex-delegation-harness.md`,
+`.claude/skills/codex-delegation/SKILL.md`. Durable facts:
+
+- The official `codex@openai-codex` Claude Code plugin is real (verified
+  via an actual `git clone` and successful install, not secondhand
+  summaries — most web search results on this topic were low-quality
+  SEO content, the same red flag pattern already rejected once for
+  `Graphify-Labs/graphify`). It wraps the user's local `codex` CLI —
+  same repository checkout, same machine, no separate sandbox.
+- Rule: Claude architects/orchestrates; Codex is a bounded LOW/MEDIUM-risk
+  implementation worker and a second-vendor adversarial reviewer for
+  HIGH-risk work (chosen specifically because this project has a
+  recurring, documented same-vendor reviewer-agent retrieval failure
+  since M7); Claude always independently reviews the actual diff, never
+  the summary; Codex never decides RBAC/auth/encryption/sync/schema/
+  provider questions.
+- **LIKHA's own `PreToolUse` secret/PII hooks do not fire for
+  Codex-originated writes** (verified from the hook source itself) —
+  independent review is the only real safety net for Codex-touched
+  changes.
+- Not promotable to ADOPT yet: this sandboxed environment's network
+  egress policy blocks `api.openai.com` outright (`HTTP 403` on the
+  websocket endpoint, confirmed via a real probe), independent of
+  whether credentials exist. A real pilot task requires a machine
+  without that restriction.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

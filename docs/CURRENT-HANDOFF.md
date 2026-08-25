@@ -1,5 +1,62 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Codex Delegation Harness, complete, PILOT)
+
+**Harness-only milestone, no product code changed.** Full record:
+`docs/adr/0038-codex-delegation-harness.md`, `.claude/skills/codex-delegation/SKILL.md`,
+`docs/SOURCE-REGISTRY.md`'s new entry.
+
+**Verified real, not assumed**: initial web research on "the Codex
+plugin for Claude Code" surfaced mostly SEO/content-farm sites with an
+inflated-star-count pattern this project already rejected once before
+(`Graphify-Labs/graphify`) — not trusted at face value. Verified
+directly instead: `claude plugin marketplace add openai/codex-plugin-cc`
+performed a real `git clone` against the real GitHub repo, and
+`claude plugin install codex@openai-codex` succeeded, exposing a real,
+versioned (v1.0.6), Apache-2.0 plugin with 11 skills, 1 agent, 3 hooks,
+0 MCP servers.
+
+**Decision: PILOT, not ADOPT.** Codex is a bounded worker under Claude
+orchestration for LOW/MEDIUM-risk implementation, and — a genuine,
+LIKHA-specific reason, not a generic "more review" argument — a
+second-vendor adversarial reviewer for HIGH-risk work, directly
+addressing this project's own long, recurring same-vendor
+reviewer-agent retrieval failure (documented since M7, hit again twice
+this same session). Risk-routing policy, implementation contract,
+return contract, and stop conditions are recorded in
+`.claude/skills/codex-delegation/SKILL.md`. **Not promoted to ADOPT**:
+no live, credentialed task could actually be delegated in this session
+— confirmed via a real (harmless) probe that this sandbox's network
+egress policy returns `HTTP 403` for `wss://api.openai.com/v1/responses`,
+a structural block independent of credentials. A real pilot task must
+run on a machine without that restriction before promotion.
+
+**Real risk found, not just theorized**: read directly from this
+repo's own hook source that LIKHA's `PreToolUse` secret/PII-pattern
+hooks are wired to Claude Code's own `Write`/`Edit`/`Bash` tool calls —
+Codex edits files as an external local process per its own
+documentation, so those hooks almost certainly do not fire for
+Codex-originated writes. Independent Claude review of the actual diff
+is therefore the only real safety net for anything Codex touches, not a
+formality — recorded as a hard rule in the new skill.
+
+**No stale "LIKHA-SIS 2.0" references found** — re-checked per this
+milestone's own instruction; the two existing hits in this repo are
+historical confirmations that no such error exists, not actual mistakes.
+
+**Global (not repository) state changed on this machine**: one
+marketplace (`openai-codex`) and one plugin (`codex@openai-codex`)
+installed at user scope — both fully reversible, nothing in this
+repository depends on either.
+
+**Per explicit instruction: return to the existing product roadmap,
+do not silently start it.** Recommended next milestone, awaiting
+approval: **Teacher Load / Class Schedule Foundation** (Wave 1's next
+slice per `docs/adr/0035-...md`) — re-verify this still leads once
+repository evidence is checked fresh, since the RBAC milestone's
+`add_user_to_school` role-authorization gap remains open debt that
+could also justify a prerequisite corrective milestone instead.
+
 ## Active Task (2026-08-25, this session — Curriculum / Key-Stage Versioning Foundation, complete)
 
 **Curriculum / Key-Stage Versioning Foundation is complete.** Full

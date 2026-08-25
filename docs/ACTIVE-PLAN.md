@@ -1,5 +1,39 @@
 # ACTIVE PLAN
 
+## Codex Delegation Harness (added 2026-08-25) — complete, read this section first
+
+**Complete, harness-only, PILOT classification.** Full record:
+`docs/adr/0038-codex-delegation-harness.md`. Verification record:
+
+- Repository truth: `git fetch`/`status`/`log` all confirmed clean, in
+  sync, HEAD `a8c71f6` at start of this milestone.
+- Plugin reality check: `claude plugin marketplace add
+openai/codex-plugin-cc` — PASS (real `git clone` succeeded).
+  `claude plugin install codex@openai-codex` — PASS. `claude plugin
+details codex@openai-codex` — PASS, reported real component inventory.
+- Live pilot task: **BLOCKED** — `codex login status` reported "Not
+  logged in" (no credentials exist in this environment, none
+  provisioned, per the explicit no-paid-infra rule); a harmless probe
+  (`codex exec --skip-git-repo-check "say hello"`) confirmed a second,
+  independent, structural blocker: this environment's network egress
+  proxy returns `HTTP 403` for `wss://api.openai.com/v1/responses`.
+  Process was killed after confirming the failure mode, not left
+  running.
+- `npm run quality`/`check:architecture`/`check:dev-preview-isolation`/
+  `knip` — not re-run this milestone (no product/application code
+  touched at all — confirmed via `git status`/`git diff --stat` showing
+  only `.claude/`/`docs/` files). `git status`/`git diff --stat` — PASS,
+  actually inspected.
+- No independent review dispatch needed — no product code, no new
+  authorization surface, no security-sensitive change; this is
+  documentation/harness-config only, reviewed by the same care as any
+  other durable-doc milestone.
+
+**Explicit non-goals honored**: no product feature work; no
+Curriculum/Learner-Core/sync/encryption/attendance/class-record/
+official-form/UI work; no paid API infrastructure enabled or
+provisioned; no fabricated pilot success.
+
 ## Curriculum / Key-Stage Versioning Foundation (added 2026-08-25) — complete, read this section first
 
 **Complete.** Full decision record: `docs/adr/0037-curriculum-key-stage-versioning.md`.
