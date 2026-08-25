@@ -3,7 +3,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::error::AppResult;
-use crate::repository::{grading, section, subject};
+use crate::repository::{grading, section, section_membership, subject};
 
 /// The workspace a teacher opens to record scores for one section, one
 /// subject, one grading period. Carries no `school_year` of its own on
@@ -45,6 +45,24 @@ pub struct ClassRecordDetail {
     pub weight_policy_id: String,
     pub weight_policy_name: String,
     pub created_at: String,
+    /// How many assessment items exist for this class record at all --
+    /// distinguishes "nothing set up yet" from "set up but not yet
+    /// scored," which `recorded_count`/`total_eligible` alone cannot (both
+    /// are legitimately 0 in either case). Lets a Class Records list show
+    /// a teacher which workspace still needs setup versus which one is
+    /// simply not yet fully scored.
+    pub item_count: i64,
+    /// How many `learner_scores` rows exist across every item in this
+    /// class record, of any status (scored/excused/not-applicable) --
+    /// same convention as `AssessmentItemDetail::recorded_count`.
+    pub recorded_count: i64,
+    /// How many roster entries are eligible to be scored under this class
+    /// record's section+grading-period range, per item (every item shares
+    /// the same eligible-learner count -- see
+    /// `assessment_item::list_by_class_record`'s identical field). Multiply
+    /// by `item_count` for the theoretical maximum `recorded_count` could
+    /// reach once every item is fully scored.
+    pub total_eligible: i64,
 }
 
 /// Creates a class record joining `section_id`, `subject_id`, and
@@ -138,7 +156,11 @@ pub fn list_by_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Class
         "{DETAIL_SELECT_LIST} ORDER BY sec.school_year DESC, pp.sequence, sec.name, sub.name"
     ))?;
     let rows = stmt.query_map([school_id], row_to_class_record_detail)?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    let details = rows.collect::<Result<Vec<_>, _>>()?;
+    details
+        .into_iter()
+        .map(|d| with_total_eligible(conn, school_id, d))
+        .collect()
 }
 
 /// A class record's `section_id` and its grading period's date range —
@@ -176,16 +198,18 @@ pub fn find_detail_by_id_in_school(
     school_id: &str,
     id: &str,
 ) -> AppResult<Option<ClassRecordDetail>> {
-    conn.query_row(
-        &format!("{DETAIL_SELECT_LIST} AND cr.id = ?2"),
-        (school_id, id),
-        row_to_class_record_detail,
-    )
-    .map(Some)
-    .or_else(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => Ok(None),
-        e => Err(e.into()),
-    })
+    let detail = conn
+        .query_row(
+            &format!("{DETAIL_SELECT_LIST} AND cr.id = ?2"),
+            (school_id, id),
+            row_to_class_record_detail,
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            e => Err(e.into()),
+        })?;
+    detail.map(|d| with_total_eligible(conn, school_id, d)).transpose()
 }
 
 /// `class_record_id`'s weight policy, resolved: its own pinned
@@ -225,7 +249,11 @@ pub fn resolved_weight_policy_id_in_school(
 const DETAIL_SELECT_LIST: &str = "SELECT cr.id, cr.school_id, cr.section_id, sec.name, \
      cr.subject_id, sub.name, cr.grading_period_id, pp.label, \
      sec.school_year, COALESCE(cr.weight_policy_id, dwp.id), COALESCE(wp.name, dwp.name), \
-     cr.created_at \
+     cr.created_at, \
+     (SELECT COUNT(*) FROM assessment_items ai WHERE ai.class_record_id = cr.id), \
+     (SELECT COUNT(*) FROM learner_scores ls \
+      JOIN assessment_items ai2 ON ai2.id = ls.assessment_item_id \
+      WHERE ai2.class_record_id = cr.id) \
      FROM class_records cr \
      JOIN sections sec ON sec.id = cr.section_id \
      JOIN subjects sub ON sub.id = cr.subject_id \
@@ -249,7 +277,41 @@ fn row_to_class_record_detail(row: &rusqlite::Row) -> rusqlite::Result<ClassReco
         weight_policy_id: row.get(9)?,
         weight_policy_name: row.get(10)?,
         created_at: row.get(11)?,
+        item_count: row.get(12)?,
+        recorded_count: row.get(13)?,
+        // Filled in by `with_total_eligible` afterward -- unlike
+        // `item_count`/`recorded_count`, this needs the section's roster
+        // over the grading period's date range, which is not a plain
+        // aggregate over this row's own joined tables.
+        total_eligible: 0,
     })
+}
+
+/// Fills in `total_eligible` for one already-fetched detail row. Split out
+/// from the main SQL (unlike `item_count`/`recorded_count`, which are
+/// cheap correlated subqueries) because eligibility depends on
+/// `section_membership::roster_for_section_over_range`, the same
+/// roster-resolution rule `assessment_item::list_by_class_record` already
+/// uses -- reused here rather than re-deriving it, so a class record's
+/// list-view total always agrees with its workspace-view total.
+fn with_total_eligible(
+    conn: &Connection,
+    school_id: &str,
+    mut detail: ClassRecordDetail,
+) -> AppResult<ClassRecordDetail> {
+    if let Some((section_id, starts_on, ends_on)) =
+        section_and_period_range_in_school(conn, school_id, &detail.id)?
+    {
+        detail.total_eligible = section_membership::roster_for_section_over_range(
+            conn,
+            school_id,
+            &section_id,
+            &starts_on,
+            &ends_on,
+        )?
+        .len() as i64;
+    }
+    Ok(detail)
 }
 
 /// `class_record_id`'s school year, scoped to `school_id` — the one piece
@@ -295,7 +357,10 @@ fn row_to_class_record(row: &rusqlite::Row) -> rusqlite::Result<ClassRecord> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{db, repository::school};
+    use crate::{
+        db,
+        repository::{assessment_item, learner, learner_score, school, section_membership, user},
+    };
     use std::path::Path;
 
     fn open_test_db() -> Connection {
@@ -305,6 +370,7 @@ mod tests {
     const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
     const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
     const EPP_TLE_MAPEH_POLICY: &str = "00000000-0000-7000-8000-000000000043";
+    const WRITTEN_WORKS: &str = "00000000-0000-7000-8000-000000000311";
 
     /// Sets up a school with a section (SY 2026-2027), a subject, and a
     /// grading period (also SY 2026-2027) — the happy-path fixture most
@@ -500,6 +566,70 @@ mod tests {
         assert_eq!(records[0].school_year, "2026-2027");
         assert_eq!(records[0].weight_policy_id, K10_POLICY);
         assert!(other_records.is_empty());
+    }
+
+    #[test]
+    fn list_and_find_detail_report_item_recorded_and_eligible_counts() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+            .unwrap()
+            .unwrap();
+        let learner_a =
+            learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let learner_b =
+            learner::create(&conn, &school_id, "Bo", "Reyes", None, None).unwrap();
+        section_membership::enroll(&conn, &school_id, &section_id, &learner_a.id, "2026-06-08")
+            .unwrap();
+        section_membership::enroll(&conn, &school_id, &section_id, &learner_b.id, "2026-06-08")
+            .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
+
+        // A fresh class record: two items exist, but only one learner's
+        // score has actually been recorded on one of them.
+        let item1 =
+            assessment_item::create(&conn, &school_id, &created.id, WRITTEN_WORKS, "WW1", 20.0)
+                .unwrap()
+                .unwrap();
+        assessment_item::create(&conn, &school_id, &created.id, WRITTEN_WORKS, "WW2", 20.0)
+            .unwrap()
+            .unwrap();
+        learner_score::record(
+            &conn,
+            &school_id,
+            &item1.id,
+            &learner_a.id,
+            learner_score::LearnerScoreStatus::Scored,
+            Some(18.0),
+            &teacher.id,
+        )
+        .unwrap();
+
+        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id).unwrap().unwrap();
+        assert_eq!(detail.item_count, 2, "two assessment items exist");
+        assert_eq!(detail.recorded_count, 1, "only one learner_scores row exists so far");
+        assert_eq!(detail.total_eligible, 2, "two learners enrolled in the section");
+
+        let listed = list_by_school(&conn, &school_id).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].item_count, 2);
+        assert_eq!(listed[0].recorded_count, 1);
+        assert_eq!(listed[0].total_eligible, 2);
+    }
+
+    #[test]
+    fn list_and_find_detail_report_zero_counts_for_a_class_record_with_no_items_yet() {
+        let conn = open_test_db();
+        let (school_id, section_id, subject_id, period_id) = setup(&conn);
+        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY)
+            .unwrap()
+            .unwrap();
+
+        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id).unwrap().unwrap();
+
+        assert_eq!(detail.item_count, 0);
+        assert_eq!(detail.recorded_count, 0);
+        assert_eq!(detail.total_eligible, 0, "no learners enrolled in this section yet");
     }
 
     #[test]

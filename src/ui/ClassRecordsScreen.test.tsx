@@ -204,6 +204,9 @@ class FakeClassRecordRepository implements ClassRecordRepository {
         weightPolicyId,
         weightPolicyName: WEIGHT_POLICY.name,
         createdAt: "now",
+        itemCount: 0,
+        recordedCount: 0,
+        totalEligible: 0,
       };
       this.records = [...this.records, detail];
     }
@@ -308,12 +311,58 @@ describe("ClassRecordsScreen", () => {
         weightPolicyId: "wp-1",
         weightPolicyName: WEIGHT_POLICY.name,
         createdAt: "now",
+        itemCount: 3,
+        recordedCount: 24,
+        totalEligible: 30,
       },
     ]);
     renderScreen({ classRecordRepo });
 
     expect(await screen.findByText("Mabini")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "Mathematics" })).toBeInTheDocument();
+  });
+
+  it("shows a compact per-class-record progress summary", async () => {
+    const classRecordRepo = new FakeClassRecordRepository([
+      {
+        id: "cr-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        subjectId: "sub-1",
+        subjectName: "Mathematics",
+        gradingPeriodId: "gp-1",
+        gradingPeriodLabel: "1st Term",
+        schoolYear: "2026-2027",
+        weightPolicyId: "wp-1",
+        weightPolicyName: WEIGHT_POLICY.name,
+        createdAt: "now",
+        itemCount: 3,
+        recordedCount: 24,
+        totalEligible: 30,
+      },
+      {
+        id: "cr-2",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        subjectId: "sub-2",
+        subjectName: "Science",
+        gradingPeriodId: "gp-1",
+        gradingPeriodLabel: "1st Term",
+        schoolYear: "2026-2027",
+        weightPolicyId: "wp-1",
+        weightPolicyName: WEIGHT_POLICY.name,
+        createdAt: "now",
+        itemCount: 0,
+        recordedCount: 0,
+        totalEligible: 30,
+      },
+    ]);
+    renderScreen({ classRecordRepo });
+
+    expect(await screen.findByText("3 items · 24 of 90 recorded")).toBeInTheDocument();
+    expect(screen.getByText("No assessment items yet")).toBeInTheDocument();
   });
 
   it("moves focus to the heading on mount", async () => {

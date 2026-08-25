@@ -29,6 +29,9 @@ describe("TauriClassRecordRepository", () => {
         weightPolicyId: "wp-1",
         weightPolicyName: "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)",
         createdAt: "now",
+        itemCount: 0,
+        recordedCount: 0,
+        totalEligible: 0,
       },
     ];
     mockInvoke.mockResolvedValueOnce(records);

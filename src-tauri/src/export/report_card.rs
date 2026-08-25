@@ -189,6 +189,9 @@ mod tests {
             weight_policy_id: "wp1".to_string(),
             weight_policy_name: "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)".to_string(),
             created_at: "now".to_string(),
+            item_count: 0,
+            recorded_count: 0,
+            total_eligible: 0,
         }
     }
 

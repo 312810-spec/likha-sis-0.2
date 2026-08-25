@@ -13,8 +13,23 @@ import type { Section } from "../domain/section";
 import type { Subject } from "../domain/subject";
 import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { Alert } from "./components/Alert";
+import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
+
+/** A short "N items · X of Y recorded" readout for one class record's row
+ * in the list -- lets a teacher tell at a glance which workspace still
+ * needs setup (no items yet) versus which one simply isn't fully scored
+ * yet, without opening each one. `Y` is `itemCount * totalEligible`, the
+ * theoretical maximum `recordedCount` could reach once every item is
+ * fully scored -- see `ClassRecordDetail`'s doc comment. */
+function progressSummary(record: ClassRecordDetail): string {
+  if (record.itemCount === 0) {
+    return "No assessment items yet";
+  }
+  const possible = record.itemCount * record.totalEligible;
+  return `${record.itemCount} item${record.itemCount === 1 ? "" : "s"} · ${record.recordedCount} of ${possible} recorded`;
+}
 
 interface ClassRecordsScreenProps {
   classRecordService: ClassRecordApplicationService;
@@ -167,6 +182,13 @@ export function ClassRecordsScreen({
         <button type="button" onClick={() => setSelectedClassRecordId(null)}>
           Back to Class Records
         </button>
+        {selectedRecord && (
+          <p className="field-hint">
+            <strong>{selectedRecord.sectionName}</strong> — {selectedRecord.subjectName} —{" "}
+            {selectedRecord.gradingPeriodLabel} ({selectedRecord.schoolYear}) — weighting:{" "}
+            {selectedRecord.weightPolicyName}
+          </p>
+        )}
         <ClassRecordWorkspace
           classRecordId={selectedClassRecordId}
           weightPolicyName={selectedRecord?.weightPolicyName ?? null}
@@ -293,6 +315,8 @@ export function ClassRecordsScreen({
 
       {loading ? (
         <Loading label="Loading class records…" />
+      ) : classRecords.length === 0 ? (
+        <EmptyState>No class records opened yet. Open one above.</EmptyState>
       ) : (
         <table className="attendance-roster">
           <thead>
@@ -302,6 +326,7 @@ export function ClassRecordsScreen({
               <th scope="col">Grading period</th>
               <th scope="col">School year</th>
               <th scope="col">Weighting</th>
+              <th scope="col">Progress</th>
               <th scope="col">
                 <span className="visually-hidden">Actions</span>
               </th>
@@ -315,6 +340,7 @@ export function ClassRecordsScreen({
                 <td>{record.gradingPeriodLabel}</td>
                 <td>{record.schoolYear}</td>
                 <td>{record.weightPolicyName}</td>
+                <td>{progressSummary(record)}</td>
                 <td>
                   <button type="button" onClick={() => setSelectedClassRecordId(record.id)}>
                     Open workspace

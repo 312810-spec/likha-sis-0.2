@@ -31,6 +31,19 @@ export interface ClassRecordDetail {
   weightPolicyId: string;
   weightPolicyName: string;
   createdAt: string;
+  /** How many assessment items exist for this class record at all --
+   * distinguishes "nothing set up yet" from "set up but not yet scored,"
+   * which `recordedCount`/`totalEligible` alone cannot (both are
+   * legitimately 0 in either case). */
+  itemCount: number;
+  /** How many learner scores (of any status) are recorded across every
+   * item in this class record. */
+  recordedCount: number;
+  /** How many roster entries are eligible to be scored under this class
+   * record's section+grading-period range, per item -- multiply by
+   * `itemCount` for the theoretical maximum `recordedCount` could reach
+   * once every item is fully scored. */
+  totalEligible: number;
 }
 
 /** A named, versioned DepEd grade-weighting policy — which learning-area
