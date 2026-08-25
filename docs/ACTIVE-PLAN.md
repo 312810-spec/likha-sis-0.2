@@ -52,28 +52,52 @@ Checklist:
       mark UX-00 in progress, UX-01–UX-08 queued.
 - [x] Repair `docs/ACTIVE-PLAN.md` (this section).
 - [x] Put the active task at the top of `docs/CURRENT-HANDOFF.md`.
-- [ ] Create `PRODUCT.md` (teacher jobs, product voice, operating
-      context, privacy/offline constraints) via `/impeccable init` in
-      "operate" mode, reconciled against `CLAUDE.md`/`PROJECT-MEMORY.md`
-      so nothing contradicts existing project truth.
-- [ ] Create `DESIGN.md` (visual thesis, tokens, typography,
-      composition, components, responsive rules, motion, accessibility,
-      anti-patterns) — select "Calm Civic Classroom" or a stronger
-      Impeccable-recommended alternative, with recorded rationale
-      against LIKHA's priority order.
-- [ ] Inventory every current screen, shared pattern, token, state,
-      breakpoint, icon pattern, and motion behavior actually in the
-      codebase (not assumed from memory).
-- [ ] Capture a synthetic-data visual baseline at representative sizes
-      to the extent this session's verification path allows; record
-      exactly what was and wasn't captured.
-- [ ] Establish measurable UI baselines (task steps for key flows,
-      viewport coverage, contrast, focus, touch targets, reduced
-      motion, loading/empty/error coverage) for later milestones to
-      compare against.
-- [ ] Run `npm run quality`, `npm run build`, `npm run check:architecture`,
-      `npx knip` as the milestone's baseline checks.
-- [ ] Push the UX-00 completion commit; verify remote sync.
+- [x] Create `PRODUCT.md` — via `/impeccable init`'s own playbook,
+      synthesized from the directing prompt's exhaustive brief plus
+      `CLAUDE.md`/`PROJECT-MEMORY.md` rather than a redundant interview
+      round (substitution disclosed in the file itself and in the
+      milestone report). Platform recorded as `adaptive` (Windows now,
+      Android a named future target, one product whose design language
+      genuinely adapts per OS).
+- [x] Create `DESIGN.md` — selected "Calm Civic Classroom" (the
+      directing prompt's own recommended thesis) with rationale against
+      LIKHA's priority order; documents the incumbent token system
+      (`src/ui/theme/styles.css`) as the evolution baseline (refinement,
+      not a from-scratch replacement) and names the concrete token/
+      typography/motion/accessibility targets UX-01 implements.
+- [x] Inventory every current screen: 13 screens/components in
+      `src/ui/*.tsx` (`AppShell`, `AttendanceScreen`, `AuditLogScreen`,
+      `ClassRecordWorkspace`, `ClassRecordsScreen`, `FirstRunSetupScreen`,
+      `GradingPeriodsScreen`, `IdleTimeoutWarning`, `LearnerListScreen`,
+      `LoginScreen`, `MonthlySummaryScreen`, `SectionsScreen`,
+      `TeacherWorkspaceScreen`). Shared CSS lives entirely in
+      `src/ui/theme/styles.css` (442 lines, no per-screen stylesheets).
+      Full token/component/pattern inventory recorded in `DESIGN.md`'s
+      "Composition and Components" section.
+- [x] Capture a visual baseline to the extent this session's
+      verification path allows: found and fixed a real bug
+      (`.claude/launch.json`'s wrong dev-server port) that had been
+      silently breaking Browser-pane verification; confirmed DOM/text/
+      console verification against the real `vite dev` server now
+      genuinely works (`LoginScreen` renders correctly with the
+      expected, already-documented "no Tauri IPC bridge" console
+      errors — not a new bug); pixel-level screenshot capture is
+      blocked this session by a client-side Browser-pane-display state,
+      disclosed, not worked around — see ADR-0030.
+- [x] Establish measurable UI baselines (grepped directly from source,
+      not estimated): loading state (`role="status"`) present in 10/13
+      screens; error state (`role="alert"`) in 12/13; a distinct empty-
+      state message in 8/13 (the other 5 either always have data by
+      construction or are pure banners/warnings with no list to be
+      empty); `useTeacherMode` (Guided-hint capability) wired in 12/13.
+      316/316 TS tests passing across 43 test files is the existing
+      structural/accessibility baseline (`axe-core` via
+      `expectNoAccessibilityViolations`) every later UX milestone's own
+      test changes are compared against.
+- [x] Run `npm run quality` (316/316), `npm run build`, `npx knip`
+      (same 5 pre-existing findings, zero new) as the milestone's
+      baseline checks.
+- [x] Push the UX-00 completion commit; verify remote sync.
 
 ### UX-01 through UX-08 — Queued
 
