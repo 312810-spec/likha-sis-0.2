@@ -63,4 +63,54 @@ export class AssessmentApplicationService {
       maxScore,
     );
   }
+
+  async renameItem(id: string, name: string): Promise<AssessmentItem | null> {
+    const trimmedId = id.trim();
+    const trimmedName = name.trim();
+    if (trimmedId.length === 0) {
+      throw new ValidationError("Assessment item is required.");
+    }
+    if (trimmedName.length === 0) {
+      throw new ValidationError("Item name is required.");
+    }
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      throw new ValidationError(`Item name must be at most ${MAX_NAME_LENGTH} characters.`);
+    }
+    return this.assessments.renameItem(trimmedId, trimmedName);
+  }
+
+  async updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    const trimmedId = id.trim();
+    const trimmedCategoryId = categoryId.trim();
+    const trimmedName = name.trim();
+    if (trimmedId.length === 0) {
+      throw new ValidationError("Assessment item is required.");
+    }
+    if (trimmedCategoryId.length === 0) {
+      throw new ValidationError("Category is required.");
+    }
+    if (trimmedName.length === 0) {
+      throw new ValidationError("Item name is required.");
+    }
+    if (trimmedName.length > MAX_NAME_LENGTH) {
+      throw new ValidationError(`Item name must be at most ${MAX_NAME_LENGTH} characters.`);
+    }
+    if (!Number.isFinite(maxScore) || maxScore <= 0) {
+      throw new ValidationError("Max score must be a positive number.");
+    }
+    return this.assessments.updateItem(trimmedId, trimmedName, trimmedCategoryId, maxScore);
+  }
+
+  async deleteItem(id: string): Promise<boolean> {
+    const trimmedId = id.trim();
+    if (trimmedId.length === 0) {
+      throw new ValidationError("Assessment item is required.");
+    }
+    return this.assessments.deleteItem(trimmedId);
+  }
 }

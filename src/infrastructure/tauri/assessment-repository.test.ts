@@ -52,6 +52,8 @@ describe("TauriAssessmentRepository", () => {
         name: "Quiz 1",
         maxScore: 20,
         createdAt: "now",
+        recordedCount: 0,
+        totalEligible: 1,
       },
     ];
     mockInvoke.mockResolvedValueOnce(items);
@@ -93,5 +95,58 @@ describe("TauriAssessmentRepository", () => {
     const result = await new TauriAssessmentRepository().createItem("cr-1", "cat-1", "Quiz 1", 20);
 
     expect(result).toBeNull();
+  });
+
+  it("renameItem invokes rename_assessment_item with id/name", async () => {
+    const item: AssessmentItem = {
+      id: "ai-1",
+      schoolId: "s1",
+      classRecordId: "cr-1",
+      categoryId: "cat-1",
+      name: "Quiz 1 (Retake)",
+      maxScore: 20,
+      createdAt: "now",
+    };
+    mockInvoke.mockResolvedValueOnce(item);
+
+    const result = await new TauriAssessmentRepository().renameItem("ai-1", "Quiz 1 (Retake)");
+
+    expect(mockInvoke).toHaveBeenCalledWith("rename_assessment_item", {
+      id: "ai-1",
+      name: "Quiz 1 (Retake)",
+    });
+    expect(result).toEqual(item);
+  });
+
+  it("updateItem invokes update_assessment_item with id/name/categoryId/maxScore", async () => {
+    const item: AssessmentItem = {
+      id: "ai-1",
+      schoolId: "s1",
+      classRecordId: "cr-1",
+      categoryId: "cat-2",
+      name: "Quiz 1",
+      maxScore: 25,
+      createdAt: "now",
+    };
+    mockInvoke.mockResolvedValueOnce(item);
+
+    const result = await new TauriAssessmentRepository().updateItem("ai-1", "Quiz 1", "cat-2", 25);
+
+    expect(mockInvoke).toHaveBeenCalledWith("update_assessment_item", {
+      id: "ai-1",
+      name: "Quiz 1",
+      categoryId: "cat-2",
+      maxScore: 25,
+    });
+    expect(result).toEqual(item);
+  });
+
+  it("deleteItem invokes delete_assessment_item with id", async () => {
+    mockInvoke.mockResolvedValueOnce(true);
+
+    const result = await new TauriAssessmentRepository().deleteItem("ai-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("delete_assessment_item", { id: "ai-1" });
+    expect(result).toBe(true);
   });
 });

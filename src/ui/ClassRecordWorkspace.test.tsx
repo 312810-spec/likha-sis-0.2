@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
@@ -52,6 +52,8 @@ const ITEM: AssessmentItemDetail = {
   name: "Quiz 1",
   maxScore: 20,
   createdAt: "now",
+  recordedCount: 0,
+  totalEligible: 0,
 };
 
 const ROSTER_ENTRY: LearnerScoreRosterEntry = {
@@ -113,10 +115,38 @@ class FakeAssessmentRepository implements AssessmentRepository {
           name,
           maxScore,
           createdAt: "now",
+          recordedCount: 0,
+          totalEligible: 0,
         },
       ];
     }
     return this.createResult;
+  }
+
+  renameCalls: Array<{ id: string; name: string }> = [];
+  renameResult: AssessmentItem | null = null;
+  async renameItem(id: string, name: string): Promise<AssessmentItem | null> {
+    this.renameCalls.push({ id, name });
+    return this.renameResult;
+  }
+
+  updateCalls: Array<{ id: string; name: string; categoryId: string; maxScore: number }> = [];
+  updateResult: AssessmentItem | null = null;
+  async updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    this.updateCalls.push({ id, name, categoryId, maxScore });
+    return this.updateResult;
+  }
+
+  deleteCalls: string[] = [];
+  deleteResult = true;
+  async deleteItem(id: string): Promise<boolean> {
+    this.deleteCalls.push(id);
+    return this.deleteResult;
   }
 }
 
@@ -247,6 +277,105 @@ describe("ClassRecordWorkspace", () => {
     expect(assessmentRepo.createCalls).toEqual([
       { classRecordId: "cr-1", categoryId: "cat-1", name: "Quiz 2", maxScore: 10 },
     ]);
+  });
+
+  it("shows a per-item completion readout once the item has eligible learners", async () => {
+    const itemWithCounts: AssessmentItemDetail = {
+      ...ITEM,
+      recordedCount: 2,
+      totalEligible: 5,
+    };
+    renderScreen({ assessmentRepo: new FakeAssessmentRepository([itemWithCounts]) });
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Written Works — Quiz 1 (max 20) · 2 of 5 recorded",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("renames an already-scored item without offering to change its category or max score", async () => {
+    const user = userEvent.setup();
+    const scoredItem: AssessmentItemDetail = { ...ITEM, recordedCount: 3, totalEligible: 5 };
+    const assessmentRepo = new FakeAssessmentRepository([scoredItem]);
+    assessmentRepo.renameResult = { ...scoredItem, name: "Quiz 1 (Retake)" };
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(
+      screen.getByText(/already contains learner scores/, { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByLabelText("Category")).toHaveLength(1); // only the create form's
+    expect(screen.queryAllByLabelText("Max score")).toHaveLength(1); // only the create form's
+
+    // Two "Item name" fields exist -- the always-visible create form's, and
+    // this edit form's -- so index into the pair rather than getByLabelText.
+    const nameField = screen.getAllByLabelText("Item name")[1]!;
+    await user.clear(nameField);
+    await user.type(nameField, "Quiz 1 (Retake)");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(assessmentRepo.renameCalls).toEqual([{ id: "ai-1", name: "Quiz 1 (Retake)" }]),
+    );
+    expect(assessmentRepo.updateCalls).toEqual([]);
+  });
+
+  it("fully edits an unscored item's name, category, and max score", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.updateResult = {
+      id: "ai-1",
+      schoolId: "s1",
+      classRecordId: "cr-1",
+      categoryId: "cat-1",
+      name: "Quiz 1 (Revised)",
+      maxScore: 25,
+      createdAt: "now",
+    };
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const nameField = screen.getAllByLabelText("Item name")[1]!;
+    await user.clear(nameField);
+    await user.type(nameField, "Quiz 1 (Revised)");
+    const maxField = screen.getAllByLabelText("Max score")[1]!;
+    await user.clear(maxField);
+    await user.type(maxField, "25");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(assessmentRepo.updateCalls).toEqual([
+        { id: "ai-1", name: "Quiz 1 (Revised)", categoryId: "cat-1", maxScore: 25 },
+      ]),
+    );
+  });
+
+  it("deletes an unscored item only after a second confirming click", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByText(/can.t be undone/i)).toBeInTheDocument();
+    expect(assessmentRepo.deleteCalls).toEqual([]);
+
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
+  });
+
+  it("does not offer to delete an item that already has recorded scores", async () => {
+    const scoredItem: AssessmentItemDetail = { ...ITEM, recordedCount: 1, totalEligible: 5 };
+    renderScreen({ assessmentRepo: new FakeAssessmentRepository([scoredItem]) });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByText(/already has recorded scores/, { exact: false })).toBeInTheDocument();
   });
 
   it("selecting an item shows its roster", async () => {
@@ -473,6 +602,253 @@ describe("ClassRecordWorkspace", () => {
       await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false }),
     ).toBeInTheDocument();
     expect(screen.getByText("Qualitative Descriptor", { exact: false })).toBeInTheDocument();
+  });
+
+  it("never shows a previous assessment item's roster after switching to an item whose load fails", async () => {
+    const user = userEvent.setup();
+    const ITEM_2: AssessmentItemDetail = {
+      id: "ai-2",
+      schoolId: "s1",
+      classRecordId: "cr-1",
+      categoryId: "cat-1",
+      categoryName: "Written Works",
+      name: "Quiz 2",
+      maxScore: 10,
+      createdAt: "now",
+      recordedCount: 0,
+      totalEligible: 0,
+    };
+
+    class PerItemLearnerScoreRepository implements LearnerScoreRepository {
+      async rosterForItem(assessmentItemId: string): Promise<LearnerScoreRosterEntry[] | null> {
+        if (assessmentItemId === "ai-2") {
+          throw new Error("simulated roster load failure");
+        }
+        return [ROSTER_ENTRY];
+      }
+      async record(): Promise<LearnerScore | null> {
+        throw new Error("not used in this test");
+      }
+      async computeTermGrade(): Promise<ComputedTermGrade | null> {
+        throw new Error("not used in this test");
+      }
+    }
+
+    render(
+      <ModeProvider>
+        <ClassRecordWorkspace
+          classRecordId="cr-1"
+          weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+          assessmentService={
+            new AssessmentApplicationService(new FakeAssessmentRepository([ITEM, ITEM_2]))
+          }
+          learnerScoreService={
+            new LearnerScoreApplicationService(new PerItemLearnerScoreRepository())
+          }
+          exportService={new ExportApplicationService(new FakeExportRepository())}
+        />
+      </ModeProvider>,
+    );
+
+    const item1Button = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(item1Button);
+    expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
+
+    const item2Button = screen.getByRole("button", { name: "Written Works — Quiz 2 (max 10)" });
+    await user.click(item2Button);
+
+    await screen.findByText(/could not load the roster for this item/i);
+    // Item 1's roster must never render as if it belongs to Item 2.
+    expect(screen.queryByText("Ana Cruz")).not.toBeInTheDocument();
+  });
+
+  it("never lets an older score-write response overwrite a newer exception-write for the same learner", async () => {
+    const user = userEvent.setup();
+
+    class OrderControlledLearnerScoreRepository implements LearnerScoreRepository {
+      calls: Array<{ learnerId: string; status: LearnerScoreStatus; score: number | null }> = [];
+      private pending: Array<(result: LearnerScore) => void> = [];
+
+      async rosterForItem(): Promise<LearnerScoreRosterEntry[] | null> {
+        return [
+          ROSTER_ENTRY,
+          {
+            learnerId: "l2",
+            givenName: "Bo",
+            familyName: "Reyes",
+            status: null,
+            score: null,
+            updatedAt: null,
+          },
+        ];
+      }
+      record(
+        _assessmentItemId: string,
+        learnerId: string,
+        status: LearnerScoreStatus,
+        score: number | null,
+      ): Promise<LearnerScore | null> {
+        this.calls.push({ learnerId, status, score });
+        const index = this.calls.length - 1;
+        return new Promise((resolve) => {
+          this.pending[index] = resolve;
+        });
+      }
+      resolveCall(index: number) {
+        const call = this.calls[index];
+        if (!call) throw new Error(`no call recorded at index ${index}`);
+        this.pending[index]?.({
+          id: `ls-${index}`,
+          schoolId: "s1",
+          assessmentItemId: "ai-1",
+          learnerId: call.learnerId,
+          status: call.status,
+          score: call.score,
+          recordedByUserId: "u1",
+          recordedAt: "now",
+          updatedAt: `record-${index}`,
+        });
+      }
+      async computeTermGrade(): Promise<ComputedTermGrade | null> {
+        throw new Error("not used in this test");
+      }
+    }
+
+    const repo = new OrderControlledLearnerScoreRepository();
+    render(
+      <ModeProvider>
+        <ClassRecordWorkspace
+          classRecordId="cr-1"
+          weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+          assessmentService={new AssessmentApplicationService(new FakeAssessmentRepository())}
+          learnerScoreService={new LearnerScoreApplicationService(repo)}
+          exportService={new ExportApplicationService(new FakeExportRepository())}
+        />
+      </ModeProvider>,
+    );
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    const anaGroup = screen.getByRole("group", { name: "Exception status for Ana Cruz" });
+
+    // Start Ana's write (call 0: scored 18).
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Enter}");
+    // Start Bo's write (call 1: scored 15) -- this must not leave Ana's row
+    // stuck disabled once Bo's write is the one in flight, and must not
+    // block a later write for Ana from starting.
+    await user.type(screen.getByLabelText("Score for Bo Reyes"), "15{Enter}");
+    // A second, newer write for Ana (call 2: Excused) starts before call 0
+    // resolves.
+    await user.click(within(anaGroup).getByRole("button", { name: "Excused" }));
+
+    expect(repo.calls).toEqual([
+      { learnerId: "l1", status: "scored", score: 18 },
+      { learnerId: "l2", status: "scored", score: 15 },
+      { learnerId: "l1", status: "excused", score: null },
+    ]);
+
+    // Resolve out of order: the newer write (call 2, Excused) resolves first...
+    repo.resolveCall(2);
+    await waitFor(() =>
+      expect(within(anaGroup).getByRole("button", { name: "Excused" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    // ...then the older write (call 0, scored 18) arrives late.
+    repo.resolveCall(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Ana's displayed state must still reflect the newer write (Excused),
+    // never reverted by the stale, older response.
+    expect(within(anaGroup).getByRole("button", { name: "Excused" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("does not perform a write when the teacher selects the already-active exception status", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([
+        {
+          learnerId: "l1",
+          givenName: "Ana",
+          familyName: "Cruz",
+          status: "excused",
+          score: null,
+          updatedAt: "2026-08-20T09:15:00.000Z",
+        },
+      ]),
+    });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Excused" }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(scoreRepo.recordCalls).toEqual([]);
+  });
+
+  it("automatically refreshes a learner's term grade after a score changes, without another button press", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+    await screen.findByText("88");
+
+    // A new score is saved after grades were computed -- the repository's
+    // computed result changes, simulating a real recomputation.
+    scoreRepo.computeTermGradeResult = {
+      initialGrade: 90,
+      termGrade: 92,
+      wasTransmuted: true,
+      wasFloored: false,
+    };
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    await waitFor(() =>
+      expect(scoreRepo.recordCalls).toEqual([
+        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 19 },
+      ]),
+    );
+
+    // The grade refreshes automatically -- no second "Show term grades"
+    // click required -- and the old, now-stale number is gone.
+    await waitFor(() => expect(screen.getByText("92")).toBeInTheDocument());
+    expect(screen.queryByText("88")).not.toBeInTheDocument();
+  });
+
+  it("does not attempt to refresh term grades after a score change if grades were never shown", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
+    await waitFor(() =>
+      expect(scoreRepo.recordCalls).toEqual([
+        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 19 },
+      ]),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(scoreRepo.computeTermGradeCalls).toEqual([]);
   });
 
   it("moves focus to the heading on mount", async () => {

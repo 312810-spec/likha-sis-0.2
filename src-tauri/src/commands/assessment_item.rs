@@ -41,3 +41,50 @@ pub fn create_assessment_item(
     let school_id = sessions.require_active_school_scope(&conn)?;
     assessment_item::create(&conn, &school_id, &class_record_id, &category_id, &name, max_score)
 }
+
+/// Renames an assessment item — always permitted, scored or not, since
+/// `name` never affects grade computation. See
+/// `assessment_item::rename`'s doc comment for the verification behind
+/// that claim.
+#[tauri::command]
+pub fn rename_assessment_item(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+    name: String,
+) -> AppResult<Option<AssessmentItem>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    assessment_item::rename(&conn, &school_id, &id, &name)
+}
+
+/// Fully edits an assessment item (name/category/max score) — only
+/// permitted while it has no recorded scores yet. See
+/// `assessment_item::update`'s doc comment for why category/max-score
+/// changes are blocked once scores exist.
+#[tauri::command]
+pub fn update_assessment_item(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+    name: String,
+    category_id: String,
+    max_score: f64,
+) -> AppResult<Option<AssessmentItem>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    assessment_item::update(&conn, &school_id, &id, &name, &category_id, max_score)
+}
+
+/// Deletes an assessment item — only permitted while it has no recorded
+/// scores yet. See `assessment_item::delete`'s doc comment.
+#[tauri::command]
+pub fn delete_assessment_item(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    assessment_item::delete(&conn, &school_id, &id)
+}

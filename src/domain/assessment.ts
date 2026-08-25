@@ -29,7 +29,11 @@ export interface AssessmentItem {
 }
 
 /** An assessment item joined with its category's name, for a workspace
- * screen that groups items by category. */
+ * screen that groups items by category. `recordedCount`/`totalEligible`
+ * let a teacher see each item's completion (e.g. "12/30 recorded")
+ * without opening it -- `totalEligible` is the class record's own
+ * eligible-learner roster size, the same for every item in one class
+ * record. */
 export interface AssessmentItemDetail {
   id: string;
   schoolId: string;
@@ -39,4 +43,6 @@ export interface AssessmentItemDetail {
   name: string;
   maxScore: number;
   createdAt: string;
+  recordedCount: number;
+  totalEligible: number;
 }

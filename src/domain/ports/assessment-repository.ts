@@ -19,4 +19,21 @@ export interface AssessmentRepository {
     name: string,
     maxScore: number,
   ): Promise<AssessmentItem | null>;
+  /** Renames an item -- always permitted, scored or not. See
+   * `assessment_item::rename`'s Rust doc comment for why this one field
+   * is always safe to change. */
+  renameItem(id: string, name: string): Promise<AssessmentItem | null>;
+  /** Fully edits an item's name/category/max score -- only accepted by
+   * the Rust layer while the item has no recorded scores yet; returns
+   * `null` otherwise (the same fail-closed convention as every other
+   * rejection in this domain). */
+  updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null>;
+  /** Deletes an item -- only accepted while it has no recorded scores
+   * yet; returns `false` otherwise. */
+  deleteItem(id: string): Promise<boolean>;
 }

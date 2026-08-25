@@ -52,6 +52,15 @@ class FakeAssessmentRepository implements AssessmentRepository {
   async createItem(): Promise<AssessmentItem | null> {
     throw new Error("not used in this test");
   }
+  async renameItem(): Promise<AssessmentItem | null> {
+    throw new Error("not used in this test");
+  }
+  async updateItem(): Promise<AssessmentItem | null> {
+    throw new Error("not used in this test");
+  }
+  async deleteItem(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeExportRepository implements ExportRepository {

@@ -36,4 +36,26 @@ export class TauriAssessmentRepository implements AssessmentRepository {
       maxScore,
     });
   }
+
+  renameItem(id: string, name: string): Promise<AssessmentItem | null> {
+    return invoke<AssessmentItem | null>("rename_assessment_item", { id, name });
+  }
+
+  updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    return invoke<AssessmentItem | null>("update_assessment_item", {
+      id,
+      name,
+      categoryId,
+      maxScore,
+    });
+  }
+
+  deleteItem(id: string): Promise<boolean> {
+    return invoke<boolean>("delete_assessment_item", { id });
+  }
 }

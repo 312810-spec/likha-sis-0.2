@@ -50,6 +50,32 @@ class FakeAssessmentRepository implements AssessmentRepository {
     this.createCalls.push({ classRecordId, categoryId, name, maxScore });
     return this.createResult;
   }
+
+  renameCalls: Array<{ id: string; name: string }> = [];
+  renameResult: AssessmentItem | null = null;
+  async renameItem(id: string, name: string): Promise<AssessmentItem | null> {
+    this.renameCalls.push({ id, name });
+    return this.renameResult;
+  }
+
+  updateCalls: Array<{ id: string; name: string; categoryId: string; maxScore: number }> = [];
+  updateResult: AssessmentItem | null = null;
+  async updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    this.updateCalls.push({ id, name, categoryId, maxScore });
+    return this.updateResult;
+  }
+
+  deleteCalls: string[] = [];
+  deleteResult = true;
+  async deleteItem(id: string): Promise<boolean> {
+    this.deleteCalls.push(id);
+    return this.deleteResult;
+  }
 }
 
 describe("AssessmentApplicationService", () => {
@@ -128,5 +154,62 @@ describe("AssessmentApplicationService", () => {
     const sets = await service.listCategorySets();
 
     expect(sets).toBe(repo.categorySetsToReturn);
+  });
+
+  it("renames an item with trimmed fields", async () => {
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+
+    await service.renameItem(" ai-1 ", " Quiz 1 (Retake) ");
+
+    expect(repo.renameCalls).toEqual([{ id: "ai-1", name: "Quiz 1 (Retake)" }]);
+  });
+
+  it("rejects renaming to an empty name without calling the repository", async () => {
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+
+    await expect(service.renameItem("ai-1", "  ")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.renameCalls).toEqual([]);
+  });
+
+  it("fully updates an item with trimmed fields", async () => {
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+
+    await service.updateItem(" ai-1 ", " Quiz 1 ", " cat-2 ", 25);
+
+    expect(repo.updateCalls).toEqual([
+      { id: "ai-1", name: "Quiz 1", categoryId: "cat-2", maxScore: 25 },
+    ]);
+  });
+
+  it("rejects a non-positive max score on update without calling the repository", async () => {
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+
+    await expect(service.updateItem("ai-1", "Quiz 1", "cat-1", 0)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.updateCalls).toEqual([]);
+  });
+
+  it("deletes an item by delegating to the repository", async () => {
+    const repo = new FakeAssessmentRepository();
+    repo.deleteResult = true;
+    const service = new AssessmentApplicationService(repo);
+
+    const result = await service.deleteItem("ai-1");
+
+    expect(result).toBe(true);
+    expect(repo.deleteCalls).toEqual(["ai-1"]);
+  });
+
+  it("rejects deleting with an empty id without calling the repository", async () => {
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+
+    await expect(service.deleteItem("  ")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.deleteCalls).toEqual([]);
   });
 });
