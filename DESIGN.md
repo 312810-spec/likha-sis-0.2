@@ -7,9 +7,13 @@ implemented** in `src/ui/theme/styles.css` and `src/ui/components/` —
 not just a target anymore. **As of UX-02 (ADR-0032), the Teacher
 Workspace screen's own information hierarchy and visual treatment are
 implemented and pixel-verified** through a dev-only fixture
-(`src/dev-preview/`). What's still target-only: the per-screen visual
-polish of Attendance/Gradebook/Learner/Section/Auth/Audit belongs to
-UX-03 through UX-06, which have not started.
+(`src/dev-preview/`). **As of UX-03 (ADR-0033), Daily Attendance and
+Monthly Attendance Summary's own information hierarchy, per-row/save
+feedback, keyboard shortcuts, mobile ledger layout, and monthly-grid
+narrow-layout treatment are implemented and pixel-verified** the same
+way. What's still target-only: the per-screen visual polish of
+Gradebook/Learner/Section/Auth/Audit belongs to UX-04 through UX-06,
+which have not started.
 
 ## Chosen direction: Calm Civic Classroom
 
@@ -143,6 +147,33 @@ not just in this doc. Confirmed at three viewports, two color schemes,
 and all three teacher modes: no card-spam, no SaaS-dashboard framing,
 full functional parity across modes (Guided mode's extra copy pushes
 content below the fold but never removes it).
+
+## Daily Attendance + Monthly Attendance Summary (implemented, UX-03 — see ADR-0033)
+
+Both screens share the same context-first hierarchy: section/date (or
+section/month) → the day's completion state and safe bulk action →
+the actual roster/grid. Attendance shows a plain-text "X of Y marked ·
+Z remaining" readout (no color dependency) and a `StatusChip`-labeled
+"Not marked" state for every unmarked learner, alongside the existing
+non-color check-mark cue on a pressed status button. Per-row save
+feedback is deliberately quiet — a transient "Saving…" text, no
+persistent "Saved" label once a write succeeds (the pressed-button
+state change is itself the confirmation, this app's established
+convention since M7) — with an inline retry action scoped to the exact
+failed action when a write fails. Keyboard shortcuts (P/A/T,
+ArrowUp/ArrowDown) are bound directly to each status button, so they
+cannot leak into the section/date form controls. The one deliberately
+mobile-specific layout mirrors `ClassRecordWorkspace`'s existing
+`.score-entry` stacked-row pattern rather than inventing a second one.
+Monthly Summary's grid keeps its full spreadsheet-like scan-ability at
+every width via a sticky learner-name column and sticky day header
+inside a bounded scroll container, chosen over re-flowing each learner
+into a stacked block (a real narrow-layout comparison, not a default —
+see ADR-0033 §5) since a 20+-school-day month would make the stacked
+alternative far more scrolling, not less. A real, pre-existing
+document-level horizontal-overflow bug (a `<select>`'s long option text
+not shrinking below its intrinsic width) was found during this
+milestone's visual verification and fixed for both screens.
 
 ## Responsive Rules
 

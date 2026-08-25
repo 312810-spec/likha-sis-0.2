@@ -271,10 +271,185 @@ describe("MonthlySummaryScreen", () => {
     await waitFor(() => expect(screen.getByText(/could not export/i)).toBeInTheDocument());
   });
 
+  it("opens with the supplied initial section and year/month when the section still exists", async () => {
+    const SECTION_B: Section = {
+      id: "sec-b",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "8",
+      name: "Rizal",
+      createdAt: "now",
+    };
+    const repo = new FakeAttendanceRepository(reportWith("present"));
+    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const sectionService = new SectionApplicationService(
+      new FakeSectionRepository([SECTION, SECTION_B]),
+    );
+    const exportService = new ExportApplicationService(new FakeExportRepository());
+    render(
+      <ModeProvider>
+        <MonthlySummaryScreen
+          attendanceService={service}
+          sectionService={sectionService}
+          exportService={exportService}
+          schoolName="Rizal Elementary"
+          initialSectionId="sec-b"
+          initialYearMonth={{ year: 2026, month: 5 }}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Ana Santos");
+
+    expect(screen.getByLabelText("Section")).toHaveValue("sec-b");
+    expect(screen.getByLabelText("Month")).toHaveValue("2026-05");
+    expect(repo.monthlySummaryCalls).toEqual([{ sectionId: "sec-b", year: 2026, month: 5 }]);
+  });
+
+  it("falls back to the first section when the supplied initial section no longer exists", async () => {
+    const repo = new FakeAttendanceRepository(reportWith("present"));
+    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
+    const exportService = new ExportApplicationService(new FakeExportRepository());
+    render(
+      <ModeProvider>
+        <MonthlySummaryScreen
+          attendanceService={service}
+          sectionService={sectionService}
+          exportService={exportService}
+          schoolName="Rizal Elementary"
+          initialSectionId="sec-deleted"
+          initialYearMonth={{ year: 2026, month: 5 }}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Ana Santos");
+
+    expect(screen.getByLabelText("Section")).toHaveValue("sec-1");
+  });
+
   it("disables the export button while there is no report to export", async () => {
     renderScreen();
     await screen.findByText("No learners enrolled in this section yet.");
 
     expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toBeDisabled();
+  });
+
+  it("never shows a previous section's report after switching to a section whose load fails", async () => {
+    const user = userEvent.setup();
+    const SECTION_B: Section = {
+      id: "sec-b",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "8",
+      name: "Rizal",
+      createdAt: "now",
+    };
+
+    class PerSectionAttendanceRepository implements AttendanceRepository {
+      async rosterForDate(): Promise<AttendanceRosterEntry[]> {
+        return [];
+      }
+      async record(): Promise<AttendanceRecord | null> {
+        return null;
+      }
+      async bulkMarkPresent(): Promise<AttendanceRosterEntry[]> {
+        return [];
+      }
+      async monthlySummary(sectionId: string): Promise<MonthlyAttendanceReport> {
+        if (sectionId === "sec-b") {
+          throw new Error("simulated monthly summary load failure");
+        }
+        return reportWith("present");
+      }
+    }
+
+    const repo = new PerSectionAttendanceRepository();
+    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const sectionService = new SectionApplicationService(
+      new FakeSectionRepository([SECTION, SECTION_B]),
+    );
+    const exportService = new ExportApplicationService(new FakeExportRepository());
+    render(
+      <ModeProvider>
+        <MonthlySummaryScreen
+          attendanceService={service}
+          sectionService={sectionService}
+          exportService={exportService}
+          schoolName="Rizal Elementary"
+        />
+      </ModeProvider>,
+    );
+
+    // Section A's report loads successfully first.
+    expect(await screen.findByText("Ana Santos")).toBeInTheDocument();
+
+    // Switch to Section B, whose load fails.
+    await user.selectOptions(screen.getByLabelText("Section"), "sec-b");
+
+    await screen.findByText(/could not load the monthly summary/i);
+    // Section A's report must never render as if it belongs to Section B.
+    expect(screen.queryByText("Ana Santos")).not.toBeInTheDocument();
+  });
+
+  it("does not apply an export result once the section/month context has changed", async () => {
+    const user = userEvent.setup();
+
+    class SlowExportRepository implements ExportRepository {
+      calls: Array<{ sectionId: string; year: number; month: number }> = [];
+      resolveExport: ((result: Sf2ExportResult | null) => void) | null = null;
+
+      exportSectionMonthlySf2(
+        sectionId: string,
+        year: number,
+        month: number,
+      ): Promise<Sf2ExportResult | null> {
+        this.calls.push({ sectionId, year, month });
+        return new Promise((resolve) => {
+          this.resolveExport = resolve;
+        });
+      }
+      async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+        throw new Error("not used in this test");
+      }
+    }
+
+    const exportRepo = new SlowExportRepository();
+    const { repo: attendanceRepo } = (() => {
+      const repo = new FakeAttendanceRepository(reportWith("present"));
+      return { repo };
+    })();
+    const service = new AttendanceApplicationService(attendanceRepo, () => new Date("2026-08-24"));
+    const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
+    const exportService = new ExportApplicationService(exportRepo);
+    render(
+      <ModeProvider>
+        <MonthlySummaryScreen
+          attendanceService={service}
+          sectionService={sectionService}
+          exportService={exportService}
+          schoolName="Rizal Elementary"
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    expect(exportRepo.calls).toEqual([{ sectionId: "sec-1", year: 2026, month: 8 }]);
+
+    // The teacher changes month before the export settles.
+    fireEvent.change(screen.getByLabelText("Month"), { target: { value: "2026-07" } });
+
+    // The export for the OLD month (August) now resolves late.
+    exportRepo.resolveExport?.({
+      filePath: "C:\\stale-august-export.csv",
+      disclosure: { populatedFields: [], omittedFields: [] },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The stale export result must never be shown once the context moved on.
+    expect(screen.queryByText("C:\\stale-august-export.csv")).not.toBeInTheDocument();
   });
 });

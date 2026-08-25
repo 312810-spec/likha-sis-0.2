@@ -43,6 +43,16 @@ function App() {
   // selected -- a narrowly-typed prop, not a router/URL param/global
   // store. See docs/adr/0032-teacher-workspace-polish.md.
   const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
+  // Set only by AttendanceScreen's "View monthly summary" action, so
+  // MonthlySummaryScreen can open with the same section and year/month
+  // already selected -- same narrowly-typed handoff pattern as above, not
+  // a router/global store. See
+  // docs/adr/0033-daily-attendance-and-monthly-summary-polish.md.
+  const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
+    sectionId: string;
+    year: number;
+    month: number;
+  } | null>(null);
 
   function handleSessionExpired() {
     setSession(null);
@@ -135,6 +145,10 @@ function App() {
                 attendanceService={attendanceService}
                 sectionService={sectionService}
                 initialSectionId={attendanceSectionId ?? undefined}
+                onViewMonthlySummary={(sectionId, year, month) => {
+                  setMonthlySummaryContext({ sectionId, year, month });
+                  setActiveTab("monthly-summary");
+                }}
               />
             ) : activeTab === "monthly-summary" ? (
               <MonthlySummaryScreen
@@ -142,6 +156,12 @@ function App() {
                 sectionService={sectionService}
                 exportService={exportService}
                 schoolName={session.schoolName}
+                initialSectionId={monthlySummaryContext?.sectionId}
+                initialYearMonth={
+                  monthlySummaryContext
+                    ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
+                    : undefined
+                }
               />
             ) : activeTab === "grading-periods" ? (
               <GradingPeriodsScreen gradingService={gradingService} />

@@ -6,7 +6,9 @@ import type { AttendanceRosterEntry, AttendanceStatus } from "../domain/attendan
 import { ValidationError } from "../domain/errors";
 import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
+import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { StatusChip } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AttendanceScreenProps {
@@ -22,6 +24,12 @@ interface AttendanceScreenProps {
    * wrong section or leaving nothing selected. See
    * docs/adr/0032-teacher-workspace-polish.md. */
   initialSectionId?: string;
+  /** Opens Monthly Summary with the currently selected section and the
+   * year/month of the currently selected date already preserved -- a
+   * narrowly-typed callback/state handoff, not a router or global store,
+   * matching ADR-0032's section-preselection pattern. Omitted (e.g. in
+   * older tests) simply hides the transition action. */
+  onViewMonthlySummary?: (sectionId: string, year: number, month: number) => void;
 }
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -38,10 +46,15 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+function buttonKey(learnerId: string, status: AttendanceStatus): string {
+  return `${learnerId}:${status}`;
+}
+
 export function AttendanceScreen({
   attendanceService,
   sectionService,
   initialSectionId,
+  onViewMonthlySummary,
 }: AttendanceScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -49,23 +62,42 @@ export function AttendanceScreen({
   const [sections, setSections] = useState<Section[]>([]);
   const [sectionId, setSectionId] = useState("");
   const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [sectionsError, setSectionsError] = useState<string | null>(null);
   const [roster, setRoster] = useState<AttendanceRosterEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [savingLearnerId, setSavingLearnerId] = useState<string | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [savingLearnerIds, setSavingLearnerIds] = useState<ReadonlySet<string>>(new Set());
+  const [rowErrors, setRowErrors] = useState<
+    Record<string, { message: string; status: AttendanceStatus }>
+  >({});
   const [bulkMarking, setBulkMarking] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+
+  // Per-learner write "generation": incremented every time a new write
+  // starts for that learner. An in-flight write's response is applied
+  // only if it is still the latest generation for that learner when it
+  // settles -- this is what stops an older, slower write's response from
+  // overwriting a newer one, regardless of network/response ordering.
+  const writeGenerationRef = useRef<Map<string, number>>(new Map());
+  // Request identity for the section-list and roster fetches: guards
+  // against an in-flight request whose context (section/date) has since
+  // changed from applying its result to the now-current context.
+  const sectionsRequestRef = useRef(0);
+  const rosterRequestRef = useRef(0);
+  const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  function loadSections() {
+    const requestId = ++sectionsRequestRef.current;
+    setSectionsLoading(true);
+    setSectionsError(null);
     sectionService
       .listSections()
       .then((result) => {
-        if (cancelled) return;
+        if (sectionsRequestRef.current !== requestId) return;
         setSections(result);
         // Prefer the workspace-supplied section, but only if it's still
         // real -- never trust it blindly, and never leave the screen
@@ -77,14 +109,17 @@ export function AttendanceScreen({
         if (preselected) setSectionId(preselected);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load sections.");
+        if (sectionsRequestRef.current !== requestId) return;
+        setSectionsError("Could not load sections.");
       })
       .finally(() => {
-        if (!cancelled) setSectionsLoading(false);
+        if (sectionsRequestRef.current !== requestId) return;
+        setSectionsLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+  }
+
+  useEffect(() => {
+    loadSections();
     // initialSectionId is intentionally a mount-time-only default, not a
     // live binding: if a teacher changes the section dropdown by hand, a
     // later change to initialSectionId (e.g. a stale prop from a parent
@@ -92,61 +127,101 @@ export function AttendanceScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionService]);
 
-  useEffect(() => {
+  function loadRoster() {
     if (!sectionId) return;
-    let cancelled = false;
+    const requestId = ++rosterRequestRef.current;
+    setLoading(true);
+    setRosterError(null);
     attendanceService
       .rosterForDate(sectionId, date)
       .then((result) => {
-        if (!cancelled) setRoster(result);
+        if (rosterRequestRef.current !== requestId) return;
+        setRoster(result);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load the attendance roster for this date.");
+        if (rosterRequestRef.current !== requestId) return;
+        setRosterError("Could not load the attendance roster for this date.");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (rosterRequestRef.current !== requestId) return;
+        setLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
+  }
+
+  useEffect(() => {
+    // Clear the previous section/date's roster immediately, before the
+    // new request even settles -- a failed load must never leave a
+    // different context's roster rendered as if it belongs to the newly
+    // selected section/date.
+    setRoster([]);
+    setRowErrors({});
+    loadRoster();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendanceService, sectionId, date]);
 
   function handleDateChange(newDate: string) {
-    setError(null);
-    setLoading(true);
+    setConfirmation(null);
     setDate(newDate);
   }
 
   function handleSectionChange(newSectionId: string) {
-    setError(null);
-    setLoading(true);
+    setConfirmation(null);
     setSectionId(newSectionId);
   }
 
   async function handleMark(learnerId: string, status: AttendanceStatus) {
-    setError(null);
+    const entry = roster.find((candidate) => candidate.learnerId === learnerId);
+    // Selecting the already-active status is a no-op, not a write -- both
+    // to avoid an unnecessary round trip and so a stray duplicate click
+    // can never surface a false "saving" state.
+    if (entry && entry.status === status) return;
+
     setConfirmation(null);
-    setSavingLearnerId(learnerId);
+    setRowErrors((current) => {
+      if (!(learnerId in current)) return current;
+      const next = { ...current };
+      delete next[learnerId];
+      return next;
+    });
+    const generation = (writeGenerationRef.current.get(learnerId) ?? 0) + 1;
+    writeGenerationRef.current.set(learnerId, generation);
+    setSavingLearnerIds((current) => new Set(current).add(learnerId));
+
     try {
       await attendanceService.recordAttendance(sectionId, learnerId, date, status);
+      // An older write's response must never overwrite a newer one's
+      // result -- only apply this response if nothing newer started for
+      // this learner while it was in flight.
+      if (writeGenerationRef.current.get(learnerId) !== generation) return;
       setRoster((current) =>
-        current.map((entry) =>
-          entry.learnerId === learnerId
-            ? { ...entry, status, recordedAt: new Date().toISOString() }
-            : entry,
+        current.map((candidate) =>
+          candidate.learnerId === learnerId
+            ? { ...candidate, status, recordedAt: new Date().toISOString() }
+            : candidate,
         ),
       );
     } catch (err) {
-      setError(
-        err instanceof ValidationError ? err.message : "Could not save this attendance mark.",
-      );
+      if (writeGenerationRef.current.get(learnerId) !== generation) return;
+      setRowErrors((current) => ({
+        ...current,
+        [learnerId]: {
+          message: err instanceof ValidationError ? err.message : "Could not save this mark.",
+          status,
+        },
+      }));
     } finally {
-      setSavingLearnerId(null);
+      if (writeGenerationRef.current.get(learnerId) === generation) {
+        setSavingLearnerIds((current) => {
+          const next = new Set(current);
+          next.delete(learnerId);
+          return next;
+        });
+      }
     }
   }
 
   async function handleMarkAllPresent() {
-    setError(null);
+    setRosterError(null);
     setConfirmation(null);
     setBulkMarking(true);
     try {
@@ -159,11 +234,40 @@ export function AttendanceScreen({
           : `Marked ${unmarkedCount} learner${unmarkedCount === 1 ? "" : "s"} Present. Existing marks were left as-is.`,
       );
     } catch (err) {
-      setError(err instanceof ValidationError ? err.message : "Could not mark the roster present.");
+      setRosterError(
+        err instanceof ValidationError ? err.message : "Could not mark the roster present.",
+      );
     } finally {
       setBulkMarking(false);
     }
   }
+
+  function handleRosterKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    learnerId: string,
+    status: AttendanceStatus,
+  ) {
+    const key = event.key;
+    if (key === "p" || key === "P") {
+      event.preventDefault();
+      void handleMark(learnerId, "present");
+    } else if (key === "a" || key === "A") {
+      event.preventDefault();
+      void handleMark(learnerId, "absent");
+    } else if (key === "t" || key === "T") {
+      event.preventDefault();
+      void handleMark(learnerId, "tardy");
+    } else if (key === "ArrowDown" || key === "ArrowUp") {
+      event.preventDefault();
+      const index = roster.findIndex((candidate) => candidate.learnerId === learnerId);
+      const target = roster[key === "ArrowDown" ? index + 1 : index - 1];
+      if (!target) return;
+      buttonRefs.current.get(buttonKey(target.learnerId, status))?.focus();
+    }
+  }
+
+  const markedCount = roster.filter((entry) => entry.status !== null).length;
+  const remainingCount = roster.length - markedCount;
 
   return (
     <section aria-label="Attendance">
@@ -177,13 +281,22 @@ export function AttendanceScreen({
         </p>
       )}
 
-      {error && <Alert tone="error">{error}</Alert>}
+      {sectionsError && (
+        <Alert tone="error">
+          <p>{sectionsError}</p>
+          <button type="button" onClick={loadSections}>
+            Retry
+          </button>
+        </Alert>
+      )}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {sectionsLoading ? (
         <Loading label="Loading sections…" />
       ) : sections.length === 0 ? (
-        <p>No sections created yet. Create a section under "Sections" first.</p>
+        sectionsError ? null : (
+          <EmptyState>No sections created yet. Create a section under "Sections" first.</EmptyState>
+        )
       ) : (
         <>
           <div className="form-row">
@@ -213,17 +326,45 @@ export function AttendanceScreen({
             </div>
           </div>
 
+          {onViewMonthlySummary && sectionId && (
+            <button
+              type="button"
+              onClick={() => {
+                const yearPart = Number(date.slice(0, 4));
+                const monthPart = Number(date.slice(5, 7));
+                onViewMonthlySummary(sectionId, yearPart, monthPart);
+              }}
+            >
+              View monthly summary
+            </button>
+          )}
+
+          {rosterError && (
+            <Alert tone="error">
+              <p>{rosterError}</p>
+              <button type="button" onClick={loadRoster}>
+                Retry
+              </button>
+            </Alert>
+          )}
+
           {loading ? (
             <Loading label="Loading roster…" />
-          ) : roster.length === 0 ? (
-            <p>No learners enrolled in this section yet.</p>
+          ) : rosterError ? null : roster.length === 0 ? (
+            <EmptyState>No learners enrolled in this section yet.</EmptyState>
           ) : (
             <>
+              <p className="attendance-count">
+                <strong>
+                  {markedCount} of {roster.length} marked
+                </strong>{" "}
+                · {remainingCount} remaining
+              </p>
               {mode === "guided" && (
                 <p className="field-hint">
                   Most days, most of the class is present. Use "Mark all present" to fill in
-                  everyone who doesn't have a mark yet, then adjust the few who are Absent or Tardy
-                  — it never changes a mark you've already made.
+                  everyone who doesn't have a mark yet — it never changes a mark you've already
+                  made, so it's always safe to use. Then adjust the few who are Absent or Tardy.
                 </p>
               )}
               <button
@@ -234,6 +375,10 @@ export function AttendanceScreen({
               >
                 {bulkMarking ? "Marking…" : "Mark all present"}
               </button>
+              <p className="field-hint">
+                Keyboard: P Present · A Absent · T Tardy · ↑/↓ move between learners (while focus is
+                on a status button).
+              </p>
               <table className="attendance-roster">
                 <thead>
                   <tr>
@@ -242,31 +387,63 @@ export function AttendanceScreen({
                   </tr>
                 </thead>
                 <tbody>
-                  {roster.map((entry) => (
-                    <tr key={entry.learnerId}>
-                      <th scope="row">
-                        {entry.givenName} {entry.familyName}
-                      </th>
-                      <td>
-                        <div
-                          role="group"
-                          aria-label={`Attendance status for ${entry.givenName} ${entry.familyName}`}
-                        >
-                          {ATTENDANCE_STATUSES.map((status) => (
-                            <button
-                              key={status}
-                              type="button"
-                              aria-pressed={entry.status === status}
-                              disabled={savingLearnerId === entry.learnerId}
-                              onClick={() => handleMark(entry.learnerId, status)}
-                            >
-                              {STATUS_LABELS[status]}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {roster.map((entry) => {
+                    const rowError = rowErrors[entry.learnerId];
+                    const isSaving = savingLearnerIds.has(entry.learnerId);
+                    return (
+                      <tr key={entry.learnerId}>
+                        <th scope="row">
+                          {entry.givenName} {entry.familyName}
+                        </th>
+                        <td>
+                          <div
+                            role="group"
+                            aria-label={`Attendance status for ${entry.givenName} ${entry.familyName}`}
+                          >
+                            {ATTENDANCE_STATUSES.map((status) => (
+                              <button
+                                key={status}
+                                type="button"
+                                ref={(el) => {
+                                  const key = buttonKey(entry.learnerId, status);
+                                  if (el) buttonRefs.current.set(key, el);
+                                  else buttonRefs.current.delete(key);
+                                }}
+                                aria-pressed={entry.status === status}
+                                disabled={bulkMarking}
+                                onClick={() => handleMark(entry.learnerId, status)}
+                                onKeyDown={(event) =>
+                                  handleRosterKeyDown(event, entry.learnerId, status)
+                                }
+                              >
+                                {STATUS_LABELS[status]}
+                              </button>
+                            ))}
+                          </div>
+                          {entry.status === null && !isSaving && (
+                            <StatusChip tone="neutral">Not marked</StatusChip>
+                          )}
+                          {isSaving && (
+                            <span className="field-hint" role="status">
+                              Saving…
+                            </span>
+                          )}
+                          {rowError && (
+                            <Alert tone="error" inline>
+                              <span>{rowError.message}</span>{" "}
+                              <button
+                                type="button"
+
+                                onClick={() => handleMark(entry.learnerId, rowError.status)}
+                              >
+                                Retry
+                              </button>
+                            </Alert>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </>

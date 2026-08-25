@@ -199,6 +199,13 @@ select {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-bg);
+  /* A <select> otherwise sizes itself from its longest option's text,
+     which can force the control (and the document) wider than the
+     viewport regardless of its flex container's own min-width -- see
+     .form-row .field's comment for the full explanation. Constraining
+     width here lets a long option's text truncate with the browser's
+     own ellipsis in the closed control, never overflow the layout. */
+  max-width: 100%;
 }
 
 input[type="checkbox"],
@@ -509,8 +516,19 @@ label {
   }
 }
 
+/* Narrow-layout decision (recorded in ADR-0033): a horizontal scroll
+   container with a persistent (sticky) learner-name column and sticky
+   day-header row was chosen over re-flowing each learner into a stacked
+   per-day block. With up to ~23 school-day columns, a stacked layout
+   would turn one learner into 20+ tall stacked rows -- far more
+   scrolling overall, and it breaks the "scan a whole month, compare
+   learners" task this grid actually serves. Horizontal scrolling with a
+   pinned identity column keeps the spreadsheet-like scan intact while
+   never losing track of whose row is being read. */
 .monthly-summary-scroll {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 70vh;
   margin-bottom: var(--spacing-unit);
 }
 
@@ -535,6 +553,21 @@ label {
 .monthly-summary th[scope="row"] {
   text-align: left;
   white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: var(--color-bg);
+  z-index: 1;
+}
+
+.monthly-summary thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg);
+  z-index: 2;
+}
+
+.monthly-summary thead th[scope="col"]:first-child {
+  z-index: 3;
 }
 
 .attendance-roster {
@@ -566,6 +599,64 @@ label {
 /* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
 .attendance-roster button[aria-pressed="true"]::before {
   content: "✓ ";
+}
+
+.attendance-count {
+  font-size: var(--font-size-large);
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+/* Narrow (phone-width) attendance ledger: mirrors .score-entry's existing
+   mobile pattern exactly (see below) rather than shrinking the desktop
+   table into cells nobody could reliably tap. Each learner becomes a
+   full-width block: name, then a row of full-width/44px status buttons —
+   matching a teacher's actual sequence (identify the learner, see their
+   current state, tap a status, get confirmation, move to the next row)
+   without any dialog or extra navigation. */
+@media (max-width: 640px) {
+  .attendance-roster thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .attendance-roster,
+  .attendance-roster tbody,
+  .attendance-roster tr,
+  .attendance-roster th,
+  .attendance-roster td {
+    display: block;
+    width: 100%;
+  }
+
+  .attendance-roster tr {
+    padding: var(--spacing-unit) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .attendance-roster tr:first-child {
+    border-top: none;
+  }
+
+  .attendance-roster th[scope="row"] {
+    font-size: var(--font-size-large);
+    padding: 0 0 calc(var(--spacing-unit) * 0.5) 0;
+    border-top: none;
+    white-space: normal;
+  }
+
+  .attendance-roster td {
+    padding: 0;
+    border-top: none;
+  }
+
+  .attendance-roster [role="group"] button {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
 }
 
 .term-grades {
@@ -763,6 +854,23 @@ label {
 
 .form-row .field {
   flex: 1;
+  /* Flex items default to min-width:auto, which refuses to shrink below
+     an intrinsic content width -- a <select> whose longest option is a
+     long section name would otherwise force the whole row (and the
+     document) wider than the viewport instead of just truncating its own
+     closed-state text with an ellipsis (the browser's own standard,
+     harmless behavior; the full option text still shows once opened).
+     Found as a real, reproducible document-level horizontal-overflow bug
+     at intermediate widths (roughly 640-900px) during UX-03 verification
+     -- pre-existing, not introduced by this milestone, but directly
+     affects the screens being verified here. */
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .form-row {
+    flex-direction: column;
+  }
 }
 
 /* Standard "hidden visually, present for screen readers" pattern — for a

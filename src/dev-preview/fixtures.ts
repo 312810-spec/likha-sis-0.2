@@ -20,14 +20,22 @@
  */
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { AuthRepository } from "../domain/ports/auth-repository";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
   AttendanceRecord,
   AttendanceRosterEntry,
+  AttendanceStatus,
   MonthlyAttendanceReport,
+  MonthlyLearnerAttendance,
 } from "../domain/attendance";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+} from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type { Learner } from "../domain/learner";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
@@ -209,18 +217,126 @@ export class FixtureSectionRepository implements SectionRepository {
   }
 }
 
+/** A small, deterministic per-learner day pattern so the monthly legend's
+ * P/A/T/— all appear somewhere in the fixture, not just one repeated
+ * status -- built from each section's own roster (name/id only, not its
+ * daily `status` field, since a single day's mark and a month's day-by-
+ * day history are different concepts). */
+function buildFixtureMonthlyReport(
+  sectionId: string,
+  year: number,
+  month: number,
+): MonthlyAttendanceReport {
+  const roster = FIXTURE_ROSTERS[sectionId] ?? [];
+  const schoolDays = [3, 4, 5, 6, 7];
+  const learners: MonthlyLearnerAttendance[] = roster.map((entry, index) => {
+    const days: (AttendanceStatus | null)[] = [
+      "present",
+      index === 0 ? "absent" : "present",
+      index === 1 ? "tardy" : "present",
+      null,
+      "present",
+    ];
+    return {
+      learnerId: entry.learnerId,
+      givenName: entry.givenName,
+      familyName: entry.familyName,
+      days,
+      presentCount: days.filter((status) => status === "present").length,
+      absentCount: days.filter((status) => status === "absent").length,
+      tardyCount: days.filter((status) => status === "tardy").length,
+    };
+  });
+  return { year, month, schoolDays, learners };
+}
+
+/** In-memory-only attendance state, mutated by `record()`/
+ * `bulkMarkPresent()` so a teacher can genuinely interact with the
+ * fixture (mark a learner, switch sections and back, see the mark still
+ * there) -- never persisted, never touches Tauri/SQLite. Cloned from the
+ * static `FIXTURE_ROSTERS` at construction so each fixture instance
+ * starts from the same known synthetic state. */
 export class FixtureAttendanceRepository implements AttendanceRepository {
+  private rosters: Record<string, AttendanceRosterEntry[]> = structuredClone(FIXTURE_ROSTERS);
+
   async rosterForDate(sectionId: string): Promise<AttendanceRosterEntry[]> {
-    return FIXTURE_ROSTERS[sectionId] ?? [];
+    return this.rosters[sectionId] ?? [];
   }
-  async record(): Promise<AttendanceRecord | null> {
-    throw new Error("dev-preview fixture: record() is not wired -- read-only fixture");
+
+  async record(
+    sectionId: string,
+    learnerId: string,
+    attendanceDate: string,
+    status: AttendanceStatus,
+  ): Promise<AttendanceRecord | null> {
+    const roster = this.rosters[sectionId];
+    if (!roster) return null;
+    this.rosters[sectionId] = roster.map((entry) =>
+      entry.learnerId === learnerId
+        ? { ...entry, status, recordedAt: new Date().toISOString() }
+        : entry,
+    );
+    return {
+      id: `fixture-record-${sectionId}-${learnerId}`,
+      schoolId: "fixture-school",
+      sectionId,
+      learnerId,
+      attendanceDate,
+      status,
+      recordedAt: new Date().toISOString(),
+    };
   }
-  async bulkMarkPresent(): Promise<AttendanceRosterEntry[]> {
-    throw new Error("dev-preview fixture: bulkMarkPresent() is not wired -- read-only fixture");
+
+  async bulkMarkPresent(sectionId: string): Promise<AttendanceRosterEntry[]> {
+    const roster = this.rosters[sectionId];
+    if (!roster) return [];
+    this.rosters[sectionId] = roster.map((entry) =>
+      entry.status === null
+        ? { ...entry, status: "present", recordedAt: new Date().toISOString() }
+        : entry,
+    );
+    return this.rosters[sectionId];
   }
-  async monthlySummary(): Promise<MonthlyAttendanceReport> {
-    throw new Error("dev-preview fixture: monthlySummary() is not wired -- read-only fixture");
+
+  async monthlySummary(
+    sectionId: string,
+    year: number,
+    month: number,
+  ): Promise<MonthlyAttendanceReport> {
+    return buildFixtureMonthlyReport(sectionId, year, month);
+  }
+}
+
+/** A synthetic SF2 export result -- the fixture never writes a real file;
+ * `exportClassRecordReportCard`/`exportLearnerRoster` remain unwired
+ * (out of scope for UX-03's dev-preview extension) and throw, matching
+ * this file's existing "not wired" convention for untouched methods. */
+export class FixtureExportRepository implements ExportRepository {
+  async exportSectionMonthlySf2(
+    sectionId: string,
+    year: number,
+    month: number,
+  ): Promise<Sf2ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_${sectionId}_${year}-${String(month).padStart(2, "0")}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Present/Absent/Tardy per day"],
+        omittedFields: [
+          { field: "School ID (EBEIS)", reason: "not tracked by this app" },
+          { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
+        ],
+      },
+    };
+  }
+
+  async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error(
+      "dev-preview fixture: exportClassRecordReportCard() is not wired -- read-only fixture",
+    );
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("dev-preview fixture: exportLearnerRoster() is not wired -- read-only fixture");
   }
 }
 

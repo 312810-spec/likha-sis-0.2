@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { AttendanceApplicationService } from "../application/attendance-service";
 import { AuthApplicationService } from "../application/auth-service";
+import { ExportApplicationService } from "../application/export-service";
 import { GradingApplicationService } from "../application/grading-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import { SectionApplicationService } from "../application/section-service";
 import { AppShell } from "../ui/AppShell";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
+import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "../ui/components/WorkbenchNav";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
@@ -16,6 +18,7 @@ import {
   FIXTURE_SESSION,
   FixtureAttendanceRepository,
   FixtureAuthRepository,
+  FixtureExportRepository,
   FixtureGradingRepository,
   FixtureLearnerRepository,
   FixtureSectionRepository,
@@ -42,6 +45,7 @@ import {
  */
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
+const exportService = new ExportApplicationService(new FixtureExportRepository());
 const gradingService = new GradingApplicationService(new FixtureGradingRepository());
 const learnerService = new LearnerApplicationService(new FixtureLearnerRepository());
 const sectionService = new SectionApplicationService(new FixtureSectionRepository());
@@ -49,6 +53,11 @@ const sectionService = new SectionApplicationService(new FixtureSectionRepositor
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
   const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
+  const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
+    sectionId: string;
+    year: number;
+    month: number;
+  } | null>(null);
 
   return (
     <ModeProvider>
@@ -81,6 +90,23 @@ export function DevPreviewApp() {
             attendanceService={attendanceService}
             sectionService={sectionService}
             initialSectionId={attendanceSectionId ?? undefined}
+            onViewMonthlySummary={(sectionId, year, month) => {
+              setMonthlySummaryContext({ sectionId, year, month });
+              setActiveTab("monthly-summary");
+            }}
+          />
+        ) : activeTab === "monthly-summary" ? (
+          <MonthlySummaryScreen
+            attendanceService={attendanceService}
+            sectionService={sectionService}
+            exportService={exportService}
+            schoolName={FIXTURE_SESSION.schoolName}
+            initialSectionId={monthlySummaryContext?.sectionId}
+            initialYearMonth={
+              monthlySummaryContext
+                ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
+                : undefined
+            }
           />
         ) : activeTab === "audit-log" ? (
           <AuditLogScreen authService={authService} />
