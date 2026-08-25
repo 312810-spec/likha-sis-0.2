@@ -131,6 +131,20 @@ export function ClassRecordsScreen({
     setSectionId(value);
   }
 
+  /** Returning to the list from a workspace re-fetches class records so
+   * the Progress column reflects any scoring done while it was open --
+   * without this, a teacher who scores several items then goes back
+   * would see the same stale item/recorded counts they left behind,
+   * exactly the kind of "looks current but isn't" gap this milestone
+   * exists to close everywhere else. */
+  function handleBackToList() {
+    setSelectedClassRecordId(null);
+    classRecordService
+      .listClassRecords()
+      .then((records) => setClassRecords(records))
+      .catch(() => setError("Could not refresh class records."));
+  }
+
   async function handleAddSubject() {
     setError(null);
     setConfirmation(null);
@@ -179,7 +193,7 @@ export function ClassRecordsScreen({
     const selectedRecord = classRecords.find((r) => r.id === selectedClassRecordId);
     return (
       <>
-        <button type="button" onClick={() => setSelectedClassRecordId(null)}>
+        <button type="button" onClick={handleBackToList}>
           Back to Class Records
         </button>
         {selectedRecord && (

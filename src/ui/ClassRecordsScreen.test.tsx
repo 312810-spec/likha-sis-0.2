@@ -179,8 +179,10 @@ class FakeClassRecordRepository implements ClassRecordRepository {
     createdAt: "now",
   };
   weightPolicies: GradingWeightPolicy[] = [WEIGHT_POLICY];
-  constructor(private records: ClassRecordDetail[] = []) {}
+  listCallCount = 0;
+  constructor(public records: ClassRecordDetail[] = []) {}
   async list(): Promise<ClassRecordDetail[]> {
+    this.listCallCount += 1;
     return this.records;
   }
   async create(
@@ -363,6 +365,44 @@ describe("ClassRecordsScreen", () => {
 
     expect(await screen.findByText("3 items · 24 of 90 recorded")).toBeInTheDocument();
     expect(screen.getByText("No assessment items yet")).toBeInTheDocument();
+  });
+
+  it("refreshes the progress summary after returning from a workspace, not just on first mount", async () => {
+    const user = userEvent.setup();
+    const classRecordRepo = new FakeClassRecordRepository([
+      {
+        id: "cr-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        subjectId: "sub-1",
+        subjectName: "Mathematics",
+        gradingPeriodId: "gp-1",
+        gradingPeriodLabel: "1st Term",
+        schoolYear: "2026-2027",
+        weightPolicyId: "wp-1",
+        weightPolicyName: WEIGHT_POLICY.name,
+        createdAt: "now",
+        itemCount: 0,
+        recordedCount: 0,
+        totalEligible: 30,
+      },
+    ]);
+    renderScreen({ classRecordRepo });
+
+    expect(await screen.findByText("No assessment items yet")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open workspace" }));
+    await screen.findByRole("heading", { name: "Class Record Workspace" });
+
+    // While the workspace is open, scoring happened -- simulate the
+    // repository's next `list()` reflecting that, exactly as the real
+    // Tauri repository would after items/scores are recorded.
+    classRecordRepo.records = [{ ...classRecordRepo.records[0]!, itemCount: 2, recordedCount: 15 }];
+
+    await user.click(screen.getByRole("button", { name: "Back to Class Records" }));
+
+    expect(await screen.findByText("2 items · 15 of 60 recorded")).toBeInTheDocument();
+    expect(classRecordRepo.listCallCount).toBeGreaterThanOrEqual(2);
   });
 
   it("moves focus to the heading on mount", async () => {
