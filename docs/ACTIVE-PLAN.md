@@ -423,7 +423,91 @@ Affected: `src/ui/AttendanceScreen.tsx` (+ test), `src/ui/MonthlySummaryScreen.t
       milestone.)
 - [x] Push the UX-03 completion checkpoint; verify remote sync.
 
-### UX-04 through UX-08 — Queued
+### UX-04 — Class Records, Assessments, Score Entry, Grade Output
+
+Teacher outcome: a teacher can create/select an assessment item, enter
+scores rapidly with clear per-row saving/failure/retry feedback, see
+"X of Y scored · Z remaining" for the item they're working on, trust
+that a computed term grade never silently looks current after a score
+changes, and fix a mistyped assessment item (or safely rename one that
+already has scores) without being permanently stuck with a mistake.
+
+Baseline SHA: `0634421` (UX-03 completion checkpoint).
+
+Scope: fix four confirmed correctness defects (found by direct code
+inspection during UX-04's discovery pass) — stale roster after a
+failed item switch; overlapping/out-of-order score writes reachable via
+two different trigger paths (the score input's commit path and the
+exception-status buttons, which don't guard each other); redundant
+duplicate exception writes; and term grades that stay looking current
+after a score changes. Add a completion-count readout. Add assessment-
+item edit/delete for unscored items, and a safe scored-item rename if
+inspection proves the name doesn't participate in grading math. Bring
+`ClassRecordsScreen` into the UX-01–03 shared-component/hierarchy
+convention. Extend the mobile ledger pattern. Build the Class Records
+dev-preview fixture from scratch (currently zero coverage).
+
+Non-goals: no change to the DepEd weighting algorithm, transmutation
+table, or category model unless a verified defect is found (none
+expected); no new weight groups; no inferring a weight policy from a
+subject name; no cloud/router/global-state dependency; no Android-
+native work (only responsive/shared-UI preparation).
+
+Affected (expected): `src/ui/ClassRecordsScreen.tsx` (+ test),
+`src/ui/ClassRecordWorkspace.tsx` (+ test), `src/application/assessment-service.ts`,
+`src/domain/assessment.ts`, `src/domain/ports/assessment-repository.ts`,
+`src/infrastructure/tauri/assessment-repository.ts`,
+`src-tauri/src/repository/assessment_item.rs`,
+`src-tauri/src/commands/assessment_item.rs`, `src/dev-preview/fixtures.ts`,
+`src/dev-preview/DevPreviewApp.tsx`, `src/ui/theme/styles.css`.
+
+- [x] Reverify git state (fetch, branch, working tree, local/remote SHA,
+      UX-03 checkpoint ancestry) before any doc/code change.
+- [x] Re-read `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0011/
+      0012/0013/0033, and the live implementation, confirming discovery
+      findings still hold.
+- [ ] Push the UX-04 start checkpoint.
+- [ ] TDD: stale assessment-context-after-failed-load fix.
+- [ ] TDD: overlapping learner-score-write fix covering both the
+      score-input and exception-button trigger paths.
+- [ ] TDD: duplicate-exception-write fix.
+- [ ] Term-grade freshness: investigate automatic-recompute-after-write
+      vs. explicit-stale-flag, decide, record in ADR-0034, implement
+      with a regression test.
+- [ ] Completion-count readout (selected item + per-item list
+      indicator), with blank/zero/exception-state tests.
+- [ ] Assessment-item correction: Rust repository/command layer (update/
+      delete, unscored-only for meaning-changing fields; investigate
+      and test whether a scored item's name can safely be renamed).
+- [ ] Assessment-item correction: TS domain/application/UI + tests.
+- [ ] Grade-completeness correctness check (blank/zero/exception/
+      partial-scoring handling) — add a test only if a real ambiguity
+      is found.
+- [ ] `ClassRecordsScreen` hierarchy/shared-component migration +
+      per-class-record progress summary.
+- [ ] `ClassRecordWorkspace` gradebook polish, keyboard verification,
+      mobile ledger.
+- [ ] Wire `src/dev-preview/` Class Records fixtures from scratch;
+      confirm isolation checks still pass.
+- [ ] `npm run quality`, `cargo test`/`cargo clippy` (Rust changed this
+      milestone, unlike UX-03), `npm run build`, `npm run check:architecture`,
+      `npm run check:dev-preview-isolation`, `npx knip`,
+      `npm run quality:security`, `git diff --check`, `git status --short`.
+- [ ] Browser-rendered visual verification via the dev-preview fixture
+      at 1366×768/1024×768/390×844, light/dark, 3 modes, required
+      states; disclose native Windows/WebView2 verification remains
+      unavailable.
+- [ ] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`),
+      one-retry-then-self-review fallback if needed; fix blocking
+      findings.
+- [ ] Update `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0034
+      (`docs/PROJECT-MEMORY.md` for genuinely durable reusable rules
+      only).
+- [ ] Push the UX-04 completion checkpoint; verify remote sync.
+
+### UX-05 through UX-08 — Queued
 
 See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
 ordered list and dependencies. Each gets its own detailed checklist in

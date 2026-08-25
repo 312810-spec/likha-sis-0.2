@@ -1,6 +1,25 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-25, this session)
+## Active Task (2026-08-25, this session — UX-04)
+
+**UX-04 — Class Records, Assessments, Score Entry, Grade Output — ◐ In
+Progress.** Baseline SHA `0634421` (UX-03 completion). Full checklist
+in `docs/ACTIVE-PLAN.md`'s "UX-04" section; decisions in
+`docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
+Fixing four confirmed correctness defects found by direct code
+inspection during discovery (stale roster after a failed assessment-
+item switch; overlapping score writes reachable via two separate
+trigger paths — the score input and the exception-status buttons, which
+don't guard each other; redundant duplicate exception writes; term
+grades that stay looking current after a score changes), adding a
+completion-count readout, adding assessment-item edit/delete (approved
+scope expansion, unscored items only, plus a safe scored-item rename if
+proven safe), then the `ClassRecordsScreen`/`ClassRecordWorkspace`
+hierarchy/keyboard/mobile polish. Working on branch
+`claude/likha-sis-ux03-plan-plv80c` (still this session's harness
+assignment — re-verified, not assumed).
+
+## Active Task (2026-08-25, this session — UX-03, complete)
 
 **UX-03 — Daily Attendance + Monthly Attendance Summary Polish —
 complete.** Baseline SHA `f02bce5`, start checkpoint `c0124f0`, feature
