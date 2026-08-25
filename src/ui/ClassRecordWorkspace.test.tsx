@@ -378,6 +378,33 @@ describe("ClassRecordWorkspace", () => {
     expect(screen.getByText(/already has recorded scores/, { exact: false })).toBeInTheDocument();
   });
 
+  it("disambiguates each item's Edit/Delete buttons by name, for assistive technology", async () => {
+    const user = userEvent.setup();
+    const item2: AssessmentItemDetail = {
+      ...ITEM,
+      id: "ai-2",
+      name: "Quiz 2",
+      recordedCount: 0,
+      totalEligible: 0,
+    };
+    const assessmentRepo = new FakeAssessmentRepository([ITEM, item2]);
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    // Two items both render an "Edit" and a "Delete" button -- a screen
+    // reader must be able to tell them apart via the surrounding group's
+    // accessible name, not just document order.
+    const quiz1Group = screen.getByRole("group", { name: "Actions for Quiz 1" });
+    const quiz2Group = screen.getByRole("group", { name: "Actions for Quiz 2" });
+
+    await user.click(within(quiz2Group).getByRole("button", { name: "Delete" }));
+
+    expect(within(quiz2Group).getByText(/can.t be undone/i)).toBeInTheDocument();
+    // Quiz 1's group must be entirely unaffected by Quiz 2's delete confirmation.
+    expect(within(quiz1Group).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(within(quiz1Group).getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
   it("selecting an item shows its roster", async () => {
     const user = userEvent.setup();
     renderScreen();

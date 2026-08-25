@@ -659,34 +659,36 @@ export function ClassRecordWorkspace({
                       {item.totalEligible > 0 &&
                         ` · ${item.recordedCount} of ${item.totalEligible} recorded`}
                     </button>
-                    <button type="button" onClick={() => startEditingItem(item)}>
-                      Edit
-                    </button>
-                    {isScored ? (
-                      <span className="field-hint">
-                        Can&rsquo;t delete — already has recorded scores.
-                      </span>
-                    ) : isConfirmingDelete ? (
-                      <>
-                        <span className="field-hint">
-                          Delete this item? This can&rsquo;t be undone.
-                        </span>
-                        <button
-                          type="button"
-                          disabled={deletingItemId === item.id}
-                          onClick={() => void handleDeleteItem(item)}
-                        >
-                          {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
-                        </button>
-                        <button type="button" onClick={() => setConfirmingDeleteItemId(null)}>
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button type="button" onClick={() => setConfirmingDeleteItemId(item.id)}>
-                        Delete
+                    <div role="group" aria-label={`Actions for ${item.name}`}>
+                      <button type="button" onClick={() => startEditingItem(item)}>
+                        Edit
                       </button>
-                    )}
+                      {isScored ? (
+                        <span className="field-hint">
+                          Can&rsquo;t delete — already has recorded scores.
+                        </span>
+                      ) : isConfirmingDelete ? (
+                        <>
+                          <span className="field-hint">
+                            Delete this item? This can&rsquo;t be undone.
+                          </span>
+                          <button
+                            type="button"
+                            disabled={deletingItemId === item.id}
+                            onClick={() => void handleDeleteItem(item)}
+                          >
+                            {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
+                          </button>
+                          <button type="button" onClick={() => setConfirmingDeleteItemId(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => setConfirmingDeleteItemId(item.id)}>
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </li>
