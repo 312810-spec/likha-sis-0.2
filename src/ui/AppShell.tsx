@@ -31,10 +31,10 @@ export function AppShell({ session, onLogout, children }: AppShellProps) {
         </div>
 
         {session && (
-          <div>
-            <span>
+          <div className="app-shell-session">
+            <span className="app-shell-session-identity">
               {session.displayName} · {session.schoolName}
-            </span>{" "}
+            </span>
             <button type="button" onClick={onLogout}>
               Log out
             </button>

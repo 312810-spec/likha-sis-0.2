@@ -12,6 +12,8 @@ import type { GradingPeriod } from "../domain/grading";
 import type { Section } from "../domain/section";
 import type { Subject } from "../domain/subject";
 import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ClassRecordsScreenProps {
@@ -189,16 +191,8 @@ export function ClassRecordsScreen({
         </p>
       )}
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {confirmation && (
-        <div className="confirmation-banner" role="status">
-          {confirmation}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       <div className="form-row">
         <div className="field">
@@ -298,7 +292,7 @@ export function ClassRecordsScreen({
       </div>
 
       {loading ? (
-        <p role="status">Loading class records…</p>
+        <Loading label="Loading class records…" />
       ) : (
         <table className="attendance-roster">
           <thead>

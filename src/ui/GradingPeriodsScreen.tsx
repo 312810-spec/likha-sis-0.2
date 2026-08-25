@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { GradingApplicationService } from "../application/grading-service";
 import { ValidationError } from "../domain/errors";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface GradingPeriodsScreenProps {
@@ -154,16 +156,8 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
         </p>
       )}
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {confirmation && (
-        <div className="confirmation-banner" role="status">
-          {confirmation}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       <div className="form-row">
         <div className="field">
@@ -198,7 +192,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
       )}
 
       {loading ? (
-        <p role="status">Loading grading periods…</p>
+        <Loading label="Loading grading periods…" />
       ) : (
         <table className="attendance-roster">
           <thead>

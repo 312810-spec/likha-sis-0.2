@@ -17,6 +17,39 @@ structurally valid?) and a real screen-reader pass (NVDA/Narrator) on the
 compiled app are still owed for every screen shipped so far
 (`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
 
+## Browser-pane dev-server port was misconfigured — fixed 2026-08-25 (closed)
+
+`.claude/launch.json` declared the dev server's port as `5173`, but
+Vite/Tauri's actual `devUrl` is `1420`. This silently broke every
+Browser-pane `navigate` attempt against the running dev server across
+at least two sessions (the "navigation ... was denied or failed" note
+recorded in earlier handoffs was this misconfigured port, not a tool
+limitation). Fixed in `docs/adr/0030-ui-first-program-and-ux00.md`.
+With the fix, Browser-pane DOM/text/console verification against
+`vite dev` genuinely works, and — once the user displays the Browser
+pane panel client-side — pixel-level screenshot capture works too
+(confirmed in `docs/adr/0031-design-system-and-app-shell.md`: `LoginScreen`
+screenshotted at three viewports, two color schemes, three teacher
+modes).
+
+## Authenticated (post-login) screens are not pixel-verified (open)
+
+The browser-only `vite dev` server has no live Tauri IPC bridge, so
+nothing past `LoginScreen` can be reached through a real login. UX-01
+(`docs/adr/0031-design-system-and-app-shell.md`) ran a 10-scenario
+decision on how to close this: a dev-only synthetic fixture (rendering
+`AppShell`+nav with a directly-supplied fake session prop, in a
+separate entry point never imported by production code, never touching
+real auth) scored highest, but building it was deliberately deferred
+rather than rushed under time pressure, given the directing prompt's
+explicit "never create a production authentication bypass" warning.
+Structure/ARIA/behavior of authenticated screens (the new grouped nav,
+`AppShell`'s header) IS verified via the passing jsdom test suite;
+pixel rendering is not. Build the fixture (safety-hardened, isolated
+entry point) in whichever of UX-02 through UX-06 first genuinely needs
+authenticated-screen pixel verification, or resume the native
+`@wdio/tauri-service` pilot below if that becomes more tractable first.
+
 ## Playwright CLI coverage is browser-only, not native-binary (open)
 
 `@playwright/cli` (adopted per `docs/SOURCE-REGISTRY.md`) can only drive

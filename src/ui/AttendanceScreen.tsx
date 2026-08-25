@@ -5,6 +5,8 @@ import { ATTENDANCE_STATUSES } from "../domain/attendance";
 import type { AttendanceRosterEntry, AttendanceStatus } from "../domain/attendance";
 import { ValidationError } from "../domain/errors";
 import type { Section } from "../domain/section";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AttendanceScreenProps {
@@ -149,19 +151,11 @@ export function AttendanceScreen({ attendanceService, sectionService }: Attendan
         </p>
       )}
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {confirmation && (
-        <div className="confirmation-banner" role="status">
-          {confirmation}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {sectionsLoading ? (
-        <p role="status">Loading sections…</p>
+        <Loading label="Loading sections…" />
       ) : sections.length === 0 ? (
         <p>No sections created yet. Create a section under "Sections" first.</p>
       ) : (
@@ -194,7 +188,7 @@ export function AttendanceScreen({ attendanceService, sectionService }: Attendan
           </div>
 
           {loading ? (
-            <p role="status">Loading roster…</p>
+            <Loading label="Loading roster…" />
           ) : roster.length === 0 ? (
             <p>No learners enrolled in this section yet.</p>
           ) : (

@@ -6,6 +6,8 @@ import type { AttendanceStatus, MonthlyAttendanceReport } from "../domain/attend
 import { ValidationError } from "../domain/errors";
 import type { Sf2ExportResult } from "../domain/export";
 import type { Section } from "../domain/section";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface MonthlySummaryScreenProps {
@@ -172,14 +174,10 @@ export function MonthlySummaryScreen({
         </p>
       )}
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {sectionsLoading ? (
-        <p role="status">Loading sections…</p>
+        <Loading label="Loading sections…" />
       ) : sections.length === 0 ? (
         <p>No sections created yet. Create a section under "Sections" first.</p>
       ) : (
@@ -221,7 +219,7 @@ export function MonthlySummaryScreen({
           </button>
 
           {exportResult && (
-            <div className="confirmation-banner" role="status">
+            <Alert tone="success">
               <p>
                 Saved to <code>{exportResult.filePath}</code>.
               </p>
@@ -236,11 +234,11 @@ export function MonthlySummaryScreen({
                   </li>
                 ))}
               </ul>
-            </div>
+            </Alert>
           )}
 
           {loading ? (
-            <p role="status">Loading summary…</p>
+            <Loading label="Loading summary…" />
           ) : !report || report.learners.length === 0 ? (
             <p>No learners enrolled in this section yet.</p>
           ) : (

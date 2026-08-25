@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AuthApplicationService } from "../application/auth-service";
+import { Alert } from "./components/Alert";
 
 interface IdleTimeoutWarningProps {
   authService: AuthApplicationService;
@@ -34,14 +35,12 @@ function formatMinutes(msRemaining: number): string {
  * them out, and offers a one-click way to stay signed in without needing
  * to go do something elsewhere in the app. See ADR-0026.
  *
- * Deliberately `role="alert"`, not `role="alertdialog"` (self-review
- * correction, ADR-0027) -- this banner never traps focus, moves focus
- * into itself, or blocks interaction with the rest of the page, so it
- * isn't a dialog; `alertdialog` implies exactly that modal behavior per
- * ARIA authoring practices, which would mislead assistive tech into
- * expecting it. `alert` (same role every other banner in this app
- * already uses, e.g. `error-banner`) is announced immediately without
- * claiming modal semantics this component doesn't actually have.
+ * Deliberately warning-tone `Alert` (`role="alert"`), not
+ * `role="alertdialog"` (self-review correction, ADR-0027) -- this
+ * banner never traps focus, moves focus into itself, or blocks
+ * interaction with the rest of the page, so it isn't a dialog;
+ * `alertdialog` implies exactly that modal behavior per ARIA authoring
+ * practices, which would mislead assistive tech into expecting it.
  */
 export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarningProps) {
   const [msRemaining, setMsRemaining] = useState<number | null>(null);
@@ -92,7 +91,7 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
   if (msRemaining === null) return null;
 
   return (
-    <div className="idle-timeout-warning" role="alert">
+    <Alert tone="warning" inline>
       <p>
         You&rsquo;ve been inactive for a while — your session will expire in about{" "}
         {formatMinutes(msRemaining)} unless you stay signed in.
@@ -105,6 +104,6 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
       >
         {extending ? "Staying signed in…" : "Stay signed in"}
       </button>
-    </div>
+    </Alert>
   );
 }

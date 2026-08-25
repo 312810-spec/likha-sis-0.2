@@ -74,6 +74,58 @@ describe("App", () => {
     expect(screen.getByText(/Rizal Elementary/)).toBeInTheDocument();
   });
 
+  it("groups the navigation into named workbench clusters, preserving every destination", async () => {
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+
+    render(<App />);
+    await screen.findByRole("region", { name: "Workspace" });
+
+    const nav = screen.getByRole("navigation", { name: "Teacher workbench" });
+    expect(nav).toBeInTheDocument();
+    for (const groupName of ["Daily Teaching", "Learner Records", "Grading", "Security"]) {
+      expect(screen.getByRole("group", { name: groupName })).toBeInTheDocument();
+    }
+    for (const destination of [
+      "Workspace",
+      "Attendance",
+      "Monthly Summary",
+      "Learners",
+      "Sections",
+      "Grading Periods",
+      "Class Records",
+      "Sign-in Activity",
+    ]) {
+      expect(screen.getByRole("button", { name: destination })).toBeInTheDocument();
+    }
+  });
+
+  it("sets the browser tab title to the active destination", async () => {
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByRole("region", { name: "Workspace" });
+    expect(document.title).toBe("Workspace · LIKHA-SIS");
+
+    await user.click(screen.getByRole("button", { name: "Learners" }));
+
+    expect(document.title).toBe("Learners · LIKHA-SIS");
+  });
+
   it("shows the learner screen after switching to the Learners tab", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });

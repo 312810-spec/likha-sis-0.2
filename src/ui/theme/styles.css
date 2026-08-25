@@ -1,31 +1,97 @@
+/* Public Sans (OFL-1.1), self-hosted via @fontsource -- no runtime
+   webfont fetch. Chosen for the Calm Civic Classroom direction: a
+   civic/government-service-heritage humanist sans (USWDS/US federal
+   digital services), strong legibility credentials, and good tabular
+   figure support for grades/LRNs/dates. See DESIGN.md and
+   docs/SOURCE-REGISTRY.md. Only the weights actually used are
+   imported: 400 (body), 600 (labels/emphasis, already the codebase's
+   convention), 700 (pressed/active state). */
+@import "@fontsource/public-sans/400.css";
+@import "@fontsource/public-sans/600.css";
+@import "@fontsource/public-sans/700.css";
+
 :root {
-  --color-bg: #ffffff;
-  --color-surface: #f6f7f9;
+  /* Calm Civic Classroom palette (DESIGN.md). Every pair below was
+     verified with computed WCAG relative-luminance contrast, not
+     eyeballed — see docs/adr/0031-design-system-and-app-shell.md for
+     the exact ratios. Recompute before changing any of these values. */
+  --color-bg: #fbf8f2;
+  --color-surface: #f3eee3;
   /* --color-border draws every input/button/divider outline and is often
      the only visible cue a control exists (fill matches the background).
      Keep this at >=3:1 against both --color-bg and --color-surface in
      both light and dark palettes (WCAG 1.4.11 non-text contrast) — do
-     not lighten/darken this without recomputing. */
-  --color-border: #828a98;
-  --color-text: #1a1d23;
-  --color-text-muted: #5b6472;
-  --color-primary: #1d5fa8;
+     not lighten/darken this without recomputing. Verified: 3.71:1 /
+     3.40:1. */
+  --color-border: #8a7f6e;
+  --color-text: #1b2430;
+  --color-text-muted: #5c6570;
+  /* Structural/trust color -- deep ink/navy, used for primary actions,
+     focus, and structural chrome. Verified 10.85:1 on bg. */
+  --color-primary: #1e3a5f;
   --color-primary-text: #ffffff;
+  /* Restrained teal/jade for "in progress" / productive state --
+     distinct from --color-success (a completed/confirmed state).
+     Verified 6.04:1 on bg, 5.58:1 on its own surface tint. */
+  --color-productive: #0f6b5c;
+  --color-productive-surface: #e5f2f0;
   --color-danger: #a3271f;
-  --color-danger-surface: #fbeceb;
-  --color-success: #1e7a34;
-  --color-success-surface: #e8f5ea;
-  --color-warning: #8a5a00;
+  --color-danger-surface: #fbecea;
+  --color-success: #1d7a5f;
+  --color-success-surface: #e7f3ec;
+  /* Warm sunrise/amber for meaningful attention -- darkened from the
+     first-pass hue to clear 4.5:1 text contrast (the lighter #8a5a00
+     draft only reached 4.10:1). Verified 5.86:1 on bg, 5.55:1 on its
+     own surface tint. */
+  --color-warning: #8f5209;
   --color-warning-surface: #fbf1de;
-  --color-focus: #1d5fa8;
+  --color-focus: #1e3a5f;
 
   --spacing-unit: 12px;
+  --font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Tabular figures for grades, LRNs, dates, and attendance counts --
+     digits must align in a column, not just be legible individually. */
+  --font-numeric: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-size-base: 15px;
   --font-size-large: 1.25rem;
+  --font-size-small: 0.875rem;
+  --line-height-base: 1.5;
   --control-height: 40px;
+  --content-width: 720px;
+  --content-width-wide: 1080px;
   --radius: 6px;
+  --radius-large: 10px;
+  /* Restrained elevation -- one subtle level, not a shadow system.
+     Used sparingly (e.g. the app header separating from scrolled
+     content), never as decoration. */
+  --elevation-1: 0 1px 2px rgba(27, 36, 48, 0.08);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Motion: see DESIGN.md's timing policy. Immediate feedback (button
+     press/save), routine (nav/state changes), meaningful (layout/view
+     transitions). No bounce/elastic easing by default -- ease-out for
+     entrances (feels responsive), ease-in for exits (feels quick). */
+  --motion-duration-immediate: 120ms;
+  --motion-duration-routine: 200ms;
+  --motion-duration-meaningful: 400ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
 
   color-scheme: light;
+}
+
+/* prefers-reduced-motion: collapse every motion token to effectively
+   instant, once, here -- every component that transitions using these
+   tokens automatically complies, rather than each one needing its own
+   media query. State changes/confirmations still render, just without
+   the animated transition. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-immediate: 0.01ms;
+    --motion-duration-routine: 0.01ms;
+    --motion-duration-meaningful: 0.01ms;
+  }
 }
 
 :root[data-teacher-mode="efficient"] {
@@ -42,20 +108,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #14161a;
-    --color-surface: #1c1f26;
-    --color-border: #6b7480;
-    --color-text: #e9ebef;
-    --color-text-muted: #a0a7b2;
-    --color-primary: #7fb1e8;
-    --color-primary-text: #0b1520;
+    --color-bg: #14181d;
+    --color-surface: #1c2129;
+    /* Verified 4.12:1 / 3.74:1. */
+    --color-border: #6f7b87;
+    --color-text: #ece9e1;
+    --color-text-muted: #a6adb6;
+    --color-primary: #8fb4dd;
+    --color-primary-text: #0d1720;
+    --color-productive: #6fccb9;
+    --color-productive-surface: #163330;
     --color-danger: #ff9c94;
     --color-danger-surface: #3a1f1d;
-    --color-success: #8fd19e;
-    --color-success-surface: #173a20;
+    --color-success: #8fd1a0;
+    --color-success-surface: #17332c;
     --color-warning: #e8c07d;
     --color-warning-surface: #3a2f14;
-    --color-focus: #7fb1e8;
+    --color-focus: #8fb4dd;
     color-scheme: dark;
   }
 }
@@ -74,13 +143,10 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-family);
   font-size: var(--font-size-base);
-  line-height: 1.5;
+  line-height: var(--line-height-base);
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -96,19 +162,28 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    filter var(--motion-duration-immediate) var(--motion-easing-standard),
+    background-color var(--motion-duration-immediate) var(--motion-easing-standard);
 }
 
 button:hover {
   filter: brightness(0.97);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .button-primary {
@@ -151,40 +226,112 @@ label {
   font-size: 0.9em;
 }
 
-.error-banner {
+/* Consolidated banner component (src/ui/components/Alert.tsx) --
+   replaces the three previously near-identical .error-banner/
+   .confirmation-banner/.idle-timeout-warning rules with one base plus
+   tone modifiers. See docs/adr/0031-design-system-and-app-shell.md. */
+.alert {
   padding: var(--spacing-unit);
   margin-bottom: var(--spacing-unit);
-  border: 1px solid var(--color-danger);
+  border: 1px solid;
   border-radius: var(--radius);
-  background: var(--color-danger-surface);
-  color: var(--color-danger);
 }
 
-.confirmation-banner {
-  padding: var(--spacing-unit);
-  margin-bottom: var(--spacing-unit);
-  border: 1px solid var(--color-success);
-  border-radius: var(--radius);
-  background: var(--color-success-surface);
-  color: var(--color-success);
+.alert > :first-child {
+  margin-top: 0;
 }
 
-.idle-timeout-warning {
+.alert > :last-child {
+  margin-bottom: 0;
+}
+
+/* For the one shape that needs a message beside a single action button
+   (Alert's `inline` prop) rather than stacked block content. */
+.alert-inline {
   display: flex;
   align-items: center;
   gap: var(--spacing-unit);
   flex-wrap: wrap;
-  padding: var(--spacing-unit);
-  margin-bottom: var(--spacing-unit);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius);
+}
+
+.alert-inline > :first-child {
+  flex: 1 1 auto;
+}
+
+.alert-error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.alert-success {
+  border-color: var(--color-success);
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.alert-warning {
+  border-color: var(--color-warning);
   background: var(--color-warning-surface);
   color: var(--color-warning);
 }
 
-.idle-timeout-warning p {
-  margin: 0;
-  flex: 1 1 auto;
+.alert-info {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.loading-state,
+.empty-state {
+  color: var(--color-text-muted);
+}
+
+.status-chip {
+  display: inline-block;
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.status-chip-neutral {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.status-chip-productive {
+  border-color: var(--color-productive);
+  background: var(--color-productive-surface);
+  color: var(--color-productive);
+}
+
+.status-chip-success {
+  border-color: var(--color-success);
+  background: var(--color-success-surface);
+  color: var(--color-success);
+}
+
+.status-chip-warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+}
+
+.status-chip-danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+}
+
+.page-header {
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+}
+
+.page-header h2 {
+  margin: 0 0 calc(var(--spacing-unit) * 0.35) 0;
 }
 
 .app-shell {
@@ -197,21 +344,35 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--spacing-unit);
   padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+  box-shadow: var(--elevation-1);
 }
 
 .app-shell-title {
   margin: 0;
   font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.app-shell-session {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+}
+
+.app-shell-session-identity {
+  color: var(--color-text-muted);
 }
 
 .app-shell-main {
   flex: 1;
   padding: calc(var(--spacing-unit) * 1.5);
-  max-width: 720px;
+  max-width: var(--content-width-wide);
   width: 100%;
   margin: 0 auto;
 }
@@ -233,6 +394,119 @@ label {
    a screen reader still need a way to tell which mode is active. */
 .mode-switcher button[aria-pressed="true"]::before {
   content: "✓ ";
+}
+
+/* Grouped teacher-workbench navigation (src/App.tsx's NAV_GROUPS,
+   src/ui/components/NavItem.tsx) -- replaces the flat 8-button
+   .section-switcher row with clusters matching a teacher's actual
+   daily rhythm (Daily Teaching / Learner Records / Grading /
+   Security). See docs/adr/0031-design-system-and-app-shell.md. */
+.workbench-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 1.25);
+  margin-bottom: var(--spacing-unit);
+  padding-bottom: var(--spacing-unit);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nav-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding-right: calc(var(--spacing-unit) * 1.25);
+  border-right: 1px solid var(--color-border);
+}
+
+.nav-group:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+.nav-group-label {
+  /* Visible group context for sighted users, matching the ledger/
+     class-record rhythm the Calm Civic Classroom direction calls for
+     -- a small caption, not a competing heading. Marked aria-hidden
+     because each nav-group's own role="group" aria-label already
+     gives assistive tech the same text as its accessible name; a
+     visible duplicate would otherwise be announced twice. */
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: calc(var(--spacing-unit) * 0.25);
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-item[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
+.nav-item[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+/* The one "ledger continuity" motion treatment (DESIGN.md): a selection
+   rule beneath the active destination, drawn in from the center rather
+   than appearing instantly -- a restrained echo of underlining an entry
+   in a ledger, not a decorative flourish. Transform/opacity only (no
+   layout-driving property), so it stays cheap even on ordinary school
+   hardware, and collapses to an instant state change under
+   prefers-reduced-motion via --motion-duration-routine's own reduced-
+   motion override. */
+.nav-item::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-primary-text);
+  transform: scaleX(0);
+  opacity: 0;
+  transition:
+    transform var(--motion-duration-routine) var(--motion-easing-standard),
+    opacity var(--motion-duration-routine) var(--motion-easing-standard);
+}
+
+.nav-item[aria-pressed="true"]::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .workbench-nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-unit);
+  }
+
+  .nav-group {
+    flex-wrap: wrap;
+    border-right: none;
+    padding-right: 0;
+    padding-bottom: calc(var(--spacing-unit) * 0.5);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .nav-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .nav-item {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
 }
 
 .monthly-summary-scroll {
@@ -261,24 +535,6 @@ label {
 .monthly-summary th[scope="row"] {
   text-align: left;
   white-space: nowrap;
-}
-
-.section-switcher {
-  display: flex;
-  gap: calc(var(--spacing-unit) * 0.5);
-  margin-bottom: var(--spacing-unit);
-}
-
-.section-switcher button[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
-  font-weight: 700;
-}
-
-/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
-.section-switcher button[aria-pressed="true"]::before {
-  content: "✓ ";
 }
 
 .attendance-roster {

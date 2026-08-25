@@ -387,6 +387,30 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## UX-01: Design Tokens, Shared Components, and App Shell (added 2026-08-25)
+
+Second UI-First Program milestone (ADR-0031). The Calm Civic Classroom
+palette is now real, computed CSS in `src/ui/theme/styles.css`, not
+just a written direction — every color pair's WCAG contrast was
+verified by a hand-written script against the actual final hex values
+(full table in the ADR), not eyeballed. Public Sans
+(`@fontsource/public-sans`, self-hosted, no runtime fetch) replaced the
+accidental `system-ui` stack. Six shared components
+(`Alert`/`Loading`/`EmptyState`/`StatusChip`/`PageHeader`/`NavItem`)
+now live in `src/ui/components/`, each justified by real prior
+repetition (documented per-component in the ADR) and migrated into
+real screens — `Alert`/`Loading` everywhere (13 screens), the others
+into 2 screens each as a "proves reuse" sample, not a full sweep.
+`App.tsx`'s flat 8-button nav became 4 labeled groups (Daily Teaching /
+Learner Records / Grading / Security) matching a teacher's actual daily
+rhythm, with every destination preserved. A 10-scenario decision on
+authenticated-screen visual verification (native `@wdio/tauri-service`
+pilot vs. a safety-hardened dev-only fixture) selected the fixture
+approach but deliberately deferred building it rather than rushing
+something safety-sensitive under time pressure — see the ADR for the
+full reasoning, since the directing prompt was explicit that a
+production authentication bypass must never be created.
+
 ## UI-First World-Class Product Program (added 2026-08-25)
 
 Explicit new user direction, superseding autonomous feature-list

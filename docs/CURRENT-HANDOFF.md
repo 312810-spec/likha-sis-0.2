@@ -2,21 +2,25 @@
 
 ## Active Task (2026-08-25)
 
-**UX-01 — Design Tokens, Shared Components, and App Shell — in
-progress.** Start SHA `fcf26ca` (UX-00's completion commit, verified
-against actual `git log`/`git fetch` before acting — matched the
-explicit checkpoint given for this milestone). Full scope/checklist:
-`docs/ACTIVE-PLAN.md`'s "UX-01" section. Evolves the existing token
-system to Calm Civic Classroom, builds real shared components (Button,
-Alert, Loading, Empty, Status chip, Page header, Nav item), redesigns
-`AppShell`'s navigation, adds one restrained ledger-continuity motion
-treatment. Explicitly does **not** redesign the individual Workspace/
-Attendance/Gradebook/Learner/Section/Auth/Audit screens — those are
-UX-02 through UX-06.
+**UX-01 — Design Tokens, Shared Components, and App Shell — complete.**
+Start SHA `cb644ef`, completion SHA is this commit. Full record:
+`docs/adr/0031-design-system-and-app-shell.md`. Evolved the existing
+token system to the computed-contrast Calm Civic Classroom palette,
+self-hosted Public Sans, built six real shared components (`Alert`,
+`Loading`, `EmptyState`, `StatusChip`, `PageHeader`, `NavItem`) each
+backed by genuine repetition and migrated into real call sites,
+redesigned `AppShell`'s navigation into four grouped clusters (every
+destination preserved), and added one ledger-continuity motion
+treatment with full reduced-motion handling. `npm run quality`
+339/339, `npm run build`, `npx knip` clean (5 pre-existing). Real
+Browser-pane visual verification of `LoginScreen` at three viewports,
+two color schemes, three teacher modes — see the ADR for what was and
+wasn't pixel-verified (authenticated screens remain a disclosed gap,
+`docs/VERIFICATION-DEBT.md`).
 
-**If resuming mid-UX-01**: check `docs/ACTIVE-PLAN.md`'s UX-01
-checklist for exactly which items are done vs. still open before
-continuing.
+**Next**: UX-02 — Teacher Workspace polish (○ Queued, not started —
+its own start checkpoint must be pushed before any implementation
+begins).
 
 **Previously completed**: UX-00 (start `603863b`, completion `fcf26ca`)
 — see `docs/adr/0030-ui-first-program-and-ux00.md`. `PRODUCT.md` and

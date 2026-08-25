@@ -250,7 +250,7 @@ describe("TeacherWorkspaceScreen", () => {
       rostersBySectionId: { sec1: [anEntry(null), anEntry(null)] },
     });
 
-    expect(await screen.findByText(/Mabini.*not yet marked today/)).toBeInTheDocument();
+    expect(await findSectionListItem(/Mabini.*not yet marked today/)).toBeInTheDocument();
   });
 
   it("shows a section as fully marked when every learner has a status", async () => {
@@ -267,7 +267,7 @@ describe("TeacherWorkspaceScreen", () => {
       rostersBySectionId: { sec1: [anEntry("present"), anEntry("absent")] },
     });
 
-    expect(await screen.findByText(/Mabini.*all 2 marked/)).toBeInTheDocument();
+    expect(await findSectionListItem(/Mabini.*all 2 marked/)).toBeInTheDocument();
   });
 
   it("shows a section as partially marked with a count", async () => {
@@ -284,7 +284,7 @@ describe("TeacherWorkspaceScreen", () => {
       rostersBySectionId: { sec1: [anEntry("present"), anEntry(null)] },
     });
 
-    expect(await screen.findByText(/Mabini.*1 of 2 marked/)).toBeInTheDocument();
+    expect(await findSectionListItem(/Mabini.*1 of 2 marked/)).toBeInTheDocument();
   });
 
   it("shows the currently open grading period for a section", async () => {

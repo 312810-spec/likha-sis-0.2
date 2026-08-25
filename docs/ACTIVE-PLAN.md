@@ -164,38 +164,61 @@ verification remains a separate, still-unbuilt path — a 10-scenario
 decision this milestone must make explicitly (native pilot vs.
 dev-only synthetic fixture) rather than deferring again.
 
-- [ ] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
+- [x] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
       `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`,
       `docs/ACTIVE-PLAN.md`, `docs/PROGRESS-MAP.md`,
       `docs/VERIFICATION-DEBT.md`, `docs/SOURCE-REGISTRY.md`,
       `docs/adr/0030-ui-first-program-and-ux00.md`.
-- [ ] Inspect `src/App.tsx`, `src/ui/AppShell.tsx`,
+- [x] Inspect `src/App.tsx`, `src/ui/AppShell.tsx`,
       `src/ui/theme/styles.css`, teacher-mode implementation
       (`ModeContext.tsx`/`modes.ts`/`useTeacherMode.ts`), and repeated
       screen patterns across all 13 screens.
-- [ ] Push the UX-01 start checkpoint.
-- [ ] Impeccable `shape` pass for the app-shell/navigation composition.
-- [ ] Compare fonts; select one; record in `docs/SOURCE-REGISTRY.md`.
-- [ ] Evolve tokens to the Calm Civic Classroom palette; recompute
-      contrast for real hex values.
-- [ ] Build shared components (Button, Alert, Loading, Empty, Status
-      chip, Page header, Nav item); migrate real call sites.
-- [ ] Redesign `AppShell` navigation/identity/session-status.
-- [ ] One ledger-continuity motion treatment; reduced-motion handling.
-- [ ] 10-scenario decision: native `@wdio/tauri-service` pilot vs.
-      dev-only synthetic visual fixture.
-- [ ] Visual inspection at 1366×768, 1024×768, 390×844; light/dark;
-      all 3 teacher modes; keyboard focus; loading/empty/warning/
-      success/error states; reduced motion; long/dense synthetic data.
-- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
-      `npx knip`, `npm run quality:security` (if tools available).
-- [ ] Impeccable `audit`/`critique` pass, fix findings, one
-      confirmation/polish pass.
-- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+- [x] Push the UX-01 start checkpoint (`cb644ef`).
+- [x] Impeccable `shape` pass for the app-shell/navigation composition
+      (context.mjs + one `shape` invocation; informed the nav-grouping
+      decision directly, no separate artifact).
+- [x] Compare fonts; select one; record in `docs/SOURCE-REGISTRY.md`
+      (Public Sans, over Atkinson Hyperlegible Next and Inter).
+- [x] Evolve tokens to the Calm Civic Classroom palette; recompute
+      contrast for real hex values (full ratio table in ADR-0031).
+- [x] Build shared components (Alert, Loading, EmptyState, StatusChip,
+      PageHeader, NavItem — Button deliberately not wrapped, see
+      ADR-0031 §3); migrate real call sites (full list in ADR-0031).
+- [x] Redesign `AppShell`/`App.tsx` navigation/identity/session-status
+      into 4 grouped clusters; every destination preserved.
+- [x] One ledger-continuity motion treatment (active-nav-item selection
+      rule); reduced-motion handling (one shared `:root` token-collapse
+      rule).
+- [x] 10-scenario decision: native `@wdio/tauri-service` pilot (3.65)
+      vs. dev-only synthetic visual fixture (5.30) — B selected in a
+      safety-hardened form, construction deliberately deferred to
+      whichever of UX-02–06 first needs it (see ADR-0031 §6 for the
+      full reasoning on why building it now, under time pressure,
+      wasn't the safer choice).
+- [x] Visual inspection: `LoginScreen` at 1366×768, 1024×768, 390×844;
+      light/dark; all 3 teacher modes; screenshotted and inspected via
+      the Browser pane (now working after the port fix). Authenticated
+      screens (grouped nav, `AppShell` header) not pixel-inspected this
+      session — no live Tauri IPC bridge in the browser dev server; see
+      the 10-scenario decision above and `docs/VERIFICATION-DEBT.md`.
+      Reduced motion verified by code inspection, not visually toggled
+      (no emulation control in this session's Browser-pane tooling).
+- [x] `npm run quality` (339/339), `npm run build`,
+      `npm run check:architecture` (also run directly, passed). `npx knip`
+      clean (5 pre-existing findings after 2 new ones triaged/fixed).
+      `npm run quality:security`: not run — its tools (gitleaks/
+      cargo-deny/OSV-Scanner) remain the same disclosed per-machine
+      PATH gap noted in every prior session this project, not new.
+- [x] Impeccable mechanical detector (`detect.mjs --json`) run against
+      every touched file — zero findings. Deeper interactive `critique`/
+      `polish` conversational passes not run to completion this session
+      (time budget); self-review substituted, full checklist in
+      ADR-0031's "Independent review" section.
+- [x] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
       `docs/CURRENT-HANDOFF.md`, `docs/PROJECT-MEMORY.md`,
       `docs/SOURCE-REGISTRY.md`, `docs/VERIFICATION-DEBT.md`,
       ADR-0031.
-- [ ] Push the UX-01 completion checkpoint; verify remote sync.
+- [x] Push the UX-01 completion checkpoint; verify remote sync.
 
 ### UX-02 through UX-08 — Queued
 

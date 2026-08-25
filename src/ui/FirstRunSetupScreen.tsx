@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { SetupApplicationService } from "../application/setup-service";
 import { ValidationError } from "../domain/errors";
 import type { CurrentSession } from "../domain/session";
+import { Alert } from "./components/Alert";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface FirstRunSetupScreenProps {
@@ -64,11 +65,7 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
       </p>
 
       <form onSubmit={handleSubmit} aria-label="Set up your school">
-        {error && (
-          <div className="error-banner" role="alert">
-            {error}
-          </div>
-        )}
+        {error && <Alert tone="error">{error}</Alert>}
 
         <h3>Your school</h3>
         <div className="field">

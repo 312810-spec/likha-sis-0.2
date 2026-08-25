@@ -1,12 +1,13 @@
 # Design
 
 **Status**: chosen direction for the UI-First World-Class Product
-Program (ADR-0030). Written at UX-00; implemented incrementally starting
-UX-01 — this file states the target system, it does not mean every
-screen already matches it. `src/ui/theme/styles.css` is the incumbent
-implementation as of UX-00 and the evolution baseline (refinement, not
-a from-scratch replacement — see "Relationship to the incumbent system"
-below).
+Program (ADR-0030), written at UX-00. **As of UX-01 (ADR-0031), the
+token palette, typography, and shared component set below are
+implemented** in `src/ui/theme/styles.css` and `src/ui/components/` —
+not just a target anymore. What's still target-only, not yet applied to
+every screen: the per-screen visual polish of Workspace/Attendance/
+Gradebook/Learner/Section/Auth/Audit belongs to UX-02 through UX-06,
+which have not started.
 
 ## Chosen direction: Calm Civic Classroom
 
@@ -55,50 +56,51 @@ Locally relevant without costume or cliché. Distinctive through rhythm,
 typography, and detail — not through a mascot, an illustration style,
 or a color explosion. Fast and legible on ordinary school hardware.
 
-## Tokens (target — see "Relationship to the incumbent system")
+## Tokens (implemented, UX-01 — see ADR-0031)
 
-The incumbent token set (`src/ui/theme/styles.css`'s `:root` custom
-properties) already covers the _mechanism_ correctly: semantic
-color/spacing/typography/sizing tokens, a light/dark pair, and a
-teacher-mode density multiplier. What it doesn't yet have is the Calm
-Civic Classroom _palette and type_ itself — the current values are a
-generic, unbranded neutral-gray-plus-blue system. UX-01 evolves the
-existing token mechanism to these values rather than inventing a new
-mechanism:
+`src/ui/theme/styles.css`'s `:root` custom properties now carry the Calm
+Civic Classroom palette, every pair verified with computed WCAG
+contrast (full ratio table in ADR-0031, not just asserted):
 
-- **Neutrals**: warm paper-like off-whites and warm ink/navy darks,
-  replacing the current sterile pure-gray scale. Keep the existing
-  `--color-border` ≥3:1 non-text-contrast discipline — recompute for
-  the new hex values, don't assume the ratio survives a hue change.
-- **Structure/trust**: a deep ink/navy as the primary structural color
-  (replacing the current generic blue `#1d5fa8`), used for primary
-  actions, focus, and structural chrome.
-- **Productive state**: a restrained teal/jade for "in progress" /
-  positive-productive state, distinct from the existing green
-  `--color-success` (a completed/confirmed state) — evaluate whether
-  these should merge into one token or stay two purposeful ones once
-  real screens are being touched in UX-01, rather than deciding in the
-  abstract here.
-- **Attention**: warm sunrise/amber for meaningful highlights — the
-  existing `--color-warning` (added this session for the idle-timeout
-  banner) is already close to this in spirit; refine its exact hue
-  toward the chosen palette rather than replacing it.
-- **Destructive/error**: red, reserved strictly for genuine
-  destructive/error states — the existing `--color-danger` usage
-  pattern is already correct and narrow; keep that discipline.
-- **Structural rhythm**: a subtle ledger/grid cue (rule lines, a
-  classroom-record-like structure) used as actual layout structure in
-  shared components (tables, rosters, the app shell), never as
-  decoration layered on top.
+- **Neutrals**: warm paper `#fbf8f2`/`#f3eee3` (light), warm ink-navy
+  `#14181d`/`#1c2129` (dark) — replacing the prior sterile pure-gray
+  scale. `--color-border` (`#8a7f6e` light / `#6f7b87` dark) keeps the
+  ≥3:1 non-text-contrast discipline, recomputed for the new hues.
+- **Structure/trust**: deep ink/navy `--color-primary` (`#1e3a5f`
+  light / `#8fb4dd` dark), replacing the prior generic blue.
+- **Productive state**: `--color-productive` (`#0f6b5c` light /
+  `#6fccb9` dark), kept as its own token distinct from
+  `--color-success` (completed/confirmed) rather than merged, since the
+  two real usages that emerged during UX-01 (an in-progress attendance
+  count vs. a fully-confirmed export) are genuinely different states.
+- **Attention**: `--color-warning` darkened from the prior
+  `#8a5a00` draft to `#8f5209` — the lighter draft only reached 4.10:1
+  text contrast, short of AA.
+- **Destructive/error**: `--color-danger` unchanged (`#a3271f` /
+  `#ff9c94`) — already correct and narrowly scoped.
+- **Structural rhythm**: the nav's grouped clusters (`.nav-group`, a
+  vertical rule between groups) and the active-item selection-rule
+  underline are the first real application of the ledger/grid rhythm
+  idea — used as layout structure, not decoration.
 
-## Typography (target)
+New non-color tokens: `--font-family`/`--font-numeric`,
+`--font-size-small`, `--line-height-base`, `--content-width`/
+`--content-width-wide`, `--radius-large`, `--elevation-1`,
+`--focus-ring-width`/`--focus-ring-offset`, and the
+`--motion-duration-*`/`--motion-easing-*` group (collapsed under
+`prefers-reduced-motion` in one shared rule).
 
-A locally-bundled, permissively-licensed, highly readable typeface
-chosen deliberately for this product — not the current accidental
-`system-ui` default, and not a default-SaaS choice picked without
-comparison. Selection and bundling (no runtime web-font dependency, per
-the directing prompt's performance gate) is UX-01 work, not decided in
-this file yet; record the actual choice and its license here once made.
+## Typography (implemented, UX-01)
+
+**Public Sans** (`@fontsource/public-sans@5.3.0`, OFL-1.1), self-hosted
+— no runtime webfont fetch. Chosen over Atkinson Hyperlegible Next and
+Inter (all three compared, all real/legitimate/OFL-licensed) for its
+civic/government-digital-service design heritage, matching "Calm Civic
+Classroom" thematically without using any government mark, plus strong
+legibility and tabular-figure support for grades/LRNs/dates. Only
+weights 400/600/700 imported (what the app actually uses).
+`font-variant-numeric: tabular-nums` applied globally so numeric
+columns align. See `docs/SOURCE-REGISTRY.md` and ADR-0031.
 
 ## Composition and Components
 
@@ -111,13 +113,16 @@ buttons (a real, working WCAG 1.4.1 fix, don't regress it), the
 pattern in `ClassRecordWorkspace`'s score entry (the one deliberately
 mobile-specific layout already in the app).
 
-Real gaps UX-01 should close: no shared button/banner/table component
-abstraction yet (each screen repeats its own markup shape against the
-shared CSS classes — functional, but not a true component system);
-`error-banner`/`confirmation-banner`/`idle-timeout-warning` are three
-near-identical banner patterns that could share one component; no
-skeleton/loading-state visual pattern beyond plain `<p role="status">`
-text; no empty-state visual pattern beyond plain text.
+**Closed in UX-01** (ADR-0031): `Alert` consolidates
+`error-banner`/`confirmation-banner`/`idle-timeout-warning` into one
+component (error/success/warning/info tones), migrated everywhere;
+`Loading` consolidates the loading-paragraph pattern, migrated
+everywhere; `EmptyState`, `StatusChip`, `PageHeader`, and `NavItem` are
+new, each with at least one real migrated usage proving reuse (full
+list in ADR-0031's table) without redesigning any screen's own
+information architecture. `Button` was deliberately left as the
+existing CSS-class pattern (`.button-primary` etc.) rather than wrapped
+in a new component — no markup duplication existed to consolidate.
 
 ## Responsive Rules
 
@@ -127,17 +132,18 @@ convention in the one mobile-specific CSS block that exists), full-
 width stacked rows rather than a shrunk table — extend this pattern app-
 wide in UX-01/UX-07, don't invent a second mobile pattern per screen.
 
-## Motion
+## Motion (first treatment implemented, UX-01)
 
-None exists in the codebase today beyond ordinary browser-default focus
-outlines and CSS `filter: brightness()` on button hover. UX-01 onward
-introduces motion only per the directing prompt's timing/easing policy
-(100-150ms immediate feedback, 150-250ms routine transitions, 300-500ms
-meaningful view transitions; no bounce/elastic easing; every animation
-gets a `prefers-reduced-motion` treatment that still preserves state
-confirmation). Do not add motion to make the redesign "look animated" —
-only where it explains feedback, state, hierarchy, or continuity, per
-the "ledger continuity" signature idea named in the directing prompt.
+Motion tokens (`--motion-duration-immediate/routine/meaningful`,
+`--motion-easing-standard/exit`) defined once in `:root`, collapsed to
+`0.01ms` under one shared `prefers-reduced-motion: reduce` rule so every
+component using them complies automatically. The one "ledger
+continuity" treatment so far: a selection-rule underline beneath the
+active nav item (`transform: scaleX()` + `opacity`, 200ms,
+`--motion-easing-standard`) — see ADR-0031. Buttons also gained a
+120ms `filter`/`background-color` transition on hover/press (previously
+instant). Do not add motion to make a screen "look animated" — only
+where it explains feedback, state, hierarchy, or continuity.
 
 ## Accessibility
 

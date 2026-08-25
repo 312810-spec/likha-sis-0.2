@@ -4,6 +4,7 @@ import type { SchoolApplicationService } from "../application/school-service";
 import { ValidationError } from "../domain/errors";
 import type { School } from "../domain/school";
 import type { CurrentSession } from "../domain/session";
+import { Alert } from "./components/Alert";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface LoginScreenProps {
@@ -92,16 +93,8 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
         Sign in
       </h2>
 
-      {notice && (
-        <div className="confirmation-banner" role="status">
-          {notice}
-        </div>
-      )}
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
+      {notice && <Alert tone="success">{notice}</Alert>}
+      {error && <Alert tone="error">{error}</Alert>}
 
       <div className="field">
         <label htmlFor="login-school">School</label>

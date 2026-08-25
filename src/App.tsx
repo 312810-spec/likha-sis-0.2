@@ -27,6 +27,7 @@ import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
+import { NavItem } from "./ui/components/NavItem";
 import { ModeProvider } from "./ui/theme/ModeContext";
 import "./ui/theme/styles.css";
 
@@ -39,16 +40,47 @@ type SignedInTab =
   | "grading-periods"
   | "class-records"
   | "audit-log";
-const SIGNED_IN_TABS: readonly { id: SignedInTab; label: string }[] = [
-  { id: "workspace", label: "Workspace" },
-  { id: "learners", label: "Learners" },
-  { id: "sections", label: "Sections" },
-  { id: "attendance", label: "Attendance" },
-  { id: "monthly-summary", label: "Monthly Summary" },
-  { id: "grading-periods", label: "Grading Periods" },
-  { id: "class-records", label: "Class Records" },
-  { id: "audit-log", label: "Sign-in Activity" },
+
+interface NavGroup {
+  label: string;
+  tabs: readonly { id: SignedInTab; label: string }[];
+}
+
+/** Groups every existing destination (none removed, none renamed) into
+ * the teacher's actual daily rhythm instead of one flat 8-button row --
+ * see docs/adr/0031-design-system-and-app-shell.md. */
+const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    label: "Daily Teaching",
+    tabs: [
+      { id: "workspace", label: "Workspace" },
+      { id: "attendance", label: "Attendance" },
+      { id: "monthly-summary", label: "Monthly Summary" },
+    ],
+  },
+  {
+    label: "Learner Records",
+    tabs: [
+      { id: "learners", label: "Learners" },
+      { id: "sections", label: "Sections" },
+    ],
+  },
+  {
+    label: "Grading",
+    tabs: [
+      { id: "grading-periods", label: "Grading Periods" },
+      { id: "class-records", label: "Class Records" },
+    ],
+  },
+  {
+    label: "Security",
+    tabs: [{ id: "audit-log", label: "Sign-in Activity" }],
+  },
 ];
+
+const TAB_LABELS: Record<SignedInTab, string> = Object.fromEntries(
+  NAV_GROUPS.flatMap((group) => group.tabs.map((tab) => [tab.id, tab.label])),
+) as Record<SignedInTab, string>;
 
 function App() {
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -70,6 +102,13 @@ function App() {
     // this returns the teacher to sign-in with a clear reason instead.
     return onSessionExpired(handleSessionExpired);
   }, []);
+
+  useEffect(() => {
+    // Gives a teacher an obvious sense of current location beyond the
+    // active nav item's own highlight -- visible in the browser tab
+    // and read aloud by some screen readers on navigation.
+    document.title = session ? `${TAB_LABELS[activeTab]} · LIKHA-SIS` : "LIKHA-SIS";
+  }, [session, activeTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,16 +155,21 @@ function App() {
         ) : session ? (
           <>
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
-            <nav role="group" aria-label="Section" className="section-switcher">
-              {SIGNED_IN_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  aria-pressed={activeTab === tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
+            <nav aria-label="Teacher workbench" className="workbench-nav">
+              {NAV_GROUPS.map((group) => (
+                <div className="nav-group" key={group.label} role="group" aria-label={group.label}>
+                  <span className="nav-group-label" aria-hidden="true">
+                    {group.label}
+                  </span>
+                  {group.tabs.map((tab) => (
+                    <NavItem
+                      key={tab.id}
+                      label={tab.label}
+                      active={activeTab === tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                    />
+                  ))}
+                </div>
               ))}
             </nav>
             {activeTab === "workspace" ? (

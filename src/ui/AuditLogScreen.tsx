@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AuthApplicationService } from "../application/auth-service";
 import type { AuditEventType, AuditLogEntry } from "../domain/session";
+import { Alert } from "./components/Alert";
+import { EmptyState } from "./components/EmptyState";
+import { Loading } from "./components/Loading";
+import { PageHeader } from "./components/PageHeader";
+import { StatusChip, type StatusChipTone } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AuditLogScreenProps {
@@ -12,6 +17,13 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   login_failed: "Failed sign-in attempt",
   account_locked: "Account temporarily locked",
   logout: "Signed out",
+};
+
+const EVENT_TONES: Record<AuditEventType, StatusChipTone> = {
+  login_success: "success",
+  login_failed: "warning",
+  account_locked: "danger",
+  logout: "neutral",
 };
 
 /** Formats an ISO timestamp as a readable local date and time, e.g. "Aug
@@ -37,14 +49,9 @@ function formatWhen(createdAt: string): string {
 
 export function AuditLogScreen({ authService }: AuditLogScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,26 +73,25 @@ export function AuditLogScreen({ authService }: AuditLogScreenProps) {
 
   return (
     <section aria-label="Sign-in activity">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Sign-in Activity
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          This shows recent sign-in attempts for your school — who signed in, who signed out, and
-          any failed or locked-out attempts. It does not track what anyone did after signing in.
-        </p>
-      )}
+      <PageHeader
+        title="Sign-in Activity"
+        hint={
+          mode === "guided" && (
+            <p className="field-hint">
+              This shows recent sign-in attempts for your school — who signed in, who signed out,
+              and any failed or locked-out attempts. It does not track what anyone did after signing
+              in.
+            </p>
+          )
+        }
+      />
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <p role="status">Loading sign-in activity…</p>
+        <Loading label="Loading sign-in activity…" />
       ) : entries.length === 0 ? (
-        <p>No sign-in activity recorded yet.</p>
+        <EmptyState>No sign-in activity recorded yet.</EmptyState>
       ) : (
         <table className="attendance-roster">
           <thead>
@@ -100,7 +106,11 @@ export function AuditLogScreen({ authService }: AuditLogScreenProps) {
               <tr key={entry.id}>
                 <td>{formatWhen(entry.createdAt)}</td>
                 <td>{entry.username}</td>
-                <td>{EVENT_LABELS[entry.eventType]}</td>
+                <td>
+                  <StatusChip tone={EVENT_TONES[entry.eventType]}>
+                    {EVENT_LABELS[entry.eventType]}
+                  </StatusChip>
+                </td>
               </tr>
             ))}
           </tbody>

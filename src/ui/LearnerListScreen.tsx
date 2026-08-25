@@ -4,6 +4,8 @@ import type { LearnerApplicationService } from "../application/learner-service";
 import { ValidationError } from "../domain/errors";
 import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface LearnerListScreenProps {
@@ -179,16 +181,8 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
         Learners
       </h2>
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {confirmation && (
-        <div className="confirmation-banner" role="status">
-          {confirmation}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {!loading && learners.length > 0 && (
         <>
@@ -209,7 +203,7 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
           </button>
 
           {exportResult && (
-            <div className="confirmation-banner" role="status">
+            <Alert tone="success">
               <p>
                 Saved to <code>{exportResult.filePath}</code>.
               </p>
@@ -221,13 +215,13 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
                   </li>
                 ))}
               </ul>
-            </div>
+            </Alert>
           )}
         </>
       )}
 
       {loading ? (
-        <p role="status">Loading learners…</p>
+        <Loading label="Loading learners…" />
       ) : learners.length === 0 ? (
         <p>No learners enrolled yet.</p>
       ) : filteredLearners.length === 0 ? (

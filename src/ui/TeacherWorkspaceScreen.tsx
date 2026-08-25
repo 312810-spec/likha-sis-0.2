@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AttendanceApplicationService } from "../application/attendance-service";
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
@@ -7,6 +7,10 @@ import type { SectionApplicationService } from "../application/section-service";
 import type { GradingPeriod } from "../domain/grading";
 import type { AuditEventType, AuditLogEntry } from "../domain/session";
 import type { Section } from "../domain/section";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
+import { PageHeader } from "./components/PageHeader";
+import { StatusChip, type StatusChipTone } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TeacherWorkspaceScreenProps {
@@ -66,6 +70,13 @@ function formatWhen(createdAt: string): string {
   });
 }
 
+function attendanceStatusTone(markedCount: number, totalCount: number): StatusChipTone {
+  if (totalCount === 0) return "neutral";
+  if (markedCount === 0) return "warning";
+  if (markedCount === totalCount) return "success";
+  return "productive";
+}
+
 function todayAsIsoDate(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -93,16 +104,11 @@ export function TeacherWorkspaceScreen({
   sectionService,
 }: TeacherWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [learnerCount, setLearnerCount] = useState<number | null>(null);
   const [sectionSummaries, setSectionSummaries] = useState<SectionAttendanceSummary[]>([]);
   const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,24 +165,22 @@ export function TeacherWorkspaceScreen({
 
   return (
     <section aria-label="Workspace">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Welcome, {displayName}
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          This is your workspace overview — today's attendance-marking status for each of your
-          sections, and recent sign-in activity for your school.
-        </p>
-      )}
+      <PageHeader
+        title={`Welcome, ${displayName}`}
+        hint={
+          mode === "guided" && (
+            <p className="field-hint">
+              This is your workspace overview — today's attendance-marking status for each of your
+              sections, and recent sign-in activity for your school.
+            </p>
+          )
+        }
+      />
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <p role="status">Loading your workspace…</p>
+        <Loading label="Loading your workspace…" />
       ) : (
         <>
           <p>
@@ -192,13 +196,15 @@ export function TeacherWorkspaceScreen({
               {sectionSummaries.map(({ section, markedCount, totalCount, openGradingPeriod }) => (
                 <li key={section.id}>
                   {section.name} — Grade {section.gradeLevel}:{" "}
-                  {totalCount === 0
-                    ? "no learners enrolled"
-                    : markedCount === 0
-                      ? "not yet marked today"
-                      : markedCount === totalCount
-                        ? `all ${totalCount} marked`
-                        : `${markedCount} of ${totalCount} marked`}
+                  <StatusChip tone={attendanceStatusTone(markedCount, totalCount)}>
+                    {totalCount === 0
+                      ? "no learners enrolled"
+                      : markedCount === 0
+                        ? "not yet marked today"
+                        : markedCount === totalCount
+                          ? `all ${totalCount} marked`
+                          : `${markedCount} of ${totalCount} marked`}
+                  </StatusChip>
                   <span className="field-hint">
                     {" "}
                     —{" "}

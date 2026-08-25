@@ -14,6 +14,8 @@ import type {
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
+import { Alert } from "./components/Alert";
+import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ClassRecordWorkspaceProps {
@@ -333,16 +335,8 @@ export function ClassRecordWorkspace({
         </p>
       )}
 
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-      {confirmation && (
-        <div className="confirmation-banner" role="status">
-          {confirmation}
-        </div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       <div className="form-row">
         <div className="field">
@@ -404,7 +398,7 @@ export function ClassRecordWorkspace({
       </button>
 
       {itemsLoading ? (
-        <p role="status">Loading items…</p>
+        <Loading label="Loading items…" />
       ) : items.length === 0 ? (
         <p>No assessment items yet. Add one above.</p>
       ) : (
@@ -431,7 +425,7 @@ export function ClassRecordWorkspace({
         <>
           <h3>{selectedItem.name} scores</h3>
           {rosterLoading ? (
-            <p role="status">Loading roster…</p>
+            <Loading label="Loading roster…" />
           ) : roster.length === 0 ? (
             <p>No learners eligible for this item's grading period.</p>
           ) : (
@@ -623,7 +617,7 @@ export function ClassRecordWorkspace({
               </p>
 
               {reportCardResult && (
-                <div className="confirmation-banner" role="status">
+                <Alert tone="success">
                   <p>
                     Saved to <code>{reportCardResult.filePath}</code>.
                   </p>
@@ -639,7 +633,7 @@ export function ClassRecordWorkspace({
                       </li>
                     ))}
                   </ul>
-                </div>
+                </Alert>
               )}
             </div>
           )}
