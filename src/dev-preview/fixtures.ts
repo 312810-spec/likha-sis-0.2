@@ -18,12 +18,22 @@
  * table row, no Tauri IPC call of any kind is ever made from this file
  * or anything it constructs.
  */
+import type { AssessmentRepository } from "../domain/ports/assessment-repository";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { AuthRepository } from "../domain/ports/auth-repository";
+import type { ClassRecordRepository } from "../domain/ports/class-record-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
+import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
+import type { SubjectRepository } from "../domain/ports/subject-repository";
+import type {
+  AssessmentCategory,
+  AssessmentCategorySet,
+  AssessmentItem,
+  AssessmentItemDetail,
+} from "../domain/assessment";
 import type {
   AttendanceRecord,
   AttendanceRosterEntry,
@@ -31,6 +41,7 @@ import type {
   MonthlyAttendanceReport,
   MonthlyLearnerAttendance,
 } from "../domain/attendance";
+import type { ClassRecord, ClassRecordDetail, GradingWeightPolicy } from "../domain/class-record";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
@@ -38,8 +49,15 @@ import type {
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type { Learner } from "../domain/learner";
+import type {
+  ComputedTermGrade,
+  LearnerScore,
+  LearnerScoreRosterEntry,
+  LearnerScoreStatus,
+} from "../domain/learner-score";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
 import type { AuditLogEntry, CurrentSession } from "../domain/session";
+import type { Subject } from "../domain/subject";
 
 /** A plain data object, not a real session -- see this file's own doc
  * comment. Rendered only as a prop to `AppShell`/`TeacherWorkspaceScreen`
@@ -386,5 +404,565 @@ export class FixtureAuthRepository implements AuthRepository {
   }
   async listAuditLog(): Promise<AuditLogEntry[]> {
     return FIXTURE_AUDIT_LOG;
+  }
+}
+
+/*
+ * ==== Class Records / Assessments / Learner Scores (UX-04) ====
+ *
+ * A second, independent slice of mutable in-memory state. Unlike
+ * `FixtureAttendanceRepository` above (one repository class, its own
+ * private roster), three separate repository classes here --
+ * assessment, learner-score, and class-record -- all need to observe
+ * the same evolving item/score data (e.g. the Class Records list's
+ * Progress column must agree with the workspace's own completion
+ * counts), so the underlying items/scores/subjects live at module
+ * scope instead of being duplicated per repository instance.
+ */
+
+const FIXTURE_SUBJECTS: Subject[] = [
+  {
+    id: "sub-math",
+    schoolId: "fixture-school",
+    name: "Mathematics",
+    createdAt: "2026-06-01T00:00:00.000Z",
+  },
+  {
+    id: "sub-science",
+    schoolId: "fixture-school",
+    name: "Science",
+    createdAt: "2026-06-01T00:00:00.000Z",
+  },
+  {
+    id: "sub-mapeh",
+    schoolId: "fixture-school",
+    name: "MAPEH",
+    createdAt: "2026-06-01T00:00:00.000Z",
+  },
+];
+
+/** Mutable (via `FixtureSubjectRepository.create`) -- shared with the
+ * class-record detail resolver below so a newly added subject shows up
+ * correctly once used to open a class record. */
+let allSubjects: Subject[] = [...FIXTURE_SUBJECTS];
+
+const FIXTURE_WEIGHT_POLICIES: GradingWeightPolicy[] = [
+  {
+    id: "wp-k10",
+    name: "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)",
+    sourceCitation: "DepEd Order No. 015, s. 2026",
+    isDefault: true,
+  },
+  {
+    id: "wp-mapeh",
+    name: "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)",
+    sourceCitation: "DepEd Order No. 015, s. 2026",
+    isDefault: false,
+  },
+];
+
+const FIXTURE_CATEGORY_SET: AssessmentCategorySet = {
+  id: "set-do015",
+  name: "DepEd Classroom Assessment (DO 015, s. 2026)",
+  sourceCitation: "DepEd Order No. 015, s. 2026",
+  isDefault: true,
+  createdAt: "2026-06-01T00:00:00.000Z",
+};
+
+/** Leaf categories only -- matches what the real
+ * `assessment_category::list_categories_for_set` narrows to (a parent
+ * like "Examinations" is never itself a selectable option; see
+ * ADR-0013), so this fixture's create-item category dropdown behaves
+ * the same as production's. */
+const FIXTURE_CATEGORIES: AssessmentCategory[] = [
+  { id: "cat-ww", setId: "set-do015", sequence: 1, name: "Written Works" },
+  { id: "cat-pt", setId: "set-do015", sequence: 2, name: "Performance Tasks" },
+  { id: "cat-st1", setId: "set-do015", sequence: 3, name: "Summative Test 1" },
+  { id: "cat-st2", setId: "set-do015", sequence: 4, name: "Summative Test 2" },
+  { id: "cat-te", setId: "set-do015", sequence: 5, name: "Term Examination" },
+];
+
+const CATEGORY_NAME_BY_ID: Record<string, string> = Object.fromEntries(
+  FIXTURE_CATEGORIES.map((c) => [c.id, c.name]),
+);
+
+interface FixtureAssessmentItemRecord {
+  id: string;
+  classRecordId: string;
+  categoryId: string;
+  name: string;
+  maxScore: number;
+  createdAt: string;
+}
+
+/** Which fixture learners are eligible to be scored under each class
+ * record -- a simplified stand-in for real section-membership +
+ * grading-period-range resolution (see
+ * `section_membership::roster_for_section_over_range`), not derived from
+ * `FIXTURE_ROSTERS` above (a different concept: that one is daily
+ * attendance marks, this one is scoring eligibility). */
+const CLASS_RECORD_ROSTER_LEARNER_IDS: Record<string, string[]> = {
+  "cr-not-started": ["l1", "l2"],
+  "cr-partial": ["l1", "l2", "l3"],
+  "cr-complete": ["l1", "l2", "l3"],
+};
+
+let nextItemId = 1;
+
+/** Covers the three states a teacher can be in: nothing set up yet
+ * (`cr-not-started`), items exist but scoring is incomplete
+ * (`cr-partial` -- only one of two items has any recorded score, and
+ * that item has only one of three learners scored), and everything
+ * scored across every category including the Examinations sub-tests
+ * (`cr-complete` -- lets "Show term grades" produce real numbers). */
+const CLASS_RECORD_ITEMS: Record<string, FixtureAssessmentItemRecord[]> = {
+  "cr-not-started": [],
+  "cr-partial": [
+    {
+      id: "item-ww1",
+      classRecordId: "cr-partial",
+      categoryId: "cat-ww",
+      name: "Quiz 1",
+      maxScore: 20,
+      createdAt: "2026-08-05T00:00:00.000Z",
+    },
+    {
+      id: "item-pt1",
+      classRecordId: "cr-partial",
+      categoryId: "cat-pt",
+      name: "Project 1",
+      maxScore: 50,
+      createdAt: "2026-08-10T00:00:00.000Z",
+    },
+  ],
+  "cr-complete": [
+    {
+      id: "item-c-ww1",
+      classRecordId: "cr-complete",
+      categoryId: "cat-ww",
+      name: "Quiz 1",
+      maxScore: 20,
+      createdAt: "2026-08-05T00:00:00.000Z",
+    },
+    {
+      id: "item-c-pt1",
+      classRecordId: "cr-complete",
+      categoryId: "cat-pt",
+      name: "Performance Task 1",
+      maxScore: 25,
+      createdAt: "2026-08-08T00:00:00.000Z",
+    },
+    {
+      id: "item-c-st1",
+      classRecordId: "cr-complete",
+      categoryId: "cat-st1",
+      name: "Summative Test 1",
+      maxScore: 20,
+      createdAt: "2026-08-12T00:00:00.000Z",
+    },
+    {
+      id: "item-c-st2",
+      classRecordId: "cr-complete",
+      categoryId: "cat-st2",
+      name: "Summative Test 2",
+      maxScore: 20,
+      createdAt: "2026-08-19T00:00:00.000Z",
+    },
+    {
+      id: "item-c-te",
+      classRecordId: "cr-complete",
+      categoryId: "cat-te",
+      name: "Term Examination",
+      maxScore: 40,
+      createdAt: "2026-08-26T00:00:00.000Z",
+    },
+  ],
+};
+
+interface FixtureLearnerScoreRecord {
+  id: string;
+  assessmentItemId: string;
+  learnerId: string;
+  status: LearnerScoreStatus;
+  score: number | null;
+  recordedAt: string;
+  updatedAt: string;
+}
+
+let nextScoreSeq = 1;
+
+function buildFullScoreSet(
+  assessmentItemId: string,
+  scoresByLearnerId: Record<string, number>,
+): FixtureLearnerScoreRecord[] {
+  return Object.entries(scoresByLearnerId).map(([learnerId, score]) => ({
+    id: `score-seed-${nextScoreSeq++}`,
+    assessmentItemId,
+    learnerId,
+    status: "scored",
+    score,
+    recordedAt: "2026-08-26T09:00:00.000Z",
+    updatedAt: "2026-08-26T09:00:00.000Z",
+  }));
+}
+
+/** `cr-partial`: only Ana's Quiz 1 scored so far -- the rest (Project 1
+ * entirely, and Bo/Maria's Quiz 1) still needs entry, so the workspace's
+ * "1 of 3 recorded" and the list's "2 items · 1 of 6 recorded" readouts
+ * both have something real to show. `cr-complete`: every learner scored
+ * on every item -- Ana does well throughout, Bo sits in the middle, Maria
+ * scores low enough on every item to need the 60-point floor, so
+ * "Show term grades" demonstrates a normal, a floored, and a
+ * freshly-recomputed-after-edit grade all at once. */
+const LEARNER_SCORES: FixtureLearnerScoreRecord[] = [
+  {
+    id: "score-seed-0",
+    assessmentItemId: "item-ww1",
+    learnerId: "l1",
+    status: "scored",
+    score: 18,
+    recordedAt: "2026-08-06T08:00:00.000Z",
+    updatedAt: "2026-08-06T08:00:00.000Z",
+  },
+  ...buildFullScoreSet("item-c-ww1", { l1: 19, l2: 14, l3: 2 }),
+  ...buildFullScoreSet("item-c-pt1", { l1: 24, l2: 18, l3: 3 }),
+  ...buildFullScoreSet("item-c-st1", { l1: 18, l2: 12, l3: 1 }),
+  ...buildFullScoreSet("item-c-st2", { l1: 19, l2: 13, l3: 1 }),
+  ...buildFullScoreSet("item-c-te", { l1: 38, l2: 24, l3: 3 }),
+];
+
+function findItem(
+  assessmentItemId: string,
+): { item: FixtureAssessmentItemRecord; classRecordId: string } | null {
+  for (const [classRecordId, items] of Object.entries(CLASS_RECORD_ITEMS)) {
+    const item = items.find((i) => i.id === assessmentItemId);
+    if (item) return { item, classRecordId };
+  }
+  return null;
+}
+
+function toAssessmentItem(item: FixtureAssessmentItemRecord): AssessmentItem {
+  return {
+    id: item.id,
+    schoolId: "fixture-school",
+    classRecordId: item.classRecordId,
+    categoryId: item.categoryId,
+    name: item.name,
+    maxScore: item.maxScore,
+    createdAt: item.createdAt,
+  };
+}
+
+interface ClassRecordSeed {
+  id: string;
+  sectionId: string;
+  subjectId: string;
+  gradingPeriodId: string;
+  weightPolicyId: string;
+  createdAt: string;
+}
+
+let classRecordSeeds: ClassRecordSeed[] = [
+  {
+    id: "cr-not-started",
+    sectionId: "sec-not-started",
+    subjectId: "sub-science",
+    gradingPeriodId: "gp1",
+    weightPolicyId: "wp-k10",
+    createdAt: "2026-08-01T00:00:00.000Z",
+  },
+  {
+    id: "cr-partial",
+    sectionId: "sec-partial",
+    subjectId: "sub-math",
+    gradingPeriodId: "gp1",
+    weightPolicyId: "wp-k10",
+    createdAt: "2026-08-01T00:00:00.000Z",
+  },
+  {
+    id: "cr-complete",
+    sectionId: "sec-complete",
+    subjectId: "sub-mapeh",
+    gradingPeriodId: "gp1",
+    weightPolicyId: "wp-mapeh",
+    createdAt: "2026-08-01T00:00:00.000Z",
+  },
+];
+
+function classRecordDetailFor(seed: ClassRecordSeed): ClassRecordDetail | null {
+  const section = FIXTURE_SECTIONS.find((s) => s.id === seed.sectionId);
+  const subject = allSubjects.find((s) => s.id === seed.subjectId);
+  const period = (FIXTURE_GRADING_PERIODS[section?.schoolYear ?? ""] ?? []).find(
+    (p) => p.id === seed.gradingPeriodId,
+  );
+  const policy = FIXTURE_WEIGHT_POLICIES.find((p) => p.id === seed.weightPolicyId);
+  if (!section || !subject || !period || !policy) return null;
+
+  const items = CLASS_RECORD_ITEMS[seed.id] ?? [];
+  const itemIds = new Set(items.map((i) => i.id));
+  const recordedCount = LEARNER_SCORES.filter((s) => itemIds.has(s.assessmentItemId)).length;
+  const totalEligible = (CLASS_RECORD_ROSTER_LEARNER_IDS[seed.id] ?? []).length;
+
+  return {
+    id: seed.id,
+    schoolId: "fixture-school",
+    sectionId: section.id,
+    sectionName: section.name,
+    subjectId: subject.id,
+    subjectName: subject.name,
+    gradingPeriodId: period.id,
+    gradingPeriodLabel: period.label,
+    schoolYear: section.schoolYear,
+    weightPolicyId: policy.id,
+    weightPolicyName: policy.name,
+    createdAt: seed.createdAt,
+    itemCount: items.length,
+    recordedCount,
+    totalEligible,
+  };
+}
+
+export class FixtureSubjectRepository implements SubjectRepository {
+  async list(): Promise<Subject[]> {
+    return allSubjects;
+  }
+  async create(name: string): Promise<Subject> {
+    const subject: Subject = {
+      id: `sub-fixture-${allSubjects.length + 1}`,
+      schoolId: "fixture-school",
+      name,
+      createdAt: new Date().toISOString(),
+    };
+    allSubjects = [...allSubjects, subject];
+    return subject;
+  }
+}
+
+export class FixtureClassRecordRepository implements ClassRecordRepository {
+  async list(): Promise<ClassRecordDetail[]> {
+    return classRecordSeeds
+      .map((seed) => classRecordDetailFor(seed))
+      .filter((d): d is ClassRecordDetail => d !== null);
+  }
+
+  async create(
+    sectionId: string,
+    subjectId: string,
+    gradingPeriodId: string,
+    weightPolicyId: string,
+  ): Promise<ClassRecord | null> {
+    const section = FIXTURE_SECTIONS.find((s) => s.id === sectionId);
+    const subjectExists = allSubjects.some((s) => s.id === subjectId);
+    const policyExists = FIXTURE_WEIGHT_POLICIES.some((p) => p.id === weightPolicyId);
+    if (!section || !subjectExists || !policyExists) return null;
+
+    const id = `cr-fixture-${classRecordSeeds.length + 1}`;
+    const createdAt = new Date().toISOString();
+    classRecordSeeds = [
+      ...classRecordSeeds,
+      { id, sectionId, subjectId, gradingPeriodId, weightPolicyId, createdAt },
+    ];
+    // A newly opened class record starts with no items yet, but a real
+    // (all three fixture learners) roster, so a teacher can actually add
+    // items and score them in this fixture, not just see it listed.
+    CLASS_RECORD_ITEMS[id] = [];
+    CLASS_RECORD_ROSTER_LEARNER_IDS[id] = ["l1", "l2", "l3"];
+
+    return {
+      id,
+      schoolId: "fixture-school",
+      sectionId,
+      subjectId,
+      gradingPeriodId,
+      weightPolicyId,
+      createdAt,
+    };
+  }
+
+  async listGradingWeightPolicies(): Promise<GradingWeightPolicy[]> {
+    return FIXTURE_WEIGHT_POLICIES;
+  }
+}
+
+export class FixtureAssessmentRepository implements AssessmentRepository {
+  async listCategorySets(): Promise<AssessmentCategorySet[]> {
+    return [FIXTURE_CATEGORY_SET];
+  }
+
+  async listCategoriesForSet(): Promise<AssessmentCategory[]> {
+    return FIXTURE_CATEGORIES;
+  }
+
+  async listItemsByClassRecord(classRecordId: string): Promise<AssessmentItemDetail[]> {
+    const items = CLASS_RECORD_ITEMS[classRecordId] ?? [];
+    const totalEligible = (CLASS_RECORD_ROSTER_LEARNER_IDS[classRecordId] ?? []).length;
+    return items.map((item) => ({
+      id: item.id,
+      schoolId: "fixture-school",
+      classRecordId: item.classRecordId,
+      categoryId: item.categoryId,
+      categoryName: CATEGORY_NAME_BY_ID[item.categoryId] ?? "",
+      name: item.name,
+      maxScore: item.maxScore,
+      createdAt: item.createdAt,
+      recordedCount: LEARNER_SCORES.filter((s) => s.assessmentItemId === item.id).length,
+      totalEligible,
+    }));
+  }
+
+  async createItem(
+    classRecordId: string,
+    categoryId: string,
+    name: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    const items = CLASS_RECORD_ITEMS[classRecordId];
+    if (!items) return null;
+    const id = `item-fixture-${nextItemId++}`;
+    const record: FixtureAssessmentItemRecord = {
+      id,
+      classRecordId,
+      categoryId,
+      name,
+      maxScore,
+      createdAt: new Date().toISOString(),
+    };
+    CLASS_RECORD_ITEMS[classRecordId] = [...items, record];
+    return toAssessmentItem(record);
+  }
+
+  async renameItem(id: string, name: string): Promise<AssessmentItem | null> {
+    const found = findItem(id);
+    if (!found) return null;
+    found.item.name = name;
+    return toAssessmentItem(found.item);
+  }
+
+  async updateItem(
+    id: string,
+    name: string,
+    categoryId: string,
+    maxScore: number,
+  ): Promise<AssessmentItem | null> {
+    const found = findItem(id);
+    if (!found) return null;
+    const hasScores = LEARNER_SCORES.some((s) => s.assessmentItemId === id);
+    if (hasScores) return null;
+    found.item.name = name;
+    found.item.categoryId = categoryId;
+    found.item.maxScore = maxScore;
+    return toAssessmentItem(found.item);
+  }
+
+  async deleteItem(id: string): Promise<boolean> {
+    const found = findItem(id);
+    if (!found) return false;
+    const hasScores = LEARNER_SCORES.some((s) => s.assessmentItemId === id);
+    if (hasScores) return false;
+    CLASS_RECORD_ITEMS[found.classRecordId] = (
+      CLASS_RECORD_ITEMS[found.classRecordId] ?? []
+    ).filter((i) => i.id !== id);
+    return true;
+  }
+}
+
+export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
+  async rosterForItem(assessmentItemId: string): Promise<LearnerScoreRosterEntry[] | null> {
+    const found = findItem(assessmentItemId);
+    if (!found) return null;
+    const learnerIds = CLASS_RECORD_ROSTER_LEARNER_IDS[found.classRecordId] ?? [];
+    return learnerIds.map((learnerId) => {
+      const learner = FIXTURE_LEARNERS.find((l) => l.id === learnerId);
+      const score = LEARNER_SCORES.find(
+        (s) => s.assessmentItemId === assessmentItemId && s.learnerId === learnerId,
+      );
+      return {
+        learnerId,
+        givenName: learner?.givenName ?? "",
+        familyName: learner?.familyName ?? "",
+        status: score?.status ?? null,
+        score: score?.score ?? null,
+        updatedAt: score?.updatedAt ?? null,
+      };
+    });
+  }
+
+  async record(
+    assessmentItemId: string,
+    learnerId: string,
+    status: LearnerScoreStatus,
+    score: number | null,
+  ): Promise<LearnerScore | null> {
+    const found = findItem(assessmentItemId);
+    if (!found) return null;
+    const eligibleIds = CLASS_RECORD_ROSTER_LEARNER_IDS[found.classRecordId] ?? [];
+    if (!eligibleIds.includes(learnerId)) return null;
+
+    const now = new Date().toISOString();
+    const existingIndex = LEARNER_SCORES.findIndex(
+      (s) => s.assessmentItemId === assessmentItemId && s.learnerId === learnerId,
+    );
+    const existing = existingIndex === -1 ? null : LEARNER_SCORES[existingIndex];
+    const updated: FixtureLearnerScoreRecord = {
+      id: existing?.id ?? `score-fixture-${nextScoreSeq++}`,
+      assessmentItemId,
+      learnerId,
+      status,
+      score,
+      recordedAt: existing?.recordedAt ?? now,
+      updatedAt: now,
+    };
+    if (existingIndex === -1) {
+      LEARNER_SCORES.push(updated);
+    } else {
+      LEARNER_SCORES[existingIndex] = updated;
+    }
+
+    return {
+      id: updated.id,
+      schoolId: "fixture-school",
+      assessmentItemId,
+      learnerId,
+      status,
+      score,
+      recordedByUserId: "fixture-user",
+      recordedAt: updated.recordedAt,
+      updatedAt: updated.updatedAt,
+    };
+  }
+
+  /** A simplified stand-in for visual testing only -- this is NOT the
+   * real DepEd weighted algorithm (that lives in Rust; see
+   * `grading_computation.rs` and ADR-0013). Unweighted average
+   * percentage across every item this learner has an actual `Scored`
+   * entry for in this class record; `null` if none yet, matching the
+   * real algorithm's "never fabricate a grade from nothing" rule at
+   * least at the whole-class-record level (though not its per-category
+   * completeness rule -- not worth reproducing exactly for a visual
+   * fixture). */
+  async computeTermGrade(
+    classRecordId: string,
+    learnerId: string,
+  ): Promise<ComputedTermGrade | null> {
+    const items = CLASS_RECORD_ITEMS[classRecordId] ?? [];
+    const percentages: number[] = [];
+    for (const item of items) {
+      const s = LEARNER_SCORES.find(
+        (s) => s.assessmentItemId === item.id && s.learnerId === learnerId && s.status === "scored",
+      );
+      if (s && s.score !== null && item.maxScore > 0) {
+        percentages.push((s.score / item.maxScore) * 100);
+      }
+    }
+    if (percentages.length === 0) return null;
+
+    const initialGrade = percentages.reduce((a, b) => a + b, 0) / percentages.length;
+    const termGrade = Math.max(60, Math.round(initialGrade));
+    return {
+      initialGrade,
+      termGrade,
+      wasTransmuted: false,
+      wasFloored: termGrade === 60 && initialGrade < 60,
+    };
   }
 }

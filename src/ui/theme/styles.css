@@ -753,6 +753,25 @@ label {
   }
 }
 
+/* Narrow (phone-width): each assessment item's own action row (select
+   button, Edit, Delete/blocked-reason text) wraps onto one crowded line
+   by default -- stack them instead so every control stays a clear,
+   separately tappable full-width row rather than a run-together jumble. */
+@media (max-width: 640px) {
+  .assessment-item-list li {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(var(--spacing-unit) * 0.5);
+    padding: var(--spacing-unit) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .assessment-item-list li:first-child {
+    border-top: none;
+  }
+}
+
 .learner-list {
   list-style: none;
   margin: 0 0 var(--spacing-unit) 0;

@@ -576,7 +576,7 @@ export function ClassRecordWorkspace({
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above.</EmptyState>
       ) : (
-        <ul>
+        <ul className="assessment-item-list">
           {items.map((item) => {
             const isScored = item.recordedCount > 0;
             const isEditing = editingItemId === item.id;
@@ -584,47 +584,7 @@ export function ClassRecordWorkspace({
             return (
               <li key={item.id}>
                 {isEditing ? (
-                  <div className="form-row">
-                    <div className="field">
-                      <label htmlFor={`edit-name-${item.id}`}>Item name</label>
-                      <input
-                        id={`edit-name-${item.id}`}
-                        type="text"
-                        value={editName}
-                        onChange={(event) => setEditName(event.target.value)}
-                      />
-                    </div>
-                    {!isScored && (
-                      <>
-                        <div className="field">
-                          <label htmlFor={`edit-category-${item.id}`}>Category</label>
-                          <select
-                            id={`edit-category-${item.id}`}
-                            value={editCategoryId}
-                            onChange={(event) => setEditCategoryId(event.target.value)}
-                          >
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                            {!categories.some((category) => category.id === editCategoryId) && (
-                              <option value={editCategoryId}>{item.categoryName}</option>
-                            )}
-                          </select>
-                        </div>
-                        <div className="field">
-                          <label htmlFor={`edit-max-${item.id}`}>Max score</label>
-                          <input
-                            id={`edit-max-${item.id}`}
-                            type="number"
-                            min="1"
-                            value={editMaxScore}
-                            onChange={(event) => setEditMaxScore(event.target.value)}
-                          />
-                        </div>
-                      </>
-                    )}
+                  <div className="item-edit-form">
                     {isScored && (
                       <p className="field-hint">
                         This activity already contains learner scores. Its maximum score and
@@ -632,6 +592,48 @@ export function ClassRecordWorkspace({
                         previously calculated grades. Its name can still be corrected.
                       </p>
                     )}
+                    <div className="form-row">
+                      <div className="field">
+                        <label htmlFor={`edit-name-${item.id}`}>Item name</label>
+                        <input
+                          id={`edit-name-${item.id}`}
+                          type="text"
+                          value={editName}
+                          onChange={(event) => setEditName(event.target.value)}
+                        />
+                      </div>
+                      {!isScored && (
+                        <>
+                          <div className="field">
+                            <label htmlFor={`edit-category-${item.id}`}>Category</label>
+                            <select
+                              id={`edit-category-${item.id}`}
+                              value={editCategoryId}
+                              onChange={(event) => setEditCategoryId(event.target.value)}
+                            >
+                              {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                              {!categories.some((category) => category.id === editCategoryId) && (
+                                <option value={editCategoryId}>{item.categoryName}</option>
+                              )}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`edit-max-${item.id}`}>Max score</label>
+                            <input
+                              id={`edit-max-${item.id}`}
+                              type="number"
+                              min="1"
+                              value={editMaxScore}
+                              onChange={(event) => setEditMaxScore(event.target.value)}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
                     <button
                       type="button"
                       disabled={savingEdit || editName.trim().length === 0}

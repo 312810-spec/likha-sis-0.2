@@ -1,13 +1,18 @@
 import { useState } from "react";
+import { AssessmentApplicationService } from "../application/assessment-service";
 import { AttendanceApplicationService } from "../application/attendance-service";
 import { AuthApplicationService } from "../application/auth-service";
+import { ClassRecordApplicationService } from "../application/class-record-service";
 import { ExportApplicationService } from "../application/export-service";
 import { GradingApplicationService } from "../application/grading-service";
 import { LearnerApplicationService } from "../application/learner-service";
+import { LearnerScoreApplicationService } from "../application/learner-score-service";
 import { SectionApplicationService } from "../application/section-service";
+import { SubjectApplicationService } from "../application/subject-service";
 import { AppShell } from "../ui/AppShell";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
+import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "../ui/components/WorkbenchNav";
@@ -16,12 +21,16 @@ import { ModeProvider } from "../ui/theme/ModeContext";
 import "../ui/theme/styles.css";
 import {
   FIXTURE_SESSION,
+  FixtureAssessmentRepository,
   FixtureAttendanceRepository,
   FixtureAuthRepository,
+  FixtureClassRecordRepository,
   FixtureExportRepository,
   FixtureGradingRepository,
   FixtureLearnerRepository,
+  FixtureLearnerScoreRepository,
   FixtureSectionRepository,
+  FixtureSubjectRepository,
 } from "./fixtures";
 
 /**
@@ -49,6 +58,10 @@ const exportService = new ExportApplicationService(new FixtureExportRepository()
 const gradingService = new GradingApplicationService(new FixtureGradingRepository());
 const learnerService = new LearnerApplicationService(new FixtureLearnerRepository());
 const sectionService = new SectionApplicationService(new FixtureSectionRepository());
+const subjectService = new SubjectApplicationService(new FixtureSubjectRepository());
+const classRecordService = new ClassRecordApplicationService(new FixtureClassRecordRepository());
+const assessmentService = new AssessmentApplicationService(new FixtureAssessmentRepository());
+const learnerScoreService = new LearnerScoreApplicationService(new FixtureLearnerScoreRepository());
 
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
@@ -107,6 +120,16 @@ export function DevPreviewApp() {
                 ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
                 : undefined
             }
+          />
+        ) : activeTab === "class-records" ? (
+          <ClassRecordsScreen
+            classRecordService={classRecordService}
+            sectionService={sectionService}
+            subjectService={subjectService}
+            gradingService={gradingService}
+            assessmentService={assessmentService}
+            learnerScoreService={learnerScoreService}
+            exportService={exportService}
           />
         ) : activeTab === "audit-log" ? (
           <AuditLogScreen authService={authService} />
