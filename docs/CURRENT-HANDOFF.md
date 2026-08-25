@@ -1,5 +1,40 @@
 # CURRENT HANDOFF
 
+## Account-Transition Note (2026-08-25)
+
+This session is at ~97% of its weekly usage limit and is handing off to
+a fresh Claude Code account/session. **Verified remote state at
+handoff**: branch `main`, local and `origin/main` both at `14e7e5d`
+(confirmed via `git fetch origin` + `git log`/`git status --short
+--branch`; clean working tree apart from long-standing harmless 0-byte
+junk files — `(String`, `ComputedTermGrade`, `MonthlyAttendanceReport`,
+`src-tauri/MonthlyAttendanceReport`, `button`, `repomix-output.xml` —
+untracked, not real changes; leave them as-is). **UX-02 is complete**,
+not in progress — a handoff request received mid-session assumed the
+remote HEAD was still at `2418099` (UX-02's start commit), which was
+already three commits stale by the time it arrived; see
+`docs/PROJECT-MEMORY.md`'s "UX-02 Complete; Account-Transition
+Verification Note" entry for the full correction. **First action for
+the next account: read this file, `docs/ACTIVE-PLAN.md`, and
+`docs/PROGRESS-MAP.md`, verify the current remote HEAD for real via
+`git fetch origin` before trusting any SHA stated in a prompt, then
+begin UX-03 — Daily Attendance + Monthly Summary** (queued, not
+started — see `docs/PROGRESS-MAP.md`'s UI-First Tranche table). Keep
+the Browser pane visible for real screenshot verification, per the same
+contract UX-01/UX-02 used. Impeccable remains project-local and
+hook-free — do not enable or modify its hook. Preserve the
+`src/dev-preview/` synthetic-fixture safety architecture (isolated
+entry point, throw-guards, two automated isolation proofs) rather than
+rebuilding it for future UX milestones.
+
+**Durable future direction recorded this session** (not yet
+actionable): after UX-00 through UX-08 all complete, run an
+evidence-based reassessment and begin a Forms, UI, and Interaction
+Deepening Program focused on making real teacher workflows easier,
+faster, safer, and more pleasant — full scope and exclusions recorded
+in `docs/PROJECT-MEMORY.md`'s "Post-UX-08 Direction" entry. This does
+not change UX-03's scope or start any new milestone numbering now.
+
 ## Active Task (2026-08-25)
 
 **UX-02 — Teacher Workspace Polish — complete.** Start SHA `826bf7d`
@@ -9,22 +44,19 @@ dev-only visual fixture (`src/dev-preview/`) as the first slice, then
 redesigned `TeacherWorkspaceScreen` into a three-level hierarchy
 (priority-ranked "Today's attendance" rail with direct one-click
 actions, compact overview line, quiet recent-activity list), split
-resilient data loading (secondary-activity failure never erases a
-loaded overview), and section preselection into Attendance. `npm run
-quality` 351/351, real browser-rendered visual verification performed
-across 3 viewports/2 color schemes/3 teacher modes via the fixture.
-**Next queued milestone: UX-03 — Daily Attendance + Monthly Summary**
-(not yet started).
+resilient data loading (a failure on either the overview or activity
+path never erases the other's already-loaded content — verified
+symmetric in both directions), and section preselection into
+Attendance. `npm run quality` 352/352, real browser-rendered visual
+verification performed across 3 viewports/2 color schemes/3 teacher
+modes via the fixture. **Next queued milestone: UX-03 — Daily
+Attendance + Monthly Summary** (not yet started).
 
 **Previously completed**: UX-01 — Design Tokens, Shared Components, and
 App Shell (start `cb644ef`, completion `826bf7d`) — see
 `docs/adr/0031-design-system-and-app-shell.md`. UX-00 (start `603863b`,
 completion `fcf26ca`) — see `docs/adr/0030-ui-first-program-and-ux00.md`.
 `PRODUCT.md` and `DESIGN.md` exist at the repo root.
-
-**Previously completed**: UX-00 (start `603863b`, completion `fcf26ca`)
-— see `docs/adr/0030-ui-first-program-and-ux00.md`. `PRODUCT.md` and
-`DESIGN.md` exist at the repo root.
 
 ## Status
 

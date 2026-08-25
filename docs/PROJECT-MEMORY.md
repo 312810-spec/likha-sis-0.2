@@ -699,6 +699,64 @@ accessibility/premium teacher-UX refinement — not more modules at once.
 Keep preferring one excellent reusable foundation over many incomplete
 ones.
 
+## UX-02 Complete; Account-Transition Verification Note (added 2026-08-25)
+
+**UX-02 — Teacher Workspace Polish is complete**, pushed to `origin/main`
+at `14e7e5d` (start `2418099`, baseline `826bf7d`). A later
+account-transition handoff request in this same session described the
+expected remote HEAD as still `2418099` ("UX-02 status: In Progress")
+— that description was stale relative to work already completed and
+pushed earlier in this same session, not a real divergence. Verified via
+`git fetch origin` + `git log`/`git status --short --branch`: local
+`main` and `origin/main` matched exactly at `14e7e5d` with a clean
+working tree (only the long-standing, harmless 0-byte junk files —
+`(String`, `ComputedTermGrade`, `MonthlyAttendanceReport`,
+`src-tauri/MonthlyAttendanceReport`, `button`, `repomix-output.xml` —
+untracked). Lesson for future sessions: when a prompt asserts a specific
+"expected" git state as a premise, verify it for real before acting on
+it rather than assuming the premise is current — a prompt can be
+several commits stale relative to work this same session already did.
+Full milestone record: `docs/adr/0032-teacher-workspace-polish.md`.
+
+## Post-UX-08 Direction: Forms, UI, and Interaction Deepening Program (added 2026-08-25)
+
+Durable user-directed future sequencing, recorded ahead of when it
+becomes actionable: **after UX-00 through UX-08 all complete**, run an
+evidence-based reassessment (matching this project's established
+scoring-pass pattern) and begin a focused **Forms, UI, and Interaction
+Deepening Program**. Its purpose is to make LIKHA-SIS's real teacher
+workflows easier, faster, safer, and more pleasant — not to replace the
+stack or add unrelated features. This must not expand any current UX
+milestone's present scope; it only takes effect once the UI-First
+Tranche (UX-00–UX-08) is done.
+
+Intended areas for that future program: inventory and improve every
+real data-entry form; consistent labels/hints/required-indicators/
+validation/error placement; validation timing that helps without
+interrupting teachers; safe defaults and clear field dependencies;
+keyboard-efficient field order and shortcuts; appropriate mobile
+keyboards and touch controls; unsaved-change protection; explicit
+saving/saved/retry/recovery states; inline editing where it reduces
+unnecessary navigation; bulk actions only when safe and teacher-
+justified; better search/filtering/selection/long-form navigation;
+direct transitions between connected teacher tasks; accessible local
+SVG icons with permanent text labels when they improve scanning;
+purposeful micro-interactions with reduced-motion support; responsive
+Windows and Android compositions; better preview and confidence before
+producing DepEd exports; preservation of official DepEd form structure
+and terminology; usability evaluation with realistic teacher scenarios
+and synthetic data; a formal UX-08 pre-release checklist covering
+builds, tests, security, accessibility, performance, native Windows
+verification, installer behavior, backup/recovery, and rollback
+readiness.
+
+Explicit exclusions, recorded so they aren't silently reconsidered
+later: no Graphify; no Supabase migration; no Next.js/Tailwind/shadcn
+migration; no generic UI kit replacement; no decorative charts or
+motion without a teacher decision; no real learner PII until
+production-readiness gates permit it; no new post-UX milestone numbers
+until the UX-08 reassessment itself determines the correct sequence.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.
