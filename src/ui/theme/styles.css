@@ -668,6 +668,15 @@ label {
   margin-bottom: var(--spacing-unit);
 }
 
+/* During rapid keyboard entry down a long roster, the browser's own input
+   focus ring is easy to lose track of at a glance -- a subtle whole-row
+   background makes the active learner obvious without relying on color
+   alone (the row's own content -- the learner's name -- is unchanged, so
+   this is a redundant visual cue, not the only one). */
+.score-entry tbody tr:focus-within {
+  background: var(--color-surface);
+}
+
 .score-entry-input {
   width: 5rem;
 }

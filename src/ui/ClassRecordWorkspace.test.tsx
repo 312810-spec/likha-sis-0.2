@@ -441,6 +441,86 @@ describe("ClassRecordWorkspace", () => {
     expect(screen.getByLabelText("Score for Bo Reyes")).toHaveFocus();
   });
 
+  it("ArrowDown saves and moves focus down; ArrowUp saves and moves focus up", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([
+        ROSTER_ENTRY,
+        {
+          learnerId: "l2",
+          givenName: "Bo",
+          familyName: "Reyes",
+          status: null,
+          score: null,
+          updatedAt: null,
+        },
+      ]),
+    });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{ArrowDown}");
+    await waitFor(() => expect(screen.getByLabelText("Score for Bo Reyes")).toHaveFocus());
+
+    await user.type(screen.getByLabelText("Score for Bo Reyes"), "15{ArrowUp}");
+    await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveFocus());
+
+    expect(scoreRepo.recordCalls).toEqual([
+      { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 18 },
+      { assessmentItemId: "ai-1", learnerId: "l2", status: "scored", score: 15 },
+    ]);
+  });
+
+  it("ArrowDown on the last learner's row does not move focus away (no next row to go to)", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    const input = screen.getByLabelText("Score for Ana Cruz");
+    await user.type(input, "18{ArrowDown}");
+
+    await waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it("a failed save shows an inline error and never moves focus away from the row that needs fixing", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      {
+        learnerId: "l2",
+        givenName: "Bo",
+        familyName: "Reyes",
+        status: null,
+        score: null,
+        updatedAt: null,
+      },
+    ]);
+    scoreRepo.recordResult = null;
+    renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    const input = screen.getByLabelText("Score for Ana Cruz");
+    await user.type(input, "18{Enter}");
+
+    expect(await screen.findByText("Could not save this score.")).toBeInTheDocument();
+    // Enter would normally move focus to the next learner on success --
+    // a rejected save must never imply success by moving focus away from
+    // the row a teacher still needs to fix.
+    expect(input).toHaveFocus();
+    expect(screen.getByLabelText("Score for Bo Reyes")).not.toHaveFocus();
+  });
+
   it("does not re-save an unchanged value on blur", async () => {
     const user = userEvent.setup();
     const { scoreRepo } = renderScreen({
