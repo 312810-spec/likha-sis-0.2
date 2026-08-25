@@ -1,13 +1,93 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Post-UX-04 Roadmap Reconciliation, complete)
+
+Immediately after UX-04 completed (checkpoint `c91a45e`), the user
+directed a full roadmap reconciliation — repository truth-check,
+capture an expanded product definition, and replace the flat
+UX-05..UX-08 queue with an evidence-based execution plan — before any
+further implementation. **No feature code was changed in this task**,
+per explicit instruction. Full record:
+`docs/adr/0035-roadmap-reconciliation-and-execution-waves.md` (the
+architecture/sequencing decision), `docs/product/PRODUCT-CONTRACT.md`
+(durable product facts, with BUILT/DIRECTION SET/HYPOTHESIS status per
+item), `docs/product/ROADMAP-RECONCILIATION-DECISION.md` (the
+scenario-scoring pass).
+
+**Repository truth confirmed this task**: branch
+`claude/likha-sis-ux03-plan-plv80c` at `c91a45e`, 13 commits ahead of
+`origin/main` (still at `f02bce5`, pre-UX-03), working tree clean.
+`npm run quality` 390/390, `npm run build`, `check:dev-preview-isolation`,
+`npx knip` all re-verified clean. `cargo check`/`test`/`clippy` still
+blocked by the pre-existing `windows-future`/`windows-core` conflict
+(`docs/VERIFICATION-DEBT.md`, unchanged from UX-04). Confirmed via
+direct code/schema inspection: RBAC, curriculum versioning, Teacher
+Load/schedule, sync, SF1 bulk import, and SF10 all have zero code in
+the repo; SF9 is a non-authoritative CSV only; `School` has no branding
+fields; the app is Tauri-only.
+
+**Decision**: adopt the user's "reusable engines + representative
+vertical slices + architecture freeze" strategy (scored 7.55 vs. 7.30
+for "just continue old UX-05," a real but modest margin — see the
+decision doc for the full comparison and why it's not a rubber stamp).
+Old UX-05 (Learners/Search/Sections/Editing/Export) is merged with the
+new SF1 Enrollment scope into one wave, not run as two competing
+efforts. Full Wave 0-7 sequence in ADR-0035.
+
+**Per explicit instruction: no implementation has begun.** The
+recommended next milestone, awaiting approval:
+
+### Recommended next milestone: RBAC Foundation (Teacher / Registrar / School Head)
+
+- **Objective**: prove real, enforced role-based access control exists
+  end-to-end — schema, session, and one representative gated feature —
+  as the first slice of Wave 1 (`docs/adr/0035-...md`), unblocking Wave
+  2's Registrar-gated bulk import.
+- **Scope**: add a `role` column (or equivalent) to
+  `user_school_memberships` with the three already-confirmed roles
+  (Teacher, Registrar, School Head — confirmed with the user during M8,
+  do not re-ask); extend `SessionManager`/the session domain type to
+  carry the caller's role; add an `authorize_role`-style gate mirroring
+  the existing `require_active_school_scope` pattern
+  (`docs/adr/0004-authentication-and-local-session.md`); pick **one**
+  already-existing feature to actually gate as the representative proof
+  (candidate: `LearnerListScreen`'s bulk-capable operations, or a
+  School-Head-only view of another teacher's section — decide against
+  real repository shape when this milestone starts, not assumed here).
+- **Explicit non-goals**: do not attempt to fully scope every
+  Teacher/Registrar/School-Head authority boundary in one pass — only
+  what the one representative gated feature needs; do not build SF1
+  bulk import itself (that's Wave 2); do not build curriculum
+  versioning or school branding in the same milestone (separate Wave 1
+  slices — sequence one at a time per ADR-0035 Decision 1); do not
+  invent a fourth role; do not touch cloud/sync.
+- **Tests/verification required**: TDD for the new authorization gate
+  (a session without the required role must be rejected, matching this
+  project's fail-closed convention); Rust repository/command tests for
+  the role column and gate; TS domain/application tests for the
+  session-shape change; `npm run quality`, `npm run build`,
+  `check:architecture`, `check:dev-preview-isolation`, `npx knip`;
+  `cargo test`/`clippy` attempted (disclose plainly if still blocked by
+  the pre-existing dependency conflict, do not claim it passed);
+  independent `security-reviewer` dispatch (this touches authorization
+  directly — required per `.claude/rules/security-privacy.md`, not
+  optional).
+- **Completion criteria**: a session's role is derivable server-side
+  only (never client-supplied, matching `school_id`'s existing
+  convention); the one representative gated feature demonstrably denies
+  an unauthorized role and allows an authorized one, proven by a test;
+  no existing screen's functionality regresses for the Teacher role
+  (today's default, unchanged behavior for the common case); ADR
+  recording the exact authority boundaries actually implemented (not
+  just the three-role names).
+
 ## Active Task (2026-08-25, this session — UX-04, complete)
 
 **UX-04 — Class Records, Assessments, Score Entry, Grade Output —
 complete.** Baseline SHA `0634421` (UX-03 completion), start checkpoint
-`bf93185`, completion checkpoint `aa4706d` (exact final synchronized
-head recorded once the documentation commits following it are pushed —
-see the completion-checkpoint note below). Full checklist in
-`docs/ACTIVE-PLAN.md`'s "UX-04" section; decisions in
+`bf93185`, completion checkpoint `c91a45e` (final synchronized head —
+confirmed identical locally and on `origin` at that SHA). Full checklist
+in `docs/ACTIVE-PLAN.md`'s "UX-04" section; decisions in
 `docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
 
 Fixed all four confirmed correctness defects found by direct code

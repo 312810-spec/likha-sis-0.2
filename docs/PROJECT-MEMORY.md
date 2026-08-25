@@ -833,7 +833,21 @@ dependency conflict blocks compilation in this environment; Rust
 changes were verified by careful manual review instead. Full detail:
 `docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
 
-## Post-UX-08 Direction: Forms, UI, and Interaction Deepening Program (added 2026-08-25)
+## Post-UX-08 Direction: Forms, UI, and Interaction Deepening Program (added 2026-08-25, SUPERSEDED same day)
+
+**Superseded** by the post-UX-04 roadmap reconciliation
+(`docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`) recorded
+later the same day — kept here as historical record per this project's
+"mark superseded in place, don't delete" convention, not current
+instruction. The reconciliation absorbed this section's substance
+(forms/UI/interaction improvements) directly into the new Wave 1-7
+sequence rather than deferring it to a separate later phase; see
+`docs/product/PRODUCT-CONTRACT.md` for the current durable product
+facts and ADR-0035 for the current roadmap. Do not treat "after UX-00
+through UX-08 all complete" as the current gating condition — the wave
+sequence in ADR-0035 is now authoritative.
+
+Original text, preserved for history:
 
 Durable user-directed future sequencing, recorded ahead of when it
 becomes actionable: **after UX-00 through UX-08 all complete**, run an
@@ -871,6 +885,47 @@ migration; no generic UI kit replacement; no decorative charts or
 motion without a teacher decision; no real learner PII until
 production-readiness gates permit it; no new post-UX milestone numbers
 until the UX-08 reassessment itself determines the correct sequence.
+
+## Post-UX-04 Roadmap Reconciliation (added 2026-08-25)
+
+The product definition expanded substantially right after UX-04
+completed — School Forms (SF1-SF10) relationships, Teacher Load/Class
+Schedule, curriculum/key-stage versioning, RBAC, school branding, a
+cloud/sync target hypothesis, and a Teacher Creation Studio concept. Full
+durable facts: `docs/product/PRODUCT-CONTRACT.md`. Strategy decision and
+scoring: `docs/product/ROADMAP-RECONCILIATION-DECISION.md`. Durable
+architecture/sequencing record: `docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`.
+
+**Durable facts worth remembering without re-reading the full ADR**:
+
+- Repository truth as of this reconciliation: RBAC, curriculum
+  versioning, Teacher Load/schedule, sync, SF1 bulk import, and SF10
+  all have **zero code** in the repository. SF9 exists only as a
+  non-authoritative CSV. `School` has no branding fields. The app is
+  Tauri-only (no PWA/web target yet). The feature branch is 13 commits
+  ahead of `origin/main`, not yet merged.
+- Strategy chosen (scored, not assumed): reusable engines proven via
+  one representative vertical slice per domain, sequenced one domain at
+  a time — not parallel half-finished domains, not fully-finished forms
+  built bespoke one at a time.
+- Old UX-05 (Learners/Search/Sections/Editing/Export) is **merged**
+  with the new SF1 Enrollment scope — same domain, one wave, not two
+  competing efforts.
+- RBAC's starting role model (Teacher/Registrar/School Head) was
+  already confirmed with the user during M8 — do not re-ask it; only
+  the exact authority boundaries between the three roles remain open.
+- The Cloudflare Worker + Durable Object (next-best: Worker + D1) cloud
+  target is a **hypothesis**, not a ratified ADR decision — no prior
+  cloud-architecture ADR exists in this repo. Run the actual
+  10-scenario process before writing sync code, don't treat it as
+  pre-approved.
+- Curriculum must be modeled as versioned/cohort-aware (school year +
+  grade + curriculum version + cohort + implementation status +
+  applicable policy/subjects/form) from the start — reusing this
+  codebase's existing grading-weight-policy versioning pattern, never a
+  `grade == 11/12` heuristic.
+- Recommended next milestone (not started, awaiting approval): RBAC
+  foundation, the highest-leverage single slice of Wave 1.
 
 ## Current Milestone
 

@@ -1,5 +1,33 @@
 # ACTIVE PLAN
 
+## Post-UX-04 Roadmap Reconciliation (added 2026-08-25) — read this section first
+
+Immediately after UX-04 completed, the user directed a full roadmap
+reconciliation before any further implementation: verify repository
+truth, capture a substantially expanded product definition, and replace
+the flat UX-05..UX-08 queue below with an evidence-based execution plan.
+**No feature code changed in this reconciliation.**
+
+Full record:
+
+- `docs/adr/0035-roadmap-reconciliation-and-execution-waves.md` — the
+  durable architecture/sequencing decision (Wave 0-7, supersedes the
+  "UX-05 through UX-08 — Queued" section below).
+- `docs/product/PRODUCT-CONTRACT.md` — durable product facts (school
+  isolation, RBAC, curriculum versioning, School Forms relationships,
+  Teacher Load, branding, cloud direction, etc.), each marked BUILT /
+  DIRECTION SET / HYPOTHESIS against actual repository state.
+- `docs/product/ROADMAP-RECONCILIATION-DECISION.md` — the scenario-
+  scoring pass that chose the execution strategy.
+
+The "UX-05 through UX-08 — Queued" section below is left intact as
+historical record (per this file's own established "repair, don't
+erase" convention — see the UI-First Tranche note just below) but is no
+longer the active plan; ADR-0035's Wave table is authoritative going
+forward. **Per explicit instruction, Wave 1 has not been started** —
+see `docs/CURRENT-HANDOFF.md` for the recommended next milestone
+(RBAC Foundation), which is not yet approved or begun.
+
 ## UI-First Tranche (added 2026-08-25) — current work, read this section first
 
 **Drift repair note**: this file previously listed only M0 onward in
@@ -526,11 +554,15 @@ Affected (expected): `src/ui/ClassRecordsScreen.tsx` (+ test),
       (`docs/PROJECT-MEMORY.md` updated with the durable summary).
 - [x] Push the UX-04 completion checkpoint; verify remote sync.
 
-### UX-05 through UX-08 — Queued
+### UX-05 through UX-08 — Superseded 2026-08-25, see the reconciliation section at the top of this file
 
-See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
-ordered list and dependencies. Each gets its own detailed checklist in
-this section once its own start checkpoint is pushed.
+**Superseded, not abandoned.** The 2026-08-25 post-UX-04 roadmap
+reconciliation (see this file's top section) replaced this flat queue
+with `docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`'s
+Wave 0-7 sequence: UX-05's scope merges into Wave 2 (combined with SF1
+Enrollment); UX-06's scope splits across Waves 1 and 5; UX-07 becomes
+Wave 6; UX-08 becomes Wave 7 unchanged in substance. Do not resume
+planning against this section — use ADR-0035's table instead.
 
 ## Historical M0-M20 detail (unchanged, chronological, pre-dates the UI-first direction)
 

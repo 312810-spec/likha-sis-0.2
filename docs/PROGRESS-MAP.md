@@ -174,17 +174,28 @@ existing `premium-teacher-ui`/`accessibility` skills remain the
 authoritative source of truth — Impeccable is a lens, never a competing
 one. Exactly one row may be ◐ at a time.
 
-| ID    | Milestone                                                     | Status | Depends on | Start SHA | Completion SHA | ADR/Decision                                                        | Verification                                                                                                                                                                                            |
-| ----- | ------------------------------------------------------------- | ------ | ---------- | --------- | -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX-00 | Progress Map Repair + Impeccable Pilot + Visual Baseline      | ✓      | none       | 603863b   | fcf26ca        | docs/adr/0030-ui-first-program-and-ux00.md                          | npm run quality 316/316, npm run build, npx knip clean (5 pre-existing)                                                                                                                                 |
-| UX-01 | Design Tokens, Shared Components, and App Shell               | ✓      | UX-00      | fcf26ca   | 826bf7d        | docs/adr/0031-design-system-and-app-shell.md                        | npm run quality 339/339, npm run build, npx knip clean (5 pre-existing)                                                                                                                                 |
-| UX-02 | Teacher Workspace Polish                                      | ✓      | UX-01      | 826bf7d   | 14e7e5d        | docs/adr/0032-teacher-workspace-polish.md                           | npm run quality 352/352, npm run build, npx knip clean (5 pre-existing), check:dev-preview-isolation clean                                                                                              |
-| UX-03 | Daily Attendance + Monthly Summary                            | ✓ ↺    | UX-01      | f02bce5   | 0634421        | docs/adr/0033-daily-attendance-and-monthly-summary-polish.md        | npm run quality 365/365, npm run build, check:dev-preview-isolation clean, knip 4 findings (down from 5, zero new); teacher-ux/accessibility review debt open                                           |
-| UX-04 | Class Records, Assessments, Score Entry, Grade Output         | ✓ ↺    | UX-01      | 0634421   | aa4706d        | docs/adr/0034-class-records-assessments-score-entry-grade-output.md | npm run quality 390/390, npm run build, check:dev-preview-isolation clean, knip clean (of new findings); cargo test/clippy blocked by pre-existing env issue; teacher-ux/accessibility review debt open |
-| UX-05 | Learners, Search, Sections, Editing, Export                   | ○      | UX-01      | —         | —              | —                                                                   | —                                                                                                                                                                                                       |
-| UX-06 | Authentication, First Run, Session, Audit, Trust States       | ○      | UX-01      | —         | —              | —                                                                   | —                                                                                                                                                                                                       |
-| UX-07 | Android-Specific Adaptation and Native Verification           | ○      | UX-02..06  | —         | —              | —                                                                   | —                                                                                                                                                                                                       |
-| UX-08 | Cross-App Finish, Accessibility, Performance, Regression Gate | ○      | UX-02..07  | —         | —              | —                                                                   | —                                                                                                                                                                                                       |
+| ID    | Milestone                                                                                                             | Status | Depends on | Start SHA | Completion SHA | ADR/Decision                                                        | Verification                                                                                                                                                                                            |
+| ----- | --------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | --------- | -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-00 | Progress Map Repair + Impeccable Pilot + Visual Baseline                                                              | ✓      | none       | 603863b   | fcf26ca        | docs/adr/0030-ui-first-program-and-ux00.md                          | npm run quality 316/316, npm run build, npx knip clean (5 pre-existing)                                                                                                                                 |
+| UX-01 | Design Tokens, Shared Components, and App Shell                                                                       | ✓      | UX-00      | fcf26ca   | 826bf7d        | docs/adr/0031-design-system-and-app-shell.md                        | npm run quality 339/339, npm run build, npx knip clean (5 pre-existing)                                                                                                                                 |
+| UX-02 | Teacher Workspace Polish                                                                                              | ✓      | UX-01      | 826bf7d   | 14e7e5d        | docs/adr/0032-teacher-workspace-polish.md                           | npm run quality 352/352, npm run build, npx knip clean (5 pre-existing), check:dev-preview-isolation clean                                                                                              |
+| UX-03 | Daily Attendance + Monthly Summary                                                                                    | ✓ ↺    | UX-01      | f02bce5   | 0634421        | docs/adr/0033-daily-attendance-and-monthly-summary-polish.md        | npm run quality 365/365, npm run build, check:dev-preview-isolation clean, knip 4 findings (down from 5, zero new); teacher-ux/accessibility review debt open                                           |
+| UX-04 | Class Records, Assessments, Score Entry, Grade Output                                                                 | ✓ ↺    | UX-01      | 0634421   | aa4706d        | docs/adr/0034-class-records-assessments-score-entry-grade-output.md | npm run quality 390/390, npm run build, check:dev-preview-isolation clean, knip clean (of new findings); cargo test/clippy blocked by pre-existing env issue; teacher-ux/accessibility review debt open |
+| UX-05 | Learners, Search, Sections, Editing, Export — **superseded, see below**                                               | ⊘      | UX-01      | —         | —              | docs/adr/0035-roadmap-reconciliation-and-execution-waves.md         | —                                                                                                                                                                                                       |
+| UX-06 | Authentication, First Run, Session, Audit, Trust States — **superseded, see below**                                   | ⊘      | UX-01      | —         | —              | docs/adr/0035-roadmap-reconciliation-and-execution-waves.md         | —                                                                                                                                                                                                       |
+| UX-07 | Android-Specific Adaptation and Native Verification — **superseded, see below**                                       | ⊘      | UX-02..06  | —         | —              | docs/adr/0035-roadmap-reconciliation-and-execution-waves.md         | —                                                                                                                                                                                                       |
+| UX-08 | Cross-App Finish, Accessibility, Performance, Regression Gate — **carried forward as Wave 7, unchanged in substance** | ⊘      | UX-02..07  | —         | —              | docs/adr/0035-roadmap-reconciliation-and-execution-waves.md         | —                                                                                                                                                                                                       |
+
+⊘ = superseded by the 2026-08-25 post-UX-04 roadmap reconciliation, not
+abandoned outright. UX-05's scope is absorbed into Wave 2 (combined with
+SF1 Enrollment); UX-06's scope is absorbed into Waves 1 and 5; UX-07's
+scope becomes Wave 6; UX-08's scope becomes Wave 7 unchanged. See
+`docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`,
+`docs/product/PRODUCT-CONTRACT.md`, and
+`docs/product/ROADMAP-RECONCILIATION-DECISION.md` for the full
+reconciliation. The Wave 0-7 table in ADR-0035 is now the authoritative
+forward roadmap; this table's UX-00–04 rows remain the accurate
+historical record of what shipped under the UI-First Program naming.
 
 Full checklists live in `docs/ACTIVE-PLAN.md`'s "UI-First Tranche"
 section; durable direction and decisions in `docs/PROJECT-MEMORY.md`
@@ -231,10 +242,18 @@ UX-04 ✓ ↺ complete (2026-08-25, baseline 0634421) — Class Records,
   this session by a pre-existing, unrelated Cargo.lock dependency
   conflict — see docs/VERIFICATION-DEBT.md.
 
-CURRENT ← UX-04 complete. This session's explicit instruction was not
-  to begin UX-05 or any other milestone after completing UX-04 — see
-  docs/CURRENT-HANDOFF.md for the exact stopping point and the
-  recommended next milestone (named there, not started).
+2026-08-25 (same day, later): the user directed a full post-UX-04
+  roadmap reconciliation before any further implementation — see
+  docs/adr/0035-roadmap-reconciliation-and-execution-waves.md,
+  docs/product/PRODUCT-CONTRACT.md, and
+  docs/product/ROADMAP-RECONCILIATION-DECISION.md. The flat UX-05..UX-08
+  queue above is superseded by ADR-0035's Wave 0-7 sequence (Wave 0,
+  this reconciliation, is complete).
+
+CURRENT ← Wave 0 (reconciliation) complete. Recommended next milestone:
+  Wave 1's RBAC foundation (Teacher/Registrar/School Head) — named in
+  full in docs/CURRENT-HANDOFF.md. Per explicit instruction, not started;
+  awaiting approval of the reconciled roadmap.
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and
