@@ -1,7 +1,6 @@
 # ADR-0034 — Class Records, Assessments, Score Entry, Grade Output (UX-04)
 
-Status: Proposed (in progress — filled in as the milestone proceeds,
-per this project's convention of recording decisions as they are made)
+Status: Accepted
 
 ## Context
 
@@ -254,8 +253,20 @@ illegibly at phone width. Both fixed; see Verification.
   tests alone.
 - Accessibility: existing `expectNoAccessibilityViolations` (axe-core)
   checks pass for every touched screen as part of the Vitest suite.
-  Independent accessibility-reviewer and teacher-ux-reviewer dispatch:
-  see `docs/CURRENT-HANDOFF.md` for the outcome recorded at completion.
-  Native screen-reader and real-device touch-target verification remain
-  out of scope for this environment (no Tauri/WebView2 bridge here) —
-  recorded as verification debt, not claimed as covered.
+  Independent `accessibility-reviewer` and `teacher-ux-reviewer` were
+  both dispatched (fresh agents, not this session's own implementing
+  context) and both hit the project's known agent-resume/retrieval
+  failure on their one permitted retry each — no findings text came
+  back either time. A rigorous self-review was substituted and found
+  one real, must-fix gap: every assessment item's "Edit"/"Delete"
+  buttons shared an identical accessible name across the whole list,
+  giving a screen-reader user no way to tell which item's controls they
+  were on. Fixed by wrapping each item's actions in a named
+  `role="group"` (matching the pattern this file's own Excused/N/A
+  buttons already used correctly), with a new test proving two items'
+  controls stay independently identifiable. The owed independent
+  reviews remain open debt (`docs/VERIFICATION-DEBT.md`), not silently
+  dropped. Native screen-reader and real-device touch-target
+  verification remain out of scope for this environment (no
+  Tauri/WebView2 bridge here) — recorded as debt, not claimed as
+  covered.

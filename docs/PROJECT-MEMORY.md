@@ -753,6 +753,86 @@ every teacher mode) — independent-review debt remains open, recorded
 in `docs/VERIFICATION-DEBT.md`. Full detail:
 `docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`.
 
+## UX-04: Class Records, Assessments, Score Entry, Grade Output (added 2026-08-25)
+
+Fifth UI-First Program milestone (ADR-0034), baseline `0634421`. Four
+correctness defects were found by direct code inspection during
+planning and fixed via TDD: (1) a failed assessment-item switch could
+leave a previous item's roster rendered as the new one's, same defect
+class and cure as UX-03's identical fix; (2) the score-input commit
+path and the Excused/N/A exception buttons were two separate,
+mutually-unguarded write trigger sites for the same learner — fixed
+with one per-learner write-generation counter living inside the shared
+`handleRecord` function both paths call, not duplicated per call site;
+(3) re-clicking an already-active exception status issued a redundant
+write; (4) a computed term grade kept looking current after the
+underlying score changed. (4)'s fix is a **durable, reusable pattern**:
+recomputing an entire roster's grades on every save would be wasteful
+and would contradict this app's existing "grade computation is
+on-demand, not automatic" design (ADR-0013); recomputing only the one
+affected learner is O(1), deterministic, and safe, and is itself gated
+behind "grades have already been shown at least once" so a teacher who
+never opens the grade table pays no hidden cost. Apply this same
+single-record-recompute-after-write pattern to any future feature that
+shows a computed value which can silently go stale after a related
+edit — never re-derive the "recompute everything" instinct without
+first asking whether only the one changed record needs it.
+
+Assessment-item correction was added as an approved scope expansion:
+**renaming an item is always safe regardless of scoring state** (name
+is purely descriptive, verified by grepping every grade-computation and
+export code path for a read of it, plus checking for a uniqueness
+constraint — found neither); a full edit (category/max score) or
+delete is permitted only while the item has zero recorded scores of
+any status (scored/excused/not-applicable alike) — a deliberately
+conservative rule (an item with only Excused/N/A entries technically
+contributes nothing to any computed grade yet, so a stricter "any score
+at all" block is more cautious than strictly required, kept anyway to
+match this codebase's established fail-closed convention). This
+rename-vs-full-edit distinction is a reusable pattern: before blocking
+an edit "because the record has already been used," check whether the
+specific field being changed is actually read by anything downstream —
+don't assume every field of a scored/finalized record is equally
+sensitive.
+
+Two real bugs were found and fixed that weren't part of the original
+four: the Class Records list's Progress column (new this milestone)
+didn't refresh after returning from a workspace, so it could show stale
+counts — the exact same "looks current but isn't" failure mode as
+defect (4), one level up in a different screen, caught by a dedicated
+test; and real browser-rendered visual verification (not reachable
+from jsdom-based unit tests, which have no layout engine) found two
+genuine CSS layout bugs in the new assessment-item edit/list UI — both
+fixed. **Durable lesson**: jsdom-based tests cannot catch flex/layout
+overlap or narrow-viewport wrapping defects; a real browser pass
+(Playwright against the dev-preview fixture) remains necessary for any
+milestone with non-trivial new layout, not just a nice-to-have.
+
+The dev-preview fixture (`src/dev-preview/`) was extended from scratch
+to cover Class Records/Assessments/Learner Scores — previously zero
+coverage. Since three separate repository classes (assessment,
+learner-score, class-record) need to observe the same evolving
+item/score data, the new fixture state lives at module scope rather
+than duplicated per repository instance, unlike the single-repository
+attendance fixture that preceded it — a reusable pattern for any future
+dev-preview extension spanning more than one repository over the same
+underlying entity.
+
+`teacher-ux-reviewer` and `accessibility-reviewer` again both hit the
+recurring agent-resume/retrieval failure on both their initial dispatch
+and one permitted retry each; a rigorous self-review substituted, found
+and fixed one real, must-fix accessibility gap (every assessment item's
+Edit/Delete buttons shared an identical accessible name across the
+whole list, giving a screen-reader user no way to distinguish them —
+fixed with a named `role="group"`, matching this file's own Excused/N/A
+buttons' existing correct pattern) — independent-review debt remains
+open, recorded in `docs/VERIFICATION-DEBT.md`. `cargo test`/`cargo
+build`/`cargo clippy` could not run this session at all — a
+pre-existing, unrelated `windows-future`/`windows-core` Cargo.lock
+dependency conflict blocks compilation in this environment; Rust
+changes were verified by careful manual review instead. Full detail:
+`docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
+
 ## Post-UX-08 Direction: Forms, UI, and Interaction Deepening Program (added 2026-08-25)
 
 Durable user-directed future sequencing, recorded ahead of when it

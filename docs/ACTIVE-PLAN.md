@@ -514,14 +514,17 @@ Affected (expected): `src/ui/ClassRecordsScreen.tsx` (+ test),
       the `playwright` package directly against the pre-installed
       Chromium (see `docs/VERIFICATION-DEBT.md`). Native Windows/WebView2
       verification remains unavailable, as disclosed.
-- [ ] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`),
-      one-retry-then-self-review fallback if needed; fix blocking
-      findings.
-- [ ] Update `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+- [x] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`)
+      dispatched, both hit the recurring agent-resume/retrieval failure
+      on both the initial attempt and one permitted retry each; rigorous
+      self-review substituted, found and fixed one real must-fix
+      accessibility gap (ambiguous per-item Edit/Delete button names —
+      see ADR-0034's Verification section); independent-review debt
+      recorded as open in `docs/VERIFICATION-DEBT.md`.
+- [x] Update `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
       `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0034
-      (`docs/PROJECT-MEMORY.md` for genuinely durable reusable rules
-      only).
-- [ ] Push the UX-04 completion checkpoint; verify remote sync.
+      (`docs/PROJECT-MEMORY.md` updated with the durable summary).
+- [x] Push the UX-04 completion checkpoint; verify remote sync.
 
 ### UX-05 through UX-08 — Queued
 

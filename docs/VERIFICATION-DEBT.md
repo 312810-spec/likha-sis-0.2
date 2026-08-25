@@ -1,5 +1,28 @@
 # Verification Debt
 
+## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+
+Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
+against UX-04's `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx`
+changes (2026-08-25) and hit the same recurring agent-resume/retrieval
+failure documented since M7 (see `docs/adr/0027-audit-timestamp-readability-fix.md`,
+and the identical UX-02/UX-03 entries below): each did real work
+(teacher-ux: 31 tool calls across two attempts; accessibility: 31 tool
+calls across two attempts) but returned no retrievable findings text,
+on both the initial dispatch and one permitted retry. A rigorous
+self-review was substituted and found and fixed one real, must-fix
+accessibility gap: every assessment item's "Edit"/"Delete" buttons
+shared the same accessible name across the whole list, with nothing
+distinguishing which item a given pair belonged to for a screen-reader
+user (fixed with a named `role="group"`, matching the pattern this
+file's own Excused/N/A buttons already used correctly) — recorded in
+`docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
+This did not block completing UX-04, but the owed independent reviews
+themselves are still open debt. Retry both in a future session once
+there's reason to believe the agent-resume harness issue is fixed;
+remove this entry once real (non-self) reviews actually complete and
+their findings are recorded.
+
 ## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (open)
 
 `cargo check --lib` (and therefore `cargo test`/`cargo build`/`cargo

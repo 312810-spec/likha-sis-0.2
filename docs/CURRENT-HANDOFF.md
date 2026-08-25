@@ -1,23 +1,86 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-25, this session — UX-04)
+## Active Task (2026-08-25, this session — UX-04, complete)
 
-**UX-04 — Class Records, Assessments, Score Entry, Grade Output — ◐ In
-Progress.** Baseline SHA `0634421` (UX-03 completion). Full checklist
-in `docs/ACTIVE-PLAN.md`'s "UX-04" section; decisions in
+**UX-04 — Class Records, Assessments, Score Entry, Grade Output —
+complete.** Baseline SHA `0634421` (UX-03 completion), start checkpoint
+`bf93185`, completion checkpoint `aa4706d` (exact final synchronized
+head recorded once the documentation commits following it are pushed —
+see the completion-checkpoint note below). Full checklist in
+`docs/ACTIVE-PLAN.md`'s "UX-04" section; decisions in
 `docs/adr/0034-class-records-assessments-score-entry-grade-output.md`.
-Fixing four confirmed correctness defects found by direct code
-inspection during discovery (stale roster after a failed assessment-
-item switch; overlapping score writes reachable via two separate
-trigger paths — the score input and the exception-status buttons, which
-don't guard each other; redundant duplicate exception writes; term
-grades that stay looking current after a score changes), adding a
-completion-count readout, adding assessment-item edit/delete (approved
-scope expansion, unscored items only, plus a safe scored-item rename if
-proven safe), then the `ClassRecordsScreen`/`ClassRecordWorkspace`
-hierarchy/keyboard/mobile polish. Working on branch
-`claude/likha-sis-ux03-plan-plv80c` (still this session's harness
-assignment — re-verified, not assumed).
+
+Fixed all four confirmed correctness defects found by direct code
+inspection during discovery, each via TDD: stale roster after a failed
+assessment-item switch; overlapping score writes reachable via two
+separate trigger paths (the score input and the exception-status
+buttons, guarded by one shared per-learner write-generation counter
+inside `handleRecord` rather than duplicated per call site); redundant
+duplicate exception writes; term grades that stayed looking current
+after a score changed (fixed with an automatic single-learner
+recompute, gated behind "term grades have already been shown," plus a
+non-flickery "(just updated)" flash — confirmed working live in a real
+browser, not just in tests).
+
+Added assessment-item correction (approved scope expansion): rename is
+always safe (verified by grepping every grade-computation/export code
+path for a read of the name field, plus checking the schema for a
+uniqueness constraint — found neither); a full edit or delete is
+permitted only while the item has zero recorded scores of any status.
+Added completion-count readouts at the per-item, per-roster, and (a
+second, investigated-then-implemented addition) per-class-record list
+level. Re-verified grade-completeness handling against the explicit
+worry that "category has an assessment" might get conflated with "grade
+is meaningfully complete" — no defect found; the existing ADR-0013
+interpretation already handles blank/zero/exception/missing-category/
+partial-scoring correctly.
+
+Two real bugs were found and fixed along the way, neither part of the
+original four: the Class Records list didn't re-fetch after returning
+from a workspace, so its new Progress column could show stale counts
+(caught by a dedicated test before a human would have); and, found via
+real browser-rendered visual verification (not reachable from jsdom
+tests), the scored-item rename form's label/input overlapped its
+explanatory text at any width, plus the assessment-item list's action
+row ran together illegibly at phone width — both fixed.
+
+`npm run quality` 390/390 (up from 379 at the UX-03 baseline),
+`npm run build` clean, `check:dev-preview-isolation` clean, `npx knip`
+clean of every new finding this session introduced. `cargo test`/`cargo
+build`/`cargo clippy` could **not** run — a pre-existing, unrelated
+`windows-future`/`windows-core` Cargo.lock dependency conflict blocks
+compilation in this environment (not caused by, and not fixable from,
+any file changed this session); Rust changes were verified by careful
+manual review instead — see `docs/VERIFICATION-DEBT.md`. The dev-preview
+fixture (`src/dev-preview/`) was extended from scratch to cover Class
+Records/Assessments/Learner Scores (previously zero coverage) and used
+for real browser-rendered verification via Playwright (working around a
+`playwright-cli` browser-version mismatch in this environment by driving
+the `playwright` package directly against the pre-installed Chromium) at
+1366-wide and 390-wide, light/dark, and all three teacher modes, across
+the empty/partial/fully-scored workspace states, locked-vs-unlocked item
+editing, two-step delete, a live term-grade table with a floored grade,
+and the grade-freshness flash after a real edit.
+
+`teacher-ux-reviewer`/`accessibility-reviewer` were dispatched in
+parallel and both hit the same recurring agent-resume/retrieval failure
+documented since M7 on both the initial attempt and one permitted retry
+each; a rigorous self-review was substituted and found and fixed one
+real, must-fix accessibility gap (every assessment item's Edit/Delete
+buttons shared an identical accessible name across the whole list —
+fixed with a named `role="group"`, matching this file's own Excused/N/A
+pattern) — real independent-review debt remains open, recorded in
+`docs/VERIFICATION-DEBT.md`. Worked on branch
+`claude/likha-sis-ux03-plan-plv80c` per this session's harness
+assignment, re-verified (not assumed) to still be current.
+
+**Explicit instruction for this session: do not begin UX-05 or any
+other milestone after completing UX-04.** Recommended next milestone
+(named, not started): **UX-05 — Learners, Search, Sections, Editing,
+Export** — the next item on the UI-First Program roadmap depending only
+on UX-01 (already complete), continuing the same
+discovery→fix→polish→dev-preview→verify pattern this and the prior two
+milestones established.
 
 ## Active Task (2026-08-25, this session — UX-03, complete)
 
