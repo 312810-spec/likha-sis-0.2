@@ -1,5 +1,49 @@
 # Verification Debt
 
+## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (open)
+
+`cargo check --lib` (and therefore `cargo test`/`cargo build`/`cargo
+clippy`) fails in this session's Linux dev environment on a pre-existing,
+unrelated dependency conflict: `Cargo.lock` locks both `windows-core`
+0.61.2 and 0.62.2, and both `windows-future` 0.2.1 and 0.3.2,
+simultaneously. Building `windows-future` 0.3.2 then fails with several
+`cannot find function/type ... in module windows_core::imp` errors (a
+transitive Windows-target crate expecting symbols only the other locked
+version provides). Confirmed via `cargo update -p windows-future`, which
+refuses ("specification is ambiguous") without a version qualifier this
+session deliberately did not supply, since forcing a Cargo.lock/Cargo.toml
+change is outside any single UI milestone's scope and risks
+side effects on an unrelated dependency tree. Not caused by, and not
+fixable from, any `.rs` source file changed in UX-04 (only source files
+were touched, never the manifest/lockfile). All UX-04 Rust changes
+(`assessment_item.rs`'s `rename`/`update`/`delete`, `class_record.rs`'s
+`item_count`/`recorded_count`/`total_eligible`) were verified instead by
+careful manual review — signatures, SQL correctness, fail-closed-on-
+`None` conventions, and the logic of each new test — not by an actual
+compile/test run. Resolve by pinning a single consistent
+`windows-future`/`windows-core` pair (a deliberate dependency decision,
+not a drive-by fix) in a session where that's the explicit task, then
+re-run `cargo test`/`cargo clippy --all-targets -- -D warnings` for every
+milestone whose Rust changes accumulated while this was broken.
+
+## `playwright-cli` browser mismatch in this environment — workaround exists (open, session-specific)
+
+`playwright-cli open` (any browser argument) failed in this session with
+either "Chromium distribution 'chrome' is not found" or "Browser
+'chrome-for-testing' is not installed... expected executable at
+/opt/pw-browsers/chromium-1237/..." — the pinned `@playwright/cli`
+version's expected browser build does not match what's actually
+pre-installed at `/opt/pw-browsers` (chromium-1194) in this environment.
+Workaround used successfully this session: bypass `playwright-cli`
+entirely and drive the `playwright` npm package directly from a small
+script, launching with `chromium.launch({ executablePath:
+"/opt/pw-browsers/chromium" })` — this produced real, correct browser
+screenshots (see `docs/adr/0034-class-records-assessments-score-entry-grade-output.md`'s
+Verification section) and caught two genuine layout bugs jsdom-based
+tests could not. Future sessions hitting the same `playwright-cli`
+failure should use this workaround rather than concluding no
+browser-rendered verification is possible.
+
 ## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched

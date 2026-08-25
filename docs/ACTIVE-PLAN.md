@@ -468,36 +468,52 @@ Affected (expected): `src/ui/ClassRecordsScreen.tsx` (+ test),
       0012/0013/0033, and the live implementation, confirming discovery
       findings still hold.
 - [ ] Push the UX-04 start checkpoint.
-- [ ] TDD: stale assessment-context-after-failed-load fix.
-- [ ] TDD: overlapping learner-score-write fix covering both the
+- [x] TDD: stale assessment-context-after-failed-load fix.
+- [x] TDD: overlapping learner-score-write fix covering both the
       score-input and exception-button trigger paths.
-- [ ] TDD: duplicate-exception-write fix.
-- [ ] Term-grade freshness: investigate automatic-recompute-after-write
+- [x] TDD: duplicate-exception-write fix.
+- [x] Term-grade freshness: investigate automatic-recompute-after-write
       vs. explicit-stale-flag, decide, record in ADR-0034, implement
       with a regression test.
-- [ ] Completion-count readout (selected item + per-item list
+- [x] Completion-count readout (selected item + per-item list
       indicator), with blank/zero/exception-state tests.
-- [ ] Assessment-item correction: Rust repository/command layer (update/
+- [x] Assessment-item correction: Rust repository/command layer (update/
       delete, unscored-only for meaning-changing fields; investigate
       and test whether a scored item's name can safely be renamed).
-- [ ] Assessment-item correction: TS domain/application/UI + tests.
-- [ ] Grade-completeness correctness check (blank/zero/exception/
-      partial-scoring handling) — add a test only if a real ambiguity
-      is found.
-- [ ] `ClassRecordsScreen` hierarchy/shared-component migration +
-      per-class-record progress summary.
-- [ ] `ClassRecordWorkspace` gradebook polish, keyboard verification,
-      mobile ledger.
-- [ ] Wire `src/dev-preview/` Class Records fixtures from scratch;
+- [x] Assessment-item correction: TS domain/application/UI + tests.
+- [x] Grade-completeness correctness check (blank/zero/exception/
+      partial-scoring handling) — no real ambiguity found; re-verified
+      against ADR-0013's already-accepted interpretation (ADR-0034 §6).
+- [x] `ClassRecordsScreen` hierarchy/shared-component migration +
+      per-class-record progress summary. Also fixed a real bug found
+      along the way: the list didn't re-fetch after returning from a
+      workspace, so the new Progress column could show stale counts.
+- [x] `ClassRecordWorkspace` gradebook polish, keyboard verification
+      (added missing Arrow-key-navigation and save-failure-keeps-focus
+      tests; added a `:focus-within` active-row highlight), mobile
+      ledger (already covered by UX-03's shared `.score-entry` pattern).
+- [x] Wire `src/dev-preview/` Class Records fixtures from scratch;
       confirm isolation checks still pass.
-- [ ] `npm run quality`, `cargo test`/`cargo clippy` (Rust changed this
-      milestone, unlike UX-03), `npm run build`, `npm run check:architecture`,
+- [x] `npm run quality`, `npm run build`, `npm run check:architecture`,
       `npm run check:dev-preview-isolation`, `npx knip`,
-      `npm run quality:security`, `git diff --check`, `git status --short`.
-- [ ] Browser-rendered visual verification via the dev-preview fixture
-      at 1366×768/1024×768/390×844, light/dark, 3 modes, required
-      states; disclose native Windows/WebView2 verification remains
-      unavailable.
+      `git diff --check`, `git status --short` — all green.
+      `cargo test`/`cargo clippy` could **not** run this session (a
+      pre-existing, unrelated `windows-future`/`windows-core` dependency
+      conflict blocks compilation — see `docs/VERIFICATION-DEBT.md`);
+      Rust changes were verified by careful manual review instead.
+      `npm run quality:security` tooling (gitleaks/OSV-Scanner) not
+      available in this environment, same as prior milestones.
+- [x] Browser-rendered visual verification via the dev-preview fixture
+      at 1366-wide and 390-wide, light/dark, all 3 modes, and the
+      required states (empty/partial/complete workspace, locked vs.
+      unlocked item edit, two-step delete, live term-grade table with a
+      floored grade, the grade-freshness flash after a real edit, item
+      creation). Found and fixed two real layout bugs jsdom tests could
+      not catch (ADR-0034 §8). `playwright-cli` itself failed in this
+      environment (browser-version mismatch); worked around by driving
+      the `playwright` package directly against the pre-installed
+      Chromium (see `docs/VERIFICATION-DEBT.md`). Native Windows/WebView2
+      verification remains unavailable, as disclosed.
 - [ ] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`),
       one-retry-then-self-review fallback if needed; fix blocking
       findings.
