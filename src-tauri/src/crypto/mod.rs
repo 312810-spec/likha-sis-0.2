@@ -1,7 +1,9 @@
+#[cfg(windows)]
 mod dpapi;
 
 use std::path::Path;
 
+#[cfg(windows)]
 pub use dpapi::DpapiKeyStore;
 
 use crate::error::AppResult;

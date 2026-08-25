@@ -1,5 +1,63 @@
 # ACTIVE PLAN
 
+## Native Rust Verification Recovery (added 2026-08-25) — complete, read this section first
+
+**Complete.** Full decision record:
+`docs/adr/0040-windows-only-dependency-target-gating.md`. This closes
+the "Rust toolchain cannot compile in this environment" debt every
+milestone since before this session's visible window had to work
+around. Verification record — every line actually run, not claimed:
+
+- `cargo check --lib` — PASS, 0 warnings, 0 errors (first success this
+  session).
+- `cargo test --lib auth::` (targeted RBAC/authorization) — PASS, 57/57.
+- `cargo test --lib teaching_assignment::` / `schedule_meeting` (targeted
+  Teacher Load) — PASS, 9/9 + 13/13.
+- Full `cargo test` — PASS, 338 lib tests + all integration test
+  binaries, 0 failed, 0 ignored.
+- `cargo clippy --all-targets -- -D warnings` — PASS, 0 warnings.
+- `npm run quality` — PASS, 390/390, typecheck/lint/format/architecture
+  all green.
+- `cargo fmt --check` — run for the first time this session (never part
+  of `quality:full`); found ~264 pre-existing formatting diffs across
+  most of the crate, unrelated to this fix. Not corrected here (out of
+  scope for a targeted dependency-recovery milestone) — recorded as new
+  debt in `docs/VERIFICATION-DEBT.md`.
+- `git diff --stat` — 6 files changed, 71 insertions, 10 deletions
+  (`Cargo.toml`, `crypto/mod.rs`, `db/mod.rs`, plus 3 files touched only
+  to fix bugs the restored compiler/test signal revealed). `Cargo.lock`
+  byte-identical to before the fix — zero lockfile churn.
+- Independent `security-reviewer` — dispatched for the crypto/key-store
+  boundary change; outcome recorded in `docs/VERIFICATION-DEBT.md`.
+- Codex — not touched this milestone, per explicit instruction (this
+  dependency milestone did not need it). Remains PILOT.
+
+**Root cause** (Category E — platform/target-specific dependency
+problem, confirmed with `cargo tree` reverse-dependency evidence, not
+guessed): LIKHA's own `windows = "0.62.2"` dependency in
+`src-tauri/Cargo.toml` was declared unconditionally, with no
+`[target.'cfg(windows)'.dependencies]` gate, forcing `windows-future`'s
+Windows-only COM/async code to compile on every host including this
+Linux sandbox. Tauri's own Windows-only webview backend dependencies
+were already correctly target-gated in the same lockfile — proof the
+fix pattern was already proven, just never applied to LIKHA's own
+declaration.
+
+**Three genuine pre-existing bugs fixed**, all revealed only once real
+compilation succeeded for the first time: a type-inference ambiguity in
+`class_record::find_detail_by_id_in_school`; dead code in
+`schedule_meeting::create` where `CreateMeetingOutcome::Duplicate` could
+never actually be returned; and four `assessment_item` tests that had
+never validly passed (a hardcoded `"teacher-1"` string could never
+satisfy a real foreign-key constraint). None of these were introduced
+by this milestone — all pre-date it, none had ever been compiler/test-
+verified before.
+
+**Gate decision: RUST VERIFICATION RECOVERED — READY TO RESUME PRODUCT
+WAVE.** Per explicit instruction, the recommended next milestone is not
+started — see `docs/CURRENT-HANDOFF.md` for the recommendation and full
+report.
+
 ## Teacher Load / Class Schedule Foundation (added 2026-08-25) — complete, read this section first
 
 **Complete.** Full decision record:

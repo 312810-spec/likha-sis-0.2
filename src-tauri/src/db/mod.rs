@@ -3,10 +3,14 @@ mod migrations;
 use std::path::Path;
 
 use rusqlite::Connection;
-use tauri::{AppHandle, Manager};
+#[cfg(windows)]
+use tauri::Manager;
+use tauri::AppHandle;
 use zeroize::Zeroize;
 
-use crate::crypto::{self, DpapiKeyStore, KeyStore, KEY_LEN};
+#[cfg(windows)]
+use crate::crypto::{DpapiKeyStore, KeyStore};
+use crate::crypto::{self, KEY_LEN};
 use crate::error::AppResult;
 
 pub const DB_FILE_NAME: &str = "likha-sis.db";
@@ -63,6 +67,7 @@ pub fn open(path: &Path, key: &[u8; KEY_LEN]) -> AppResult<Connection> {
 /// Resolves the per-user application data directory, loads (or creates) the
 /// encryption key from the Windows-protected key file there, and opens the
 /// working database. Creates the app data directory if it does not exist.
+#[cfg(windows)]
 pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
     let dir = app
         .path()
@@ -74,6 +79,20 @@ pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
     let result = open(&dir.join(DB_FILE_NAME), &key);
     key.zeroize();
     result
+}
+
+/// Windows is currently LIKHA's only shipping desktop target (see
+/// CLAUDE.md); the key store is DPAPI-backed and Windows-only (see
+/// `crate::crypto::dpapi`). Fails closed rather than falling back to an
+/// unprotected key store on any other host, matching this module's
+/// existing invariant that a key-protection failure must never be silently
+/// downgraded.
+#[cfg(not(windows))]
+pub fn open_app_db(_app: &AppHandle) -> AppResult<Connection> {
+    Err(crate::error::AppError::key_store(
+        "no encryption key store is implemented for this platform; \
+         LIKHA-SIS currently ships on Windows only",
+    ))
 }
 
 #[cfg(test)]

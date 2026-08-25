@@ -103,6 +103,14 @@ pub fn create(
         return Ok(CreateMeetingOutcome::InvalidTime);
     }
 
+    // Must run before `has_teacher_conflict`: an exact duplicate (same
+    // assignment, weekday, and time range) always shares its teacher with
+    // itself, so the overlap check below would otherwise always report it
+    // as a `TeacherConflict` and the `UNIQUE` constraint's own `Duplicate`
+    // outcome could never actually be returned.
+    if has_exact_duplicate(conn, teaching_assignment_id, weekday, starts_at, ends_at)? {
+        return Ok(CreateMeetingOutcome::Duplicate);
+    }
     if has_teacher_conflict(conn, school_id, &assignment.teacher_user_id, weekday, starts_at, ends_at)? {
         return Ok(CreateMeetingOutcome::TeacherConflict);
     }
@@ -141,6 +149,24 @@ pub fn create(
     let meeting = find_by_id_in_school(conn, school_id, &id)?
         .expect("row just inserted must exist");
     Ok(CreateMeetingOutcome::Created(meeting))
+}
+
+fn has_exact_duplicate(
+    conn: &Connection,
+    teaching_assignment_id: &str,
+    weekday: i64,
+    starts_at: &str,
+    ends_at: &str,
+) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(\
+             SELECT 1 FROM schedule_meetings \
+             WHERE teaching_assignment_id = ?1 AND weekday = ?2 \
+               AND starts_at = ?3 AND ends_at = ?4)",
+        (teaching_assignment_id, weekday, starts_at, ends_at),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
 }
 
 fn has_teacher_conflict(

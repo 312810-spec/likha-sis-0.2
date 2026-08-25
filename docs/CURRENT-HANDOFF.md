@@ -1,5 +1,82 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Native Rust Verification Recovery, complete)
+
+Full record: `docs/adr/0040-windows-only-dependency-target-gating.md`.
+
+**Root cause confirmed with evidence, not guessed**: every prior
+session's "windows-future/windows-core version mismatch" framing was
+wrong. `cargo tree -i windows@<ver> --target all` showed each `windows`
+version's own dependency edges were internally consistent; the real
+problem was that `src-tauri/Cargo.toml` declared LIKHA's own
+`windows = "0.62.2"` (used for DPAPI key protection) **unconditionally**
+— no `[target.'cfg(windows)'.dependencies]` gate — forcing Windows-only
+COM/async code to compile on every host, including this Linux sandbox.
+Tauri's own Windows-only webview backend (`tao`/`wry`/`webview2-com`,
+which locks `windows` 0.61.3) was already correctly target-gated in the
+same `Cargo.lock` — proof the pattern works, LIKHA's own declaration
+just never used it.
+
+**Fix applied — Category E (platform/target-specific dependency
+problem), minimal-change, zero lockfile diff**: moved `windows` to
+`[target.'cfg(windows)'.dependencies]`; `#[cfg(windows)]`-gated
+`mod dpapi;`/`DpapiKeyStore` in `crypto/mod.rs`; split
+`db::open_app_db` so the `#[cfg(not(windows))]` path fails closed with a
+`KeyStore` error rather than opening an unprotected database (Windows
+is the only shipping desktop target). `git diff --stat`: 6 files
+changed, 71 insertions, 10 deletions — `Cargo.toml`, `crypto/mod.rs`,
+`db/mod.rs`, plus 3 files touched only to fix bugs restored compilation
+revealed (below). `Cargo.lock` is byte-identical to before the fix.
+
+**Compiler Recovery:**
+
+| Check                                                                     | Result        | Evidence                                                                                                                           |
+| ------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `cargo check --lib`                                                       | PASS          | 0 warnings, 0 errors                                                                                                               |
+| Targeted RBAC/auth tests (`cargo test --lib auth::`)                      | PASS          | 57/57                                                                                                                              |
+| Targeted Teacher Load tests (`teaching_assignment::`, `schedule_meeting`) | PASS          | 9/9 + 13/13                                                                                                                        |
+| Full `cargo test`                                                         | PASS          | 338 lib tests + all integration binaries, 0 failed                                                                                 |
+| `cargo clippy --all-targets -- -D warnings`                               | PASS          | 0 warnings                                                                                                                         |
+| `npm run quality`                                                         | PASS          | typecheck/lint/format/architecture/vitest all green, 390 tests                                                                     |
+| Tauri/native build                                                        | NOT ATTEMPTED | out of scope — `cargo check`/`test`/`clippy` were this milestone's success criteria; a full GUI build was not required and not run |
+
+**Product bugs revealed and fixed (direct correctness issues in
+already-shipped foundation code, not scope expansion)**:
+
+1. `class_record::find_detail_by_id_in_school` — type-inference
+   ambiguity (`Err(e.into())`) fixed to `Err(AppError::from(e))`, no
+   behavior change.
+2. `schedule_meeting::create` — `CreateMeetingOutcome::Duplicate` was
+   dead code (an exact duplicate always shares its teacher with itself,
+   so `has_teacher_conflict` always fired first, despite an existing
+   regression test asserting `Duplicate` should be returned). Fixed
+   with a `has_exact_duplicate` check run before the conflict checks.
+3. Four `assessment_item` tests used a literal `"teacher-1"` for
+   `recorded_by_user_id`, which could never satisfy the real
+   `learner_scores.recorded_by_user_id REFERENCES users(id)` FK once it
+   actually ran. Fixed by creating a real `user::create_user(...)` row,
+   matching `learner_score.rs`'s own correct test pattern.
+
+**Verification debt closed**: the entire "Rust toolchain cannot compile
+in this environment" entry in `docs/VERIFICATION-DEBT.md` (open since
+before this session's visible window, reproduced and diagnosed but not
+fixed in the RBAC milestone). **New debt opened**: `cargo fmt --check`
+(never part of `quality:full`) found ~264 pre-existing formatting diffs
+across most of the crate — not corrected in this milestone (out of
+scope; recommend a dedicated follow-up commit). Independent
+`security-reviewer` dispatched for the crypto/key-store boundary change
+— outcome recorded in `docs/VERIFICATION-DEBT.md` once it returns.
+
+**Gate decision: RUST VERIFICATION RECOVERED — READY TO RESUME PRODUCT
+WAVE.** Recommended next milestone (not started, per explicit
+instruction to stop and wait for approval): link `class_records` to
+`teaching_assignments` where a matching assignment exists (surfacing
+"who teaches this" on the class record itself), OR — given verification
+was the whole point of this milestone — re-run the two previously-owed
+independent reviews (Curriculum Foundation's `architecture-reviewer`,
+RBAC's `security-reviewer`) now that a healthy compiler signal exists to
+ground them in, closing that debt before adding new surface area.
+
 ## Active Task (2026-08-25, this session — Teacher Load / Class Schedule Foundation, complete)
 
 Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`.

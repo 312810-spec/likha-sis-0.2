@@ -278,7 +278,9 @@ mod tests {
     use super::*;
     use crate::{
         db,
-        repository::{grading, learner, learner_score, school, section, section_membership, subject},
+        repository::{
+            grading, learner, learner_score, school, section, section_membership, subject, user,
+        },
     };
     use std::path::Path;
 
@@ -409,6 +411,7 @@ mod tests {
                 .unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &l1.id, "2026-06-08").unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &l2.id, "2026-06-08").unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         learner_score::record(
             &conn,
             &school_id,
@@ -416,7 +419,7 @@ mod tests {
             &l1.id,
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
-            "teacher-1",
+            &teacher.id,
         )
         .unwrap();
 
@@ -443,6 +446,7 @@ mod tests {
                 .unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &learner.id, "2026-06-08")
             .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         learner_score::record(
             &conn,
             &school_id,
@@ -450,7 +454,7 @@ mod tests {
             &learner.id,
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
-            "teacher-1",
+            &teacher.id,
         )
         .unwrap();
 
@@ -507,6 +511,7 @@ mod tests {
                 .unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &learner.id, "2026-06-08")
             .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         learner_score::record(
             &conn,
             &school_id,
@@ -514,7 +519,7 @@ mod tests {
             &learner.id,
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
-            "teacher-1",
+            &teacher.id,
         )
         .unwrap();
 
@@ -573,6 +578,7 @@ mod tests {
                 .unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &learner.id, "2026-06-08")
             .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         learner_score::record(
             &conn,
             &school_id,
@@ -580,7 +586,7 @@ mod tests {
             &learner.id,
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
-            "teacher-1",
+            &teacher.id,
         )
         .unwrap();
 

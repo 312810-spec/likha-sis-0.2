@@ -2,7 +2,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::{curriculum, grading, section, section_membership, subject};
 
 /// The workspace a teacher opens to record scores for one section, one
@@ -242,7 +242,7 @@ pub fn find_detail_by_id_in_school(
         .map(Some)
         .or_else(|e| match e {
             rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e.into()),
+            e => Err(AppError::from(e)),
         })?;
     detail.map(|d| with_total_eligible(conn, school_id, d)).transpose()
 }

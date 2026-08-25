@@ -1099,6 +1099,48 @@ Durable facts:
 - No UI this milestone — proven at repository/command layer only, same
   zero-UI shape as RBAC and Curriculum Foundation.
 
+## Native Rust Verification Recovery (added 2026-08-25)
+
+Full record: `docs/adr/0040-windows-only-dependency-target-gating.md`.
+Durable facts:
+
+- **`cargo check --lib`/`cargo test`/`cargo clippy` now succeed in this
+  Linux dev environment.** Root cause was never a lockfile/version
+  mismatch (every prior session's framing) — it was that
+  `src-tauri/Cargo.toml`'s own `windows = "0.62.2"` dependency (used for
+  Windows DPAPI key protection) was declared **unconditionally**, with
+  no `[target.'cfg(windows)'.dependencies]` gate, forcing Windows-only
+  code to try to compile on every host. Fixed by target-gating it and
+  `#[cfg(windows)]`-gating `crypto::dpapi`, exactly matching the pattern
+  Tauri's own Windows-only webview backend (`tao`/`wry`/`webview2-com`)
+  already used correctly in the same `Cargo.lock`. Zero lockfile
+  changes were needed.
+- **New durable rule**: any dependency/module that only makes sense on
+  one platform must be `[target.'cfg(...)'.dependencies]`-gated in
+  `Cargo.toml` and `#[cfg(...)]`-gated at its `mod` declaration — never
+  declared unconditionally on the assumption that only the shipping
+  target will ever run `cargo check`. Apply this to any future
+  Android-only dependency too.
+- `db::open_app_db` now fails closed with a `KeyStore` error on any
+  non-Windows host rather than silently opening an unprotected
+  database — Windows is currently the only shipping desktop target.
+- Restoring real compiler/test signal (previously **zero** on any
+  LIKHA-authored Rust across the whole session — RBAC, Curriculum,
+  Teacher Load had never actually been compiled or tested) exposed and
+  fixed three genuine pre-existing bugs: a type-inference ambiguity in
+  `class_record::find_detail_by_id_in_school`; a dead-code
+  `CreateMeetingOutcome::Duplicate` branch in `schedule_meeting::create`
+  (an exact-duplicate submission always shares its teacher with itself,
+  so the teacher-conflict check always fired first); and four
+  `assessment_item` tests that bound `recorded_by_user_id` to a literal
+  `"teacher-1"` string that could never satisfy the real `users(id)` FK.
+  All were fixed within this milestone as direct correctness issues
+  revealed by restored compilation, not scope expansion.
+- `cargo fmt --check` was run for the first time this session (it was
+  never part of `npm run quality:full`) and found ~264 pre-existing
+  formatting diffs unrelated to this fix — recorded as new verification
+  debt, not corrected here.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

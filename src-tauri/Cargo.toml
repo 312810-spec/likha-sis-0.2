@@ -28,10 +28,18 @@ rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl
 rusqlite_migration = "2"
 uuid = { version = "1.20.0", features = ["v7"] }
 rand = "0.10.2"
-windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
+
+# Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
+# APIs that only exist on Windows. Tauri's own Windows-only webview backend
+# deps (tao/wry/webview2-com) are already target-gated the same way — this
+# was previously declared unconditionally, forcing windows-future's
+# Windows-only async/COM-marshaling code to compile even on non-Windows
+# hosts, where it cannot succeed (see ADR-0040).
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

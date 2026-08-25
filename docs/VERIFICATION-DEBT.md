@@ -268,7 +268,80 @@ there's reason to believe the agent-resume harness issue is fixed;
 remove this entry once real (non-self) reviews actually complete and
 their findings are recorded.
 
-## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (open)
+## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (RESOLVED 2026-08-25 — Native Rust Verification Recovery)
+
+**Closed.** Root cause was not a lockfile/version-mismatch (the two
+`windows` package instances in `Cargo.lock` were each internally
+self-consistent, per `cargo tree` reverse-dependency evidence gathered
+this session) — it was that LIKHA's own `src-tauri/Cargo.toml` declared
+`windows = { version = "0.62.2", ... }` **unconditionally**, forcing
+`windows-future`'s Windows-only COM/async code to compile on every host
+including this Linux dev container, exactly as the "deeper structural
+cause" paragraph below had already predicted. Fixed by moving `windows`
+to `[target.'cfg(windows)'.dependencies]` and `#[cfg(windows)]`-gating
+`mod dpapi;`/`DpapiKeyStore` in `crypto/mod.rs`, with `db::open_app_db`
+split so the `#[cfg(not(windows))]` path fails closed rather than
+opening an unprotected database. Zero `Cargo.lock` changes were needed.
+See `docs/adr/0040-windows-only-dependency-target-gating.md` for full
+detail, evidence, and the 10-scenario decision record.
+
+**Verified this session, actually run (not claimed):** `cargo check
+--lib` (clean, 0 warnings/errors), `cargo test` (338 lib tests + all
+integration test binaries, 0 failures), `cargo clippy --all-targets --
+-D warnings` (0 warnings), `npm run quality` (typecheck/lint/format/
+architecture/vitest all green, 390 TS tests). Restoring real compiler
+signal exposed and fixed three genuine pre-existing bugs, none of which
+had ever been caught because no Rust compile/test had ever actually
+succeeded on this branch:
+
+1. A type-inference ambiguity in
+   `class_record::find_detail_by_id_in_school` (`Err(e.into())` — three
+   competing `From<rusqlite::Error>` impls in scope made `?`'s target
+   type unresolvable). Fixed: `Err(AppError::from(e))`. No behavior
+   change.
+2. `schedule_meeting::create`'s `CreateMeetingOutcome::Duplicate` was
+   dead code — an exact-duplicate meeting submission always shares its
+   teacher with itself, so `has_teacher_conflict` always fired first
+   and `Duplicate` could never actually be returned, despite a
+   dedicated regression test (`create_rejects_an_exact_duplicate_meeting`)
+   asserting it should. Fixed by adding a `has_exact_duplicate` check
+   that runs before the conflict checks.
+3. Four `assessment_item` tests (`delete_refuses_an_item_that_already_
+has_a_recorded_score`, `list_by_class_record_reports_recorded_and_
+total_eligible_counts`, `rename_changes_the_name_even_when_the_item_
+already_has_a_recorded_score`, `update_rejects_a_category_or_max_
+score_change_once_the_item_has_a_recorded_score`) called
+   `learner_score::record(..., "teacher-1")` with a literal string that
+   was never a real row — always violating `learner_scores.recorded_by_
+user_id REFERENCES users(id)` once FK enforcement actually ran.
+   These four tests had never passed under real execution. Fixed by
+   creating a real `user::create_user(...)` row first, matching the
+   pattern `learner_score.rs`'s own tests already use correctly.
+
+**New debt discovered by this recovery, not yet closed:** `cargo fmt
+--check` was run for the first time this session (it was never wired
+into `npm run quality:full`, only `cargo test` + `cargo clippy` are) and
+found ~264 pre-existing formatting diff hunks across most of the crate,
+entirely unrelated to this fix. Not corrected here — a whole-crate
+reformat is out of this recovery milestone's scope (risk of unrelated
+diff noise across every Rust file). Recommend a dedicated, low-risk
+follow-up: run `cargo fmt` once crate-wide in its own commit, then add
+`cargo fmt --check` to `quality:full` so it can't silently drift again.
+
+**Independent review status:** `security-reviewer` was dispatched for
+an adversarial pass on the crypto/key-store boundary change (`Cargo.toml`
+target-gating, `crypto/mod.rs`, `db/mod.rs`'s fail-closed non-Windows
+path) plus the three bug fixes above. [Outcome to be recorded once the
+review returns — see `docs/CURRENT-HANDOFF.md` for the live status; if
+it hits the same recurring agent-resume/retrieval failure documented
+elsewhere in this file, a rigorous self-review was already performed
+inline during the fix and this note will be updated accordingly rather
+than silently dropped.]
+
+No repository history below this point is deleted — kept for the full
+diagnostic trail that led to the correct root cause:
+
+### Original open-debt record (pre-resolution, kept for trail)
 
 `cargo check --lib` (and therefore `cargo test`/`cargo build`/`cargo
 clippy`) fails in this session's Linux dev environment on a pre-existing,
