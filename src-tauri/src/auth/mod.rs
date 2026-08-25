@@ -387,6 +387,13 @@ pub enum Capability {
     /// chosen as the conservative fix rather than also including
     /// Registrar.
     ManageSchoolMembership,
+    /// Create, reassign, or remove a `TeachingAssignment`/`ScheduleMeeting`
+    /// -- see `docs/adr/0039-teacher-load-class-schedule-foundation.md`.
+    /// School Head only, deliberately not reusing
+    /// `ManageSchoolMembership`: assigning teachers to classes is a
+    /// scheduling-authority decision, distinct from onboarding a school
+    /// member, even though both currently resolve to the same role.
+    ManageTeachingAssignments,
 }
 
 impl Capability {
@@ -394,8 +401,44 @@ impl Capability {
         match self {
             Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
         }
     }
+}
+
+/// A teacher may always view their own load/schedule; viewing another
+/// teacher's requires the `ManageTeachingAssignments` capability **and**
+/// that the target teacher is actually a member of the caller's own
+/// school -- without that second check, a School Head's role in their
+/// own school would incorrectly authorize viewing a same-named-parameter
+/// teacher belonging to a *different* school, since holding the role
+/// says nothing on its own about which school `target_teacher_user_id`
+/// belongs to (caught by
+/// `authorize_view_teacher_load_denies_a_school_head_from_a_different_school`
+/// during this function's own TDD pass, not shipped and fixed later).
+/// This is deliberately not a `Capability` match arm -- unlike a
+/// capability, whether this check passes depends on *which* teacher is
+/// being viewed, not on a fixed role set alone. Fails closed with no
+/// session, exactly like every other gate in this module.
+pub fn authorize_view_teacher_load(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_teacher_user_id: &str,
+) -> AppResult<String> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if user_id == target_teacher_user_id {
+        return Ok(school_id);
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageTeachingAssignments.allowed_roles(),
+    )? && user_repo::is_member_of_school(conn, target_teacher_user_id, &school_id)?
+    {
+        return Ok(school_id);
+    }
+    Err(AppError::Unauthorized)
 }
 
 /// The trusted authorization boundary for a capability-gated command.
@@ -1324,5 +1367,106 @@ mod tests {
         role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
 
         assert_eq!(sessions.require_active_school_scope(&conn).unwrap(), s.id);
+    }
+
+    // ---- Teacher Load / Class Schedule Foundation ----
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_teaching_assignments() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(
+            authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments).is_ok()
+        );
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_teaching_assignments() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_registrar_for_manage_teaching_assignments() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_view_teacher_load_allows_a_teacher_to_view_their_own() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, u) = setup_member_with_session(&conn, &sessions);
+
+        assert!(authorize_view_teacher_load(&conn, &sessions, &u.id).is_ok());
+    }
+
+    #[test]
+    fn authorize_view_teacher_load_denies_a_teacher_viewing_a_colleagues_load() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let colleague = user::create_user(&conn, "colleague", "password", "Colleague").unwrap();
+        user::add_school_membership(&conn, &colleague.id, &s.id).unwrap();
+
+        let result = authorize_view_teacher_load(&conn, &sessions, &colleague.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_view_teacher_load_allows_a_school_head_to_view_a_colleagues_load() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let colleague = user::create_user(&conn, "colleague", "password", "Colleague").unwrap();
+        user::add_school_membership(&conn, &colleague.id, &s.id).unwrap();
+
+        assert!(authorize_view_teacher_load(&conn, &sessions, &colleague.id).is_ok());
+    }
+
+    #[test]
+    fn authorize_view_teacher_load_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_view_teacher_load(&conn, &sessions, "someone");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_view_teacher_load_denies_a_school_head_from_a_different_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_teacher = user::create_user(&conn, "other.teacher", "password", "Other Teacher")
+            .unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &other_school.id).unwrap();
+
+        let result = authorize_view_teacher_load(&conn, &sessions, &other_teacher.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a School Head's authority does not extend to a teacher outside their own school"
+        );
     }
 }

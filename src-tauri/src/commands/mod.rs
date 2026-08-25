@@ -11,6 +11,7 @@ pub mod school;
 pub mod section;
 pub mod setup;
 pub mod subject;
+pub mod teaching_assignment;
 pub mod user;
 
 use std::sync::{Mutex, MutexGuard};

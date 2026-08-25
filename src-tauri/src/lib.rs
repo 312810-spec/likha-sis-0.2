@@ -74,6 +74,14 @@ pub fn run() {
             commands::learner_score::roster_for_assessment_item,
             commands::learner_score::record_learner_score,
             commands::learner_score::compute_learner_term_grade,
+            commands::teaching_assignment::create_teaching_assignment,
+            commands::teaching_assignment::replace_teacher_assignment,
+            commands::teaching_assignment::remove_teaching_assignment,
+            commands::teaching_assignment::list_teaching_assignments_by_section,
+            commands::teaching_assignment::list_teacher_assignments,
+            commands::teaching_assignment::get_teacher_load,
+            commands::teaching_assignment::create_schedule_meeting,
+            commands::teaching_assignment::list_schedule_meetings_by_assignment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

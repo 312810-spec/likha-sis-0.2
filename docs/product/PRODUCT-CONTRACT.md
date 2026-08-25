@@ -128,10 +128,30 @@ Card") — the label explains use, never renames the official form.
 | SF9 Report Card                        | **partially BUILT** — `report_card.rs`/UX-04 already export a CSV, explicitly disclosed as "DepEd-grade-computation-inspired," not an authoritative-template reproduction, and not gated per subject group. An authoritative-template, three-term-aware, duplex-printable SF9 is **not built**. | Must derive from finalized grades + attendance + learner identity; adviser reviews, doesn't re-encode; batch generation matters. Exact current template dimensions must come from an authoritative source, not a guess.                                                                                                                                                                |
 | SF10 Permanent Record                  | **not built at all** (confirmed: zero references anywhere in the repo)                                                                                                                                                                                                                          | Cumulative, strongly controlled, provenance-aware; needs historical records, transfer provenance, controlled corrections, issuance workflow, and a bulk importer that should reuse the same general import/reconciliation architecture as SF1 rather than a bespoke parser.                                                                                                            |
 
-## 6. Teacher Load + Class Schedule — HYPOTHESIS / DIRECTION SET (not built)
+## 6. Teacher Load + Class Schedule — BUILT (foundation), narrower than the full chain
 
-Nothing exists today (`class_records` only links one section+subject+
-grading-period; no schedule, load, or assignment-generation concept).
+**Built** (2026-08-25, see
+`docs/adr/0039-teacher-load-class-schedule-foundation.md`):
+`teaching_assignments` (who teaches what, school-year-long) and
+`schedule_meetings` (when/where, local wall-clock time, with teacher/
+section/room conflict detection) exist as real, tested tables and
+repository functions; `TeacherLoad` (assignment count, distinct-subject/
+preparation count, weekly instructional minutes — confirmed via RA 4670/
+DepEd Order No. 005, s. 2024 to be the right kind of metric) is derived,
+never stored. Authorization: `Capability::ManageTeachingAssignments`
+(School Head only) plus a self-or-School-Head view rule. No UI.
+
+**Not yet built**: the full chain below (personnel/qualifications/
+position/designation, advisory/ancillary duties — deliberately excluded,
+DepEd itself classifies advisory as non-instructional — availability/
+constraints, a schedule generator, SF7 export, "My Day" integration).
+`class_records` was deliberately not linked to `teaching_assignments`
+this milestone (different lifecycles — see the ADR); a future milestone
+may derive one from the other without a schema change.
+
+Nothing existed before this milestone (`class_records` only linked one
+section+subject+grading-period; no schedule, load, or assignment
+concept, and no teacher/owner column on `class_records` at all).
 **Decision**: Teacher Load is a foundational school-organization record,
 not merely an SF7 field. Chain: school structure + grade levels +
 sections + curriculum + subjects + time allotments + personnel +

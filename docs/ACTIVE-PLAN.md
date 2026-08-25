@@ -1,5 +1,45 @@
 # ACTIVE PLAN
 
+## Teacher Load / Class Schedule Foundation (added 2026-08-25) — complete, read this section first
+
+**Complete.** Full decision record:
+`docs/adr/0039-teacher-load-class-schedule-foundation.md`. Verification
+record:
+
+- `npm run quality` — PASS, 390/390, unaffected (Rust-only change).
+- `npx knip` — PASS, same pre-existing findings, zero new.
+- `npm run check:dev-preview-isolation` — PASS.
+- `git diff --check` — PASS, no whitespace errors.
+- `cargo check --lib` — **BLOCKED**, reconfirmed once (not repeatedly
+  retried, per instruction): fails at the pre-existing `windows-future`
+  dependency-compile stage before this crate's own new source is even
+  type-checked — zero compiler signal exists on this milestone's Rust,
+  not even partial.
+- Independent `security-reviewer` — dispatched for an adversarial pass;
+  outcome recorded in `docs/VERIFICATION-DEBT.md`.
+- Codex — `codex login status` checked once (still "Not logged in," no
+  change from last session); not re-probed against the network beyond
+  that, per explicit instruction not to repeatedly chase a known
+  environmental condition. Remains PILOT.
+
+**Two real bugs caught by this session's own TDD/adversarial self-review
+before any independent review ran**: a School Head-role-only check in
+`authorize_view_teacher_load` would have let a School Head "view" a
+teacher belonging to a different school entirely (fixed: added a
+same-school membership check on the target); `schedule_meeting::create`
+used `INSERT OR IGNORE` with no Rust-side weekday validation, the same
+class of bug as RBAC's `role::grant` mistake (fixed: explicit validation
+plus `ON CONFLICT ... DO NOTHING`). Both fixed and test-pinned before
+this checkpoint, not left as debt.
+
+**Explicit non-goals honored**: no timetable optimizer/solver; no
+advisory/ancillary/personnel/qualifications tracking; no availability
+constraints; no relief/substitute suggestion; no SF7 export; no "My
+Day" integration; no UI; no automatic overload enforcement (metric
+only); no link from `class_records` to `teaching_assignments`; no
+Curriculum Versioning, Learner Core/SF1, cloud sync, or official-form
+work.
+
 ## Codex Delegation Harness (added 2026-08-25) — complete, read this section first
 
 **Complete, harness-only, PILOT classification.** Full record:

@@ -1,5 +1,67 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Teacher Load / Class Schedule Foundation, complete)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`.
+
+**Repository truth confirmed before designing anything**: `class_records`
+has no teacher/owner column at all; no `teachers` table, schedule, or
+assignment concept existed anywhere. "Teacher" is fully represented by
+the existing `users` + `user_school_memberships` + `user_school_roles`.
+
+**Domain model**: three distinct concepts, two new tables, load always
+derived. `teaching_assignments` (who teaches what, school-year-long,
+`UNIQUE(section_id, subject_id)`, no `school_year` column of its own —
+derived via `section_id`, same single-source-of-truth pattern as
+`class_records`). `schedule_meetings` (when/where, one row per weekly
+slot, local wall-clock `HH:MM` text, not UTC). `TeacherLoad` is always
+computed fresh (assignment count, distinct-subject/preparation count,
+weekly instructional minutes) — no stored running total. Deliberately
+**not** linked to `class_records` this milestone (different lifecycle:
+term-scoped vs. year-long; a real FK would force retrofitting an
+already-stable four-ADR-deep table for a benefit nothing yet needs).
+Advisory/ancillary duties explicitly excluded — DepEd Order No. 005,
+s. 2024 itself classifies advisory as non-instructional.
+
+**Authorization**: new `Capability::ManageTeachingAssignments` (School
+Head only, deliberately not reusing `ManageSchoolMembership`). New
+`auth::authorize_view_teacher_load` (self, or School Head viewing within
+their own school). **A real cross-school leak was caught and fixed
+during this function's own TDD pass**: the first draft authorized a
+School Head to view any `target_teacher_user_id` based on their own
+role alone, without checking the target actually belongs to the
+caller's school — fixed by adding an explicit `is_member_of_school`
+check before the fix was ever committed, not discovered later.
+
+**A second real bug was caught by adversarial self-review before
+dispatching the independent reviewer**: `schedule_meeting::create` used
+`INSERT OR IGNORE` for its final insert with no Rust-side weekday
+validation — the exact `INSERT OR IGNORE`-swallows-a-`CHECK`-violation
+mistake this project already documented as a lesson after the RBAC
+milestone's `role::grant` bug. Fixed: explicit weekday-range validation
+in Rust, `INSERT ... ON CONFLICT (...) DO NOTHING` instead of `OR
+IGNORE`. A regression test pins the fix.
+
+**No UI this milestone** — the vertical slice ("School Head assigns a
+teacher, sees it reflected in load") is proven at the repository/command
+layer with tests, the same zero-UI proof shape RBAC and Curriculum
+Foundation both already used.
+
+**Verification**: `npm run quality` 390/390, `check:dev-preview-isolation`,
+`knip`, `git diff --check` all clean (Rust-only change). `cargo check
+--lib` reconfirmed **BLOCKED** — fails at the pre-existing
+`windows-future` dependency-compile stage, before this crate's own
+source is even type-checked, so there is literally zero compiler signal
+on this new code, not even partial. Independent `security-reviewer`
+dispatched for an adversarial pass; outcome recorded in
+`docs/VERIFICATION-DEBT.md`. Codex remains PILOT — not re-probed beyond
+one login-status check (unchanged: not logged in), per explicit
+instruction not to repeatedly probe a known condition.
+
+**Per explicit instruction: do not begin the next milestone
+automatically.** See this session's final report for the gate decision
+and recommended next milestone.
+
 ## Active Task (2026-08-25, this session — RBAC Authorization Corrective Gate, complete)
 
 **Reported `add_user_to_school` gap: CONFIRMED and fixed.** Full record:

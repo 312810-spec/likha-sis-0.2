@@ -1066,6 +1066,39 @@ Durable facts:
   ADR-0036 already specified (a capability-oriented gate), not a new
   architectural decision.
 
+## Teacher Load / Class Schedule Foundation (added 2026-08-25)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`.
+Durable facts:
+
+- Three concepts, two new tables: `teaching_assignments` (who teaches
+  what, school-year-long) and `schedule_meetings` (when/where, local
+  `HH:MM` wall-clock text). `TeacherLoad` (assignment count, distinct-
+  subject/preparation count, weekly instructional minutes) is always
+  derived, never a stored total.
+- Deliberately **not** linked to `class_records` — different lifecycles
+  (term-scoped vs. year-long); `class_records` still has no teacher
+  column at all, confirmed before designing anything.
+- Advisory/ancillary duties are out of scope by DepEd's own
+  classification (DO 005, s. 2024: class-advising is ancillary, not
+  instructional load) — do not fold them into `teaching_assignments`
+  later without re-checking that classification.
+- New `Capability::ManageTeachingAssignments` (School Head only) and
+  `auth::authorize_view_teacher_load` (self, or School Head within their
+  own school).
+- **Two real bugs were caught and fixed by this session's own TDD/
+  adversarial-self-review before any independent review ran**: (1) a
+  School Head's role alone was originally enough to "authorize" viewing
+  a teacher from a _different_ school — fixed by checking
+  `is_member_of_school` on the target too. (2) `schedule_meeting::create`
+  used `INSERT OR IGNORE` with no Rust-side weekday validation — the
+  same class of bug as RBAC's `role::grant` mistake — fixed with
+  explicit validation plus `ON CONFLICT ... DO NOTHING`. Both are strong
+  evidence the TDD-first/self-review discipline this project follows is
+  catching real defects before they ship, not just theater.
+- No UI this milestone — proven at repository/command layer only, same
+  zero-UI shape as RBAC and Curriculum Foundation.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

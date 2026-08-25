@@ -39,9 +39,20 @@ default)` lookup — never re-reads "whichever is default today" for an
 - Never use `INSERT OR IGNORE` to make a grant/insert idempotent when a
   `CHECK`/`UNIQUE` violation on that same statement should still error —
   `OR IGNORE` silently swallows _any_ constraint violation, not just the
-  intended conflict (a real bug, caught by review in
-  `repository::role::grant()`). Use `INSERT ... ON CONFLICT (columns) DO
-NOTHING` instead — it only suppresses the named conflict target.
+  intended conflict. Use `INSERT ... ON CONFLICT (columns) DO NOTHING`
+  instead — it only suppresses the named conflict target. **This exact
+  mistake has been made and caught twice**: `repository::role::grant()`
+  (RBAC milestone, caught by independent review) and
+  `repository::schedule_meeting::create()` (Teacher Load milestone,
+  caught by this project's own TDD/adversarial-self-review before any
+  review even ran — a missing Rust-side weekday-range check meant the
+  schema's own `CHECK (weekday BETWEEN 0 AND 6)` was the only
+  guard, and `OR IGNORE` would have silently reported a bogus
+  "duplicate" instead of the real out-of-range error). If you write
+  `INSERT OR IGNORE` (or catch one in review), stop and ask: does this
+  table have _any_ `CHECK` or FK besides the one conflict this is
+  supposed to catch? If yes, either validate every one of those in Rust
+  first, or use `ON CONFLICT` targeting the exact conflict intended.
 
 Any schema or key-handling change touching this area needs an independent
 security/reliability review before being marked complete — see the

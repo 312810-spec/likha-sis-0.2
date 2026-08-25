@@ -1,5 +1,76 @@
 # Verification Debt
 
+## Teacher Load / Class Schedule Foundation: Rust unverified by compiler, `security-reviewer` retrieval failure, two self-caught bugs (2026-08-25)
+
+`cargo check --lib` was attempted once against this milestone's new
+code (migration 18, `repository::teaching_assignment`,
+`repository::schedule_meeting`, `auth::Capability::ManageTeachingAssignments`/
+`authorize_view_teacher_load`, `commands::teaching_assignment`) and
+failed identically to every prior reproduction — `windows-future`
+0.3.2 vs. `windows-core` 0.62.2, unchanged root cause. Per this
+milestone's own instruction, not retried further. Notably, this failure
+occurs while compiling a transitive dependency, **before this crate's
+own source is type-checked at all** — meaning there is zero compiler
+signal on this milestone's new Rust, not even partial. All of it is
+written and manually reviewed, not compiler-verified.
+
+`security-reviewer` was dispatched for an adversarial pass on the new
+authorization (`authorize_view_teacher_load`) and data-integrity logic
+(conflict detection, `INSERT OR IGNORE` review). It completed real work
+(19 tool uses, ~80K tokens across two attempts) but returned no
+retrievable findings text on the initial attempt or one retry — the
+same recurring agent-resume/retrieval failure documented since M7, now
+hit for the fourth time this session alone (Curriculum Foundation's
+`architecture-reviewer`, RBAC's and this milestone's `security-reviewer`).
+Per the established protocol, a rigorous self-review was substituted.
+
+**Two real, non-theoretical bugs were caught and fixed during this
+milestone's own TDD/self-review, before the (failed) independent review
+was even dispatched**:
+
+1. `authorize_view_teacher_load`'s first draft authorized a School Head
+   to view any `target_teacher_user_id` based solely on holding the
+   `ManageTeachingAssignments` role in their own school — never checking
+   that the _target_ teacher actually belongs to that school. Caught by
+   the test `authorize_view_teacher_load_denies_a_school_head_from_a_different_school`
+   before it was ever committed. Fixed by adding
+   `user_repo::is_member_of_school(conn, target_teacher_user_id, &school_id)?`
+   to the check.
+2. `schedule_meeting::create`'s first draft used `INSERT OR IGNORE` for
+   its final insert with no Rust-side `weekday` range validation — the
+   same class of bug as the RBAC milestone's `role::grant()` mistake,
+   which this project's own `local-database` skill already documented
+   as a lesson. An out-of-range `weekday` would have silently reported
+   `CreateMeetingOutcome::Duplicate` instead of the real error, since
+   `OR IGNORE` swallows any constraint violation on the statement, not
+   just the intended `UNIQUE` conflict. Fixed: explicit `(0..=6)` range
+   check in Rust, `INSERT ... ON CONFLICT (...) DO NOTHING` instead of
+   `OR IGNORE`. A third, related gap found in the same self-review pass
+   (a time missing its leading zero, e.g. "8:00", would pass numeric
+   parsing but fail the schema's `GLOB` shape check, surfacing as a raw
+   database error instead of a clean `InvalidTime` outcome) was also
+   fixed, with a regression test for each.
+
+Self-review beyond the two fixes above also traced: tenant isolation
+(`school_id` is session-derived only throughout; `section_id`/
+`subject_id`/`teacher_user_id` are validated against it before any
+write); conflict-detection SQL correctness (the half-open-interval
+overlap condition and lexicographic "HH:MM" string comparison were
+verified correct by hand, including the adjacent-non-overlapping edge
+case); absence of a TOCTOU window (every command holds one
+`Mutex<Connection>` guard for its full duration, serializing all
+DB-touching commands globally, the same guarantee every other command
+in this codebase already relies on); derived-load correctness (no
+stored total exists anywhere in the schema); and command-layer
+architecture (every `commands::teaching_assignment` handler is a thin
+lock+authorize+single-repository-call wrapper, no business logic in the
+Tauri layer).
+
+**No further blocking findings.** Real, non-self independent-review
+debt remains open for this milestone — re-run `security-reviewer` once
+agent-resume behavior is confirmed reliably working in a future
+session.
+
 ## RBAC Authorization Corrective Gate: `security-reviewer` retrieval failure, self-review substituted (2026-08-25)
 
 `security-reviewer` was dispatched for an adversarial pass on the

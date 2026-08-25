@@ -896,6 +896,64 @@ pub fn migrations() -> Migrations<'static> {
             ('00000000-0000-7000-8000-000000005208', '00000000-0000-7000-8000-000000005002', 'MAPEH');
         "#,
         ),
+        M::up(
+            r#"
+        -- Teacher Load / Class Schedule Foundation. See
+        -- docs/adr/0039-teacher-load-class-schedule-foundation.md.
+        --
+        -- Two separate concepts, deliberately not merged and deliberately
+        -- not linked to `class_records`:
+        --   1. `teaching_assignments` -- WHO teaches WHAT, for a whole
+        --      school year. Stores no `school_year` of its own -- derived
+        --      from `sections.school_year` via `section_id`, the same
+        --      single-source-of-truth reasoning migration 7 already
+        --      established for `class_records`. UNIQUE (section_id,
+        --      subject_id): at most one teacher per section+subject at a
+        --      time -- a reassignment is an explicit remove-then-create,
+        --      never a silent overwrite.
+        --   2. `schedule_meetings` -- WHEN/WHERE an assignment occurs, one
+        --      row per recurring weekly slot. `starts_at`/`ends_at` are
+        --      local wall-clock "HH:MM" text, not UTC timestamps -- the
+        --      Philippines is a single timezone and a recurring Monday
+        --      8am class is a standing local-clock rule, not a moment in
+        --      time. The GLOB checks are shape-only defense in depth;
+        --      full semantic validation (real hour/minute ranges, start
+        --      before end as parsed minutes) happens in
+        --      `repository::schedule_meeting`, not relied on here alone.
+        -- Advisory/ancillary duties are deliberately not modeled --
+        -- DepEd Order No. 005, s. 2024 itself classifies class-advising as
+        -- an ancillary task, separate from the 6-hour classroom-teaching
+        -- load this foundation measures.
+        CREATE TABLE teaching_assignments (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            subject_id TEXT NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (section_id, subject_id)
+        );
+
+        CREATE INDEX idx_teaching_assignments_school_id ON teaching_assignments(school_id);
+        CREATE INDEX idx_teaching_assignments_teacher_id ON teaching_assignments(teacher_user_id);
+
+        CREATE TABLE schedule_meetings (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+            starts_at TEXT NOT NULL CHECK (starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            ends_at TEXT NOT NULL CHECK (ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            room TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            CHECK (starts_at < ends_at),
+            UNIQUE (teaching_assignment_id, weekday, starts_at, ends_at)
+        );
+
+        CREATE INDEX idx_schedule_meetings_school_id ON schedule_meetings(school_id);
+        CREATE INDEX idx_schedule_meetings_assignment_id ON schedule_meetings(teaching_assignment_id);
+        "#,
+        ),
     ])
 }
 
@@ -2186,5 +2244,229 @@ mod tests {
         );
 
         assert!(result.is_err(), "a class record must not pin a curriculum version that doesn't exist");
+    }
+
+    // ---- Teacher Load / Class Schedule Foundation ----
+
+    fn seed_school_teacher_section_subject(conn: &Connection) {
+        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('t1', 'teacher.a', 'hash', 'Teacher A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_memberships (user_id, school_id) VALUES ('t1', 's1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2026-2027', '7', 'Mabini')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_18_creates_a_teaching_assignment() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM teaching_assignments", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn migration_18_rejects_an_assignment_for_an_unknown_teacher() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 'does-not-exist', 'sec1', 'sub1')",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_18_rejects_a_second_teacher_for_the_same_section_and_subject() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('t2', 'teacher.b', 'hash', 'Teacher B')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_memberships (user_id, school_id) VALUES ('t2', 's1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta2', 's1', 't2', 'sec1', 'sub1')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "at most one teacher may be assigned to a given section+subject at a time"
+        );
+    }
+
+    #[test]
+    fn migration_18_creates_a_schedule_meeting_and_cascades_when_the_assignment_is_deleted() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm1', 's1', 'ta1', 0, '08:00', '08:50')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute("DELETE FROM teaching_assignments WHERE id = 'ta1'", [])
+            .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM schedule_meetings", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "a meeting must not outlive the assignment it depends on");
+    }
+
+    #[test]
+    fn migration_18_rejects_a_weekday_outside_0_to_6() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm1', 's1', 'ta1', 7, '08:00', '08:50')",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_18_rejects_an_end_time_that_does_not_come_after_the_start_time() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm1', 's1', 'ta1', 0, '09:00', '08:50')",
+            [],
+        );
+
+        assert!(result.is_err(), "end time must come after start time");
+    }
+
+    #[test]
+    fn migration_18_rejects_a_malformed_time_string() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm1', 's1', 'ta1', 0, '8am', '9am')",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_18_rejects_a_duplicate_meeting() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_teacher_section_subject(&conn);
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm1', 's1', 'ta1', 0, '08:00', '08:50')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO schedule_meetings (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm2', 's1', 'ta1', 0, '08:00', '08:50')",
+            [],
+        );
+
+        assert!(result.is_err(), "the exact same meeting must not be insertable twice");
     }
 }
