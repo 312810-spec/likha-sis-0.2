@@ -2,18 +2,37 @@
 
 ## Active Task (2026-08-25, this session)
 
-**UX-03 — Daily Attendance + Monthly Attendance Summary Polish — ◐ In
-Progress.** Baseline SHA `f02bce5`. Full checklist in
+**UX-03 — Daily Attendance + Monthly Attendance Summary Polish —
+complete.** Baseline SHA `f02bce5`, start checkpoint `c0124f0`, feature
+commit `d77089f` (exact final synchronized head recorded once pushed —
+see the completion-checkpoint note below). Full checklist in
 `docs/ACTIVE-PLAN.md`'s "UX-03" section; decisions in
-`docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`. Fixing
+`docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`. Fixed
 three confirmed correctness defects found by direct code inspection
 before implementation (stale context after a failed section/date/month
-change; overlapping same-learner writes with no ordering guard;
-"Mark all present" not serialized against concurrent individual
-writes), then the hierarchy/keyboard/mobile/legend/transition polish
-work the milestone brief specifies. Working on branch
+change; overlapping same-learner writes with no ordering guard; "Mark
+all present" not serialized against concurrent individual writes),
+then the hierarchy/keyboard/mobile/legend/transition polish work the
+milestone brief specified, then a self-review-found fix (the "Mark all
+present preserves existing marks" reassurance is now visible in every
+teacher mode, not just Guided). `npm run quality` 365/365,
+`npm run build` clean, `check:dev-preview-isolation` clean, `npx knip`
+4 findings (down from 5, zero new). Browser-rendered visual
+verification performed via Playwright against the dev-preview fixture
+(this remote session has Chromium pre-installed) at three viewports,
+light/dark, and all three teacher modes, across loading/empty/success/
+write-in-progress/bulk/failure/retry/mobile-ledger states — native
+Windows/WebView2 verification remains a disclosed, separate gap.
+`teacher-ux-reviewer`/`accessibility-reviewer` were dispatched in
+parallel and both hit the same recurring agent-resume/retrieval failure
+documented since M7 on both the initial attempt and one permitted retry
+each; a rigorous self-review was substituted (found and fixed the one
+real gap above) — real independent-review debt remains open, recorded
+in `docs/VERIFICATION-DEBT.md`. Worked on branch
 `claude/likha-sis-ux03-plan-plv80c` per this session's harness
-assignment, not `origin/main` directly.
+assignment, not `origin/main` directly. **Next queued milestone:
+UX-04 — Class Records, Assessments, Score Entry, Grade Output** (not
+started — per explicit instruction, do not begin it automatically).
 
 **Naming note**: verified this session (grep across the whole repo,
 case-insensitive) that no "LIKHA-SIS 2.0"/"LIKHA SIS 2.0" naming errors

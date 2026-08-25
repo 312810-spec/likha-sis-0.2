@@ -1,8 +1,6 @@
 # ADR-0033 — Daily Attendance + Monthly Attendance Summary Polish (UX-03)
 
-Status: Proposed (in progress — this ADR is filled in as the milestone
-proceeds, per this project's convention of recording decisions as they
-are made rather than backfilling at the end)
+Status: Accepted
 
 ## Context
 
@@ -231,6 +229,46 @@ the root cause predates UX-03.
 
 ### 9. Independent review
 
-(Recorded once the dispatched `teacher-ux-reviewer`/`accessibility-reviewer`
-findings return — see the "Independent review" section of the
-completion report and `docs/VERIFICATION-DEBT.md` for the outcome.)
+`teacher-ux-reviewer` and `accessibility-reviewer` were dispatched in
+parallel against this milestone's actual diff. Both did real work
+(teacher-ux: 31 tool calls, ~71k then ~77k tokens across two attempts;
+accessibility: 21 tool calls, ~110k then ~120k tokens across two
+attempts), but neither returned retrievable findings text — the same
+recurring agent-resume/retrieval failure documented since M7 (see
+`docs/CURRENT-HANDOFF.md`'s repeated notes on this). Per this project's
+established escalation rule, each was resumed once (asked directly to
+restate its findings); both resumes also returned no retrievable
+findings. Per the rule, they were not retried a third time.
+
+A rigorous self-review was performed instead, covering the exact
+questions each reviewer was asked. It found and fixed **one real,
+should-fix teacher-UX gap**: "Mark all present"'s "never overwrites an
+existing mark" reassurance previously only appeared in Guided mode's
+extra explanatory paragraph — a Comfortable- or Efficient-mode teacher
+had no such reassurance until _after_ clicking (the post-action
+confirmation banner). Since the milestone brief requires this
+communicated clearly regardless of mode, a persistent, non-mode-gated
+one-line hint ("Only fills in learners with no mark yet — never changes
+a mark you've already made.") was added beneath the button, with a
+dedicated regression test (`AttendanceScreen.test.tsx`, "communicates
+that Mark all present preserves existing marks in every teacher mode").
+
+The rest of the self-review found no blocking issues: context clarity
+(heading-focus-on-mount, section/date always visible), the count
+readout and "Not marked"/pressed-button non-color cues, per-row
+saving/failure+retry feedback, the P/A/T/Arrow keyboard scoping (bound
+directly to each status button, structurally unable to fire in the
+section/date form controls — also test-covered), full mode parity,
+the Monthly Summary legend's accuracy against `src/domain/attendance.ts`'s
+actual `AttendanceStatus | null` model, the new `aria-label` on every
+day cell (marked and unrecorded), the mobile ledger's 44px targets and
+preserved table semantics (`<thead>` visually hidden via the
+established clip-based technique, not `display:none`), and the sticky
+Monthly Summary header/column's contrast in both themes (confirmed via
+the real screenshots already captured — see the completion report).
+
+**Independent-review debt remains open** for this milestone specifically
+(recorded in `docs/VERIFICATION-DEBT.md`) — the self-review is not a
+substitute for a real second set of eyes. Retry both reviewers in a
+future session once there's reason to believe the harness's agent-
+resume behavior is fixed.

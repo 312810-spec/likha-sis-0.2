@@ -718,6 +718,41 @@ it rather than assuming the premise is current — a prompt can be
 several commits stale relative to work this same session already did.
 Full milestone record: `docs/adr/0032-teacher-workspace-polish.md`.
 
+## UX-03: Daily Attendance + Monthly Attendance Summary Polish (added 2026-08-25)
+
+Fourth UI-First Program milestone (ADR-0033), baseline `f02bce5`. Three
+correctness defects were found by direct code inspection during
+planning (before implementation began) and confirmed as real,
+reproducible bugs with failing regression tests before being fixed:
+(1) both `AttendanceScreen` and `MonthlySummaryScreen` could render a
+previous section/date/month's roster or report as if it belonged to a
+newly-selected context, if the new load failed — fixed by clearing the
+stale state on every context change and guarding every in-flight
+request with a request-identity ref; (2) `AttendanceScreen`'s shared
+`savingLearnerId` string let an older write's response overwrite a
+newer one's result for the same learner — fixed with a per-learner
+write-generation counter; (3) "Mark all present" didn't serialize
+against concurrent individual writes — fixed by disabling individual
+status buttons only while the bulk operation itself is in flight (a
+teacher-understandable rule), while leaving individual-write-vs-
+individual-write concurrency to the generation mechanism instead of
+disabling (per the milestone's own instruction not to slow ordinary
+entry). A real, pre-existing document-level horizontal-overflow bug
+(a `<select>`'s long option text not shrinking below its intrinsic
+width in a flex row) was also found during browser-rendered visual
+verification and fixed (`.form-row .field { min-width: 0 }` +
+`select { max-width: 100% }`) — confirmed via `git stash` to predate
+this milestone, not introduced by it.
+
+Both `teacher-ux-reviewer` and `accessibility-reviewer` hit the
+recurring agent-resume/retrieval failure (documented since M7) on both
+their initial dispatch and one permitted retry each; a rigorous
+self-review substituted, found and fixed one real gap ("Mark all
+present preserves existing marks" was Guided-mode-only, now shown in
+every teacher mode) — independent-review debt remains open, recorded
+in `docs/VERIFICATION-DEBT.md`. Full detail:
+`docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`.
+
 ## Post-UX-08 Direction: Forms, UI, and Interaction Deepening Program (added 2026-08-25)
 
 Durable user-directed future sequencing, recorded ahead of when it

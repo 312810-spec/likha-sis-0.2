@@ -376,6 +376,9 @@ export function AttendanceScreen({
                 {bulkMarking ? "Marking…" : "Mark all present"}
               </button>
               <p className="field-hint">
+                Only fills in learners with no mark yet — never changes a mark you've already made.
+              </p>
+              <p className="field-hint">
                 Keyboard: P Present · A Absent · T Tardy · ↑/↓ move between learners (while focus is
                 on a status button).
               </p>

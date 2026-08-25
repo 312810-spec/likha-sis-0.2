@@ -342,6 +342,17 @@ describe("AttendanceScreen", () => {
     expect(screen.queryByText(/mark each learner present/i)).not.toBeInTheDocument();
   });
 
+  it("communicates that Mark all present preserves existing marks in every teacher mode", async () => {
+    renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    // Not mode-gated: this reassurance must be visible in Comfortable
+    // (the default) too, not only in Guided mode's extra explanatory copy.
+    expect(screen.getByText(/never changes a mark you've already made/i)).toBeInTheDocument();
+  });
+
   it("never shows a previous section's roster after switching to a section whose load fails", async () => {
     const user = userEvent.setup();
     const repo = new PerSectionAttendanceRepository({

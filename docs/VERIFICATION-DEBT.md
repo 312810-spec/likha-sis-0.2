@@ -1,5 +1,25 @@
 # Verification Debt
 
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+
+Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
+against UX-03's `AttendanceScreen`/`MonthlySummaryScreen` changes
+(2026-08-25) and hit the same recurring agent-resume/retrieval failure
+documented since M7 (see `docs/adr/0027-audit-timestamp-readability-fix.md`,
+UX-02's identical entry below): each did real work (teacher-ux: 31 tool
+calls across two attempts; accessibility: 21 tool calls across two
+attempts) but returned no retrievable findings text, on both the
+initial dispatch and one permitted retry. A rigorous self-review was
+substituted (recorded in `docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`'s
+"Independent review" section) and found and fixed one real teacher-UX
+gap (the "Mark all present preserves existing marks" reassurance was
+Guided-mode-only; now shown in every mode) — so this did not block
+completing UX-03, but the owed independent reviews themselves are still
+open debt. Retry both in a future session once there's reason to
+believe the agent-resume harness issue is fixed; remove this entry once
+real (non-self) reviews actually complete and their findings are
+recorded.
+
 Things that are believed correct but not yet verified by the specific
 means listed — because this environment/session lacked the tool, device,
 or hardware. This is **not** a bug backlog; move an item here only when

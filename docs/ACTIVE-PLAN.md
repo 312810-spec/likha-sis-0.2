@@ -384,38 +384,44 @@ Affected: `src/ui/AttendanceScreen.tsx` (+ test), `src/ui/MonthlySummaryScreen.t
       `App.tsx`, shared components, `src/dev-preview/`, application
       services/domain types for attendance/section/export, `styles.css`,
       `package.json`, architecture/dev-preview-isolation scripts.
-- [ ] Push the UX-03 start checkpoint.
-- [ ] TDD: stale-context-after-failed-load fix (Attendance and Monthly
+- [x] Push the UX-03 start checkpoint (`c0124f0`).
+- [x] TDD: stale-context-after-failed-load fix (Attendance and Monthly
       Summary), with the Section-A/Section-B regression test named in
       this milestone's directing requirements.
-- [ ] TDD: overlapping-learner-writes fix (per-row generation/sequencing
+- [x] TDD: overlapping-learner-writes fix (per-row generation/sequencing
       guard; skip a write when re-selecting the already-active status).
-- [ ] TDD: bulk-vs-individual write serialization, with an explicit,
+- [x] TDD: bulk-vs-individual write serialization, with an explicit,
       teacher-understandable rule, tested.
-- [ ] Daily Attendance hierarchy/count-readout/non-color-cue/per-row-
+- [x] Daily Attendance hierarchy/count-readout/non-color-cue/per-row-
       state/keyboard-shortcut work.
-- [ ] Mobile attendance ledger layout at ~390px.
-- [ ] Monthly Summary legend/retry/narrow-layout-comparison work
+- [x] Mobile attendance ledger layout at ~390px.
+- [x] Monthly Summary legend/retry/narrow-layout-comparison work
       (comparison recorded in ADR-0033).
-- [ ] Attendance → Monthly Summary context-preserving transition.
-- [ ] Wire `src/dev-preview/` (screen, transition, fixture upgrades);
+- [x] Attendance → Monthly Summary context-preserving transition.
+- [x] Wire `src/dev-preview/` (screen, transition, fixture upgrades);
       confirm isolation checks still pass.
-- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
-      `npm run check:dev-preview-isolation`, `npx knip`,
-      `npm run quality:security`, `git diff --check`, `git status --short`.
-- [ ] Browser-rendered visual verification via the dev-preview fixture
+- [x] `npm run quality` (365/365), `npm run build`, `npm run check:architecture`,
+      `npm run check:dev-preview-isolation`, `npx knip` (4 findings, down
+      from 5 pre-existing — zero new), `npm run quality:security`
+      (tools unavailable on this machine, honestly disclosed), `git diff
+--check`, `git status --short`.
+- [x] Browser-rendered visual verification via the dev-preview fixture
       at 1366×768/1024×768/390×844, light/dark, 3 modes, required states
-      (loading/empty/success/write-in-progress/write-failure/load-
-      failure-retry/mobile); disclose native Windows/WebView2
-      verification remains unavailable.
-- [ ] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`),
-      one-retry-then-self-review fallback if needed; fix blocking
-      findings.
-- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
-      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0033
-      (`docs/PROJECT-MEMORY.md`/`docs/SOURCE-REGISTRY.md` only if a
-      genuinely durable fact/dependency changed).
-- [ ] Push the UX-03 completion checkpoint; verify remote sync.
+      (loading/empty/success/write-in-progress/bulk/failure/retry/
+      mobile-ledger); native Windows/WebView2 verification remains
+      unavailable (disclosed, not claimed).
+- [x] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`)
+      dispatched, both hit the recurring agent-resume/retrieval failure
+      on both the initial attempt and one permitted retry each; rigorous
+      self-review substituted, found and fixed one real teacher-UX gap
+      (see ADR-0033 §9); independent-review debt recorded as open in
+      `docs/VERIFICATION-DEBT.md`.
+- [x] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0033.
+      (`docs/PROJECT-MEMORY.md` updated with the durable summary;
+      `docs/SOURCE-REGISTRY.md` untouched — no new dependency this
+      milestone.)
+- [x] Push the UX-03 completion checkpoint; verify remote sync.
 
 ### UX-04 through UX-08 — Queued
 
