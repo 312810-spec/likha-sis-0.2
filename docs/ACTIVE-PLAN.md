@@ -314,7 +314,110 @@ concrete Tauri adapters).
       no durable-fact or dependency change this milestone, left as is.)
 - [x] Push the UX-02 completion checkpoint; verify remote sync.
 
-### UX-03 through UX-08 — Queued
+### UX-03 — Daily Attendance + Monthly Attendance Summary Polish
+
+Teacher outcome: a teacher can confirm the selected section/date (or
+section/month) at a glance, see how many learners are marked and how
+many remain, use the safe "assume Present, flag exceptions" bulk
+workflow with confidence it never overwrites an existing mark, mark or
+correct Present/Absent/Tardy quickly with clear per-row save feedback
+and a keyboard-efficient workflow, recover cleanly from a load or save
+failure without ever seeing stale data from a different section/date/
+month presented as current, move from Attendance into Monthly Summary
+with the same section/month already selected, and read the monthly grid
+without guessing what a letter or a blank cell means.
+
+Baseline SHA: `f02bce5` (account-transition checkpoint, one commit after
+UX-02's own completion `14e7e5d` — no code changed in between).
+
+Scope:
+
+- Fix three confirmed correctness defects (found by direct code
+  inspection during planning, not merely hypothesized): (1) a failed
+  section/date/month change can leave the previous context's roster or
+  monthly report rendered underneath the new error, since neither
+  screen clears stale data before a new request settles; (2) two writes
+  for the same learner can resolve out of order with no guard, so an
+  older response can overwrite a newer one, and re-selecting the
+  already-active status performs a redundant write; (3) "Mark all
+  present" does not serialize against concurrent individual writes on
+  the same roster. Each gets a failing regression test first (TDD),
+  matching this project's testing rule for anything touching saved
+  state.
+- Reorder `AttendanceScreen` into section/date → completion state +
+  bulk action → roster; add an "X of Y marked · Z remaining" text
+  readout (not color-only); a non-color cue for the selected status;
+  per-row saving/saved/failed states with a retry path; P/A/T/Up/Down
+  keyboard shortcuts scoped strictly to roster focus; a mobile ledger
+  layout at ~390px instead of a shrunk table.
+- Add a P/A/T/— legend to `MonthlySummaryScreen` (wording matching this
+  app's actual domain semantics — no invented distinction the data
+  model doesn't support), a retry action on load failure, and a
+  compared, recorded narrow-layout decision for the monthly grid.
+- A narrowly-typed callback/state handoff (mirroring ADR-0032's
+  section-preselection pattern) so opening Monthly Summary from
+  Attendance preserves the current section and year/month — no router,
+  no global state.
+- Extend `src/dev-preview/` to wire `MonthlySummaryScreen` and the new
+  transition, upgrading `FixtureAttendanceRepository`'s `record()`/
+  `bulkMarkPresent()`/`monthlySummary()` (currently unwired, throwing)
+  and adding a `FixtureExportRepository`, without weakening any existing
+  isolation guarantee.
+
+Non-goals: no schema/Rust/attendance-rule/export-format change unless a
+verified correctness defect makes one unavoidable (none found); no
+change to Present/Absent/Tardy as the only statuses; no router/global-
+state package; no cloud/provider dependency; no new generic UI kit/icon/
+animation dependency.
+
+Affected: `src/ui/AttendanceScreen.tsx` (+ test), `src/ui/MonthlySummaryScreen.tsx`
+(+ test), `src/App.tsx`, `src/dev-preview/DevPreviewApp.tsx`,
+`src/dev-preview/fixtures.ts`, `src/ui/theme/styles.css`.
+
+- [x] Reverify git state (fetch, branch, working tree, local/remote SHA)
+      before any doc/code change.
+- [x] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`, `docs/PROJECT-MEMORY.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/PROGRESS-MAP.md`,
+      `docs/VERIFICATION-DEBT.md`, `docs/SOURCE-REGISTRY.md`, ADR-0008,
+      ADR-0009, ADR-0018, ADR-0030, ADR-0031, ADR-0032.
+- [x] Inspect `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` (+ tests),
+      `App.tsx`, shared components, `src/dev-preview/`, application
+      services/domain types for attendance/section/export, `styles.css`,
+      `package.json`, architecture/dev-preview-isolation scripts.
+- [ ] Push the UX-03 start checkpoint.
+- [ ] TDD: stale-context-after-failed-load fix (Attendance and Monthly
+      Summary), with the Section-A/Section-B regression test named in
+      this milestone's directing requirements.
+- [ ] TDD: overlapping-learner-writes fix (per-row generation/sequencing
+      guard; skip a write when re-selecting the already-active status).
+- [ ] TDD: bulk-vs-individual write serialization, with an explicit,
+      teacher-understandable rule, tested.
+- [ ] Daily Attendance hierarchy/count-readout/non-color-cue/per-row-
+      state/keyboard-shortcut work.
+- [ ] Mobile attendance ledger layout at ~390px.
+- [ ] Monthly Summary legend/retry/narrow-layout-comparison work
+      (comparison recorded in ADR-0033).
+- [ ] Attendance → Monthly Summary context-preserving transition.
+- [ ] Wire `src/dev-preview/` (screen, transition, fixture upgrades);
+      confirm isolation checks still pass.
+- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
+      `npm run check:dev-preview-isolation`, `npx knip`,
+      `npm run quality:security`, `git diff --check`, `git status --short`.
+- [ ] Browser-rendered visual verification via the dev-preview fixture
+      at 1366×768/1024×768/390×844, light/dark, 3 modes, required states
+      (loading/empty/success/write-in-progress/write-failure/load-
+      failure-retry/mobile); disclose native Windows/WebView2
+      verification remains unavailable.
+- [ ] Independent review (`teacher-ux-reviewer`, `accessibility-reviewer`),
+      one-retry-then-self-review fallback if needed; fix blocking
+      findings.
+- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/VERIFICATION-DEBT.md`, ADR-0033
+      (`docs/PROJECT-MEMORY.md`/`docs/SOURCE-REGISTRY.md` only if a
+      genuinely durable fact/dependency changed).
+- [ ] Push the UX-03 completion checkpoint; verify remote sync.
+
+### UX-04 through UX-08 — Queued
 
 See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
 ordered list and dependencies. Each gets its own detailed checklist in

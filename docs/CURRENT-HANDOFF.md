@@ -1,5 +1,26 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session)
+
+**UX-03 — Daily Attendance + Monthly Attendance Summary Polish — ◐ In
+Progress.** Baseline SHA `f02bce5`. Full checklist in
+`docs/ACTIVE-PLAN.md`'s "UX-03" section; decisions in
+`docs/adr/0033-daily-attendance-and-monthly-summary-polish.md`. Fixing
+three confirmed correctness defects found by direct code inspection
+before implementation (stale context after a failed section/date/month
+change; overlapping same-learner writes with no ordering guard;
+"Mark all present" not serialized against concurrent individual
+writes), then the hierarchy/keyboard/mobile/legend/transition polish
+work the milestone brief specifies. Working on branch
+`claude/likha-sis-ux03-plan-plv80c` per this session's harness
+assignment, not `origin/main` directly.
+
+**Naming note**: verified this session (grep across the whole repo,
+case-insensitive) that no "LIKHA-SIS 2.0"/"LIKHA SIS 2.0" naming errors
+exist anywhere in the repository — the product has always been recorded
+correctly as **LIKHA-SIS 0.2** in every durable document. Nothing to
+correct.
+
 ## Account-Transition Note (2026-08-25)
 
 This session is at ~97% of its weekly usage limit and is handing off to
