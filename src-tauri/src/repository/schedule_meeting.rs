@@ -108,7 +108,7 @@ pub fn create(
     // itself, so the overlap check below would otherwise always report it
     // as a `TeacherConflict` and the `UNIQUE` constraint's own `Duplicate`
     // outcome could never actually be returned.
-    if has_exact_duplicate(conn, teaching_assignment_id, weekday, starts_at, ends_at)? {
+    if has_exact_duplicate(conn, school_id, teaching_assignment_id, weekday, starts_at, ends_at)? {
         return Ok(CreateMeetingOutcome::Duplicate);
     }
     if has_teacher_conflict(conn, school_id, &assignment.teacher_user_id, weekday, starts_at, ends_at)? {
@@ -153,6 +153,7 @@ pub fn create(
 
 fn has_exact_duplicate(
     conn: &Connection,
+    school_id: &str,
     teaching_assignment_id: &str,
     weekday: i64,
     starts_at: &str,
@@ -161,9 +162,9 @@ fn has_exact_duplicate(
     conn.query_row(
         "SELECT EXISTS(\
              SELECT 1 FROM schedule_meetings \
-             WHERE teaching_assignment_id = ?1 AND weekday = ?2 \
-               AND starts_at = ?3 AND ends_at = ?4)",
-        (teaching_assignment_id, weekday, starts_at, ends_at),
+             WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND weekday = ?3 \
+               AND starts_at = ?4 AND ends_at = ?5)",
+        (school_id, teaching_assignment_id, weekday, starts_at, ends_at),
         |row| row.get(0),
     )
     .map_err(Into::into)

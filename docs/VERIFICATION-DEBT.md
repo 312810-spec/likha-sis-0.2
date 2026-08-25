@@ -328,15 +328,44 @@ diff noise across every Rust file). Recommend a dedicated, low-risk
 follow-up: run `cargo fmt` once crate-wide in its own commit, then add
 `cargo fmt --check` to `quality:full` so it can't silently drift again.
 
-**Independent review status:** `security-reviewer` was dispatched for
-an adversarial pass on the crypto/key-store boundary change (`Cargo.toml`
-target-gating, `crypto/mod.rs`, `db/mod.rs`'s fail-closed non-Windows
-path) plus the three bug fixes above. [Outcome to be recorded once the
-review returns — see `docs/CURRENT-HANDOFF.md` for the live status; if
-it hits the same recurring agent-resume/retrieval failure documented
-elsewhere in this file, a rigorous self-review was already performed
-inline during the fix and this note will be updated accordingly rather
-than silently dropped.]
+**Independent review: COMPLETE, no recurring retrieval failure this
+time.** `security-reviewer` was dispatched for an adversarial pass on
+the crypto/key-store boundary change (`Cargo.toml` target-gating,
+`crypto/mod.rs`, `db/mod.rs`'s fail-closed non-Windows path) plus the
+three bug fixes above, and returned real, retrievable findings on the
+first attempt (16 tool uses, ~63K tokens) — breaking this session's
+recurring agent-resume/retrieval-failure streak (hit 4 times previously:
+Curriculum Foundation's `architecture-reviewer`, RBAC's and Teacher
+Load's `security-reviewer`).
+
+**Verdict: no blocking issues.** Confirmed independently (not merely
+re-asserted from this session's own claims): `dpapi.rs` has zero diff
+lines and the Windows `open_app_db` body is byte-identical to before —
+purely a compilation-gating change, no Windows-path behavior change;
+the sole production call site of `open_app_db` is `src-tauri/src/lib.rs`'s
+`setup()`, called with `?` so startup aborts on `Err` — no path lets a
+non-Windows host run commands against an unprotected key store;
+`AppError::key_store(...)` serializes only to the generic
+`"key_store_error"` string, no detail leak across IPC; `windows::` usage
+is confined to `dpapi.rs`; the unrelated bug fixes
+(`class_record.rs`/`schedule_meeting.rs`/`assessment_item.rs`) were
+independently checked and confirmed correct; neither of this project's
+two previously-shipped failure classes (unauthenticated bootstrap self-
+grant; check-then-act singleton race) recurs, since `auth::
+bootstrap_installation` is untouched by this diff.
+
+**One should-fix (non-blocking), applied same session**: the new
+`has_exact_duplicate` helper in `schedule_meeting.rs` queried without a
+`school_id` predicate — not exploitable given `create()` already
+resolves `teaching_assignment_id` through a school-scoped lookup first
+and assignment ids are UUIDv7 (not cross-tenant guessable), but
+recommended as defense-in-depth. Fixed immediately: `school_id` is now
+threaded through `has_exact_duplicate`'s query, matching every other
+conflict-check helper in this file. Re-verified after the fix:
+`cargo test --lib schedule_meeting` (13/13 pass) and
+`cargo clippy --all-targets -- -D warnings` (0 warnings).
+
+**Closed.** No independent-review debt remains from this milestone.
 
 No repository history below this point is deleted — kept for the full
 diagnostic trail that led to the correct root cause:
