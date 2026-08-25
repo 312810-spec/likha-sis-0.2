@@ -927,6 +927,50 @@ architecture/sequencing record: `docs/adr/0035-roadmap-reconciliation-and-execut
 - Recommended next milestone (not started, awaiting approval): RBAC
   foundation, the highest-leverage single slice of Wave 1.
 
+## Wave 1A: RBAC Foundation (added 2026-08-25)
+
+**Complete** — see `docs/adr/0036-rbac-foundation.md` for full decision
+record, `docs/CURRENT-HANDOFF.md`'s top entry for the completion summary.
+Durable facts worth remembering without re-reading the ADR:
+
+- Authorization is capability-oriented, never scattered role-string
+  checks: `auth::Capability` + `auth::authorize_capability()` is the one
+  new gate function, mirroring the codebase's existing `authorize_*`
+  pattern; `Capability::allowed_roles()` is the only place a role maps to
+  what it's allowed to do.
+- Roles live in a separate `user_school_roles` join table (composite PK
+  `user_id, school_id, role`), not a column — a person can hold more than
+  one role in the same school without any future schema change; adding a
+  new role later is a migration widening the `CHECK` constraint, not a
+  redesign.
+- Role membership is always a fresh DB lookup, never cached on `Session`
+  — the same anti-staleness reasoning as the existing session-revocation
+  check.
+- **Teacher/Registrar/School Head are the initial proof set, not the
+  final role universe.** Adviser, LIS Coordinator, ICT Coordinator,
+  Master Teacher/Department Head, and others are expected later without
+  a fundamental redesign of this schema/pattern.
+- Representative proof: `create_learner`/`update_learner` require
+  Registrar or School Head; learner reads are still ungated (no Teacher
+  regression). No account/role-management UI was built — an explicit
+  non-goal; `add_user_to_school`'s only check is "same school," not "same
+  school and an appropriate role" — a real, recorded, pre-existing,
+  currently-unreachable-from-UI gap (`docs/VERIFICATION-DEBT.md`), not
+  fixed this milestone since deciding who may grant membership is exactly
+  the authority-boundary work Wave 1A deferred.
+- The `windows-future`/`windows-core` Cargo blocker was reproduced and
+  traced to its actual structural root cause this milestone: `windows`
+  and `crypto/dpapi.rs` are both compiled **unconditionally** (no
+  `cfg(windows)` anywhere), not merely a version-pin mismatch — so this
+  crate cannot compile on any non-Windows host today regardless of which
+  `windows-future`/`windows-core` pair is locked. A real fix is a genuine
+  architecture decision (target-gating + a non-Windows `KeyStore` story),
+  deliberately not made this milestone. Full detail in
+  `docs/VERIFICATION-DEBT.md`.
+- Harness audit concluded **no new tooling adopted** (ast-grep,
+  dependency-cruiser, repomix, cargo-mutants all evaluated and rejected
+  for now against actual repo evidence) — see `docs/SOURCE-REGISTRY.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

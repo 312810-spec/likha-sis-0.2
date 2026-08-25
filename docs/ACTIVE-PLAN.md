@@ -1,5 +1,51 @@
 # ACTIVE PLAN
 
+## Wave 1A: RBAC Foundation (added 2026-08-25) — complete, read this section first
+
+**Complete.** Full decision record: `docs/adr/0036-rbac-foundation.md`.
+Verification record:
+
+- `npm run quality` — PASS, 390/390 (typecheck, lint, format:check,
+  `check:architecture`, vitest), unaffected since this milestone's
+  application changes are Rust-only.
+- `npx knip` — PASS, same pre-existing findings as before this milestone
+  (`userService`, `LEARNER_SCORE_STATUSES`, `OmittedField`/
+  `FieldDisclosure`), zero new.
+- `cargo check --lib` / `cargo test --lib` — **BLOCKED**, reproduced this
+  milestone (not merely cited): `windows-future` 0.3.2 fails to compile
+  against the `windows-core` 0.62.2 pair it's locked to. Traced further
+  than prior sessions: `windows` and `crypto/dpapi.rs` are both compiled
+  unconditionally (no `cfg(windows)` anywhere in the manifest or the
+  module), so this crate cannot compile on any non-Windows host at all
+  today, independent of the specific version pairing. A real fix is a
+  genuine architecture decision, not made this milestone — see
+  `docs/VERIFICATION-DEBT.md`.
+- All new/changed Rust (migration 16, `repository::role`,
+  `auth::Capability`/`authorize_capability`, `commands::learner`/
+  `commands::user`) was written and reviewed by hand against the
+  established `authorize_*`/schema-enum conventions, then independently
+  security-reviewed (see below) — not compiled, per the blocker above.
+- `cargo clippy`/`cargo nextest` — NOT RUN, same blocker.
+- Mutation testing (`cargo-mutants`) on the new authorization logic —
+  **NOT WARRANTED / BLOCKED**: `cargo` cannot compile in this
+  environment at all, so there is nothing to mutate-test against.
+- Independent `security-reviewer` — dispatched, returned real findings
+  (found and fixed a real bug: `role::grant()`'s `INSERT OR IGNORE`
+  silently swallowed `CHECK` constraint violations, independently
+  reproduced against real SQLite before trusting the claim, fixed to
+  `ON CONFLICT (...) DO NOTHING`; recorded one pre-existing, non-blocking,
+  currently-UI-unreachable gap in `add_user_to_school`'s authorization
+  scope as debt rather than expanding this milestone to fix it) before
+  hitting a session-limit API error mid-follow-up. Full detail in
+  `docs/VERIFICATION-DEBT.md`.
+
+**Explicit non-goals honored**: no account/role-management UI; no second
+`Capability` variant; no `Session` shape change; no cloud/sync,
+curriculum versioning, SF1, Teacher Load/schedule, SMEA, or ILAWCraft
+work; no new harness tooling adopted (see `docs/SOURCE-REGISTRY.md`'s
+Wave 1A audit — ast-grep/dependency-cruiser/repomix/cargo-mutants all
+evaluated and rejected for now against real repository evidence).
+
 ## Post-UX-04 Roadmap Reconciliation (added 2026-08-25) — read this section first
 
 Immediately after UX-04 completed, the user directed a full roadmap

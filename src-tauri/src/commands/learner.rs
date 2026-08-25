@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::learner::{self, Learner};
@@ -23,6 +23,11 @@ pub fn list_learners_by_school(
     learner::list_by_school(&conn, &school_id)
 }
 
+/// WAVE 1A RBAC Foundation's representative authorization proof: only a
+/// session holding the Registrar or School Head role in this school may
+/// enroll a learner — see `docs/adr/0036-rbac-foundation.md`. A Teacher
+/// session is rejected with `Unauthorized`, the same fail-closed error
+/// every other authorization denial in this codebase already returns.
 #[tauri::command]
 pub fn create_learner(
     db: State<'_, Mutex<Connection>>,
@@ -33,7 +38,7 @@ pub fn create_learner(
     sex: Option<String>,
 ) -> AppResult<Learner> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
     learner::create(
         &conn,
         &school_id,
@@ -61,6 +66,9 @@ pub fn get_learner(
     learner::find_by_id_in_school(&conn, &school_id, &learner_id)
 }
 
+/// Same Registrar/School Head gate as `create_learner` — editing a
+/// learner's identity/records is the same "manage learners" capability,
+/// not a separate one.
 #[tauri::command]
 pub fn update_learner(
     db: State<'_, Mutex<Connection>>,
@@ -72,7 +80,7 @@ pub fn update_learner(
     sex: Option<String>,
 ) -> AppResult<Option<Learner>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
     learner::update(
         &conn,
         &school_id,

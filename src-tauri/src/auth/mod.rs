@@ -10,8 +10,8 @@ use rusqlite::Connection;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    audit_log as audit_log_repo, installation as installation_repo, school as school_repo,
-    session as session_repo, user as user_repo,
+    audit_log as audit_log_repo, installation as installation_repo, role as role_repo,
+    school as school_repo, session as session_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -279,6 +279,16 @@ pub fn bootstrap_installation(
     let school = school_repo::create(&tx, school_name)?;
     let user = user_repo::create_user(&tx, username, password, display_name)?;
     user_repo::add_school_membership(&tx, &user.id, &school.id)?;
+    // The founding user is the sole account on a fresh installation --
+    // there is no one else yet to hold Registrar/School Head duties, so
+    // granting all three starting roles is the only way this account can
+    // actually use the app (e.g. enroll its first learner) before a
+    // second account exists. A subsequently added member
+    // (`add_user_to_school`) defaults to Teacher only -- the least-
+    // privilege default -- not this same all-roles grant.
+    role_repo::grant(&tx, &user.id, &school.id, role_repo::TEACHER)?;
+    role_repo::grant(&tx, &user.id, &school.id, role_repo::REGISTRAR)?;
+    role_repo::grant(&tx, &user.id, &school.id, role_repo::SCHOOL_HEAD)?;
 
     let duration_modifier = format!("+{} seconds", SESSION_DURATION.as_secs());
     let session_id = session_repo::insert(&tx, &user.id, &school.id, &duration_modifier)?;
@@ -333,6 +343,57 @@ pub fn authorize_school_membership_grant(
         return Err(AppError::Unauthorized);
     }
     Ok(())
+}
+
+/// The capabilities WAVE 1A's RBAC foundation recognizes -- each variant
+/// names the role(s) allowed to exercise it, per
+/// `docs/product/PRODUCT-CONTRACT.md`'s RBAC section and the confirmed
+/// Teacher/Registrar/School Head starting model
+/// (`docs/product/M8-DECISION.md`'s follow-up). Deliberately
+/// capability-oriented rather than scattered `if role == "..."` checks
+/// throughout command code: a future capability is one new match arm
+/// here, not a new pattern; a future role is a widened CHECK constraint
+/// (migration 16) plus a widened `allowed_roles` list here, never a
+/// restructuring of this type or of any command that already calls
+/// `authorize_capability`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Capability {
+    /// Create or edit a learner's enrollment record. The representative
+    /// authorization proof for this milestone -- see
+    /// `docs/adr/0036-rbac-foundation.md`.
+    ManageLearners,
+}
+
+impl Capability {
+    fn allowed_roles(self) -> &'static [&'static str] {
+        match self {
+            Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+        }
+    }
+}
+
+/// The trusted authorization boundary for a capability-gated command.
+/// Mirrors `require_active_school_scope`'s fail-closed shape exactly,
+/// with one addition: the session's user must also hold one of
+/// `capability`'s allowed roles WITHIN that same school. Role membership
+/// is looked up fresh from the database on every call, never cached on
+/// the in-memory `Session` -- a role granted or revoked mid-session
+/// takes effect on the very next protected call, the same guarantee
+/// `require_active_session`'s independent revocation lookup already
+/// gives session validity itself. `capability` is never a client-
+/// supplied argument -- callers pass a fixed `Capability` variant chosen
+/// by the command itself, exactly like `school_id` is never accepted
+/// from the caller.
+pub fn authorize_capability(
+    conn: &Connection,
+    sessions: &SessionManager,
+    capability: Capability,
+) -> AppResult<String> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !role_repo::has_any_role(conn, &user_id, &school_id, capability.allowed_roles())? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(school_id)
 }
 
 #[cfg(test)]
@@ -922,5 +983,219 @@ mod tests {
             authorize_school_membership_grant(&conn, &attacker_sessions, &legitimate.school_id),
             Err(AppError::Unauthorized)
         ));
+    }
+
+    // ---- WAVE 1A RBAC Foundation: authorize_capability ----
+    //
+    // These are the security tests for this milestone's representative
+    // authorization proof (ManageLearners, gating `create_learner`/
+    // `update_learner`). See docs/adr/0036-rbac-foundation.md.
+
+    /// A school with one plain member (no role granted at all) plus a
+    /// logged-in session for them — the starting point most of the tests
+    /// below build on, mirroring `authorize_school_membership_grant`'s
+    /// own test fixtures.
+    fn setup_member_with_session(
+        conn: &Connection,
+        sessions: &SessionManager,
+    ) -> (crate::repository::school::School, user::User) {
+        let s = school::create(conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(conn, &u.id, &s.id).unwrap();
+        login(conn, sessions, "ana.cruz", "password", &s.id).unwrap();
+        (s, u)
+    }
+
+    #[test]
+    fn authorize_capability_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_session_with_no_role_granted_at_all() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        setup_member_with_session(&conn, &sessions);
+        // Deliberately no role_repo::grant call at all.
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn authorize_capability_allows_a_registrar_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        assert_eq!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners).unwrap(),
+            s.id
+        );
+    }
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert_eq!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners).unwrap(),
+            s.id
+        );
+    }
+
+    #[test]
+    fn authorize_capability_allows_a_session_holding_multiple_roles_including_an_allowed_one() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageLearners).is_ok());
+    }
+
+    /// A tampered/forged capability cannot be supplied by a caller at
+    /// all — `Capability` is a fixed enum chosen by the command's own
+    /// source code, never deserialized from client input. This test
+    /// instead proves the more relevant tamper scenario: a role granted
+    /// in a DIFFERENT school must not authorize this one, even for the
+    /// same user and the same capability — a stand-in for "forged
+    /// school scope," since `school_id` itself is already proven
+    /// session-derived-only by the existing `require_active_school_scope`
+    /// tests above.
+    #[test]
+    fn authorize_capability_denies_a_role_held_only_in_a_different_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        user::add_school_membership(&conn, &u.id, &other_school.id).unwrap();
+        role_repo::grant(&conn, &u.id, &other_school.id, role_repo::REGISTRAR).unwrap();
+        // The session above is scoped to `s`, not `other_school`.
+        let _ = &s;
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn authorize_capability_denies_once_the_role_is_removed_mid_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageLearners).is_ok());
+
+        // Revoke the role directly (no revoke() API exists yet -- this
+        // milestone doesn't need one — but the DB is the source of
+        // truth, so removing the row must take effect immediately,
+        // exactly like an independently-revoked session already does).
+        conn.execute(
+            "DELETE FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2 AND role = ?3",
+            (&u.id, &s.id, role_repo::REGISTRAR),
+        )
+        .unwrap();
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn authorize_capability_fails_closed_for_an_expired_session_even_with_an_allowed_role() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+        let session_id = session_repo::insert(&conn, &u.id, &s.id, "+8 hours").unwrap();
+        let past = SystemTime::now() - Duration::from_secs(1);
+        sessions.set(Session {
+            id: session_id,
+            user_id: u.id,
+            school_id: s.id,
+            created_at: past - SESSION_DURATION,
+            expires_at: past,
+            last_activity_at: past,
+        });
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageLearners),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn bootstrap_installation_grants_the_founding_user_all_three_starting_roles() {
+        let mut conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let session = bootstrap_installation(
+            &mut conn,
+            &sessions,
+            "Rizal Elementary",
+            "ana.cruz",
+            "password",
+            "Ana Cruz",
+        )
+        .unwrap();
+
+        for role in [role_repo::TEACHER, role_repo::REGISTRAR, role_repo::SCHOOL_HEAD] {
+            assert!(
+                role_repo::has_any_role(&conn, &session.user_id, &session.school_id, &[role])
+                    .unwrap(),
+                "founding user must hold the {role} role"
+            );
+        }
+        // Direct proof the representative gate actually accepts this
+        // account, not just that role rows exist.
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageLearners).is_ok());
+    }
+
+    /// Regression proof for the "existing authorized workflow keeps
+    /// working" completion criterion: a Teacher-only session (the
+    /// default for anyone added via `add_user_to_school`, proven
+    /// separately in `commands::user`'s own scope) must still pass the
+    /// unrelated, unchanged `require_active_school_scope` check that
+    /// `list_learners_by_school`/`get_learner` rely on -- RBAC only
+    /// narrows the one gated capability, never read access generally.
+    #[test]
+    fn a_teacher_only_session_still_passes_the_ordinary_school_scope_check() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        assert_eq!(sessions.require_active_school_scope(&conn).unwrap(), s.id);
     }
 }

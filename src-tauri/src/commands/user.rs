@@ -7,6 +7,7 @@ use zeroize::Zeroize;
 use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
+use crate::repository::role;
 use crate::repository::user::{self, User};
 
 /// Always requires an active session — this is no longer a bootstrap
@@ -29,7 +30,12 @@ pub fn register_user(
 }
 
 /// Always requires an active session scoped to `school_id` — see
-/// `register_user`'s doc comment above and ADR-0006.
+/// `register_user`'s doc comment above and ADR-0006. Grants the new
+/// member the Teacher role by default -- the least-privilege starting
+/// point (see `docs/adr/0036-rbac-foundation.md`); this milestone builds
+/// no UI/command to grant Registrar/School Head to anyone other than a
+/// fresh installation's founding user (`auth::bootstrap_installation`),
+/// deliberately out of scope for WAVE 1A.
 #[tauri::command]
 pub fn add_user_to_school(
     db: State<'_, Mutex<Connection>>,
@@ -39,5 +45,6 @@ pub fn add_user_to_school(
 ) -> AppResult<()> {
     let conn = lock_db(&db);
     auth::authorize_school_membership_grant(&conn, &sessions, &school_id)?;
-    user::add_school_membership(&conn, &user_id, &school_id)
+    user::add_school_membership(&conn, &user_id, &school_id)?;
+    role::grant(&conn, &user_id, &school_id, role::TEACHER)
 }

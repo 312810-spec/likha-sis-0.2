@@ -716,6 +716,35 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- Functional role assignments -- WAVE 1A RBAC Foundation.
+        -- Deliberately a separate table from `user_school_memberships`
+        -- (not a `role` column on it) so a user can hold MORE THAN ONE
+        -- role in the same school at once (e.g. Teacher + Adviser later)
+        -- without a schema change: a new role is a new possible CHECK
+        -- value and a new row, never a new column. `teacher`/`registrar`/
+        -- `school_head` are this milestone's confirmed starting set (see
+        -- docs/product/PRODUCT-CONTRACT.md's RBAC section and
+        -- docs/product/M8-DECISION.md's follow-up, where this exact
+        -- three-role model was already asked and answered with the
+        -- user) -- explicitly NOT the final LIKHA role universe. A
+        -- future role (Adviser, LIS Coordinator, ICT Coordinator, Master
+        -- Teacher/Department Head) is added by widening this CHECK
+        -- constraint in a new migration -- the same recreate-table
+        -- pattern this schema already used once for
+        -- `attendance_records`'s status enum -- never a redesign of this
+        -- table's shape or of any authorization code that reads it.
+        CREATE TABLE user_school_roles (
+            user_id TEXT NOT NULL,
+            school_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('teacher', 'registrar', 'school_head')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (user_id, school_id, role),
+            FOREIGN KEY (user_id, school_id) REFERENCES user_school_memberships(user_id, school_id) ON DELETE CASCADE
+        );
+        "#,
+        ),
     ])
 }
 
@@ -1666,5 +1695,114 @@ mod tests {
             .query_row("SELECT user_id FROM audit_log WHERE id = 'a1'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(user_id, None, "the audit row itself must survive the user's deletion");
+    }
+
+    fn seed_school_user_and_membership(conn: &Connection) {
+        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_memberships (user_id, school_id) VALUES ('u1', 's1')",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_16_allows_a_user_to_hold_more_than_one_role_in_the_same_school() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'teacher')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'registrar')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM user_school_roles WHERE user_id = 'u1' AND school_id = 's1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2, "one user must be able to hold two roles in the same school at once");
+    }
+
+    #[test]
+    fn migration_16_rejects_an_unrecognized_role() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'principal')",
+            [],
+        );
+
+        assert!(result.is_err(), "an unrecognized role string must be rejected by the CHECK constraint");
+    }
+
+    #[test]
+    fn migration_16_rejects_a_role_for_a_membership_that_does_not_exist() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
+            [],
+        )
+        .unwrap();
+        // Deliberately no user_school_memberships row for (u1, s1).
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'teacher')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "a role cannot be granted for a school membership that doesn't exist"
+        );
+    }
+
+    #[test]
+    fn migration_16_cascades_when_the_underlying_membership_is_deleted() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'registrar')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "DELETE FROM user_school_memberships WHERE user_id = 'u1' AND school_id = 's1'",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM user_school_roles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "a role row must not outlive the membership it depends on");
     }
 }

@@ -1,5 +1,45 @@
 # Verification Debt
 
+## Wave 1A RBAC Foundation: `security-reviewer` findings — one fixed, one pre-existing gap recorded (2026-08-25)
+
+Independent `security-reviewer` review of the new RBAC gate was dispatched
+and returned real, substantive findings before hitting a session-limit API
+error partway through a follow-up exchange (not the usual agent-resume
+retrieval failure documented elsewhere in this file — the review itself
+completed and reported). Two findings:
+
+1. **Fixed.** `repository::role::grant()` used `INSERT OR IGNORE`, which
+   silently swallows a `CHECK` constraint violation (not just the intended
+   primary-key conflict) — an unrecognized role would have been a silent
+   no-op instead of the error the function's own doc comment and the
+   `grant_rejects_an_unrecognized_role` test require. Independently
+   reproduced against real SQLite before trusting the reviewer's claim
+   (`INSERT OR IGNORE` on a `CHECK`-violating row: 0 rows affected, no
+   exception; `INSERT ... ON CONFLICT(...) DO NOTHING` on the same row:
+   raises `CHECK constraint failed` as expected — conflict resolution only
+   suppresses the named conflict target, not an unrelated `CHECK` failure).
+   Fixed by switching to `ON CONFLICT (user_id, school_id, role) DO
+NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
+   still cannot compile in this environment (see the `windows-future`
+   entry below) — verified instead by reproducing the exact SQLite
+   semantics in isolation, and the fix is a one-line, easily-inspectable
+   change.
+2. **Pre-existing gap, recorded not fixed.** `commands::user::add_user_to_school`
+   only checks that the caller has an active session scoped to the same
+   `school_id` being granted into (`auth::authorize_school_membership_grant`)
+   — it does not check the caller's _role_ at all, so today any
+   authenticated member of a school (Teacher included) could add a new
+   colleague. This predates Wave 1A (the check itself wasn't touched this
+   milestone, only the new `role::grant(.., TEACHER)` call after it) and is
+   not currently reachable from any UI — `userService`/`add_user_to_school`
+   have no calling screen (confirmed via `npx knip` and a source grep this
+   session). Deciding who should be allowed to grant school membership
+   (School Head only? Registrar too?) is exactly the kind of authority-
+   boundary decision Wave 1A's own scope explicitly deferred beyond its one
+   representative proof (`ManageLearners` on `create_learner`/
+   `update_learner`) — recorded here as real, open debt rather than
+   expanded into an unplanned second capability this milestone.
+
 ## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
@@ -48,6 +88,39 @@ compile/test run. Resolve by pinning a single consistent
 not a drive-by fix) in a session where that's the explicit task, then
 re-run `cargo test`/`cargo clippy --all-targets -- -D warnings` for every
 milestone whose Rust changes accumulated while this was broken.
+
+**Root cause actually reproduced and diagnosed, Wave 1A RBAC Foundation
+(2026-08-25)** — this milestone's own task explicitly required reproducing
+this blocker rather than continuing to cite it secondhand. `cargo check
+--lib` and `cargo test --lib` were both actually run and both fail at the
+identical point: `windows-future` 0.3.2 cannot compile — it references
+`windows_core::imp::IMarshal`, `windows_core::imp::marshaler`, and
+`windows_threading::submit`, none of which exist in the `windows-core`
+0.62.2 / `windows-threading` 0.2.1 versions the lockfile actually pairs it
+with. `git log -p -- Cargo.lock` confirms this dual-version lock existed
+since the very first Cargo.lock commit (`e237e00`, M0) — nothing this
+project has done introduced it. The deeper structural cause: `Cargo.toml`
+declares `windows = { version = "0.62.2", ... }` **unconditionally** (no
+`[target.'cfg(windows)'.dependencies]` section exists in this manifest at
+all), and `src-tauri/src/crypto/dpapi.rs` (`mod dpapi;` in `crypto/mod.rs`,
+used unconditionally by `db::mod.rs`'s `DpapiKeyStore`) is not gated behind
+`#[cfg(windows)]` either — so this crate is structured to require a
+functioning Windows API binding on every platform it's built on, including
+this Linux dev container, regardless of whether the specific
+windows-future/windows-core version pair matches. Even a corrected,
+mutually-compatible `windows`/`windows-future`/`windows-core` version set
+would still only fix the _compile_ error — DPAPI's actual Win32 calls
+(`CryptProtectData`/`CryptUnprotectData`) have no Linux implementation to
+link against, so a real fix likely also needs `#[cfg(windows)]` gating on
+`dpapi.rs` and a target-specific `windows` dependency, which is a genuine
+architecture change (how the crate is structured per-platform, and what a
+non-Windows dev/CI build does for `KeyStore` — a stub, a different
+`KeyStore` impl, or simply "this crate cannot build outside Windows,
+accept that and provision only Windows CI/dev machines"). Per this
+milestone's explicit instruction, this is **not** decided or implemented
+here — recorded as the reproduced blocker, its exact chain, and evidence;
+the corrective action (a real architecture decision, not a drive-by fix)
+is deferred to a session where that's the explicit task.
 
 ## `playwright-cli` browser mismatch in this environment — workaround exists (open, session-specific)
 

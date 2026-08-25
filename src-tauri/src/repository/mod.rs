@@ -8,6 +8,7 @@ pub mod grading_computation;
 pub mod learner_score;
 pub mod installation;
 pub mod learner;
+pub mod role;
 pub mod school;
 pub mod section;
 pub mod section_membership;

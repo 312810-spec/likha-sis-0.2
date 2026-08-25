@@ -1,5 +1,94 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-25, this session — Wave 1A: RBAC Foundation, complete)
+
+**RBAC Foundation (Teacher / Registrar / School Head) is complete.**
+Full record: `docs/adr/0036-rbac-foundation.md` (architecture decision),
+`docs/VERIFICATION-DEBT.md`'s Wave 1A entries (reproduced Cargo blocker,
+`security-reviewer` findings), `docs/SOURCE-REGISTRY.md`'s Wave 1A
+harness-tooling-audit section.
+
+**Repository truth confirmed this task**: branch
+`claude/likha-sis-ux03-plan-plv80c`, working tree clean apart from this
+milestone's own changes before commit. `npm run quality` 390/390 (no
+regression — this milestone's application code is Rust-only), `npx knip`
+shows the same pre-existing findings, zero new. `cargo check --lib`/
+`cargo test --lib` were both actually run and both **reconfirmed the
+pre-existing blocker** — `windows-future` 0.3.2 fails to compile against
+the `windows-core` 0.62.2/`windows-threading` 0.2.1 pair Cargo.lock
+resolves it to. Root cause traced further than before: `Cargo.toml`
+declares `windows = "0.62.2"` **unconditionally** (no
+`[target.'cfg(windows)'.dependencies]` section exists), and
+`crypto/dpapi.rs` (Windows DPAPI key protection, ADR-0003) is compiled
+unconditionally too (no `#[cfg(windows)]`) — so this crate cannot compile
+on any non-Windows host regardless of the specific version conflict. A
+real fix needs a genuine architecture decision (target-gate the
+dependency and the module, decide what non-Windows dev/CI does for
+`KeyStore`) — per this milestone's explicit instruction, **not** made
+here; recorded as the reproduced blocker for a future dedicated session.
+
+**RBAC implementation**: new `user_school_roles` join table (migration
+16, composite PK `(user_id, school_id, role)`, `CHECK` on role, cascading
+FK to `user_school_memberships`) — a separate table, not a role column,
+specifically so one person can hold more than one role in the same
+school without a schema change. New `auth::Capability` enum (one
+variant, `ManageLearners`) and `auth::authorize_capability()`, mirroring
+the existing `authorize_user_registration`/`authorize_school_membership_grant`
+gate pattern exactly — the only place a role is ever mapped to what it's
+allowed to do. Representative proof: `create_learner`/`update_learner`
+now require Registrar or School Head; learner reads stay ungated (no
+regression for Teachers). `bootstrap_installation` grants its founding
+user all three roles; `add_user_to_school` grants `teacher` only
+(least-privilege default). Role membership is always a fresh DB lookup,
+never cached on `Session` — closes the stale-assignment/revocation class
+of threat the same way `require_active_session`'s existing independent
+revocation check already does. No TypeScript/UI change was needed —
+`LearnerListScreen`'s existing generic error handling already degrades an
+`Unauthorized` rejection gracefully; security is enforced entirely below
+React.
+
+**Independent `security-reviewer` review**: dispatched and returned real
+findings (unlike several prior sessions' agent-resume failures — this one
+completed) before hitting a session-limit API error mid-follow-up. Found
+and fixed: `role::grant()` used `INSERT OR IGNORE`, which silently
+swallows a `CHECK` constraint violation (not just the intended
+primary-key conflict) — independently reproduced against real SQLite
+before trusting the claim, then fixed to `ON CONFLICT (...) DO NOTHING`,
+which does still raise on a `CHECK` failure. Recorded, not fixed (Wave
+1A's own explicit scope boundary): `add_user_to_school` authorizes only
+"same school," not "same school AND an appropriate role" — a pre-existing
+gap (the check itself predates this milestone), not currently reachable
+from any UI, and deciding who may grant membership is exactly the kind of
+authority-boundary question this milestone deferred beyond its one
+representative proof. Full detail in `docs/VERIFICATION-DEBT.md`.
+
+**Explicit durable clarification (per this milestone's own instruction)**:
+Teacher/Registrar/School Head are the **initial RBAC proof set**, not the
+final LIKHA functional-role universe — Adviser, LIS Coordinator, ICT
+Coordinator, Master Teacher/Department Head, and other school-authorized
+responsibilities are expected later, added via new role-constant values
+and widened `CHECK` constraints, never a redesign of `user_school_roles`,
+`Capability`, or `authorize_capability`.
+
+**Harness**: audited ast-grep, dependency-cruiser, repomix, and
+cargo-mutants against actual repository evidence and adopted **none of
+them** this milestone — `check-architecture.mjs` already covers the one
+import-direction rule that matters, the repo is small enough that
+Grep/Glob are already token-efficient, and `cargo` cannot compile here at
+all, so a mutation-testing pilot has nothing to run against. Full
+reasoning in `docs/SOURCE-REGISTRY.md`'s Wave 1A section — a deliberate
+"add nothing new" conclusion, not a shortfall against the instruction to
+consider harness improvements.
+
+**Per explicit instruction: do not begin the next milestone
+automatically.** Recommended next milestone, awaiting approval:
+**Curriculum / Key-Stage Versioning Foundation** (Wave 1's next slice per
+`docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`) — no
+repository evidence surfaced this session that demands a prerequisite
+corrective milestone instead (the one real defect found, `role::grant`'s
+`INSERT OR IGNORE` bug, was fixed within this same milestone, not left
+open).
+
 ## Active Task (2026-08-25, this session — Post-UX-04 Roadmap Reconciliation, complete)
 
 Immediately after UX-04 completed (checkpoint `c91a45e`), the user
