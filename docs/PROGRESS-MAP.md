@@ -177,8 +177,8 @@ one. Exactly one row may be ◐ at a time.
 | ID    | Milestone                                                     | Status | Depends on | Start SHA | Completion SHA | ADR/Decision                                 | Verification                                                            |
 | ----- | ------------------------------------------------------------- | ------ | ---------- | --------- | -------------- | -------------------------------------------- | ----------------------------------------------------------------------- |
 | UX-00 | Progress Map Repair + Impeccable Pilot + Visual Baseline      | ✓      | none       | 603863b   | fcf26ca        | docs/adr/0030-ui-first-program-and-ux00.md   | npm run quality 316/316, npm run build, npx knip clean (5 pre-existing) |
-| UX-01 | Design Tokens, Shared Components, and App Shell               | ✓      | UX-00      | fcf26ca   | (this commit)  | docs/adr/0031-design-system-and-app-shell.md | npm run quality 339/339, npm run build, npx knip clean (5 pre-existing) |
-| UX-02 | Teacher Workspace polish                                      | ○      | UX-01      | —         | —              | —                                            | —                                                                       |
+| UX-01 | Design Tokens, Shared Components, and App Shell               | ✓      | UX-00      | fcf26ca   | 826bf7d        | docs/adr/0031-design-system-and-app-shell.md | npm run quality 339/339, npm run build, npx knip clean (5 pre-existing) |
+| UX-02 | Teacher Workspace Polish                                      | ◐      | UX-01      | 826bf7d   | —              | docs/adr/0032-teacher-workspace-polish.md    | in progress, see ACTIVE-PLAN                                            |
 | UX-03 | Daily Attendance + Monthly Summary                            | ○      | UX-01      | —         | —              | —                                            | —                                                                       |
 | UX-04 | Class Records, Assessments, Score Entry, Grade Output         | ○      | UX-01      | —         | —              | —                                            | —                                                                       |
 | UX-05 | Learners, Search, Sections, Editing, Export                   | ○      | UX-01      | —         | —              | —                                            | —                                                                       |
@@ -197,9 +197,8 @@ UX-00 ✓ complete — see table above and docs/ACTIVE-PLAN.md
 UX-01 ✓ complete — see table above and docs/ACTIVE-PLAN.md's "UX-01"
   section
 
-NEXT ← UX-02 Teacher Workspace polish (○ Queued — not started; per the
-  milestone contract stays Queued, not In Progress, until its own
-  start checkpoint is pushed)
+CURRENT ← UX-02 Teacher Workspace Polish (◐ In Progress — see table
+  above and docs/ACTIVE-PLAN.md's "UX-02" section)
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and

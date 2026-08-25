@@ -220,7 +220,100 @@ dev-only synthetic fixture) rather than deferring again.
       ADR-0031.
 - [x] Push the UX-01 completion checkpoint; verify remote sync.
 
-### UX-02 through UX-08 — Queued
+### UX-02 — Teacher Workspace Polish
+
+Teacher outcome: within seconds of signing in, a teacher understands
+what needs attention today (which sections still need attendance,
+which are partial/complete, which grading period is open per section),
+sees learner/section counts as useful context, can review recent
+sign-in activity, and can begin the next real task with one click —
+without a second dashboard being invented alongside the existing
+Workspace.
+
+Baseline SHA: `826bf7d` (UX-01's completion commit).
+
+Scope:
+
+- Restructure `TeacherWorkspaceScreen`'s data loading into two
+  independent paths (critical: sections/attendance/grading/learner
+  count; secondary: recent sign-in activity) so a secondary-data
+  failure never erases valid attendance information, plus a retry
+  affordance for each.
+- Sort sections by a documented, deterministic attention rank (not
+  started → partial → complete → no learners enrolled, tie-broken by
+  name) — the "Today's priority" rail.
+- Give each section a direct, one-click action: open Attendance with
+  that section pre-selected (verified against the loaded section list,
+  safe fallback if it no longer exists), or "Manage sections" when a
+  section has no learners enrolled yet.
+- "View all sign-in activity" action to the existing Sign-in Activity
+  destination; "Create a section" action on the no-sections empty
+  state.
+- One authored focal treatment: a ledger-row priority list (left accent
+  bar by status, not a card), plus a status-transition motion cue.
+- **First implementation slice**: a safety-hardened, development-only
+  synthetic visual fixture (ADR-0031's selected approach) so
+  authenticated screens can finally be pixel-inspected — built before
+  claiming any visual-quality result for this milestone.
+
+Non-goals: no new domain features, no duplicate forms inside Workspace,
+no changes to attendance rules/grading calculations/auth/authorization/
+school isolation/database schema/Rust commands/exports/PII fields, no
+router/global-state package/URL-param mechanism for section
+preselection (narrowly-typed props/callbacks only), no fabricated
+online/offline indicator.
+
+Affected: `src/ui/TeacherWorkspaceScreen.tsx` (+ test), `src/App.tsx`,
+`src/ui/AttendanceScreen.tsx` (+ test, for safe section preselection),
+new `src/dev-preview/` fixture entry point (isolated, never imported by
+production code), `src/ui/theme/styles.css` (priority-rail styling).
+
+Acceptance criteria: functional (every new action navigates correctly,
+section preselection falls back safely when the section no longer
+exists, no regression to existing Workspace behavior), visual
+(inspected via the new fixture at 1366×768/1024×768/390×844, light/
+dark, all 3 modes — real screenshots, not inferred), accessibility
+(heading hierarchy, keyboard operability, focus after actions, 44px
+narrow targets, non-color status meaning, screen-reader names, 200%
+zoom/reflow, reduced motion), fixture safety (proven: production entry
+graph doesn't import it, production `dist` doesn't contain it, it
+cannot reach real auth/session code), architecture (`src/ui/**` still
+only receives services via props; only `src/composition.ts` imports
+concrete Tauri adapters).
+
+- [ ] Read `CLAUDE.md`, `PRODUCT.md`, `DESIGN.md`,
+      `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`,
+      `docs/ACTIVE-PLAN.md`, `docs/PROGRESS-MAP.md`,
+      `docs/VERIFICATION-DEBT.md`, `docs/SOURCE-REGISTRY.md`,
+      ADR-0024, ADR-0028, ADR-0030, ADR-0031.
+- [ ] Inspect `TeacherWorkspaceScreen.tsx` + tests, `App.tsx`,
+      `AppShell.tsx`, `AttendanceScreen.tsx`, UX-01 shared
+      components/styles.
+- [ ] Push the UX-02 start checkpoint.
+- [ ] Build the safety-hardened dev-only fixture; prove isolation
+      (production entry graph, `dist` contents, no auth/session reach).
+- [ ] Impeccable `shape` pass for the Workspace's morning-workflow
+      composition; `critique` the current Workspace.
+- [ ] Restructure data loading (critical vs. secondary, retry).
+- [ ] Priority-ranked section list with direct actions.
+- [ ] Section preselection into Attendance (safe fallback).
+- [ ] "View all sign-in activity" / "Create a section" actions.
+- [ ] One focal ledger-row treatment; one status-transition motion cue.
+- [ ] Visual inspection via the fixture at 3 viewports, light/dark, 3
+      modes, all listed states (loading/empty/partial-failure/retry/
+      every attendance status/no grading period/no activity).
+- [ ] `npm run quality`, `npm run build`, `npm run check:architecture`,
+      `npx knip`, `npm run quality:security` (report tool availability
+      honestly).
+- [ ] Impeccable `audit`, one correction pass, one confirmation/polish
+      pass; scope-drift review.
+- [ ] Update `DESIGN.md`, `docs/PROGRESS-MAP.md`, `docs/ACTIVE-PLAN.md`,
+      `docs/CURRENT-HANDOFF.md`, `docs/PROJECT-MEMORY.md` (if durable
+      facts changed), `docs/SOURCE-REGISTRY.md` (if applicable),
+      `docs/VERIFICATION-DEBT.md`, ADR-0032.
+- [ ] Push the UX-02 completion checkpoint; verify remote sync.
+
+### UX-03 through UX-08 — Queued
 
 See `docs/PROGRESS-MAP.md`'s UI-First Tranche table for the full
 ordered list and dependencies. Each gets its own detailed checklist in
