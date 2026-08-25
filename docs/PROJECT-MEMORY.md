@@ -1141,6 +1141,36 @@ Durable facts:
   formatting diffs unrelated to this fix — recorded as new verification
   debt, not corrected here.
 
+## Foundation Independent Review Debt Closure (added 2026-08-26)
+
+The two independent reviews owed since 2026-08-25 (Curriculum
+Foundation `architecture-reviewer`, RBAC Foundation `security-reviewer`)
+were re-dispatched and, this time, both completed **and** their
+findings were successfully retrieved — full record in
+`docs/VERIFICATION-DEBT.md`'s top entry. No BLOCKING findings in
+either. Two SHOULD-FIX findings applied: a doc-comment overclaim in
+`repository::curriculum.rs::default_version_id` (the unique index
+enforces at most one default, not at least one), and a real
+authorization gap in `commands::teaching_assignment::list_schedule_meetings_by_assignment`
+(any Teacher session could reconstruct a colleague's full weekly
+schedule by chaining it with the intentionally-open
+`list_teaching_assignments_by_section`, bypassing
+`authorize_view_teacher_load`) — fixed by gating on the assignment's
+own teacher via the same pattern the sibling commands already used.
+Both previously-fixed regressions (`add_user_to_school` self-grant,
+Teacher Load cross-school view leak) reconfirmed intact.
+
+**Retrieval-mechanism lesson**: the recurring since-M7 agent-resume
+failure did not recur — both reviewer agents resumed fine via
+`SendMessage`. What failed on the first attempt was retrieving their
+findings as text at all: each agent's first reply was a terse
+acknowledgment, because it had already reported findings via
+`ReportFindings`, which renders to a UI channel the orchestrating
+session can't read. Explicitly asking the resumed agent to restate
+findings as plain text (not via `ReportFindings`) worked. Future
+dispatches of `architecture-reviewer`/`security-reviewer` as background
+agents should request a plain-text report in the original prompt.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

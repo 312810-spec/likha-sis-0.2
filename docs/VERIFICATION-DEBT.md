@@ -1,5 +1,101 @@
 # Verification Debt
 
+## Curriculum Foundation `architecture-reviewer` + RBAC Foundation `security-reviewer`: independent reviews actually completed and retrieved (2026-08-26)
+
+Both previously-owed independent reviews (see the two "retrieval
+failure, self-review substituted" entries below, 2026-08-25) were
+re-dispatched against current code at HEAD `096dcfc` on branch
+`claude/likha-sis-ux03-plan-plv80c`. Both completed and, this time,
+their findings were successfully retrieved in full (the recurring
+agent-resume/retrieval failure documented since M7 did not recur) by
+resuming each agent via `SendMessage` and asking it to restate its
+report as plain text rather than through `ReportFindings` (which
+renders to a UI channel the orchestrating session can't read back).
+
+**Curriculum Foundation `architecture-reviewer` — CLOSED.** No BLOCKING
+findings. One SHOULD-FIX: `repository::curriculum.rs`'s
+`default_version_id` doc comment overclaimed a guarantee
+(`idx_one_default_curriculum_version` enforces *at most one* default
+row, not *at least one* — a zero-default state is schema-reachable,
+just not reached by any current production code path). Fixed by
+correcting the doc comment to state the actual guarantee and the
+`QueryReturnedNoRows` failure mode. Two items independently checked and
+ruled FALSE-POSITIVE (subject identity via display string; a suspected
+column-position drift in `row_to_class_record` after the new column was
+added — indices re-verified correct by direct read). Four
+NON-BLOCKING-FUTURE observations recorded for later milestones (no
+`effective_from`/`effective_to` period columns yet; `key_stages`'
+integer grade levels vs. `sections.grade_level`'s free-text type; the
+same zero-default latent shape already exists for the pre-existing
+`weight_policy_id` pattern this milestone mirrors). The reviewer also
+flagged that `docs/VERIFICATION-DEBT.md`'s two prior "Rust unverified by
+compiler" entries for this milestone (below) are now stale — `cargo
+check --lib`/`cargo test` were confirmed clean and re-run live during
+this review, not merely cited from the `caf850b` fix that resolved them.
+
+**RBAC Foundation `security-reviewer` — CLOSED, one SHOULD-FIX applied.**
+No BLOCKING findings. Both previously-fixed regressions were confirmed
+still intact by direct code read: `add_user_to_school`'s self-grant gap
+(`authorize_school_membership_grant`, `auth/mod.rs:351-361`) and the
+Teacher Load cross-school view leak (`authorize_view_teacher_load`,
+`auth/mod.rs:423-442`), each with its regression test still present.
+One SHOULD-FIX, confirmed exploitable via exposed Tauri commands
+bypassing the UI entirely: `commands::teaching_assignment::list_teaching_assignments_by_section`
+(intentionally open, school-scoped reference data — unchanged) combined
+with `list_schedule_meetings_by_assignment` (previously gated only by
+`require_active_school_scope`, no teacher-identity check) let any
+Teacher-only session reconstruct any colleague's full weekly schedule
+(weekday/time/room) without ever passing `auth::authorize_view_teacher_load`,
+contradicting the rule `docs/adr/0039-teacher-load-class-schedule-foundation.md:120-124`
+states. Fixed by resolving the assignment's `teacher_user_id` via
+`teaching_assignment::find_by_id_in_school` and gating on
+`authorize_view_teacher_load` before returning meetings — the same
+pattern the sibling commands `list_teacher_assignments`/`get_teacher_load`
+already used (`src-tauri/src/commands/teaching_assignment.rs`). No new
+command-layer regression test was added — this codebase has no
+command-layer test infrastructure at all (confirmed: zero `#[test]`
+functions exist under `src-tauri/src/commands/`); all authorization
+logic in this codebase is tested at the `auth::mod`/repository layer,
+where `authorize_view_teacher_load`'s existing tests (including the
+cross-school-denial case) already cover the gate this fix now wires in.
+Two NON-BLOCKING-FUTURE observations recorded (SELECT-then-act schedule
+overlap checks have no backing DB constraint, theoretically racy only
+across two separate OS processes writing the same SQLite file
+concurrently — the single in-process `Mutex<Connection>` already
+prevents in-process interleaving; `register_user` remains callable by
+any authenticated session regardless of role, the surviving harmless
+half of the historical two-command self-grant chain now that
+`add_user_to_school` is closed). One FALSE-POSITIVE ruled out
+(`create_school`/`list_schools` being unauthenticated — confirmed
+structurally unreachable for privilege escalation, per
+`docs/adr/0004-authentication-and-local-session.md:89-99`).
+
+**Verification after both fixes** (all actually run this session):
+`cargo check --lib` PASS; targeted tests (`auth::`, `curriculum::`,
+`teaching_assignment::`, `schedule_meeting::`, 81 tests) PASS; full
+`cargo test` PASS (342 lib tests + all integration binaries, 0 failed);
+`cargo clippy --all-targets -- -D warnings` PASS, 0 warnings; `npm run
+quality` PASS, 390/390; `cargo fmt --check` — 265 pre-existing diffs
+across the crate (consistent with the ~264 baseline already recorded
+below; neither touched file's newly-added lines are among the diffs —
+confirmed by cross-referencing line numbers), not corrected in this
+milestone per explicit instruction to leave formatting cleanup for its
+own follow-up milestone; `git diff --check` clean; secret scan (`gitleaks`)
+**NOT RUN** — binary unavailable on `PATH` in this environment, per
+project policy not installed solely to complete this review milestone
+(same limitation previously recorded for `quality:security`).
+
+**Debt closed**: Curriculum Foundation `architecture-reviewer` review,
+RBAC Foundation `security-reviewer` review (both entries below remain as
+historical record of the earlier retrieval-failure attempts, marked
+superseded rather than deleted). **Debt still open, unrelated to this
+milestone**: Teacher Load's own `security-reviewer` re-run (see the
+entry immediately below — that milestone's code did not change since
+its self-review, so re-running it was correctly out of this milestone's
+scope per the directing instruction); `cargo fmt` normalization (~265
+diffs); no CI configuration exists yet; `gitleaks` secret scan remains
+unavailable in this environment.
+
 ## Teacher Load / Class Schedule Foundation: Rust unverified by compiler, `security-reviewer` retrieval failure, two self-caught bugs (2026-08-25)
 
 `cargo check --lib` was attempted once against this milestone's new
@@ -115,6 +211,10 @@ codebase at all (confirmed via a full grep of `src-tauri/src/commands/`).
 this specific fix remains open — re-run `security-reviewer` once
 agent-resume behavior is confirmed reliably working in a future session.
 
+**SUPERSEDED (2026-08-26)** — see this file's top entry: an independent
+`security-reviewer` review was successfully dispatched and retrieved
+against current code, covering this fix among others. Debt closed.
+
 ## Curriculum / Key-Stage Versioning Foundation: `architecture-reviewer` retrieval failure, self-review substituted (2026-08-25)
 
 `architecture-reviewer` was dispatched to review the new curriculum
@@ -160,6 +260,10 @@ tenant data, existence-check only" pattern already established for
 milestone remains open — re-run `architecture-reviewer` once agent-resume
 behavior is confirmed reliably working in a future session.
 
+**SUPERSEDED (2026-08-26)** — see this file's top entry: an independent
+`architecture-reviewer` review was successfully dispatched and retrieved
+against current code. Debt closed.
+
 ## Curriculum / Key-Stage Versioning Foundation: Rust unverified by compiler, `deped-researcher` failure (2026-08-25)
 
 `cargo check --lib` was re-run against this milestone's new migration/
@@ -187,6 +291,14 @@ environment's network egress policy) findings — see
 confirmed. Periodically retry `deped-researcher` in a future session once
 the harness appears healthy, per the project's standing reviewer-failure
 rule.
+
+**STALE (2026-08-26)** — the "Rust unverified by compiler" half of this
+entry no longer reflects repository state: `caf850b` (2026-08-25, later
+the same day) fixed the `windows`-crate target-gating root cause. `cargo
+check --lib`/`cargo test` were confirmed clean and re-run live during
+this session's `architecture-reviewer` closure review (see this file's
+top entry). The `deped-researcher` retrieval-failure record above stays
+accurate and open.
 
 ## Wave 1A RBAC Foundation: `security-reviewer` findings — one fixed, one pre-existing gap recorded (2026-08-25)
 

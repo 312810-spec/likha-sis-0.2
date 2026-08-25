@@ -33,9 +33,12 @@ pub fn list_versions(conn: &Connection) -> AppResult<Vec<CurriculumVersion>> {
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
-/// The id of the current default curriculum version — always exactly one
-/// exists, enforced structurally by `idx_one_default_curriculum_version`,
-/// so this never needs to handle zero-or-many.
+/// The id of the current default curriculum version. `idx_one_default_curriculum_version`
+/// structurally enforces at most one default row, but not at least one — a
+/// zero-default state is schema-reachable (no production code path unsets
+/// `is_default` today; only test fixtures do) and would surface here as
+/// `QueryReturnedNoRows`, propagated as an error rather than silently
+/// returning a wrong id.
 pub fn default_version_id(conn: &Connection) -> AppResult<String> {
     conn.query_row(
         "SELECT id FROM curriculum_versions WHERE is_default = 1",

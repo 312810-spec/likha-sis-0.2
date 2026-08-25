@@ -1,5 +1,68 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Foundation Independent Review Debt Closure, complete)
+
+Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
+
+**Repository truth verified before reviewing anything**: local branch
+`claude/likha-sis-ux03-plan-plv80c` was 2 commits behind
+`origin/claude/likha-sis-ux03-plan-plv80c` and carried uncommitted
+working-tree edits to 6 files. Diff comparison confirmed these were
+stale, pre-fix duplicates of work already merged upstream in `caf850b`
+(the compiler-recovery commit) — not in-progress work. Discarded (with
+explicit user confirmation, since this session's auto-mode classifier
+correctly blocked the discard as a destructive git action) and pulled
+to `096dcfc`. Also removed five stray 0-byte junk files (`(String`,
+`ComputedTermGrade`, `MonthlyAttendanceReport`, `button`,
+`src-tauri/MonthlyAttendanceReport`) and an untracked 4.9MB
+`repomix-output.xml` — accidental artifacts from an unrelated prior
+tool invocation, not source.
+
+**Both previously-owed independent reviews actually completed and
+retrieved this session** — full record in `docs/VERIFICATION-DEBT.md`'s
+top entry. Curriculum Foundation `architecture-reviewer`: no BLOCKING
+findings, one SHOULD-FIX (a doc-comment overclaim in
+`repository::curriculum.rs`'s `default_version_id`, fixed). RBAC
+Foundation `security-reviewer`: no BLOCKING findings, one SHOULD-FIX
+(teacher schedule reconstructable by any Teacher session bypassing
+`authorize_view_teacher_load`, fixed in
+`commands::teaching_assignment::list_schedule_meetings_by_assignment`).
+Both previously-fixed regressions (`add_user_to_school` self-grant,
+Teacher Load cross-school view leak) reconfirmed intact by the RBAC
+reviewer via direct code read.
+
+**A process finding worth recording for future sessions**: the
+recurring agent-resume/retrieval failure documented since M7 did *not*
+recur here — both reviewer agents completed and could be resumed via
+`SendMessage`. What did initially fail was retrieving their findings as
+usable text: the first response from each resumed agent was a terse
+one-line acknowledgment, not the full report. The reviewers had likely
+already communicated their findings via `ReportFindings`, a tool whose
+output renders to a UI channel this orchestrating session can't read
+back. Explicitly asking each agent to restate its findings as plain
+text (not via `ReportFindings`) in a follow-up `SendMessage` worked.
+Future sessions dispatching `architecture-reviewer`/`security-reviewer`
+as background agents should anticipate this and ask for a plain-text
+report explicitly in the original dispatch prompt to avoid the extra
+round trip.
+
+**Verification, all actually run this session**: `cargo check --lib`
+PASS; targeted tests (81, `auth::`/`curriculum::`/`teaching_assignment::`/
+`schedule_meeting::`) PASS; full `cargo test` PASS (342 lib + all
+integration binaries); `cargo clippy --all-targets -- -D warnings` PASS;
+`npm run quality` PASS, 390/390; `cargo fmt --check` — 265 pre-existing
+diffs, unchanged by this session's edits, not corrected (out of scope,
+recommended follow-up milestone below); `git diff --check` clean;
+`gitleaks` secret scan NOT RUN (binary unavailable on `PATH`, not
+installed per project policy).
+
+**Gate decision: FOUNDATION REVIEW DEBT CLOSED — READY FOR
+FORMATTING/CI HARDENING.** Recommended next milestone (not started, per
+this session's explicit instruction to stop and wait for approval):
+Rust Formatting + Quality Gate Normalization (the ~265-file `cargo fmt`
+diff, then a minimal CI foundation, per the sequence recorded in
+`docs/VERIFICATION-DEBT.md`).
+
 ## Active Task (2026-08-25, this session — Native Rust Verification Recovery, complete)
 
 Full record: `docs/adr/0040-windows-only-dependency-target-gating.md`.

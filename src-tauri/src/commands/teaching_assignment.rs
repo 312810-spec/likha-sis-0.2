@@ -129,6 +129,15 @@ pub fn create_schedule_meeting(
     )
 }
 
+/// Gated by `auth::authorize_view_teacher_load` on the assignment's own
+/// teacher -- otherwise a Teacher session could reconstruct a colleague's
+/// full weekly schedule (weekday/time/room) by chaining
+/// `list_teaching_assignments_by_section` (reference data, intentionally
+/// open) with this command, bypassing the narrower rule
+/// `docs/adr/0039-teacher-load-class-schedule-foundation.md` states for
+/// teacher-keyed views. An assignment id foreign to the caller's school
+/// resolves to an empty list, matching this codebase's established
+/// `find_by_id_in_school` convention (e.g. `commands::export`).
 #[tauri::command]
 pub fn list_schedule_meetings_by_assignment(
     db: State<'_, Mutex<Connection>>,
@@ -137,5 +146,11 @@ pub fn list_schedule_meetings_by_assignment(
 ) -> AppResult<Vec<ScheduleMeeting>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
+    let Some(assignment) =
+        teaching_assignment::find_by_id_in_school(&conn, &school_id, &teaching_assignment_id)?
+    else {
+        return Ok(Vec::new());
+    };
+    auth::authorize_view_teacher_load(&conn, &sessions, &assignment.teacher_user_id)?;
     schedule_meeting::list_by_assignment_in_school(&conn, &school_id, &teaching_assignment_id)
 }
