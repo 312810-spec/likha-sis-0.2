@@ -8,6 +8,7 @@ pub mod grading;
 pub mod import;
 pub mod learner;
 pub mod learner_score;
+pub mod reference_geo;
 pub mod school;
 pub mod section;
 pub mod setup;

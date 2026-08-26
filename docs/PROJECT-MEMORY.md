@@ -1432,6 +1432,60 @@ a direct official static binary, checksum-verified against Google's
 own published SHA256SUMS before execution. All three tools re-confirmed
 clean locally immediately before wiring CI.
 
+## Wave 2G: External API & Government Reference-Data Foundation (added 2026-08-26)
+
+Full record: `docs/adr/0047-psgc-reference-data-foundation.md`. First
+concrete implementation of a pattern for external/public reference-data
+providers that does not make LIKHA depend on Internet availability.
+
+**PSGC (PSA Philippine Standard Geographic Code) implemented as a
+local-file import, not a live PSA API call.** PSA's own API site
+(`psa.gov.ph/classifications-api/psgc`) returned HTTP 403 Forbidden from
+this environment — the same disclosed network-egress gap already
+recorded for `deped.gov.ph`/`lis.deped.gov.ph`. Ten-scenario decision:
+Recommended = a local-file importer (admin picks a JSON snapshot via
+the same `dialog:allow-open` capability SF1 import already uses; no new
+Tauri capability needed), explicitly the brief's own "Next Best"
+hypothesis, taken because the "switch condition" (direct PSA sync
+proving unreachable/unverifiable) was concretely met, not assumed.
+
+**Schema (migration 20) is deliberately global (no `school_id` — the
+only tables in this schema without one) and append-only/versioned**:
+`reference_geo_snapshots` + `reference_geo_units`, one immutable
+generation per import, only one snapshot per source ever `is_current`.
+Old generations are never deleted or updated in place — this is what
+lets a historical geographic reference survive a future PSA rename
+without inventing a supersession/rename mapping PSA's own public data
+does not clearly expose from this environment. Every PSGC code is
+stored as an **opaque authoritative string**, never sliced to derive
+hierarchy — `level`/`parent_code` are their own explicit columns — because
+the exact PSGC code-length convention (9 vs. 10 digits, per
+inconsistent secondary sources) could not be independently verified.
+`authoritative_version`/`authoritative_published_at` come only from the
+imported file's own declared content, never from the local import
+timestamp and never operator-typed.
+
+`import::psgc` (parse/validate an untrusted JSON snapshot file) →
+`repository::reference_geo` (transactional, versioned commit — same
+all-or-nothing shape `import::commit::commit_import` already proved for
+SF1 — plus network-free reads) → `commands::reference_geo` (3 Tauri
+commands: import gated behind `Capability::ManageLearners`, reads
+gated behind only an active session). **Zero dependencies added** —
+`src-tauri/Cargo.toml` is unchanged; the local-file design needed no
+HTTP client crate. No UI screen built this wave (deliberately deferred,
+per the brief's own permission to prefer domain/repository/application
+tests over premature UI) — no SF1 redesign, no `learners` schema
+change.
+
+**12 external providers classified** (PSGC, PSCED, OpenSTAT, Cloudflare
+Turnstile, Tauri Biometric, Tauri Barcode/QR, Tauri Updater, DepEd
+Integration, GeoRisk/PHIVOLCS/PAGASA, Philippine eGov interoperability,
+scraping services, AI providers) — full table in
+`docs/SOURCE-REGISTRY.md`'s Wave 2G section. Only PSGC (A) was
+implemented; the rest are ADOPT-selectively-deferred, REFERENCE/PILOT,
+WATCH, REJECT, or DEFER, each with an evidence-based revisit trigger —
+none implemented this wave.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

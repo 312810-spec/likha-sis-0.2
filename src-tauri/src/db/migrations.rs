@@ -1012,6 +1012,85 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_sf1_import_history_fingerprint ON sf1_import_history(school_id, source_fingerprint);
         "#,
         ),
+        M::up(
+            r#"
+        -- PSGC (PSA Philippine Standard Geographic Code) reference data
+        -- (Wave 2G: External API & Government Reference-Data Foundation).
+        -- See docs/adr/0047-psgc-reference-data-foundation.md.
+        --
+        -- Deliberately GLOBAL, not school-scoped: PSGC is public national
+        -- reference data, not school-owned data, so unlike every other
+        -- table in this schema it carries no `school_id`.
+        --
+        -- Deliberately append-only/versioned rather than update-in-place:
+        -- each import creates a new `reference_geo_snapshots` row (an
+        -- immutable generation of data) and its own full set of
+        -- `reference_geo_units` rows, rather than overwriting the previous
+        -- generation. Nothing is ever deleted or renamed in place. This is
+        -- what lets a historical geographic reference stay valid forever
+        -- even after PSA renames or restructures a unit in a later
+        -- release, without this project inventing a rename/supersession
+        -- mapping PSA's own public data does not clearly expose to us.
+        -- Only one snapshot is ever `is_current = 1` at a time; that flag
+        -- flips atomically in the same transaction that inserts the new
+        -- snapshot's units, so a failed/partial import leaves the
+        -- previous snapshot fully intact and still current.
+        -- `imported_by_user_id`/`imported_by_username`: same provenance
+        -- pattern as `sf1_import_history` (migration 19) — who actually
+        -- triggered this import, for auditability, since this table has no
+        -- `school_id` to otherwise attribute it to.
+        CREATE TABLE reference_geo_snapshots (
+            id TEXT PRIMARY KEY,
+            source_name TEXT NOT NULL,
+            authoritative_version TEXT NOT NULL,
+            authoritative_published_at TEXT,
+            imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            is_current INTEGER NOT NULL DEFAULT 0 CHECK (is_current IN (0, 1)),
+            unit_count INTEGER NOT NULL,
+            imported_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            imported_by_username TEXT NOT NULL,
+            UNIQUE (source_name, authoritative_version)
+        );
+
+        CREATE INDEX idx_reference_geo_snapshots_current ON reference_geo_snapshots(source_name, is_current);
+
+        -- Schema-level backstop for "only one current snapshot per
+        -- source" — independent review (Wave 2G) found the invariant
+        -- previously lived ONLY in `repository::reference_geo::record_snapshot`'s
+        -- application-level UPDATE statements, with nothing preventing two
+        -- differently-named sources (e.g. a `source_name` typo on import)
+        -- from each silently holding their own orphaned `is_current = 1`
+        -- row. A partial unique index makes that state impossible to
+        -- reach even by a future bug, not just avoided by today's code.
+        CREATE UNIQUE INDEX idx_reference_geo_snapshots_one_current_per_source
+            ON reference_geo_snapshots(source_name) WHERE is_current = 1;
+
+        -- `code` is stored and compared as an OPAQUE authoritative string —
+        -- never parsed/sliced to derive hierarchy. PSA's own published
+        -- code-length convention could not be independently confirmed from
+        -- this environment (see the ADR's disclosed limitation), so
+        -- `level`/`parent_code` are stored as their own explicit columns
+        -- from the source data rather than derived from code structure.
+        CREATE TABLE reference_geo_units (
+            id TEXT PRIMARY KEY,
+            snapshot_id TEXT NOT NULL REFERENCES reference_geo_snapshots(id) ON DELETE CASCADE,
+            code TEXT NOT NULL,
+            name TEXT NOT NULL,
+            level TEXT NOT NULL CHECK (level IN ('region', 'province', 'city_municipality', 'barangay')),
+            parent_code TEXT,
+            UNIQUE (snapshot_id, code),
+            FOREIGN KEY (snapshot_id, parent_code) REFERENCES reference_geo_units(snapshot_id, code)
+        );
+
+        CREATE INDEX idx_reference_geo_units_snapshot ON reference_geo_units(snapshot_id);
+        CREATE INDEX idx_reference_geo_units_parent ON reference_geo_units(snapshot_id, parent_code);
+        -- Covers the `level`-filtered branch of `list_units` (the
+        -- highest-volume future query path once a real address-entry UI
+        -- exists — barangay is PSGC's largest tier by row count) so it
+        -- doesn't fall back to a full snapshot scan plus a temporary sort.
+        CREATE INDEX idx_reference_geo_units_snapshot_level ON reference_geo_units(snapshot_id, level, name);
+        "#,
+        ),
     ])
 }
 

@@ -1,5 +1,57 @@
 # ACTIVE PLAN
 
+## Wave 2G: External API & Government Reference-Data Foundation (added 2026-08-26) — complete
+
+Full record: `docs/adr/0047-psgc-reference-data-foundation.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s
+Wave 2G section, `docs/CURRENT-HANDOFF.md`'s top entry. Verification
+record:
+
+- **Repository truth verified first**: `git fetch` clean; branch/HEAD
+  at Wave 2F's checkpoint `c00bc15`; `main` unchanged at `d9ab036`;
+  working tree clean; both Wave 2F CI runs re-confirmed
+  `completed`/`success` for that exact commit before any implementation
+  began.
+- **Ten-scenario architecture decision**: Recommended = local-file PSGC
+  importer (no live PSA network call), explicitly the brief's own
+  "Next Best" hypothesis — taken because PSA's own API site returned
+  HTTP 403 from this environment. Full scoring in ADR-0047.
+- **Schema**: migration 20, `reference_geo_snapshots`/
+  `reference_geo_units` — global (no `school_id`), append-only/versioned,
+  self-referencing FK plus a schema-level partial unique index
+  (`WHERE is_current = 1`) enforcing exactly one current snapshot per
+  source.
+- **Code**: `import::psgc` (parse/validate), `repository::reference_geo`
+  (transactional commit + reads), `commands::reference_geo` (3
+  commands). Zero new dependencies — `src-tauri/Cargo.toml` unchanged.
+- **Three independent reviews, all CLOSED, one blocking finding fixed**
+  (converged on independently by two of three reviewers): hardcoded
+  `"PSA PSGC"` read literal vs. unvalidated `source_name` write field —
+  a mismatched import silently succeeded then became permanently
+  invisible to every read. Fixed with an `EXPECTED_SOURCE_NAME`
+  constant plus a schema-level backstop. Also fixed: two overstated
+  test claims (a rollback test that never called `record_snapshot`; a
+  "reconnect" test that never reconnected — both replaced with genuine
+  versions), a level-adjacency validation gap, missing actor
+  attribution, zero command-layer test coverage (added
+  `tests/reference_geo.rs`), and a misleading `unit_count: 0` on no-op
+  re-imports. Both reviewers hit this project's recurring
+  reviewer-retrieval bug and were recovered via the established
+  raw-transcript-then-retry protocol. Full detail:
+  `docs/VERIFICATION-DEBT.md`.
+- Full regression re-run, unaffected: `cargo nextest run` 521/521
+  (up from 501); plain `cargo test` (incl. doctests) green; `cargo fmt
+--check`/`cargo clippy --all-targets -D warnings` clean; `npm run
+quality` 438/438 clean (no frontend files touched); `npm run build`
+  (production) PASS. `npm run quality:security`: `cargo-deny` clean
+  locally; `gitleaks`/`osv-scanner` not installed on PATH this session
+  (disclosed, not new — CI's Security Gate is authoritative for this
+  zero-new-dependency diff).
+- 12 external providers researched and classified (only PSGC
+  implemented) — full table in `docs/SOURCE-REGISTRY.md`.
+- **Next**: Wave 3 — Authoritative-Template SF1 Form Engine. Not
+  started this session, per the milestone's own explicit instruction.
+
 ## Wave 2F: Harness Closure + Security CI Gate (added 2026-08-26) — complete, not a LIKHA feature milestone, read this section first
 
 Full record: `docs/adr/0045-claude-code-harness-audit.md`'s Wave 2F

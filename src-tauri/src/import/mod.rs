@@ -3,6 +3,7 @@ pub mod fingerprint;
 pub mod matching;
 pub mod normalize;
 pub mod preview;
+pub mod psgc;
 pub mod sf1;
 pub mod validate;
 pub mod workbook;

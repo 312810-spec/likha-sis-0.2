@@ -1,5 +1,80 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2G: External API & Government Reference-Data Foundation, complete)
+
+Full record: `docs/adr/0047-psgc-reference-data-foundation.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s
+Wave 2G section. Same branch as prior waves
+(`claude/likha-sis-wave2a-learner-core`).
+
+**Repository-truth/CI hard gate verified first**: `git fetch` clean;
+branch and HEAD both at `c00bc15` (Wave 2F's checkpoint); `main`
+unchanged at `d9ab036`; working tree clean. Both Wave 2F CI runs
+re-confirmed genuinely `completed`/`success` for that exact commit
+(Quality Gate `32964519995`, Security Gate `32964520041`) before any
+Wave 2G work began.
+
+**Ten-scenario decision**: Recommended = a local-file PSGC importer
+(no live PSA network call) — explicitly the brief's own "Next Best"
+hypothesis, taken because PSA's own API site returned HTTP 403 from
+this environment (couldn't even be reached to inspect, let alone build
+a live-sync importer against). Full scoring of all ten designs in
+ADR-0047.
+
+**What was built**: `reference_geo_snapshots`/`reference_geo_units`
+(migration 20) — deliberately global (no `school_id`, the only tables
+in this schema without one) and append-only/versioned (old generations
+never deleted, only one `is_current` per source, enforced by both
+application logic and a schema-level partial unique index).
+`import::psgc` (parse/validate an untrusted JSON snapshot file) →
+`repository::reference_geo` (transactional versioned commit, same
+all-or-nothing shape as SF1's `commit_import`) → `commands::reference_geo`
+(3 commands: import gated behind `ManageLearners` with actor
+attribution, reads gated behind only an active session). **Zero
+dependencies added.** No UI screen built this wave (deliberately
+deferred, per the brief's own permission).
+
+**12 external providers classified** (PSGC ADOPT/implemented; PSCED,
+OpenSTAT REFERENCE/PILOT; Turnstile, Biometric, Updater ADOPT-direction/
+deferred; Barcode/QR PILOT; DepEd Integration, eGov WATCH; GeoRisk
+REFERENCE/PILOT; scraping REJECT; AI providers DEFER) — full table in
+`docs/SOURCE-REGISTRY.md`.
+
+**Three independent reviews, all CLOSED, one blocking finding fixed**
+(security/privacy, reliability/architecture, teacher/compliance — two
+of the three independently converged on the same root defect, both hit
+this project's recurring reviewer-retrieval bug and were recovered via
+the established protocol). Blocking: read commands hardcoded
+`"PSA PSGC"` while the importer accepted any `sourceName` — a
+mismatched import silently succeeded then became permanently invisible
+to every read. Fixed with an `EXPECTED_SOURCE_NAME` constant enforced
+at parse time plus a schema-level partial unique index. Also fixed:
+two test-quality gaps (a rollback test that never called the function
+it claimed to prove; a "reconnect" test that never reconnected), a
+level-adjacency validation gap (same-level malformed hierarchy
+acceptance was file-order-dependent), missing actor attribution, zero
+command-layer test coverage (added), and a misleading `unit_count: 0`
+on no-op re-imports. Full detail: `docs/VERIFICATION-DEBT.md`'s Wave
+2G entry.
+
+**Verification**: `cargo nextest run` — 521/521 passed (up from 501
+pre-milestone). `cargo test` (stable-checkpoint gate) — green,
+including 0 doctests. `cargo fmt --check` — clean. `cargo clippy
+--all-targets -- -D warnings` — clean. `npm run quality` — clean, 438
+TS tests, no frontend regression (no frontend files touched).
+`npm run build` — clean production build. `npm run quality:security`
+— `cargo-deny` clean locally; `gitleaks`/`osv-scanner` not installed
+on PATH this session (disclosed, not new — CI's Security Gate is
+authoritative for this zero-new-dependency diff).
+
+**Exact next action**: Wave 3 — Authoritative-Template SF1 Form Engine
+(per this project's own priority order and the milestone's own explicit
+instruction that Wave 2G must not begin it automatically). Before
+starting, read `docs/adr/0047-psgc-reference-data-foundation.md`'s
+"Remaining verification debt" section — it records a concrete
+constraint the SF1/address work must honor: any future learner-address
+field must key on `reference_geo_units.code`, never `.id`/`snapshot_id`.
+
 ## Note: Wave 2F — harness closure + security CI gate (2026-08-26) — separate from the feature track below
 
 Two non-feature milestones ran after Wave 2E, neither touching

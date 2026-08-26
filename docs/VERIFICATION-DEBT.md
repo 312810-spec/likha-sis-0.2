@@ -1,5 +1,68 @@
 # Verification Debt
 
+## Wave 2G — External API & Government Reference-Data Foundation (PSGC) (2026-08-26)
+
+Full record: `docs/adr/0047-psgc-reference-data-foundation.md`.
+
+**Three independent reviews dispatched (security/privacy, reliability/
+architecture, teacher/compliance) — all CLOSED, one genuinely blocking
+finding fixed, converged on independently by two of the three
+reviewers.** Both the security and reliability reviewers hit this
+project's recurring reviewer-retrieval bug on the standard notification
+channel (a stub confirmation instead of the actual findings text) and
+were recovered via the established two-step protocol — raw-transcript
+JSONL parsing first (recovered the reliability review's full text this
+way), then a `SendMessage` retry explicitly demanding the full text be
+pasted (recovered both the security and teacher/compliance reviews this
+way). **Blocking finding, fixed**: read commands
+(`get_current_psgc_snapshot`/`list_psgc_units`) hardcoded the literal
+`"PSA PSGC"` as the source name to look up, while the importer accepted
+any non-blank `sourceName` string with no allow-list — a file with any
+other spelling imported "successfully" but became permanently invisible
+to every read, with no schema-level backstop and no in-app remedy under
+the append-only design. Fixed with an `EXPECTED_SOURCE_NAME` constant
+enforced at parse time, plus a schema-level partial unique index
+(`idx_reference_geo_snapshots_one_current_per_source`) so the class of
+bug is now impossible at the database layer too. Two test-quality
+findings, also fixed: the original "failure partway through" rollback
+test never actually called `record_snapshot` (it only proved
+`rusqlite::Transaction`'s own `Drop`-rollback behavior); the original
+"survives a reconnect" test never actually reconnected. Both replaced
+with genuine versions. One data-integrity gap, fixed: level-sort-before-
+insert accepted a same-level malformed parent/child pair whenever file
+row order happened to place the child after its "parent" — now an
+explicit level-adjacency check rejects this deterministically regardless
+of order. Two smaller gaps, fixed: no actor-attribution column on
+`reference_geo_snapshots` (added, matching `sf1_import_history`'s
+pattern); zero command-layer test coverage (added
+`tests/reference_geo.rs`, 4 integration tests). One cosmetic gap, fixed:
+a repeat-import no-op previously reported `unit_count: 0`, which a
+future UI could misread as a failed import — now reports the existing
+snapshot's real count.
+
+**New debt recorded** (documentation gaps, not code defects — see
+ADR-0047's own "Remaining verification debt" section for the full
+text): `GeoLevel`'s closed 4-variant enum would reject an entire real
+PSA-derived file if it ever contained a level outside those four values
+(not widened this wave — no verified real PSA level taxonomy exists to
+widen it against, so a guess was deliberately not made); a future
+learner-address field must key on `reference_geo_units.code`, never
+`.id`/`snapshot_id` (fresh UUIDs per import, unstable across
+re-imports) — flagged by the teacher/compliance reviewer as absent from
+the ADR's original text, now recorded there explicitly; producing a
+real PSGC snapshot file from PSA's actual publications is realistically
+a developer/technical task, not a registrar self-service one — the
+ADR's phrasing previously read as though picking a file were the hard
+part, now corrected.
+
+`gitleaks`/`osv-scanner` were not installed on PATH in this session, so
+`npm run quality:security` only ran `cargo-deny` locally (clean:
+advisories/bans/licenses/sources all ok) — not a new gap, the same
+disclosed local-tool-availability pattern already recorded for prior
+waves. CI's `.github/workflows/security.yml` (Wave 2F) runs all three
+regardless of local availability and is the authoritative check for
+this milestone's zero-new-dependency diff.
+
 ## Wave 2F — security tool CI gate (2026-08-26)
 
 Full record: `docs/adr/0046-security-ci-gate.md`. Closes Wave 2E's own
