@@ -1,5 +1,61 @@
 # Verification Debt
 
+## Wave 2C SF1 Import Preview + Duplicate Review UX (2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C
+addendum. Carries forward all four Wave 2B items below unchanged (UI
+work doesn't close backend-only debt), plus two new items scoped to
+this milestone:
+
+1. **`cargo-deny`/OSV-Scanner did not run against `tauri-plugin-dialog`**
+   either — same disclosed unavailable-tooling gap as `calamine` below.
+2. **No native visual/screen-reader pass on the actual Tauri desktop
+   binary.** `npm run quality:ui` (Playwright) and this session's own
+   axe-core checks (`expectNoAccessibilityViolations`) cover structural
+   accessibility in jsdom, and the native binary was confirmed to build
+   and run (`cargo build`), but this environment has no browser/
+   screenshot tool for the native window itself — a human visual pass
+   (200% text reflow at real DPI, actual keyboard-only completion of the
+   full workflow in the compiled app, screen-reader announcement
+   behavior) has not happened. Same disclosed limitation
+   `.claude/rules/testing.md` already documents as a standing gap for
+   every UI milestone, not new to this one.
+
+**Independent teacher-UX review (premium-design + teacher-comfort
+combined) — CLOSED.** The standard notification channel again hit this
+project's recurring reviewer-retrieval bug (the agent kept insisting
+its report was "already delivered" on every automated follow-up ping);
+recovered in full by reading the agent's raw transcript file directly,
+same recovery technique as Wave 2B's security review. 7 of 11 questions
+GOOD, 2 CONCERN (plain visual density/hierarchy, both explicitly
+characterized as consistent with this app's existing CRUD-plain
+baseline — not a regression, noted for a future density pass once
+imports scale past a handful of duplicate rows), **4 NEEDS-FIX, all
+fixed in this same checkpoint**:
+
+1. `Sf1DuplicateReview.tsx` only ever showed/decided against
+   `match.candidates[0]`, though `learner::find_candidates` has no
+   `LIMIT 1` and can legitimately return more than one plausible match
+   (verified directly against the Rust query, not theoretical). Fixed:
+   the component now shows a candidate count and a selector when more
+   than one exists, and the decision always targets whichever candidate
+   the teacher has selected.
+2. The "nothing is saved until you decide / no auto-merge" safety
+   reassurance was Guided-mode-only, missing from Comfortable (the app
+   default) and Efficient. Fixed: the core reassurance sentence is now
+   shown in all three modes; Guided still layers on extra explanation.
+3. A whole-file parse/commit failure collapsed every cause into one
+   generic "Something went wrong" message, unlike the specific
+   row-level error copy elsewhere on the same screen. Fixed:
+   `describeError` now recognizes the backend's `import_error` category
+   specifically and gives SF1-workbook-specific guidance for it,
+   distinct from the true-unknown-failure fallback.
+4. The birthdate row used two different phrasings for the same fact
+   ("Not tracked" vs. "Not stored in LIKHA"). Fixed: reconciled to one
+   phrase used in both the value cell and the comparison chip.
+
+No further UX debt remains open from this review.
+
 ## Wave 2B SF1 Bulk Import Engine (2026-08-26)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`. Three genuine,

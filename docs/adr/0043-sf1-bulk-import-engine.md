@@ -326,3 +326,63 @@ natural next increment on top of this contract, not a redesign of it.
 - `cargo-deny`/OSV-Scanner supply-chain check for `calamine` — recorded
   in `docs/VERIFICATION-DEBT.md`, same disclosed gap as every prior
   dependency addition.
+
+## Addendum (Wave 2C): Import Preview + Duplicate Review UX
+
+Connects the engine above to a teacher-facing screen
+(`src/ui/Sf1ImportScreen.tsx` + `src/ui/components/Sf1DuplicateReview.tsx`).
+No backend contract changed — the UI adapts to the existing
+`Sf1ImportPreview`/`Sf1RowCommitPlan`/`MatchKind`/`IssueSeverity` shapes
+verbatim (mirrored in `src/domain/sf1-import.ts`, including the exact
+serde externally-tagged wire format for `Sf1RowAction`).
+
+**Native file picker**: added `tauri-plugin-dialog` /
+`@tauri-apps/plugin-dialog` (official first-party Tauri plugins, both
+v2.7.2 — see `docs/SOURCE-REGISTRY.md`) behind a new `FilePicker` port
+(`src/domain/ports/file-picker.ts`), implemented only in
+`src/infrastructure/tauri/file-picker.ts`. `capabilities/default.json`
+grants only `dialog:allow-open`, not the plugin's broader default
+permission set. The frontend never receives or constructs a filesystem
+path from anywhere except this dialog.
+
+**No new backend authority**: the UI never supplies `school_id` or a
+capability — both Tauri commands still derive scope from the session,
+proven directly by existing Wave 2B tests
+(`commit_sf1_import`/`preview_sf1_import`'s own `authorize_capability`
+gate) plus new UI-level tests confirming no `schoolId` field is ever
+sent. The screen also never converts a `SuspectedDuplicate` into an
+`ExactLrn` match or offers a merge action — `DuplicateDecision` is
+`useExisting`/`createSeparate` only, matching Decision 4 above exactly.
+
+**Target section is a UI-level addition, not a hidden backend
+requirement**: `commit_sf1_import` already required `section_id`/
+`starts_on` (Wave 2B), so the screen's "Which section is this SF1 for?"
+step is adapting to that existing contract, not inventing new backend
+scope.
+
+**Android decision**: kept Windows-only, deliberately (Option C from
+the brief), not attempted as a shrunken desktop UI. This codebase has
+no Android build target scaffolded at all yet (`src-tauri/gen/android`
+does not exist) — there is no runtime to evaluate feasibility against,
+so claiming any Android behavior here would be unverifiable. Revisit
+once an Android target actually exists, per `CLAUDE.md`'s own
+"Windows first; Android later."
+
+**Verification debt carried forward unchanged** by this addendum (UI
+work doesn't close any of it): real SF1 template fidelity, the
+non-blank cached-formula-value proof, `cargo-deny`/OSV-Scanner for
+`calamine`, and now also for `tauri-plugin-dialog`, and
+`MAX_DATA_ROWS`'s post-materialization ordering. See
+`docs/VERIFICATION-DEBT.md`.
+
+**Independent teacher-UX review (premium-design + teacher-comfort) —
+CLOSED**, 4 NEEDS-FIX findings, all fixed in this same checkpoint: only
+the first duplicate candidate was ever shown/decided against despite
+the backend query legitimately being able to return more than one
+(fixed with a candidate selector); the "nothing is saved until you
+decide" safety reassurance was Guided-only instead of shown in every
+mode (fixed); a whole-file failure collapsed every cause into one
+generic message instead of recognizing the backend's `import_error`
+category (fixed); the birthdate row used two different phrasings for
+the same fact (fixed, reconciled to one). Full detail in
+`docs/VERIFICATION-DEBT.md`.

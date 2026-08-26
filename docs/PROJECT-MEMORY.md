@@ -1230,6 +1230,42 @@ matching this project's established zero-or-minimal-UI-first precedent
 (RBAC, Curriculum, Teacher Load, Wave 2A). 43 new unit tests + 8 new
 integration tests, all passing alongside the full existing suite.
 
+## Wave 2C: SF1 Import Preview + Duplicate Review UX (added 2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C
+addendum. Connects Wave 2B's tested engine to a teacher-facing screen
+(`src/ui/Sf1ImportScreen.tsx` + `src/ui/components/Sf1DuplicateReview.tsx`),
+under a new "SF1: Enrollment" nav item (Learner Records group) — never
+renamed to a generic "Learner Import." Flow: pick target section + date
+→ choose an `.xls`/`.xlsx` file via the native OS dialog (new
+`tauri-plugin-dialog`/`@tauri-apps/plugin-dialog` dependency, first-party
+Tauri plugins, `dialog:allow-open` only) → LIKHA classifies every row
+New/Already-in-LIKHA/Needs-review/Has-an-error → suspected duplicates
+get an inline side-by-side comparison with explicit "same learner" /
+"different learners" decisions (no merge option — matches Wave 2A.1's
+finding that this codebase has no merge capability) → transactional
+commit reusing Wave 2B's `commit_sf1_import` unchanged → success/failure
+summary using only backend-reported numbers. The UI never supplies
+`school_id` or a capability and never re-implements Wave 2B's
+parsing/validation/matching rules — it only presents the already-computed
+`Sf1ImportPreview` and assembles a `Sf1RowCommitPlan` from the teacher's
+decisions. Kept Windows-only deliberately (no Android build target
+exists in this codebase yet — nothing to evaluate feasibility against).
+
+An independent teacher-UX review (premium-design + teacher-comfort)
+found and this session fixed 4 real issues: duplicate review only ever
+showed the first of potentially several matching candidates (the
+backing SQL has no row limit and can genuinely return more than one) —
+now shows a candidate count and selector; the "nothing is saved until
+you decide" safety reassurance was Guided-mode-only instead of shown in
+every mode — now shown in all three; a whole-file failure collapsed
+every cause into one generic message — now recognizes the backend's
+`import_error` category specifically; two different phrasings described
+the same "birthdate not stored in LIKHA" fact — reconciled to one. 25
+new unit/component tests (application service, two infrastructure
+adapters, the screen itself) all passing alongside the full existing
+429-test suite.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

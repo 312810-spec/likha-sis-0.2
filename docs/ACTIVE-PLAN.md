@@ -1,5 +1,36 @@
 # ACTIVE PLAN
 
+## Wave 2C: SF1 Import Preview + Duplicate Review UX (added 2026-08-26) — complete, read this section first
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C
+addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
+
+- 25 new tests: `sf1-import-service.test.ts` (application logic —
+  `buildCommitPlan`/`unresolvedReviewCount`), `sf1-import-repository.test.ts`
+  - `file-picker.test.ts` (infrastructure adapters), `Sf1ImportScreen.test.tsx`
+    (22 component tests — file selection, parsing state, classification
+    counts, duplicate comparison/decisions, mode parity, keyboard
+    reachability, 2 accessibility checks). All passing.
+- Full `npm run test` — PASS, 429/429 (up from 404).
+- `tsc -b --noEmit` / `eslint .` / `prettier --check .` /
+  `check:architecture` — all clean.
+- `cargo fmt --check` / `cargo test` (393 lib tests, unchanged) /
+  `cargo clippy --all-targets -- -D warnings` — all PASS.
+- Native `cargo build` and `npm run build` — both succeed.
+- Independent teacher-UX review (premium-design + teacher-comfort) —
+  4 NEEDS-FIX findings, all fixed this session (multi-candidate
+  duplicate selection, all-mode safety reassurance, `import_error`-
+  specific failure copy, consistent birthdate-field wording).
+- Wave 2B's own CI run was found to have actually failed (Prettier
+  drift on docs edited after the local gate ran) — fixed and confirmed
+  green before any Wave 2C work began.
+
+**Deliberately not covered**: a human visual/screen-reader pass on the
+compiled native Tauri binary — no browser/screenshot tool available for
+it in this environment (standing gap, `docs/VERIFICATION-DEBT.md`).
+Android intentionally out of scope — no Android build target exists in
+this codebase yet.
+
 ## Wave 2B: SF1 Bulk Import Engine (added 2026-08-26) — engine checkpoint complete, UI deferred, read this section first
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`,

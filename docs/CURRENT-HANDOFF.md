@@ -1,5 +1,70 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2C: SF1 Import Preview + Duplicate Review UX, complete)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C
+addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Same branch as
+Wave 2A/2A.1/2B (`claude/likha-sis-wave2a-learner-core`).
+
+**Repository truth verified first**: branch/`origin` HEAD both at
+`926eddc` as reported, `main` unchanged at `d9ab036`, working tree
+clean. **Wave 2B's own CI run (`32938597210`) had actually failed** —
+Prettier drift in three docs edited after the last local `npm run
+quality` pass, the exact same class of gap this project's own prior
+lesson already named ("run the full gate before every push, including
+docs-only edits"). Fixed immediately (`5105cef`, confirmed green
+`32939416520`) before starting any Wave 2C work, per this milestone's
+own instruction not to build UI on an unconfirmed checkpoint.
+
+**What was built**: `src/ui/Sf1ImportScreen.tsx` (workflow screen) +
+`src/ui/components/Sf1DuplicateReview.tsx` (side-by-side duplicate
+comparison), under a new "SF1: Enrollment" nav tab. Full domain/
+application/infrastructure layers added
+(`src/domain/sf1-import.ts`, `src/application/sf1-import-service.ts`,
+`src/infrastructure/tauri/sf1-import-repository.ts`) mirroring Wave
+2B's Rust contract exactly, including the serde externally-tagged wire
+format for `Sf1RowAction`. New native file-picker port
+(`src/domain/ports/file-picker.ts` /
+`src/infrastructure/tauri/file-picker.ts`) backed by
+`tauri-plugin-dialog`/`@tauri-apps/plugin-dialog` (first-party Tauri
+plugins, `dialog:allow-open` permission only).
+
+**No backend changed**: the UI adapts to Wave 2B's existing
+preview/commit contract; no new Tauri command, no schema change, no
+re-implementation of parsing/validation/matching in TypeScript. No
+merge option anywhere (matches Wave 2A.1's finding that this codebase
+has no merge capability). UI never supplies `school_id` or a
+capability — proven by both existing backend tests and new UI-level
+assertions.
+
+**Independent teacher-UX review — CLOSED**: found and fixed 4 real
+issues this same session (only the first of possibly several duplicate
+candidates was ever shown/decided against; the safety reassurance was
+Guided-only instead of all-mode; a whole-file failure gave one generic
+message instead of recognizing the backend's `import_error` category;
+inconsistent "not tracked"/"not stored" phrasing). Standard
+notification channel hit this project's recurring reviewer-retrieval
+bug again; recovered in full from the agent's raw transcript file, same
+technique as Wave 2B's security review. Full detail:
+`docs/VERIFICATION-DEBT.md`.
+
+**Verification, all actually run**: 25 new tests (application service,
+2 infra adapters, screen component) all passing; full `npm run test`
+429/429 PASS (up from 404 pre-Wave-2C); `tsc -b --noEmit`/`eslint .`/
+`prettier --check .`/`check:architecture` all clean; `cargo fmt
+--check`/`cargo test` (393 lib tests, unchanged — no Rust logic
+changed)/`cargo clippy --all-targets -D warnings` all PASS; native
+`cargo build` succeeds; `npm run build` succeeds. Android kept
+deliberately out of scope — no Android build target exists in this
+codebase yet, so there is nothing to evaluate feasibility against, per
+`CLAUDE.md`'s "Windows first; Android later."
+
+**Deliberately not built this checkpoint**: a Playwright/native visual
+pass on the compiled Tauri binary (no browser/screenshot tool available
+for it in this environment, same standing disclosed gap as every prior
+UI milestone) — recorded honestly in `docs/VERIFICATION-DEBT.md`, not
+claimed as covered.
+
 ## Active Task (2026-08-26, this session — Wave 2B: SF1 Bulk Import Engine, engine checkpoint complete, UI deferred)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`. Same branch as
