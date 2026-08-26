@@ -1,6 +1,10 @@
 {
   "enabledPlugins": {
-    "security-guidance@claude-plugins-official": true
+    "security-guidance@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "claude-security@claude-plugins-official": true
   },
   "env": {
     "ENABLE_STOP_REVIEW": "0",
