@@ -40,6 +40,14 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 Greenfield repository. No old implementation is authoritative.
 
+- **`main` verified baseline (2026-08-26): `3951c3d`.** Fast-forward
+  integration of `claude/likha-sis-ux03-plan-plv80c` (30 commits: RBAC
+  Foundation, Curriculum/Key-Stage Versioning, Teacher Load/Class
+  Schedule Foundation, the `windows-future` target-gating fix, Rust
+  formatting normalization, Minimal CI Foundation) — no merge commit,
+  no squash. CI green on `main` itself (Ubuntu + Windows). Previous
+  baseline: `f02bce5`. See `docs/adr/0035` through `0041` and
+  `docs/CURRENT-HANDOFF.md`'s Integration Review entry for full detail.
 - **Minimal CI Foundation (2026-08-26)**: `.github/workflows/quality.yml`
   runs `npm run quality:full` on `ubuntu-latest` and `windows-latest`
   (GitHub-hosted standard runners) on push/PR/manual dispatch,

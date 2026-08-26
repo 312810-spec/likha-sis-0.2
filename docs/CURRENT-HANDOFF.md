@@ -1,5 +1,74 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
+
+**`main` is now the verified integration baseline at `3951c3d`.**
+Previous baseline: `f02bce5` (account-transition checkpoint, pre-UX-03).
+30 commits, 89 files (+14094/-727) fast-forwarded — no merge commit,
+no squash, no rebase, no force push.
+
+**Repository truth verified first**: `main`/`origin/main` were both at
+`f02bce5`, an unmodified strict ancestor of the feature branch (0
+commits behind, 30 ahead) — no divergence, safe to integrate without
+reconciliation.
+
+**Cross-milestone integration delta reviewed**: automated checks
+(junk/generated files, `Cargo.lock` byte-identical to `main` — zero
+dependency drift, migration chain — 15→18, pure appends only, no
+reordering/destructive changes, no `LIKHA-SIS 2.0` stale naming, no
+hardcoded secrets/credentials, three-term grading confirmed as the
+seeded default) all clean. An `architecture-reviewer` was dispatched
+for the specific cross-milestone question this gate exists to answer
+(does RBAC compose correctly with every command added after it landed
+— Teacher Load, Curriculum) and hit this project's recurring
+agent-resume/retrieval failure on both the initial attempt and the one
+permitted retry (documented since M7). A rigorous self-review was
+substituted: read every command in `commands::teaching_assignment.rs`
+directly — all eight are correctly and consistently gated (four
+via `authorize_capability(ManageTeachingAssignments)`, two via
+`authorize_view_teacher_load`, one reference-data read intentionally
+open, matching the codebase's established convention, and the one
+previously-fixed cross-teacher leak in
+`list_schedule_meetings_by_assignment` reconfirmed still fixed);
+`authorize_view_teacher_load`/`authorize_capability` themselves
+reconfirmed fail-closed and session-derived only; `node
+scripts/check-architecture.mjs` passed with zero restricted imports.
+No BLOCKING or SHOULD-FIX findings — real, non-self independent-review
+debt for this specific integration-delta question remains open (see
+`docs/VERIFICATION-DEBT.md`).
+
+**One real documentation-truth gap found and fixed**: `docs/PROGRESS-MAP.md`'s
+`CURRENT` pointer still said "Wave 0 complete, recommended next: RBAC
+foundation" — stale since RBAC, Curriculum, Teacher Load, and the
+`windows-future` compiler blocker have all since closed. Fixed to
+point at the closed ADRs.
+
+**Pre-integration CI, actually run on the exact HEAD integrated**:
+feature-branch run `32921475227` (HEAD `3951c3d`) — Ubuntu and Windows
+both green. Local `npm run quality:full`, `cargo check --lib`, native
+`cargo build`, `git diff --check` — all PASS, all actually run this
+session.
+
+**Fast-forward performed** (`git checkout main && git pull --ff-only
+origin main && git merge --ff-only claude/likha-sis-ux03-plan-plv80c`)
+— Git itself reported `Fast-forward`, not a merge commit. Pushed;
+`origin/main` confirmed at `3951c3d`, matching local exactly.
+
+**`main` CI verified green on the new baseline, not assumed**: run
+`32922664816` (push event, HEAD `3951c3d`) — Ubuntu and Windows both
+`success`.
+
+**Feature branch status**: `claude/likha-sis-ux03-plan-plv80c` is
+fully integrated into `main`. Not deleted this milestone, per explicit
+instruction — retained until the user approves removal. It is no
+longer the development baseline; the next product milestone starts
+from fresh `main` on a new branch.
+
+**Gate decision: INTEGRATION PASSED — MAIN IS THE NEW VERIFIED
+BASELINE.** Per explicit instruction, no product feature work has
+begun. Recommended next milestone (not started): see this session's
+final report.
+
 ## Active Task (2026-08-26, this session — Minimal CI Foundation, complete)
 
 Full record: `docs/adr/0041-minimal-ci-foundation.md`,

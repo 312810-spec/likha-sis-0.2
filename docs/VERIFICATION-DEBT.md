@@ -1,5 +1,53 @@
 # Verification Debt
 
+## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
+
+`architecture-reviewer` was dispatched for a narrow cross-milestone
+question (does every command RBAC should gate, added after RBAC
+landed — specifically Teacher Load's `commands::teaching_assignment.rs`
+— actually route through it consistently; any accidental
+curriculum/class-record/teacher-load concept duplication; migration
+chain safety; leftover debug artifacts). It completed real work (30
+tool uses, ~84-89K tokens across two attempts) but returned no
+retrievable findings text on the initial dispatch or the one permitted
+retry — the same recurring agent-resume/retrieval failure documented
+since M7. A rigorous self-review was substituted:
+
+- Read `src-tauri/src/commands/teaching_assignment.rs` directly, all 8
+  commands: `create_teaching_assignment`/`replace_teacher_assignment`/
+  `remove_teaching_assignment`/`create_schedule_meeting` gated via
+  `auth::authorize_capability(Capability::ManageTeachingAssignments)`;
+  `list_teacher_assignments`/`get_teacher_load`/
+  `list_schedule_meetings_by_assignment` gated via
+  `auth::authorize_view_teacher_load`; `list_teaching_assignments_by_section`
+  intentionally open (reference data, matching `list_learners_by_school`'s
+  established convention, documented inline). The previously-fixed
+  cross-teacher schedule leak in `list_schedule_meetings_by_assignment`
+  (closed by the RBAC Foundation `security-reviewer` review, see below)
+  reconfirmed still present and correct — no regression.
+- Read `authorize_view_teacher_load`/`authorize_capability` themselves
+  (`src-tauri/src/auth/mod.rs:430-473`): both session-derived only, both
+  do a fresh (non-cached) role lookup on every call, both fail closed.
+- `node scripts/check-architecture.mjs` — PASS, zero restricted
+  imports, across the whole delta.
+- Migration chain (`src-tauri/src/db/migrations.rs`): `main` had 15
+  `M::up(...)` entries, this branch has 18 — diffed and confirmed the
+  3 new ones (16 RBAC, 17 Curriculum, 18 Teacher Load) are pure
+  appends, no existing migration reordered or altered.
+- `git diff main...HEAD -- src-tauri/Cargo.lock` — empty; zero
+  dependency drift across all 30 commits.
+- Curriculum/class-record/teacher-load conceptual model: `teaching_assignments`
+  (who teaches what, year-long), `class_records` (term-scoped grading,
+  carries `curriculum_version_id`), `curriculum_versions` (which
+  curriculum content applies) — three genuinely separate concepts per
+  ADR-0037/ADR-0039's own explicit "deliberately not linked" reasoning,
+  re-confirmed by direct schema read, not just cited.
+
+**No BLOCKING or SHOULD-FIX findings.** Real, non-self independent-review
+debt for this specific cross-milestone integration-delta question
+remains open — re-run `architecture-reviewer` once agent-resume
+behavior is confirmed reliably working in a future session.
+
 ## Minimal CI Foundation: no CI configuration debt closed (2026-08-26)
 
 The "no CI configuration exists yet" line carried in the entry below
