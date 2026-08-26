@@ -41,6 +41,10 @@ skipped: fixed with `npx prettier --write` on the four files, `npm run
 quality:full` re-run clean locally before re-pushing, then reconfirmed
 green on GitHub Actions (run recorded below).
 
+Final confirmation run (32917911205, after the formatting fix) is also
+**green on both jobs** — Ubuntu `success` in 7m18s, Windows `success`
+in 17m41s.
+
 **Debt closed**: no CI configuration existed → now exists and is
 proven green on both target platforms with real evidence, including
 two genuine findings caught and fixed by the CI itself (the Ubuntu

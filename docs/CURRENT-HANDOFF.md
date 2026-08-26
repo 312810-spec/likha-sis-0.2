@@ -47,7 +47,11 @@ Windows job passed `npm run quality:full` end-to-end on the first
 try. Fixed by adding the exact `apt-get` package list from Tauri's own
 official prerequisites docs (fetched directly, quoted, not
 remembered). Re-pushed; run 32916282825 is **green on both jobs**
-(Ubuntu 6m9s, Windows 17m17s).
+(Ubuntu 6m9s, Windows 17m17s). A second real, non-CI-config finding
+followed: the docs checkpoint commit itself failed `prettier --check`
+(this session hadn't run the local gate on doc edits) — fixed with
+`prettier --write`, re-verified locally, and reconfirmed green on
+GitHub Actions (run 32917911205, Ubuntu 7m18s, Windows 17m41s).
 
 **Gate decision: MINIMAL CI FOUNDATION PASSED — READY FOR INTEGRATION
 REVIEW / MAIN FAST-FORWARD DECISION.** `main` remains a strict ancestor
