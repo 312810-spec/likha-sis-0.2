@@ -1,0 +1,114 @@
+# Security tool gate — deliberately a SEPARATE workflow from quality.yml,
+# not a step folded into "npm run quality:full". Each tool is its own
+# job so a scanner failure/crash in one never masks or blocks the
+# others, and a genuine finding fails closed rather than being silently
+# absorbed into an already-large lint/test log. See
+# docs/adr/0046-security-ci-gate.md for the full decision record,
+# including why each action below was chosen over the alternatives
+# considered (official binary vs. marketplace action, reusable workflow
+# vs. single action step).
+#
+# All three tools already run clean locally against this repository
+# (docs/VERIFICATION-DEBT.md) — this workflow is verification, not new
+# tool adoption.
+name: Security Gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Deliberately NO concurrency/cancel-in-progress group here (unlike
+# quality.yml). gitleaks-action's automatic scan path only covers each
+# push/PR's own new commits (`--log-opts=<baseRef>^..<headRef>`, verified
+# directly against the pinned action's source), not full history — so if
+# a rapid second push canceled the first push's in-flight scan, that
+# first push's own commits (and any secret in them) would never be
+# scanned by any completed job. A security scan is cheap; letting one
+# finish is worth more than the resource savings a cancel would give.
+# See docs/adr/0046-security-ci-gate.md's independent-review addendum.
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Security / gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # Full-depth checkout: gitleaks-action's automatic scan on push/PR
+      # only ever asks gitleaks to look at that event's own new commits
+      # (verified against the pinned action's source), not this whole
+      # history — full depth here is what lets gitleaks itself resolve
+      # those commit refs at all, and lets a manual workflow_dispatch run
+      # (which the action does scan in full) see everything.
+      - name: Checkout (full history)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # gitleaks/gitleaks-action v3.0.0, pinned to its release commit.
+      # v3 only changes the Actions runtime (Node 20 -> Node 24, ahead of
+      # GitHub's Sept 2026 Node 20 removal) — no behavior/input change
+      # from v2. No license key needed: this repo is under a personal
+      # GitHub account, not an organization (gitleaks-action's own docs
+      # only require GITLEAKS_LICENSE for orgs).
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: false # keeps this job at contents:read only — no pull-requests:write needed
+
+  cargo-deny:
+    name: Security / cargo-deny
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # EmbarkStudios/cargo-deny-action v2.1.1, pinned to its release
+      # commit. Checks advisories/bans/licenses/sources against
+      # src-tauri/deny.toml — the same policy file and command
+      # (`cargo deny check`) already verified locally every milestone
+      # touching dependencies.
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: src-tauri/Cargo.toml
+
+  osv-scanner:
+    name: Security / osv-scanner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Deliberately NOT google/osv-scanner-action here. That action's
+      # own action.yml says "Not intended to be used directly... behavior
+      # might change in a minor patch update," and Google's recommended
+      # reusable workflow (osv-scanner-reusable.yml) needs
+      # `security-events: write` for SARIF/Code-Scanning upload plus a
+      # `continue-on-error: true` step ahead of the pass/fail check —
+      # both add permission surface and a scanner-crash-masking risk
+      # this repo doesn't need. Instead: download the same official
+      # static Linux binary this project already verified locally
+      # (docs/VERIFICATION-DEBT.md), pinned to an exact release tag and
+      # verified against Google's own published SHA256SUMS before
+      # execution — a real supply-chain check, not just a version pin.
+      - name: Download and verify osv-scanner v2.5.1 (linux_amd64)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o osv-scanner \
+            https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
+          echo "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+
+      - name: Run osv-scanner
+        run: ./osv-scanner scan source --config osv-scanner.toml -r .
