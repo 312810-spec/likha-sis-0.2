@@ -102,7 +102,13 @@ pub fn record(
     if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
         return Ok(None);
     }
-    if !section_membership::is_active_member(conn, school_id, section_id, learner_id, attendance_date)? {
+    if !section_membership::is_active_member(
+        conn,
+        school_id,
+        section_id,
+        learner_id,
+        attendance_date,
+    )? {
         return Ok(None);
     }
 
@@ -163,7 +169,10 @@ pub fn roster_for_section_date(
             learner_id: row.get(0)?,
             given_name: row.get(1)?,
             family_name: row.get(2)?,
-            status: status.as_deref().map(AttendanceStatus::from_db_str).transpose()?,
+            status: status
+                .as_deref()
+                .map(AttendanceStatus::from_db_str)
+                .transpose()?,
             recorded_at: row.get(4)?,
         })
     })?;
@@ -427,8 +436,8 @@ mod tests {
     }
 
     #[test]
-    fn recording_attendance_again_for_the_same_learner_and_date_overwrites_the_status_not_duplicates_it()
-     {
+    fn recording_attendance_again_for_the_same_learner_and_date_overwrites_the_status_not_duplicates_it(
+    ) {
         let conn = open_test_db();
         let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
 
@@ -541,10 +550,7 @@ mod tests {
         assert_eq!(roster.len(), 2);
         let marked_entry = roster.iter().find(|e| e.learner_id == marked).unwrap();
         assert_eq!(marked_entry.status, Some(AttendanceStatus::Present));
-        let unmarked_entry = roster
-            .iter()
-            .find(|e| e.learner_id == unmarked.id)
-            .unwrap();
+        let unmarked_entry = roster.iter().find(|e| e.learner_id == unmarked.id).unwrap();
         assert_eq!(unmarked_entry.status, None);
         assert_eq!(unmarked_entry.recorded_at, None);
     }
@@ -555,7 +561,8 @@ mod tests {
         let (_school_a, section_a, _) = setup_enrolled_learner(&conn);
         let school_b = school::create(&conn, "School B").unwrap();
 
-        let roster = roster_for_section_date(&conn, &school_b.id, &section_a, "2026-08-24").unwrap();
+        let roster =
+            roster_for_section_date(&conn, &school_b.id, &section_a, "2026-08-24").unwrap();
 
         assert!(roster.is_empty());
     }
@@ -583,23 +590,23 @@ mod tests {
     fn bulk_mark_present_marks_every_unmarked_learner_present() {
         let conn = open_test_db();
         let (school_id, section_id, _) = setup_enrolled_learner(&conn);
-        let second =
-            learner::create(&conn, &school_id, "Maria", "Santos", None, None).unwrap();
+        let second = learner::create(&conn, &school_id, "Maria", "Santos", None, None).unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &second.id, "2026-08-01")
             .unwrap();
 
         let roster = bulk_mark_present(&conn, &school_id, &section_id, "2026-08-24").unwrap();
 
         assert_eq!(roster.len(), 2);
-        assert!(roster.iter().all(|e| e.status == Some(AttendanceStatus::Present)));
+        assert!(roster
+            .iter()
+            .all(|e| e.status == Some(AttendanceStatus::Present)));
     }
 
     #[test]
     fn bulk_mark_present_does_not_overwrite_an_already_marked_learner() {
         let conn = open_test_db();
         let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
-        let unmarked =
-            learner::create(&conn, &school_id, "Maria", "Santos", None, None).unwrap();
+        let unmarked = learner::create(&conn, &school_id, "Maria", "Santos", None, None).unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &unmarked.id, "2026-08-01")
             .unwrap();
         record(
@@ -672,9 +679,33 @@ mod tests {
     fn monthly_grid_places_each_mark_in_the_correct_day_column_and_totals_it() {
         let conn = open_test_db();
         let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
-        record(&conn, &school_id, &section_id, &learner_id, "2026-08-24", AttendanceStatus::Present).unwrap(); // Mon
-        record(&conn, &school_id, &section_id, &learner_id, "2026-08-25", AttendanceStatus::Absent).unwrap(); // Tue
-        record(&conn, &school_id, &section_id, &learner_id, "2026-08-27", AttendanceStatus::Tardy).unwrap(); // Thu
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-24",
+            AttendanceStatus::Present,
+        )
+        .unwrap(); // Mon
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-25",
+            AttendanceStatus::Absent,
+        )
+        .unwrap(); // Tue
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-27",
+            AttendanceStatus::Tardy,
+        )
+        .unwrap(); // Thu
 
         let report = monthly_grid_for_section(&conn, &school_id, &section_id, 2026, 8).unwrap();
 
@@ -694,8 +725,24 @@ mod tests {
     fn monthly_grid_ignores_a_weekend_mark_and_a_different_months_mark() {
         let conn = open_test_db();
         let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
-        record(&conn, &school_id, &section_id, &learner_id, "2026-08-01", AttendanceStatus::Present).unwrap(); // Saturday
-        record(&conn, &school_id, &section_id, &learner_id, "2026-08-08", AttendanceStatus::Absent).unwrap(); // also Saturday, safe weekend probe
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-01",
+            AttendanceStatus::Present,
+        )
+        .unwrap(); // Saturday
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-08",
+            AttendanceStatus::Absent,
+        )
+        .unwrap(); // also Saturday, safe weekend probe
 
         let report = monthly_grid_for_section(&conn, &school_id, &section_id, 2026, 8).unwrap();
 

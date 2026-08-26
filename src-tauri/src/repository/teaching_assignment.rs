@@ -168,7 +168,9 @@ pub fn list_by_section_in_school(
     school_id: &str,
     section_id: &str,
 ) -> AppResult<Vec<TeachingAssignmentDetail>> {
-    let mut stmt = conn.prepare(&format!("{DETAIL_SELECT} AND ta.section_id = ?2 ORDER BY sub.name"))?;
+    let mut stmt = conn.prepare(&format!(
+        "{DETAIL_SELECT} AND ta.section_id = ?2 ORDER BY sub.name"
+    ))?;
     let rows = stmt.query_map((school_id, section_id), row_to_detail)?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
@@ -191,7 +193,11 @@ pub fn teacher_load(
     )?;
     let weekly_instructional_minutes =
         schedule_meeting::total_weekly_minutes_for_teacher(conn, school_id, teacher_user_id)?;
-    Ok(TeacherLoad { assignment_count, distinct_subject_count, weekly_instructional_minutes })
+    Ok(TeacherLoad {
+        assignment_count,
+        distinct_subject_count,
+        weekly_instructional_minutes,
+    })
 }
 
 fn row_to_assignment(row: &rusqlite::Row) -> rusqlite::Result<TeachingAssignment> {
@@ -272,8 +278,14 @@ mod tests {
         let other_section =
             section::create(&conn, &other_school.id, "2026-2027", "7", "Bonifacio").unwrap();
 
-        let result =
-            create(&conn, &school_id, &teacher_id, &other_section.id, &subject_id).unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &other_section.id,
+            &subject_id,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -285,8 +297,14 @@ mod tests {
         let other_school = school::create(&conn, "Other School").unwrap();
         let other_subject = subject::create(&conn, &other_school.id, "Science").unwrap();
 
-        let result =
-            create(&conn, &school_id, &teacher_id, &section_id, &other_subject.id).unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &section_id,
+            &other_subject.id,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -299,7 +317,13 @@ mod tests {
         let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
 
-        let result = create(&conn, &school_id, &other_teacher.id, &section_id, &subject_id);
+        let result = create(
+            &conn,
+            &school_id,
+            &other_teacher.id,
+            &section_id,
+            &subject_id,
+        );
 
         assert!(result.is_err());
     }
@@ -312,13 +336,23 @@ mod tests {
         let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
 
-        let replaced = replace_teacher(&conn, &school_id, &section_id, &subject_id, &other_teacher.id)
-            .unwrap()
-            .unwrap();
+        let replaced = replace_teacher(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &other_teacher.id,
+        )
+        .unwrap()
+        .unwrap();
 
         assert_eq!(replaced.teacher_user_id, other_teacher.id);
         let all = list_by_section_in_school(&conn, &school_id, &section_id).unwrap();
-        assert_eq!(all.len(), 1, "reassigning must not leave the old assignment behind");
+        assert_eq!(
+            all.len(),
+            1,
+            "reassigning must not leave the old assignment behind"
+        );
     }
 
     #[test]
@@ -332,11 +366,15 @@ mod tests {
 
         let removed_from_wrong_school = remove(&conn, &other_school.id, &created.id).unwrap();
         assert!(!removed_from_wrong_school);
-        assert!(find_by_id_in_school(&conn, &school_id, &created.id).unwrap().is_some());
+        assert!(find_by_id_in_school(&conn, &school_id, &created.id)
+            .unwrap()
+            .is_some());
 
         let removed = remove(&conn, &school_id, &created.id).unwrap();
         assert!(removed);
-        assert!(find_by_id_in_school(&conn, &school_id, &created.id).unwrap().is_none());
+        assert!(find_by_id_in_school(&conn, &school_id, &created.id)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -349,7 +387,14 @@ mod tests {
         let other_section =
             section::create(&conn, &other_school.id, "2026-2027", "7", "Rizal").unwrap();
         let other_subject = subject::create(&conn, &other_school.id, "Science").unwrap();
-        create(&conn, &other_school.id, &teacher_id, &other_section.id, &other_subject.id).unwrap();
+        create(
+            &conn,
+            &other_school.id,
+            &teacher_id,
+            &other_section.id,
+            &other_subject.id,
+        )
+        .unwrap();
 
         let assignments = list_by_teacher_in_school(&conn, &school_id, &teacher_id).unwrap();
 
@@ -358,19 +403,33 @@ mod tests {
     }
 
     #[test]
-    fn teacher_load_counts_assignments_and_distinct_subjects_with_zero_minutes_before_any_schedule() {
+    fn teacher_load_counts_assignments_and_distinct_subjects_with_zero_minutes_before_any_schedule()
+    {
         let conn = open_test_db();
         let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
         create(&conn, &school_id, &teacher_id, &section_id, &subject_id).unwrap();
         let other_section =
             section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
         // Same subject, a different section -- two assignments, one prep.
-        create(&conn, &school_id, &teacher_id, &other_section.id, &subject_id).unwrap();
+        create(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &other_section.id,
+            &subject_id,
+        )
+        .unwrap();
 
         let load = teacher_load(&conn, &school_id, &teacher_id).unwrap();
 
         assert_eq!(load.assignment_count, 2);
-        assert_eq!(load.distinct_subject_count, 1, "same subject in two sections is one preparation");
-        assert_eq!(load.weekly_instructional_minutes, 0, "no schedule_meetings exist yet");
+        assert_eq!(
+            load.distinct_subject_count, 1,
+            "same subject in two sections is one preparation"
+        );
+        assert_eq!(
+            load.weekly_instructional_minutes, 0,
+            "no schedule_meetings exist yet"
+        );
     }
 }

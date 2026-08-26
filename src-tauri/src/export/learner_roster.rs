@@ -78,7 +78,9 @@ pub fn build_learner_roster_export(school: &School, learners: &[Learner]) -> Lea
     }
 
     lines.push(String::new());
-    lines.push("# This is a learner-roster export for your own records, not an official".to_string());
+    lines.push(
+        "# This is a learner-roster export for your own records, not an official".to_string(),
+    );
     lines.push("# DepEd form. Fields NOT included, and important limitations:".to_string());
     for omitted in &disclosure.omitted_fields {
         lines.push(format!("# - {}: {}", omitted.field, omitted.reason));
@@ -123,12 +125,18 @@ mod tests {
     #[test]
     fn a_learner_with_lrn_and_sex_renders_both() {
         let export = build_learner_roster_export(&a_school(), &[a_learner()]);
-        assert!(export.csv.contains("Ana,Cruz,123456789012,F,2026-08-25T00:00:00Z"));
+        assert!(export
+            .csv
+            .contains("Ana,Cruz,123456789012,F,2026-08-25T00:00:00Z"));
     }
 
     #[test]
     fn a_learner_missing_lrn_and_sex_renders_blank_not_a_placeholder() {
-        let learner = Learner { lrn: None, sex: None, ..a_learner() };
+        let learner = Learner {
+            lrn: None,
+            sex: None,
+            ..a_learner()
+        };
         let export = build_learner_roster_export(&a_school(), &[learner]);
         assert!(export.csv.contains("Ana,Cruz,,,2026-08-25T00:00:00Z"));
     }
@@ -160,6 +168,9 @@ mod tests {
     #[test]
     fn no_data_appears_outside_the_header_and_disclosure_block_for_an_empty_roster() {
         let export = build_learner_roster_export(&a_school(), &[]);
-        assert!(!export.csv.lines().any(|line| !line.starts_with('#') && line.contains("Ana")));
+        assert!(!export
+            .csv
+            .lines()
+            .any(|line| !line.starts_with('#') && line.contains("Ana")));
     }
 }

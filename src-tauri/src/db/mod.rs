@@ -3,14 +3,14 @@ mod migrations;
 use std::path::Path;
 
 use rusqlite::Connection;
+use tauri::AppHandle;
 #[cfg(windows)]
 use tauri::Manager;
-use tauri::AppHandle;
 use zeroize::Zeroize;
 
+use crate::crypto::{self, KEY_LEN};
 #[cfg(windows)]
 use crate::crypto::{DpapiKeyStore, KeyStore};
-use crate::crypto::{self, KEY_LEN};
 use crate::error::AppResult;
 
 pub const DB_FILE_NAME: &str = "likha-sis.db";

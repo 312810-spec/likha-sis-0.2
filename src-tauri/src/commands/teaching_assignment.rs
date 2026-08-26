@@ -27,8 +27,15 @@ pub fn create_teaching_assignment(
     subject_id: String,
 ) -> AppResult<Option<TeachingAssignment>> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
-    teaching_assignment::create(&conn, &school_id, &teacher_user_id, &section_id, &subject_id)
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
+    teaching_assignment::create(
+        &conn,
+        &school_id,
+        &teacher_user_id,
+        &section_id,
+        &subject_id,
+    )
 }
 
 /// Removes any existing assignment for `(section_id, subject_id)` and
@@ -44,8 +51,15 @@ pub fn replace_teacher_assignment(
     new_teacher_user_id: String,
 ) -> AppResult<Option<TeachingAssignment>> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
-    teaching_assignment::replace_teacher(&conn, &school_id, &section_id, &subject_id, &new_teacher_user_id)
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
+    teaching_assignment::replace_teacher(
+        &conn,
+        &school_id,
+        &section_id,
+        &subject_id,
+        &new_teacher_user_id,
+    )
 }
 
 #[tauri::command]
@@ -55,7 +69,8 @@ pub fn remove_teaching_assignment(
     id: String,
 ) -> AppResult<bool> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
     teaching_assignment::remove(&conn, &school_id, &id)
 }
 
@@ -117,7 +132,8 @@ pub fn create_schedule_meeting(
     room: Option<String>,
 ) -> AppResult<CreateMeetingOutcome> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
     schedule_meeting::create(
         &conn,
         &school_id,

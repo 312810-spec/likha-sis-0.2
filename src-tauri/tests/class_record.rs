@@ -36,7 +36,15 @@ fn create_as_current_session(
     grading_period_id: &str,
 ) -> app_lib::error::AppResult<Option<class_record::ClassRecord>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    class_record::create(conn, &school_id, section_id, subject_id, grading_period_id, K10_POLICY, None)
+    class_record::create(
+        conn,
+        &school_id,
+        section_id,
+        subject_id,
+        grading_period_id,
+        K10_POLICY,
+        None,
+    )
 }
 
 /// Standing in for `commands::class_record::list_class_records_by_school`.
@@ -59,16 +67,24 @@ fn setup_school(
     let sessions = login_as_a_teacher_at(conn, &school.id, username);
     let sec = section::create(conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
     let sub = subject::create(conn, &school.id, "Mathematics").unwrap();
-    let period = grading::create(conn, &school.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-        .unwrap()
-        .unwrap();
+    let period = grading::create(
+        conn,
+        &school.id,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap()
+    .unwrap();
     (sessions, sec.id, sub.id, period.id)
 }
 
 #[test]
 fn a_teacher_can_open_and_list_their_own_schools_class_record() {
     let conn = open_test_db();
-    let (sessions, section_id, subject_id, period_id) = setup_school(&conn, "School A", "teacher.a");
+    let (sessions, section_id, subject_id, period_id) =
+        setup_school(&conn, "School A", "teacher.a");
 
     create_as_current_session(&conn, &sessions, &section_id, &subject_id, &period_id)
         .unwrap()
@@ -85,13 +101,22 @@ fn a_teacher_cannot_open_a_class_record_using_another_schools_section() {
     let conn = open_test_db();
     let (_sessions_b, foreign_section_id, _sub_b, _period_b) =
         setup_school(&conn, "School B", "teacher.b");
-    let (sessions_a, _section_a, subject_a, period_a) = setup_school(&conn, "School A", "teacher.a");
+    let (sessions_a, _section_a, subject_a, period_a) =
+        setup_school(&conn, "School A", "teacher.a");
 
-    let result =
-        create_as_current_session(&conn, &sessions_a, &foreign_section_id, &subject_a, &period_a)
-            .unwrap();
+    let result = create_as_current_session(
+        &conn,
+        &sessions_a,
+        &foreign_section_id,
+        &subject_a,
+        &period_a,
+    )
+    .unwrap();
 
-    assert_eq!(result, None, "cross-school section reference must be rejected");
+    assert_eq!(
+        result, None,
+        "cross-school section reference must be rejected"
+    );
 }
 
 #[test]
@@ -112,7 +137,8 @@ fn a_teachers_class_records_never_include_another_schools() {
 #[test]
 fn creating_a_class_record_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
     let conn = open_test_db();
-    let (_sessions, section_id, subject_id, period_id) = setup_school(&conn, "School A", "teacher.a");
+    let (_sessions, section_id, subject_id, period_id) =
+        setup_school(&conn, "School A", "teacher.a");
     let sessions = SessionManager::new(); // nobody logged in
 
     let result = create_as_current_session(&conn, &sessions, &section_id, &subject_id, &period_id);

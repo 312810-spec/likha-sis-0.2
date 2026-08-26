@@ -322,7 +322,13 @@ mod tests {
     #[test]
     fn account_locks_after_the_maximum_number_of_wrong_passwords() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
 
         for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS - 1 {
             let result = verify_credentials(&conn, "ana.cruz", "wrong password");
@@ -338,7 +344,13 @@ mod tests {
     #[test]
     fn a_locked_account_rejects_even_the_correct_password() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
             let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
         }
@@ -351,7 +363,13 @@ mod tests {
     #[test]
     fn a_successful_login_resets_the_failed_attempt_counter() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS - 2 {
             let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
         }
@@ -380,7 +398,13 @@ mod tests {
     #[test]
     fn a_locked_account_unlocks_after_the_lockout_window_and_a_fresh_attempt() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz").unwrap();
+        create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
             let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
         }

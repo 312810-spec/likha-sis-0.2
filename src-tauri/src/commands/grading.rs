@@ -61,5 +61,12 @@ pub fn create_grading_period(
 ) -> AppResult<Option<GradingPeriod>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    grading::create(&conn, &school_id, &school_year, &policy_period_id, &starts_on, &ends_on)
+    grading::create(
+        &conn,
+        &school_id,
+        &school_year,
+        &policy_period_id,
+        &starts_on,
+        &ends_on,
+    )
 }

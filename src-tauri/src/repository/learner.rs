@@ -251,7 +251,15 @@ mod tests {
     fn create_rejects_an_lrn_already_used_by_another_learner_in_the_same_school() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        create(&conn, &s.id, "Juan", "Dela Cruz", Some("123456789012"), None).unwrap();
+        create(
+            &conn,
+            &s.id,
+            "Juan",
+            "Dela Cruz",
+            Some("123456789012"),
+            None,
+        )
+        .unwrap();
 
         let result = create(&conn, &s.id, "Maria", "Santos", Some("123456789012"), None);
 
@@ -265,7 +273,16 @@ mod tests {
         let school_b = school::create(&conn, "School B").unwrap();
         let learner = create(&conn, &school_a.id, "Juan", "Dela Cruz", None, None).unwrap();
 
-        let result = update(&conn, &school_b.id, &learner.id, "Someone", "Else", None, None).unwrap();
+        let result = update(
+            &conn,
+            &school_b.id,
+            &learner.id,
+            "Someone",
+            "Else",
+            None,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
         // The original learner, in its real school, is untouched.
@@ -278,7 +295,16 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let result = update(&conn, &s.id, "does-not-exist", "Someone", "Else", None, None).unwrap();
+        let result = update(
+            &conn,
+            &s.id,
+            "does-not-exist",
+            "Someone",
+            "Else",
+            None,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }

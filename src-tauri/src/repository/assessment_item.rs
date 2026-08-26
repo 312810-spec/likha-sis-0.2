@@ -70,7 +70,14 @@ pub fn create(
         "INSERT INTO assessment_items \
              (id, school_id, class_record_id, category_id, name, max_score) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (&id, school_id, class_record_id, category_id, name, max_score),
+        (
+            &id,
+            school_id,
+            class_record_id,
+            category_id,
+            name,
+            max_score,
+        ),
     )?;
 
     find_by_id_in_school(conn, school_id, &id)
@@ -224,14 +231,16 @@ pub fn list_by_class_record(
     // than once per row.
     let total_eligible: i64 =
         match class_record::section_and_period_range_in_school(conn, school_id, class_record_id)? {
-            Some((section_id, starts_on, ends_on)) => section_membership::roster_for_section_over_range(
-                conn,
-                school_id,
-                &section_id,
-                &starts_on,
-                &ends_on,
-            )?
-            .len() as i64,
+            Some((section_id, starts_on, ends_on)) => {
+                section_membership::roster_for_section_over_range(
+                    conn,
+                    school_id,
+                    &section_id,
+                    &starts_on,
+                    &ends_on,
+                )?
+                .len() as i64
+            }
             None => 0,
         };
 
@@ -310,9 +319,16 @@ mod tests {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
 
-        let created = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let created = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let found = find_by_id_in_school(&conn, &school_id, &created.id).unwrap();
 
         assert_eq!(found, Some(created));
@@ -324,8 +340,15 @@ mod tests {
         let (_school_id, class_record_id) = setup(&conn);
         let other_school = school::create(&conn, "Other School").unwrap();
 
-        let result = create(&conn, &other_school.id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap();
+        let result = create(
+            &conn,
+            &other_school.id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -336,8 +359,15 @@ mod tests {
         let (school_id, class_record_id) = setup(&conn);
         const EXAMINATIONS: &str = "00000000-0000-7000-8000-000000000313";
 
-        let result = create(&conn, &school_id, &class_record_id, EXAMINATIONS, "Q1 Exams", 100.0)
-            .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            EXAMINATIONS,
+            "Q1 Exams",
+            100.0,
+        )
+        .unwrap();
 
         assert_eq!(
             result, None,
@@ -364,8 +394,15 @@ mod tests {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
 
-        let result = create(&conn, &school_id, &class_record_id, "does-not-exist", "Quiz 1", 20.0)
-            .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            "does-not-exist",
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -375,7 +412,14 @@ mod tests {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
 
-        let result = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 0.0);
+        let result = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            0.0,
+        );
 
         assert!(result.is_err());
     }
@@ -384,7 +428,15 @@ mod tests {
     fn list_by_class_record_only_returns_that_class_records_items_with_the_category_name() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0).unwrap();
+        create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap();
 
         let items = list_by_class_record(&conn, &school_id, &class_record_id).unwrap();
 
@@ -397,9 +449,16 @@ mod tests {
     fn list_by_class_record_reports_recorded_and_total_eligible_counts() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
 
         // Two eligible learners enrolled in the class record's section;
         // only one has a score recorded so far.
@@ -436,9 +495,16 @@ mod tests {
     fn rename_changes_the_name_even_when_the_item_already_has_a_recorded_score() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let learner = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let (section_id, _starts, _ends) =
             class_record::section_and_period_range_in_school(&conn, &school_id, &class_record_id)
@@ -458,20 +524,35 @@ mod tests {
         )
         .unwrap();
 
-        let renamed = rename(&conn, &school_id, &item.id, "Quiz 1 (Retake)").unwrap().unwrap();
+        let renamed = rename(&conn, &school_id, &item.id, "Quiz 1 (Retake)")
+            .unwrap()
+            .unwrap();
 
         assert_eq!(renamed.name, "Quiz 1 (Retake)");
-        assert_eq!(renamed.category_id, WRITTEN_WORKS, "renaming must not touch the category");
-        assert_eq!(renamed.max_score, 20.0, "renaming must not touch the max score");
+        assert_eq!(
+            renamed.category_id, WRITTEN_WORKS,
+            "renaming must not touch the category"
+        );
+        assert_eq!(
+            renamed.max_score, 20.0,
+            "renaming must not touch the max score"
+        );
     }
 
     #[test]
     fn rename_rejects_an_item_from_a_different_school() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let result = rename(&conn, &other_school.id, &item.id, "Hijacked").unwrap();
@@ -483,9 +564,16 @@ mod tests {
     fn update_fully_edits_an_unscored_item() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
 
         const ST1: &str = "00000000-0000-7000-8000-000000003131";
         let updated = update(&conn, &school_id, &item.id, "Quiz 1 (fixed)", ST1, 25.0)
@@ -501,9 +589,16 @@ mod tests {
     fn update_rejects_a_category_or_max_score_change_once_the_item_has_a_recorded_score() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let learner = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let (section_id, _starts, _ends) =
             class_record::section_and_period_range_in_school(&conn, &school_id, &class_record_id)
@@ -523,7 +618,8 @@ mod tests {
         )
         .unwrap();
 
-        let max_score_change = update(&conn, &school_id, &item.id, "Quiz 1", WRITTEN_WORKS, 30.0).unwrap();
+        let max_score_change =
+            update(&conn, &school_id, &item.id, "Quiz 1", WRITTEN_WORKS, 30.0).unwrap();
         assert_eq!(
             max_score_change, None,
             "changing max_score after a score exists would silently change that score's meaning"
@@ -541,9 +637,16 @@ mod tests {
     fn update_rejects_a_parent_category() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
 
         let result = update(&conn, &school_id, &item.id, "Quiz 1", EXAMINATIONS, 20.0).unwrap();
 
@@ -554,23 +657,40 @@ mod tests {
     fn delete_removes_an_unscored_item() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
 
         let deleted = delete(&conn, &school_id, &item.id).unwrap();
 
         assert!(deleted);
-        assert_eq!(find_by_id_in_school(&conn, &school_id, &item.id).unwrap(), None);
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &item.id).unwrap(),
+            None
+        );
     }
 
     #[test]
     fn delete_refuses_an_item_that_already_has_a_recorded_score() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let learner = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let (section_id, _starts, _ends) =
             class_record::section_and_period_range_in_school(&conn, &school_id, &class_record_id)
@@ -592,22 +712,36 @@ mod tests {
 
         let deleted = delete(&conn, &school_id, &item.id).unwrap();
 
-        assert!(!deleted, "a scored item must not be deletable -- it would discard grade data");
-        assert!(find_by_id_in_school(&conn, &school_id, &item.id).unwrap().is_some());
+        assert!(
+            !deleted,
+            "a scored item must not be deletable -- it would discard grade data"
+        );
+        assert!(find_by_id_in_school(&conn, &school_id, &item.id)
+            .unwrap()
+            .is_some());
     }
 
     #[test]
     fn delete_rejects_an_item_from_a_different_school() {
         let conn = open_test_db();
         let (school_id, class_record_id) = setup(&conn);
-        let item = create(&conn, &school_id, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+        let item = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let deleted = delete(&conn, &other_school.id, &item.id).unwrap();
 
         assert!(!deleted);
-        assert!(find_by_id_in_school(&conn, &school_id, &item.id).unwrap().is_some());
+        assert!(find_by_id_in_school(&conn, &school_id, &item.id)
+            .unwrap()
+            .is_some());
     }
 }

@@ -108,7 +108,10 @@ pub fn build_report_card_export(
         csv::row(&["School Name".to_string(), school.name.clone()]),
         csv::row(&["Section".to_string(), class_record.section_name.clone()]),
         csv::row(&["Subject".to_string(), class_record.subject_name.clone()]),
-        csv::row(&["Grading Period".to_string(), class_record.grading_period_label.clone()]),
+        csv::row(&[
+            "Grading Period".to_string(),
+            class_record.grading_period_label.clone(),
+        ]),
         csv::row(&["School Year".to_string(), class_record.school_year.clone()]),
         String::new(),
         csv::row(&[
@@ -130,7 +133,11 @@ pub fn build_report_card_export(
                 lrn,
                 format!("{:.1}", grade.initial_grade),
                 grade.term_grade.to_string(),
-                if grade.was_transmuted { "Transmuted".to_string() } else { "Zero-Based".to_string() },
+                if grade.was_transmuted {
+                    "Transmuted".to_string()
+                } else {
+                    "Zero-Based".to_string()
+                },
                 if grade.was_floored {
                     "Raised to the minimum of 60".to_string()
                 } else {
@@ -150,8 +157,11 @@ pub fn build_report_card_export(
     }
 
     lines.push(String::new());
-    lines.push("# This report card is inspired by DepEd Order No. 015, s. 2026's grade".to_string());
-    lines.push("# computation rules, not a submission-ready official-form reproduction.".to_string());
+    lines
+        .push("# This report card is inspired by DepEd Order No. 015, s. 2026's grade".to_string());
+    lines.push(
+        "# computation rules, not a submission-ready official-form reproduction.".to_string(),
+    );
     lines.push("# Fields NOT included, and important limitations:".to_string());
     for omitted in &disclosure.omitted_fields {
         lines.push(format!("# - {}: {}", omitted.field, omitted.reason));
@@ -226,7 +236,9 @@ mod tests {
         }];
         let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
 
-        assert!(export.csv.contains("\"Cruz, Ana\",123456789012,85.8,88,Transmuted,"));
+        assert!(export
+            .csv
+            .contains("\"Cruz, Ana\",123456789012,85.8,88,Transmuted,"));
     }
 
     #[test]
@@ -260,7 +272,9 @@ mod tests {
         }];
         let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
 
-        assert!(export.csv.contains("\"Cruz, Ana\",,Not yet available,Not yet available"));
+        assert!(export
+            .csv
+            .contains("\"Cruz, Ana\",,Not yet available,Not yet available"));
         assert!(export.csv.contains("Scoring is incomplete"));
     }
 

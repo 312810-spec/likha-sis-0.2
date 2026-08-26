@@ -244,7 +244,9 @@ pub fn find_detail_by_id_in_school(
             rusqlite::Error::QueryReturnedNoRows => Ok(None),
             e => Err(AppError::from(e)),
         })?;
-    detail.map(|d| with_total_eligible(conn, school_id, d)).transpose()
+    detail
+        .map(|d| with_total_eligible(conn, school_id, d))
+        .transpose()
 }
 
 /// `class_record_id`'s weight policy, resolved: its own pinned
@@ -452,9 +454,17 @@ mod tests {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
 
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
-            .unwrap()
-            .unwrap();
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
         let found = find_by_id_in_school(&conn, &school_id, &created.id).unwrap();
 
         assert_eq!(found, Some(created.clone()));
@@ -469,9 +479,16 @@ mod tests {
         let other_section =
             section::create(&conn, &other_school.id, "2026-2027", "7", "Bonifacio").unwrap();
 
-        let result =
-            create(&conn, &school_id, &other_section.id, &subject_id, &period_id, K10_POLICY, None)
-                .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &other_section.id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -483,9 +500,16 @@ mod tests {
         let other_school = school::create(&conn, "Other School").unwrap();
         let other_subject = subject::create(&conn, &other_school.id, "Science").unwrap();
 
-        let result =
-            create(&conn, &school_id, &section_id, &other_subject.id, &period_id, K10_POLICY, None)
-                .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &other_subject.id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -495,14 +519,27 @@ mod tests {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, _period_id) = setup(&conn);
         let other_school = school::create(&conn, "Other School").unwrap();
-        let other_period =
-            grading::create(&conn, &other_school.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-                .unwrap()
-                .unwrap();
+        let other_period = grading::create(
+            &conn,
+            &other_school.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
 
-        let result =
-            create(&conn, &school_id, &section_id, &subject_id, &other_period.id, K10_POLICY, None)
-                .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &other_period.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -536,9 +573,16 @@ mod tests {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
 
-        let result =
-            create(&conn, &school_id, &section_id, &subject_id, &period_id, "does-not-exist", None)
-                .unwrap();
+        let result = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            "does-not-exist",
+            None,
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -560,16 +604,36 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        assert_eq!(created.weight_policy_id, Some(EPP_TLE_MAPEH_POLICY.to_string()));
+        assert_eq!(
+            created.weight_policy_id,
+            Some(EPP_TLE_MAPEH_POLICY.to_string())
+        );
     }
 
     #[test]
     fn create_rejects_a_duplicate_combination() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None).unwrap();
+        create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap();
 
-        let result = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None);
+        let result = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        );
 
         assert!(result.is_err());
     }
@@ -590,23 +654,36 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id).unwrap().unwrap();
+        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(detail.section_name, "Mabini");
         assert_eq!(detail.subject_name, "Mathematics");
         assert_eq!(detail.grading_period_label, "1st Term");
         assert_eq!(detail.school_year, "2026-2027");
         assert_eq!(detail.weight_policy_id, EPP_TLE_MAPEH_POLICY);
-        assert_eq!(detail.weight_policy_name, "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)");
+        assert_eq!(
+            detail.weight_policy_name,
+            "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)"
+        );
     }
 
     #[test]
     fn find_detail_by_id_in_school_returns_none_for_a_different_school() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
-            .unwrap()
-            .unwrap();
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let detail = find_detail_by_id_in_school(&conn, &other_school.id, &created.id).unwrap();
@@ -618,7 +695,16 @@ mod tests {
     fn list_by_school_only_returns_that_schools_class_records_with_joined_names() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None).unwrap();
+        create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let records = list_by_school(&conn, &school_id).unwrap();
@@ -637,13 +723,19 @@ mod tests {
     fn list_and_find_detail_report_item_recorded_and_eligible_counts() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
-            .unwrap()
-            .unwrap();
-        let learner_a =
-            learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let learner_b =
-            learner::create(&conn, &school_id, "Bo", "Reyes", None, None).unwrap();
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let learner_a = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let learner_b = learner::create(&conn, &school_id, "Bo", "Reyes", None, None).unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &learner_a.id, "2026-06-08")
             .unwrap();
         section_membership::enroll(&conn, &school_id, &section_id, &learner_b.id, "2026-06-08")
@@ -670,10 +762,18 @@ mod tests {
         )
         .unwrap();
 
-        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id).unwrap().unwrap();
+        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(detail.item_count, 2, "two assessment items exist");
-        assert_eq!(detail.recorded_count, 1, "only one learner_scores row exists so far");
-        assert_eq!(detail.total_eligible, 2, "two learners enrolled in the section");
+        assert_eq!(
+            detail.recorded_count, 1,
+            "only one learner_scores row exists so far"
+        );
+        assert_eq!(
+            detail.total_eligible, 2,
+            "two learners enrolled in the section"
+        );
 
         let listed = list_by_school(&conn, &school_id).unwrap();
         assert_eq!(listed.len(), 1);
@@ -686,15 +786,28 @@ mod tests {
     fn list_and_find_detail_report_zero_counts_for_a_class_record_with_no_items_yet() {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id)
             .unwrap()
             .unwrap();
 
-        let detail = find_detail_by_id_in_school(&conn, &school_id, &created.id).unwrap().unwrap();
-
         assert_eq!(detail.item_count, 0);
         assert_eq!(detail.recorded_count, 0);
-        assert_eq!(detail.total_eligible, 0, "no learners enrolled in this section yet");
+        assert_eq!(
+            detail.total_eligible, 0,
+            "no learners enrolled in this section yet"
+        );
     }
 
     #[test]
@@ -731,13 +844,21 @@ mod tests {
         )
         .unwrap();
 
-        let resolved =
-            resolved_weight_policy_id_in_school(&conn, &school_id, "legacy-cr").unwrap();
-        let detail = find_detail_by_id_in_school(&conn, &school_id, "legacy-cr").unwrap().unwrap();
+        let resolved = resolved_weight_policy_id_in_school(&conn, &school_id, "legacy-cr").unwrap();
+        let detail = find_detail_by_id_in_school(&conn, &school_id, "legacy-cr")
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(resolved, Some(K10_POLICY.to_string()), "must fall back to the current default policy");
+        assert_eq!(
+            resolved,
+            Some(K10_POLICY.to_string()),
+            "must fall back to the current default policy"
+        );
         assert_eq!(detail.weight_policy_id, K10_POLICY);
-        assert_eq!(detail.weight_policy_name, "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)");
+        assert_eq!(
+            detail.weight_policy_name,
+            "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+        );
     }
 
     // ---- Curriculum / Key-Stage Versioning Foundation: curriculum_version_id ----
@@ -750,11 +871,22 @@ mod tests {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
 
-        let created = create(&conn, &school_id, &section_id, &subject_id, &period_id, K10_POLICY, None)
-            .unwrap()
-            .unwrap();
+        let created = create(
+            &conn,
+            &school_id,
+            &section_id,
+            &subject_id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
 
-        assert_eq!(created.curriculum_version_id, Some(K_TO_12_CURRICULUM.to_string()));
+        assert_eq!(
+            created.curriculum_version_id,
+            Some(K_TO_12_CURRICULUM.to_string())
+        );
     }
 
     #[test]
@@ -774,7 +906,10 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        assert_eq!(created.curriculum_version_id, Some(MATATAG_CURRICULUM.to_string()));
+        assert_eq!(
+            created.curriculum_version_id,
+            Some(MATATAG_CURRICULUM.to_string())
+        );
     }
 
     #[test]
@@ -831,8 +966,8 @@ mod tests {
     /// records are resolved by the exact same
     /// `resolved_curriculum_version_id_in_school` COALESCE lookup.
     #[test]
-    fn two_curriculum_versions_coexist_and_changing_the_default_does_not_rewrite_an_already_pinned_record()
-    {
+    fn two_curriculum_versions_coexist_and_changing_the_default_does_not_rewrite_an_already_pinned_record(
+    ) {
         let conn = open_test_db();
         let (school_id, section_id, subject_id, period_id) = setup(&conn);
         let other_subject = subject::create(&conn, &school_id, "Science").unwrap();

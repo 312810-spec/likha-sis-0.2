@@ -114,7 +114,11 @@ fn disclosure() -> FieldDisclosure {
 /// isolation checking itself, matching the separation between
 /// `repository::*` (isolation-enforcing data access) and this pure
 /// formatting layer.
-pub fn build_sf2_export(school: &School, section: &Section, report: &MonthlyAttendanceReport) -> Sf2Export {
+pub fn build_sf2_export(
+    school: &School,
+    section: &Section,
+    report: &MonthlyAttendanceReport,
+) -> Sf2Export {
     let disclosure = disclosure();
 
     let month_name = MONTH_NAMES
@@ -133,7 +137,11 @@ pub fn build_sf2_export(school: &School, section: &Section, report: &MonthlyAtte
         String::new(),
     ];
 
-    let mut header = vec!["Learner Name".to_string(), "LRN".to_string(), "Sex".to_string()];
+    let mut header = vec![
+        "Learner Name".to_string(),
+        "LRN".to_string(),
+        "Sex".to_string(),
+    ];
     header.extend(report.school_days.iter().map(|d| d.to_string()));
     header.push("Total Absent".to_string());
     header.push("Total Tardy".to_string());
@@ -256,7 +264,9 @@ mod tests {
     fn the_day_header_row_lists_only_school_days_in_order() {
         let export = build_sf2_export(&a_school(), &a_section(), &a_report());
 
-        assert!(export.csv.contains("Learner Name,LRN,Sex,3,4,5,Total Absent,Total Tardy"));
+        assert!(export
+            .csv
+            .contains("Learner Name,LRN,Sex,3,4,5,Total Absent,Total Tardy"));
     }
 
     #[test]
@@ -305,6 +315,9 @@ mod tests {
     fn school_id_field_is_never_fabricated() {
         let export = build_sf2_export(&a_school(), &a_section(), &a_report());
 
-        assert!(!export.csv.lines().any(|l| !l.starts_with('#') && l.starts_with("School ID")));
+        assert!(!export
+            .csv
+            .lines()
+            .any(|l| !l.starts_with('#') && l.starts_with("School ID")));
     }
 }

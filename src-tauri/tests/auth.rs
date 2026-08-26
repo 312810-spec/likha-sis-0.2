@@ -239,7 +239,10 @@ fn extending_a_session_slides_the_idle_window_forward() {
     extend_session_as_current_session(&conn, &sessions).unwrap();
 
     let after = sessions.current().unwrap().last_activity_at;
-    assert!(after > before, "extend_session must slide last_activity_at forward");
+    assert!(
+        after > before,
+        "extend_session must slide last_activity_at forward"
+    );
 }
 
 /// Standing in for `commands::auth::list_audit_log`.

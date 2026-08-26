@@ -977,8 +977,11 @@ mod tests {
         // exact state this migration must convert.
         migrations().to_version(&mut conn, 4).unwrap();
 
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name) \
              VALUES ('l1', 's1', 'Ana', 'Cruz'), ('l2', 's1', 'Bo', 'Reyes'), ('l3', 's1', 'Cy', 'Santos')",
@@ -1046,8 +1049,11 @@ mod tests {
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
 
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name) VALUES ('l1', 's1', 'Ana', 'Cruz')",
             [],
@@ -1091,7 +1097,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(default_count, 1, "exactly one policy must be seeded as default");
+        assert_eq!(
+            default_count, 1,
+            "exactly one policy must be seeded as default"
+        );
 
         let default_name: String = conn
             .query_row(
@@ -1169,8 +1178,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
 
         let result = conn.execute(
             "INSERT INTO grading_periods \
@@ -1188,16 +1200,22 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
              VALUES ('sec1', 's1', '2026-2027', '7', 'Mabini')",
             [],
         )
         .unwrap();
-        conn.execute("INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO grading_periods \
                  (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
@@ -1266,7 +1284,10 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
-        assert_eq!(names, vec!["Written Works", "Performance Tasks", "Examinations"]);
+        assert_eq!(
+            names,
+            vec!["Written Works", "Performance Tasks", "Examinations"]
+        );
     }
 
     #[test]
@@ -1289,8 +1310,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('u1', 'teacher', 'hash', 'A Teacher')",
@@ -1303,8 +1327,11 @@ mod tests {
             [],
         )
         .unwrap();
-        conn.execute("INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO grading_periods \
                  (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
@@ -1338,7 +1365,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "status 'scored' must require a non-null score");
+        assert!(
+            result.is_err(),
+            "status 'scored' must require a non-null score"
+        );
     }
 
     #[test]
@@ -1359,11 +1389,15 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
-        assert_eq!(children, vec!["Summative Test 1", "Summative Test 2", "Term Examination"]);
+        assert_eq!(
+            children,
+            vec!["Summative Test 1", "Summative Test 2", "Term Examination"]
+        );
     }
 
     #[test]
-    fn migration_10_seeds_exactly_one_default_weight_policy_matching_the_verified_worked_examples() {
+    fn migration_10_seeds_exactly_one_default_weight_policy_matching_the_verified_worked_examples()
+    {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
@@ -1416,7 +1450,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "at most one default weight policy must be allowed");
+        assert!(
+            result.is_err(),
+            "at most one default weight policy must be allowed"
+        );
     }
 
     #[test]
@@ -1432,7 +1469,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "a category must not have two weight rows in the same policy");
+        assert!(
+            result.is_err(),
+            "a category must not have two weight rows in the same policy"
+        );
     }
 
     #[test]
@@ -1448,7 +1488,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(default_count, 1, "the K-10 core policy must remain the sole default");
+        assert_eq!(
+            default_count, 1,
+            "the K-10 core policy must remain the sole default"
+        );
 
         let mut stmt = conn
             .prepare(
@@ -1486,8 +1529,11 @@ mod tests {
         // pre-M15 database would have -- with no weight_policy_id column
         // at all yet.
         migrations().to_version(&mut conn, 10).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
              VALUES ('sec1', 's1', '2026-2027', '7', 'Mabini')",
@@ -1515,9 +1561,11 @@ mod tests {
         migrations().to_latest(&mut conn).unwrap();
 
         let weight_policy_id: Option<String> = conn
-            .query_row("SELECT weight_policy_id FROM class_records WHERE id = 'cr1'", [], |r| {
-                r.get(0)
-            })
+            .query_row(
+                "SELECT weight_policy_id FROM class_records WHERE id = 'cr1'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(
             weight_policy_id, None,
@@ -1539,7 +1587,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(default_count, 1, "the K-10 core policy must remain the sole default");
+        assert_eq!(
+            default_count, 1,
+            "the K-10 core policy must remain the sole default"
+        );
 
         let shs_count: i64 = conn
             .query_row(
@@ -1630,11 +1681,17 @@ mod tests {
         for (policy_id, expected) in [
             (
                 "00000000-0000-7000-8000-000000000047",
-                vec![("Written Works".to_string(), 40.0), ("Performance Tasks".to_string(), 60.0)],
+                vec![
+                    ("Written Works".to_string(), 40.0),
+                    ("Performance Tasks".to_string(), 60.0),
+                ],
             ),
             (
                 "00000000-0000-7000-8000-000000000049",
-                vec![("Written Works".to_string(), 20.0), ("Performance Tasks".to_string(), 80.0)],
+                vec![
+                    ("Written Works".to_string(), 20.0),
+                    ("Performance Tasks".to_string(), 80.0),
+                ],
             ),
         ] {
             let mut stmt = conn
@@ -1651,7 +1708,10 @@ mod tests {
                 .unwrap()
                 .collect::<Result<_, _>>()
                 .unwrap();
-            assert_eq!(weights, expected, "policy {policy_id} must have no Examinations row at all");
+            assert_eq!(
+                weights, expected,
+                "policy {policy_id} must have no Examinations row at all"
+            );
         }
     }
 
@@ -1660,8 +1720,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')",
+            [],
+        )
+        .unwrap();
 
         conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name) VALUES ('l1', 's1', 'Juan', 'Dela Cruz')",
@@ -1683,8 +1746,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')",
+            [],
+        )
+        .unwrap();
 
         let result = conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name, lrn, sex) \
@@ -1700,8 +1766,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')",
+            [],
+        )
+        .unwrap();
 
         for bad_lrn in ["12345", "12345678901X", "1234567890123"] {
             let result = conn.execute(
@@ -1718,8 +1787,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')",
+            [],
+        )
+        .unwrap();
 
         let result = conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name, sex) \
@@ -1735,8 +1807,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Rizal Elementary')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name, lrn) \
              VALUES ('l1', 's1', 'Juan', 'Dela Cruz', '123456789012')",
@@ -1762,10 +1837,16 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'School A')", [])
-            .unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s2', 'School B')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'School A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s2', 'School B')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO learners (id, school_id, given_name, family_name, lrn) \
              VALUES ('l1', 's1', 'Juan', 'Dela Cruz', '123456789012')",
@@ -1811,8 +1892,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'School A')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'School A')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
@@ -1834,8 +1918,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'School A')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'School A')",
+            [],
+        )
+        .unwrap();
 
         let result = conn.execute(
             "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
@@ -1851,8 +1938,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'School A')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'School A')",
+            [],
+        )
+        .unwrap();
 
         let result = conn.execute(
             "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
@@ -1883,8 +1973,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'School A')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'School A')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
@@ -1898,17 +1991,26 @@ mod tests {
         )
         .unwrap();
 
-        conn.execute("DELETE FROM users WHERE id = 'u1'", []).unwrap();
+        conn.execute("DELETE FROM users WHERE id = 'u1'", [])
+            .unwrap();
 
         let user_id: Option<String> = conn
-            .query_row("SELECT user_id FROM audit_log WHERE id = 'a1'", [], |r| r.get(0))
+            .query_row("SELECT user_id FROM audit_log WHERE id = 'a1'", [], |r| {
+                r.get(0)
+            })
             .unwrap();
-        assert_eq!(user_id, None, "the audit row itself must survive the user's deletion");
+        assert_eq!(
+            user_id, None,
+            "the audit row itself must survive the user's deletion"
+        );
     }
 
     fn seed_school_user_and_membership(conn: &Connection) {
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
@@ -1947,7 +2049,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(count, 2, "one user must be able to hold two roles in the same school at once");
+        assert_eq!(
+            count, 2,
+            "one user must be able to hold two roles in the same school at once"
+        );
     }
 
     #[test]
@@ -1962,7 +2067,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "an unrecognized role string must be rejected by the CHECK constraint");
+        assert!(
+            result.is_err(),
+            "an unrecognized role string must be rejected by the CHECK constraint"
+        );
     }
 
     #[test]
@@ -1970,8 +2078,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('u1', 'teacher.a', 'hash', 'Teacher A')",
@@ -2012,7 +2123,10 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM user_school_roles", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 0, "a role row must not outlive the membership it depends on");
+        assert_eq!(
+            count, 0,
+            "a role row must not outlive the membership it depends on"
+        );
     }
 
     #[test]
@@ -2033,7 +2147,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(default_count, 1, "exactly one curriculum version must be the default");
+        assert_eq!(
+            default_count, 1,
+            "exactly one curriculum version must be the default"
+        );
 
         let default_name: String = conn
             .query_row(
@@ -2057,7 +2174,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "a second default curriculum version must be rejected");
+        assert!(
+            result.is_err(),
+            "a second default curriculum version must be rejected"
+        );
     }
 
     #[test]
@@ -2099,7 +2219,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "min_grade_level must never exceed max_grade_level");
+        assert!(
+            result.is_err(),
+            "min_grade_level must never exceed max_grade_level"
+        );
     }
 
     #[test]
@@ -2141,7 +2264,10 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "a learning area must reference a real curriculum version");
+        assert!(
+            result.is_err(),
+            "a learning area must reference a real curriculum version"
+        );
     }
 
     #[test]
@@ -2171,8 +2297,11 @@ mod tests {
         // pre-M17 database would have -- with no curriculum_version_id
         // column at all yet.
         migrations().to_version(&mut conn, 16).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
              VALUES ('sec1', 's1', '2025-2026', 'Grade 7', 'Rizal')",
@@ -2217,8 +2346,11 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
         migrations().to_latest(&mut conn).unwrap();
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
              VALUES ('sec1', 's1', '2025-2026', 'Grade 7', 'Rizal')",
@@ -2243,14 +2375,20 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "a class record must not pin a curriculum version that doesn't exist");
+        assert!(
+            result.is_err(),
+            "a class record must not pin a curriculum version that doesn't exist"
+        );
     }
 
     // ---- Teacher Load / Class Schedule Foundation ----
 
     fn seed_school_teacher_section_subject(conn: &Connection) {
-        conn.execute("INSERT INTO schools (id, name) VALUES ('s1', 'Test School')", [])
-            .unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('t1', 'teacher.a', 'hash', 'Teacher A')",
@@ -2290,7 +2428,9 @@ mod tests {
         .unwrap();
 
         let count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM teaching_assignments", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM teaching_assignments", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(count, 1);
     }
@@ -2373,7 +2513,10 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM schedule_meetings", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 0, "a meeting must not outlive the assignment it depends on");
+        assert_eq!(
+            count, 0,
+            "a meeting must not outlive the assignment it depends on"
+        );
     }
 
     #[test]
@@ -2467,6 +2610,9 @@ mod tests {
             [],
         );
 
-        assert!(result.is_err(), "the exact same meeting must not be insertable twice");
+        assert!(
+            result.is_err(),
+            "the exact same meeting must not be insertable twice"
+        );
     }
 }

@@ -118,7 +118,14 @@ pub fn create(
         "INSERT INTO grading_periods \
              (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        (&id, school_id, school_year, policy_period_id, starts_on, ends_on),
+        (
+            &id,
+            school_id,
+            school_year,
+            policy_period_id,
+            starts_on,
+            ends_on,
+        ),
     )?;
 
     find_by_id_in_school(conn, school_id, &id)
@@ -230,9 +237,16 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let created = create(&conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-            .unwrap()
-            .unwrap();
+        let created = create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(created.label, "1st Term");
 
         let periods = list_by_school_year(&conn, &s.id, "2026-2027").unwrap();
@@ -244,8 +258,15 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let result = create(&conn, &s.id, "2026-2027", "does-not-exist", "2026-06-08", "2026-09-15")
-            .unwrap();
+        let result = create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            "does-not-exist",
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap();
 
         assert_eq!(result, None);
     }
@@ -255,7 +276,14 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        let result = create(&conn, &s.id, "2026-2027", TERM_1, "2026-09-15", "2026-06-08");
+        let result = create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-09-15",
+            "2026-06-08",
+        );
 
         assert!(result.is_err());
     }
@@ -264,11 +292,29 @@ mod tests {
     fn create_rejects_a_duplicate_period_for_the_same_school_year() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        create(&conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15").unwrap();
+        create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap();
 
-        let result = create(&conn, &s.id, "2026-2027", TERM_1, "2026-06-10", "2026-09-20");
+        let result = create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-10",
+            "2026-09-20",
+        );
 
-        assert!(result.is_err(), "the same period must not be entered twice for one school year");
+        assert!(
+            result.is_err(),
+            "the same period must not be entered twice for one school year"
+        );
     }
 
     #[test]
@@ -276,7 +322,15 @@ mod tests {
         let conn = open_test_db();
         let school_a = school::create(&conn, "School A").unwrap();
         let school_b = school::create(&conn, "School B").unwrap();
-        create(&conn, &school_a.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15").unwrap();
+        create(
+            &conn,
+            &school_a.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap();
 
         let periods = list_by_school_year(&conn, &school_b.id, "2026-2027").unwrap();
 
@@ -287,7 +341,15 @@ mod tests {
     fn list_by_school_year_does_not_include_a_different_school_year() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        create(&conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15").unwrap();
+        create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap();
 
         let periods = list_by_school_year(&conn, &s.id, "2025-2026").unwrap();
 

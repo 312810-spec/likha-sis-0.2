@@ -47,8 +47,7 @@ fn export_as_current_session(
     let Some(section) = section::find_by_id_in_school(conn, &school_id, section_id)? else {
         return Ok(None);
     };
-    let report =
-        attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
+    let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
 
     Ok(Some(sf2::build_sf2_export(&school, &section, &report)))
 }
@@ -65,7 +64,9 @@ fn export_learner_roster_as_current_session(
     };
     let learners = learner::list_by_school(conn, &school_id)?;
 
-    Ok(Some(learner_roster::build_learner_roster_export(&school, &learners)))
+    Ok(Some(learner_roster::build_learner_roster_export(
+        &school, &learners,
+    )))
 }
 
 fn setup_enrolled_learner_with_session(
@@ -104,7 +105,10 @@ fn exporting_a_foreign_schools_section_returns_none_not_an_error() {
 
     let result = export_as_current_session(&conn, &sessions, &section_b.id, 2026, 8).unwrap();
 
-    assert!(result.is_none(), "a foreign section_id must not resolve to any data");
+    assert!(
+        result.is_none(),
+        "a foreign section_id must not resolve to any data"
+    );
 }
 
 #[test]
@@ -125,10 +129,15 @@ fn the_export_never_includes_another_schools_learners() {
     let school_b = school::create(&conn, "School B").unwrap();
     let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
     let learner_b = learner::create(&conn, &school_b.id, "Maria", "Santos", None, None).unwrap();
-    section_membership::enroll(&conn, &school_b.id, &section_b.id, &learner_b.id, "2026-08-01")
-        .unwrap();
-    let (_school_a, section_a, sessions) =
-        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    section_membership::enroll(
+        &conn,
+        &school_b.id,
+        &section_b.id,
+        &learner_b.id,
+        "2026-08-01",
+    )
+    .unwrap();
+    let (_school_a, section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
 
     let export = export_as_current_session(&conn, &sessions, &section_a, 2026, 8)
         .unwrap()
@@ -144,7 +153,9 @@ fn a_teacher_can_export_their_own_schools_learner_roster() {
     let (_school_id, _section_id, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let export = export_learner_roster_as_current_session(&conn, &sessions).unwrap().unwrap();
+    let export = export_learner_roster_as_current_session(&conn, &sessions)
+        .unwrap()
+        .unwrap();
 
     assert!(export.csv.contains("Juan"));
     assert!(export.csv.contains("Dela Cruz"));
@@ -165,10 +176,11 @@ fn the_learner_roster_export_never_includes_another_schools_learners() {
     let conn = open_test_db();
     let school_b = school::create(&conn, "School B").unwrap();
     learner::create(&conn, &school_b.id, "Maria", "Santos", None, None).unwrap();
-    let (_school_a, _section_a, sessions) =
-        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (_school_a, _section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let export = export_learner_roster_as_current_session(&conn, &sessions).unwrap().unwrap();
+    let export = export_learner_roster_as_current_session(&conn, &sessions)
+        .unwrap()
+        .unwrap();
 
     assert!(!export.csv.contains("Maria"));
     assert!(!export.csv.contains("Santos"));

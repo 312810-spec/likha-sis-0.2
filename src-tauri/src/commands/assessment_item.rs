@@ -39,7 +39,14 @@ pub fn create_assessment_item(
 ) -> AppResult<Option<AssessmentItem>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    assessment_item::create(&conn, &school_id, &class_record_id, &category_id, &name, max_score)
+    assessment_item::create(
+        &conn,
+        &school_id,
+        &class_record_id,
+        &category_id,
+        &name,
+        max_score,
+    )
 }
 
 /// Renames an assessment item — always permitted, scored or not, since

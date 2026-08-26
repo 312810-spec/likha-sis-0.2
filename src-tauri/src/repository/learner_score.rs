@@ -109,7 +109,11 @@ pub fn record(
         return Ok(None);
     };
     let roster = section_membership::roster_for_section_over_range(
-        conn, school_id, &section_id, &starts_on, &ends_on,
+        conn,
+        school_id,
+        &section_id,
+        &starts_on,
+        &ends_on,
     )?;
     if !roster.iter().any(|m| m.learner_id == learner_id) {
         return Ok(None);
@@ -189,14 +193,23 @@ pub fn roster_for_item(
          ORDER BY l.family_name, l.given_name",
     )?;
     let rows = stmt.query_map(
-        (assessment_item_id, school_id, &section_id, &starts_on, &ends_on),
+        (
+            assessment_item_id,
+            school_id,
+            &section_id,
+            &starts_on,
+            &ends_on,
+        ),
         |row| {
             let status: Option<String> = row.get(3)?;
             Ok(LearnerScoreRosterEntry {
                 learner_id: row.get(0)?,
                 given_name: row.get(1)?,
                 family_name: row.get(2)?,
-                status: status.as_deref().map(LearnerScoreStatus::from_db_str).transpose()?,
+                status: status
+                    .as_deref()
+                    .map(LearnerScoreStatus::from_db_str)
+                    .transpose()?,
                 score: row.get(4)?,
                 updated_at: row.get(5)?,
             })
@@ -226,7 +239,9 @@ mod tests {
     use super::*;
     use crate::{
         db,
-        repository::{assessment_item, grading, learner, school, section, section_membership, subject, user},
+        repository::{
+            assessment_item, grading, learner, school, section, section_membership, subject, user,
+        },
     };
     use std::path::Path;
 
@@ -288,8 +303,16 @@ mod tests {
     fn recording_again_overwrites_the_score_not_duplicates_it() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
-        record(&conn, &school_id, &item_id, &learner_id, LearnerScoreStatus::Scored, Some(15.0), &teacher_id)
-            .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+        )
+        .unwrap();
 
         let corrected = record(
             &conn,
@@ -304,7 +327,9 @@ mod tests {
         .unwrap();
 
         assert_eq!(corrected.score, Some(19.0));
-        let roster = roster_for_item(&conn, &school_id, &item_id).unwrap().unwrap();
+        let roster = roster_for_item(&conn, &school_id, &item_id)
+            .unwrap()
+            .unwrap();
         assert_eq!(roster.len(), 1);
         assert_eq!(roster[0].score, Some(19.0));
     }
@@ -325,7 +350,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result, None, "a score above the item's max_score must be rejected");
+        assert_eq!(
+            result, None,
+            "a score above the item's max_score must be rejected"
+        );
     }
 
     #[test]
@@ -470,10 +498,15 @@ mod tests {
         )
         .unwrap();
 
-        let roster = roster_for_item(&conn, &school_id, &item_id).unwrap().unwrap();
+        let roster = roster_for_item(&conn, &school_id, &item_id)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(roster.len(), 2);
-        let scored_entry = roster.iter().find(|e| e.learner_id == scored_learner).unwrap();
+        let scored_entry = roster
+            .iter()
+            .find(|e| e.learner_id == scored_learner)
+            .unwrap();
         assert_eq!(scored_entry.score, Some(20.0));
         let unscored_entry = roster.iter().find(|e| e.learner_id == unscored.id).unwrap();
         assert_eq!(unscored_entry.status, None);

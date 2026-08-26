@@ -109,7 +109,8 @@ impl SessionManager {
     /// that forgets to do that still cannot leave a revoked session
     /// usable — see `repository::session::is_revoked`.
     pub fn require_active_school_scope(&self, conn: &Connection) -> AppResult<String> {
-        self.require_active_session(conn).map(|(_, school_id)| school_id)
+        self.require_active_session(conn)
+            .map(|(_, school_id)| school_id)
     }
 
     /// The same check as `require_active_school_scope`, but also returns
@@ -171,7 +172,13 @@ pub fn login(
     let user = match user_repo::verify_credentials(conn, username, password) {
         Ok(user) => user,
         Err(AppError::AccountLocked) => {
-            audit_log_repo::record(conn, school_id, None, username, AuditEventType::AccountLocked)?;
+            audit_log_repo::record(
+                conn,
+                school_id,
+                None,
+                username,
+                AuditEventType::AccountLocked,
+            )?;
             return Err(AppError::AccountLocked);
         }
         Err(AppError::AuthenticationFailed) => {
@@ -530,12 +537,24 @@ mod tests {
     fn a_successful_login_is_recorded_in_the_audit_log() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
-            .unwrap();
+        let u = user::create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
         let sessions = SessionManager::new();
 
-        login(&conn, &sessions, "ana.cruz", "correct horse battery staple", &s.id).unwrap();
+        login(
+            &conn,
+            &sessions,
+            "ana.cruz",
+            "correct horse battery staple",
+            &s.id,
+        )
+        .unwrap();
 
         let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries.len(), 1);
@@ -563,8 +582,13 @@ mod tests {
     fn a_locked_account_login_attempt_is_recorded_as_account_locked_not_login_failed() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
-            .unwrap();
+        let u = user::create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
         let sessions = SessionManager::new();
         for _ in 0..user::MAX_FAILED_LOGIN_ATTEMPTS {
@@ -583,11 +607,23 @@ mod tests {
     fn a_logout_is_recorded_in_the_audit_log() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let u = user::create_user(&conn, "ana.cruz", "correct horse battery staple", "Ana Cruz")
-            .unwrap();
+        let u = user::create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
         let sessions = SessionManager::new();
-        login(&conn, &sessions, "ana.cruz", "correct horse battery staple", &s.id).unwrap();
+        login(
+            &conn,
+            &sessions,
+            "ana.cruz",
+            "correct horse battery staple",
+            &s.id,
+        )
+        .unwrap();
 
         logout(&conn, &sessions).unwrap();
 
@@ -668,7 +704,8 @@ mod tests {
     }
 
     #[test]
-    fn require_active_school_scope_fails_closed_for_a_session_idle_too_long_even_within_the_absolute_ttl() {
+    fn require_active_school_scope_fails_closed_for_a_session_idle_too_long_even_within_the_absolute_ttl(
+    ) {
         let conn = open_test_db();
         let sessions = SessionManager::new();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
@@ -912,8 +949,8 @@ mod tests {
     fn authorize_school_membership_grant_allows_a_school_head_session_in_the_same_school() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let existing = user::create_user(&conn, "principal.one", "password", "Principal One")
-            .unwrap();
+        let existing =
+            user::create_user(&conn, "principal.one", "password", "Principal One").unwrap();
         user::add_school_membership(&conn, &existing.id, &s.id).unwrap();
         role_repo::grant(&conn, &existing.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
         let sessions = SessionManager::new();
@@ -980,8 +1017,7 @@ mod tests {
         // enrollment/records scope. See the Capability doc comment.
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let registrar = user::create_user(&conn, "registrar.a", "password", "Registrar A")
-            .unwrap();
+        let registrar = user::create_user(&conn, "registrar.a", "password", "Registrar A").unwrap();
         user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
         role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
         let sessions = SessionManager::new();
@@ -996,8 +1032,7 @@ mod tests {
     fn authorize_school_membership_grant_denies_once_the_school_head_role_is_removed_mid_session() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let principal = user::create_user(&conn, "principal.a", "password", "Principal A")
-            .unwrap();
+        let principal = user::create_user(&conn, "principal.a", "password", "Principal A").unwrap();
         user::add_school_membership(&conn, &principal.id, &s.id).unwrap();
         role_repo::grant(&conn, &principal.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
         let sessions = SessionManager::new();
@@ -1340,7 +1375,11 @@ mod tests {
         )
         .unwrap();
 
-        for role in [role_repo::TEACHER, role_repo::REGISTRAR, role_repo::SCHOOL_HEAD] {
+        for role in [
+            role_repo::TEACHER,
+            role_repo::REGISTRAR,
+            role_repo::SCHOOL_HEAD,
+        ] {
             assert!(
                 role_repo::has_any_role(&conn, &session.user_id, &session.school_id, &[role])
                     .unwrap(),
@@ -1458,8 +1497,8 @@ mod tests {
         let (s, head) = setup_member_with_session(&conn, &sessions);
         role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
-        let other_teacher = user::create_user(&conn, "other.teacher", "password", "Other Teacher")
-            .unwrap();
+        let other_teacher =
+            user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &other_school.id).unwrap();
 
         let result = authorize_view_teacher_load(&conn, &sessions, &other_teacher.id);

@@ -47,7 +47,14 @@ pub fn record_attendance(
 ) -> AppResult<Option<AttendanceRecord>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    attendance::record(&conn, &school_id, &section_id, &learner_id, &attendance_date, status)
+    attendance::record(
+        &conn,
+        &school_id,
+        &section_id,
+        &learner_id,
+        &attendance_date,
+        status,
+    )
 }
 
 /// Marks every currently-unmarked learner on `section_id`'s roster for

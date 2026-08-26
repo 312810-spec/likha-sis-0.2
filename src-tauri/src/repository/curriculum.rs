@@ -81,7 +81,9 @@ mod tests {
         assert_eq!(versions.len(), 2);
         assert!(versions[0].is_default);
         assert_eq!(versions[0].name, "K to 12 Basic Education Curriculum");
-        assert!(versions.iter().any(|v| v.name == "MATATAG Curriculum" && !v.is_default));
+        assert!(versions
+            .iter()
+            .any(|v| v.name == "MATATAG Curriculum" && !v.is_default));
     }
 
     #[test]
@@ -91,7 +93,11 @@ mod tests {
         let id = default_version_id(&conn).unwrap();
 
         let name: String = conn
-            .query_row("SELECT name FROM curriculum_versions WHERE id = ?1", [&id], |r| r.get(0))
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE id = ?1",
+                [&id],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(name, "K to 12 Basic Education Curriculum");
     }

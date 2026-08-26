@@ -130,7 +130,8 @@ fn a_teacher_cannot_mark_attendance_for_another_schools_learner() {
     let school_a = school::create(&conn, "School A").unwrap();
     let section_a = section::create(&conn, &school_a.id, "2025-2026", "7", "Mabini").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
+    let other_schools_learner =
+        learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     let result = record_attendance_as_current_session(
@@ -182,8 +183,14 @@ fn a_teachers_roster_view_never_includes_another_schools_learners() {
     let school_b = school::create(&conn, "School B").unwrap();
     let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
     let learner_b = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
-    section_membership::enroll(&conn, &school_b.id, &section_b.id, &learner_b.id, "2026-08-01")
-        .unwrap();
+    section_membership::enroll(
+        &conn,
+        &school_b.id,
+        &section_b.id,
+        &learner_b.id,
+        "2026-08-01",
+    )
+    .unwrap();
 
     let roster = roster_as_current_session(&conn, &sessions, &section_id, "2026-08-24").unwrap();
 
@@ -229,7 +236,8 @@ fn bulk_marking_present_requires_a_session_even_if_a_caller_tries_to_bypass_ui_c
     let section_a = section::create(&conn, &school_a.id, "2025-2026", "7", "Mabini").unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
-    let result = bulk_mark_present_as_current_session(&conn, &sessions, &section_a.id, "2026-08-24");
+    let result =
+        bulk_mark_present_as_current_session(&conn, &sessions, &section_a.id, "2026-08-24");
 
     assert!(matches!(result, Err(AppError::Unauthorized)));
 }
@@ -242,13 +250,16 @@ fn bulk_marking_present_never_marks_another_schools_section() {
     let school_b = school::create(&conn, "School B").unwrap();
     let sessions_b = login_as_a_teacher_at(&conn, &school_b.id, "teacher.b");
 
-    let roster = bulk_mark_present_as_current_session(&conn, &sessions_b, &section_a, "2026-08-24")
-        .unwrap();
+    let roster =
+        bulk_mark_present_as_current_session(&conn, &sessions_b, &section_a, "2026-08-24").unwrap();
 
     assert!(roster.is_empty());
     let roster_a =
         roster_as_current_session(&conn, &_sessions_a, &section_a, "2026-08-24").unwrap();
-    assert_eq!(roster_a[0].status, None, "school A's learner must remain unmarked");
+    assert_eq!(
+        roster_a[0].status, None,
+        "school A's learner must remain unmarked"
+    );
 }
 
 #[test]
@@ -257,8 +268,8 @@ fn bulk_marking_present_marks_the_callers_own_unmarked_roster() {
     let (_school_id, section_id, learner_id, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let roster = bulk_mark_present_as_current_session(&conn, &sessions, &section_id, "2026-08-24")
-        .unwrap();
+    let roster =
+        bulk_mark_present_as_current_session(&conn, &sessions, &section_id, "2026-08-24").unwrap();
 
     let entry = roster.iter().find(|e| e.learner_id == learner_id).unwrap();
     assert_eq!(entry.status, Some(AttendanceStatus::Present));
@@ -300,8 +311,14 @@ fn a_teachers_monthly_summary_never_includes_another_schools_learners() {
     let school_b = school::create(&conn, "School B").unwrap();
     let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
     let learner_b = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
-    section_membership::enroll(&conn, &school_b.id, &section_b.id, &learner_b.id, "2026-08-01")
-        .unwrap();
+    section_membership::enroll(
+        &conn,
+        &school_b.id,
+        &section_b.id,
+        &learner_b.id,
+        "2026-08-01",
+    )
+    .unwrap();
     attendance::record(
         &conn,
         &school_b.id,
@@ -314,10 +331,13 @@ fn a_teachers_monthly_summary_never_includes_another_schools_learners() {
     let (_school_a, section_a, _learner_a, sessions) =
         setup_enrolled_learner_with_session(&conn, "teacher.a");
 
-    let report =
-        monthly_summary_as_current_session(&conn, &sessions, &section_a, 2026, 8).unwrap();
+    let report = monthly_summary_as_current_session(&conn, &sessions, &section_a, 2026, 8).unwrap();
 
-    assert_eq!(report.learners.len(), 1, "only school A's section's own member");
+    assert_eq!(
+        report.learners.len(),
+        1,
+        "only school A's section's own member"
+    );
     assert_eq!(report.learners[0].present_count, 0);
 }
 

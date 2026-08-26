@@ -128,7 +128,14 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
 
-        record(&conn, &s.id, Some(&u.id), "ana.cruz", AuditEventType::LoginSuccess).unwrap();
+        record(
+            &conn,
+            &s.id,
+            Some(&u.id),
+            "ana.cruz",
+            AuditEventType::LoginSuccess,
+        )
+        .unwrap();
 
         let entries = list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries.len(), 1);
@@ -142,7 +149,14 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
 
-        record(&conn, &s.id, None, "does.not.exist", AuditEventType::LoginFailed).unwrap();
+        record(
+            &conn,
+            &s.id,
+            None,
+            "does.not.exist",
+            AuditEventType::LoginFailed,
+        )
+        .unwrap();
 
         let entries = list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries[0].user_id, None);
@@ -160,7 +174,10 @@ mod tests {
         let entries = list_for_school(&conn, &s.id, 10).unwrap();
 
         assert_eq!(
-            entries.iter().map(|e| e.username.as_str()).collect::<Vec<_>>(),
+            entries
+                .iter()
+                .map(|e| e.username.as_str())
+                .collect::<Vec<_>>(),
             vec!["third", "second", "first"]
         );
     }
@@ -170,7 +187,14 @@ mod tests {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         for i in 0..5 {
-            record(&conn, &s.id, None, &format!("user{i}"), AuditEventType::LoginFailed).unwrap();
+            record(
+                &conn,
+                &s.id,
+                None,
+                &format!("user{i}"),
+                AuditEventType::LoginFailed,
+            )
+            .unwrap();
         }
 
         let entries = list_for_school(&conn, &s.id, 2).unwrap();
@@ -183,8 +207,22 @@ mod tests {
         let conn = open_test_db();
         let school_a = school::create(&conn, "School A").unwrap();
         let school_b = school::create(&conn, "School B").unwrap();
-        record(&conn, &school_a.id, None, "ana.cruz", AuditEventType::LoginSuccess).unwrap();
-        record(&conn, &school_b.id, None, "ben.reyes", AuditEventType::LoginSuccess).unwrap();
+        record(
+            &conn,
+            &school_a.id,
+            None,
+            "ana.cruz",
+            AuditEventType::LoginSuccess,
+        )
+        .unwrap();
+        record(
+            &conn,
+            &school_b.id,
+            None,
+            "ben.reyes",
+            AuditEventType::LoginSuccess,
+        )
+        .unwrap();
 
         let entries = list_for_school(&conn, &school_a.id, 10).unwrap();
 

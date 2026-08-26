@@ -33,7 +33,15 @@ fn update_learner_as_current_session(
     family_name: &str,
 ) -> app_lib::error::AppResult<Option<learner::Learner>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    learner::update(conn, &school_id, learner_id, given_name, family_name, None, None)
+    learner::update(
+        conn,
+        &school_id,
+        learner_id,
+        given_name,
+        family_name,
+        None,
+        None,
+    )
 }
 
 fn login_as_a_teacher_at(
@@ -72,7 +80,8 @@ fn a_teacher_cannot_view_another_schools_learner_by_id() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
+    let other_schools_learner =
+        learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     let result =
@@ -89,7 +98,8 @@ fn a_teacher_cannot_update_another_schools_learner_by_id() {
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let school_b = school::create(&conn, "School B").unwrap();
-    let other_schools_learner = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
+    let other_schools_learner =
+        learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     let result = update_learner_as_current_session(
@@ -158,10 +168,26 @@ fn the_learner_list_remains_correct_with_a_large_synthetic_roster() {
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
     for i in 0..500 {
-        learner::create(&conn, &school_a.id, "Maria", &format!("Santos {i}"), None, None).unwrap();
+        learner::create(
+            &conn,
+            &school_a.id,
+            "Maria",
+            &format!("Santos {i}"),
+            None,
+            None,
+        )
+        .unwrap();
     }
     for i in 0..50 {
-        learner::create(&conn, &school_b.id, "Other", &format!("School {i}"), None, None).unwrap();
+        learner::create(
+            &conn,
+            &school_b.id,
+            "Other",
+            &format!("School {i}"),
+            None,
+            None,
+        )
+        .unwrap();
     }
 
     let start = std::time::Instant::now();

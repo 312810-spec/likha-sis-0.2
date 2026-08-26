@@ -77,7 +77,11 @@ mod tests {
     #[test]
     fn row_joins_fields_with_commas_and_escapes_each_independently() {
         assert_eq!(
-            row(&["Cruz, Ana".to_string(), "Present".to_string(), "3".to_string()]),
+            row(&[
+                "Cruz, Ana".to_string(),
+                "Present".to_string(),
+                "3".to_string()
+            ]),
             "\"Cruz, Ana\",Present,3"
         );
     }

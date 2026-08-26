@@ -42,7 +42,14 @@ fn create_item_as_current_session(
     max_score: f64,
 ) -> app_lib::error::AppResult<Option<assessment_item::AssessmentItem>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    assessment_item::create(conn, &school_id, class_record_id, category_id, name, max_score)
+    assessment_item::create(
+        conn,
+        &school_id,
+        class_record_id,
+        category_id,
+        name,
+        max_score,
+    )
 }
 
 /// Standing in for `commands::learner_score::record_learner_score`.
@@ -56,7 +63,15 @@ fn record_score_as_current_session(
     score: Option<f64>,
 ) -> app_lib::error::AppResult<Option<learner_score::LearnerScore>> {
     let (user_id, school_id) = sessions.require_active_session(conn)?;
-    learner_score::record(conn, &school_id, assessment_item_id, learner_id, status, score, &user_id)
+    learner_score::record(
+        conn,
+        &school_id,
+        assessment_item_id,
+        learner_id,
+        status,
+        score,
+        &user_id,
+    )
 }
 
 /// Builds a school with a class record and an enrolled learner, logged
@@ -71,12 +86,21 @@ fn setup_school(
     let sessions = login_as_a_teacher_at(conn, &school.id, username);
     let sec = section::create(conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
     let sub = subject::create(conn, &school.id, "Mathematics").unwrap();
-    let period = grading::create(conn, &school.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-        .unwrap()
-        .unwrap();
-    let cr = class_record::create(conn, &school.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
-        .unwrap()
-        .unwrap();
+    let period = grading::create(
+        conn,
+        &school.id,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap()
+    .unwrap();
+    let cr = class_record::create(
+        conn, &school.id, &sec.id, &sub.id, &period.id, K10_POLICY, None,
+    )
+    .unwrap()
+    .unwrap();
     let l = learner::create(conn, &school.id, "Ana", "Cruz", None, None).unwrap();
     section_membership::enroll(conn, &school.id, &sec.id, &l.id, "2026-06-08").unwrap();
     (sessions, cr.id, l.id)
@@ -87,10 +111,16 @@ fn a_teacher_can_create_an_item_and_record_a_score_for_their_own_schools_class_r
     let conn = open_test_db();
     let (sessions, class_record_id, learner_id) = setup_school(&conn, "School A", "teacher.a");
 
-    let item =
-        create_item_as_current_session(&conn, &sessions, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+    let item = create_item_as_current_session(
+        &conn,
+        &sessions,
+        &class_record_id,
+        WRITTEN_WORKS,
+        "Quiz 1",
+        20.0,
+    )
+    .unwrap()
+    .unwrap();
     let score = record_score_as_current_session(
         &conn,
         &sessions,
@@ -108,7 +138,8 @@ fn a_teacher_can_create_an_item_and_record_a_score_for_their_own_schools_class_r
 #[test]
 fn a_teacher_cannot_create_an_item_using_another_schools_class_record() {
     let conn = open_test_db();
-    let (_sessions_b, foreign_class_record_id, _learner_b) = setup_school(&conn, "School B", "teacher.b");
+    let (_sessions_b, foreign_class_record_id, _learner_b) =
+        setup_school(&conn, "School B", "teacher.b");
     let (sessions_a, ..) = setup_school(&conn, "School A", "teacher.a");
 
     let result = create_item_as_current_session(
@@ -121,17 +152,26 @@ fn a_teacher_cannot_create_an_item_using_another_schools_class_record() {
     )
     .unwrap();
 
-    assert_eq!(result, None, "cross-school class-record reference must be rejected");
+    assert_eq!(
+        result, None,
+        "cross-school class-record reference must be rejected"
+    );
 }
 
 #[test]
 fn a_teacher_cannot_record_a_score_for_another_schools_item() {
     let conn = open_test_db();
     let (sessions_b, class_record_b, learner_b) = setup_school(&conn, "School B", "teacher.b");
-    let item_b =
-        create_item_as_current_session(&conn, &sessions_b, &class_record_b, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+    let item_b = create_item_as_current_session(
+        &conn,
+        &sessions_b,
+        &class_record_b,
+        WRITTEN_WORKS,
+        "Quiz 1",
+        20.0,
+    )
+    .unwrap()
+    .unwrap();
 
     let (sessions_a, ..) = setup_school(&conn, "School A", "teacher.a");
 
@@ -154,8 +194,14 @@ fn creating_an_assessment_item_requires_a_session_even_if_a_caller_tries_to_bypa
     let (_sessions, class_record_id, _learner_id) = setup_school(&conn, "School A", "teacher.a");
     let sessions = SessionManager::new(); // nobody logged in
 
-    let result =
-        create_item_as_current_session(&conn, &sessions, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0);
+    let result = create_item_as_current_session(
+        &conn,
+        &sessions,
+        &class_record_id,
+        WRITTEN_WORKS,
+        "Quiz 1",
+        20.0,
+    );
 
     assert!(matches!(result, Err(AppError::Unauthorized)));
 }
@@ -164,9 +210,16 @@ fn creating_an_assessment_item_requires_a_session_even_if_a_caller_tries_to_bypa
 fn recording_a_score_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
     let conn = open_test_db();
     let (sessions_a, class_record_id, learner_id) = setup_school(&conn, "School A", "teacher.a");
-    let item = create_item_as_current_session(&conn, &sessions_a, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-        .unwrap()
-        .unwrap();
+    let item = create_item_as_current_session(
+        &conn,
+        &sessions_a,
+        &class_record_id,
+        WRITTEN_WORKS,
+        "Quiz 1",
+        20.0,
+    )
+    .unwrap()
+    .unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
     let result = record_score_as_current_session(
@@ -185,10 +238,16 @@ fn recording_a_score_requires_a_session_even_if_a_caller_tries_to_bypass_ui_chec
 fn a_recorded_score_is_attributed_to_the_session_that_recorded_it_not_a_client_supplied_id() {
     let conn = open_test_db();
     let (sessions, class_record_id, learner_id) = setup_school(&conn, "School A", "teacher.a");
-    let item =
-        create_item_as_current_session(&conn, &sessions, &class_record_id, WRITTEN_WORKS, "Quiz 1", 20.0)
-            .unwrap()
-            .unwrap();
+    let item = create_item_as_current_session(
+        &conn,
+        &sessions,
+        &class_record_id,
+        WRITTEN_WORKS,
+        "Quiz 1",
+        20.0,
+    )
+    .unwrap()
+    .unwrap();
 
     let score = record_score_as_current_session(
         &conn,

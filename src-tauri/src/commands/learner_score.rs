@@ -7,7 +7,9 @@ use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::grading_computation::{self, ComputedTermGrade};
-use crate::repository::learner_score::{self, LearnerScore, LearnerScoreRosterEntry, LearnerScoreStatus};
+use crate::repository::learner_score::{
+    self, LearnerScore, LearnerScoreRosterEntry, LearnerScoreStatus,
+};
 
 /// `assessment_item_id` is client-supplied the same legitimate way
 /// `section_id` already is elsewhere — `learner_score::roster_for_item`
@@ -39,7 +41,15 @@ pub fn record_learner_score(
 ) -> AppResult<Option<LearnerScore>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    learner_score::record(&conn, &school_id, &assessment_item_id, &learner_id, status, score, &user_id)
+    learner_score::record(
+        &conn,
+        &school_id,
+        &assessment_item_id,
+        &learner_id,
+        status,
+        score,
+        &user_id,
+    )
 }
 
 /// `class_record_id`/`learner_id` are client-supplied the same legitimate

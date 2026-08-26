@@ -135,6 +135,9 @@ mod tests {
         let categories = list_categories_for_set(&conn, DO_8_SET).unwrap();
 
         let names: Vec<&str> = categories.iter().map(|c| c.name.as_str()).collect();
-        assert_eq!(names, vec!["Written Work", "Performance Task", "Quarterly Assessment"]);
+        assert_eq!(
+            names,
+            vec!["Written Work", "Performance Task", "Quarterly Assessment"]
+        );
     }
 }

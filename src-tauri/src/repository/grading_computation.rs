@@ -134,7 +134,11 @@ fn uses_zero_based_grading(school_year: &str) -> bool {
 /// caller can still distinguish a learner who is genuinely at the floor
 /// from one whose raw performance was lower still.
 fn apply_minimum_floor(tg: u32) -> (u32, bool) {
-    if tg < 60 { (60, true) } else { (tg, false) }
+    if tg < 60 {
+        (60, true)
+    } else {
+        (tg, false)
+    }
 }
 
 /// A named, versioned DepEd grade-weighting policy — which learning-area
@@ -289,7 +293,11 @@ pub fn compute_term_grade(
                     }
                 }
             }
-            if all_defined { Some(combined) } else { None }
+            if all_defined {
+                Some(combined)
+            } else {
+                None
+            }
         };
 
         let Some(ps) = ps else {
@@ -340,7 +348,10 @@ mod tests {
         let mut ig = 0.0;
         while ig <= 100.0 {
             let tg = transmute_adjusted(ig);
-            assert!((60..=100).contains(&tg), "IG {ig} produced out-of-range TG {tg}");
+            assert!(
+                (60..=100).contains(&tg),
+                "IG {ig} produced out-of-range TG {tg}"
+            );
             ig += 0.01;
         }
     }
@@ -420,9 +431,17 @@ mod tests {
         let period = grading::create(conn, &s.id, school_year, TERM_1, "2026-06-08", "2026-09-15")
             .unwrap()
             .unwrap();
-        let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, weight_policy_id, None)
-            .unwrap()
-            .unwrap();
+        let cr = class_record::create(
+            conn,
+            &s.id,
+            &sec.id,
+            &sub.id,
+            &period.id,
+            weight_policy_id,
+            None,
+        )
+        .unwrap()
+        .unwrap();
         let l = learner::create(conn, &s.id, "Ana", "Cruz", None, None).unwrap();
         section_membership::enroll(conn, &s.id, &sec.id, &l.id, "2026-06-08").unwrap();
         let teacher = user::create_user(conn, "teacher.a", "password", "A Teacher").unwrap();
@@ -441,10 +460,16 @@ mod tests {
         max_score: f64,
         score: f64,
     ) {
-        let item =
-            assessment_item::create(conn, school_id, class_record_id, category_id, name, max_score)
-                .unwrap()
-                .unwrap();
+        let item = assessment_item::create(
+            conn,
+            school_id,
+            class_record_id,
+            category_id,
+            name,
+            max_score,
+        )
+        .unwrap()
+        .unwrap();
         learner_score::record(
             conn,
             school_id,
@@ -467,17 +492,109 @@ mod tests {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
 
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 17.0);
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW2", 25.0, 22.0);
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW3", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW4", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT2", 25.0, 23.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 18.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 40.0, 35.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            17.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW2",
+            25.0,
+            22.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW3",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW4",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT2",
+            25.0,
+            23.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            35.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         assert!(
             (result.initial_grade - 85.8).abs() < 0.05,
@@ -497,17 +614,109 @@ mod tests {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2027-2028");
 
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW2", 25.0, 22.0);
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW3", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT2", 25.0, 23.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT3", 25.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 25.0, 19.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 16.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 50.0, 42.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW2",
+            25.0,
+            22.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW3",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT2",
+            25.0,
+            23.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT3",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            25.0,
+            19.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            16.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            50.0,
+            42.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         // The Order's own displayed 83.6 comes from rounding each WS to one
         // decimal place before summing (17.5 + 42 + 24.12); this
@@ -531,14 +740,68 @@ mod tests {
     fn compute_term_grade_is_deterministic_across_repeated_calls() {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 18.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 40.0, 30.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            30.0,
+        );
 
-        let first = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
-        let second = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let first = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+        let second = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(first, second);
     }
@@ -547,7 +810,17 @@ mod tests {
     fn compute_term_grade_returns_none_when_a_required_category_has_no_scored_item_yet() {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 18.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            18.0,
+        );
         // Performance Tasks and Examinations never scored at all.
 
         let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap();
@@ -562,10 +835,50 @@ mod tests {
     fn compute_term_grade_returns_none_when_only_two_of_three_examinations_subtests_are_scored() {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 18.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 20.0, 15.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 15.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            15.0,
+        );
         // Term Examination never scored.
 
         let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap();
@@ -577,23 +890,79 @@ mod tests {
     fn compute_term_grade_ignores_excused_items_in_the_denominator() {
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
-        let excused_item = assessment_item::create(
-            &conn, &school_id, &cr, WRITTEN_WORKS, "WW-excused", 20.0,
-        )
-        .unwrap()
-        .unwrap();
+        let excused_item =
+            assessment_item::create(&conn, &school_id, &cr, WRITTEN_WORKS, "WW-excused", 20.0)
+                .unwrap()
+                .unwrap();
         learner_score::record(
-            &conn, &school_id, &excused_item.id, &learner_id,
-            learner_score::LearnerScoreStatus::Excused, None, &teacher_id,
+            &conn,
+            &school_id,
+            &excused_item.id,
+            &learner_id,
+            learner_score::LearnerScoreStatus::Excused,
+            None,
+            &teacher_id,
         )
         .unwrap();
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 25.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 40.0, 40.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            25.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            40.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         // A perfect score on every *scored* item, with the excused item
         // correctly excluded from both numerator and denominator, must
@@ -612,16 +981,71 @@ mod tests {
         // ever fire when nothing produced 60 through the table itself).
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 1.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 1.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 25.0, 0.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 0.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 50.0, 0.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            1.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            1.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            25.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            50.0,
+            0.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(result.term_grade, 60);
-        assert!(result.initial_grade < 60.0, "IG itself should still reflect true low performance");
+        assert!(
+            result.initial_grade < 60.0,
+            "IG itself should still reflect true low performance"
+        );
     }
 
     #[test]
@@ -633,18 +1057,73 @@ mod tests {
         // `was_floored = true`.
         let conn = open_test_db();
         let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2027-2028");
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 1.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 25.0, 1.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 25.0, 0.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 0.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 50.0, 0.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            1.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            1.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            25.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            50.0,
+            0.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         assert_eq!(result.term_grade, 60);
         assert!(result.was_floored);
         assert!(!result.was_transmuted);
-        assert!(result.initial_grade < 60.0, "IG itself should still reflect true low performance");
+        assert!(
+            result.initial_grade < 60.0,
+            "IG itself should still reflect true low performance"
+        );
     }
 
     #[test]
@@ -667,10 +1146,18 @@ mod tests {
         // K-10 core + EPP/TLE & MAPEH (M15) + six SHS groups (M16) = 8.
         assert_eq!(policies.len(), 8);
         let default_count = policies.iter().filter(|p| p.is_default).count();
-        assert_eq!(default_count, 1, "exactly one policy must be marked default");
+        assert_eq!(
+            default_count, 1,
+            "exactly one policy must be marked default"
+        );
         assert!(policies[0].is_default);
-        assert_eq!(policies[0].name, "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)");
-        assert!(policies.iter().any(|p| p.name == "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)"));
+        assert_eq!(
+            policies[0].name,
+            "DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+        );
+        assert!(policies
+            .iter()
+            .any(|p| p.name == "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)"));
         assert!(
             policies
                 .iter()
@@ -691,13 +1178,65 @@ mod tests {
         let (school_id, cr, learner_id, teacher_id) =
             setup_with_policy(&conn, "2026-2027", EPP_TLE_MAPEH_POLICY);
 
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, ST1, &learner_id, &teacher_id, "ST1", 25.0, 25.0);
-        add_item_and_score(&conn, &school_id, &cr, ST2, &learner_id, &teacher_id, "ST2", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 50.0, 50.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            25.0,
+            25.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            50.0,
+            50.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         // A perfect score under EPP/TLE & MAPEH is still a perfect IG
         // (100) -- weights differ from K-10, but a 100% learner scores
@@ -713,11 +1252,61 @@ mod tests {
             setup_with_policy(&conn_k10, "2026-2027", K10_POLICY);
         // WWs 50%, PTs 100%, EXs 0% -- K-10 weights WWs 20/PTs 50/EXs 30,
         // so IG = 50*0.2 + 100*0.5 + 0*0.3 = 60.
-        add_item_and_score(&conn_k10, &school_id_k10, &cr_k10, WRITTEN_WORKS, &learner_k10, &teacher_k10, "WW1", 20.0, 10.0);
-        add_item_and_score(&conn_k10, &school_id_k10, &cr_k10, PERFORMANCE_TASKS, &learner_k10, &teacher_k10, "PT1", 20.0, 20.0);
-        add_item_and_score(&conn_k10, &school_id_k10, &cr_k10, ST1, &learner_k10, &teacher_k10, "ST1", 25.0, 0.0);
-        add_item_and_score(&conn_k10, &school_id_k10, &cr_k10, ST2, &learner_k10, &teacher_k10, "ST2", 20.0, 0.0);
-        add_item_and_score(&conn_k10, &school_id_k10, &cr_k10, TE, &learner_k10, &teacher_k10, "TE", 50.0, 0.0);
+        add_item_and_score(
+            &conn_k10,
+            &school_id_k10,
+            &cr_k10,
+            WRITTEN_WORKS,
+            &learner_k10,
+            &teacher_k10,
+            "WW1",
+            20.0,
+            10.0,
+        );
+        add_item_and_score(
+            &conn_k10,
+            &school_id_k10,
+            &cr_k10,
+            PERFORMANCE_TASKS,
+            &learner_k10,
+            &teacher_k10,
+            "PT1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn_k10,
+            &school_id_k10,
+            &cr_k10,
+            ST1,
+            &learner_k10,
+            &teacher_k10,
+            "ST1",
+            25.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn_k10,
+            &school_id_k10,
+            &cr_k10,
+            ST2,
+            &learner_k10,
+            &teacher_k10,
+            "ST2",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn_k10,
+            &school_id_k10,
+            &cr_k10,
+            TE,
+            &learner_k10,
+            &teacher_k10,
+            "TE",
+            50.0,
+            0.0,
+        );
         let k10_result = compute_term_grade(&conn_k10, &school_id_k10, &cr_k10, &learner_k10)
             .unwrap()
             .unwrap();
@@ -727,16 +1316,71 @@ mod tests {
             setup_with_policy(&conn_mapeh, "2026-2027", EPP_TLE_MAPEH_POLICY);
         // Identical raw scores/percentages, but EPP/TLE & MAPEH weights
         // WWs 20/PTs 60/EXs 20, so IG = 50*0.2 + 100*0.6 + 0*0.2 = 70.
-        add_item_and_score(&conn_mapeh, &school_id_mapeh, &cr_mapeh, WRITTEN_WORKS, &learner_mapeh, &teacher_mapeh, "WW1", 20.0, 10.0);
-        add_item_and_score(&conn_mapeh, &school_id_mapeh, &cr_mapeh, PERFORMANCE_TASKS, &learner_mapeh, &teacher_mapeh, "PT1", 20.0, 20.0);
-        add_item_and_score(&conn_mapeh, &school_id_mapeh, &cr_mapeh, ST1, &learner_mapeh, &teacher_mapeh, "ST1", 25.0, 0.0);
-        add_item_and_score(&conn_mapeh, &school_id_mapeh, &cr_mapeh, ST2, &learner_mapeh, &teacher_mapeh, "ST2", 20.0, 0.0);
-        add_item_and_score(&conn_mapeh, &school_id_mapeh, &cr_mapeh, TE, &learner_mapeh, &teacher_mapeh, "TE", 50.0, 0.0);
-        let mapeh_result = compute_term_grade(&conn_mapeh, &school_id_mapeh, &cr_mapeh, &learner_mapeh)
-            .unwrap()
-            .unwrap();
+        add_item_and_score(
+            &conn_mapeh,
+            &school_id_mapeh,
+            &cr_mapeh,
+            WRITTEN_WORKS,
+            &learner_mapeh,
+            &teacher_mapeh,
+            "WW1",
+            20.0,
+            10.0,
+        );
+        add_item_and_score(
+            &conn_mapeh,
+            &school_id_mapeh,
+            &cr_mapeh,
+            PERFORMANCE_TASKS,
+            &learner_mapeh,
+            &teacher_mapeh,
+            "PT1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn_mapeh,
+            &school_id_mapeh,
+            &cr_mapeh,
+            ST1,
+            &learner_mapeh,
+            &teacher_mapeh,
+            "ST1",
+            25.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn_mapeh,
+            &school_id_mapeh,
+            &cr_mapeh,
+            ST2,
+            &learner_mapeh,
+            &teacher_mapeh,
+            "ST2",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn_mapeh,
+            &school_id_mapeh,
+            &cr_mapeh,
+            TE,
+            &learner_mapeh,
+            &teacher_mapeh,
+            "TE",
+            50.0,
+            0.0,
+        );
+        let mapeh_result =
+            compute_term_grade(&conn_mapeh, &school_id_mapeh, &cr_mapeh, &learner_mapeh)
+                .unwrap()
+                .unwrap();
 
-        assert!((k10_result.initial_grade - 60.0).abs() < 0.01, "got {}", k10_result.initial_grade);
+        assert!(
+            (k10_result.initial_grade - 60.0).abs() < 0.01,
+            "got {}",
+            k10_result.initial_grade
+        );
         assert!(
             (mapeh_result.initial_grade - 70.0).abs() < 0.01,
             "got {}",
@@ -761,15 +1405,41 @@ mod tests {
             setup_with_policy(&conn, "2026-2027", SHS_WORK_IMMERSION_POLICY);
 
         // Work Immersion: WWs 20% (portfolio), PTs 80% (industry evaluation).
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "Portfolio", 20.0, 18.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "Industry Eval", 100.0, 90.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "Portfolio",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "Industry Eval",
+            100.0,
+            90.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         // PS(WWs) = 18/20*100 = 90, WS = 90*0.2 = 18.
         // PS(PTs) = 90/100*100 = 90, WS = 90*0.8 = 72.
         // IG = 18 + 72 = 90. No Examinations term at all.
-        assert!((result.initial_grade - 90.0).abs() < 0.01, "got {}", result.initial_grade);
+        assert!(
+            (result.initial_grade - 90.0).abs() < 0.01,
+            "got {}",
+            result.initial_grade
+        );
     }
 
     /// SHS Field Exposure/Arts Apprenticeship/Creative Production weights
@@ -783,21 +1453,58 @@ mod tests {
         let (school_id, cr, learner_id, teacher_id) =
             setup_with_policy(&conn, "2026-2027", SHS_FIELD_EXPOSURE_POLICY);
 
-        add_item_and_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id, &teacher_id, "WW1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, PERFORMANCE_TASKS, &learner_id, &teacher_id, "PT1", 20.0, 20.0);
-        add_item_and_score(&conn, &school_id, &cr, TE, &learner_id, &teacher_id, "TE", 50.0, 40.0);
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            50.0,
+            40.0,
+        );
 
-        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id).unwrap().unwrap();
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
 
         // PS(WWs) = 100, WS = 100*0.15 = 15. PS(PTs) = 100, WS = 100*0.70 = 70.
         // PS(TE) = 40/50*100 = 80, weighted within Examinations at 100% -> 80,
         // then Examinations' own 15% weight -> WS = 80*0.15 = 12.
         // IG = 15 + 70 + 12 = 97.
-        assert!((result.initial_grade - 97.0).abs() < 0.01, "got {}", result.initial_grade);
+        assert!(
+            (result.initial_grade - 97.0).abs() < 0.01,
+            "got {}",
+            result.initial_grade
+        );
     }
 
     #[test]
-    fn compute_term_grade_returns_none_when_the_only_weighted_categories_have_nothing_scored_under_the_field_exposure_policy() {
+    fn compute_term_grade_returns_none_when_the_only_weighted_categories_have_nothing_scored_under_the_field_exposure_policy(
+    ) {
         let conn = open_test_db();
         let (school_id, cr, learner_id, _teacher_id) =
             setup_with_policy(&conn, "2026-2027", SHS_FIELD_EXPOSURE_POLICY);

@@ -95,7 +95,8 @@ pub fn create(
         return Ok(CreateMeetingOutcome::InvalidWeekday);
     }
 
-    let (Some(start_minutes), Some(end_minutes)) = (parse_minutes(starts_at), parse_minutes(ends_at))
+    let (Some(start_minutes), Some(end_minutes)) =
+        (parse_minutes(starts_at), parse_minutes(ends_at))
     else {
         return Ok(CreateMeetingOutcome::InvalidTime);
     };
@@ -108,13 +109,34 @@ pub fn create(
     // itself, so the overlap check below would otherwise always report it
     // as a `TeacherConflict` and the `UNIQUE` constraint's own `Duplicate`
     // outcome could never actually be returned.
-    if has_exact_duplicate(conn, school_id, teaching_assignment_id, weekday, starts_at, ends_at)? {
+    if has_exact_duplicate(
+        conn,
+        school_id,
+        teaching_assignment_id,
+        weekday,
+        starts_at,
+        ends_at,
+    )? {
         return Ok(CreateMeetingOutcome::Duplicate);
     }
-    if has_teacher_conflict(conn, school_id, &assignment.teacher_user_id, weekday, starts_at, ends_at)? {
+    if has_teacher_conflict(
+        conn,
+        school_id,
+        &assignment.teacher_user_id,
+        weekday,
+        starts_at,
+        ends_at,
+    )? {
         return Ok(CreateMeetingOutcome::TeacherConflict);
     }
-    if has_section_conflict(conn, school_id, &assignment.section_id, weekday, starts_at, ends_at)? {
+    if has_section_conflict(
+        conn,
+        school_id,
+        &assignment.section_id,
+        weekday,
+        starts_at,
+        ends_at,
+    )? {
         return Ok(CreateMeetingOutcome::SectionConflict);
     }
     if let Some(room) = room {
@@ -140,14 +162,22 @@ pub fn create(
              (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at, room) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
          ON CONFLICT (teaching_assignment_id, weekday, starts_at, ends_at) DO NOTHING",
-        (&id, school_id, teaching_assignment_id, weekday, starts_at, ends_at, room),
+        (
+            &id,
+            school_id,
+            teaching_assignment_id,
+            weekday,
+            starts_at,
+            ends_at,
+            room,
+        ),
     )?;
     if inserted == 0 {
         return Ok(CreateMeetingOutcome::Duplicate);
     }
 
-    let meeting = find_by_id_in_school(conn, school_id, &id)?
-        .expect("row just inserted must exist");
+    let meeting =
+        find_by_id_in_school(conn, school_id, &id)?.expect("row just inserted must exist");
     Ok(CreateMeetingOutcome::Created(meeting))
 }
 
@@ -164,7 +194,13 @@ fn has_exact_duplicate(
              SELECT 1 FROM schedule_meetings \
              WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND weekday = ?3 \
                AND starts_at = ?4 AND ends_at = ?5)",
-        (school_id, teaching_assignment_id, weekday, starts_at, ends_at),
+        (
+            school_id,
+            teaching_assignment_id,
+            weekday,
+            starts_at,
+            ends_at,
+        ),
         |row| row.get(0),
     )
     .map_err(Into::into)
@@ -326,8 +362,9 @@ mod tests {
         user::add_school_membership(conn, &teacher.id, &s.id).unwrap();
         let sec = section::create(conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
         let sub = subject::create(conn, &s.id, "Mathematics").unwrap();
-        let assignment =
-            teaching_assignment::create(conn, &s.id, &teacher.id, &sec.id, &sub.id).unwrap().unwrap();
+        let assignment = teaching_assignment::create(conn, &s.id, &teacher.id, &sec.id, &sub.id)
+            .unwrap()
+            .unwrap();
         (s.id, teacher.id, assignment.id)
     }
 
@@ -350,7 +387,16 @@ mod tests {
         let conn = open_test_db();
         let (school_id, ..) = setup(&conn);
 
-        let outcome = create(&conn, &school_id, "does-not-exist", 0, "08:00", "08:50", None).unwrap();
+        let outcome = create(
+            &conn,
+            &school_id,
+            "does-not-exist",
+            0,
+            "08:00",
+            "08:50",
+            None,
+        )
+        .unwrap();
 
         assert_eq!(outcome, CreateMeetingOutcome::UnknownAssignment);
     }
@@ -420,15 +466,24 @@ mod tests {
         let (school_id, teacher_id, assignment_id) = setup(&conn);
         create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap();
         // A second assignment for the same teacher, a different section.
-        let other_section = section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
+        let other_section =
+            section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
         let sub = subject::create(&conn, &school_id, "Science").unwrap();
         let other_assignment =
             teaching_assignment::create(&conn, &school_id, &teacher_id, &other_section.id, &sub.id)
                 .unwrap()
                 .unwrap();
 
-        let outcome =
-            create(&conn, &school_id, &other_assignment.id, 0, "08:30", "09:20", None).unwrap();
+        let outcome = create(
+            &conn,
+            &school_id,
+            &other_assignment.id,
+            0,
+            "08:30",
+            "09:20",
+            None,
+        )
+        .unwrap();
 
         assert_eq!(outcome, CreateMeetingOutcome::TeacherConflict);
     }
@@ -438,15 +493,24 @@ mod tests {
         let conn = open_test_db();
         let (school_id, teacher_id, assignment_id) = setup(&conn);
         create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap();
-        let other_section = section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
+        let other_section =
+            section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
         let sub = subject::create(&conn, &school_id, "Science").unwrap();
         let other_assignment =
             teaching_assignment::create(&conn, &school_id, &teacher_id, &other_section.id, &sub.id)
                 .unwrap()
                 .unwrap();
 
-        let outcome =
-            create(&conn, &school_id, &other_assignment.id, 0, "08:50", "09:40", None).unwrap();
+        let outcome = create(
+            &conn,
+            &school_id,
+            &other_assignment.id,
+            0,
+            "08:50",
+            "09:40",
+            None,
+        )
+        .unwrap();
 
         assert!(matches!(outcome, CreateMeetingOutcome::Created(_)));
     }
@@ -456,10 +520,11 @@ mod tests {
         let conn = open_test_db();
         let (school_id, _teacher_id, assignment_id) = setup(&conn);
         create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap();
-        let section_id = teaching_assignment::find_by_id_in_school(&conn, &school_id, &assignment_id)
-            .unwrap()
-            .unwrap()
-            .section_id;
+        let section_id =
+            teaching_assignment::find_by_id_in_school(&conn, &school_id, &assignment_id)
+                .unwrap()
+                .unwrap()
+                .section_id;
         let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
         let sub = subject::create(&conn, &school_id, "Science").unwrap();
@@ -468,8 +533,16 @@ mod tests {
                 .unwrap()
                 .unwrap();
 
-        let outcome =
-            create(&conn, &school_id, &other_assignment.id, 0, "08:30", "09:20", None).unwrap();
+        let outcome = create(
+            &conn,
+            &school_id,
+            &other_assignment.id,
+            0,
+            "08:30",
+            "09:20",
+            None,
+        )
+        .unwrap();
 
         assert_eq!(outcome, CreateMeetingOutcome::SectionConflict);
     }
@@ -478,8 +551,18 @@ mod tests {
     fn create_rejects_an_overlapping_meeting_in_the_same_room() {
         let conn = open_test_db();
         let (school_id, _teacher_id, assignment_id) = setup(&conn);
-        create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", Some("Room 101")).unwrap();
-        let other_section = section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
+        create(
+            &conn,
+            &school_id,
+            &assignment_id,
+            0,
+            "08:00",
+            "08:50",
+            Some("Room 101"),
+        )
+        .unwrap();
+        let other_section =
+            section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
         let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
         let sub = subject::create(&conn, &school_id, "Science").unwrap();
@@ -524,13 +607,23 @@ mod tests {
         let (school_id, teacher_id, assignment_id) = setup(&conn);
         create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap(); // 50 min
         create(&conn, &school_id, &assignment_id, 2, "08:00", "08:50", None).unwrap(); // 50 min
-        let other_section = section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
+        let other_section =
+            section::create(&conn, &school_id, "2026-2027", "8", "Bonifacio").unwrap();
         let sub = subject::create(&conn, &school_id, "Science").unwrap();
         let other_assignment =
             teaching_assignment::create(&conn, &school_id, &teacher_id, &other_section.id, &sub.id)
                 .unwrap()
                 .unwrap();
-        create(&conn, &school_id, &other_assignment.id, 1, "09:00", "10:00", None).unwrap(); // 60 min
+        create(
+            &conn,
+            &school_id,
+            &other_assignment.id,
+            1,
+            "09:00",
+            "10:00",
+            None,
+        )
+        .unwrap(); // 60 min
 
         let total = total_weekly_minutes_for_teacher(&conn, &school_id, &teacher_id).unwrap();
 

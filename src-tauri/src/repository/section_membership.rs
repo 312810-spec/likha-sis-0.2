@@ -257,13 +257,28 @@ mod tests {
 
         enroll(&conn, &school_id, &section_b.id, &l.id, "2025-10-01").unwrap();
 
-        let roster_a_before = roster_for_section(&conn, &school_id, &section_a, "2025-09-01").unwrap();
-        let roster_a_after = roster_for_section(&conn, &school_id, &section_a, "2025-10-01").unwrap();
-        let roster_b_after = roster_for_section(&conn, &school_id, &section_b.id, "2025-10-01").unwrap();
+        let roster_a_before =
+            roster_for_section(&conn, &school_id, &section_a, "2025-09-01").unwrap();
+        let roster_a_after =
+            roster_for_section(&conn, &school_id, &section_a, "2025-10-01").unwrap();
+        let roster_b_after =
+            roster_for_section(&conn, &school_id, &section_b.id, "2025-10-01").unwrap();
 
-        assert_eq!(roster_a_before.len(), 1, "learner was still in section A before the transfer");
-        assert_eq!(roster_a_after.len(), 0, "learner must not double-count in section A on the transfer day");
-        assert_eq!(roster_b_after.len(), 1, "learner is in section B from the transfer day onward");
+        assert_eq!(
+            roster_a_before.len(),
+            1,
+            "learner was still in section A before the transfer"
+        );
+        assert_eq!(
+            roster_a_after.len(),
+            0,
+            "learner must not double-count in section A on the transfer day"
+        );
+        assert_eq!(
+            roster_b_after.len(),
+            1,
+            "learner is in section B from the transfer day onward"
+        );
     }
 
     #[test]
@@ -279,7 +294,10 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        assert_eq!(first.id, second.id, "must not create a duplicate open membership");
+        assert_eq!(
+            first.id, second.id,
+            "must not create a duplicate open membership"
+        );
     }
 
     #[test]
@@ -291,7 +309,10 @@ mod tests {
 
         let result = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01").unwrap();
 
-        assert_eq!(result, None, "cross-school enrollment must be rejected, not just hidden");
+        assert_eq!(
+            result, None,
+            "cross-school enrollment must be rejected, not just hidden"
+        );
     }
 
     #[test]

@@ -36,7 +36,14 @@ fn create_as_current_session(
     ends_on: &str,
 ) -> app_lib::error::AppResult<Option<grading::GradingPeriod>> {
     let school_id = sessions.require_active_school_scope(conn)?;
-    grading::create(conn, &school_id, school_year, policy_period_id, starts_on, ends_on)
+    grading::create(
+        conn,
+        &school_id,
+        school_year,
+        policy_period_id,
+        starts_on,
+        ends_on,
+    )
 }
 
 /// Standing in for `commands::grading::list_grading_periods_by_school_year`.
@@ -55,9 +62,16 @@ fn a_teacher_can_create_and_list_their_own_schools_grading_periods() {
     let school_a = school::create(&conn, "School A").unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
 
-    create_as_current_session(&conn, &sessions, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-        .unwrap()
-        .unwrap();
+    create_as_current_session(
+        &conn,
+        &sessions,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap()
+    .unwrap();
 
     let periods = list_as_current_session(&conn, &sessions, "2026-2027").unwrap();
     assert_eq!(periods.len(), 1);
@@ -69,8 +83,15 @@ fn a_teachers_grading_periods_never_include_another_schools() {
     let conn = open_test_db();
     let school_b = school::create(&conn, "School B").unwrap();
     let sessions_b = login_as_a_teacher_at(&conn, &school_b.id, "teacher.b");
-    create_as_current_session(&conn, &sessions_b, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
-        .unwrap();
+    create_as_current_session(
+        &conn,
+        &sessions_b,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap();
 
     let school_a = school::create(&conn, "School A").unwrap();
     let sessions_a = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
@@ -86,8 +107,14 @@ fn creating_a_grading_period_requires_a_session_even_if_a_caller_tries_to_bypass
     school::create(&conn, "School A").unwrap();
     let sessions = SessionManager::new(); // nobody logged in
 
-    let result =
-        create_as_current_session(&conn, &sessions, "2026-2027", TERM_1, "2026-06-08", "2026-09-15");
+    let result = create_as_current_session(
+        &conn,
+        &sessions,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    );
 
     assert!(matches!(result, Err(AppError::Unauthorized)));
 }
@@ -110,5 +137,7 @@ fn the_seeded_grading_policies_are_visible_reference_data() {
     let policies = grading::list_policies(&conn).unwrap();
 
     assert_eq!(policies.len(), 2);
-    assert!(policies.iter().any(|p| p.is_default && p.name == "DepEd Three-Term School Calendar"));
+    assert!(policies
+        .iter()
+        .any(|p| p.is_default && p.name == "DepEd Three-Term School Calendar"));
 }

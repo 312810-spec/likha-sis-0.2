@@ -12,7 +12,9 @@ use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
 use crate::export::sf2;
 use crate::export::FieldDisclosure;
-use crate::repository::{attendance, class_record, grading_computation, learner, school, section, section_membership};
+use crate::repository::{
+    attendance, class_record, grading_computation, learner, school, section, section_membership,
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,7 +105,8 @@ pub fn export_class_record_report_card(
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
     };
-    let Some(detail) = class_record::find_detail_by_id_in_school(&conn, &school_id, &class_record_id)?
+    let Some(detail) =
+        class_record::find_detail_by_id_in_school(&conn, &school_id, &class_record_id)?
     else {
         return Ok(None);
     };
@@ -114,12 +117,20 @@ pub fn export_class_record_report_card(
     };
 
     let roster = section_membership::roster_for_section_over_range(
-        &conn, &school_id, &section_id, &starts_on, &ends_on,
+        &conn,
+        &school_id,
+        &section_id,
+        &starts_on,
+        &ends_on,
     )?;
     let mut rows = Vec::with_capacity(roster.len());
     for member in roster {
-        let grade =
-            grading_computation::compute_term_grade(&conn, &school_id, &class_record_id, &member.learner_id)?;
+        let grade = grading_computation::compute_term_grade(
+            &conn,
+            &school_id,
+            &class_record_id,
+            &member.learner_id,
+        )?;
         rows.push(ReportCardRow {
             learner_id: member.learner_id,
             given_name: member.given_name,
