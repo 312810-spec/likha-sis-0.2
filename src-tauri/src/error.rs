@@ -35,6 +35,17 @@ pub enum AppError {
     /// permissions problem, the one-time setup capability is simply gone
     /// (see `auth::bootstrap_installation`).
     AlreadyInitialized,
+    /// A workbook-level import failure that isn't a specific row's
+    /// problem: the file can't be opened, isn't a recognized spreadsheet
+    /// format, has no readable sheet, or exceeds the SF1 import engine's
+    /// own size/row limits (see `import::workbook`). Distinct from a
+    /// `Sf1ValidationIssue`, which is always attributable to one row and
+    /// surfaces in a preview rather than failing the whole read. The
+    /// message is a fixed, generic category string chosen by the caller —
+    /// never the underlying `calamine` error text or any cell content —
+    /// so it is safe to include as-is in `Display` and never needs its own
+    /// log-then-generic-serialize split like `KeyStore` has.
+    Import(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -48,6 +59,7 @@ impl std::fmt::Display for AppError {
             AppError::AccountLocked => write!(f, "account locked"),
             AppError::Unauthorized => write!(f, "unauthorized"),
             AppError::AlreadyInitialized => write!(f, "already initialized"),
+            AppError::Import(msg) => write!(f, "import error: {msg}"),
         }
     }
 }
@@ -101,6 +113,7 @@ impl Serialize for AppError {
             AppError::AccountLocked => "account_locked",
             AppError::Unauthorized => "unauthorized",
             AppError::AlreadyInitialized => "already_initialized",
+            AppError::Import(_) => "import_error",
         };
         serializer.serialize_str(category)
     }

@@ -1,5 +1,63 @@
 # Verification Debt
 
+## Wave 2B SF1 Bulk Import Engine (2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`. Three genuine,
+disclosed gaps carried forward (all in areas the engine itself does not
+depend on for correctness — see the ADR for why none of them block this
+checkpoint):
+
+1. **Real SF1 template fidelity unverified.** `import::workbook`'s
+   header/column layout is this project's own invented structure,
+   verified only against a synthetic fixture
+   (`tests/fixtures/sf1_synthetic_*.xls`) — no official DepEd `.xls`
+   template was available in this repo or reachable from this
+   environment (`deped.gov.ph` unreachable, same disclosed gap as every
+   prior session). The adapter boundary is deliberately narrow
+   (`import::workbook` is the only module aware of the layout) so
+   retargeting it later is a mapping change, not a rewrite. Recorded as
+   external material only the user can provide.
+2. **Non-blank cached-formula-value read not provable in this
+   environment.** `calamine` never evaluates a formula — it only
+   returns whatever cached result value a workbook file itself stored —
+   confirmed directly, but the only tool available to author a
+   synthetic `.xls` fixture (`xlwt`) doesn't compute a cached formula
+   result the way real Excel does, so only the *blank-cached-value* case
+   could be proven, not a genuine non-blank round-trip. A real DepEd
+   workbook opened and saved by actual Excel would carry real cached
+   values; this gap only affects the synthetic-fixture proof, not the
+   underlying `calamine` behavior itself.
+3. **`cargo-deny`/OSV-Scanner did not run against `calamine`.** Same
+   disclosed unavailable-tooling gap as every prior dependency addition
+   in this project (`gitleaks`/`cargo-deny`/`osv-scanner` all remain
+   uninstalled in this environment, per `check-security.mjs`). The
+   supply-chain/CVE check for `calamine` and its transitive tree
+   (`chrono`, `zip`, `encoding_rs`, `codepage`, and others) has not
+   actually executed.
+
+**Independent `security-reviewer` — CLOSED**, findings retrieved by
+reading the agent's raw transcript file directly after the standard
+notification channel hit this project's recurring reviewer-retrieval
+bug again (the agent's own replies insisted its findings were "already
+delivered" on every automated follow-up ping, but nothing reached this
+session through the normal path — recovered from
+`tasks/<agent-id>.output` instead of falling back to self-review this
+time). 7 of 8 questions FALSE POSITIVE with direct file:line citations
+— see ADR-0043's Security Review section for the full breakdown. **One
+real should-fix, addressed by disclosure, not by a code change**:
+`import::workbook.rs`'s `MAX_DATA_ROWS` check runs only after
+`calamine::worksheet_range` has already fully materialized the sheet
+into memory — the crate's public API has no cheaper way to count rows
+first, so a crafted `.xlsx` with a small on-disk size but a very dense
+in-memory cell grid would be fully parsed before the row cap could
+reject it. `MAX_FILE_BYTES` (checked first, before any parsing) is the
+real bound against that specific zip-bomb-style shape; the row cap only
+bounds what's accepted as a valid import. Documented in place in
+`import::workbook.rs`'s doc comment and here as an accepted,
+disclosed risk for a single-tenant, non-internet-facing desktop app —
+revisit if this engine is ever exposed to a less-trusted caller than
+this app's own webview.
+
 ## Wave 2A.1 Authorization Closure: `create_section` fixed, independent `security-reviewer` CLOSED (2026-08-26)
 
 `create_section` (`src-tauri/src/commands/section.rs`) had the same

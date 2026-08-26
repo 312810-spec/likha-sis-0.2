@@ -1,5 +1,43 @@
 # ACTIVE PLAN
 
+## Wave 2B: SF1 Bulk Import Engine (added 2026-08-26) — engine checkpoint complete, UI deferred, read this section first
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
+
+- 43 new `src-tauri/src/import/*` unit tests — PASS (workbook: 8,
+  normalize: 10, validate: 12, matching: 6, preview: 3, commit: 6).
+- 8 new `tests/sf1_import.rs` integration tests — PASS (authorized
+  Registrar/School Head succeed; Teacher and no-session denied on both
+  commands with zero mutation; school-scope cannot be overridden by
+  workbook content or a foreign section; re-import + `UseExisting`
+  resolution enrolls without duplicating).
+- Full `cargo test` — PASS, 393 lib tests (up from 350) + all
+  integration binaries.
+- `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` —
+  PASS, clean.
+- `npm run quality` — PASS (390 vitest tests, typecheck, lint,
+  format:check, architecture check — all unaffected, no frontend
+  changes this milestone).
+- A dedicated failure-injection test proves whole-batch transactional
+  rollback: a later row's LRN-uniqueness violation leaves zero rows
+  from earlier in the same batch committed, not just the failing row.
+- One independent `security-reviewer` dispatch, narrow scope +
+  numbered questions (this project's one reliably-retrievable review
+  pattern) — outcome recorded in `docs/VERIFICATION-DEBT.md`'s top
+  entry once resolved.
+- `gitleaks`/`cargo-deny`/`osv-scanner` confirmed still unavailable —
+  `calamine`'s supply-chain check has not run, honestly disclosed in
+  `docs/VERIFICATION-DEBT.md`, not silently skipped.
+
+**Deliberately not built this checkpoint**: the import-preview UI
+screen (New/Existing/Needs Review/Errors, Efficient/Comfortable/Guided
+mode parity). The engine + full authorized command-layer vertical
+slice is a stable, independently useful checkpoint — matching this
+project's established zero-or-minimal-UI-first precedent (RBAC,
+Curriculum Foundation, Teacher Load, Wave 2A). Next actionable step:
+build the import-preview screen on top of this already-tested contract.
+
 ## Wave 2A.1: Authorization Closure (added 2026-08-26) — complete, read this section first
 
 **Complete.** Full record: `docs/adr/0042`'s Addendum,

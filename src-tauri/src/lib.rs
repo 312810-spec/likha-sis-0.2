@@ -4,6 +4,7 @@ pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod export;
+pub mod import;
 pub mod repository;
 
 use std::sync::Mutex;
@@ -85,6 +86,8 @@ pub fn run() {
             commands::teaching_assignment::get_teacher_load,
             commands::teaching_assignment::create_schedule_meeting,
             commands::teaching_assignment::list_schedule_meetings_by_assignment,
+            commands::import::preview_sf1_import,
+            commands::import::commit_sf1_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

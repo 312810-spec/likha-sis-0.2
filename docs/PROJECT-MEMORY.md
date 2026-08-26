@@ -1198,6 +1198,38 @@ was the actual reason formatting drift accumulated unnoticed:
 `quality:full` ran `cargo test`/`clippy` but never `cargo fmt --check`.
 Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
 
+## Wave 2B: SF1 Bulk Import Engine (added 2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`. Built a
+reusable, local-first SF1 `.xls`/`.xlsx` bulk import engine
+(`src-tauri/src/import/`) on top of Wave 2A/2A.1's Learner Core +
+Enrollment domain: `calamine` (pure Rust, MIT, read-only) parses the
+workbook; safe normalization and row-level validation (errors block
+commit, warnings never do) run before duplicate matching, which reuses
+`learner::find_candidates` unchanged to classify every row `ExactLrn` /
+`SuspectedDuplicate` / `New` — never auto-merged, no merge capability
+exists in this codebase at all (confirmed by Wave 2A.1's own audit).
+Commit is one `rusqlite::Transaction` for the whole approved batch,
+reusing `learner::create`/`section_membership::enroll` completely
+unchanged (`Transaction` deref-coerces to `Connection` — verified
+directly before the pipeline was designed around it). Re-import
+idempotency relies entirely on existing DB invariants
+(`idx_learners_school_lrn`, `idx_one_active_membership_per_learner`,
+`enroll()`'s own idempotency) — no new import-fingerprint/session table
+was added, since the brief only authorized one "if it provides real
+value" and it didn't here. Both new Tauri commands
+(`preview_sf1_import`, `commit_sf1_import`) gate on the existing
+`Capability::ManageLearners`. **No official DepEd SF1 template was
+available** (repo had none; `deped.gov.ph` unreachable) — the
+column/header layout `import::workbook` searches for is this project's
+own invented, disclosed-as-unverified structure, isolated behind a
+narrow adapter so retargeting it to a real template later is a mapping
+change, not a rewrite. Deliberately shipped as an engine + full
+authorized command-layer checkpoint with no import-preview UI yet,
+matching this project's established zero-or-minimal-UI-first precedent
+(RBAC, Curriculum, Teacher Load, Wave 2A). 43 new unit tests + 8 new
+integration tests, all passing alongside the full existing suite.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.
