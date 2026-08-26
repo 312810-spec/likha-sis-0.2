@@ -1,5 +1,60 @@
 # Verification Debt
 
+## Rust Formatting + Quality Gate Normalization: `cargo fmt` debt closed, gate added (2026-08-26)
+
+The ~265-diff pre-existing `cargo fmt` debt (recorded throughout this
+file, e.g. the "Native Rust Verification Recovery" entry below) is
+**closed**. Baseline re-measured, not assumed: `cargo fmt --check`
+(rustfmt 1.9.0-stable, no `rustfmt.toml` — default config) showed 265
+diff hunks across 35 first-party files (`src-tauri/src/**`,
+`src-tauri/tests/**`; zero vendor/generated/`Cargo.lock` files
+involved). Ran plain `cargo fmt` (mechanical, no manual edits) —
+committed in isolation as `139c36d` (`style(rust): normalize rustfmt
+formatting`), separate from the quality-gate wiring change (`8ee1187`,
+`chore(quality): enforce rustfmt check`, which added `cargo fmt --check`
+as the first Rust step in `npm run quality:full` and updated
+`.claude/rules/testing.md`'s command reference to match).
+
+**Semantic-free, rigorously proven, not merely asserted**: beyond
+identical `cargo test`/`nextest`/`clippy`/`npm run quality` results
+(below), every one of the 35 changed files was diffed with all
+whitespace and rustfmt-inserted trailing commas stripped — 31 files
+were then byte-for-byte identical; the remaining 4
+(`db/migrations.rs`, `db/mod.rs`, `repository/mod.rs`,
+`repository/assessment_item.rs`) were confirmed to differ only by
+either a character-multiset-preserving `use` statement reordering
+(import order is not semantic in Rust) or rustfmt's standard
+brace-add/-remove around a single-expression closure/match arm body
+(e.g. `\|r\| r.get(0)` vs `\|r\| { r.get(0) }` — a block containing one
+expression is semantically identical to that expression alone). No
+identifier, operator, string literal, or SQL text changed anywhere.
+The security-sensitive `#[cfg(windows)]` DPAPI import gating in
+`db/mod.rs` was spot-checked directly — the attribute stayed attached
+to the correct `use` statement, only import order changed.
+
+**Verification, all actually run this session** (identical results to
+the pre-format baseline): `cargo fmt --check` PASS (was FAIL); `cargo
+check --lib` PASS; `cargo test` PASS (342 lib tests + all integration
+binaries, same counts as baseline); `cargo nextest run` PASS, 403/403;
+`cargo clippy --all-targets -- -D warnings` PASS, 0 warnings; `cargo
+build` (native) succeeds, only the pre-existing harmless OpenSSL
+`LNK4099` PDB linker warnings; `npm run quality` PASS, 390/390; `npm run
+quality:full` PASS end-to-end (confirms the new gate wiring — a
+formatting failure would have stopped the chain before `cargo test`);
+`git diff --check` clean; secret scan (`gitleaks`) **NOT RUN** — binary
+still unavailable on `PATH`, not installed per project policy (same
+limitation recorded throughout this file).
+
+**Debt closed**: `cargo fmt` normalization (~265 diffs, all prior
+entries below referencing this as open are now stale — see each
+milestone's own record for what it covered); `cargo fmt --check` is now
+part of `npm run quality:full`, closing the gap that let the debt
+accumulate silently in the first place. **Debt still open, unrelated to
+this milestone**: no CI configuration exists yet (the next recommended
+milestone); `gitleaks` secret scan remains unavailable in this
+environment; Teacher Load's own `security-reviewer` re-run (its code
+has not changed since its self-review).
+
 ## Curriculum Foundation `architecture-reviewer` + RBAC Foundation `security-reviewer`: independent reviews actually completed and retrieved (2026-08-26)
 
 Both previously-owed independent reviews (see the two "retrieval
@@ -15,8 +70,8 @@ renders to a UI channel the orchestrating session can't read back).
 **Curriculum Foundation `architecture-reviewer` — CLOSED.** No BLOCKING
 findings. One SHOULD-FIX: `repository::curriculum.rs`'s
 `default_version_id` doc comment overclaimed a guarantee
-(`idx_one_default_curriculum_version` enforces *at most one* default
-row, not *at least one* — a zero-default state is schema-reachable,
+(`idx_one_default_curriculum_version` enforces _at most one_ default
+row, not _at least one_ — a zero-default state is schema-reachable,
 just not reached by any current production code path). Fixed by
 correcting the doc comment to state the actual guarantee and the
 `QueryReturnedNoRows` failure mode. Two items independently checked and

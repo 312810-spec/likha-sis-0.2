@@ -1171,6 +1171,16 @@ findings as plain text (not via `ReportFindings`) worked. Future
 dispatches of `architecture-reviewer`/`security-reviewer` as background
 agents should request a plain-text report in the original prompt.
 
+## Rust Formatting + Quality Gate Normalization (added 2026-08-26)
+
+The ~265-diff pre-existing `cargo fmt` debt is closed (mechanical
+`cargo fmt`, proven semantic-free, committed in isolation as `139c36d`)
+and `cargo fmt --check` is now a permanent part of `npm run
+quality:full` (`8ee1187`) — the canonical milestone/release gate. This
+was the actual reason formatting drift accumulated unnoticed:
+`quality:full` ran `cargo test`/`clippy` but never `cargo fmt --check`.
+Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

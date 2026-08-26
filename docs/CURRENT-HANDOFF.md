@@ -1,5 +1,47 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Rust Formatting + Quality Gate Normalization, complete)
+
+Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
+
+**Repository truth verified first**: local branch was already at
+`ce22c08`, matching origin, with the prior session's Curriculum/RBAC
+review-fix checkpoint uncommitted as expected. Diffed it against what
+that session's report described — matched exactly — then committed and
+pushed it (`ce22c08`) before touching formatting, so the security/
+architecture fixes are preserved independent of this milestone.
+
+**Formatting baseline re-measured, not assumed**: 265 `cargo fmt --check`
+diff hunks across 35 first-party files (rustfmt 1.9.0-stable, no
+`rustfmt.toml`). Ran plain `cargo fmt` — no manual restyling, no
+opportunistic refactors. Proven semantic-free by a stricter method than
+a simple `git diff -w` (which under-proves when rustfmt reflows a call
+across multiple lines — line-count changes defeat a naive whitespace-
+ignoring diff): every changed file was compared with all whitespace and
+rustfmt's trailing commas stripped, confirming the only remaining
+differences were `use`-statement reordering (not semantic in Rust) and
+standard single-expression closure/match-arm brace add/remove (also not
+semantic). Committed in isolation (`139c36d`), separate from the
+quality-gate wiring change (`8ee1187`) that added `cargo fmt --check`
+to `npm run quality:full` (the milestone/release gate) and updated
+`.claude/rules/testing.md` to match, per its own "keep in sync" rule.
+
+**Verification, all actually run this session**: `cargo fmt --check`
+PASS (was FAIL); `cargo check --lib` PASS; `cargo test` PASS (342 lib +
+all integration binaries, identical counts to the pre-format baseline);
+`cargo nextest run` 403/403 PASS; `cargo clippy --all-targets -- -D
+warnings` PASS, 0 warnings; `cargo build` (native) succeeds; `npm run
+quality` 390/390 PASS; `npm run quality:full` PASS end-to-end (proves
+the new gate is actually wired in — a formatting regression would have
+stopped the chain before `cargo test`); `git diff --check` clean;
+`gitleaks` secret scan NOT RUN (still unavailable on `PATH`).
+
+**Gate decision: RUST FORMATTING + QUALITY GATE PASSED — READY FOR
+MINIMAL CI FOUNDATION.** Recommended next milestone (not started, per
+this session's explicit instruction to stop and wait for approval):
+Minimal CI Foundation (`.github/workflows/`, running the existing
+`npm run quality:full` gate on push/PR against this branch).
+
 ## Active Task (2026-08-26, this session — Foundation Independent Review Debt Closure, complete)
 
 Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
@@ -32,7 +74,7 @@ Teacher Load cross-school view leak) reconfirmed intact by the RBAC
 reviewer via direct code read.
 
 **A process finding worth recording for future sessions**: the
-recurring agent-resume/retrieval failure documented since M7 did *not*
+recurring agent-resume/retrieval failure documented since M7 did _not_
 recur here — both reviewer agents completed and could be resumed via
 `SendMessage`. What did initially fail was retrieving their findings as
 usable text: the first response from each resumed agent was a terse
