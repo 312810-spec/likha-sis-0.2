@@ -1,6 +1,87 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-27, this session — Wave 2I: Multi-Form Official-Form Contract + SF9 Readiness, complete)
+## Active Task (2026-08-27, this session — Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening, complete)
+
+Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`.
+Harness/developer-infrastructure milestone — no learner-facing change.
+
+**Mandatory Wave 2I checkpoint gate, verified first**: `git fetch`
+clean; branch/HEAD both at `287a0f2` (Wave 2I's commit), matching
+`origin`; `main` unchanged at `d9ab036`; working tree clean; 0
+ahead/behind. Both Wave 2I CI runs (Quality Gate `33011365970`,
+Security Gate `33011365972`) confirmed genuinely `completed`/`success`
+before any Wave 2J implementation began — Quality Gate was still
+`in_progress` on first check; work was correctly held until it finished.
+
+**Incident**: `claude-mem` (a third-party, inference-backed, OPTIONAL
+Claude Code plugin) exhausted its free-trial allowance ~3 days ago.
+**Empirical finding**: this repository's actual durable memory
+(`docs/*.md`, ADRs) was never affected — every wave in this session
+(2G–2I) updated it successfully throughout the outage, because it was
+never dependent on claude-mem or any external inference call.
+
+**Ten-scenario decision**: repository-brain-authoritative + a new
+deterministic local journal (`scripts/memory/`), with claude-mem
+disabled entirely (not deleted) rather than wrapped in a circuit
+breaker — because no external inference call exists anywhere in the
+new code's path, most of the required failure-state machine describes
+states this architecture cannot enter; that absence is documented
+directly rather than built around. `d2a8k3u/claude-code-memory`
+evaluated and classified REFERENCE (not needed at this scale). Full
+scoring in ADR-0050.
+
+**What was built**: `scripts/memory/journal.mjs` (deterministic,
+replay-safe capture — SHA-256 id from normalized project/session/type/
+content, never a timestamp), `scripts/memory/recall.mjs` (grep-based,
+verbatim retrieval — no LLM, no embeddings), `scripts/memory/
+health.mjs` (`/memory-health` skill, zero-cost diagnostic, no network
+call), `scripts/memory/capture-session-stop.mjs` (new project-scoped
+`Stop` hook — captures only git HEAD sha/subject + changed file PATHS,
+never file contents/env vars/Bash output; secret-shaped paths dropped
+before recording). `.claude/memory/` gitignored. Global
+`~/.claude/settings.json`: `claude-mem@thedotmack` flipped to `false`
+(reversible, data preserved) — **this is a machine-wide change, not
+repository-scoped**, disclosed plainly.
+
+**Highest-value test this wave**: `recall.test.mjs`'s "NOT_VERIFIED
+must never be corrupted" suite, run against the REAL
+`docs/VERIFICATION-DEBT.md` — proves SF1 fidelity, SF9 fidelity, and
+Windows packaging are all still recoverable as `NOT_VERIFIED`, that
+recall returns only verbatim substrings of source lines, and that none
+of the canonical docs contain fabricated "PASSED/VERIFIED/confirmed"
+phrasings for those three facts.
+
+**Two independent reviews dispatched in parallel this wave** (security;
+failure-mode/silent-failure) — correcting Wave 2I's own disclosed
+process gap of dispatching reviews sequentially/incompletely. **A
+third role (architecture/harness review) was NOT dispatched — recorded
+honestly as retained debt, not omitted from this report**, per the
+brief's explicit instruction not to repeat Wave 2I's under-recording.
+**Both reviews closed, no blocking findings.** Security review: 3
+non-blocking items, all fixed/corrected (commit-subject redaction added;
+claude-mem disable-certainty corrected in ADR-0050; fail-open doc
+comment narrowed). Failure-mode review found and fixed 2 REAL bugs with
+new regression tests: a truncated mid-write journal line could silently
+destroy the next valid observation too (fixed via a trailing-newline
+check before append); `computeHealth()` was not actually crash-safe
+against a directory-level read failure (fixed by wrapping directory/
+file reads in try/catch). Full detail in ADR-0050's "Independent
+review" section.
+
+**Verification (re-run after the review fixes)**: `npx vitest run
+scripts/memory` — 24/24 passed (22 + 2 new regression tests for the
+bugs the failure-mode review found). `npm run quality` — clean, 462 TS
+tests (up from 438; no regression). No Rust code touched this wave —
+Rust gates not re-run (nothing to verify there).
+
+**Exact next action**: commit/push this checkpoint (branch
+`claude/likha-sis-wave2a-learner-core`) with the remaining review debt
+(undispatched architecture role; claude-mem disable not empirically
+live-tested; unbounded journal growth; theoretical cross-process race)
+explicitly retained in `docs/VERIFICATION-DEBT.md`. Confirm CI green
+for the exact commit before considering this wave fully closed.
+
+## Note: Wave 2I — Multi-Form Official-Form Contract + SF9 Readiness, complete (superseded as "Active Task" by Wave 2J above, kept for history)
 
 Full record: `docs/adr/0049-multi-form-official-form-contract.md`,
 `docs/VERIFICATION-DEBT.md`'s top entry. Same branch as prior waves

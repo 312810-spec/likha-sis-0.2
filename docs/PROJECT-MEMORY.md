@@ -1614,6 +1614,63 @@ the caller having already checked); now verifies this directly via
 other three roles the brief named are retained as verification debt,
 not dropped — see `docs/VERIFICATION-DEBT.md`.
 
+## Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening (added 2026-08-27)
+
+Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`.
+Harness/developer-infrastructure milestone triggered by a third-party
+plugin's own outage: `claude-mem` (an inference-backed, OPTIONAL Claude
+Code memory plugin, distinct from this project's own `docs/`-based
+memory) exhausted its free-trial allowance and stopped observing.
+
+**Empirical finding that shaped the whole decision**: this repository's
+actual durable memory — `docs/PROJECT-MEMORY.md`, `CURRENT-HANDOFF.md`,
+`ACTIVE-PLAN.md`, `VERIFICATION-DEBT.md`, every ADR — was updated
+successfully in every wave (2G through 2I) during claude-mem's entire
+multi-day outage. It was never dependent on claude-mem, or on any
+external inference call, at any point. This finding, not a hypothetical
+risk, is what justified the architecture below.
+
+**Decision**: repository-brain-authoritative (unchanged) + a new,
+zero-cost, purely local "Layer 2" (`scripts/memory/journal.mjs`,
+`recall.mjs`, `health.mjs`) + claude-mem disabled globally as "Layer 3"
+optional enrichment (data preserved, not deleted — reversible via
+`~/.claude/settings.json`'s `enabledPlugins["claude-mem@thedotmack"]`).
+The key architectural move: because no external inference call exists
+anywhere in the new code's write or read path, the required
+five-state failure machine (HEALTHY/LOCAL_ONLY/DEGRADED/DISABLED/
+RECOVERING) mostly describes states this architecture cannot enter —
+operating mode is always and only `LOCAL_ONLY`, by design, not reached
+as a fallback after detecting a failure.
+
+**What Layer 2 actually captures**: at each session's `Stop` event, one
+deterministic record (git HEAD sha/subject + changed file PATHS only —
+never file contents, env vars, or Bash/tool output; secret-shaped paths
+dropped before recording) into a gitignored local JSONL journal, keyed
+by a SHA-256 id derived from normalized (project, session, type,
+content) — never a timestamp — so replay/restart/duplicate-event
+scenarios are dedup-safe by construction, not by retry logic.
+
+**Recall is grep-based, deliberately never LLM-based**: this is what
+makes the wave's highest-value guarantee provable at all —
+`recall.test.mjs`'s tests run against the REAL `docs/VERIFICATION-
+DEBT.md` and prove SF1 fidelity, SF9 fidelity, and Windows packaging
+all remain recoverable as `NOT_VERIFIED`, that every match is a
+verbatim substring of its source line, and that no canonical doc
+contains a fabricated "PASSED/VERIFIED/confirmed" phrasing for any of
+those three facts. A summarizing/paraphrasing recall implementation
+could not offer this guarantee; a grep-only one can, by construction.
+
+**Two independent reviews dispatched in parallel this wave** (security;
+failure-mode/silent-failure) — a deliberate process correction from
+Wave 2I's sequential, under-recorded review dispatch. A third role
+(architecture/harness review) was NOT dispatched — recorded honestly as
+retained debt in `docs/VERIFICATION-DEBT.md`, not omitted.
+
+**No new npm dependency was added** — Layer 2 uses only Node.js
+built-ins (`node:fs`, `node:path`, `node:crypto`, `node:child_process`,
+`node:url`). No new database migration, no new Rust code, no
+learner-facing functionality changed.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

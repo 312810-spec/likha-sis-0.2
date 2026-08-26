@@ -1,5 +1,69 @@
 # Verification Debt
 
+## Wave 2J — Resilient Zero-Cost Memory Observer + Project-Brain Hardening (2026-08-27)
+
+Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`.
+Harness/developer-infrastructure milestone.
+
+**Two independent reviews closed, no blocking findings; two real bugs
+found and fixed.** Security review: 3 non-blocking items, all fixed/
+corrected (commit-subject line now redacted like paths; claude-mem
+disable-certainty corrected in the ADR; fail-open doc comment
+narrowed). Failure-mode review: 2 real gaps found and fixed with new
+regression tests — a truncated mid-write journal line could silently
+destroy the NEXT valid observation too (fixed: trailing-newline check
+before append); `computeHealth()` was not actually crash-safe against
+a directory-level read failure (fixed: directory/file reads now
+wrapped in try/catch, matching the write path's existing discipline).
+See ADR-0050's "Independent review" section for full evidence.
+Remaining, not fixed this wave: claude-mem's disable is
+configuration-only, not empirically live-tested (do a live smoke test
+in a future session); unbounded journal-file re-scan (design debt, not
+currently a problem); a theoretical, unconfirmed cross-process
+double-invocation race in the Stop hook's dedup.
+
+**Independent review debt (one of three roles not dispatched this
+wave)**: security review and failure-mode/silent-failure review were
+dispatched in parallel this wave. **Architecture/harness review was
+NOT dispatched** — recorded here honestly rather than omitted, per this
+wave's own explicit instruction not to repeat Wave 2I's under-recording
+of undispatched review roles. Periodically retry in a later session.
+
+**No SessionStart-specific health probe was added** — `/memory-health`
+provides on-demand checking; ADR-0050 records the reasoning for why a
+separate SessionStart probe was judged unnecessary (Layer 2's failure
+modes are already fail-open by construction, so there is no "external
+observer down, fall back" transition for a probe to preemptively
+perform). Revisit if evidence shows this judgment wrong.
+
+**Memory promotion pipeline (observation → candidate → curator → durable
+doc) was not built** — a deliberate scope cut per the brief's own
+elimination-first instruction (§6), not an oversight. Layer 1 updates
+remain manual/Claude-driven, unchanged from every prior wave's own
+practice.
+
+**Local embeddings remain deliberately `DISABLED`** — no evidence
+reviewed this wave justified adding one for this project's current
+scale. Revisit only with concrete evidence that grep-based recall
+(`scripts/memory/recall.mjs`) is insufficient.
+
+**The global `~/.claude/settings.json` change (disabling claude-mem) is
+machine-wide, not repository-scoped** — it affects every project on
+this machine that had claude-mem enabled, not only LIKHA-SIS. Fully
+reversible (flip the same key back to `true`), but the user should be
+aware of the blast radius; this is not something a future session
+should assume was scoped to this repository alone.
+
+**All prior verification debt (Wave 2I and earlier) remains fully
+intact and unweakened by this wave** — confirmed both by direct human
+re-read of this file before writing this entry, and by
+`scripts/memory/recall.test.mjs`'s own automated tests, which run
+against this file's REAL live content (not a fixture) and assert SF1
+fidelity, SF9 fidelity, and Windows packaging are all still recoverable
+as `NOT_VERIFIED`, with none of the corrupted "PASSED/VERIFIED"
+phrasings present anywhere in the canonical docs. See the untouched
+entries below.
+
 ## Wave 2I — Multi-Form Official-Form Contract + SF9 Readiness (2026-08-27)
 
 Full record: `docs/adr/0049-multi-form-official-form-contract.md`.

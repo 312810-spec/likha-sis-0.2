@@ -1,5 +1,59 @@
 # ACTIVE PLAN
 
+## Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening (added 2026-08-27) — complete
+
+Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s
+Wave 2J section, `docs/CURRENT-HANDOFF.md`'s top entry. Harness/
+developer-infrastructure milestone — no learner-facing change.
+Verification record:
+
+- **Mandatory checkpoint gate verified first**: repository truth
+  confirmed clean at Wave 2I's `287a0f2`; both its CI runs
+  (`33011365970`, `33011365972`) re-confirmed genuinely
+  `completed`/`success` — Quality Gate was caught mid-run on first
+  check and work was correctly held until it finished, not merely
+  assumed from local tests.
+- **Incident + empirical finding**: claude-mem (third-party,
+  inference-backed, OPTIONAL plugin) exhausted its trial allowance;
+  this repository's own durable memory was never affected across the
+  entire multi-wave outage, confirmed by reviewing every prior wave's
+  successful docs updates during the outage window.
+- **Ten-scenario decision**: repository-brain-authoritative + new
+  deterministic local journal; claude-mem disabled entirely (data
+  preserved) rather than circuit-breaker-wrapped, since no external
+  call exists in the new code's path for a breaker to protect.
+  `d2a8k3u/claude-code-memory` evaluated, classified REFERENCE. Full
+  scoring in ADR-0050.
+- **Architecture**: `scripts/memory/journal.mjs` (deterministic,
+  replay-safe SHA-256-id capture) → `.claude/memory/journal/*.jsonl`
+  (gitignored) ← `scripts/memory/capture-session-stop.mjs` (new `Stop`
+  hook, git-metadata-only capture, secret-path filtering).
+  `scripts/memory/recall.mjs` (grep-based, verbatim) and
+  `scripts/memory/health.mjs` (`/memory-health` skill) both zero-cost,
+  zero-network. Global claude-mem plugin flipped to disabled
+  (machine-wide change, disclosed).
+- **Highest-value test**: `recall.test.mjs`'s NOT_VERIFIED-preservation
+  suite, run against the real `docs/VERIFICATION-DEBT.md` — proves SF1/
+  SF9 fidelity and Windows packaging remain recoverable as
+  `NOT_VERIFIED` and cannot be recalled as fabricated "PASSED" claims.
+- **Verification (re-run after review fixes)**: `npx vitest run
+scripts/memory` 24/24 (22 + 2 new regression tests for the failure-
+  mode review's findings). `npm run quality` clean, 462 TS tests (438 +
+  24 new, no regression). No Rust changes this wave.
+- **Independent review**: security review + failure-mode review
+  dispatched in parallel (correcting Wave 2I's sequential/incomplete
+  dispatch pattern) — both closed, no blocking findings. Security: 3
+  non-blocking items, all fixed/corrected. Failure-mode: 2 REAL bugs
+  found and fixed with new regression tests (truncated-JSONL data-loss
+  gap; `computeHealth()` not crash-safe on directory-level read
+  failure). Full detail in ADR-0050. Architecture/harness review role
+  NOT dispatched — retained as debt explicitly, not omitted, per the
+  brief's instruction not to repeat Wave 2I's under-recording.
+- **Scope guards held**: no learner-facing functionality; no paid
+  provider/payment method introduced; no existing claude-mem data
+  deleted; no new npm dependency added (Node built-ins only).
+
 ## Wave 2I: Multi-Form Official-Form Contract + SF9 Readiness (added 2026-08-27) — complete
 
 Full record: `docs/adr/0049-multi-form-official-form-contract.md`,

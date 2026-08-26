@@ -74,6 +74,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/memory/capture-session-stop.mjs",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

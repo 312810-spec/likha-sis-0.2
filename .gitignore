@@ -30,3 +30,11 @@ Thumbs.db
 
 # Claude Code task working memory (canonical truth stays in docs/)
 .planning/
+
+# LIKHA local memory journal (Wave 2J, docs/adr/0050) — disposable
+# Layer-2 episodic trail, never canonical truth. Rebuildable from git
+# history at any time; must never be committed (see ADR-0050's
+# "Security requirements" — a journal entry lists changed file PATHS
+# only, but keeping it out of git is still the right default for local
+# working state).
+.claude/memory/
