@@ -1,5 +1,52 @@
 # Verification Debt
 
+## Wave 2I — Multi-Form Official-Form Contract + SF9 Readiness (2026-08-27)
+
+Full record: `docs/adr/0049-multi-form-official-form-contract.md`.
+
+**Official SF9 fidelity against a real authoritative DepEd template is
+`NOT_VERIFIED`** — no such template exists anywhere in this repository
+or was obtainable from `deped.gov.ph` directly (confirmed by a live
+fetch of the department's own homepage this wave). Built and tested
+against an explicitly synthetic fixture
+(`src-tauri/tests/fixtures/sf9_template_synthetic.xlsx`, mirrored at
+`src-tauri/resources/sf9/sf9_template_synthetic.xlsx`) instead — same
+disclosed gap as SF1's own `NOT_VERIFIED` fidelity (still open, see
+below). The exact missing artifact for SF9 is the same kind as SF1's: a
+real, authoritative DepEd SF9 workbook or official field-layout
+documentation.
+
+**Windows packaged-installer resource resolution for `resources/sf9/*`
+is `NOT_VERIFIED`** — same disclosed gap as SF1's, not re-attempted this
+wave since the sandboxed environment has not changed. `tauri.conf.json`
+was widened to include `resources/sf9/*` following the exact pattern
+already used for `resources/sf1/*`, and a byte-identity test confirms
+the bundled resource matches the fixture, but no `tauri build` installer
+was produced this wave either.
+
+**Independent review debt (three of four §12 roles not dispatched this
+wave)**: only a security review (SF9 authorization parity, atomic-write
+correctness, `sf9_projection` query isolation, `reject_unsupported_
+format` call ordering, log/error PII exposure) was dispatched this
+wave — it closed with no `BLOCKING` findings and one `NON-BLOCKING`
+should-fix, fixed (`sf9_projection` now independently verifies
+`learner_id` belongs to `school_id`, rather than relying solely on the
+caller having already checked). Workbook/template-fidelity review,
+architecture/maintainability review, and a second security pass
+specifically re-checking the fix above are retained as owed
+independent-review debt — periodically retry in a later session per the
+established reviewer-harness fallback rule, not silently dropped.
+
+**Secure/encrypted export UX is not designed** — deliberately out of
+scope this wave per the brief's own instruction not to add
+password-protected spreadsheets merely to "solve" the disclosed
+unencrypted-file data-exposure boundary absent evidence it's actually
+required/interoperable with official DepEd workflows. A future secure-
+export UX requirement (if evidence ever supports one) should be
+designed as its own milestone, reusing the now-formalized data-exposure
+contract in ADR-0049 rather than bolting encryption onto a single
+adapter.
+
 ## Wave 3 — Authoritative-Template SF1 Form Engine (2026-08-26)
 
 Full record: `docs/adr/0048-official-form-engine-sf1.md`.

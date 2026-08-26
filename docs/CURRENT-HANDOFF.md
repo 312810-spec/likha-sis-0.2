@@ -1,6 +1,85 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-26, this session — Wave 3: Authoritative-Template SF1 Form Engine, complete)
+## Active Task (2026-08-27, this session — Wave 2I: Multi-Form Official-Form Contract + SF9 Readiness, complete)
+
+Full record: `docs/adr/0049-multi-form-official-form-contract.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry. Same branch as prior waves
+(`claude/likha-sis-wave2a-learner-core`). Note: the directing prompt
+called the prior checkpoint (commit `313ac0f`) "Wave 2H"; this
+repository's own continuous numbering calls it "Wave 3" — both labels
+refer to the same commit; ADR-0049 records this explicitly.
+
+**Repository-truth/CI verified first**: `git fetch` clean; branch and
+local HEAD both at `313ac0f068d0c8aafbcf9025492562550fd65eb1`, matching
+`origin`; `main` unchanged at `d9ab036`; working tree clean before work
+began. Both Wave 3 CI runs re-confirmed genuinely `completed`/`success`
+for that exact commit (Quality Gate `33006880512`, Security Gate
+`33006880522`).
+
+**SF9 evidence gate**: no authoritative DepEd SF9 template exists in
+this repository or was obtainable from `deped.gov.ph` (a direct fetch of
+the department's own homepage found no School Forms/SF9 link). Every
+other source found was a third-party/community recreation —
+COMMUNITY/UNVERIFIED, never OFFICIAL. **`OFFICIAL_SF9_FIDELITY =
+NOT_VERIFIED`**, unconditionally — SF9 work this wave is architecture-
+readiness only, against a clearly synthetic fixture.
+
+**Ten-scenario decision**: kept `OfficialFormGenerator` (SF1) and added
+a separate `Sf9FormGenerator` trait rather than one generic multi-form
+port with a shared/generic request type — a shared type is exactly how
+an SF9 field could silently compile as SF1 data. Generalized only
+`TemplateDescriptor`: added `workbook_format: WorkbookFormat` (`Xlsx` |
+`LegacyXls`, the concrete, tested expression of the "`.xlsx` does not
+imply Java, `.xls` does not imply Rust" adapter policy — see
+`umya_adapter::reject_unsupported_format`), and widened
+`data_columns`/`header_cells` from SF1-shaped fixed arrays to
+`&'static` slices. Full scoring in ADR-0049.
+
+**What was built**: `formgen::sf9` (domain contract) →
+`formgen::Sf9FormGenerator` (port) → `formgen::umya_adapter::
+UmyaSf9Generator` → a SHA-256-hash-pinned bundled SYNTHETIC template
+(`resources/sf9/`, registered in `tauri.conf.json`).
+`formgen::sf9_projection::subject_term_grades_for_learner` (new,
+read-only) builds SF9's subject/term grade rows by calling the
+EXISTING `repository::grading_computation::compute_term_grade` once per
+class record via the new `repository::class_record::
+list_by_section_in_school` — no grading rule is reimplemented anywhere
+in `formgen`. `commands::formgen::generate_sf9_form` mirrors
+`generate_sf1_form`'s authorization/output-path discipline exactly (no
+caller-supplied output path; `school_id` session-derived;
+`section_id`/`learner_id` resolved only within that school).
+
+**One independent review dispatched (security — SF9 authorization
+parity, atomic-write correctness, projection-query isolation,
+format-rejection ordering, log/error PII exposure): CLOSED, no
+`BLOCKING` findings.** One `NON-BLOCKING` should-fix, fixed: `formgen::
+sf9_projection` had a stated-but-unenforced precondition that
+`learner_id` belongs to `school_id` — fixed by adding a direct
+`learner::find_by_id_in_school` check as the first thing the function
+does (defense in depth, independent of the caller), proven by two new
+tests (a nonexistent learner id, and a REAL learner id from a
+DIFFERENT school, both rejected). The other three roles the brief's own
+§12 names (workbook/template fidelity, architecture/maintainability,
+and a confirmation pass) were NOT dispatched this wave — retained as
+verification debt, not dropped, per this project's established
+reviewer-harness fallback rule.
+
+**Verification**: `cargo nextest run` — 557/557 passed (up from Wave
+3's 546; SF1's own suite unchanged and still green — the descriptor's
+array→slice widening did not regress SF1). `cargo test` (stable-
+checkpoint gate) — green, 0 doctests. `cargo fmt --check`/`cargo clippy
+--all-targets -D warnings` — clean. `cargo deny check` — clean, no new
+dependency. `npm run quality` — clean, 438 TS tests, no frontend
+regression (no UI added this wave — deliberate, per the brief's
+minimal-UI-only guidance and "no full SF9 UI" scope guard).
+
+**Exact next action**: commit and push this checkpoint (branch
+`claude/likha-sis-wave2a-learner-core`), confirm CI green for the exact
+commit, then return to LIKHA's priority order for the next
+highest-value work. Do not begin SF10 — no candidate pre-selected for
+the next wave.
+
+## Note: Wave 3 — Authoritative-Template SF1 Form Engine, complete (superseded as "Active Task" by Wave 2I above, kept for history)
 
 Full record: `docs/adr/0048-official-form-engine-sf1.md`,
 `docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s

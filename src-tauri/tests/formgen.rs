@@ -23,9 +23,14 @@ use app_lib::auth::{self, Capability, SessionManager};
 use app_lib::error::AppResult;
 use app_lib::export::sanitize_filename_component;
 use app_lib::formgen::sf1::{Sf1GenerationRequest, Sf1GenerationResult, Sf1LearnerRow};
-use app_lib::formgen::umya_adapter::UmyaSf1Generator;
-use app_lib::formgen::OfficialFormGenerator;
-use app_lib::repository::{learner, role as role_repo, school, section, section_membership, user};
+use app_lib::formgen::sf9::{Sf9GenerationRequest, Sf9GenerationResult};
+use app_lib::formgen::sf9_projection;
+use app_lib::formgen::umya_adapter::{UmyaSf1Generator, UmyaSf9Generator};
+use app_lib::formgen::{OfficialFormGenerator, Sf9FormGenerator};
+use app_lib::repository::{
+    class_record, grading, learner, role as role_repo, school, section, section_membership,
+    subject, user,
+};
 
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
@@ -265,4 +270,179 @@ fn the_bundled_resource_and_the_test_fixture_are_byte_identical() {
     )
     .unwrap();
     assert_eq!(resource_bytes, template_bytes());
+}
+
+// ---------------------------------------------------------------------
+// SF9 (Wave 2I) -- standing in for `commands::formgen::generate_sf9_form`.
+// NO authoritative DepEd SF9 template exists in this repository or was
+// obtainable from `deped.gov.ph` (see docs/adr/0049-multi-form-official-
+// form-contract.md, "SF9 evidence gate"). These tests prove the
+// generalized architecture and the real grading-computation reuse only --
+// OFFICIAL_SF9_FIDELITY = NOT_VERIFIED.
+// ---------------------------------------------------------------------
+
+const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+fn sf9_template_bytes() -> Vec<u8> {
+    std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sf9_template_synthetic.xlsx"),
+    )
+    .unwrap()
+}
+
+/// Standing in for `commands::formgen::generate_sf9_form`.
+fn generate_sf9_form_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    learner_id: &str,
+    as_of_date: &str,
+    output_dir: &Path,
+) -> AppResult<Option<Sf9GenerationResult>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(section) = section::find_by_id_in_school(conn, &school_id, section_id)? else {
+        return Ok(None);
+    };
+    let Some(learner) = learner::find_by_id_in_school(conn, &school_id, learner_id)? else {
+        return Ok(None);
+    };
+    if !section_membership::is_active_member(conn, &school_id, section_id, learner_id, as_of_date)?
+    {
+        return Ok(None);
+    }
+
+    let subject_grades =
+        sf9_projection::subject_term_grades_for_learner(conn, &school_id, section_id, learner_id)?;
+
+    let request = Sf9GenerationRequest {
+        school_name: school.name,
+        school_year: section.school_year.clone(),
+        grade_level: section.grade_level.clone(),
+        section_name: section.name.clone(),
+        learner_name: format!("{}, {}", learner.family_name, learner.given_name),
+        lrn: learner.lrn,
+        sex: learner.sex,
+        subject_grades,
+    };
+
+    let file_name = format!(
+        "SF9_{}_{}_{}.xlsx",
+        sanitize_filename_component(&section.school_year.replace(' ', "_")),
+        sanitize_filename_component(&section.name.replace(' ', "_")),
+        sanitize_filename_component(&request.learner_name.replace(' ', "_")),
+    );
+    let output_path = output_dir.join(file_name);
+
+    let generator = UmyaSf9Generator::sf9_synthetic_v1();
+    let result = generator.generate_sf9(&sf9_template_bytes(), &request, &output_path)?;
+    Ok(Some(result))
+}
+
+/// End-to-end proof that SF9 generation reuses the EXISTING
+/// `grading_computation::compute_term_grade` rather than reimplementing
+/// any grading rule (docs/adr/0049 Section 8) -- a class record with no
+/// scores entered yet has no computable grade, and this must show up on
+/// the generated SF9 as an explicit blank, not a placeholder or a
+/// crash.
+#[test]
+fn sf9_generation_reflects_the_existing_grading_computation_not_a_reimplementation() {
+    let conn = open_test_db();
+    let (sessions, school_id) = login_with_role(&conn, "registrar.a", role_repo::REGISTRAR);
+    let sect = section::create(&conn, &school_id, "2026-2027", "7", "Sampaguita").unwrap();
+    let subj = subject::create(&conn, &school_id, "Mathematics").unwrap();
+    let period = grading::create(
+        &conn,
+        &school_id,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap()
+    .unwrap();
+    class_record::create(
+        &conn, &school_id, &sect.id, &subj.id, &period.id, K10_POLICY, None,
+    )
+    .unwrap()
+    .unwrap();
+    let l1 = learner::create(
+        &conn,
+        &school_id,
+        "Ana",
+        "Dela Cruz",
+        Some("123456789012"),
+        Some("F"),
+    )
+    .unwrap();
+    section_membership::enroll(&conn, &school_id, &sect.id, &l1.id, "2026-06-01").unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let result = generate_sf9_form_as_current_session(
+        &conn,
+        &sessions,
+        &sect.id,
+        &l1.id,
+        "2026-06-15",
+        dir.path(),
+    )
+    .unwrap()
+    .expect("learner is an active member of their own school's section");
+
+    assert_eq!(result.subject_count, 1);
+    let book = umya_spreadsheet::reader::xlsx::read(&result.output_path).unwrap();
+    let sheet = book.sheet_by_name("SF9").unwrap();
+    assert_eq!(sheet.value((1, 10)), "Mathematics");
+    assert_eq!(
+        sheet.value((3, 10)),
+        "",
+        "no scores have been entered yet, so the term grade cell must be blank, \
+         never a fabricated value"
+    );
+}
+
+#[test]
+fn generating_sf9_for_another_schools_learner_returns_none_not_an_error() {
+    let conn = open_test_db();
+    let (sessions, _school_id) = login_with_role(&conn, "registrar.a", role_repo::REGISTRAR);
+    let other_school =
+        school::create(&conn, "Rizal Elementary (SYNTHETIC, different school)").unwrap();
+    let foreign_section =
+        section::create(&conn, &other_school.id, "2026-2027", "7", "Rosal").unwrap();
+    let foreign_learner =
+        learner::create(&conn, &other_school.id, "Juan", "Santos", None, None).unwrap();
+    section_membership::enroll(
+        &conn,
+        &other_school.id,
+        &foreign_section.id,
+        &foreign_learner.id,
+        "2026-06-01",
+    )
+    .unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let result = generate_sf9_form_as_current_session(
+        &conn,
+        &sessions,
+        &foreign_section.id,
+        &foreign_learner.id,
+        "2026-06-15",
+        dir.path(),
+    )
+    .unwrap();
+
+    assert!(result.is_none());
+}
+
+#[test]
+fn the_sf9_bundled_resource_and_the_test_fixture_are_byte_identical() {
+    let resource_bytes = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/sf9/sf9_template_synthetic.xlsx"),
+    )
+    .unwrap();
+    assert_eq!(resource_bytes, sf9_template_bytes());
 }

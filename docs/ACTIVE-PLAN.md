@@ -1,5 +1,53 @@
 # ACTIVE PLAN
 
+## Wave 2I: Multi-Form Official-Form Contract + SF9 Readiness (added 2026-08-27) — complete
+
+Full record: `docs/adr/0049-multi-form-official-form-contract.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/CURRENT-HANDOFF.md`'s top
+entry. Verification record:
+
+- **Repository truth verified first**: `git fetch` clean; branch/HEAD
+  at Wave 3's checkpoint `313ac0f`; `main` unchanged at `d9ab036`;
+  working tree clean; both Wave 3 CI runs re-confirmed
+  `completed`/`success` for that exact commit before any implementation
+  began.
+- **SF9 evidence gate**: no authoritative DepEd SF9 template found in
+  this repository or obtainable from `deped.gov.ph` directly. Official
+  SF9 fidelity remains `NOT_VERIFIED` — built against a synthetic
+  fixture, per the brief's own explicit Option B permission.
+- **Ten-scenario decision**: kept SF1's `OfficialFormGenerator` port
+  as-is; added a separate `Sf9FormGenerator` trait rather than one
+  generic multi-form method, to keep an SF9 field from ever silently
+  compiling as SF1 data through a shared request type. Generalized only
+  `TemplateDescriptor` (added `workbook_format`, widened two fields from
+  fixed arrays to slices). Full scoring in ADR-0049.
+- **Architecture**: `formgen::sf9` (domain contract) →
+  `formgen::Sf9FormGenerator` (port) → `formgen::umya_adapter::
+UmyaSf9Generator` → a SHA-256-hash-pinned bundled SYNTHETIC template.
+  `formgen::sf9_projection` builds SF9's grade data by calling the
+  EXISTING `grading_computation::compute_term_grade` — no grading rule
+  reimplemented. Same atomic-write/no-caller-path discipline as SF1.
+- **Multi-form adapter policy made concrete**: `umya_adapter::
+reject_unsupported_format` rejects a `WorkbookFormat::LegacyXls`
+  descriptor before any parsing — proven by a dedicated test — so
+  "`.xlsx` does not imply Java, `.xls` does not imply Rust" is a checked
+  fact, not only prose.
+- **Verification**: `cargo nextest run` 557/557 (SF1's own suite
+  unchanged and still green). `cargo test`/`cargo fmt --check`/`cargo
+clippy -D warnings`/`cargo deny check` all clean. `npm run quality`
+  clean, 438 TS tests, no frontend regression (no UI added this wave).
+- **Independent review**: one security review dispatched (SF9
+  authorization parity, atomic-write correctness, projection-query
+  isolation, format-rejection ordering, PII-in-logs) — CLOSED, no
+  blocking findings. One should-fix, fixed: `sf9_projection` now
+  independently verifies `learner_id` belongs to `school_id` rather
+  than relying solely on the caller. Three of the brief's four named
+  review roles not dispatched this wave — retained as debt in
+  `docs/VERIFICATION-DEBT.md`, per the established reviewer-harness
+  fallback rule, not dropped.
+- **Scope guards held**: no SF10, no cloud sync, no full SF9 UI, no live
+  learner PII, no paid infrastructure, no unrelated file changes.
+
 ## Wave 3: Authoritative-Template SF1 Form Engine (added 2026-08-26) — complete
 
 Full record: `docs/adr/0048-official-form-engine-sf1.md`,

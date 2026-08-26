@@ -10,8 +10,27 @@ use umya_spreadsheet::{reader, writer};
 
 use crate::error::{AppError, AppResult};
 use crate::formgen::sf1::{Sf1GenerationRequest, Sf1GenerationResult};
-use crate::formgen::template::{self, TemplateDescriptor};
+use crate::formgen::sf9::{Sf9GenerationRequest, Sf9GenerationResult};
+use crate::formgen::template::{self, TemplateDescriptor, WorkbookFormat};
 use crate::formgen::OfficialFormGenerator;
+
+/// Rejects a template descriptor this adapter cannot handle. Called
+/// first in every `generate_*` method, before identity verification —
+/// the multi-form adapter policy (docs/adr/0048-official-form-engine-
+/// sf1.md, "Multi-form adapter policy") is that the AUTHORITATIVE
+/// TEMPLATE'S FORMAT selects the adapter, not the form kind: `.xlsx`
+/// does not imply this Rust adapter is always right, and a legacy
+/// `.xls` descriptor must never silently be parsed as OOXML bytes.
+fn reject_unsupported_format(descriptor: &TemplateDescriptor) -> AppResult<()> {
+    match descriptor.workbook_format {
+        WorkbookFormat::Xlsx => Ok(()),
+        WorkbookFormat::LegacyXls => Err(AppError::FormGeneration(
+            "this template requires a legacy .xls-capable generator, which this Rust adapter \
+             does not implement"
+                .to_string(),
+        )),
+    }
+}
 
 pub struct UmyaSf1Generator {
     pub descriptor: TemplateDescriptor,
@@ -25,6 +44,18 @@ impl UmyaSf1Generator {
     }
 }
 
+pub struct UmyaSf9Generator {
+    pub descriptor: TemplateDescriptor,
+}
+
+impl UmyaSf9Generator {
+    pub fn sf9_synthetic_v1() -> Self {
+        UmyaSf9Generator {
+            descriptor: template::SF9_SYNTHETIC_V1,
+        }
+    }
+}
+
 impl OfficialFormGenerator for UmyaSf1Generator {
     fn generate_sf1(
         &self,
@@ -32,6 +63,7 @@ impl OfficialFormGenerator for UmyaSf1Generator {
         request: &Sf1GenerationRequest,
         output_path: &Path,
     ) -> AppResult<Sf1GenerationResult> {
+        reject_unsupported_format(&self.descriptor)?;
         // Step 1: verify template identity BEFORE any parsing is
         // attempted -- a byte mismatch is rejected without ever trying
         // to interpret the bytes as a spreadsheet at all.
@@ -98,7 +130,11 @@ impl OfficialFormGenerator for UmyaSf1Generator {
                 .set_value_string(value.to_string());
         }
 
-        let [lrn_col, family_col, given_col, sex_col] = self.descriptor.data_columns;
+        let &[lrn_col, family_col, given_col, sex_col] = self.descriptor.data_columns else {
+            return Err(AppError::FormGeneration(
+                "the SF1 template descriptor does not declare exactly 4 data columns".to_string(),
+            ));
+        };
         for (i, learner) in request.learners.iter().enumerate() {
             let row = self.descriptor.first_data_row + i as u32;
             sheet
@@ -150,6 +186,110 @@ impl OfficialFormGenerator for UmyaSf1Generator {
     }
 }
 
+impl crate::formgen::Sf9FormGenerator for UmyaSf9Generator {
+    fn generate_sf9(
+        &self,
+        template_bytes: &[u8],
+        request: &Sf9GenerationRequest,
+        output_path: &Path,
+    ) -> AppResult<Sf9GenerationResult> {
+        reject_unsupported_format(&self.descriptor)?;
+        template::verify_identity(&self.descriptor, template_bytes)?;
+
+        if request.subject_grades.len() as u32 > self.descriptor.max_learner_rows {
+            return Err(AppError::FormGeneration(format!(
+                "this learner has {} subject/term rows, exceeding this template's capacity of \
+                 {} rows",
+                request.subject_grades.len(),
+                self.descriptor.max_learner_rows
+            )));
+        }
+
+        let mut book =
+            reader::xlsx::read_reader(Cursor::new(template_bytes), true).map_err(|e| {
+                log::warn!("SF9 template failed to parse as a spreadsheet: {e}");
+                AppError::FormGeneration(
+                    "the SF9 template could not be read as a spreadsheet".to_string(),
+                )
+            })?;
+
+        let sheet_names: Vec<String> = book
+            .sheet_collection()
+            .iter()
+            .map(|s| s.name().to_string())
+            .collect();
+        verify_structure(&self.descriptor, &sheet_names)?;
+
+        let sheet = book
+            .sheet_by_name_mut(self.descriptor.data_sheet_name)
+            .map_err(|_| {
+                AppError::FormGeneration(
+                    "the SF9 template is missing its expected data sheet".to_string(),
+                )
+            })?;
+
+        let header_values = [
+            request.learner_name.as_str(),
+            request.lrn.as_deref().unwrap_or(""),
+            request.sex.as_deref().unwrap_or(""),
+            request.grade_level.as_str(),
+            request.section_name.as_str(),
+            request.school_year.as_str(),
+        ];
+        for ((col, row), value) in self.descriptor.header_cells.iter().zip(header_values) {
+            sheet
+                .cell_mut((*col, *row))
+                .set_value_string(value.to_string());
+        }
+
+        let &[subject_col, period_col, grade_col, _unused_col] = self.descriptor.data_columns
+        else {
+            return Err(AppError::FormGeneration(
+                "the SF9 template descriptor does not declare exactly 4 data columns".to_string(),
+            ));
+        };
+        for (i, row_data) in request.subject_grades.iter().enumerate() {
+            let row = self.descriptor.first_data_row + i as u32;
+            sheet
+                .cell_mut((subject_col, row))
+                .set_value_string(row_data.subject_name.clone());
+            sheet
+                .cell_mut((period_col, row))
+                .set_value_string(row_data.grading_period_label.clone());
+            sheet.cell_mut((grade_col, row)).set_value_string(
+                row_data
+                    .term_grade
+                    .map(|g| g.to_string())
+                    .unwrap_or_default(),
+            );
+        }
+
+        let tmp_path = sibling_temp_path(output_path)?;
+        let result: AppResult<()> = (|| {
+            let mut file = std::fs::File::create(&tmp_path)?;
+            writer::xlsx::write_writer(&book, &mut file).map_err(|e| {
+                log::warn!("failed to write generated SF9 workbook: {e}");
+                AppError::FormGeneration("failed to write the generated SF9 workbook".to_string())
+            })?;
+            file.sync_all()?;
+            std::fs::rename(&tmp_path, output_path)?;
+            Ok(())
+        })();
+
+        if let Err(e) = result {
+            let _ = std::fs::remove_file(&tmp_path);
+            return Err(e);
+        }
+
+        Ok(Sf9GenerationResult {
+            output_path: output_path.to_string_lossy().to_string(),
+            subject_count: request.subject_grades.len(),
+            template_form_type: self.descriptor.form_type.to_string(),
+            template_version: self.descriptor.version.to_string(),
+        })
+    }
+}
+
 /// Confirms `sheet_names` contains every sheet `descriptor` expects.
 /// Extracted from `generate_sf1` so this defense-in-depth layer can be
 /// exercised directly by a unit test — reaching it through
@@ -161,15 +301,17 @@ impl OfficialFormGenerator for UmyaSf1Generator {
 /// mismatch between the test's name and what it exercised).
 fn verify_structure(descriptor: &TemplateDescriptor, sheet_names: &[String]) -> AppResult<()> {
     if !sheet_names.iter().any(|n| n == descriptor.data_sheet_name) {
-        return Err(AppError::FormGeneration(
-            "the SF1 template is missing its expected data sheet".to_string(),
-        ));
+        return Err(AppError::FormGeneration(format!(
+            "the {} template is missing its expected data sheet",
+            descriptor.form_type
+        )));
     }
     for expected in descriptor.other_expected_sheet_names {
         if !sheet_names.iter().any(|n| n == expected) {
-            return Err(AppError::FormGeneration(
-                "the SF1 template is missing an expected sheet".to_string(),
-            ));
+            return Err(AppError::FormGeneration(format!(
+                "the {} template is missing an expected sheet",
+                descriptor.form_type
+            )));
         }
     }
     Ok(())
@@ -204,6 +346,8 @@ fn sibling_temp_path(output_path: &Path) -> AppResult<std::path::PathBuf> {
 mod tests {
     use super::*;
     use crate::formgen::sf1::{Sf1GenerationRequest, Sf1LearnerRow};
+    use crate::formgen::sf9::{Sf9GenerationRequest, Sf9SubjectTermGrade};
+    use crate::formgen::Sf9FormGenerator as _;
 
     fn template_bytes() -> Vec<u8> {
         std::fs::read(
@@ -211,6 +355,99 @@ mod tests {
                 .join("tests/fixtures/sf1_template_synthetic.xlsx"),
         )
         .unwrap()
+    }
+
+    fn sf9_template_bytes() -> Vec<u8> {
+        std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/sf9_template_synthetic.xlsx"),
+        )
+        .unwrap()
+    }
+
+    fn sf9_sample_request() -> Sf9GenerationRequest {
+        Sf9GenerationRequest {
+            school_name: "TEST ELEMENTARY SCHOOL (SYNTHETIC)".to_string(),
+            school_year: "2026-2027".to_string(),
+            grade_level: "7".to_string(),
+            section_name: "Sampaguita".to_string(),
+            learner_name: "DELA CRUZ, ANA".to_string(),
+            lrn: Some("123456789012".to_string()),
+            sex: Some("F".to_string()),
+            subject_grades: vec![
+                Sf9SubjectTermGrade {
+                    subject_name: "Mathematics".to_string(),
+                    grading_period_label: "Term 1".to_string(),
+                    term_grade: Some(88),
+                },
+                Sf9SubjectTermGrade {
+                    subject_name: "Mathematics".to_string(),
+                    grading_period_label: "Term 2".to_string(),
+                    term_grade: None,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn generates_an_sf9_workbook_with_the_expected_subject_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("sf9_output.xlsx");
+        let generator = UmyaSf9Generator::sf9_synthetic_v1();
+
+        let result = generator
+            .generate_sf9(&sf9_template_bytes(), &sf9_sample_request(), &output_path)
+            .unwrap();
+        assert_eq!(result.subject_count, 2);
+
+        let book = reader::xlsx::read(&output_path).unwrap();
+        let sheet = book.sheet_by_name("SF9").unwrap();
+        assert_eq!(sheet.value((1, 10)), "Mathematics"); // A10: subject
+        assert_eq!(sheet.value((2, 10)), "Term 1");
+        assert_eq!(sheet.value((3, 10)), "88");
+        // A missing computed grade writes as empty, never a placeholder.
+        assert_eq!(sheet.value((3, 11)), "");
+        // Header cells.
+        assert_eq!(sheet.value((2, 3)), "DELA CRUZ, ANA");
+        assert_eq!(sheet.value((2, 4)), "123456789012");
+    }
+
+    #[test]
+    fn rejects_a_template_declaring_legacy_xls_format() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("sf9_output.xlsx");
+        let mut descriptor = template::SF9_SYNTHETIC_V1;
+        descriptor.workbook_format = WorkbookFormat::LegacyXls;
+        let generator = UmyaSf9Generator { descriptor };
+
+        let result =
+            generator.generate_sf9(&sf9_template_bytes(), &sf9_sample_request(), &output_path);
+        assert!(
+            result.is_err(),
+            "a legacy-.xls descriptor must be rejected before any parsing is attempted, \
+             proving .xlsx does not implicitly cover every workbook_format"
+        );
+        assert!(!output_path.exists());
+    }
+
+    #[test]
+    fn rejects_more_subject_rows_than_the_sf9_template_has_capacity_for() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("sf9_output.xlsx");
+        let generator = UmyaSf9Generator::sf9_synthetic_v1();
+
+        let mut request = sf9_sample_request();
+        request.subject_grades = (0..13)
+            .map(|i| Sf9SubjectTermGrade {
+                subject_name: format!("Subject {i}"),
+                grading_period_label: "Term 1".to_string(),
+                term_grade: Some(80),
+            })
+            .collect();
+
+        let result = generator.generate_sf9(&sf9_template_bytes(), &request, &output_path);
+        assert!(result.is_err());
+        assert!(!output_path.exists());
     }
 
     fn sample_request(learner_count: usize) -> Sf1GenerationRequest {

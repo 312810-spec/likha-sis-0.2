@@ -1558,6 +1558,62 @@ database migration — generation only reads existing learner/section
 data and writes a spreadsheet file. No UI screen built this wave,
 deliberately deferred per the brief's own permission.
 
+## Wave 2I: Multi-Form Official-Form Contract + SF9 Readiness (added 2026-08-27)
+
+Full record: `docs/adr/0049-multi-form-official-form-contract.md`.
+Generalizes Wave 3's single-form (SF1) engine to a second form (SF9)
+without collapsing the port into one generic method — a deliberate
+architecture choice, not an oversight: `OfficialFormGenerator` (SF1)
+and the new `Sf9FormGenerator` (SF9) stay separate traits with their
+own typed request types, so a form-specific mapping bug cannot silently
+compile as a different form's data. `TemplateDescriptor` itself was
+generalized (added `workbook_format: WorkbookFormat`, widened two
+fixed-size arrays to slices) — this is the one part of the contract
+meant to be shared across forms.
+
+**No authoritative DepEd SF9 template exists anywhere in this
+repository or was obtainable from `deped.gov.ph` directly** (a live
+fetch of the department's own homepage this wave found no School
+Forms/SF9 link — same recurring gap this project has now hit for SF1,
+PSGC, and SF9 alike). **Official SF9 fidelity remains `NOT_VERIFIED`**
+— built and tested against a synthetic fixture instead.
+
+**The multi-form adapter policy is now a checked fact, not only
+prose**: `umya_adapter::reject_unsupported_format` rejects a
+`WorkbookFormat::LegacyXls` descriptor before any parsing is attempted
+— proven by a dedicated test that flips a real descriptor's format and
+confirms generation fails closed. No legacy-`.xls` template was
+encountered this wave, so no Java/POI adapter was built; the seam
+exists and is tested, the adapter remains ADR-0048's recorded Next Best
+if one is ever needed.
+
+**SF9 grade data is never computed in `formgen`** — `formgen::
+sf9_projection::subject_term_grades_for_learner` (new, read-only) calls
+the EXISTING `repository::grading_computation::compute_term_grade` once
+per class record, via a new narrow query
+(`repository::class_record::list_by_section_in_school`). A class record
+with no computable grade yet produces an explicit blank cell, never a
+placeholder — proven end-to-end by a test that creates a real class
+record with zero scores entered and confirms the generated SF9 shows a
+genuinely empty grade cell, not a hardcoded/faked value.
+
+**Data-exposure contract formalized as reusable** (ADR-0049): every
+official-form generator now shares, by construction: PII classification
+disclosed, no caller-controlled output path, deterministic overwrite,
+atomic write with guaranteed temp-file cleanup on any failure, no PII
+in logs/errors, local-only (no network/upload/sync), and — a deliberate,
+disclosed gap, not solved this wave — still unencrypted, per the
+brief's own instruction not to add encryption merely to "solve" the
+issue absent evidence it's required.
+
+**One independent review dispatched this wave (security) — CLOSED, no
+blocking findings.** One should-fix, fixed: `sf9_projection` did not
+itself enforce that `learner_id` belongs to `school_id` (it relied on
+the caller having already checked); now verifies this directly via
+`learner::find_by_id_in_school` before reading any grade data. The
+other three roles the brief named are retained as verification debt,
+not dropped — see `docs/VERIFICATION-DEBT.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

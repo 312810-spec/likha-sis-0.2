@@ -98,6 +98,7 @@ pub fn run() {
             commands::reference_geo::get_current_psgc_snapshot,
             commands::reference_geo::list_psgc_units,
             commands::formgen::generate_sf1_form,
+            commands::formgen::generate_sf9_form,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

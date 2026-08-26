@@ -198,6 +198,28 @@ pub fn list_by_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Class
         .collect()
 }
 
+/// Only `section_id`'s own class records within `school_id` — every
+/// subject/grading-period combination a learner in that section has
+/// been graded under. Added for `formgen::sf9_projection` (Wave 2I):
+/// SF9 needs one learner's full subject-by-term grade set, which is a
+/// section-scoped slice of exactly what `list_by_school` already joins,
+/// so this reuses `DETAIL_SELECT_LIST` rather than duplicating the join.
+pub fn list_by_section_in_school(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+) -> AppResult<Vec<ClassRecordDetail>> {
+    let mut stmt = conn.prepare(&format!(
+        "{DETAIL_SELECT_LIST} AND cr.section_id = ?2 ORDER BY sub.name, pp.sequence"
+    ))?;
+    let rows = stmt.query_map((school_id, section_id), row_to_class_record_detail)?;
+    let details = rows.collect::<Result<Vec<_>, _>>()?;
+    details
+        .into_iter()
+        .map(|d| with_total_eligible(conn, school_id, d))
+        .collect()
+}
+
 /// A class record's `section_id` and its grading period's date range —
 /// the two pieces of context `learner_score::record`/`roster_for_item`
 /// need to determine which learners are eligible to be scored (anyone
