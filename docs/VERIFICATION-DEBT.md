@@ -1,5 +1,86 @@
 # Verification Debt
 
+## Wave 2E SF1 Import Operational Hardening & Auditability (2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
+addendum. Adds `sf1_import_history` (migration 19) and re-import
+fingerprinting on top of the unchanged Wave 2B/2C engine + UI and
+unchanged Wave 2D encryption architecture.
+
+**Re-confirmed this session (not newly closed — same debt, re-run
+against a changed dependency graph):** `gitleaks`/`cargo-deny`/
+`osv-scanner` all re-run against this milestone's changes (new `sha2`
+direct dependency included in the scan). `gitleaks`: no leaks.
+`cargo-deny`: advisories/bans/licenses/sources all ok. `osv-scanner`:
+no unaccounted-for issues (18 known, pre-documented/accepted advisories
+filtered per `src-tauri/osv-scanner.toml`). Installed binaries from
+Wave 2D persisted on disk but were **not on this session's fresh shell
+`PATH`** — re-invoked via full path
+(`...\WinGet\Links\{gitleaks,osv-scanner}.exe`), confirming the earlier
+install is durable but this environment's PATH is not guaranteed
+stable across sessions; worth a one-line note if a future session hits
+"command not found" for a tool this project's docs say is installed.
+
+**New debt recorded this session:**
+
+1. Security tooling in CI — still not wired in, still deliberately
+   deferred, but with a concrete, named plan this time instead of a
+   repeated "deferred" note: a separate `security-scan` job (never
+   inside `quality-ubuntu`/`quality-windows`) on `ubuntu-latest` using
+   `gitleaks/gitleaks-action` and `EmbarkStudios/cargo-deny-action`
+   (both official, pinned by commit SHA), with `osv-scanner` held back
+   for a follow-up session specifically because this session's own CLI
+   needed a non-default `--config=... -r .` invocation to apply
+   `osv-scanner.toml`'s ignore list correctly — that same fragility
+   needs to be proven safe against `google/osv-scanner-action`
+   specifically before trusting it unattended in CI. See ADR-0043's
+   Wave 2E addendum for the full reasoning.
+2. `cargo build --release` failed in this session's Bash-tool shell
+   with a Perl/OpenSSL `Configure` error (`Locale::Maketext::Simple`
+   module missing) — this is a local environment gap in that specific
+   shell's Perl toolchain for a release-profile vendored-OpenSSL
+   rebuild, not a code regression: plain `cargo build` (debug, full
+   binary, not just `--lib`) succeeded cleanly, as did `cargo test` and
+   `cargo clippy --all-targets -D warnings`. Not investigated further
+   this session since CI's own Windows runner (not this local shell) is
+   the authoritative build-verification environment and was not
+   affected. Worth investigating if a native release build is ever
+   needed directly from this local environment.
+3. No dedicated "process closes mid-transaction" test was written for
+   `commit_sf1_import`'s history-write path — this is SQLite/WAL's own
+   documented guarantee (an uncommitted transaction is discarded on the
+   next open), not independently reproduced by actually killing the
+   process mid-write in this session. The existing
+   `a_failure_partway_through_the_batch_rolls_back_the_entire_batch`
+   and new `a_failed_commit_leaves_no_history_row_behind` tests cover
+   the reachable in-process failure mode (a constraint violation) but
+   not a hard process kill.
+
+**Transient frontend test flake observed and re-verified, not a
+regression**: one `npm run quality` pass showed `App.test.tsx`'s
+`document.title` assertion fail once; re-running that file alone and
+re-running the full suite both immediately after showed 438/438
+passing cleanly. Not investigated further — this file was untouched by
+Wave 2E and the failure did not reproduce, consistent with a
+parallel-test-run `document.title` ordering flake, the same class of
+transient issue Wave 2D already documented for a different test file.
+
+**Independent reviews — both CLOSED.** Security review: no blocking
+findings across all 8 requested angles; 2 non-blocking doc-comment
+accuracy items, both fixed in this checkpoint. Architecture review: no
+blocking findings across all 8 requested angles, but one real gap
+found and fixed — `commit_import` had no server-side guard against an
+empty `plans` slice, which would have written a phantom "0 rows, 0
+learners" history row (only the frontend guarded against this before).
+Now rejected server-side with a dedicated test. Two further optional
+code-health suggestions (a provenance struct, SQL-literal style
+consistency) were deliberately left unimplemented as non-blocking
+nits. Both reviewer dispatches hit this project's recurring
+reviewer-retrieval bug on the standard notification channel (empty/
+stub first reply); both recovered in full on one retry via direct
+message. Full detail: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave
+2E addendum.
+
 ## Wave 2D Local Data Security Verification (2026-08-26)
 
 Full record: `docs/adr/0044-local-data-security-verification.md`. This

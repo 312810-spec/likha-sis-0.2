@@ -386,3 +386,166 @@ generic message instead of recognizing the backend's `import_error`
 category (fixed); the birthdate row used two different phrasings for
 the same fact (fixed, reconciled to one). Full detail in
 `docs/VERIFICATION-DEBT.md`.
+
+## Addendum (Wave 2E): SF1 Import Operational Hardening & Auditability
+
+Adds the operational layer this milestone's own directing brief asked
+for — "what was imported, by whom, when, from which file" — without
+touching the existing preview/commit contract, duplicate-resolution
+semantics (`useExisting`/`createSeparate` only, still no merge), or
+Wave 2D's encryption architecture. No repository-truth surprises: the
+existing engine and UI were exactly as documented above.
+
+**Import history model — a new table, not an audit_log extension.**
+`repository::audit_log` was inspected first, per this milestone's own
+instruction to prefer reuse. Its own doc comment (migration 15) scopes
+it deliberately to authentication events only, and its row shape
+(`event_type` enum, no counts, no filename/fingerprint) doesn't fit an
+import result. Rather than widen `audit_log`'s scope — which the
+project has already decided against once — a new `sf1_import_history`
+table (migration 19) mirrors its _pattern_ instead: school-scoped
+`record`/`list_for_school`, a UUIDv7 `id` breaking same-millisecond
+ties in `ORDER BY created_at DESC, id DESC`, `user_id` nullable with
+`ON DELETE SET NULL` plus a denormalized `username` snapshot — all
+copied conventions, not new decisions.
+
+**No `status` column — a deliberate omission, not an oversight.** The
+one new history-writing call, `sf1_import_history::record`, is invoked
+from inside `import::commit::commit_import`'s existing single
+`rusqlite::Transaction`, immediately before `tx.commit()`. Because
+`commit_import` was already proven fully atomic in Wave 2B
+(`a_failure_partway_through_the_batch_rolls_back_the_entire_batch`),
+a history row can only ever exist for a batch that actually committed
+— there is no reachable "partially failed" or "previewed" state for it
+to represent, so adding a status column would be lifecycle complexity
+with no real requirement behind it (explicitly against this project's
+own autonomous-development scope-discipline rule). A new adversarial
+test, `a_failed_commit_leaves_no_history_row_behind`, proves the
+history insert rolls back with everything else, not just the learner
+rows.
+
+**Re-import detection is a SHA-256 content fingerprint, advisory
+only.** `import::fingerprint::compute` hashes the picked file's raw
+bytes (reusing `workbook::MAX_FILE_BYTES` as the same size guard the
+parser itself applies) and is looked up against
+`sf1_import_history.source_fingerprint` — by content, never by
+filename, in either direction (proven by
+`a_previous_import_recorded_under_a_different_filename_still_matches_by_content`
+in `import::preview`'s test module). `std`'s `DefaultHasher` was
+considered and rejected: its own documentation disclaims algorithm
+stability across Rust releases, which would silently stop matching a
+fingerprint already persisted in SQLite after a toolchain upgrade —
+fatal for a value meant to be compared against history written months
+earlier. `sha2` was added as a direct dependency instead of writing a
+hand-rolled hash, but at effectively zero build cost: it was already
+resolved in this workspace's Cargo.lock as a transitive dependency of
+`tauri-codegen` (a build-time proc-macro crate), so promoting it to a
+runtime dependency links the same already-compiled version into the
+app binary rather than adding a new one to the dependency graph. A
+lookup failure (e.g. a moved/deleted file between preview and commit)
+never fails the preview or the commit — it just means no advisory
+notice is shown, or the history row's filename/fingerprint fall back to
+fixed placeholders (never a raw error, never blocking).
+
+**The fingerprint is not a security or authorization control**, and
+nothing in this milestone treats it as one — it never gates whether a
+commit is allowed, and the client never supplies it: `commit_sf1_import`
+re-reads the same `file_path` the caller already previewed and computes
+the filename/fingerprint itself, exactly like `school_id` is never
+accepted from a caller.
+
+**Teacher-facing surface**: the preview screen shows a non-blocking
+advisory banner when this exact file's content matches a prior
+`sf1_import_history` row ("You appear to have imported this exact file
+before…") — informational only, every row still goes through the same
+review as always. A minimal "View past imports" panel on the setup
+screen lists `sf1_import_history` rows (filename, actor, timestamp,
+counts) — no raw SF1 content, no learner names/LRNs, matching this
+milestone's explicit "no analytics dashboard" scope limit.
+
+**Authorization**: `list_sf1_import_history` uses the same
+`Capability::ManageLearners` gate and session-derived `school_id` as
+every other SF1 import command — there is no school-id parameter for a
+caller to supply at all. A new `auth::authorize_capability_with_actor`
+sits alongside the existing `authorize_capability` (identical gate
+logic, additionally returning `user_id`) rather than changing that
+function's signature for every existing caller. New negative-
+authorization tests
+(`a_teacher_cannot_list_sf1_import_history`,
+`a_registrar_never_sees_another_schools_import_history`) cover both the
+capability gate and school isolation specifically for history.
+
+**Security tooling in CI (Section 14) — deferred again, with a
+concrete plan this time.** `gitleaks`, `cargo-deny`, and `osv-scanner`
+were re-run locally against this milestone's changes (the new `sha2`
+dependency included) and are clean — see
+`docs/VERIFICATION-DEBT.md`. They remain unwired in CI: this session
+could not dry-run a new GitHub Actions job before pushing, and an
+untested scanner step risks exactly the failure mode this milestone's
+own brief warns against ("a secure scanner configuration that randomly
+breaks the project's primary CI is also not acceptable"). The concrete
+next-session plan: add a **separate** `security-scan` job (not inside
+`quality-ubuntu`/`quality-windows`, so a scanner outage or false
+positive can never redden the primary gate) on `ubuntu-latest`, using
+`gitleaks/gitleaks-action` and `EmbarkStudios/cargo-deny-action` (both
+official, both to be pinned by commit SHA, not a floating tag) with
+`cargo-deny-action`'s `manifest-path: src-tauri/Cargo.toml`.
+`osv-scanner` is left out of that first pass — this session's own CLI
+invocation needed a specific `--config=... -r .` form to apply
+`osv-scanner.toml`'s ignore list correctly (a plain `--lockfile` form
+silently ignored it in Wave 2D), and that same fragility should be
+proven safe against `google/osv-scanner-action` specifically before
+trusting it in CI, not assumed to carry over.
+
+**Verification debt closed by this addendum**: dependency-security
+debt is re-confirmed (not newly closed) against the changed
+dependency graph. **Verification debt still carried forward
+unchanged**: everything listed at the end of the Wave 2C addendum
+above, plus CI wiring for the three security tools (now with the
+concrete plan above instead of a repeated deferral).
+
+**Independent security review — CLOSED, no blocking findings.**
+Checked all 8 requested angles (cross-school leakage, authorization
+bypass, PII/logging, transaction atomicity, fingerprint's
+advisory-only status, SQLCipher/DPAPI regression, oversized-file
+handling, the new `sha2` dependency) against direct file evidence and
+existing tests; found nothing exploitable in any of them. Two
+non-blocking should-fix items, both doc-comment accuracy, not code
+defects: `commit_sf1_import`'s doc comment overstated that the
+computed fingerprint is bound to the actually-committed `plans` (it
+isn't — the value itself just isn't client-supplied); migration 19's
+comment claimed "no learner PII" too absolutely, since
+`source_filename` is teacher-supplied free text that could
+incidentally contain a name. **Both fixed in this same checkpoint** —
+see the softened comments in `commands/import.rs` and
+`db/migrations.rs`. This session's standard reviewer-notification
+channel initially returned only a stall message for this agent
+(this project's known recurring reviewer-retrieval bug); one retry via
+direct message recovered the full report.
+
+**Independent architecture review — CLOSED, one real (non-blocking)
+finding fixed.** Checked all 8 requested angles (layering, reuse vs.
+reinvention, transaction-boundary correctness, schema proportionality,
+`sha2` justification — independently re-verified via `cargo tree -i
+sha2 -e normal`/`-e build`, not just trusted from the Cargo.toml
+comment — frontend-state-as-source-of-truth risk, the command-layer
+trust boundary, general code health). Found `commit_import` had no
+server-side guard against an empty `plans` slice: the only guard was
+client-side (`Sf1ImportApplicationService.commitImport`'s
+`ValidationError`), so a caller that reached `commit_sf1_import`
+directly with `plans: []` would have written a phantom "0 rows, 0
+learners" `sf1_import_history` row — a real, if low-severity, gap in
+migration 19's own "existence implies a real import" invariant. **Fixed
+in this same checkpoint**: `commit_import` now rejects an empty
+`plans` before opening a transaction at all, proven by a new test
+(`an_empty_plan_is_rejected_server_side_and_writes_no_phantom_history_row`).
+Two further optional, non-blocking suggestions (a small
+`ImportProvenance` struct to remove the `clippy::too_many_arguments`
+allow and an adjacent-same-type-argument transposition hazard; using
+plain SQL literals instead of a `format!`-composed constant in
+`sf1_import_history.rs` for pattern consistency with `audit_log.rs`)
+were deliberately not implemented — genuine code-health nits with no
+correctness impact, not worth the churn against this milestone's scope
+discipline. This session's standard reviewer-notification channel
+initially returned a stall message for this agent too; one retry via
+direct message recovered the full report.

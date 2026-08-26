@@ -1321,6 +1321,36 @@ new abstraction layer was proposed, since building one before a second
 implementation exists would be the premature genericization this
 project's engineering rules warn against.
 
+## Wave 2E: SF1 Import Operational Hardening & Auditability (added 2026-08-26)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
+addendum. Adds import history/auditability on top of the unchanged
+Wave 2B engine, Wave 2C UI, and Wave 2D encryption architecture — no
+existing preview/commit contract or duplicate-resolution semantics
+changed. New `sf1_import_history` table (migration 19), written inside
+`import::commit::commit_import`'s existing single transaction so a
+history row exists if and only if that batch actually committed —
+deliberately no `status` column, since there is no other reachable
+state for one to represent. Re-import detection is a SHA-256 content
+fingerprint (`import::fingerprint`, new but zero-build-cost `sha2`
+dependency — already resolved transitively via `tauri-codegen`),
+compared by content never filename, and purely advisory: it never
+blocks a commit and the client never supplies it — `commit_sf1_import`
+re-reads the file server-side, exactly like `school_id` is never
+client-supplied. `std`'s `DefaultHasher` was rejected for this because
+its own docs disclaim algorithm stability across Rust releases, which
+would silently break a fingerprint persisted in SQLite after a
+toolchain upgrade. New `list_sf1_import_history` command, same
+`ManageLearners` capability gate and session-derived `school_id` as
+every other SF1 command. Teacher-facing: a non-blocking "you've
+imported this file before" advisory banner on the preview screen, and
+a minimal "View past imports" panel (filename/actor/timestamp/counts
+only — no learner names/LRNs/raw SF1 content). Security tooling
+(`gitleaks`/`cargo-deny`/`osv-scanner`) re-confirmed clean against the
+changed dependency graph; still not wired into CI, now with a concrete
+named plan (separate job, specific pinned actions) instead of a
+repeated deferral — see `docs/VERIFICATION-DEBT.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

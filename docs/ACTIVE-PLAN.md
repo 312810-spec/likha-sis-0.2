@@ -1,5 +1,65 @@
 # ACTIVE PLAN
 
+## Wave 2E: SF1 Import Operational Hardening & Auditability (added 2026-08-26) — complete, read this section first
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
+addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
+
+- New Rust module tests: `import::fingerprint` (5 tests — identical
+  content/different filename matches, different content differs, a
+  single-byte difference differs, safe_filename strips a full path,
+  fails closed for a missing file), `repository::sf1_import_history`
+  (6 tests — record/list round-trip, ordering+limit, school isolation,
+  fingerprint lookup hit/miss/cross-school).
+- `import::commit` gained 4 new tests: a successful commit records one
+  history row with backend-computed counts; a failed commit leaves no
+  history row (the atomicity proof this milestone specifically
+  required); re-importing the same file twice records two separate
+  history rows; history from one school is never visible when listing
+  another.
+- `import::preview` gained 3 new tests: no notice for a never-seen
+  file; a previously-recorded import of identical content surfaces the
+  advisory notice; the same content under a different filename still
+  matches (filename is never used as a content-identity proxy).
+- `tests/sf1_import.rs` (integration) gained 5 new tests: a teacher
+  cannot list history; a registrar can list their own committed
+  imports; a registrar never sees another school's history; history
+  persists across a real close-and-reopen of the encrypted database
+  file (not just an in-memory connection); the existing re-import/
+  authorization/school-scope tests were updated for the new
+  `commit_sf1_import` signature without changing their assertions.
+- Full `cargo test` (plain, the stable-checkpoint command, includes
+  doctests) — PASS, all passing (498 via `cargo nextest run`, the fast
+  inner-loop runner, immediately before and after `cargo fmt`).
+- `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` —
+  PASS, clean.
+- Native `cargo build` (debug, full binary) — PASS. `cargo build
+--release` failed in this session's shell on a local Perl/OpenSSL gap
+  unrelated to this milestone's code — see `docs/VERIFICATION-DEBT.md`.
+- Frontend: 46 new/updated tests across `Sf1ImportScreen.test.tsx`
+  (advisory banner shown/not-shown, commit called with the same file
+  path preview used, view/empty-state/no-raw-content for the history
+  panel), `sf1-import-service.test.ts`, `sf1-import-repository.test.ts`.
+  Full `npm run test` — PASS, 438/438 (up from ~429, reflecting the
+  Wave 2E-specific additions net of pre-existing counts).
+- `tsc -b --noEmit` / `eslint .` / `prettier --check .` /
+  `npm run check:architecture` — all clean. `npm run build` (production
+  Vite build) — PASS.
+- `gitleaks`/`cargo-deny`/`osv-scanner` re-run against the changed
+  dependency graph (new `sha2` direct dependency) — all clean; see
+  `docs/VERIFICATION-DEBT.md` for exact output.
+- Independent security + architecture reviews dispatched; outcome
+  recorded once retrieved (see `docs/VERIFICATION-DEBT.md` and this
+  ADR addendum).
+
+**Not done this session, deliberately**: wiring the three security
+tools into CI (a concrete, named plan recorded instead — see the ADR
+addendum); an actual process-kill-mid-transaction reproduction (relied
+on SQLite/WAL's documented rollback-on-reopen guarantee instead, per
+this milestone's own instruction not to claim untested behavior);
+cloud sync, Android key store, SF10, or any unrelated attendance/
+grading work (explicit non-goals).
+
 ## Wave 2D: Local Data Security Verification (added 2026-08-26) — complete, read this section first
 
 Full record: `docs/adr/0044-local-data-security-verification.md`,

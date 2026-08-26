@@ -1,5 +1,67 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2E: SF1 Import Operational Hardening & Auditability, complete)
+
+Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
+addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Same branch as Wave
+2A/2A.1/2B/2C/2D (`claude/likha-sis-wave2a-learner-core`).
+
+**Repository-truth/CI hard gate verified first, per this milestone's
+own explicit instruction**: `git fetch` clean; branch and `origin`
+both at `364214f` (Wave 2D's checkpoint) as reported; `main` unchanged
+at `d9ab036`; working tree clean. CI run `32951314150` for that exact
+commit was polled until it genuinely reached `completed`/`success`
+(it was still `in_progress` at the start of this session) before any
+Wave 2E implementation began.
+
+**What was built**: `sf1_import_history` (migration 19), written
+inside `import::commit::commit_import`'s existing single transaction
+so a history row exists if and only if the batch it describes actually
+committed — deliberately no `status` column. A SHA-256 content
+fingerprint (`import::fingerprint`, a zero-build-cost `sha2` direct
+dependency already resolved transitively via `tauri-codegen`) for an
+advisory-only re-import notice, compared by content never filename,
+never blocking a commit. New `list_sf1_import_history` command, same
+`ManageLearners` gate and session-derived `school_id` as every other
+SF1 command. `commit_sf1_import` re-reads the file server-side for
+provenance rather than trusting a client-supplied filename/hash.
+Teacher-facing: a non-blocking advisory banner on the preview screen
+and a minimal "View past imports" panel (no raw SF1 content, no
+learner PII).
+
+**Two independent reviews, both CLOSED** (both hit this project's
+recurring reviewer-retrieval bug on the standard notification channel
+— empty/stub first reply for both — and both recovered in full on one
+retry via direct message). Security review: no blocking findings
+across all 8 requested angles; 2 non-blocking doc-comment-accuracy
+should-fix items, both fixed in this checkpoint. Architecture review:
+no blocking findings across all 8 requested angles, but one real gap
+found and fixed — `commit_import` had no server-side guard against an
+empty `plans` slice (only the frontend guarded against it), which
+would have written a phantom "0 rows, 0 learners" history row; now
+rejected server-side with a dedicated test. Full detail:
+`docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E addendum.
+
+**Verification, all actually run**: `cargo nextest run` 499/499 (up
+from 498 after the empty-plans fix) + plain `cargo test` (includes
+doctests) also green; `cargo fmt --check`/`cargo clippy --all-targets
+-- -D warnings` PASS, clean; native `cargo build` (debug, full binary)
+PASS — `cargo build --release` failed on a local Perl/OpenSSL
+toolchain gap in this session's shell specifically, unrelated to this
+milestone's code (see `docs/VERIFICATION-DEBT.md`); `npm run test`
+438/438 (one transient `App.test.tsx` flake observed once,
+re-confirmed clean on immediate re-run, unrelated to any file this
+milestone touched); `tsc -b --noEmit`/`eslint .`/`prettier --check
+.`/`npm run check:architecture` all clean; `npm run build` (production
+Vite build) PASS. `gitleaks`/`cargo-deny`/`osv-scanner` re-run against
+the changed dependency graph (new `sha2`) — all clean.
+
+**Not done this session, deliberately**: wiring the three security
+tools into CI (a concrete named plan recorded instead of a repeated
+deferral — see the ADR addendum); cloud sync; Android key store; SF10;
+unrelated attendance/grading work; a full-codebase PII-logging audit
+(explicit non-goals).
+
 ## Active Task (2026-08-26, this session — Wave 2D: Local Data Security Verification, complete)
 
 Full record: `docs/adr/0044-local-data-security-verification.md`,
