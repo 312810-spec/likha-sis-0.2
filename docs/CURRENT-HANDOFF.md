@@ -1,5 +1,53 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2A.1: Authorization Closure, complete)
+
+Full record: `docs/adr/0042-learner-core-enrollment-domain-foundation.md`'s
+Addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Same branch as Wave
+2A (`claude/likha-sis-wave2a-learner-core`).
+
+**Repository truth verified first**: `main` unchanged at `d9ab036`,
+branch clean, both expected Wave 2A commits (`f337d8f`, `8b83932`)
+present exactly as reported.
+
+**The reported gap confirmed and fixed**: `create_section` had no
+capability check at all (same class of bug as Wave 2A's
+`enroll_learner_in_section` fix) — any Teacher could create sections.
+Fixed to `Capability::ManageTeachingAssignments` (School Head only,
+reusing the existing Teacher Load capability — no new capability
+invented, per instruction). Six new authorization tests added,
+including the explicit adversarial proof (Teacher rejected, no partial
+mutation) and a Registrar-alone-denied test confirming the
+`ManageLearners`/`ManageTeachingAssignments` split is intentional.
+
+**Bounded Wave 2A mutation-surface audit**: all 11 commands across
+`commands/section.rs`/`commands/learner.rs` inventoried — every write
+now capability-gated, every read correctly stays session-scoped-only
+(the established convention, not a gap), no client-supplied
+`school_id` anywhere, no IDOR found. No further defect discovered; no
+scope expansion needed.
+
+**Independent `security-reviewer` — CLOSED, real findings retrieved**
+(this specific dispatch broke the retrieval-failure streak the
+Integration Review and Wave 2A milestones both hit). 5 of 6 adversarial
+questions FALSE-POSITIVE with direct citations; one non-security
+SHOULD-FIX (document the capability split as deliberate) — addressed
+in ADR-0042's addendum. No BLOCKING findings.
+
+**Verification, all actually run**: `enrollment.rs` 13/13 PASS (up
+from 7); full `cargo test` 350 lib tests + all integration binaries
+PASS; `cargo fmt --check`/`clippy -D warnings` PASS; native `cargo
+build` succeeds; `npm run quality:full` PASS; `git diff --check`
+clean. `gitleaks`/`cargo-deny`/`osv-scanner` confirmed still
+unavailable (`check-security.mjs`: 0 ok, 3 missing, honestly
+disclosed, not installed). Codex Pilot: BLOCKED (not logged in, same
+unchanged condition as prior sessions, not re-probed).
+
+**Gate decision: WAVE 2A.1 AUTHORIZATION CLOSURE PASSED — READY FOR
+WAVE 2B SF1 BULK IMPORT ENGINE.** `main` untouched. Per explicit
+instruction, Wave 2B is **not** started — this session stops here and
+waits for approval.
+
 ## Active Task (2026-08-26, this session — Wave 2A: Learner Core + Enrollment Domain Foundation, complete)
 
 Full record: `docs/adr/0042-learner-core-enrollment-domain-foundation.md`,

@@ -293,3 +293,22 @@ periods/terms already live entirely under `grading_policies`/
 - `create_section`'s identical missing-capability-gate issue is
   tracked as a separate follow-up (spawned as a background task this
   session), not fixed here.
+
+## Addendum (Wave 2A.1, 2026-08-26): `create_section` fixed, capability split confirmed deliberate
+
+`create_section` is now gated by `Capability::ManageTeachingAssignments`
+(School Head only) — not `ManageLearners` (Registrar or School Head),
+the capability that gates `enroll_learner_in_section`. This asymmetry
+was flagged by this session's independent `security-reviewer` as a
+non-security, documentation-worthy SHOULD-FIX ("confirm this is
+deliberate policy"), and it is: defining what sections/classes exist
+for a school year is a structural scheduling decision — the same
+domain `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+already scoped to School Head only, distinct from an individual
+learner's own record/placement, which is a Registrar's ordinary
+operational job. A Registrar can enroll a learner into a section a
+School Head already created, but cannot define new sections
+themselves — this mirrors real Philippine school administrative
+practice (School Head/Registrar jointly plan the year's sections;
+Registrar handles day-to-day enrollment into them) and is not an
+oversight. Full independent review record: `docs/VERIFICATION-DEBT.md`.

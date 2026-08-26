@@ -1,5 +1,68 @@
 # Verification Debt
 
+## Wave 2A.1 Authorization Closure: `create_section` fixed, independent `security-reviewer` CLOSED (2026-08-26)
+
+`create_section` (`src-tauri/src/commands/section.rs`) had the same
+class of gap Wave 2A found in `enroll_learner_in_section`: gated only
+by `sessions.require_active_school_scope`, no capability check at all
+— any authenticated Teacher session could create sections. Fixed to
+`auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)`
+(School Head only, reusing the existing capability that already gates
+Teacher Load's teaching-assignment commands — no new capability
+invented). Six new integration tests in `src-tauri/tests/enrollment.rs`
+prove: School Head succeeds; Teacher denied with no partial mutation;
+Registrar-alone denied (confirming `ManageTeachingAssignments` is
+intentionally distinct from `ManageLearners`); no-session denied; a
+School Head at School A cannot create a section under School B; the
+legitimate workflow still works end-to-end.
+
+**Independent `security-reviewer` — CLOSED, real findings retrieved
+this time** (breaking this session's own earlier retrieval-failure
+streak on the same milestone family). 5 of 6 adversarial questions
+ruled FALSE-POSITIVE with direct file:line citations (no
+client-influenceable `school_id`; no alternate unguarded write path to
+`sections`, confirmed by a repo-wide grep; `authorize_capability`
+derives `school_id` from the trusted session only; mutation strictly
+follows a successful `?`-propagated authorization check; no fail-open
+default anywhere in `authorize_capability`). One non-security
+SHOULD-FIX: document that the `ManageLearners`/`ManageTeachingAssignments`
+split (Registrar can enroll, but only School Head can create sections)
+is deliberate policy, not an oversight — addressed by ADR-0042's new
+"Addendum (Wave 2A.1)" section. **No BLOCKING findings.**
+
+**Bounded Wave 2A mutation-surface audit** (11 commands across
+`commands/section.rs`/`commands/learner.rs`): every write command now
+has a capability gate; every read command is session-scoped only,
+matching the established "reads stay open" convention; no command
+anywhere accepts a client-supplied `school_id`; no update/delete path
+weaker than its create path (no delete exists for either entity); no
+IDOR found. No further authorization defect discovered in this
+bounded surface.
+
+**Verification, all actually run this session**: targeted
+`enrollment.rs` integration tests PASS, 13/13 (up from 7); full `cargo
+test` PASS, 350 lib tests (unchanged — the fix was a pure gate change,
+no new lib-level logic) + all integration binaries; `cargo fmt --check`
+PASS; `cargo clippy --all-targets -- -D warnings` PASS, 0 warnings;
+native `cargo build` succeeds; `npm run quality:full` PASS end-to-end;
+`git diff --check` clean; `gitleaks`/`cargo-deny`/`osv-scanner`
+**still unavailable** (`node scripts/check-security.mjs`: 0 ok, 0
+failed, 3 missing — same disclosed, unchanged environment gap, not a
+new debt); manual secret grep of the diff found nothing. Codex Pilot:
+**BLOCKED** — `codex login status` reports "Not logged in," the same
+unchanged condition confirmed in a prior session (including a network-egress
+probe that found `wss://api.openai.com` returns HTTP 403 in this
+environment); not re-probed further this session per the established
+"don't repeatedly chase a known condition" rule.
+
+**Debt closed**: `create_section`'s missing capability gate; the Wave
+2A `security-reviewer` debt this specific follow-up scope covered
+(the milestone's own boundary was `create_section` plus a bounded
+mutation-surface audit — both are now independently reviewed with real
+findings, not self-review). **Debt still open, unrelated to this
+milestone**: `gitleaks`/`cargo-deny`/`osv-scanner` remain unavailable
+in this environment.
+
 ## Wave 2A Learner Core + Enrollment: `security-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
 `security-reviewer` was dispatched for a narrow adversarial pass on the

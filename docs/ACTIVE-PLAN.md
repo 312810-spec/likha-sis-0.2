@@ -1,5 +1,51 @@
 # ACTIVE PLAN
 
+## Wave 2A.1: Authorization Closure (added 2026-08-26) — complete, read this section first
+
+**Complete.** Full record: `docs/adr/0042`'s Addendum,
+`docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
+
+- 6 new `enrollment.rs` authorization tests — PASS (13/13 total in
+  that file, up from 7).
+- Full `cargo test` — PASS, 350 lib tests (unchanged — pure gate
+  change) + all integration binaries.
+- `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` —
+  PASS, clean.
+- Native `cargo build` — PASS.
+- `npm run quality:full` — PASS end-to-end.
+- `git diff --check` — PASS, clean.
+- `gitleaks`/`cargo-deny`/`osv-scanner` — confirmed still unavailable
+  (`node scripts/check-security.mjs`: 0 ok, 3 missing), not installed,
+  same disclosed gap. Manual secret grep of the diff: clean.
+- Codex Pilot — BLOCKED (`codex login status`: not logged in, same
+  condition as prior sessions; not re-probed).
+- Independent `security-reviewer` — dispatched, **returned real,
+  retrievable findings this time**: 5/6 adversarial questions
+  FALSE-POSITIVE (with citations), one non-security SHOULD-FIX
+  (document the `ManageLearners`/`ManageTeachingAssignments` capability
+  split as deliberate — done, ADR-0042's addendum). No BLOCKING
+  findings. **Debt closed**, not carried forward.
+
+**Fix**: `commands::section::create_section` now requires
+`Capability::ManageTeachingAssignments` (School Head only) — closing
+the same class of gap Wave 2A found and fixed in
+`enroll_learner_in_section`. Reuses the existing Teacher Load
+capability rather than inventing a new one.
+
+**Bounded mutation-surface audit**: all 11 Wave 2A-surface commands
+inventoried (capability/scope-source/mutation/test-coverage table in
+the session's own report). Every write is now capability-gated, every
+read is correctly session-scoped-only, no client-supplied `school_id`
+anywhere, no IDOR. No further defect found; scope was not expanded
+beyond this bounded surface.
+
+**Explicit non-goals honored**: no new authorization mechanism
+invented; no repository-wide RBAC redesign; no SF1 import work begun.
+
+**Per explicit instruction: do not begin Wave 2B (SF1 Bulk Import
+Engine) automatically.** Not started — this session stops here and
+waits for approval.
+
 ## Wave 2A: Learner Core + Enrollment Domain Foundation (added 2026-08-26) — complete, read this section first
 
 **Complete.** Full decision record:
