@@ -40,6 +40,15 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 Greenfield repository. No old implementation is authoritative.
 
+- **Minimal CI Foundation (2026-08-26)**: `.github/workflows/quality.yml`
+  runs `npm run quality:full` on `ubuntu-latest` and `windows-latest`
+  (GitHub-hosted standard runners) on push/PR/manual dispatch,
+  proven green on both after fixing a real Ubuntu-side gap (Tauri's
+  Linux GTK/glib apt dependencies). This repo is **public**, so
+  standard-runner minutes — Windows included — are free/unmetered per
+  GitHub's own billing docs; no spending-limit configuration was
+  needed. See `docs/adr/0041-minimal-ci-foundation.md`.
+
 - M0 Workspace Foundation (React + TypeScript + Vite + Tauri 2, strict
   TypeScript, ESLint, Prettier, Vitest, `npm run quality`) is complete.
 - M1 LocalDatabase Foundation is complete: all SQL lives in the Rust core

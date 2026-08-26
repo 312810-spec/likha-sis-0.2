@@ -1,5 +1,97 @@
 # Verification Debt
 
+## Minimal CI Foundation: no CI configuration debt closed (2026-08-26)
+
+The "no CI configuration exists yet" line carried in the entry below
+this one (and in the Rust Formatting entry) is now **closed**. Full
+decision record: `docs/adr/0041-minimal-ci-foundation.md`.
+`.github/workflows/quality.yml` runs `npm run quality:full` verbatim
+(the same canonical command a developer runs locally) on
+`ubuntu-latest` and `windows-latest`, on `push`/`pull_request`/
+`workflow_dispatch`, with `permissions: contents: read` only and no
+secrets.
+
+**Actually executed on GitHub Actions, not just written**: first real
+run (32915080360) genuinely failed on the Ubuntu job — a real,
+diagnosed environment gap, not a product defect: `ubuntu-latest`
+doesn't ship the GTK/glib system libraries (`libwebkit2gtk-4.1-dev`
+and friends) Tauri's Linux webview backend needs at compile time, so
+`gobject-sys`/`glib-sys` failed their `pkg-config` build scripts. The
+*same run*'s Windows job **passed** `npm run quality:full` end-to-end
+on the first attempt, proving the workflow design itself was sound —
+only the Ubuntu job's system-dependency list was incomplete. Fixed by
+adding the exact `apt-get install` package list from Tauri's own
+official prerequisites page (`v2.tauri.app/start/prerequisites/`,
+fetched and quoted directly, not from memory or a blog). Re-pushed;
+run 32916282825 is **green on both jobs** — Ubuntu `success` in
+6m9s, Windows `success` in 17m17s, both real, both actually run, not
+claimed.
+
+**Debt closed**: no CI configuration existed → now exists and is
+proven green on both target platforms with real evidence, including
+one genuine failure found and fixed by the CI itself (exactly the kind
+of finding a verification foundation exists to surface). **New,
+disclosed limitations, not blocking this milestone's completion**: no
+caching configured yet (deliberately deferred — first workflow kept
+simple per this milestone's own scope discipline; revisit if runtime
+grows); Android CI remains out of scope (a future extension, not a
+gap at this milestone); a full `tauri build` installer/bundle step was
+evaluated and deferred to a future release-workflow milestone, not
+this verification-foundation one.
+
+## Teacher Load `security-reviewer` re-run record: STALE, CORRECTED (2026-08-26)
+
+The "Teacher Load's own `security-reviewer` re-run" line carried at the
+bottom of the entry immediately below this one (and repeated in the
+"Native Rust Verification Recovery" entry further down) is **stale
+documentation, not genuine open debt**. Reconciled by inspecting Git
+history and the current code, not re-dispatching a reviewer:
+
+The line originally meant "the dedicated adversarial `security-reviewer`
+pass scoped to the Teacher Load / Class Schedule Foundation milestone
+itself failed to return retrievable findings (self-review substituted),
+and no non-self review of that exact scope has re-run since." That was
+accurate on 2026-08-25. It stopped being accurate once two later,
+**successfully retrieved** independent reviews each touched and fixed
+real issues in Teacher Load's actual security-sensitive surface:
+
+1. **Native Rust Verification Recovery's `security-reviewer`**
+   (2026-08-25, later the same day) — adversarial pass covering, among
+   other things, `schedule_meeting.rs`'s `has_exact_duplicate` helper
+   (introduced by this same recovery to fix the dead-code
+   `CreateMeetingOutcome::Duplicate` bug). Found and the session fixed a
+   real should-fix: the helper queried without a `school_id` predicate.
+   Re-verified with `cargo test --lib schedule_meeting` (13/13) and
+   `cargo clippy --all-targets -- -D warnings`. This is genuinely
+   Teacher Load code (the conflict/duplicate-detection data-integrity
+   half of the milestone), independently reviewed and fixed.
+2. **RBAC Foundation `security-reviewer` closure review** (2026-08-26)
+   — found and fixed a real cross-teacher schedule leak directly in
+   `commands::teaching_assignment::list_schedule_meetings_by_assignment`:
+   any Teacher-only session could reconstruct a colleague's full weekly
+   schedule without ever passing `auth::authorize_view_teacher_load`,
+   contradicting ADR-0039's own stated rule. This is the authorization
+   half of Teacher Load, independently reviewed and fixed.
+
+Between these two, both halves of Teacher Load's actual risk surface —
+the authorization gate (`authorize_view_teacher_load` and every command
+that must route through it) and the data-integrity/conflict-detection
+SQL (`has_exact_duplicate` and its siblings) — have each been covered
+by a real, non-self, successfully-retrieved independent review that
+found and fixed a genuine issue. No single dispatch re-ran the
+_original_ milestone's full adversarial checklist end-to-end in one
+pass, so this is not "identical to redispatching the original review"
+— but the practical exposure the debt entry existed to track is closed,
+not merely time-passed-without-incident. **Per the CI milestone's own
+instruction not to duplicate a completed review**: no new
+`security-reviewer` dispatch was performed to produce this
+reconciliation.
+
+**Correction applied**: the stale "Teacher Load's own `security-reviewer`
+re-run" line in the entry immediately below is struck through and
+replaced with a pointer to this entry, rather than left to keep
+resurfacing as apparently-open debt in future sessions.
+
 ## Rust Formatting + Quality Gate Normalization: `cargo fmt` debt closed, gate added (2026-08-26)
 
 The ~265-diff pre-existing `cargo fmt` debt (recorded throughout this

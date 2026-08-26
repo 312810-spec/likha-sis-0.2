@@ -1,5 +1,58 @@
 # ACTIVE PLAN
 
+## Minimal CI Foundation (added 2026-08-26) — complete, read this section first
+
+**Complete.** Full decision record: `docs/adr/0041-minimal-ci-foundation.md`.
+Verification record — every line actually run, not claimed:
+
+- Repository truth verified: branch `claude/likha-sis-ux03-plan-plv80c`,
+  HEAD `62e0948` matching expected checkpoint, `origin` in sync,
+  working tree clean.
+- Teacher Load review-debt: reconciled as STALE, CORRECTED (see
+  `docs/VERIFICATION-DEBT.md`'s top entries) — no reviewer re-dispatch
+  performed, per instruction not to duplicate a completed review.
+- GitHub Actions billing: verified from official `docs.github.com`
+  billing documentation — this repository is public, standard-runner
+  minutes (including Windows) are free/unmetered. Zero-billing gate
+  passed unconditionally.
+- 10 CI scenarios evaluated; selected two jobs (Ubuntu, Windows), both
+  running `npm run quality:full` verbatim, on
+  `push`/`pull_request`/`workflow_dispatch`, `permissions: contents:
+read` only, concurrency-cancel per ref, no third-party actions beyond
+  official `actions/checkout@v5`/`actions/setup-node@v5`.
+- `npx js-yaml` — PASS, workflow YAML syntax valid (no `actionlint`
+  available in this environment, disclosed rather than skipped
+  silently).
+- `git diff --check` — PASS, no whitespace errors.
+- `npm run quality:full` (local, before every push) — PASS, matching
+  the exact command CI runs.
+- **First real GitHub Actions run (32915080360)**: Ubuntu job
+  **FAILED** — `gobject-sys`/`glib-sys` `pkg-config` build-script
+  failures, root-caused to `ubuntu-latest` missing Tauri's Linux
+  GTK/glib system dependencies (confirmed against Tauri's own official
+  prerequisites docs, not guessed). Windows job **PASSED** —
+  `npm run quality:full` green end-to-end on the actual Windows target
+  on the first attempt.
+- Fixed: added the exact `apt-get install` package list from
+  `v2.tauri.app/start/prerequisites/` to the Ubuntu job, before the
+  Rust toolchain check step.
+- **Second real GitHub Actions run (32916282825)**: **both jobs
+  green** — Ubuntu `success` in 6m9s, Windows `success` in 17m17s.
+- `main` remains a strict ancestor of this branch (`git merge-base
+--is-ancestor main HEAD`, 27 commits ahead, 0 behind) — not touched,
+  fast-forwarded, or merged.
+
+**Explicit non-goals honored**: no product feature work; `main`
+untouched; no installer/`tauri build` bundle step; no Android CI; no
+new secret-scanning tooling adopted (evaluated implicitly — `gitleaks`
+remains the disclosed unavailable-locally gap, not expanded this
+milestone); no dependency caching added (deliberately deferred, first
+workflow kept simple).
+
+**Per explicit instruction: do not begin the next milestone
+automatically.** Recommended next milestone, awaiting approval:
+**Integration Review + `main` Fast-Forward Decision** — not started.
+
 ## Native Rust Verification Recovery (added 2026-08-25) — complete, read this section first
 
 **Complete.** Full decision record:

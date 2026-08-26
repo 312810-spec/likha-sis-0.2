@@ -1,5 +1,62 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Minimal CI Foundation, complete)
+
+Full record: `docs/adr/0041-minimal-ci-foundation.md`,
+`docs/VERIFICATION-DEBT.md`'s top two entries.
+
+**Repository truth verified first**: branch
+`claude/likha-sis-ux03-plan-plv80c`, local HEAD `62e0948`, matching
+`origin`, working tree clean — exactly the expected checkpoint, not
+assumed.
+
+**Teacher Load review-debt reconciled**: found **STALE, CORRECTED**
+(full reasoning: `docs/VERIFICATION-DEBT.md`'s top entry). The "Teacher
+Load's own `security-reviewer` re-run still owed" line was accurate
+when written (the milestone's own dedicated review had failed
+retrieval) but two later, successfully-retrieved independent reviews —
+Native Rust Verification Recovery's `security-reviewer` (fixed a real
+missing-`school_id`-scope gap in `schedule_meeting.rs`'s
+`has_exact_duplicate`) and RBAC Foundation's `security-reviewer`
+closure (fixed a real cross-teacher schedule leak in
+`list_schedule_meetings_by_assignment`) — collectively covered both
+halves of Teacher Load's actual security surface (data-integrity and
+authorization) with real, non-self findings, fixed. No new reviewer
+was dispatched to reach this conclusion, per the explicit instruction
+not to duplicate a completed review.
+
+**GitHub Actions billing researched from official docs, not assumed**:
+this repository is **public** (confirmed via `gh repo view`), and
+GitHub's own billing documentation states standard-runner minutes are
+free/unmetered for public repositories — Windows included. This
+removed the usual private-repo "spend Windows minutes sparingly"
+constraint entirely; zero-billing gate passed unconditionally (no
+spending limit configuration needed, none possible to circumvent since
+the workflow structurally can't generate a charge).
+
+**10-scenario CI decision**: two jobs (Ubuntu, Windows), each running
+`npm run quality:full` verbatim, on `push`/`pull_request`/
+`workflow_dispatch`, `permissions: contents: read` only, no secrets,
+concurrency-cancel per ref. Full scoring in ADR-0041.
+
+**Actually executed on GitHub Actions, evidence not claimed**: first
+real run (32915080360) genuinely failed on Ubuntu — `ubuntu-latest`
+lacks the GTK/glib system packages Tauri's Linux backend needs
+(`gobject-sys`/`glib-sys` `pkg-config` failures); the *same run*'s
+Windows job passed `npm run quality:full` end-to-end on the first
+try. Fixed by adding the exact `apt-get` package list from Tauri's own
+official prerequisites docs (fetched directly, quoted, not
+remembered). Re-pushed; run 32916282825 is **green on both jobs**
+(Ubuntu 6m9s, Windows 17m17s).
+
+**Gate decision: MINIMAL CI FOUNDATION PASSED — READY FOR INTEGRATION
+REVIEW / MAIN FAST-FORWARD DECISION.** `main` remains a strict ancestor
+of this branch (27 commits ahead, 0 behind) — untouched, not
+fast-forwarded, not merged, per explicit instruction. Per the same
+instruction, the next milestone (Integration Review + `main`
+Fast-Forward Decision) has **not** been started — this session stops
+here and waits for approval.
+
 ## Active Task (2026-08-26, this session — Rust Formatting + Quality Gate Normalization, complete)
 
 Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
