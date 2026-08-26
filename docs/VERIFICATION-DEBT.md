@@ -22,7 +22,7 @@ checkpoint):
    returns whatever cached result value a workbook file itself stored —
    confirmed directly, but the only tool available to author a
    synthetic `.xls` fixture (`xlwt`) doesn't compute a cached formula
-   result the way real Excel does, so only the *blank-cached-value* case
+   result the way real Excel does, so only the _blank-cached-value_ case
    could be proven, not a genuine non-blank round-trip. A real DepEd
    workbook opened and saved by actual Excel would carry real cached
    values; this gap only affects the synthetic-fixture proof, not the

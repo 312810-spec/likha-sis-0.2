@@ -63,12 +63,12 @@ cell-value **reading**. Those are different jobs; "one runtime, not
 competing stacks" doesn't apply when there is nothing built yet to be
 consistent with.
 
-| Option | Verdict |
-| --- | --- |
-| **`calamine` (Recommended)** | Pure Rust, MIT, read-only, no C bindings, no network I/O in the crate. `cargo add calamine --features dates` resolved to a real, current v0.36.1 (confirmed via `cargo add --dry-run`, since crates.io's API refused this session's direct query — same recurring gap noted in prior ADRs). `.xls`/BIFF support is not feature-gated (confirmed against a real `.xls` fixture). One in-process dependency, zero new toolchain, zero CI changes, and a materially better Android story than bundling a JRE. |
+| Option                                                                  | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`calamine` (Recommended)**                                            | Pure Rust, MIT, read-only, no C bindings, no network I/O in the crate. `cargo add calamine --features dates` resolved to a real, current v0.36.1 (confirmed via `cargo add --dry-run`, since crates.io's API refused this session's direct query — same recurring gap noted in prior ADRs). `.xls`/BIFF support is not feature-gated (confirmed against a real `.xls` fixture). One in-process dependency, zero new toolchain, zero CI changes, and a materially better Android story than bundling a JRE.                                        |
 | **Next Best: stand up a Tauri-sidecar + Apache POI/HSSF reader (Java)** | Would give the exact library the export direction already names, and stronger legacy-BIFF-edge-case coverage from a decades-mature library. Rejected for now: real cost (JVM/JRE bundling, sidecar process lifecycle, a Java toolchain added to both CI jobs, a worse Android story) for a benefit (template-preserving writes) that import doesn't need. Revisit if Wave 3's export work stands up this sidecar anyway — reading could then reasonably move onto the same runtime for genuine consistency, not merely because the option exists. |
-| JS/TS spreadsheet parser (e.g. `xlsx`/SheetJS) called from the frontend | Rejected outright: architecture rule requires all file parsing behind a Rust/Tauri command, never in UI/domain code (`.claude/rules/architecture.md`). |
-| Hand-rolled minimal BIFF/OOXML reader | Rejected: reinventing a mature, audited parser for a security-relevant untrusted-input path is exactly the kind of premature abstraction/avoidable risk this project's engineering rules warn against. |
+| JS/TS spreadsheet parser (e.g. `xlsx`/SheetJS) called from the frontend | Rejected outright: architecture rule requires all file parsing behind a Rust/Tauri command, never in UI/domain code (`.claude/rules/architecture.md`).                                                                                                                                                                                                                                                                                                                                                                                            |
+| Hand-rolled minimal BIFF/OOXML reader                                   | Rejected: reinventing a mature, audited parser for a security-relevant untrusted-input path is exactly the kind of premature abstraction/avoidable risk this project's engineering rules warn against.                                                                                                                                                                                                                                                                                                                                            |
 
 Verified directly rather than assumed, per this project's TDD discipline
 (`src/import/workbook.rs`'s tests):
@@ -78,7 +78,7 @@ Verified directly rather than assumed, per this project's TDD discipline
   by this crate — `calamine` only ever returns whatever cached value the
   workbook file itself stored. (The synthetic fixture generator,
   `xlwt`, doesn't compute a cached formula result the way real Excel
-  does, so a *non-blank* cached-value round-trip could not be verified
+  does, so a _non-blank_ cached-value round-trip could not be verified
   in this environment — recorded as verification debt below, not
   claimed as covered.)
 - The crate has no macro-execution or external-link-following capability
@@ -153,7 +153,7 @@ stable identifier, never ambiguous); any other name/LRN overlap is
 auto-resolved, even with a single unambiguous-looking candidate); no
 overlap at all is `New`. Every classification is school-scoped by
 `find_candidates`'s own `WHERE school_id = ?1` — a shared name or LRN in
-a *different* school is never treated as a duplicate.
+a _different_ school is never treated as a duplicate.
 
 There is no merge option. Wave 2A.1's own authorization audit already
 established this codebase has no learner delete/merge capability at
@@ -168,7 +168,7 @@ silently created as a duplicate.
 The brief allows an import-session record "only if it provides real
 value." It doesn't, for deduplication: `idx_learners_school_lrn`
 (UNIQUE on `(school_id, lrn)`) already makes a repeated LRN a
-*recognized existing learner* via `find_candidates`, not a duplicate;
+_recognized existing learner_ via `find_candidates`, not a duplicate;
 `idx_one_active_membership_per_learner` (UNIQUE WHERE `ends_on IS
 NULL`) already prevents a duplicate active enrollment structurally; and
 `section_membership::enroll` is already idempotent for re-enrolling into
