@@ -21,6 +21,15 @@ pub fn list_sections_by_school(
     section::list_by_school(&conn, &school_id)
 }
 
+/// Gated by `ManageTeachingAssignments` -- defining what sections/classes
+/// exist for a school year is a structural scheduling-authority decision,
+/// the same domain `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+/// already scoped to School Head only, not `ManageLearners` (which governs
+/// an individual learner's own record/enrollment, a Registrar's
+/// operational job rather than a School Head's structural one). Previously
+/// ungated beyond an active session (any role) -- closed as a real
+/// authorization gap found during Wave 2A, fixed in Wave 2A.1. See
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`.
 #[tauri::command]
 pub fn create_section(
     db: State<'_, Mutex<Connection>>,
@@ -30,7 +39,8 @@ pub fn create_section(
     name: String,
 ) -> AppResult<Section> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
     section::create(&conn, &school_id, &school_year, &grade_level, &name)
 }
 

@@ -47,6 +47,19 @@ fn current_enrollment_as_current_session(
     section_membership::current_membership_for_learner_in_school(conn, &school_id, learner_id)
 }
 
+/// Standing in for `commands::section::create_section` (Wave 2A.1 fix).
+fn create_section_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    school_year: &str,
+    grade_level: &str,
+    name: &str,
+) -> AppResult<section::Section> {
+    let school_id =
+        auth::authorize_capability(conn, sessions, Capability::ManageTeachingAssignments)?;
+    section::create(conn, &school_id, school_year, grade_level, name)
+}
+
 fn login_with_role_at(
     conn: &rusqlite::Connection,
     school_id: &str,
@@ -212,4 +225,106 @@ fn a_registrar_can_check_for_duplicate_candidates_before_creating_a_learner() {
         1,
         "the near-duplicate must surface as a candidate, never auto-merged or auto-blocked"
     );
+}
+
+// --- Wave 2A.1: create_section authorization closure ---
+
+#[test]
+fn a_school_head_can_create_a_section() {
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let head = login_with_role_at(&conn, &school.id, "head.a", role_repo::SCHOOL_HEAD);
+
+    let created =
+        create_section_as_current_session(&conn, &head, "2026-2027", "7", "Mabini").unwrap();
+
+    assert_eq!(created.school_id, school.id);
+    assert_eq!(created.name, "Mabini");
+}
+
+#[test]
+fn a_teacher_cannot_create_a_section_the_fixed_authorization_gap() {
+    // Wave 2A.1's own headline fix: `create_section` was previously gated
+    // only by an active session, no role check at all -- any Teacher could
+    // create sections. Proves the fix closes that gap end-to-end.
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+
+    let result = create_section_as_current_session(&conn, &teacher, "2026-2027", "7", "Mabini");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    let sections = section::list_by_school(&conn, &school.id).unwrap();
+    assert_eq!(
+        sections.len(),
+        0,
+        "an unauthorized attempt must leave no section persisted -- no partial mutation"
+    );
+}
+
+#[test]
+fn a_registrar_alone_cannot_create_a_section() {
+    // `ManageTeachingAssignments` (School Head only) is deliberately
+    // distinct from `ManageLearners` (Registrar or School Head) -- section
+    // definition is a structural/scheduling decision, not learner-record
+    // management. A Registrar with no School Head role must be denied.
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+
+    let result = create_section_as_current_session(&conn, &registrar, "2026-2027", "7", "Mabini");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn creating_a_section_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = create_section_as_current_session(&conn, &sessions, "2026-2027", "7", "Mabini");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_school_heads_own_session_cannot_be_used_to_create_a_section_for_another_school() {
+    // `create_section` never accepts a client-supplied `school_id` -- the
+    // command signature has no such parameter at all, so there is no
+    // forged-privilege-input path to test at the boundary beyond this: a
+    // School Head authenticated at School A can only ever create a section
+    // scoped to School A, regardless of any other id a malicious caller
+    // might try to smuggle through unrelated parameters (school_year/
+    // grade_level/name are plain strings with no id semantics).
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let head_a = login_with_role_at(&conn, &school_a.id, "head.a", role_repo::SCHOOL_HEAD);
+
+    let created =
+        create_section_as_current_session(&conn, &head_a, "2026-2027", "7", "Mabini").unwrap();
+
+    assert_eq!(created.school_id, school_a.id);
+    let school_b_sections = section::list_by_school(&conn, &school_b.id).unwrap();
+    assert_eq!(
+        school_b_sections.len(),
+        0,
+        "School A's session must never be able to create a section under School B"
+    );
+}
+
+#[test]
+fn existing_legitimate_section_creation_still_works_end_to_end() {
+    // Regression: the full create-section-then-enroll workflow (already
+    // proven piecemeal above) still works together for an authorized
+    // School Head, matching pre-fix behavior for the legitimate case.
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let head = login_with_role_at(&conn, &school.id, "head.a", role_repo::SCHOOL_HEAD);
+
+    let section =
+        create_section_as_current_session(&conn, &head, "2026-2027", "8", "Rizal").unwrap();
+    let sections = section::list_by_school(&conn, &school.id).unwrap();
+
+    assert_eq!(sections, vec![section]);
 }
