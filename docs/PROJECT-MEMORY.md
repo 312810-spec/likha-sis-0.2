@@ -1266,6 +1266,61 @@ new unit/component tests (application service, two infrastructure
 adapters, the screen itself) all passing alongside the full existing
 429-test suite.
 
+## Wave 2D: Local Data Security Verification (added 2026-08-26)
+
+Full record: `docs/adr/0044-local-data-security-verification.md`.
+**Important repository-truth correction**: local encryption-at-rest was
+NOT greenfield work — it already existed and was accepted in M2
+(`docs/adr/0003-encryption-at-rest.md`): SQLCipher (page-level AES-256
+
+- HMAC-SHA512) via `rusqlite`'s `bundled-sqlcipher-vendored-openssl`,
+  keyed with a DPAPI-protected (current-Windows-user-scope) 256-bit raw
+  key, fail-closed on a corrupted key file. Wave 2D verified and
+  lightly hardened that existing architecture rather than building a new
+  one. Reaffirmed the SQLCipher+DPAPI decision against current evidence
+  (no reason found to change it).
+
+**New primary evidence produced this session**: the real
+`sqlite3.org` CLI tool (freshly installed) pointed at a genuine
+encrypted LIKHA database file with synthetic learner data — `.tables`
+returns nothing, a raw `SELECT` fails with "file is not a database,"
+and a raw byte-level `grep` of the file finds zero occurrences of the
+synthetic name/LRN/school-name strings anywhere in the file. This is
+the literal "ordinary SQLite tooling" scenario proven, not just
+asserted.
+
+**One genuine coverage gap found and closed**: WAL/SHM sidecar files
+(already enabled since M1/M2 for crash-resilience reasons) had never
+been checked for plaintext leakage — a new test
+(`wal_and_shm_sidecar_files_never_contain_plaintext_learner_data`,
+`src-tauri/src/db/mod.rs`) now proves no plaintext learner data
+appears in either sidecar file while the WAL file genuinely holds
+unflushed content (not a vacuous pass on an empty file).
+
+**Long-carried dependency-security debt (unavailable since M6) is
+closed for this session**: `gitleaks`, `cargo-deny`, and `osv-scanner`
+were all installed via `winget`/`cargo install` (network access
+available this session) and actually run — clean across all three,
+specifically confirming `calamine` and `tauri-plugin-dialog` have no
+flagged advisories. Not yet wired into CI (deliberately deferred, see
+`docs/VERIFICATION-DEBT.md`).
+
+**Threat model documented explicitly** (17 scenarios: stolen device,
+copied DB/backup, another local Windows account, corrupted DB, lost
+key, backup restore same/different device, WAL/journal files, etc.) in
+ADR-0044, with an honest in-scope/out-of-scope boundary — malicious
+code running as the same logged-in Windows user remains out of scope
+(a known DPAPI limitation), and there is deliberately no local
+self-service recovery path for a lost key or a device/profile change
+(deferred to future authenticated cloud-sync infrastructure, not
+solved with an insecure workaround).
+
+`KeyStore` (the existing `crypto::KeyStore` trait) was reconfirmed as
+already being the platform-abstraction boundary Android will need — no
+new abstraction layer was proposed, since building one before a second
+implementation exists would be the premature genericization this
+project's engineering rules warn against.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

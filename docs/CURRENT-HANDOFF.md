@@ -1,5 +1,73 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2D: Local Data Security Verification, complete)
+
+Full record: `docs/adr/0044-local-data-security-verification.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry. Same branch as Wave
+2A/2A.1/2B/2C (`claude/likha-sis-wave2a-learner-core`).
+
+**Repository truth verified first**: branch/`origin` HEAD both at
+`3be4ef3` as reported, `main` unchanged at `d9ab036`, working tree
+clean. Wave 2C's CI run (`32941620676`) confirmed genuinely
+`completed success` (17m56s) before any Wave 2D work began.
+
+**Critical repository-truth correction the directive got wrong**: this
+milestone's brief assumed local-data encryption did not exist yet. **It
+already did** — SQLCipher + DPAPI, built and accepted in M2
+(`docs/adr/0003-encryption-at-rest.md`). This session re-scoped
+accordingly: verify/harden the existing architecture rather than build
+a new one. See ADR-0044's "Repository truth" section for the full
+correction.
+
+**What was actually new this session**:
+
+1. **Primary-evidence proof using real `sqlite3.org` CLI tooling**
+   (freshly `winget`-installed) against a genuine encrypted LIKHA
+   database file with synthetic data — `.tables` empty, raw `SELECT`
+   fails with "file is not a database," raw byte-level `grep` finds
+   zero plaintext occurrences of the synthetic name/LRN/school-name
+   anywhere in the file. The literal "ordinary SQLite tooling" scenario
+   from the brief, proven with primary evidence, not only the app's own
+   `rusqlite`-based test suite.
+2. **One genuine coverage gap found and closed**: WAL/SHM sidecar files
+   (enabled since M1/M2, unrelated to encryption) had never been
+   checked for plaintext leakage. New test
+   (`wal_and_shm_sidecar_files_never_contain_plaintext_learner_data`,
+   `src-tauri/src/db/mod.rs`) proves neither sidecar file leaks
+   plaintext while the WAL file genuinely holds unflushed content.
+3. **Long-carried dependency-security debt (unavailable since M6) —
+   closed for this session**: `gitleaks`/`cargo-deny`/`osv-scanner` all
+   installed via `winget`/`cargo install` (network access available)
+   and actually run. `gitleaks`: 55 commits, no leaks. `cargo-deny`:
+   advisories/bans/licenses/sources all ok. `osv-scanner`: no
+   unaccounted-for issues (17 known, all pre-documented). Directly
+   confirms `calamine`/`tauri-plugin-dialog` (Wave 2B/2C additions) have
+   no flagged advisories. **Not wired into CI** — deliberately deferred
+   (see VERIFICATION-DEBT.md) to avoid untested cross-platform CI
+   changes against a currently-green pipeline.
+4. **Full 17-scenario threat model documented explicitly** in ADR-0044,
+   with an honest in-scope/out-of-scope boundary. No local self-service
+   recovery path exists for a lost key or device/profile change —
+   deliberately not solved with an insecure workaround, deferred to
+   future authenticated cloud-sync infrastructure.
+
+**Independent reviews — both CLOSED, no blocking findings.** Security
+review (9 angles) found all 8 adversarial angles FALSE-POSITIVE and one
+legitimate should-fix (this ADR's first draft understated its own
+logging-surface audit — corrected in place). Architecture review (7
+questions) found GOOD across the board, including catching and closing
+its own thin first-pass sampling before confirming no production
+layering violation. Both hit this project's recurring
+reviewer-retrieval bug on the standard notification channel; recovered
+in full from each agent's raw transcript file both times. Full detail:
+`docs/adr/0044-local-data-security-verification.md`'s review sections.
+
+**Verification, all actually run**: full `cargo test` 394 lib tests (up
+from 393 — the one new WAL/SHM test) + all integration binaries PASS;
+`cargo fmt --check`/`cargo clippy --all-targets -D warnings` PASS;
+native `cargo build` succeeds; `npm run quality` PASS (unaffected — no
+frontend changes this milestone).
+
 ## Active Task (2026-08-26, this session — Wave 2C: SF1 Import Preview + Duplicate Review UX, complete)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C

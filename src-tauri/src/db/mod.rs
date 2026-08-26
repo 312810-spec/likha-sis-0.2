@@ -196,4 +196,68 @@ mod tests {
             );
         }
     }
+
+    /// Wave 2D: proves the encryption guarantee extends to WAL/SHM
+    /// sidecar files, not just the main `.db` file. `journal_mode = WAL`
+    /// (set by `open` above) means SQLite writes new/changed pages to a
+    /// separate `-wal` file before they're checkpointed into the main
+    /// file — if SQLCipher only encrypted the main file, a learner's
+    /// name could sit in cleartext in that sidecar file for the entire
+    /// session. Deliberately does NOT call `PRAGMA wal_checkpoint`, so
+    /// the marker row is still sitting in the WAL file (not yet folded
+    /// into the main file) when this test reads the raw bytes back.
+    #[test]
+    fn wal_and_shm_sidecar_files_never_contain_plaintext_learner_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("wal-test.db");
+        let key = crypto::generate_key();
+        // A long, distinctive marker unlikely to appear by coincidence in
+        // any binary page structure, cipher metadata, or SQL keyword.
+        let marker = "ZZWAVE2D_SYNTHETIC_LEARNER_MARKER_Dela_Cruz_Ana_Test_ZZ";
+
+        {
+            let conn = open(&path, &key).unwrap();
+            conn.execute("INSERT INTO schools (id, name) VALUES ('s1', ?1)", [marker])
+                .unwrap();
+            // Connection drops here without an explicit checkpoint --
+            // WAL mode's normal behavior leaves the new page in `-wal`
+            // until SQLite decides to checkpoint it, which is exactly
+            // the window this test needs to inspect.
+        }
+
+        let wal_path = path.with_extension("db-wal");
+        let shm_path = path.with_extension("db-shm");
+
+        let db_bytes = std::fs::read(&path).unwrap();
+        assert!(
+            !contains_bytes(&db_bytes, marker.as_bytes()),
+            "main .db file must never contain the marker in plaintext"
+        );
+
+        if wal_path.exists() {
+            let wal_bytes = std::fs::read(&wal_path).unwrap();
+            assert!(
+                !wal_bytes.is_empty(),
+                "WAL file should actually have content for this test to be meaningful"
+            );
+            assert!(
+                !contains_bytes(&wal_bytes, marker.as_bytes()),
+                "WAL sidecar file must never contain the marker in plaintext"
+            );
+        }
+
+        if shm_path.exists() {
+            let shm_bytes = std::fs::read(&shm_path).unwrap();
+            assert!(
+                !contains_bytes(&shm_bytes, marker.as_bytes()),
+                "SHM sidecar file must never contain the marker in plaintext"
+            );
+        }
+    }
+
+    fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
+        haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
+    }
 }

@@ -1,5 +1,39 @@
 # ACTIVE PLAN
 
+## Wave 2D: Local Data Security Verification (added 2026-08-26) — complete, read this section first
+
+Full record: `docs/adr/0044-local-data-security-verification.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
+
+- New test `wal_and_shm_sidecar_files_never_contain_plaintext_learner_data`
+  (`src-tauri/src/db/mod.rs`) — PASS.
+- Full `cargo test` — PASS, 394 lib tests (up from 393) + all
+  integration binaries.
+- `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` —
+  PASS, clean.
+- Native `cargo build` — PASS.
+- `npm run quality` — PASS (unaffected, no frontend changes).
+- Primary-evidence manual verification: real `sqlite3.org` CLI (v3.53.4)
+  against a genuine encrypted database file with synthetic data —
+  `.tables` empty, raw `SELECT` fails ("file is not a database"), raw
+  byte-level grep finds zero plaintext matches for the synthetic
+  name/LRN/school-name.
+- `gitleaks` v8.30.1: 55 commits scanned, no leaks.
+- `cargo-deny` v0.20.2: `advisories ok, bans ok, licenses ok, sources
+ok`, exit 0.
+- `osv-scanner` v2.4.0: no unaccounted-for issues (17 known advisories,
+  all pre-documented/accepted); `calamine`/`tauri-plugin-dialog` not
+  flagged.
+- Independent security + architecture reviews dispatched; outcome
+  recorded once retrieved (see `docs/VERIFICATION-DEBT.md`).
+
+**Not done this session, deliberately**: wiring the three security
+tools into CI (cross-platform install logic is untested, real risk to
+a currently-green pipeline); a full-codebase PII-in-logs audit beyond
+`crypto`/`db`; reproducing an actual Windows password reset against
+DPAPI; any cross-device key-recovery mechanism (deliberately deferred
+to future authenticated sync, not solved with an insecure workaround).
+
 ## Wave 2C: SF1 Import Preview + Duplicate Review UX (added 2026-08-26) — complete, read this section first
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C

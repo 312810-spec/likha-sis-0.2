@@ -1,5 +1,80 @@
 # Verification Debt
 
+## Wave 2D Local Data Security Verification (2026-08-26)
+
+Full record: `docs/adr/0044-local-data-security-verification.md`. This
+milestone verified/hardened the EXISTING M2 encryption-at-rest
+architecture (SQLCipher + DPAPI, ADR-0003) — it did not build new
+encryption. Debt closed and newly recorded:
+
+**Closed this session:**
+
+- WAL/SHM sidecar-file plaintext exposure was entirely unverified
+  before this session — now covered by a new test
+  (`wal_and_shm_sidecar_files_never_contain_plaintext_learner_data`,
+  `src-tauri/src/db/mod.rs`) proving no plaintext learner data in
+  either sidecar file while the WAL file genuinely holds unflushed
+  content.
+- `gitleaks`/`cargo-deny`/`osv-scanner` — the long-carried "unavailable
+  in this environment" debt (since M6) is **closed for this session**:
+  all three were installed via `winget`/`cargo install` and actually
+  run against this repository. `gitleaks`: 55 commits, no leaks.
+  `cargo-deny`: advisories/bans/licenses/sources all ok. `osv-scanner`:
+  no unaccounted-for issues (17 known, all pre-documented/accepted).
+  This specifically confirms `calamine` and `tauri-plugin-dialog`
+  (Wave 2B/2C's dependency additions) have no flagged advisories.
+
+**New debt recorded this session (see ADR-0044 for full detail):**
+
+1. The three security tools above are proven runnable in an
+   environment with `winget`/network access, but are **not yet wired
+   into CI** (`.github/workflows/quality.yml` still only runs `npm run
+quality:full`). Deliberately not added this session — cross-platform
+   (Ubuntu has no `winget`) CI wiring is real, untested surface area
+   that risks destabilizing a currently-green pipeline; recorded as a
+   recommended follow-up, not attempted.
+2. Malicious code already running as the same logged-in Windows user
+   can still call `CryptUnprotectData` itself — a known, disclosed DPAPI
+   limitation (unchanged from ADR-0003), explicitly out of this
+   milestone's scope.
+3. No full-codebase audit for accidental PII-in-logs beyond the
+   `crypto`/`db` modules specifically — only those two modules were
+   directly audited this session (confirmed: exactly one `log::` call
+   in either, and it's a fixed generic string with no key material).
+4. Windows-account-password-change behavior against DPAPI was reasoned
+   about from documented semantics, not reproduced by an actual
+   password reset in this environment.
+5. No safe cross-device/cross-profile key recovery exists — a lost key
+   or a device/profile change has no local recovery path today. This is
+   a deliberate, disclosed design tradeoff (stated in both ADR-0003 and
+   ADR-0044), deferred to future authenticated cloud-sync
+   infrastructure, not solved with an insecure workaround.
+6. Android key-store implementation remains unimplemented — no Android
+   build target exists in this repository yet (same standing gap Wave
+   2C already documented). The `KeyStore` trait is architecturally
+   ready for it, but that readiness is itself unverified against a real
+   Android target.
+
+**Independent security review + architecture review — both CLOSED, no
+blocking findings.** Standard notification channel hit this project's
+recurring reviewer-retrieval bug on both dispatches; recovered in full
+from each agent's raw transcript. Security review (9 angles: stolen
+device, copied backup, compromised local files/other Windows account,
+key extraction/zeroize placement, logs, tenant conflation, session/key
+lifecycle, `DpapiKeyStore`'s `AlreadyExists` race) found all 8
+adversarial angles FALSE-POSITIVE and one legitimate should-fix — this
+ADR's first draft understated its own logging-surface audit (claimed
+one `log::` call in `crypto`/`db`; `error.rs` actually has four more
+that fire on the same error paths, logging full error detail by design
+for operators, confirmed never including key bytes) — corrected in
+place in ADR-0044, not left standing. Architecture review (7 questions)
+found GOOD across all of them, including catching and closing its own
+thin first-pass evidence (verified all ~24 `crate::crypto` references
+outside `crypto`/`db` individually, not just one sampled file, before
+confirming none are production layering violations). Full detail:
+ADR-0044's "Independent security review"/"Independent architecture
+review" sections.
+
 ## Wave 2C SF1 Import Preview + Duplicate Review UX (2026-08-26)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2C
