@@ -1003,3 +1003,29 @@ label {
 .sf1-chosen-file {
   font-weight: 600;
 }
+
+.sf1-history-toggle {
+  margin-top: var(--spacing-unit);
+}
+
+.sf1-history-list {
+  list-style: none;
+  padding: 0;
+  margin: calc(var(--spacing-unit) * 0.5) 0 0;
+}
+
+.sf1-history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.2);
+  padding: calc(var(--spacing-unit) * 0.6) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.sf1-history-list li:first-child {
+  border-top: none;
+}
+
+.sf1-history-filename {
+  font-weight: 600;
+}

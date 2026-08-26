@@ -3,7 +3,12 @@ import type { SectionApplicationService } from "../application/section-service";
 import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
 import { ValidationError } from "../domain/errors";
 import type { Section } from "../domain/section";
-import type { DuplicateDecision, Sf1ImportPreview, Sf1ImportSummary } from "../domain/sf1-import";
+import type {
+  DuplicateDecision,
+  Sf1ImportHistoryEntry,
+  Sf1ImportPreview,
+  Sf1ImportSummary,
+} from "../domain/sf1-import";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -31,6 +36,15 @@ function todayAsIsoDate(): string {
 function fileNameFromPath(path: string): string {
   const parts = path.split(/[\\/]/);
   return parts[parts.length - 1] || path;
+}
+
+function formatImportTimestamp(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 /**
@@ -81,6 +95,10 @@ export function Sf1ImportScreen({
   const [summary, setSummary] = useState<Sf1ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<Sf1ImportHistoryEntry[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -138,6 +156,22 @@ export function Sf1ImportScreen({
     }
   }
 
+  async function handleToggleHistory() {
+    const opening = !historyOpen;
+    setHistoryOpen(opening);
+    if (!opening || history !== null) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const result = await sf1ImportService.listImportHistory();
+      setHistory(result);
+    } catch {
+      setHistoryError("Could not load import history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   function handleDecision(rowNumber: number, decision: DuplicateDecision) {
     if (!preview) return;
     const next = new Map(decisions);
@@ -148,15 +182,16 @@ export function Sf1ImportScreen({
   }
 
   async function handleCommit() {
-    if (!preview || busy || sectionId.length === 0) return;
+    if (!preview || busy || sectionId.length === 0 || !filePath) return;
     setError(null);
     setBusy(true);
     setPhase("committing");
     try {
       const plans = sf1ImportService.buildCommitPlan(preview, decisions);
-      const result = await sf1ImportService.commitImport(sectionId, startsOn, plans);
+      const result = await sf1ImportService.commitImport(sectionId, startsOn, plans, filePath);
       setSummary(result);
       setPhase("success");
+      setHistory(null);
       onImportComplete?.();
     } catch (err) {
       setError(describeError(err, "importing"));
@@ -261,6 +296,39 @@ export function Sf1ImportScreen({
               label={`Reading ${fileNameFromPath(filePath)} and comparing with existing learners…`}
             />
           )}
+
+          {phase === "setup" && (
+            <div className="sf1-history-toggle">
+              <button type="button" onClick={handleToggleHistory}>
+                {historyOpen ? "Hide past imports" : "View past imports"}
+              </button>
+              {historyOpen && (
+                <>
+                  {historyLoading && <Loading label="Loading past imports…" />}
+                  {historyError && <Alert tone="error">{historyError}</Alert>}
+                  {history && history.length === 0 && (
+                    <EmptyState>No SF1 imports have been recorded for this school yet.</EmptyState>
+                  )}
+                  {history && history.length > 0 && (
+                    <ul className="sf1-history-list" aria-label="Past SF1 imports">
+                      {history.map((entry) => (
+                        <li key={entry.id}>
+                          <span className="sf1-history-filename">{entry.sourceFilename}</span>
+                          <span className="field-hint">
+                            {formatImportTimestamp(entry.createdAt)} — {entry.username}
+                          </span>
+                          <span className="field-hint">
+                            {entry.newLearnersCreated} new, {entry.existingLearnersEnrolled}{" "}
+                            existing ({entry.rowsCommitted} total)
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -273,6 +341,18 @@ export function Sf1ImportScreen({
             </span>{" "}
             — {preview.rows.length} learner {preview.rows.length === 1 ? "row" : "rows"} found
           </p>
+
+          {preview.previousImport && (
+            <Alert tone="info">
+              You appear to have imported this exact file before, on{" "}
+              {formatImportTimestamp(preview.previousImport.createdAt)} (
+              {preview.previousImport.username}), adding {preview.previousImport.newLearnersCreated}{" "}
+              learner
+              {preview.previousImport.newLearnersCreated === 1 ? "" : "s"}. This is just a heads-up
+              — LIKHA has not skipped anything below; review every row as usual and decide whether
+              to continue.
+            </Alert>
+          )}
 
           <div className="sf1-summary-grid">
             <span className="sf1-summary-item">
@@ -424,6 +504,16 @@ export function Sf1ImportScreen({
             <br />
             {summary.rowsCommitted} enrollment records confirmed
           </p>
+          {preview && (errorRowCount > 0 || preview.warnings.length > 0) && (
+            <p className="field-hint">
+              From the original file: {errorRowCount} row
+              {errorRowCount === 1 ? "" : "s"} could not be read and{" "}
+              {errorRowCount === 1 ? "was" : "were"} left out entirely, and{" "}
+              {preview.warnings.length} row{preview.warnings.length === 1 ? "" : "s"} had
+              information LIKHA could not fully interpret. Neither of these affected the learners
+              listed above.
+            </p>
+          )}
           <div className="sf1-review-actions">
             <button type="button" className="button-primary" onClick={resetToSetup}>
               Import another SF1

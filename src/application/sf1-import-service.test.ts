@@ -4,6 +4,7 @@ import type { FilePicker } from "../domain/ports/file-picker";
 import type { Sf1ImportRepository } from "../domain/ports/sf1-import-repository";
 import type {
   DuplicateDecision,
+  Sf1ImportHistoryEntry,
   Sf1ImportPreview,
   Sf1ImportRow,
   Sf1ImportSummary,
@@ -13,13 +14,20 @@ import { Sf1ImportApplicationService } from "./sf1-import-service";
 
 class FakeSf1ImportRepository implements Sf1ImportRepository {
   previewCalls: string[] = [];
-  commitCalls: Array<{ sectionId: string; startsOn: string; plans: Sf1RowCommitPlan[] }> = [];
+  commitCalls: Array<{
+    sectionId: string;
+    startsOn: string;
+    plans: Sf1RowCommitPlan[];
+    filePath: string;
+  }> = [];
+  listImportHistoryCalls: number[] = [];
   previewResult: Sf1ImportPreview = emptyPreview();
   commitResult: Sf1ImportSummary = {
     rowsCommitted: 0,
     newLearnersCreated: 0,
     existingLearnersEnrolled: 0,
   };
+  historyResult: Sf1ImportHistoryEntry[] = [];
 
   async preview(filePath: string): Promise<Sf1ImportPreview> {
     this.previewCalls.push(filePath);
@@ -30,9 +38,15 @@ class FakeSf1ImportRepository implements Sf1ImportRepository {
     sectionId: string,
     startsOn: string,
     plans: Sf1RowCommitPlan[],
+    filePath: string,
   ): Promise<Sf1ImportSummary> {
-    this.commitCalls.push({ sectionId, startsOn, plans });
+    this.commitCalls.push({ sectionId, startsOn, plans, filePath });
     return this.commitResult;
+  }
+
+  async listImportHistory(limit: number): Promise<Sf1ImportHistoryEntry[]> {
+    this.listImportHistoryCalls.push(limit);
+    return this.historyResult;
   }
 }
 
@@ -44,7 +58,15 @@ class FakeFilePicker implements FilePicker {
 }
 
 function emptyPreview(): Sf1ImportPreview {
-  return { rows: [], newRows: [], exactMatches: [], needsReview: [], errors: [], warnings: [] };
+  return {
+    rows: [],
+    newRows: [],
+    exactMatches: [],
+    needsReview: [],
+    errors: [],
+    warnings: [],
+    previousImport: null,
+  };
 }
 
 function row(overrides: Partial<Sf1ImportRow> = {}): Sf1ImportRow {
@@ -281,13 +303,13 @@ describe("Sf1ImportApplicationService", () => {
       const repo = new FakeSf1ImportRepository();
       const service = new Sf1ImportApplicationService(repo, new FakeFilePicker());
 
-      await expect(service.commitImport("sec-1", "2026-06-01", [])).rejects.toThrow(
+      await expect(service.commitImport("sec-1", "2026-06-01", [], "C:\\sf1.xls")).rejects.toThrow(
         ValidationError,
       );
       expect(repo.commitCalls).toHaveLength(0);
     });
 
-    it("delegates to the repository with sectionId/startsOn/plans", async () => {
+    it("delegates to the repository with sectionId/startsOn/plans/filePath", async () => {
       const repo = new FakeSf1ImportRepository();
       const service = new Sf1ImportApplicationService(repo, new FakeFilePicker());
       const plans: Sf1RowCommitPlan[] = [
@@ -301,9 +323,31 @@ describe("Sf1ImportApplicationService", () => {
         },
       ];
 
-      await service.commitImport("sec-1", "2026-06-01", plans);
+      await service.commitImport("sec-1", "2026-06-01", plans, "C:\\sf1.xls");
 
-      expect(repo.commitCalls).toEqual([{ sectionId: "sec-1", startsOn: "2026-06-01", plans }]);
+      expect(repo.commitCalls).toEqual([
+        { sectionId: "sec-1", startsOn: "2026-06-01", plans, filePath: "C:\\sf1.xls" },
+      ]);
+    });
+  });
+
+  describe("listImportHistory", () => {
+    it("delegates to the repository with a default limit", async () => {
+      const repo = new FakeSf1ImportRepository();
+      const service = new Sf1ImportApplicationService(repo, new FakeFilePicker());
+
+      await service.listImportHistory();
+
+      expect(repo.listImportHistoryCalls).toEqual([20]);
+    });
+
+    it("passes through an explicit limit", async () => {
+      const repo = new FakeSf1ImportRepository();
+      const service = new Sf1ImportApplicationService(repo, new FakeFilePicker());
+
+      await service.listImportHistory(5);
+
+      expect(repo.listImportHistoryCalls).toEqual([5]);
     });
   });
 });

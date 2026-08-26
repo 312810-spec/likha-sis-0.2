@@ -49,6 +49,10 @@ export interface Sf1ImportPreview {
   needsReview: LearnerMatchResult[];
   errors: Sf1ValidationIssue[];
   warnings: Sf1ValidationIssue[];
+  /** Advisory only (Wave 2E) — set when this exact file's content was
+   * imported before, regardless of what it was named either time. Never
+   * blocks anything; see `Sf1ImportHistoryEntry`. */
+  previousImport: Sf1ImportHistoryEntry | null;
 }
 
 /**
@@ -83,3 +87,25 @@ export interface Sf1ImportSummary {
  */
 export type DuplicateDecision =
   { type: "useExisting"; learnerId: string } | { type: "createSeparate" };
+
+/**
+ * One row of `sf1_import_history` (Wave 2E) — mirrors
+ * `repository::sf1_import_history::Sf1ImportHistoryEntry` exactly.
+ * Deliberately carries no learner names/LRNs/SF1 row content — only the
+ * counts and provenance the backend already computed at commit time. See
+ * migration 19's comment for why there is no `status` field: a row only
+ * ever exists for a batch that actually committed.
+ */
+export interface Sf1ImportHistoryEntry {
+  id: string;
+  schoolId: string;
+  sectionId: string;
+  userId: string | null;
+  username: string;
+  sourceFilename: string;
+  sourceFingerprint: string;
+  rowsCommitted: number;
+  newLearnersCreated: number;
+  existingLearnersEnrolled: number;
+  createdAt: string;
+}

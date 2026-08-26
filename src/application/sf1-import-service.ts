@@ -3,6 +3,7 @@ import type { FilePicker } from "../domain/ports/file-picker";
 import type { Sf1ImportRepository } from "../domain/ports/sf1-import-repository";
 import type {
   DuplicateDecision,
+  Sf1ImportHistoryEntry,
   Sf1ImportPreview,
   Sf1ImportRow,
   Sf1ImportSummary,
@@ -103,11 +104,19 @@ export class Sf1ImportApplicationService {
     sectionId: string,
     startsOn: string,
     plans: Sf1RowCommitPlan[],
+    filePath: string,
   ): Promise<Sf1ImportSummary> {
     if (plans.length === 0) {
       throw new ValidationError("There is nothing to import.");
     }
-    return this.imports.commit(sectionId, startsOn, plans);
+    return this.imports.commit(sectionId, startsOn, plans, filePath);
+  }
+
+  /** Most recent import history for the teacher's own school, newest
+   * first — see `Sf1ImportHistoryEntry`'s doc comment for what it
+   * deliberately does not contain. */
+  async listImportHistory(limit = 20): Promise<Sf1ImportHistoryEntry[]> {
+    return this.imports.listImportHistory(limit);
   }
 }
 

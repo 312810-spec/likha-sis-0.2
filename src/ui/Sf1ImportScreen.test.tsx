@@ -8,7 +8,12 @@ import type { FilePicker } from "../domain/ports/file-picker";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { Sf1ImportRepository } from "../domain/ports/sf1-import-repository";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
-import type { Sf1ImportPreview, Sf1ImportSummary, Sf1RowCommitPlan } from "../domain/sf1-import";
+import type {
+  Sf1ImportHistoryEntry,
+  Sf1ImportPreview,
+  Sf1ImportSummary,
+  Sf1RowCommitPlan,
+} from "../domain/sf1-import";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { Sf1ImportScreen } from "./Sf1ImportScreen";
@@ -33,7 +38,15 @@ const EXISTING_LEARNER: Learner = {
 };
 
 function emptyPreview(): Sf1ImportPreview {
-  return { rows: [], newRows: [], exactMatches: [], needsReview: [], errors: [], warnings: [] };
+  return {
+    rows: [],
+    newRows: [],
+    exactMatches: [],
+    needsReview: [],
+    errors: [],
+    warnings: [],
+    previousImport: null,
+  };
 }
 
 class FakeSectionRepository implements SectionRepository {
@@ -61,13 +74,20 @@ class FakeFilePicker implements FilePicker {
 
 class FakeSf1ImportRepository implements Sf1ImportRepository {
   previewCalls: string[] = [];
-  commitCalls: Array<{ sectionId: string; startsOn: string; plans: Sf1RowCommitPlan[] }> = [];
+  commitCalls: Array<{
+    sectionId: string;
+    startsOn: string;
+    plans: Sf1RowCommitPlan[];
+    filePath: string;
+  }> = [];
+  listImportHistoryCalls: number[] = [];
   previewImpl: (filePath: string) => Promise<Sf1ImportPreview> = async () => emptyPreview();
   commitImpl: () => Promise<Sf1ImportSummary> = async () => ({
     rowsCommitted: 0,
     newLearnersCreated: 0,
     existingLearnersEnrolled: 0,
   });
+  listImportHistoryImpl: () => Promise<Sf1ImportHistoryEntry[]> = async () => [];
 
   preview(filePath: string): Promise<Sf1ImportPreview> {
     this.previewCalls.push(filePath);
@@ -78,9 +98,15 @@ class FakeSf1ImportRepository implements Sf1ImportRepository {
     sectionId: string,
     startsOn: string,
     plans: Sf1RowCommitPlan[],
+    filePath: string,
   ): Promise<Sf1ImportSummary> {
-    this.commitCalls.push({ sectionId, startsOn, plans });
+    this.commitCalls.push({ sectionId, startsOn, plans, filePath });
     return this.commitImpl();
+  }
+
+  listImportHistory(limit: number): Promise<Sf1ImportHistoryEntry[]> {
+    this.listImportHistoryCalls.push(limit);
+    return this.listImportHistoryImpl();
   }
 }
 
@@ -180,6 +206,7 @@ describe("Sf1ImportScreen", () => {
         { rowNumber: 5, field: "given_name", severity: "error", message: "given name is missing" },
       ],
       warnings: [],
+      previousImport: null,
     });
 
     await chooseSectionAndFile(user);
@@ -712,5 +739,158 @@ describe("Sf1ImportScreen", () => {
     await waitFor(() => screen.getByText(/review duplicates/i));
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  // -- Wave 2E: operational hardening --------------------------------
+
+  it("commit is called with the same file path the preview was read from", async () => {
+    const user = userEvent.setup();
+    const { importRepo, filePicker } = renderScreen();
+    filePicker.nextPath = "C:\\teacher\\sf1.xlsx";
+    importRepo.previewImpl = async () => ({
+      ...emptyPreview(),
+      rows: [
+        {
+          rowNumber: 4,
+          givenName: "Ana",
+          familyName: "Dela Cruz",
+          lrn: null,
+          lrnWasPresentButInvalid: false,
+          sex: null,
+          sexWasPresentButUnrecognized: false,
+          birthdate: null,
+          remarks: null,
+        },
+      ],
+      newRows: [4],
+    });
+
+    await chooseSectionAndFile(user);
+    await waitFor(() => screen.getByRole("button", { name: /import learners/i }));
+    await user.click(screen.getByRole("button", { name: /import learners/i }));
+
+    await waitFor(() => expect(importRepo.commitCalls).toHaveLength(1));
+    expect(importRepo.commitCalls[0]?.filePath).toBe("C:\\teacher\\sf1.xlsx");
+  });
+
+  it("shows an advisory notice when this exact file was imported before, without blocking anything", async () => {
+    const user = userEvent.setup();
+    const { importRepo } = renderScreen();
+    importRepo.previewImpl = async () => ({
+      ...emptyPreview(),
+      rows: [
+        {
+          rowNumber: 4,
+          givenName: "Ana",
+          familyName: "Dela Cruz",
+          lrn: null,
+          lrnWasPresentButInvalid: false,
+          sex: null,
+          sexWasPresentButUnrecognized: false,
+          birthdate: null,
+          remarks: null,
+        },
+      ],
+      newRows: [4],
+      previousImport: {
+        id: "hist-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        userId: "u1",
+        username: "ana.cruz",
+        sourceFilename: "sf1.xlsx",
+        sourceFingerprint: "abc",
+        rowsCommitted: 3,
+        newLearnersCreated: 3,
+        existingLearnersEnrolled: 0,
+        createdAt: "2026-08-20T10:00:00.000Z",
+      },
+    });
+
+    await chooseSectionAndFile(user);
+    await waitFor(() => screen.getByText(/import preview/i));
+
+    expect(screen.getByText(/imported this exact file before/i)).toBeInTheDocument();
+    expect(screen.getByText(/ana\.cruz/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /import learners/i })).not.toBeDisabled();
+  });
+
+  it("shows no previous-import notice for a file never imported before", async () => {
+    const user = userEvent.setup();
+    const { importRepo } = renderScreen();
+    importRepo.previewImpl = async () => emptyPreview();
+
+    await chooseSectionAndFile(user);
+    await waitFor(() => screen.getByText(/import preview/i));
+
+    expect(screen.queryByText(/imported this exact file before/i)).not.toBeInTheDocument();
+  });
+
+  it("lets a teacher view past imports without leaving the setup screen", async () => {
+    const user = userEvent.setup();
+    const { importRepo } = renderScreen();
+    importRepo.listImportHistoryImpl = async () => [
+      {
+        id: "hist-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        userId: "u1",
+        username: "ana.cruz",
+        sourceFilename: "sf1_grade1.xlsx",
+        sourceFingerprint: "abc",
+        rowsCommitted: 5,
+        newLearnersCreated: 5,
+        existingLearnersEnrolled: 0,
+        createdAt: "2026-08-20T10:00:00.000Z",
+      },
+    ];
+
+    await waitFor(() => screen.getByLabelText(/which section is this sf1 for/i));
+    await user.click(screen.getByRole("button", { name: /view past imports/i }));
+
+    await waitFor(() => expect(screen.getByText("sf1_grade1.xlsx")).toBeInTheDocument());
+    expect(screen.getByText(/ana\.cruz/)).toBeInTheDocument();
+    expect(importRepo.listImportHistoryCalls).toEqual([20]);
+  });
+
+  it("shows an empty state when no imports have been recorded yet", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await waitFor(() => screen.getByLabelText(/which section is this sf1 for/i));
+    await user.click(screen.getByRole("button", { name: /view past imports/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/no sf1 imports have been recorded/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("never shows raw SF1 row content in the import history list", async () => {
+    const user = userEvent.setup();
+    const { importRepo } = renderScreen();
+    importRepo.listImportHistoryImpl = async () => [
+      {
+        id: "hist-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        userId: "u1",
+        username: "ana.cruz",
+        sourceFilename: "sf1_grade1.xlsx",
+        sourceFingerprint: "abc",
+        rowsCommitted: 5,
+        newLearnersCreated: 5,
+        existingLearnersEnrolled: 0,
+        createdAt: "2026-08-20T10:00:00.000Z",
+      },
+    ];
+
+    await waitFor(() => screen.getByLabelText(/which section is this sf1 for/i));
+    await user.click(screen.getByRole("button", { name: /view past imports/i }));
+
+    await waitFor(() => expect(screen.getByText("sf1_grade1.xlsx")).toBeInTheDocument());
+    // The history entry's own fingerprint (a hex digest, not learner data)
+    // is never rendered, and there is no learner name/LRN anywhere in this
+    // list -- only the filename, actor, timestamp, and counts.
+    expect(screen.queryByText(/abc/)).not.toBeInTheDocument();
   });
 });
