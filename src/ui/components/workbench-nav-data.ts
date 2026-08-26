@@ -2,6 +2,7 @@ export type SignedInTab =
   | "workspace"
   | "learners"
   | "sections"
+  | "sf1-import"
   | "attendance"
   | "monthly-summary"
   | "grading-periods"
@@ -32,6 +33,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     tabs: [
       { id: "learners", label: "Learners" },
       { id: "sections", label: "Sections" },
+      { id: "sf1-import", label: "SF1: Enrollment" },
     ],
   },
   {

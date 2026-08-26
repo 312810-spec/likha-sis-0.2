@@ -32,6 +32,7 @@ zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
 calamine = { version = "0.36.1", features = ["dates"] }
+tauri-plugin-dialog = "2.7.2"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

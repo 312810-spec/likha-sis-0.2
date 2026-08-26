@@ -917,3 +917,89 @@ label {
   white-space: nowrap;
   border: 0;
 }
+
+/* SF1 Import (Wave 2C, ADR-0043) -- the classification summary strip:
+   New/Existing/Needs review/Errors as a row of count + status-chip
+   pairs, not color-only tiles. */
+.sf1-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-unit);
+  margin: var(--spacing-unit) 0;
+}
+
+.sf1-summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.6) var(--spacing-unit);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.sf1-summary-count {
+  font-size: var(--font-size-large);
+  font-weight: 700;
+}
+
+/* The side-by-side duplicate comparison table -- two data columns
+   sharing one field-label column, so "Same"/"Different"/"Missing from
+   X" always sits directly beside the two values it describes. */
+.sf1-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--spacing-unit) 0;
+}
+
+.sf1-comparison-table th,
+.sf1-comparison-table td {
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.sf1-comparison-table thead th {
+  border-top: none;
+  font-weight: 700;
+}
+
+.sf1-review-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
+  flex-wrap: wrap;
+}
+
+.sf1-review-actions {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-unit);
+}
+
+.sf1-review-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-unit) 0;
+}
+
+.sf1-review-list li {
+  padding: calc(var(--spacing-unit) * 0.6) 0;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
+}
+
+.sf1-review-list li:first-child {
+  border-top: none;
+}
+
+.sf1-chosen-file {
+  font-weight: 600;
+}

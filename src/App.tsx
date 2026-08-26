@@ -12,6 +12,7 @@ import {
   schoolService,
   sectionService,
   setupService,
+  sf1ImportService,
   subjectService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
@@ -26,6 +27,7 @@ import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
+import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "./ui/components/WorkbenchNav";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
@@ -140,6 +142,11 @@ function App() {
               <LearnerListScreen learnerService={learnerService} exportService={exportService} />
             ) : activeTab === "sections" ? (
               <SectionsScreen sectionService={sectionService} learnerService={learnerService} />
+            ) : activeTab === "sf1-import" ? (
+              <Sf1ImportScreen
+                sf1ImportService={sf1ImportService}
+                sectionService={sectionService}
+              />
             ) : activeTab === "attendance" ? (
               <AttendanceScreen
                 attendanceService={attendanceService}

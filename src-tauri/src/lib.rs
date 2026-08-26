@@ -22,6 +22,10 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // Native "choose an Excel workbook" file dialog for SF1 import
+            // (Wave 2C) -- the official first-party Tauri plugin, not a
+            // free-text path the frontend invents on its own.
+            app.handle().plugin(tauri_plugin_dialog::init())?;
 
             let conn = db::open_app_db(app.handle())?;
             app.manage(Mutex::new(conn));

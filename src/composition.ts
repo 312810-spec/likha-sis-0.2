@@ -9,6 +9,7 @@ import { LearnerScoreApplicationService } from "./application/learner-score-serv
 import { SchoolApplicationService } from "./application/school-service";
 import { SectionApplicationService } from "./application/section-service";
 import { SetupApplicationService } from "./application/setup-service";
+import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
@@ -16,12 +17,14 @@ import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-rep
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
+import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
 import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
+import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repository";
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
@@ -48,4 +51,8 @@ export const classRecordService = new ClassRecordApplicationService(
 export const assessmentService = new AssessmentApplicationService(new TauriAssessmentRepository());
 export const learnerScoreService = new LearnerScoreApplicationService(
   new TauriLearnerScoreRepository(),
+);
+export const sf1ImportService = new Sf1ImportApplicationService(
+  new TauriSf1ImportRepository(),
+  new TauriFilePicker(),
 );
