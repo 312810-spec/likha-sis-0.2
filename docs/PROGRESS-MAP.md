@@ -250,10 +250,19 @@ UX-04 ✓ ↺ complete (2026-08-25, baseline 0634421) — Class Records,
   queue above is superseded by ADR-0035's Wave 0-7 sequence (Wave 0,
   this reconciliation, is complete).
 
-CURRENT ← Wave 0 (reconciliation) complete. Recommended next milestone:
-  Wave 1's RBAC foundation (Teacher/Registrar/School Head) — named in
-  full in docs/CURRENT-HANDOFF.md. Per explicit instruction, not started;
-  awaiting approval of the reconciled roadmap.
+2026-08-25/26: Wave 1's RBAC foundation (Teacher/Registrar/School Head,
+  docs/adr/0036), Curriculum/Key-Stage Versioning schema (docs/adr/0037),
+  and Wave 4's Teacher Load/Class Schedule foundation (docs/adr/0039)
+  all completed, independently reviewed, and closed — see
+  docs/VERIFICATION-DEBT.md. The `windows-future`/`windows-core` Rust
+  compiler blocker referenced throughout this file's earlier entries is
+  also resolved (docs/adr/0040). A Minimal CI Foundation
+  (docs/adr/0041) now runs the full `npm run quality:full` contract on
+  GitHub Actions (Ubuntu + Windows) on every push/PR.
+
+CURRENT ← Wave 1 + Wave 4 complete. `main` fast-forward integration in
+  progress (this milestone) — see docs/CURRENT-HANDOFF.md for the exact
+  next product milestone once integration closes.
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and
