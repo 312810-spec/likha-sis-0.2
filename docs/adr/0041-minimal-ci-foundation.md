@@ -137,7 +137,7 @@ doesn't exist is a pure loss.
   jobs call `npm run quality:full` verbatim — no CI-only duplicate
   logic to drift out of sync with what a developer runs locally.
 - **Least-privilege, secret-free, fork-safe**: `permissions:
-  contents: read` only; no `GITHUB_TOKEN` write scope; no repository
+contents: read` only; no `GITHUB_TOKEN` write scope; no repository
   secrets referenced anywhere in the workflow; plain `pull_request`
   (not `_target`), so a malicious fork PR gets a read-only token and
   no secrets regardless.
@@ -151,7 +151,7 @@ cargo fmt --version && cargo clippy --version` step before running the
   gate — if a runner image ever drops that default, this step fails
   loudly and specifically, rather than clippy silently not running.
 - **No duplicate verification work**: `cargo test` (not `cargo
-  nextest`) is deliberately kept as the CI runner, matching
+nextest`) is deliberately kept as the CI runner, matching
   `.claude/rules/testing.md`'s own stable-checkpoint-gate guidance —
   nextest is for the fast local inner loop, `cargo test` is the one
   command proven to cover doctests too. A separate `cargo build`/

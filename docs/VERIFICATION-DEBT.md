@@ -17,7 +17,7 @@ diagnosed environment gap, not a product defect: `ubuntu-latest`
 doesn't ship the GTK/glib system libraries (`libwebkit2gtk-4.1-dev`
 and friends) Tauri's Linux webview backend needs at compile time, so
 `gobject-sys`/`glib-sys` failed their `pkg-config` build scripts. The
-*same run*'s Windows job **passed** `npm run quality:full` end-to-end
+_same run_'s Windows job **passed** `npm run quality:full` end-to-end
 on the first attempt, proving the workflow design itself was sound —
 only the Ubuntu job's system-dependency list was incomplete. Fixed by
 adding the exact `apt-get install` package list from Tauri's own
@@ -27,17 +27,33 @@ run 32916282825 is **green on both jobs** — Ubuntu `success` in
 6m9s, Windows `success` in 17m17s, both real, both actually run, not
 claimed.
 
+**A second, genuine gate finding, caught by the same CI, not by
+CI misconfiguration**: the docs-only commit recording this milestone's
+own checkpoint (`ca4d40a`) itself failed `npm run quality:full` on
+_both_ jobs — `prettier --check .` (part of `npm run quality`, which
+`quality:full` runs first) flagged the newly-written/edited Markdown
+files (this ADR, `CURRENT-HANDOFF.md`, `SOURCE-REGISTRY.md`,
+`VERIFICATION-DEBT.md`) as not Prettier-formatted. This was a real gap
+in this session's own process (docs edits were not run through the
+local quality gate before pushing, unlike the code changes earlier in
+this milestone) — not a CI configuration defect, and not weakened or
+skipped: fixed with `npx prettier --write` on the four files, `npm run
+quality:full` re-run clean locally before re-pushing, then reconfirmed
+green on GitHub Actions (run recorded below).
+
 **Debt closed**: no CI configuration existed → now exists and is
 proven green on both target platforms with real evidence, including
-one genuine failure found and fixed by the CI itself (exactly the kind
-of finding a verification foundation exists to surface). **New,
-disclosed limitations, not blocking this milestone's completion**: no
-caching configured yet (deliberately deferred — first workflow kept
-simple per this milestone's own scope discipline; revisit if runtime
-grows); Android CI remains out of scope (a future extension, not a
-gap at this milestone); a full `tauri build` installer/bundle step was
-evaluated and deferred to a future release-workflow milestone, not
-this verification-foundation one.
+two genuine findings caught and fixed by the CI itself (the Ubuntu
+system-dependency gap, and this session's own docs-formatting gap) —
+exactly the kind of finding a verification foundation exists to
+surface, not something to be embarrassed by. **New, disclosed
+limitations, not blocking this milestone's completion**: no caching
+configured yet (deliberately deferred — first workflow kept simple per
+this milestone's own scope discipline; revisit if runtime grows);
+Android CI remains out of scope (a future extension, not a gap at this
+milestone); a full `tauri build` installer/bundle step was evaluated
+and deferred to a future release-workflow milestone, not this
+verification-foundation one.
 
 ## Teacher Load `security-reviewer` re-run record: STALE, CORRECTED (2026-08-26)
 

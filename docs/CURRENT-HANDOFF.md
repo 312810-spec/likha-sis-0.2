@@ -42,7 +42,7 @@ concurrency-cancel per ref. Full scoring in ADR-0041.
 **Actually executed on GitHub Actions, evidence not claimed**: first
 real run (32915080360) genuinely failed on Ubuntu — `ubuntu-latest`
 lacks the GTK/glib system packages Tauri's Linux backend needs
-(`gobject-sys`/`glib-sys` `pkg-config` failures); the *same run*'s
+(`gobject-sys`/`glib-sys` `pkg-config` failures); the _same run_'s
 Windows job passed `npm run quality:full` end-to-end on the first
 try. Fixed by adding the exact `apt-get` package list from Tauri's own
 official prerequisites docs (fetched directly, quoted, not
