@@ -1,5 +1,28 @@
 # CURRENT HANDOFF
 
+## Note: Wave 2F — harness closure + security CI gate (2026-08-26) — separate from the feature track below
+
+Two non-feature milestones ran after Wave 2E, neither touching
+`src/`/`src-tauri/` product code:
+
+1. **Harness audit** (`docs/adr/0045-claude-code-harness-audit.md`):
+   enabled `typescript-lsp`/`rust-analyzer-lsp`/`claude-code-setup`/
+   `claude-security` in `.claude/settings.json`.
+2. **Wave 2F closure** (same ADR's addendum,
+   `docs/adr/0046-security-ci-gate.md`): closed the harness audit's own
+   disclosed LSP live-behavior gap (both LSP servers demonstrated and
+   `grep`-cross-checked working — see `docs/VERIFICATION-DEBT.md`); ran
+   a controlled MCP pilot (zero MCP servers installed — `gh` CLI,
+   `playwright-cli`, and ordinary web lookup all beat their MCP
+   alternative on real evidence); wired `gitleaks`/`cargo-deny`/
+   `osv-scanner` into a new, separate `.github/workflows/security.yml`
+   CI gate, closing Wave 2E's own recorded verification debt.
+
+**This does not change the "Active Task"/"exact next action" below**
+— Wave 2E is still the most recently completed LIKHA _feature_
+milestone; resume LIKHA product work from its own "exact next action"
+as normal, not from this note.
+
 ## Active Task (2026-08-26, this session — Wave 2E: SF1 Import Operational Hardening & Auditability, complete)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E

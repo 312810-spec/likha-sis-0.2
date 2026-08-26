@@ -1,5 +1,55 @@
 # ACTIVE PLAN
 
+## Wave 2F: Harness Closure + Security CI Gate (added 2026-08-26) — complete, not a LIKHA feature milestone, read this section first
+
+Full record: `docs/adr/0045-claude-code-harness-audit.md`'s Wave 2F
+addendum, `docs/adr/0046-security-ci-gate.md`,
+`docs/VERIFICATION-DEBT.md`'s top entries. Does not change the LIKHA
+feature track below — Wave 2E remains the most recently completed
+product milestone. Verification record:
+
+- **LSP verification**: closed for real, not just re-asserted. Root
+  cause of the original gap found (`claude plugin install` needed, not
+  just `enabledPlugins: true`) and fixed. Rust (`rust-analyzer`):
+  `workspace/symbol`, `findReferences`, `hover` all demonstrated on
+  real symbols (`authorize_capability_with_actor`, `commit_import`),
+  every result cross-checked against `grep -n` and matched exactly.
+  TypeScript (`typescript-language-server`): `workspaceSymbol`,
+  `documentSymbol`, `findReferences`, `hover` demonstrated on
+  `Sf1ImportApplicationService`/`commitImport`, every result
+  cross-checked and matched exactly.
+- **MCP pilot**: 5 candidates evaluated (Context7, GitHub, Playwright,
+  Cloudflare Docs/Workers Bindings, Semgrep) — 0 installed. Full
+  reasoning in `docs/SOURCE-REGISTRY.md`'s "Wave 2F — controlled MCP
+  pilot" entry.
+- **Security CI gate**: `.github/workflows/security.yml` created (3
+  jobs: gitleaks, cargo-deny, osv-scanner, all `contents: read` only).
+  Actions pinned to exact commit SHAs verified via `gh api`; osv-scanner
+  uses a direct checksum-verified binary rather than the marketplace
+  action (see ADR-0046 for why).
+- Full regression re-run before/around this work, unaffected: `cargo
+nextest run` 501/501; plain `cargo test` (incl. doctests) green;
+  `cargo fmt --check`/`cargo clippy --all-targets -D warnings` clean;
+  `npm run quality` 438/438 (typecheck/lint/format/architecture/test
+  all clean); `npm run build` (production) PASS.
+- Security tools re-confirmed clean locally via
+  `scripts/check-security.mjs` immediately before wiring CI: `3 ok, 0
+failed, 0 missing` (gitleaks 60 commits/no leaks; cargo-deny
+  advisories/bans/licenses/sources all ok; osv-scanner no issues found,
+  18 pre-accepted advisories correctly filtered).
+- Independent security + architecture/reliability reviews of the new
+  workflow dispatched; outcome recorded once retrieved (see
+  `docs/VERIFICATION-DEBT.md` and the relevant ADR).
+- `.claude/settings.json`'s plugin enablement changes from the prior
+  harness-audit session (uncommitted at the start of this session) were
+  reconciled and carried forward, not lost or overwritten.
+
+**Not done this wave, deliberately (non-goals stated up front, held
+to)**: no SF1 import contract redesign; no cloud sync work begun; no
+merge to `main`; no SARIF/Code-Scanning upload wiring (a separate,
+deliberately deferred decision — would need `security-events: write`);
+no scheduled/cron security scan.
+
 ## Wave 2E: SF1 Import Operational Hardening & Auditability (added 2026-08-26) — complete, read this section first
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E

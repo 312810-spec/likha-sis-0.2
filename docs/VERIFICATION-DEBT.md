@@ -1,5 +1,139 @@
 # Verification Debt
 
+## Wave 2F — security tool CI gate (2026-08-26)
+
+Full record: `docs/adr/0046-security-ci-gate.md`. Closes Wave 2E's own
+recorded debt (`gitleaks`/`cargo-deny`/`osv-scanner` proven locally,
+never wired into CI) via a new `.github/workflows/security.yml`.
+
+**Independent security review + independent architecture/reliability
+review — both CLOSED, findings fixed.** Security review: no blocking
+issues across all 8 requested angles (permissions, trigger safety,
+SHA pinning, download/verify/execute sequencing, failure-masking,
+secret handling, third-party data exposure, command injection) — all
+independently re-verified by the reviewer against live evidence
+(`git ls-remote`, the pinned `gitleaks-action` commit's actual bundled
+source, `gh api`), not accepted on trust. Three should-fix findings,
+all doc-accuracy issues in `docs/adr/0046-security-ci-gate.md` (a cache
+claim, a checksum-verification-uniformity claim, and an undisclosed
+"advisory, not enforced" gate status) — all corrected in that ADR.
+Architecture/reliability review: **one BLOCKING finding**, fixed —
+`gitleaks-action`'s automatic scan path only covers each push/PR's own
+new commits (verified by reading the pinned action's actual source),
+not full history, and the workflow's original
+`concurrency: cancel-in-progress: true` could let a superseded push's
+own commits (and any secret in them) go permanently unscanned by any
+completed job — realistic specifically because this project's own
+operating mode pushes rapidly and sequentially. Fixed by removing
+`cancel-in-progress` from `security.yml` entirely. Three further
+non-blocking findings, all fixed: an ADR citation to a
+`docs/VERIFICATION-DEBT.md` entry that didn't yet exist (this entry is
+that fix), an ADR overclaim that the CI `osv-scanner` invocation was
+"already proven locally" when it actually differs from
+`scripts/check-security.mjs`'s `--offline` form (corrected in the
+ADR), and a stale `src-tauri/osv-scanner.toml` path reference in this
+file's own Wave 2E entry (corrected above). One minor nit fixed:
+`curl -fsSL` (was `-sL`) on the `osv-scanner` binary download, so a
+404/yanked-release download fails with a clear message rather than a
+confusing downstream checksum mismatch.
+
+**New debt recorded**: `actionlint` was not available in this
+environment and was not installed for a one-time workflow-syntax
+check. YAML validity was instead confirmed via Python's
+`yaml.safe_load`, and every pinned action SHA was cross-checked
+directly against `gh api` (not merely asserted) — but no dedicated
+GitHub-Actions-specific linter ran. `.github/workflows/security.yml`'s
+actual behavior is confirmed by its own real CI run instead (see the
+final report for the exact run/commit). Revisit if `actionlint`
+becomes available in a future session's environment, or if this
+workflow grows complex enough that a manual read is no longer
+sufficient.
+
+## Claude Code harness audit — LSP live-behavior gap — CLOSED (2026-08-26, Wave 2F)
+
+Full record: `docs/adr/0045-claude-code-harness-audit.md`'s Wave 2F
+addendum. The gap recorded when the plugins were first enabled (below,
+struck through) is now closed with genuine, cross-checked evidence
+from a fresh session:
+
+**Real root cause found and fixed first**: enabling a plugin in
+`.claude/settings.json`'s `enabledPlugins` map is **not sufficient** on
+its own — a headless verification run showed `Plugin not available for
+MCP: typescript-lsp@claude-plugins-official - error type:
+plugin-cache-miss` and `Total LSP servers loaded: 0` for all four
+newly-enabled plugins. `claude plugin details` (used in the original
+audit) reports on a plugin's _manifest_, not whether its content is
+actually cached locally — a materially different check than this
+milestone assumed. Fixed by running `claude plugin install
+<name>@claude-plugins-official` for all four (user scope); confirmed
+via `claude plugin list` afterward that all four now show `Status: ✔
+enabled` with real version numbers resolved.
+
+**Rust LSP (rust-analyzer) — genuinely demonstrated, cross-checked
+against `grep`**:
+
+- `workspace/symbol` for `authorize_capability_with_actor` →
+  `src-tauri/src/auth/mod.rs:481` — matches
+  `grep -n "pub fn authorize_capability_with_actor"` exactly.
+- `findReferences` for `commit_import` → 7 references across 4 files
+  (`commit.rs:135,333,404`, `tests/sf1_import.rs:55`,
+  `commands/import.rs:80`, `import/preview.rs:176`) — every
+  cross-file location matches `grep -n "commit_import"` exactly.
+- `hover` for `commit_import` → returned the exact 9-parameter
+  signature and doc comment as written in `commit.rs`.
+- **Real operational finding**: rust-analyzer needs roughly 60 seconds
+  to finish indexing this Tauri-scale workspace before
+  `workspace/symbol`/`findReferences` return results — a query fired
+  immediately after the server starts returns "No symbols found... the
+  LSP server has not finished indexing," not an error. Retrying after
+  the wait succeeds. Not a defect, just a real cold-start cost to know
+  about.
+- **Cosmetic-only defect observed, not blocking**: the LSP client logs
+  an `ERROR` on server shutdown (`Failed to deserialize shutdown:
+invalid type: map, expected unit; {}`) — a protocol-shape mismatch
+  between this rust-analyzer version's shutdown response and Claude
+  Code's LSP client, occurring only during teardown, after all real
+  queries had already succeeded. Does not affect navigation during a
+  session.
+
+**TypeScript LSP (typescript-language-server) — genuinely demonstrated,
+cross-checked against `grep`**:
+
+- `workspaceSymbol` for `Sf1ImportApplicationService` →
+  `src/application/sf1-import-service.ts:23` — matches.
+- `documentSymbol` located `commitImport` at line 103 — matches.
+- `findReferences` → 4 references across 3 files
+  (`sf1-import-service.ts:103` declaration,
+  `Sf1ImportScreen.tsx:191`, `sf1-import-service.test.ts:306,326`) —
+  every location matches `grep -n "commitImport"` exactly (correctly
+  excluding the unrelated `describe("commitImport", ...)` line).
+- `hover` → returned the exact current method signature
+  (`(sectionId, startsOn, plans, filePath) => Promise<Sf1ImportSummary>`).
+- No indexing-delay issue observed (TypeScript indexed fast enough that
+  the first query already worked in this test).
+
+**Operational note for future sessions**: the plugin cache populated by
+`claude plugin install` is **user-scoped** (`Scope: user` per `claude
+plugin list`), not part of this repository. A fresh Claude Code
+installation on a different machine would need to run `claude plugin
+install <name>@claude-plugins-official` for each of these four plugins
+once before their capabilities work, even with `.claude/settings.json`
+correctly enabling them — the settings file alone is necessary but not
+sufficient.
+
+<details>
+<summary>Original gap record (closed above, kept for history)</summary>
+
+~~Newly enabled `.claude/settings.json` plugins (`typescript-lsp`,
+`rust-analyzer-lsp`, `claude-code-setup`, `claude-security`) were
+verified as correctly registered via `claude plugin details` (exact
+component inventories and token costs matched direct file inspection),
+and both LSP servers' underlying binaries were confirmed present and
+runnable. Not verified: live behavior inside a running Claude Code
+session.~~
+
+</details>
+
 ## Wave 2E SF1 Import Operational Hardening & Auditability (2026-08-26)
 
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
@@ -38,7 +172,10 @@ against a changed dependency graph):** `gitleaks`/`cargo-deny`/
 direct dependency included in the scan). `gitleaks`: no leaks.
 `cargo-deny`: advisories/bans/licenses/sources all ok. `osv-scanner`:
 no unaccounted-for issues (18 known, pre-documented/accepted advisories
-filtered per `src-tauri/osv-scanner.toml`). Installed binaries from
+filtered per `osv-scanner.toml` — this file lives at the repository
+root, not `src-tauri/`; corrected here after Wave 2F's independent
+review found this entry's original path reference was stale).
+Installed binaries from
 Wave 2D persisted on disk but were **not on this session's fresh shell
 `PATH`** — re-invoked via full path
 (`...\WinGet\Links\{gitleaks,osv-scanner}.exe`), confirming the earlier

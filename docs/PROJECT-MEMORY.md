@@ -1351,6 +1351,88 @@ changed dependency graph; still not wired into CI, now with a concrete
 named plan (separate job, specific pinned actions) instead of a
 repeated deferral — see `docs/VERIFICATION-DEBT.md`.
 
+## Claude Code harness audit (added 2026-08-26, not a LIKHA feature milestone)
+
+Full record: `docs/adr/0045-claude-code-harness-audit.md`,
+`docs/SOURCE-REGISTRY.md`'s top entry. Does not change the LIKHA
+feature track — Wave 2E remains the current/most recent feature
+milestone. Enabled in `.claude/settings.json`:
+`typescript-lsp`/`rust-analyzer-lsp` (official LSP plugins, ~0 tok
+always-on each, out-of-process — installed the missing underlying
+binaries, `typescript-language-server` via npm and the `rust-analyzer`
+rustup component), `claude-code-setup` (read-only automation auditor,
+kept enabled for future re-audits), and `claude-security` (on-demand
+whole-repo vulnerability scanner, menu-driven only, not run this
+session). `security-guidance` was already correctly configured
+(deterministic pattern layer only; LLM diff/commit review already
+disabled) — no change made. Deliberately NOT enabled:
+`frontend-design` (auto-triggers on frontend work, conflicting with
+`premium-teacher-ui`'s restraint/parity philosophy — LIKHA is an
+internal teacher tool, not a marketing site), `pr-review-toolkit`
+(3 of its 6 agents are worded to trigger proactively/automatically,
+conflicting with this project's milestone-gated review discipline),
+`feature-dev`/`code-review`/`commit-commands`/`plugin-dev` (LIKHA's
+existing workflow/reviewers/git-conventions are already more precise).
+Zero MCP servers added — no `.mcp.json` exists in this repo.
+AgentMemory (external, researched only, not installed) classified
+REFERENCE: Windows install requires manual binary extraction or
+WSL2/Docker, privacy filtering doesn't document PII-shape handling
+beyond secrets, and its memory store isn't git-controlled — conflicts
+with this project's memory-authority hierarchy
+(`CLAUDE.md` → ADRs → `PROJECT-MEMORY.md` → `CURRENT-HANDOFF.md`).
+Rust Token Killer (`rtk-ai/rtk`) confirmed already active at user
+scope, predating this session, with a real measured 78.3% token
+reduction across 1,489 commands on this machine — no LIKHA-specific
+action needed.
+
+## Wave 2F: harness closure + security CI gate (added 2026-08-26, not a LIKHA feature milestone)
+
+Full record: `docs/adr/0045-claude-code-harness-audit.md`'s Wave 2F
+addendum, `docs/adr/0046-security-ci-gate.md`,
+`docs/VERIFICATION-DEBT.md`'s top entries. Closes the two remaining
+gaps the harness audit above left open.
+
+**LSP verification gap closed, with a correction to the original
+audit**: enabling a plugin in `.claude/settings.json` is necessary but
+NOT sufficient — a plugin's content must also be fetched into the
+local cache via `claude plugin install <name>@claude-plugins-official`
+(user scope, not repo-scoped) before it actually loads; `claude plugin
+details` (used in the original audit) only inspects a manifest, not
+whether the plugin is cached. Fixed for all four plugins. Both LSP
+servers then demonstrated genuine, correct semantic navigation
+(go-to-definition, find-references, hover), cross-checked against
+`grep` for every result — not just claimed. rust-analyzer needs ~60s
+to index this Tauri-scale workspace before symbol queries succeed
+(cold-start cost, not a defect).
+
+**Controlled MCP pilot: zero MCP servers installed.** Context7
+classified REFERENCE (ordinary `WebSearch`/`WebFetch` already resolved
+every real doc-lookup need this session with 100% success). GitHub MCP
+rejected — `gh` CLI already fully covers CI/PR/issue inspection,
+proven by dozens of successful real calls across this and prior
+sessions. Playwright MCP rejected — the existing `playwright-cli`
+skill (already adopted) is a functional superset, invoked via `Bash`
+with zero standing MCP cost. Cloudflare Docs/Workers-Bindings MCP
+rejected — no concrete need, cloud sync hasn't started. Semgrep
+classified REFERENCE, CLI-only if ever adopted (never MCP) — no
+capability gap this project's existing deterministic checks
+(`check-architecture.mjs`, clippy, project hooks, the three security
+scanners) don't already cover.
+
+**Security tool CI gate implemented**: new
+`.github/workflows/security.yml`, three independent jobs
+(`gitleaks`, `cargo-deny`, `osv-scanner`), each `contents: read` only,
+separate from `quality.yml`. `gitleaks-action`/`cargo-deny-action`
+pinned to exact release commit SHAs (verified via GitHub's API, not
+invented). `osv-scanner` deliberately NOT wired via
+`google/osv-scanner-action` (its own docs say not to use it directly;
+its reusable workflow needs `security-events: write` plus a
+`continue-on-error` step that risks masking a scanner crash) — instead
+a direct official static binary, checksum-verified against Google's
+own published SHA256SUMS before execution. All three tools re-confirmed
+clean locally immediately before wiring CI.
+
 ## Current Milestone
 
-See `ACTIVE-PLAN.md`.
+See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
+non-feature milestone and does not change this pointer.)
