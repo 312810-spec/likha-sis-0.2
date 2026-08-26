@@ -1,4 +1,5 @@
 pub mod commit;
+pub mod fingerprint;
 pub mod matching;
 pub mod normalize;
 pub mod preview;

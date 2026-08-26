@@ -472,6 +472,24 @@ pub fn authorize_capability(
     Ok(school_id)
 }
 
+/// Identical gate to `authorize_capability`, additionally returning the
+/// session's `user_id` alongside `school_id`. Exists for the small set of
+/// callers that need to attribute a write to an actor (e.g. Wave 2E's
+/// `sf1_import_history`) without every other `authorize_capability`
+/// caller having to discard an unused `user_id` — the two never diverge
+/// in what they check, only in what they return.
+pub fn authorize_capability_with_actor(
+    conn: &Connection,
+    sessions: &SessionManager,
+    capability: Capability,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if !role_repo::has_any_role(conn, &user_id, &school_id, capability.allowed_roles())? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok((school_id, user_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -954,6 +954,64 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_schedule_meetings_assignment_id ON schedule_meetings(teaching_assignment_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- SF1 import history (Wave 2E: SF1 Import Operational Hardening &
+        -- Auditability). See docs/adr/0043-sf1-bulk-import-engine.md's
+        -- Wave 2E addendum.
+        --
+        -- One row per SUCCESSFUL `commit_sf1_import` call, written inside
+        -- the very same `rusqlite::Transaction` that writes the learner/
+        -- enrollment rows it describes (see `import::commit`). That is a
+        -- deliberate design choice, not an incidental detail: it makes a
+        -- history row exist if and only if that batch actually committed.
+        -- There is therefore no `status` column here -- a row that exists
+        -- at all is, by construction, always "committed"; a failed or
+        -- interrupted commit rolls its own history insert back along with
+        -- everything else, leaving no partial/ambiguous row to represent.
+        --
+        -- Deliberately does NOT store any parsed SF1 row content or
+        -- structured learner PII (no names/LRN columns) -- only the
+        -- counts `import::commit` itself already computes
+        -- (`Sf1ImportSummary`), plus enough identity to answer "what was
+        -- imported, by whom, when, from which file" without re-reading
+        -- the source workbook. `source_filename` is the file's bare name
+        -- only, never a full path (a shared-computer deployment can embed
+        -- a Windows profile username in a full path) -- but it is still
+        -- teacher-supplied free text from their own filesystem, so it
+        -- could incidentally contain a learner's name if a teacher names
+        -- the file that way (e.g. "juan-delacruz-lrn-....xlsx"); this is
+        -- the same trust boundary as every other value in this
+        -- SQLCipher-encrypted, school-scoped table, not a new exposure,
+        -- but it is not a hard PII-free guarantee either (found by
+        -- independent security review). `source_fingerprint`
+        -- is a non-cryptographic-purpose SHA-256 content digest
+        -- (`import::fingerprint`) used only for an advisory "you may have
+        -- imported this before" signal -- never used to block a commit.
+        --
+        -- `user_id` is nullable and ON DELETE SET NULL, matching
+        -- `audit_log`'s existing precedent (migration 15): a deleted
+        -- account should not cascade-delete this school's import history,
+        -- and `username` is stored alongside as a stable display value
+        -- independent of the account's later fate.
+        CREATE TABLE sf1_import_history (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            source_filename TEXT NOT NULL,
+            source_fingerprint TEXT NOT NULL,
+            rows_committed INTEGER NOT NULL,
+            new_learners_created INTEGER NOT NULL,
+            existing_learners_enrolled INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_sf1_import_history_school_created ON sf1_import_history(school_id, created_at DESC);
+        CREATE INDEX idx_sf1_import_history_fingerprint ON sf1_import_history(school_id, source_fingerprint);
+        "#,
+        ),
     ])
 }
 

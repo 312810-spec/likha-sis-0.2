@@ -33,6 +33,16 @@ argon2 = { version = "0.5.3", features = ["zeroize"] }
 password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
 calamine = { version = "0.36.1", features = ["dates"] }
 tauri-plugin-dialog = "2.7.2"
+# Already resolved in this workspace's dependency tree (pulled transitively
+# by tauri-codegen at build time) -- promoting it to a direct runtime
+# dependency adds no new crate to compile, just links the same version into
+# the app binary too. Used only for a stable, version-independent content
+# fingerprint (import::fingerprint) -- NOT a security/integrity control, see
+# that module's doc comment. `std`'s `DefaultHasher` was considered and
+# rejected: its docs explicitly disclaim algorithm stability across Rust
+# releases, which would silently break a fingerprint persisted in SQLite
+# after a toolchain upgrade.
+sha2 = "0.10"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

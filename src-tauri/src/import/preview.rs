@@ -11,7 +11,8 @@ use rusqlite::Connection;
 
 use crate::error::AppResult;
 use crate::import::sf1::{MatchKind, Sf1ImportPreview};
-use crate::import::{matching, normalize, validate, workbook};
+use crate::import::{fingerprint, matching, normalize, validate, workbook};
+use crate::repository::sf1_import_history;
 
 pub fn build_preview(
     conn: &Connection,
@@ -20,6 +21,18 @@ pub fn build_preview(
 ) -> AppResult<Sf1ImportPreview> {
     let raw_rows = workbook::read_sf1_rows(path)?;
 
+    // Advisory-only re-import signal (Wave 2E) — computed from the same
+    // file this preview is about to parse, but never allowed to affect
+    // parsing/classification below it. A lookup failure here must not
+    // fail the whole preview: `?` is deliberately not used past this
+    // point for this value, only `unwrap_or(None)` via `ok()`.
+    let previous_import = fingerprint::compute(path)
+        .ok()
+        .and_then(|fp| {
+            sf1_import_history::find_most_recent_by_fingerprint(conn, school_id, &fp).ok()
+        })
+        .flatten();
+
     let mut preview = Sf1ImportPreview {
         rows: Vec::new(),
         new_rows: Vec::new(),
@@ -27,6 +40,7 @@ pub fn build_preview(
         needs_review: Vec::new(),
         errors: Vec::new(),
         warnings: Vec::new(),
+        previous_import,
     };
 
     for raw in &raw_rows {
@@ -159,8 +173,18 @@ mod tests {
             })
             .collect();
         let new_rows_committed = plans.len();
-        crate::import::commit::commit_import(&mut conn, &s.id, &section.id, "2026-06-01", &plans)
-            .unwrap();
+        crate::import::commit::commit_import(
+            &mut conn,
+            &s.id,
+            &section.id,
+            "2026-06-01",
+            &plans,
+            None,
+            "test.teacher",
+            "sf1_synthetic_main.xls",
+            "test-fingerprint",
+        )
+        .unwrap();
 
         let second_preview =
             build_preview(&conn, &s.id, &fixture("sf1_synthetic_main.xls")).unwrap();
@@ -180,6 +204,83 @@ mod tests {
             second_preview.exact_matches.len() + second_preview.needs_review.len(),
             new_rows_committed,
             "every previously-committed row must resurface as a match of some kind"
+        );
+    }
+
+    #[test]
+    fn a_never_before_seen_file_has_no_previous_import_notice() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+
+        let preview = build_preview(&conn, &s.id, &fixture("sf1_synthetic_main.xls")).unwrap();
+
+        assert!(preview.previous_import.is_none());
+    }
+
+    #[test]
+    fn a_previously_recorded_import_of_the_identical_file_surfaces_as_an_advisory_notice() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "Grade 1", "Sampaguita")
+                .unwrap();
+        let path = fixture("sf1_synthetic_main.xls");
+        let fp = fingerprint::compute(&path).unwrap();
+        crate::repository::sf1_import_history::record(
+            &conn,
+            &s.id,
+            &section.id,
+            None,
+            "ana.cruz",
+            "sf1_synthetic_main.xls",
+            &fp,
+            &crate::import::sf1::Sf1ImportSummary {
+                rows_committed: 5,
+                new_learners_created: 5,
+                existing_learners_enrolled: 0,
+            },
+        )
+        .unwrap();
+
+        let preview = build_preview(&conn, &s.id, &path).unwrap();
+
+        let notice = preview
+            .previous_import
+            .expect("identical file content should surface a previous-import notice");
+        assert_eq!(notice.username, "ana.cruz");
+        assert_eq!(notice.rows_committed, 5);
+    }
+
+    #[test]
+    fn a_previous_import_recorded_under_a_different_filename_still_matches_by_content() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "Grade 1", "Sampaguita")
+                .unwrap();
+        let path = fixture("sf1_synthetic_main.xls");
+        let fp = fingerprint::compute(&path).unwrap();
+        crate::repository::sf1_import_history::record(
+            &conn,
+            &s.id,
+            &section.id,
+            None,
+            "ana.cruz",
+            "a_totally_different_name.xls",
+            &fp,
+            &crate::import::sf1::Sf1ImportSummary {
+                rows_committed: 5,
+                new_learners_created: 5,
+                existing_learners_enrolled: 0,
+            },
+        )
+        .unwrap();
+
+        let preview = build_preview(&conn, &s.id, &path).unwrap();
+
+        assert!(
+            preview.previous_import.is_some(),
+            "content identity, not filename, must drive the advisory notice"
         );
     }
 }

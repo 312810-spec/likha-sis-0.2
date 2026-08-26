@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::repository::learner::Learner;
+use crate::repository::sf1_import_history::Sf1ImportHistoryEntry;
 
 /// One SF1 row after normalization (see `import::normalize`) but before
 /// validation has decided whether it's usable. Holds both the raw,
@@ -114,6 +115,14 @@ pub struct Sf1ImportPreview {
     pub needs_review: Vec<LearnerMatchResult>,
     pub errors: Vec<Sf1ValidationIssue>,
     pub warnings: Vec<Sf1ValidationIssue>,
+    /// Advisory only (Wave 2E) — set when this school has a prior
+    /// `sf1_import_history` row whose `source_fingerprint` matches this
+    /// file's content exactly, regardless of the picked filename. Never
+    /// blocks anything; a reviewer sees this and every row's own
+    /// classification and decides for themselves. See
+    /// `import::fingerprint`'s doc comment for why filename is never used
+    /// as a proxy for content identity in either direction.
+    pub previous_import: Option<Sf1ImportHistoryEntry>,
 }
 
 /// What to do with one row at commit time — assembled by the caller from

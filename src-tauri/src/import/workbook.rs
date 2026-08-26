@@ -23,7 +23,7 @@ use crate::error::{AppError, AppResult};
 /// rows of plain text/dates) is at most a few hundred KB; this generous
 /// cap exists only to bound worst-case memory/CPU on a malformed or
 /// hostile file, not to constrain any legitimate use.
-const MAX_FILE_BYTES: u64 = 25 * 1024 * 1024;
+pub(crate) const MAX_FILE_BYTES: u64 = 25 * 1024 * 1024;
 
 /// Reject a sheet with more data rows than this. SF1 is generated
 /// per-section by a class adviser — a legitimate section roster is at

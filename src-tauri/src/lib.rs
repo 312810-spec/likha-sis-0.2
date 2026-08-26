@@ -92,6 +92,7 @@ pub fn run() {
             commands::teaching_assignment::list_schedule_meetings_by_assignment,
             commands::import::preview_sf1_import,
             commands::import::commit_sf1_import,
+            commands::import::list_sf1_import_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
