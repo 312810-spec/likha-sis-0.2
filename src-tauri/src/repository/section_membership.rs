@@ -192,6 +192,54 @@ pub fn is_active_member(
     Ok(count > 0)
 }
 
+/// The full placement history for `learner_id` -- every membership span,
+/// closed or still open -- ordered oldest first. Scoped by `school_id` in
+/// the query itself (not merely implied by `learner_id` belonging to that
+/// school) so a caller supplying the wrong `school_id` can never see
+/// another school's real enrollment history. This is the "Enrollment
+/// history" view of `section_memberships`; see
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`.
+pub fn list_by_learner_in_school(
+    conn: &Connection,
+    school_id: &str,
+    learner_id: &str,
+) -> AppResult<Vec<SectionMembership>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, school_id, section_id, learner_id, starts_on, ends_on, created_at \
+         FROM section_memberships \
+         WHERE school_id = ?1 AND learner_id = ?2 \
+         ORDER BY starts_on ASC",
+    )?;
+    let rows = stmt.query_map((school_id, learner_id), row_to_membership)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// The learner's current (still-open) placement, if any -- derived from the
+/// same `ends_on IS NULL` condition `idx_one_active_membership_per_learner`
+/// already enforces as a database invariant, never a separate "is current"
+/// flag (see ADR-0042). `None` both when the learner has never been
+/// enrolled and when they belong to a different school -- the two are
+/// deliberately indistinguishable, matching `learner::find_by_id_in_school`'s
+/// convention.
+pub fn current_membership_for_learner_in_school(
+    conn: &Connection,
+    school_id: &str,
+    learner_id: &str,
+) -> AppResult<Option<SectionMembership>> {
+    conn.query_row(
+        "SELECT id, school_id, section_id, learner_id, starts_on, ends_on, created_at \
+         FROM section_memberships \
+         WHERE school_id = ?1 AND learner_id = ?2 AND ends_on IS NULL",
+        (school_id, learner_id),
+        row_to_membership,
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
 fn row_to_membership(row: &rusqlite::Row) -> rusqlite::Result<SectionMembership> {
     Ok(SectionMembership {
         id: row.get(0)?,
@@ -338,5 +386,81 @@ mod tests {
 
         assert!(is_active_member(&conn, &school_id, &section_id, &l.id, "2025-08-15").unwrap());
         assert!(!is_active_member(&conn, &school_id, &section_id, &l.id, "2025-07-01").unwrap());
+    }
+
+    #[test]
+    fn list_by_learner_in_school_returns_full_history_in_start_order() {
+        let conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "8", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01").unwrap();
+        enroll(&conn, &school_id, &section_b.id, &l.id, "2026-06-01").unwrap();
+
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+
+        assert_eq!(
+            history.len(),
+            2,
+            "both the closed and open membership must appear"
+        );
+        assert_eq!(history[0].section_id, section_a);
+        assert_eq!(history[0].ends_on.as_deref(), Some("2026-06-01"));
+        assert_eq!(history[1].section_id, section_b.id);
+        assert_eq!(history[1].ends_on, None, "the current placement stays open");
+    }
+
+    #[test]
+    fn list_by_learner_in_school_returns_empty_when_queried_with_the_wrong_school_id() {
+        let conn = open_test_db();
+        let (school_id, _section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_section =
+            section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
+        let l = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        // A real, valid membership -- but scoped to `other_school`, not the
+        // `school_id` this test queries with.
+        enroll(
+            &conn,
+            &other_school.id,
+            &other_section.id,
+            &l.id,
+            "2025-08-01",
+        )
+        .unwrap()
+        .expect("enroll within the learner's own school must succeed");
+
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+
+        assert_eq!(
+            history.len(),
+            0,
+            "a caller supplying the wrong school_id must never see another school's real enrollment history"
+        );
+    }
+
+    #[test]
+    fn current_membership_for_learner_in_school_returns_only_the_open_row() {
+        let conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "8", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01").unwrap();
+        enroll(&conn, &school_id, &section_b.id, &l.id, "2026-06-01").unwrap();
+
+        let current = current_membership_for_learner_in_school(&conn, &school_id, &l.id).unwrap();
+
+        assert_eq!(current.unwrap().section_id, section_b.id);
+    }
+
+    #[test]
+    fn current_membership_for_learner_in_school_is_none_when_never_enrolled() {
+        let conn = open_test_db();
+        let (school_id, _section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+
+        let current = current_membership_for_learner_in_school(&conn, &school_id, &l.id).unwrap();
+
+        assert_eq!(current, None);
     }
 }

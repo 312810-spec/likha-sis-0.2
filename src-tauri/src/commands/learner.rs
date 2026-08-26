@@ -66,6 +66,25 @@ pub fn get_learner(
     learner::find_by_id_in_school(&conn, &school_id, &learner_id)
 }
 
+/// Candidate learners that might already be the same person as one
+/// described by the given name/LRN, for a Registrar to compare before
+/// deciding to create a new record -- never auto-merged. Same
+/// `ManageLearners` gate as `create_learner`, since this exists to inform
+/// that same decision. See `repository::learner::find_candidates`'s doc
+/// comment for the exact matching rule.
+#[tauri::command]
+pub fn find_learner_candidates(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    given_name: String,
+    family_name: String,
+    lrn: Option<String>,
+) -> AppResult<Vec<Learner>> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    learner::find_candidates(&conn, &school_id, &given_name, &family_name, lrn.as_deref())
+}
+
 /// Same Registrar/School Head gate as `create_learner` — editing a
 /// learner's identity/records is the same "manage learners" capability,
 /// not a separate one.

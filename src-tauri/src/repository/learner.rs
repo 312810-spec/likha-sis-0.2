@@ -127,6 +127,43 @@ pub fn update(
     find_by_id_in_school(conn, school_id, learner_id)
 }
 
+/// Learners in `school_id` that might be the same person as one described
+/// by `given_name`/`family_name`/`lrn` -- for a Registrar to compare before
+/// creating a new record, never to auto-merge. Matches on an exact LRN (a
+/// stable, DepEd-issued identifier -- see ADR-0017) OR a case-insensitive,
+/// trimmed exact name match. Deliberately no fuzzy/phonetic matching
+/// (punctuation, middle names, Filipino naming conventions) -- see
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`'s "Deferred"
+/// section for why that's left to the SF1 import milestone, not guessed at
+/// here. Always school-scoped, so a shared LRN or name in a different
+/// school (a real, legitimate possibility) is never returned as a false
+/// duplicate.
+pub fn find_candidates(
+    conn: &Connection,
+    school_id: &str,
+    given_name: &str,
+    family_name: &str,
+    lrn: Option<&str>,
+) -> AppResult<Vec<Learner>> {
+    let trimmed_given = given_name.trim();
+    let trimmed_family = family_name.trim();
+    let mut stmt = conn.prepare(
+        "SELECT id, school_id, given_name, family_name, lrn, sex, created_at \
+         FROM learners \
+         WHERE school_id = ?1 \
+           AND ( \
+             (?2 IS NOT NULL AND lrn = ?2) \
+             OR (trim(given_name) = ?3 COLLATE NOCASE AND trim(family_name) = ?4 COLLATE NOCASE) \
+           ) \
+         ORDER BY family_name, given_name",
+    )?;
+    let rows = stmt.query_map(
+        (school_id, lrn, trimmed_given, trimmed_family),
+        row_to_learner,
+    )?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 fn row_to_learner(row: &rusqlite::Row) -> rusqlite::Result<Learner> {
     Ok(Learner {
         id: row.get(0)?,
@@ -245,6 +282,69 @@ mod tests {
                 ..created
             })
         );
+    }
+
+    #[test]
+    fn find_candidates_matches_an_exact_lrn() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let existing = create(
+            &conn,
+            &s.id,
+            "Juan",
+            "Dela Cruz",
+            Some("123456789012"),
+            None,
+        )
+        .unwrap();
+
+        let candidates =
+            find_candidates(&conn, &s.id, "Different", "Name", Some("123456789012")).unwrap();
+
+        assert_eq!(candidates, vec![existing]);
+    }
+
+    #[test]
+    fn find_candidates_matches_the_same_name_case_and_whitespace_insensitively() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let existing = create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+
+        let candidates = find_candidates(&conn, &s.id, "  juan ", " DELA CRUZ ", None).unwrap();
+
+        assert_eq!(candidates, vec![existing]);
+    }
+
+    #[test]
+    fn find_candidates_never_returns_another_schools_learner() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let other = school::create(&conn, "Other School").unwrap();
+        create(
+            &conn,
+            &other.id,
+            "Juan",
+            "Dela Cruz",
+            Some("123456789012"),
+            None,
+        )
+        .unwrap();
+
+        let candidates =
+            find_candidates(&conn, &s.id, "Juan", "Dela Cruz", Some("123456789012")).unwrap();
+
+        assert_eq!(candidates, Vec::new());
+    }
+
+    #[test]
+    fn find_candidates_returns_none_for_a_genuinely_new_learner() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+
+        let candidates = find_candidates(&conn, &s.id, "Maria", "Santos", None).unwrap();
+
+        assert_eq!(candidates, Vec::new());
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
@@ -37,7 +37,13 @@ pub fn create_section(
 /// `section_id`/`learner_id` identify WHAT and WHO; `school_id` still comes
 /// only from the session. Returns `None`, not an error, when either id
 /// doesn't resolve within the caller's own school — see
-/// `repository::section_membership::enroll`'s doc comment.
+/// `repository::section_membership::enroll`'s doc comment. Gated by the
+/// same `ManageLearners` capability as `create_learner`/`update_learner` --
+/// enrolling/transferring a learner is "manage learners," not a separate
+/// capability (matches `update_learner`'s own established convention).
+/// Previously ungated beyond an active session (any role) -- closed as a
+/// real authorization gap during Wave 2A, see
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`.
 #[tauri::command]
 pub fn enroll_learner_in_section(
     db: State<'_, Mutex<Connection>>,
@@ -47,7 +53,7 @@ pub fn enroll_learner_in_section(
     starts_on: String,
 ) -> AppResult<Option<SectionMembership>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
     section_membership::enroll(&conn, &school_id, &section_id, &learner_id, &starts_on)
 }
 
@@ -66,4 +72,32 @@ pub fn section_roster(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     section_membership::roster_for_section(&conn, &school_id, &section_id, &as_of_date)
+}
+
+/// A learner's full enrollment (section-placement) history -- ungated
+/// beyond an active session, matching `commands::learner::get_learner`'s
+/// existing "reads stay open, writes are capability-gated" convention.
+#[tauri::command]
+pub fn list_learner_enrollment_history(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+) -> AppResult<Vec<SectionMembership>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    section_membership::list_by_learner_in_school(&conn, &school_id, &learner_id)
+}
+
+/// A learner's current (still-open) section placement, if any -- see
+/// `repository::section_membership::current_membership_for_learner_in_school`'s
+/// doc comment for why this is derived, not a stored flag.
+#[tauri::command]
+pub fn get_current_enrollment(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+) -> AppResult<Option<SectionMembership>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    section_membership::current_membership_for_learner_in_school(&conn, &school_id, &learner_id)
 }
