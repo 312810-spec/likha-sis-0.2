@@ -20,7 +20,10 @@ changes):
   the _native Tauri binary_; state that limitation plainly rather than
   implying it was covered.
 - `npm run quality:full` — milestone/release gate: everything above plus
-  `cargo test` and `cargo clippy --all-targets -- -D warnings`.
+  `cargo fmt --check`, `cargo test`, and `cargo clippy --all-targets -- -D
+warnings`. `cargo fmt --check` runs first (fast, fails cheap) — a
+  formatting drift now fails this gate; run plain `cargo fmt` to fix it,
+  never hand-restyle.
 
 Do not invent a slower "run everything" command as the default for small
 edits — match the tier to the change.
