@@ -5,18 +5,23 @@
 Full record: `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E
 addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
 
-- New Rust module tests: `import::fingerprint` (5 tests — identical
+- New Rust module tests: `import::fingerprint` (7 tests — identical
   content/different filename matches, different content differs, a
-  single-byte difference differs, safe_filename strips a full path,
-  fails closed for a missing file), `repository::sf1_import_history`
-  (6 tests — record/list round-trip, ordering+limit, school isolation,
-  fingerprint lookup hit/miss/cross-school).
-- `import::commit` gained 4 new tests: a successful commit records one
-  history row with backend-computed counts; a failed commit leaves no
-  history row (the atomicity proof this milestone specifically
-  required); re-importing the same file twice records two separate
-  history rows; history from one school is never visible when listing
-  another.
+  single-byte difference differs, `safe_filename` strips a Windows-style
+  path AND a forward-slash path AND falls back to a placeholder for a
+  trailing separator — the forward-slash and trailing-separator cases
+  were added after a real CI-only bug, see below — fails closed for a
+  missing file), `repository::sf1_import_history` (6 tests — record/list
+  round-trip, ordering+limit, school isolation, fingerprint lookup
+  hit/miss/cross-school).
+- `import::commit` gained 5 new tests: an empty plan is rejected server-
+  side and writes no phantom history row (added after independent
+  architecture review found the original code had no server-side guard,
+  only a client-side one); a successful commit records one history row
+  with backend-computed counts; a failed commit leaves no history row
+  (the atomicity proof this milestone specifically required);
+  re-importing the same file twice records two separate history rows;
+  history from one school is never visible when listing another.
 - `import::preview` gained 3 new tests: no notice for a never-seen
   file; a previously-recorded import of identical content surfaces the
   advisory notice; the same content under a different filename still
@@ -29,10 +34,15 @@ addendum, `docs/VERIFICATION-DEBT.md`'s top entry. Verification record:
   authorization/school-scope tests were updated for the new
   `commit_sf1_import` signature without changing their assertions.
 - Full `cargo test` (plain, the stable-checkpoint command, includes
-  doctests) — PASS, all passing (498 via `cargo nextest run`, the fast
+  doctests) — PASS, all passing (501 via `cargo nextest run`, the fast
   inner-loop runner, immediately before and after `cargo fmt`).
 - `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` —
   PASS, clean.
+- **A real, non-transient CI failure was caught on the `Quality
+(Ubuntu)` job after the first push and fixed before declaring this
+  milestone done** — see `docs/VERIFICATION-DEBT.md`'s top entry for
+  full root-cause detail (a platform-dependent `Path::file_name()`
+  separator bug, not a flake/infra/formatting issue).
 - Native `cargo build` (debug, full binary) — PASS. `cargo build
 --release` failed in this session's shell on a local Perl/OpenSSL gap
   unrelated to this milestone's code — see `docs/VERIFICATION-DEBT.md`.

@@ -7,6 +7,31 @@ addendum. Adds `sf1_import_history` (migration 19) and re-import
 fingerprinting on top of the unchanged Wave 2B/2C engine + UI and
 unchanged Wave 2D encryption architecture.
 
+**A real, non-transient CI failure was caught and fixed after the
+first push, per this milestone's own CI-verification rule**: the
+`Quality (Ubuntu)` job failed a genuinely new test,
+`import::fingerprint::tests::safe_filename_returns_only_the_final_path_component`,
+which asserted on a hardcoded `C:\Users\...\sf1_grade1.xlsx` literal.
+Root cause: `safe_filename`'s first implementation delegated to
+`std::path::Path::file_name()`, whose separator handling is
+platform-dependent — it only treats `\` as a path separator when
+_compiled_ for Windows. This app is Windows-only, but its own CI
+(ADR-0041) also runs the identical test suite on an `ubuntu-latest`
+runner for toolchain-portability verification, where `Path` uses Unix
+semantics and a backslash is just a literal character — so the whole
+hardcoded string came back as one "filename." Not a flake, not
+infrastructure, not a formatting drift — a genuine platform-dependent
+logic bug in new code, caught exactly the way this milestone's Section
+1 hard gate exists to catch it. **Fixed**: `safe_filename` no longer
+delegates to `Path::file_name()` at all — it now splits on `/` and `\`
+explicitly and manually, making its behavior identical regardless of
+the host OS running the test. Two new tests added
+(`..._for_a_forward_slash_path`, `..._falls_back_to_a_placeholder_for_a_trailing_separator`)
+alongside the renamed original
+(`..._for_a_windows_style_path`) to prove both separator styles and
+the edge case explicitly, rather than relying on incidental platform
+behavior again.
+
 **Re-confirmed this session (not newly closed — same debt, re-run
 against a changed dependency graph):** `gitleaks`/`cargo-deny`/
 `osv-scanner` all re-run against this milestone's changes (new `sha2`

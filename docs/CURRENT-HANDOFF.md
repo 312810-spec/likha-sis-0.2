@@ -42,18 +42,30 @@ would have written a phantom "0 rows, 0 learners" history row; now
 rejected server-side with a dedicated test. Full detail:
 `docs/adr/0043-sf1-bulk-import-engine.md`'s Wave 2E addendum.
 
-**Verification, all actually run**: `cargo nextest run` 499/499 (up
-from 498 after the empty-plans fix) + plain `cargo test` (includes
-doctests) also green; `cargo fmt --check`/`cargo clippy --all-targets
--- -D warnings` PASS, clean; native `cargo build` (debug, full binary)
-PASS — `cargo build --release` failed on a local Perl/OpenSSL
-toolchain gap in this session's shell specifically, unrelated to this
-milestone's code (see `docs/VERIFICATION-DEBT.md`); `npm run test`
-438/438 (one transient `App.test.tsx` flake observed once,
-re-confirmed clean on immediate re-run, unrelated to any file this
-milestone touched); `tsc -b --noEmit`/`eslint .`/`prettier --check
-.`/`npm run check:architecture` all clean; `npm run build` (production
-Vite build) PASS. `gitleaks`/`cargo-deny`/`osv-scanner` re-run against
+**A real CI-only bug was caught and fixed after the first push** (see
+`docs/VERIFICATION-DEBT.md`'s top entry for full detail): `Quality
+(Ubuntu)` failed one new test because `safe_filename`'s first cut
+delegated to `std::path::Path::file_name()`, whose `\`-as-separator
+handling is Windows-only at compile time — this app's own CI also runs
+the same suite on `ubuntu-latest` (ADR-0041), where a hardcoded
+Windows-style test path came back unsplit. Fixed by splitting on `/`
+and `\` explicitly instead of relying on host-OS path semantics, with
+two new tests (forward-slash path, trailing-separator edge case)
+proving both cases directly rather than incidentally.
+
+**Verification, all actually run**: `cargo nextest run` 501/501 (up
+from 498 — the empty-plans guard test plus two new cross-platform
+`safe_filename` tests) + plain `cargo test` (includes doctests) also
+green; `cargo fmt --check`/`cargo clippy --all-targets -- -D warnings`
+PASS, clean; native `cargo build` (debug, full binary) PASS — `cargo
+build --release` failed on a local Perl/OpenSSL toolchain gap in this
+session's shell specifically, unrelated to this milestone's code (see
+`docs/VERIFICATION-DEBT.md`); `npm run test` 438/438 (one transient
+`App.test.tsx` flake observed once, re-confirmed clean on immediate
+re-run, unrelated to any file this milestone touched); `tsc -b
+--noEmit`/`eslint .`/`prettier --check .`/`npm run check:architecture`
+all clean; `npm run build` (production Vite build) PASS.
+`gitleaks`/`cargo-deny`/`osv-scanner` re-run against
 the changed dependency graph (new `sha2`) — all clean.
 
 **Not done this session, deliberately**: wiring the three security

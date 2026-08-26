@@ -51,10 +51,24 @@ fn hex_encode(bytes: &[u8]) -> String {
 /// shared-computer deployment model can embed a Windows profile
 /// username) — falls back to a fixed placeholder for the pathological case
 /// of a path with no final component.
+///
+/// Deliberately does not delegate to `std::path::Path::file_name()`: that
+/// method's separator handling is platform-dependent (it only treats `\`
+/// as a separator when *compiled* for Windows), but this project's CI
+/// runs the same test suite on an Ubuntu runner too (see ADR-0041) — a
+/// path a real Windows deployment produces (backslash-separated) would
+/// silently fail to split there even though the app itself is
+/// Windows-only. Splitting on both `/` and `\` explicitly makes this
+/// function's behavior deterministic regardless of the host compiling
+/// or running the test, not just the target the real app ships for.
 pub fn safe_filename(path: &Path) -> String {
-    path.file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "unknown-file".to_string())
+    let raw = path.to_string_lossy();
+    match raw.rfind(['/', '\\']) {
+        Some(index) if index + 1 < raw.len() => raw[index + 1..].to_string(),
+        Some(_) => "unknown-file".to_string(),
+        None if raw.is_empty() => "unknown-file".to_string(),
+        None => raw.into_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -94,9 +108,27 @@ mod tests {
     }
 
     #[test]
-    fn safe_filename_returns_only_the_final_path_component() {
+    fn safe_filename_returns_only_the_final_path_component_for_a_windows_style_path() {
         let path = Path::new("C:\\Users\\some.teacher\\Downloads\\sf1_grade1.xlsx");
         assert_eq!(safe_filename(path), "sf1_grade1.xlsx");
+    }
+
+    /// This project's own toolchain is Windows-only, but its CI test
+    /// suite also runs on an Ubuntu runner (see ADR-0041) -- proving a
+    /// forward-slash path splits correctly too guards against this
+    /// function silently regressing into `std::path::Path::file_name()`'s
+    /// platform-dependent separator handling, which is exactly what broke
+    /// the Windows-style-path test above the first time it ran there.
+    #[test]
+    fn safe_filename_returns_only_the_final_path_component_for_a_forward_slash_path() {
+        let path = Path::new("/home/some-teacher/Downloads/sf1_grade1.xlsx");
+        assert_eq!(safe_filename(path), "sf1_grade1.xlsx");
+    }
+
+    #[test]
+    fn safe_filename_falls_back_to_a_placeholder_for_a_trailing_separator() {
+        let path = Path::new("C:\\Users\\some.teacher\\Downloads\\");
+        assert_eq!(safe_filename(path), "unknown-file");
     }
 
     #[test]
