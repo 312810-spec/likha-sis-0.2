@@ -4,6 +4,7 @@ pub mod attendance;
 pub mod auth;
 pub mod class_record;
 pub mod export;
+pub mod formgen;
 pub mod grading;
 pub mod import;
 pub mod learner;

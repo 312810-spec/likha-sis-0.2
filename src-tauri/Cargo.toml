@@ -33,6 +33,18 @@ argon2 = { version = "0.5.3", features = ["zeroize"] }
 password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
 calamine = { version = "0.36.1", features = ["dates"] }
 tauri-plugin-dialog = "2.7.2"
+# Wave 3: official-form (SF1) generation engine. Pure Rust, MIT-licensed,
+# actively maintained (v3.1.0, 1M+ total downloads as of 2026-08 -- see
+# docs/adr/0048-official-form-engine-sf1.md). Opens an EXISTING .xlsx
+# template and patches specific cells while leaving the rest of the
+# workbook object model (merges, formulas, styles, other sheets) intact
+# -- exactly the "template-copy + constrained cell patching" shape this
+# project needs, with zero new runtime/process/IPC surface. `.xlsx`/`.xlsm`
+# only, no legacy `.xls` (BIFF) support -- accepted per ADR-0048's
+# evidence that DepEd's current School Form distribution format is
+# `.xlsx` (a real in-use `CONSO SF v2025.xlsx` workbook, inspected during
+# M8).
+umya-spreadsheet = "3"
 # Already resolved in this workspace's dependency tree (pulled transitively
 # by tauri-codegen at build time) -- promoting it to a direct runtime
 # dependency adds no new crate to compile, just links the same version into

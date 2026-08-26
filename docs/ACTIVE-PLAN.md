@@ -1,5 +1,64 @@
 # ACTIVE PLAN
 
+## Wave 3: Authoritative-Template SF1 Form Engine (added 2026-08-26) — complete
+
+Full record: `docs/adr/0048-official-form-engine-sf1.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s
+Wave 3 section, `docs/CURRENT-HANDOFF.md`'s top entry. Verification
+record:
+
+- **Repository truth verified first**: `git fetch` clean; branch/HEAD
+  at Wave 2G's checkpoint `c23cf16`; `main` unchanged at `d9ab036`;
+  working tree clean; both Wave 2G CI runs re-confirmed
+  `completed`/`success` for that exact commit before any implementation
+  began.
+- **Authoritative-template evidence gate**: no official SF1 template
+  found anywhere in this repository or obtainable from this
+  environment. Official SF1 fidelity remains `NOT_VERIFIED` — the
+  engine was built against a synthetic fixture instead, per the
+  brief's own explicit permission to do so.
+- **Ten-scenario architecture decision**: departed from the brief's own
+  named working hypothesis (Java + Apache POI/HSSF sidecar) on the
+  strength of this repo's own prior evidence (a real DepEd `CONSO SF
+v2025.xlsx` workbook is `.xlsx`, not legacy `.xls`). Adopted
+  `umya-spreadsheet` (pure Rust, zero new runtime/packaging/process
+  surface); Java/POI retained as documented Next Best with an explicit
+  switch condition. Full scoring in ADR-0048.
+- **Architecture**: `formgen::sf1` (domain contract) →
+  `formgen::OfficialFormGenerator` (port) → `formgen::umya_adapter`
+  (only production module coupled to `umya-spreadsheet`) → a
+  SHA-256-hash-pinned bundled template resource. Atomic write (sibling
+  `.tmp` + rename, cleaned up on any failure). No caller-supplied
+  output path. No new migration. No UI screen (deliberately deferred).
+- **Three independent reviews, all CLOSED, no blocking findings** (form
+  fidelity, security/native-boundary, architecture/maintainability —
+  all three hit this project's recurring reviewer-retrieval bug,
+  recovered via the established protocol). Fixed: a genuine temp-file-
+  cleanup gap (rename failures weren't cleaned up), four
+  test-name-vs-behavior mismatches, an inaccurate "only module" doc
+  claim, an unimplemented "defined names" fidelity claim, two dangling
+  ADR-section citations. Newly disclosed: unencrypted generated files
+  as a deliberate data-exposure boundary; the generation authorization
+  gate matches sibling export commands' existing convention. Full
+  detail: `docs/VERIFICATION-DEBT.md`.
+- Full regression re-run, unaffected: `cargo nextest run` 546/546 (up
+  from 521); plain `cargo test` (incl. doctests) green; `cargo fmt
+--check`/`cargo clippy --all-targets -D warnings` clean; `cargo deny
+check` clean; `npm run quality` 438/438 clean (no frontend files
+  touched); `npm run build` (production) PASS. `npm run quality:security`:
+  `cargo-deny` clean locally; `gitleaks`/`osv-scanner` not installed on
+  PATH this session (disclosed, not new — CI's Security Gate is
+  authoritative).
+- **Remaining verification debt**: official SF1 fidelity
+  `NOT_VERIFIED` (no real template available); Windows packaged-
+  installer resource resolution `NOT_VERIFIED` (no `tauri build`
+  installer produced in this sandboxed environment); genuine SF9/SF10
+  reuse would need new domain-contract/port code, not just a new
+  `TemplateDescriptor`.
+- **Next**: no candidate pre-selected — select the next highest-value
+  work at the start of the next session using current evidence, per
+  `.claude/rules/autonomous-development.md`.
+
 ## Wave 2G: External API & Government Reference-Data Foundation (added 2026-08-26) — complete
 
 Full record: `docs/adr/0047-psgc-reference-data-foundation.md`,

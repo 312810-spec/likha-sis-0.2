@@ -4,6 +4,7 @@ pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod export;
+pub mod formgen;
 pub mod import;
 pub mod repository;
 
@@ -96,6 +97,7 @@ pub fn run() {
             commands::reference_geo::import_psgc_snapshot,
             commands::reference_geo::get_current_psgc_snapshot,
             commands::reference_geo::list_psgc_units,
+            commands::formgen::generate_sf1_form,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

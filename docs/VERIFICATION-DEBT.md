@@ -1,5 +1,113 @@
 # Verification Debt
 
+## Wave 3 — Authoritative-Template SF1 Form Engine (2026-08-26)
+
+Full record: `docs/adr/0048-official-form-engine-sf1.md`.
+
+**Official SF1 fidelity against a real authoritative DepEd template
+remains `NOT_VERIFIED`** — no such template exists anywhere in this
+repository or was obtainable from this development environment. The
+form engine is built and empirically tested against an explicitly
+synthetic fixture (`src-tauri/tests/fixtures/sf1_template_synthetic.xlsx`,
+mirrored as the bundled resource at
+`src-tauri/resources/sf1/sf1_template_synthetic.xlsx`) instead. This is
+the single most important open item from this wave — the exact missing
+artifact is a real, authoritative DepEd SF1 workbook (or official field-
+layout documentation) to inspect and design a real `TemplateDescriptor`
+against.
+
+**Windows packaged-installer resource resolution is `NOT_VERIFIED`** —
+`tauri.conf.json`'s `bundle.resources` config and
+`commands::formgen.rs`'s `BaseDirectory::Resource` resolution call are
+structurally correct per Tauri 2's documented convention (confirmed by
+independent architecture review), and a test proves the bundled
+resource file is byte-identical to what the engine expects, but no
+`tauri build` installer was actually produced or run in this sandboxed
+environment this wave — the real installed-resource-resolution path
+(as opposed to the dev-mode/source-tree path) is unproven.
+
+**Three independent reviews (form fidelity, security/native-boundary,
+architecture/maintainability), all CLOSED, no blocking findings.** All
+three hit this project's recurring reviewer-retrieval bug on the
+standard notification channel and were recovered via the established
+raw-transcript-then-retry protocol. Findings and fixes:
+
+- **Fixed, real bug**: `formgen::umya_adapter`'s atomic-write logic
+  cleaned up its sibling `.tmp` file on a write failure but NOT on a
+  rename failure (the rename call sat outside the cleanup closure).
+  Fixed by moving the rename inside the same closure. Caught by a new
+  test (`a_rename_failure_after_a_successful_write_still_cleans_up_the_temp_file`)
+  that forces a rename failure by pointing the output path at an
+  existing directory.
+- **Fixed, test-name-vs-behavior mismatches** (found by the form-
+  fidelity reviewer, an adversarial check of every test's name against
+  its actual body): `rejects_a_structurally_wrong_workbook_even_if_it_were_hash_matched`
+  was, per its own inline comment, actually caught by the hash check,
+  never the structural check it claimed to prove — the structural check
+  (`verify_structure`, extracted into its own testable function) had
+  zero test coverage. `empty_optional_fields_are_written_as_blank_not_a_placeholder_string`
+  claimed to distinguish a genuinely blank cell from a placeholder empty
+  string, but `umya-spreadsheet`'s own source confirms `set_value_string("")`
+  always writes an explicit empty-string value — the test could not
+  prove what its name claimed. `a_failed_generation_never_leaves_a_temp_file_behind`
+  only exercised the pre-temp-file-creation rejection path, never the
+  cleanup-on-error branch inside the write/rename closure (this is what
+  led to discovering the rename-cleanup bug above).
+  `a_section_with_no_enrolled_learners_generates_a_form_with_zero_rows`
+  only checked a return-value struct field, never opened the generated
+  workbook to confirm the row was actually empty. All four renamed/
+  rewritten to prove only what they actually exercise, plus new direct
+  tests for `verify_structure` and a full-30-learner-capacity test
+  confirming the footer formula survives at the boundary.
+- **Fixed, doc-accuracy**: `formgen::umya_adapter`'s and
+  `formgen::mod`'s doc comments claimed `umya_adapter` was "the only
+  module that imports `umya_spreadsheet`," while `formgen::fidelity`
+  (an unconditional `pub mod`) also imported it directly — false as
+  written. Fixed by gating `fidelity` to `#[cfg(test)]` (matching its
+  only actual caller), making the claim true again for the production
+  binary. `formgen::fidelity`'s own doc comment claimed to check
+  "defined names (where a print area lives)" before that field/check
+  actually existed in the struct — fixed, `defined_names` is now a real,
+  compared field. Two source comments cited "ADR-0048 §8" and "ADR-0048's
+  disclosed packaging-spike limitation" — sections/content that did not
+  exist in the ADR at the time (found independently by both the
+  architecture and form-fidelity reviewers). Fixed: citations corrected
+  to real section names, and the "Security and privacy"/"Windows
+  packaging spike" content those comments pointed at was written into
+  the ADR rather than left dangling.
+- **Newly disclosed, not fixed (deliberate, documented limitations)**:
+  generated `.xlsx` files are unencrypted, unlike the SQLCipher-
+  encrypted working database — a deliberate data-exposure boundary, now
+  explicit in ADR-0048 (previously undisclosed in both this ADR and the
+  precedent ADR-0009). `generate_sf1_form`'s authorization gate
+  (session-only, no `Capability` check) matches every sibling export
+  command's existing convention, but the asymmetry against the stricter-
+  gated SF1 _import preview_ path was previously unexamined — recorded
+  as a deliberate decision to keep convention consistent this wave,
+  revisit uniformly across the whole export family if DepEd compliance
+  requirements are found to demand it. `formgen::fidelity`'s sheet-
+  protection comparison checks presence only, not content (a password
+  could be dropped silently). Its `excluded_write_region` supports only
+  one rectangle and, against this wave's own fixture, is slightly wider
+  than the true write surface. A genuine panic mid-write (not a
+  returned `Err`) can still leave a `.tmp` file behind — accepted rather
+  than wrapped in `catch_unwind`, per the security reviewer's own
+  offered resolution.
+- **Recorded, not implemented this wave**: genuine SF9/SF10 reuse would
+  need new domain-contract/port-method code, not just a new
+  `TemplateDescriptor` constant — `formgen::sf1`'s types and
+  `OfficialFormGenerator::generate_sf1`'s signature are SF1-specific.
+  `formgen::fidelity` is typed directly against
+  `umya_spreadsheet::Worksheet`; a future switch to the Java/POI Next
+  Best would need to rewrite it (re-parsing output bytes independently),
+  not reuse it as-is.
+
+`gitleaks`/`osv-scanner` were not installed on PATH in this session
+(same disclosed local-tool-availability pattern as prior waves);
+`cargo-deny` ran clean locally (`advisories ok, bans ok, licenses ok,
+sources ok`). CI's `.github/workflows/security.yml` runs all three
+regardless of local availability.
+
 ## Wave 2G — External API & Government Reference-Data Foundation (PSGC) (2026-08-26)
 
 Full record: `docs/adr/0047-psgc-reference-data-foundation.md`.

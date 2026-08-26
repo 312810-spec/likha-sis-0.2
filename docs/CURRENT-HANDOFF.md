@@ -1,6 +1,80 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-26, this session — Wave 2G: External API & Government Reference-Data Foundation, complete)
+## Active Task (2026-08-26, this session — Wave 3: Authoritative-Template SF1 Form Engine, complete)
+
+Full record: `docs/adr/0048-official-form-engine-sf1.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s
+Wave 3 section. Same branch as prior waves
+(`claude/likha-sis-wave2a-learner-core`).
+
+**Repository-truth/CI hard gate verified first**: `git fetch` clean;
+branch and HEAD both at `c23cf16` (Wave 2G's checkpoint); `main`
+unchanged at `d9ab036`; working tree clean. Both Wave 2G CI runs
+re-confirmed genuinely `completed`/`success` for that exact commit
+(Quality Gate `32982080979`, Security Gate `32982080980`) before any
+Wave 3 work began.
+
+**Authoritative-template evidence gate**: no official SF1 template
+exists anywhere in this repository or was obtainable from this
+environment (same disclosed gap ADR-0043 already recorded for the
+import direction). The engine was built and tested against a synthetic
+fixture instead — **official SF1 fidelity remains `NOT_VERIFIED`**,
+recorded as verification debt rather than claimed.
+
+**Ten-scenario decision**: departed from the brief's own named working
+hypothesis (Java + Apache POI/HSSF sidecar) on the strength of this
+repo's own prior evidence — a real, in-use `CONSO SF v2025.xlsx` DepEd
+workbook (inspected during M8) is `.xlsx`, not legacy `.xls`. Adopted
+`umya-spreadsheet` (MIT, pure Rust, zero new runtime/packaging/process-
+invocation surface) instead; Java/POI retained as documented Next Best
+with an explicit switch condition. Full scoring in ADR-0048.
+
+**What was built**: `formgen::sf1` (domain contract) →
+`formgen::OfficialFormGenerator` (port) → `formgen::umya_adapter`
+(the only production module coupled to `umya-spreadsheet`) → a
+SHA-256-hash-pinned bundled template resource (`resources/sf1/`,
+registered in `tauri.conf.json`). `commands::formgen::generate_sf1_form`
+resolves the output path itself from sanitized, authorized data (no
+caller-supplied path at all), reads roster data through existing
+repositories, and writes atomically. `formgen::fidelity` (test-only)
+proves structural fidelity — sheet names/merges/formulas/sizing/defined-
+names — survives generation, including at the full 30-learner capacity.
+No new migration; no UI screen (deliberately deferred).
+
+**Three independent reviews, all CLOSED, no blocking findings** (form
+fidelity, security/native-boundary, architecture/maintainability — all
+three hit this project's recurring reviewer-retrieval bug, recovered
+via the established protocol). Fixed: a genuine temp-file-cleanup gap
+(rename failures weren't cleaned up, only write failures were); four
+tests whose names claimed more than their bodies proved; an inaccurate
+"only module" doc claim (fixed by gating `formgen::fidelity` test-only);
+an unimplemented "defined names" fidelity claim (now implemented); two
+dangling ADR-section citations in code comments. Newly disclosed:
+generated files are unencrypted (a deliberate, now-explicit data-
+exposure boundary); the generation authorization gate matches sibling
+export commands' existing convention. Full detail:
+`docs/VERIFICATION-DEBT.md`'s Wave 3 entry.
+
+**Verification**: `cargo nextest run` — 546/546 passed (up from 521
+pre-milestone). `cargo test` (stable-checkpoint gate) — green, 0
+doctests. `cargo fmt --check`/`cargo clippy --all-targets -D warnings`
+— clean. `cargo deny check` — clean (advisories/bans/licenses/sources
+all ok). `npm run quality` — clean, 438 TS tests, no frontend
+regression. `npm run build` — clean production build. `npm run
+quality:security` — `cargo-deny` clean locally; `gitleaks`/`osv-scanner`
+not installed on PATH this session (disclosed, not new — CI's Security
+Gate is authoritative).
+
+**Exact next action**: return to LIKHA's priority order for the next
+highest-value work. Candidates: expanding the SF1 form engine's UI
+surface (a minimal "Generate SF1" screen, deferred this wave), pursuing
+a real authoritative SF1 template to close the `NOT_VERIFIED` fidelity
+gap, or a genuinely new milestone per the project's standing autonomous-
+selection process — no candidate is pre-selected here; select using
+current evidence at the start of the next session, per
+`.claude/rules/autonomous-development.md`.
+
+## Note: Wave 2G — External API & Government Reference-Data Foundation, complete (superseded as "Active Task" by Wave 3 above, kept for history)
 
 Full record: `docs/adr/0047-psgc-reference-data-foundation.md`,
 `docs/VERIFICATION-DEBT.md`'s top entry, `docs/SOURCE-REGISTRY.md`'s

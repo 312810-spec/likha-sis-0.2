@@ -1486,6 +1486,78 @@ implemented; the rest are ADOPT-selectively-deferred, REFERENCE/PILOT,
 WATCH, REJECT, or DEFER, each with an evidence-based revisit trigger —
 none implemented this wave.
 
+## Wave 3: Authoritative-Template SF1 Form Engine (added 2026-08-26)
+
+Full record: `docs/adr/0048-official-form-engine-sf1.md`. First reusable
+pattern for filling an authoritative DepEd spreadsheet template with
+trusted local data while preserving the template itself — not a CSV
+re-derivation like ADR-0009's SF2 export.
+
+**No authoritative SF1 template exists anywhere in this repository or
+was obtainable from this environment** (same disclosed gap ADR-0043
+already recorded for the import direction). Official SF1 fidelity
+against a real DepEd template remains **`NOT_VERIFIED`** — the engine
+was built and tested against a synthetic, clearly-labeled fixture
+instead, per the milestone's own explicit permission to do so rather
+than fabricate a template.
+
+**Ten-scenario decision departed from the brief's own named working
+hypothesis** (a Java + Apache POI/HSSF sidecar) **on the strength of
+this repo's own prior evidence**: a real, in-use `CONSO SF v2025.xlsx`
+DepEd workbook (inspected during M8, cited in ADR-0009) is `.xlsx`/
+OOXML, not legacy `.xls`/BIFF — the one fact that would have forced
+POI's HSSF path. Adopted `umya-spreadsheet` (MIT, pure Rust) instead:
+zero new runtime, packaging story, or process-invocation surface. Java/
+POI retained as the documented Next Best with an explicit switch
+condition (a real template turning out to be legacy `.xls`, or fidelity
+verification showing unacceptable data loss).
+
+**Architecture**: `commands::formgen` (application-service role) →
+`formgen::OfficialFormGenerator` (port trait) → `formgen::umya_adapter`
+(the only production module coupled to `umya_spreadsheet`) → a
+SHA-256-hash-pinned bundled template resource. The generator never
+grows the template (fixed learner-row capacity, checked before any
+cell is touched), never opens the template path for writing, and
+writes atomically (sibling `.tmp` file + rename, cleaned up on any
+failure including a rename failure). No output-path parameter is
+accepted from the caller at all — the command resolves it itself from
+sanitized, authorized data, closing the path-traversal/arbitrary-file-
+overwrite threat class by construction.
+
+**Structural fidelity** (not byte-for-byte, which the library can't
+guarantee across a save regardless of content changes) is verified by
+`formgen::fidelity` (test-only): sheet names/order/visibility, merged
+regions, formulas outside the write region, row/column sizing, and
+defined names (where a print area lives) all survive generation
+unchanged, empirically checked including at the full 30-learner
+capacity.
+
+**Three independent reviews (form fidelity, security/native-boundary,
+architecture/maintainability), all CLOSED, no blocking findings.** All
+three hit this project's recurring reviewer-retrieval bug and were
+recovered via the established protocol. Real findings fixed: a genuine
+temp-file-cleanup gap (a rename failure after a successful write didn't
+clean up, only a write failure did); several tests whose names claimed
+more than their bodies proved (a "structurally wrong workbook" test
+actually only exercised the hash check, not the structural check it
+claimed to; a "blank vs placeholder" test couldn't actually distinguish
+the two; a "temp file cleanup" test never exercised the cleanup branch
+it named); an inaccurate module-doc claim ("only module that imports
+umya_spreadsheet") that was false until `formgen::fidelity` was gated
+test-only; an unimplemented "defined names" fidelity claim (now
+implemented); two dangling ADR-section citations in code comments
+pointing at content that didn't exist at the time (now real content).
+Also newly disclosed: generated official-form files are unencrypted
+(unlike the SQLCipher-encrypted database) — a deliberate, now-explicit
+data-exposure boundary; generation's authorization gate (session-only,
+no capability) matches every sibling export command's existing
+convention but was previously undocumented as a deliberate choice.
+
+**Zero dependencies removed, one added** (`umya-spreadsheet`). No new
+database migration — generation only reads existing learner/section
+data and writes a spreadsheet file. No UI screen built this wave,
+deliberately deferred per the brief's own permission.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
