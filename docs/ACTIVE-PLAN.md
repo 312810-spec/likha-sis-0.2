@@ -1,5 +1,66 @@
 # ACTIVE PLAN
 
+## Wave 2A: Learner Core + Enrollment Domain Foundation (added 2026-08-26) — complete, read this section first
+
+**Complete.** Full decision record:
+`docs/adr/0042-learner-core-enrollment-domain-foundation.md`.
+Verification record:
+
+- 10 new `section_membership::`/`learner::` unit tests — PASS.
+- New `src-tauri/tests/enrollment.rs` integration suite — PASS, 7/7,
+  including the adversarial proof that a Teacher session is now
+  rejected by `enroll_learner_in_section` where it previously would
+  have succeeded.
+- Full `cargo test` — PASS, 350 lib tests (up from 342) + all
+  integration binaries including the new one.
+- `cargo fmt --check` — PASS.
+- `cargo clippy --all-targets -- -D warnings` — PASS, 0 warnings.
+- Native `cargo build` — PASS (harmless pre-existing PDB linker
+  warning only).
+- `npm run quality:full` — PASS end-to-end.
+- `git diff --check` — PASS, clean.
+- Independent `security-reviewer` — dispatched, hit the recurring
+  agent-resume/retrieval failure on both the dispatch and the one
+  permitted retry; rigorous self-review substituted (full record in
+  `docs/VERIFICATION-DEBT.md`), no BLOCKING/SHOULD-FIX findings.
+
+**Domain decision**: no new table, no migration. `learners` (identity)
+and `section_memberships` (enrollment/placement, already
+history-preserving via a half-open interval and a DB-level "one
+current placement" invariant) already correctly implement the
+Learner/Enrollment separation the milestone brief hypothesized as a
+new schema — confirmed by direct inspection before assuming the
+brief's default hypothesis was correct. Full 10-scenario evaluation in
+the ADR.
+
+**A real authorization gap was found and closed**:
+`commands::section::enroll_learner_in_section` had no capability check
+at all (any Teacher could enroll/transfer any learner) — fixed to
+reuse `Capability::ManageLearners`. `create_section`'s identical gap
+was spawned as a separate follow-up task, not fixed in this milestone.
+
+**Added**: `section_membership::list_by_learner_in_school`/
+`current_membership_for_learner_in_school` (enrollment history/current
+placement), `learner::find_candidates` (duplicate-candidate lookup,
+exact-match only, never auto-merges), and the three commands wiring
+them (`list_learner_enrollment_history`, `get_current_enrollment` —
+both ungated reads; `find_learner_candidates` — gated same as
+`create_learner`).
+
+**Explicit non-goals honored**: no SF1 bulk import; no learner photo;
+no large enrollment UI (repository/command layer only, matching the
+zero-UI proof shape RBAC/Curriculum/Teacher Load all used); no cloud
+sync; no provenance/source-tracking schema (deferred — not yet
+justified until Wave 2B's actual importer design is known, see ADR-0042);
+no enrollment status/reason taxonomy (deferred to Wave 3's Form
+Engine, which will need SF1's exact field requirements); no
+cross-school transfer representation; no fuzzy/phonetic duplicate
+matching.
+
+**Per explicit instruction: do not begin Wave 2B (SF1 Bulk Import
+Engine) automatically.** Not started — this session stops here and
+waits for approval.
+
 ## Minimal CI Foundation (added 2026-08-26) — complete, read this section first
 
 **Complete.** Full decision record: `docs/adr/0041-minimal-ci-foundation.md`.

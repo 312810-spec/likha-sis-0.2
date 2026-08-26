@@ -1,5 +1,86 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-26, this session — Wave 2A: Learner Core + Enrollment Domain Foundation, complete)
+
+Full record: `docs/adr/0042-learner-core-enrollment-domain-foundation.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry. Branch
+`claude/likha-sis-wave2a-learner-core`, branched from verified `main`
+at `d9ab036`.
+
+**Repository truth verified first**: `main`/`origin/main` both at
+`d9ab036`, clean, CI green — matched the expected baseline exactly.
+
+**Inspected the existing learner model before designing anything, and
+found the domain foundation already substantially built**: `learners`
+(identity only — name/LRN/sex, never grade/section/school_year) and
+`section_memberships` (already the enrollment-history model — half-open
+interval `[starts_on, ends_on)`, a `UNIQUE INDEX ... WHERE ends_on IS
+NULL` enforcing "one current placement" as a database invariant,
+transfer/history already correct and already tested) already correctly
+separate identity from placement. The 10-scenario domain decision
+(full record in ADR-0042) concluded: **no new table, no migration** —
+building a parallel `enrollments` table would have created exactly the
+"two systems representing who's placed where" duplication risk the
+prior Integration Review milestone was watching for.
+
+**DepEd/SF1 research** (secondary sources, `deped.gov.ph` unreachable
+this session — disclosed, not primary-source-verified): confirmed
+LRN's permanent, 12-digit, transfer-surviving shape (already correctly
+built, ADR-0017); confirmed SF1's own Remarks column tracks
+transfer/drop/Balik-Aral status — deliberately **not** encoded now
+(the taxonomy mixes placement-reason and unrelated learner-flag
+concerns; belongs to Wave 3's Form Engine, which will need SF1's exact
+field requirements). The schema is additive-only, so this is deferred
+with zero destructive-redesign risk, not precluded.
+
+**A real, previously undiscovered authorization gap was found and
+closed**: `commands::section::enroll_learner_in_section` was gated
+only by an active session — no role check at all, so any Teacher could
+enroll or transfer any learner into any section. Fixed to reuse
+`Capability::ManageLearners` (same gate as `create_learner`/
+`update_learner`, per this codebase's own established "same capability,
+not a separate one" convention). `create_section`'s identical gap was
+found in passing and spawned as a separate follow-up task, not fixed
+here (a different, adjacent decision — section _definition_ is closer
+to scheduling/admin than learner enrollment).
+
+**Vertical slice delivered, repository/command layer, no UI**: an
+authorized Registrar or School Head creates a learner, enrolls them
+into a section, and retrieves both their current enrollment and full
+history — proven end-to-end by a new integration test file
+(`src-tauri/tests/enrollment.rs`, 7 tests, including the explicit
+adversarial proof that a Teacher session is now rejected where it
+previously would have succeeded). Two new read-only repository
+functions (`section_membership::list_by_learner_in_school`/
+`current_membership_for_learner_in_school`) and one duplicate-candidate
+lookup (`learner::find_candidates` — exact-LRN or exact-name match,
+school-scoped, never auto-merges) back three new commands.
+
+**Verification, all actually run this session**: targeted repository
+tests (10 new, `section_membership::`/`learner::`) PASS; new
+integration suite (`enrollment.rs`, 7/7) PASS; full `cargo test` PASS
+(350 lib tests, up from 342, + all integration binaries incl. the new
+one); `cargo fmt --check` PASS; `cargo clippy --all-targets -- -D
+warnings` PASS, 0 warnings; native `cargo build` succeeds (harmless
+pre-existing PDB warning only); `npm run quality:full` PASS end-to-end;
+`git diff --check` clean. Two stray 0-byte junk files (`(String`,
+`Connection` — the same accidental-artifact class documented earlier
+in this project's history) were found untracked and deleted, not
+committed.
+
+**Independent `security-reviewer`** dispatched for the authorization
+gap and the three new commands; hit the recurring agent-resume/
+retrieval failure on both the initial dispatch and the one permitted
+retry. Rigorous self-review substituted, answering all six adversarial
+questions the dispatch was given — no BLOCKING or SHOULD-FIX findings;
+real independent-review debt recorded as open in
+`docs/VERIFICATION-DEBT.md`.
+
+**Gate decision: WAVE 2A LEARNER CORE + ENROLLMENT FOUNDATION PASSED —
+READY FOR SF1 BULK IMPORT ENGINE.** `main` untouched. Per explicit
+instruction, Wave 2B (SF1 bulk import) is **not** started — this
+session stops here and waits for approval.
+
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 
 **`main` is now the verified integration baseline at `3951c3d`.**

@@ -1,5 +1,66 @@
 # Verification Debt
 
+## Wave 2A Learner Core + Enrollment: `security-reviewer` retrieval failure, self-review substituted (2026-08-26)
+
+`security-reviewer` was dispatched for a narrow adversarial pass on the
+real authorization gap this milestone closed
+(`commands::section::enroll_learner_in_section`, previously gated only
+by an active session with no role check at all) plus the three new
+read-only commands/repository functions it added. It completed real
+work (9 tool uses, ~49-56K tokens across two attempts) but returned no
+retrievable findings text on the initial dispatch or the one permitted
+retry — the same recurring agent-resume/retrieval failure documented
+throughout this project since M7. A rigorous self-review was
+substituted, answering the exact six adversarial questions the
+dispatch was given:
+
+1. **Every touched/new command derives `school_id` from the session
+   only.** Confirmed by direct grep across
+   `commands/section.rs`/`commands/learner.rs`: every handler calls
+   either `sessions.require_active_school_scope(&conn)` or
+   `auth::authorize_capability(&conn, &sessions, ...)` — no command
+   accepts `school_id` as a parameter anywhere in this diff.
+2. **No remaining path to enroll/transfer without `ManageLearners`.**
+   Grepped every call site of `section_membership::enroll` in the
+   crate: the only production (non-`#[cfg(test)]`) caller is
+   `commands::section::enroll_learner_in_section`, now fixed. Every
+   other call site is inside a `#[cfg(test)]` module or an integration
+   test file, calling the repository function directly — expected and
+   correct, since those tests deliberately bypass the command/auth
+   layer to test the repository in isolation, the same pattern every
+   other repository test in this codebase already uses.
+3. **No cross-school leak in the three new read paths.** Re-read each
+   query directly: `learner::find_candidates`
+   (`WHERE school_id = ?1 AND (...)`),
+   `section_membership::list_by_learner_in_school`
+   (`WHERE school_id = ?1 AND learner_id = ?2`), and
+   `current_membership_for_learner_in_school`
+   (adds `AND ends_on IS NULL` to the same two-condition scope) all
+   filter by `school_id` directly in the query, matching every other
+   school-scoped query in this codebase — not merely implied by the
+   caller already being "in" that school.
+4. **No SQL injection risk.** `find_candidates`' `trim()`/`COLLATE
+NOCASE` are query-template SQL syntax, not string-interpolated
+   values; all four parameters (`school_id`, `lrn`, trimmed given/family
+   name) are passed through `rusqlite`'s positional parameter binding
+   (`stmt.query_map((school_id, lrn, trimmed_given, trimmed_family),
+...)`), never concatenated into the SQL text.
+5. **`create_section`'s identical missing-capability-gate issue is
+   unchanged by this diff** (confirmed via `git diff main` — the
+   function body is untouched) — a deliberate, disclosed decision
+   recorded in `docs/adr/0042`, tracked as a separate spawned follow-up
+   task rather than silently left unaddressed.
+6. **No new TOCTOU risk.** Every touched/new command acquires
+   `lock_db(&db)` once at the top and holds it for the command's full
+   duration, the same `Mutex<Connection>` guarantee every other command
+   in this codebase already relies on — confirmed by reading each
+   command body directly, not assumed.
+
+**No BLOCKING or SHOULD-FIX findings.** Real, non-self independent-review
+debt for this specific change remains open — re-run `security-reviewer`
+once agent-resume behavior is confirmed reliably working in a future
+session.
+
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone
