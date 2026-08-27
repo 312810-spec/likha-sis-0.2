@@ -108,8 +108,10 @@ findings. `cargo-deny` clean (no dependency change); `gitleaks` /
 authoritative). No packaged-native Tauri run (standing environment gap;
 `quality:ui` is an explicit placeholder — recorded, not claimed).
 
-**Committed and CI-confirmed**: `<commit>` — Quality Gate `<id>` +
-Security Gate `<id>` `completed/success` [record at checkpoint].
+**Committed and CI-confirmed**: `8e782e4` — Quality Gate `33042106266`
+
+- Security Gate `33042106188`, both `completed/success` for this exact
+  commit. Wave 2O is fully closed.
 
 **Deliberately NOT built** (Wave 2P onward): transfer between sections,
 end enrollment, bulk enrollment, CSV/XLS import, drag-and-drop, SF1
