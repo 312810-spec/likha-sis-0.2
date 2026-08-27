@@ -1,5 +1,41 @@
 # ACTIVE PLAN
 
+## Wave 2N: SF10 Evidence Closure (added 2026-08-27) — complete
+
+Full record: `docs/adr/0053-*` Wave 2N addendum,
+`docs/form-evidence/sf10/README.md`. DEPED_OFFICIAL_FORM /
+COMPLIANCE_SENSITIVE / TEMPLATE_EVIDENCE / HISTORICAL_DATA_COMPATIBILITY.
+Verification record:
+
+- **Repo/CI truth first**: HEAD `0c6aaf8` = origin, tree clean; Wave 2M
+  gates `33031801131`/`33031801110` re-confirmed `completed/success`.
+- **DM 020, s. 2026** official PDF: page 2 extracted verbatim with
+  `pdftotext -layout` (bundled with Git for Windows; pre-existing, not
+  new harness tooling). Pages 1/3/4 = scanned images, no text layer.
+  Para 5(b) names `SSHS SF 10 v2026.xlsx`; para 4 = SSHS-pilot-only
+  scope. DepEd Order No. 010, s. 2024 primary page confirmed; Joint
+  Memorandum STR-250331-0910-PS national PDF NOT obtained (secondary +
+  Quezon DM 306 s. 2025 only).
+- **Provenance promotion**: `SF10_SSHS_V2026_CANDIDATE_EVIDENCE` →
+  `AuthoritativeSourceConfirmed`, `authoritative_issuance` = DM 020
+  para 5(b) citation. Test asserts `confirm_authoritative_source`
+  itself would allow it (guard-satisfying). Test asserts fidelity
+  stayed `NotVerified`. Test asserts the JHS record stays unpromotable.
+- **Model changes**: `track: None` for SSHS now evidence-backed (one
+  template per DM 020); JHS `grade_levels` narrowed `["7","8","9","10"]`
+  → `["7"]` (per-grade MATATAG phase-in); id/version strings tidied
+  (pre-persistence, no stamp exists yet).
+- **Checks actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` 483 lib + all
+  integration + 0 doctests pass. `npm run quality` — [record at
+  commit].
+- **Independent review**: security + architecture dispatched per
+  frozen-harness rules; results/debt in `VERIFICATION-DEBT.md`.
+- **Readiness**: SF10 = PARTIALLY READY. SF10 research stopped; no
+  generator/import/UI/persistence/migration (Part G/H). Next slice:
+  Section Roster + Enrollment Management (Wave 2O) — see
+  `CURRENT-HANDOFF.md`.
+
 ## Wave 2M: SF10 Authoritative Template Intake & Version Applicability (added 2026-08-27) — complete
 
 Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,

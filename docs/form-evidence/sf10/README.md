@@ -1,14 +1,153 @@
-# SF10 Template Evidence (Wave 2M)
+# SF10 Template Evidence (Wave 2M → Wave 2N)
 
 Narrow form-evidence record for the SF10 (Learner's Permanent Academic
 Record, formerly Form 137) template candidates acquired 2026-08-27.
-Kept out of `docs/PROJECT-MEMORY.md` deliberately (Wave 2M step 16 — no
-large workbook reverse-engineering in project memory).
+Kept out of `docs/PROJECT-MEMORY.md` deliberately (no large workbook
+reverse-engineering in project memory — citations/provenance only).
 
-**Status: every candidate is `ProvenanceState::CandidateUnverified` /
-`FidelityState::NotVerified`.** None was promoted. Portal hosting on a
-`*.deped.gov.ph` subdomain is provenance evidence, not proof of
-governing applicability.
+**Status after Wave 2N:**
+
+| Candidate                                | Provenance                                   | Fidelity      |
+| ---------------------------------------- | -------------------------------------------- | ------------- |
+| `SSHS SF 10 v2026.xlsx`                  | **`AuthoritativeSourceConfirmed`** (Wave 2N) | `NotVerified` |
+| JHS MATATAG SF10 (×3, community-touched) | `CandidateUnverified` — **EVIDENCE BLOCKED** | `NotVerified` |
+
+Provenance promotion for the SSHS file does **not** touch fidelity —
+the two axes are independent and no SF10 generator exists, so nothing
+has established render fidelity for any SF10.
+
+## Wave 2N — DM 020, s. 2026: primary-source text read
+
+The DM 020 PDF at `https://www.deped.gov.ph/wp-content/uploads/DM_s2026_020r-1.pdf`
+IS partly text-extractable — **page 2** was transcribed verbatim via
+`pdftotext -layout` (a tool bundled with Git for Windows, not new
+harness tooling). Pages 1, 3, 4 are scanned images with no text layer
+(no OCR in the frozen harness).
+
+**Verbatim, DM 020 s. 2026 page 2:**
+
+- Para 3(b), "School Form 10 for Strengthened Senior High School":
+  "A Summary of Final Grades per Grade Level section is provided as the
+  official reference for learner academic performance." · "The general
+  average per semester is removed across all grade levels." · "For Core
+  subjects, the tool automatically computes the Final Grade based on the
+  results of the four quarters." · "Ten additional slots are allocated
+  to Electives and Special Curricular Programs/Institutional subjects."
+- Para 4: "The modified ECR and SF 10 templates shall be used
+  **exclusively, until further notice, by Strengthened SHS teachers in
+  SSHS Pilot Schools.** Senior High School teachers who are not teaching
+  subjects under the Strengthened SHS curriculum **shall continue using
+  the existing ECR and SF 10 (formerly Form 137)** for their SHS
+  classes."
+- Para 5: "Strengthened SHS teachers may download the modified ECR and
+  SF 10 templates from the Learner Information System Support Page at
+  https://support.lis.deped.gov.ph/support. ... the official filenames
+  of the modified templates are as follows: a. SSHS E-Class Record
+  v2026.xlsx ... and **b. SSHS SF 10 v2026.xlsx for the Modified SF 10
+  for SSHS.**"
+- Para 6(a): RO-CLMD and SDO-CID (PSDS) "responsible for providing
+  consistent guidance on the Strengthened SHS curriculum and grade
+  computation".
+
+**Findings against the Wave 2M questions:**
+
+1. Scope: Strengthened SHS teachers in SSHS Pilot Schools.
+2. School year: SY 2025-2026 onward ("until further notice"), title +
+   para 4.
+3. Pilot vs non-pilot: **explicit** — pilot uses the modified SF10;
+   non-Strengthened-SHS SHS teachers keep the DO 69 s. 2016 SF10.
+   4-6. Academic/TechPro: **not mentioned on the readable page**; para 3(b)
+   describes ONE "School Form 10 for Strengthened Senior High School"
+   and para 5 lists a **single** SF10 filename. **No evidence of a
+   template-level track split.** If track matters it is workbook
+   content/data-validation, not template identity.
+4. Existing/historical records: non-Strengthened classes keep the old
+   SF10; nothing on the readable page about redoing completed records
+   (that is the MATATAG Joint-Memorandum question, below).
+5. Download: LIS Support Page; user guides `bit.ly/SSHSGuide-ModifiedECRSF10`;
+   **official filename `SSHS SF 10 v2026.xlsx`**.
+6. Implementation: RO/SDO curriculum divisions provide guidance (para 6).
+7. Effect on the model: confirms `curriculum: "Strengthened SHS"`,
+   grades 11-12, `effective_from "2025-2026"`, `track: None`, and that
+   DM 020 **coexists with** (does not supersede) the DO 69 s. 2016
+   SF10.
+
+### SSHS workbook-to-issuance binding
+
+**CONFIRMED (explicit, not temporal).** DM 020 para 5(b) names the exact
+filename `SSHS SF 10 v2026.xlsx` and the exact portal
+(`support.lis.deped.gov.ph/support`) from which Wave 2M downloaded it.
+Residual gap: pages 1/3/4 (full legal scope, effectivity clause) unread.
+
+## Wave 2N — MATATAG JHS transition evidence
+
+Sources found (secondary / division-level; the underlying national PDF
+was NOT obtained):
+
+- **Joint Memorandum ref. STR-250331-0910-PS** (28 Mar 2025), DepEd
+  Central Office — "Guidance and Clarifications on the School Form 10
+  for End of School Year 2024-2025 and Reiteration of Senior High
+  School Status Tagging". Consistent with **DepEd Order No. 010,
+  s. 2024** ("Policy Guidelines on the Implementation of the MATATAG
+  Curriculum" — **primary-source page confirmed on deped.gov.ph**,
+  23 Jul 2024, K-Grade 10, phased from SY 2024-2025 for K/G1/G4/G7).
+- Per converging secondary sources (DepEd-Click, teacher-forum
+  republications) and the user-supplied **Schools Division of Quezon
+  Province DM No. 306, s. 2025**: the revised SF10 is attached as
+  **Annexes I (Grade 1), II (Grade 4), III (Grade 7)**; a school that
+  **had already completed a learner's old SF10 was NOT required to
+  redo it** on the revised version — the **old SF10 is attached to the
+  revised SF10**; the revised SF10 is used from SY 2025-2026 onward.
+
+**Transition rule established (matches ADR-0053's principle):**
+
+```text
+previously-completed old SF10  →  preserved, attached to the new record (not rewritten)
+new / current applicable records  →  the revised SF10 for that grade's MATATAG phase-in year
+```
+
+The MATATAG SF10 phases in **per grade** (G7 first, SY 2024-2025), NOT
+as a "Grade 8-10" block — the Wave 2M applicability entry was corrected
+to Grade 7 only, pending the per-grade Annexes.
+
+**Evidence strength:** the division memo is authoritative for what that
+division was instructed to do; the underlying national Joint Memorandum
+is the stronger evidence still desired and was not retrieved.
+
+## Wave 2N — JHS clean-master investigation (Part E)
+
+- LIS directory listing (`.../schoolforms/`): **HTTP 403** on every
+  attempt (curl and WebFetch) — cannot enumerate for a pristine
+  master or a checksum.
+- The `SirWedz Guides` worksheet is present in 3 of 4 JHS candidates.
+  Not investigated to the point of proving it is "merely an appended
+  guide" vs. a structural modification — and per Part E, removing the
+  sheet and calling the result authoritative is not permitted.
+- **Conclusion: no clean DepEd JHS SF10 master proven. JHS candidates
+  stay `CandidateUnverified`; debt retained.**
+
+## SF10 readiness classification (Wave 2N, Part F)
+
+**PARTIALLY READY.**
+
+- **SSHS SF10**: provenance `AuthoritativeSourceConfirmed`,
+  applicability confirmed and centrally modeled (`sf10-sshs-v2026`).
+  Fidelity `NotVerified` — a generator/fidelity slice is possible but
+  is framework work, deferred per Part G/H.
+- **JHS MATATAG SF10**: EVIDENCE BLOCKED — no clean master, national
+  Joint Memorandum PDF not obtained. `resolve()` fails closed for
+  Grades 8-10; Grade 7 returns a `CandidateUnverified` version (any
+  fidelity-gated caller gets `FidelityInsufficient`).
+- **Pre-MATATAG SF10** (DO 69 s. 2016, DO 4 s. 2014): templates not
+  acquired; `resolve()` correctly returns `NoApplicableTemplate`.
+
+Per Part H: SF10 research stops here. Remaining debt is recorded; the
+fail-closed resolver is preserved; development proceeds on an unrelated
+production slice.
+
+---
+
+## Original Wave 2M record (below, unchanged)
 
 ## Acquisition
 

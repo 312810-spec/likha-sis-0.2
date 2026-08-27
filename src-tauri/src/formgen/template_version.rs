@@ -209,12 +209,16 @@ pub fn resolve<'a>(
 }
 
 /// The SF10 template versions this project can currently reason about.
-/// **All `CandidateUnverified` / `NotVerified`** — Wave 2M registered
-/// real DepEd-hosted candidates but promoted none (governing issuance
-/// bodies unread). The applicability windows below are LEADS from
-/// secondary-source research plus the one primary-source issuance page
-/// that was reachable (DM 020, s. 2026); they are not
-/// authority-confirmed. See ADR-0053 and
+///
+/// - `sf10-sshs-v2026`: provenance **`AuthoritativeSourceConfirmed`**
+///   (Wave 2N — DepEd Memorandum No. 020, s. 2026 para. 5(b) names the
+///   exact file; fidelity still `NotVerified`).
+/// - `sf10-jhs-matatag-candidate`: **still `CandidateUnverified`** —
+///   EVIDENCE BLOCKED (community-touched file, national Joint
+///   Memorandum PDF not obtained). Applicability is an evidence-based
+///   lead, deliberately narrowed to Grade 7 (see below).
+///
+/// See ADR-0053 (+ its Wave 2N addendum) and
 /// `docs/form-evidence/sf10/README.md`.
 pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
     TemplateVersion {
@@ -225,13 +229,19 @@ pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
             form_type: "SF10",
             effective_from_school_year: "2024-2025",
             effective_to_school_year: None,
-            grade_levels: &["7", "8", "9", "10"],
+            // MATATAG phases in per grade (DepEd Order No. 010, s. 2024):
+            // Grade 7 from SY 2024-2025, higher JHS grades in successive
+            // years. Modeled as Grade 7 only until the per-grade Annexes
+            // (I/II/III) of the governing Joint Memorandum are obtained —
+            // an under-claim is safe (resolver fails closed for the
+            // grades it cannot yet vouch for); an over-claim is not.
+            grade_levels: &["7"],
             curriculum: "MATATAG",
             track: None,
         },
     },
     TemplateVersion {
-        id: "sf10-sshs-dm020-2026-candidate",
+        id: "sf10-sshs-v2026",
         descriptor: None,
         evidence: &crate::formgen::evidence::SF10_SSHS_V2026_CANDIDATE_EVIDENCE,
         applicability: TemplateApplicability {
@@ -240,10 +250,13 @@ pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
             effective_to_school_year: None,
             grade_levels: &["11", "12"],
             curriculum: "Strengthened SHS",
-            track: None, // LEAD: DM 020 s. 2026 body unread — whether Academic
-                         // and TechPro share one SF10 or split is UNCONFIRMED. Modeled as
-                         // track-agnostic until the issuance is read; ADR-0053 records this
-                         // as the single most likely thing to change.
+            // DM 020 s. 2026 (readable page) describes ONE "School Form 10
+            // for Strengthened Senior High School" and para. 5 lists a
+            // single SF10 filename — no per-track file. Track is NOT a
+            // template-selection axis on current evidence; if Academic vs
+            // TechPro matters it is workbook content, not template
+            // identity. `None` is evidence-backed, not a placeholder.
+            track: None,
         },
     },
 ];
@@ -253,7 +266,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolves_the_sshs_candidate_for_a_strengthened_shs_grade_11_context() {
+    fn resolves_the_confirmed_sshs_v2026_for_a_strengthened_shs_grade_11_context() {
         let ctx = FormContext {
             form_type: "SF10",
             school_year: "2025-2026",
@@ -261,21 +274,45 @@ mod tests {
             curriculum: "Strengthened SHS",
             track: None,
         };
+        // Wave 2N: provenance is now confirmed, so a non-fidelity-gated
+        // caller gets the version back.
         let v = resolve(SF10_TEMPLATE_VERSIONS, &ctx, false).unwrap();
-        assert_eq!(v.id, "sf10-sshs-dm020-2026-candidate");
+        assert_eq!(v.id, "sf10-sshs-v2026");
+        assert_eq!(
+            v.evidence.provenance,
+            ProvenanceState::AuthoritativeSourceConfirmed
+        );
     }
 
     #[test]
-    fn resolves_the_jhs_candidate_for_a_matatag_grade_9_context() {
+    fn resolves_the_jhs_candidate_for_a_matatag_grade_7_context() {
         let ctx = FormContext {
             form_type: "SF10",
             school_year: "2025-2026",
-            grade_level: "9",
+            grade_level: "7",
             curriculum: "MATATAG",
             track: None,
         };
         let v = resolve(SF10_TEMPLATE_VERSIONS, &ctx, false).unwrap();
         assert_eq!(v.id, "sf10-jhs-matatag-candidate");
+        assert_eq!(v.evidence.provenance, ProvenanceState::CandidateUnverified);
+    }
+
+    #[test]
+    fn a_matatag_grade_9_context_does_not_yet_resolve_only_grade_7_is_modeled() {
+        // The JHS band is deliberately narrowed to Grade 7 until the
+        // per-grade Annexes are obtained — Grades 8-10 fail closed.
+        let ctx = FormContext {
+            form_type: "SF10",
+            school_year: "2026-2027",
+            grade_level: "9",
+            curriculum: "MATATAG",
+            track: None,
+        };
+        assert!(matches!(
+            resolve(SF10_TEMPLATE_VERSIONS, &ctx, false),
+            Err(ResolveError::NoApplicableTemplate)
+        ));
     }
 
     #[test]
@@ -322,7 +359,9 @@ mod tests {
         };
         match resolve(SF10_TEMPLATE_VERSIONS, &ctx, true) {
             Err(ResolveError::FidelityInsufficient { id, have }) => {
-                assert_eq!(id, "sf10-sshs-dm020-2026-candidate");
+                // Provenance is confirmed but fidelity is not — the
+                // Provenance != Fidelity invariant, enforced at resolve.
+                assert_eq!(id, "sf10-sshs-v2026");
                 assert_eq!(have, FidelityState::NotVerified);
             }
             other => panic!("expected FidelityInsufficient, got {other:?}"),
@@ -446,16 +485,32 @@ mod tests {
     }
 
     #[test]
-    fn every_registered_sf10_version_is_a_conservative_candidate() {
+    fn no_registered_sf10_version_claims_verified_fidelity() {
+        // Wave 2N promoted the SSHS provenance; NOTHING has established
+        // render fidelity for any SF10 (no generator exists). Every
+        // registered version must still be `NotVerified` on the fidelity
+        // axis regardless of its provenance.
         for v in SF10_TEMPLATE_VERSIONS {
             assert_eq!(v.evidence.form_type, "SF10");
             assert_eq!(
-                v.evidence.provenance,
-                ProvenanceState::CandidateUnverified,
-                "{} must not be promoted without reading its governing issuance",
+                v.evidence.fidelity,
+                FidelityState::NotVerified,
+                "{} must not claim verified fidelity — no SF10 generator exists",
                 v.id
             );
-            assert_eq!(v.evidence.fidelity, FidelityState::NotVerified);
         }
+    }
+
+    #[test]
+    fn exactly_the_sshs_v2026_version_is_provenance_confirmed_the_jhs_one_is_not() {
+        let by_id = |id: &str| SF10_TEMPLATE_VERSIONS.iter().find(|v| v.id == id).unwrap();
+        assert_eq!(
+            by_id("sf10-sshs-v2026").evidence.provenance,
+            ProvenanceState::AuthoritativeSourceConfirmed
+        );
+        assert_eq!(
+            by_id("sf10-jhs-matatag-candidate").evidence.provenance,
+            ProvenanceState::CandidateUnverified
+        );
     }
 }

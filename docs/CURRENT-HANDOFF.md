@@ -1,5 +1,74 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-27 — Wave 2N: SF10 Evidence Closure, COMPLETE — SF10 = PARTIALLY READY)
+
+Full record: `docs/adr/0053-*` Wave 2N addendum,
+`docs/form-evidence/sf10/README.md`, `docs/VERIFICATION-DEBT.md` top
+entry. Same branch. Frozen harness not reopened.
+
+**Repository/CI truth verified first**: HEAD `0c6aaf8` = origin, 0/0;
+`main` `d9ab036`; tree clean. Wave 2M CI (`33031801131` Quality +
+`33031801110` Security) re-confirmed `completed/success`.
+
+**What changed**:
+
+- **DM 020, s. 2026 page 2 read verbatim** (`pdftotext`, a Git-bundled
+  tool — no harness change). Para 5(b): official filename
+  `SSHS SF 10 v2026.xlsx`. Para 4: modified SF10 used exclusively by
+  SSHS Pilot Schools; non-Strengthened SHS keeps the DO 69 s. 2016
+  SF10. Pages 1/3/4 unread (scanned images).
+- **`SF10_SSHS_V2026_CANDIDATE_EVIDENCE` promoted → `AuthoritativeSourceConfirmed`**
+  (guard-satisfying, tested). **Fidelity unchanged: `NotVerified`.**
+- **`track: None` for SSHS is now evidence-backed** — no template-level
+  Academic/TechPro split on current evidence.
+- **JHS applicability corrected** Grades 7-10 → **Grade 7 only**
+  (MATATAG per-grade phase-in; DO 010 s. 2024). JHS stays
+  `CandidateUnverified` — **EVIDENCE BLOCKED** (national Joint
+  Memorandum PDF not obtained; community-touched files; LIS listing
+  403).
+- **MATATAG transition rule modeled**: completed old SF10 preserved &
+  attached, not rewritten; revised SF10 forward.
+
+**Verification (actually run)**: `cargo fmt --check` clean; `cargo
+clippy --all-targets -- -D warnings` clean; `cargo test` 483 lib + all
+integration + 0 doctests pass (13 SF10-related tests incl.
+guard-satisfying-promotion, provenance-didn't-touch-fidelity,
+JHS-unpromotable, Grade-8-10-fails-closed). `npm run quality` — [record
+at commit]. No dependency / migration / command / UI / learner data.
+
+**Independent review**: security + architecture reviewers dispatched
+per frozen-harness rules; outcome/debt in `docs/VERIFICATION-DEBT.md`
+Wave 2N entry.
+
+**SF10 readiness = PARTIALLY READY.** SSHS provenance confirmed
+(fidelity not); JHS EVIDENCE BLOCKED; pre-MATATAG templates not
+acquired. Per the Wave 2N directive, **SF10 research stops here** — no
+generator was built (Part G/H); the fail-closed `resolve` seam is
+preserved.
+
+**Exact next production vertical slice** (teacher-facing, local-first,
+verified foundation, no form-fidelity dependency):
+**Section Roster + Enrollment Management** (Wave 2O). Wave 2A shipped
+the learner-core/enrollment domain at the repository + command layer
+"no UI"; `SectionsScreen` only does create-section + enroll-one.
+The gap a registrar/teacher hits daily: seeing who is currently in a
+section, transferring a learner between sections, and ending an
+enrollment. Build on the **verified** `section_membership` domain
+(half-open `[starts_on, ends_on)` intervals; the `UNIQUE ... WHERE
+ends_on IS NULL` one-open-membership invariant — ADR-0008/ADR-0042).
+Smallest first increment: a read-only **Section Roster view** — a new
+`section_membership::list_current_members_in_school(section_id)` query
+
+- narrow command + a `SectionRosterScreen` (Efficient/Comfortable/
+  Guided parity), then add transfer/end-enrollment as follow-ups.
+  Dispatch teacher-ux + accessibility reviewers for the UI.
+
+_(Wave 2N deliberately did not start this slice: SF10 evidence closure
+is a complete compliance-critical unit, and a UI vertical deserves its
+own wave scoping — screen design + teacher-UX/a11y review — rather than
+being tacked on. A wave boundary is a valid checkpoint per
+`.claude/rules/autonomous-development.md`.)_
+
 ## Active Task (2026-08-27 — Wave 2M: SF10 Authoritative Template Intake & Version Applicability, COMPLETE)
 
 Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,

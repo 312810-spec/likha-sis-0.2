@@ -1827,6 +1827,43 @@ require_verified_fidelity)` selects the SF10 template version that
   generation/import, teacher/transcript UI, historical-grade migration,
   persistence, production export, any migration.
 
+## Wave 2N — SF10 Evidence Closure (added 2026-08-27)
+
+Full record: `docs/adr/0053-*` Wave 2N addendum,
+`docs/form-evidence/sf10/README.md`. Citations only here.
+
+- **DepEd Memorandum No. 020, s. 2026 page 2 was read verbatim** (via
+  `pdftotext`, a Git-for-Windows bundled tool — no harness change).
+  Para 5(b) names the official filename **`SSHS SF 10 v2026.xlsx`**;
+  para 4 scopes the modified SF10 to **SSHS Pilot Schools** and keeps
+  the DepEd Order No. 69, s. 2016 SF10 for all other SHS classes.
+  Pages 1/3/4 are scanned images (unread).
+- **`SF10_SSHS_V2026_CANDIDATE_EVIDENCE` provenance promoted
+  `CandidateUnverified` → `AuthoritativeSourceConfirmed`** — the memo
+  names the exact file this project downloaded from the exact portal
+  it names (explicit binding, not temporal proximity). Promotion
+  validated against `confirm_authoritative_source`, not bypassed.
+  **Fidelity stays `NotVerified`** (no SF10 generator; `Provenance !=
+Fidelity` preserved and now enforced inside `resolve`).
+- **No Academic/TechPro template split** — DM 020's readable page
+  describes one SSHS SF10, one filename. `track: None` is now
+  evidence-backed.
+- **MATATAG JHS transition rule** (DepEd Order No. 010, s. 2024
+  primary-confirmed; Joint Memorandum ref. STR-250331-0910-PS
+  secondary/division only, national PDF NOT obtained): a
+  previously-completed old SF10 is **preserved and attached**, not
+  rewritten; the revised SF10 phases in **per grade** (Grade 7 first,
+  SY 2024-2025). The Wave 2M JHS applicability band was corrected from
+  Grades 7-10 to **Grade 7 only** (fail closed for the rest).
+- **JHS SF10 candidates stay `CandidateUnverified` — EVIDENCE
+  BLOCKED**: community-touched (`SirWedz Guides` sheet), LIS directory
+  listing 403, no clean master proven.
+- **SF10 readiness = PARTIALLY READY.** SSHS provenance confirmed;
+  JHS blocked; pre-MATATAG templates not acquired. Per the Wave 2N
+  directive, SF10 research **stops here** — no generator/import/UI/
+  persistence/migration was built. Next work is an unrelated
+  teacher-facing production slice (see `CURRENT-HANDOFF.md`).
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

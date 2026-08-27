@@ -254,8 +254,118 @@ and the security-review-specifics debt is retained in
 - SF10 provenance: `CandidateUnverified` for all four (see
   `docs/form-evidence/sf10/README.md` for the six enumerated authority
   gaps). Not promotable until the governing issuances are read.
+  **[Wave 2N: partly closed — SSHS promoted; see addendum.]**
 - SF10 render fidelity: `NotVerified` — no generator exists.
-- Pre-MATATAG-era SF10 templates: not acquired.
+  **[Unchanged after Wave 2N.]**
+- Pre-MATATAG-era SF10 templates: not acquired. **[Unchanged.]**
 - `formgen::template_version` has no persistence or command surface
   yet — it is the resolver seam only, unexercised by any real
-  generation path (by design this wave).
+  generation path (by design this wave). **[Unchanged after Wave 2N.]**
+
+---
+
+## Wave 2N addendum — DM 020 read, SSHS provenance promoted (2026-08-27)
+
+Full evidence detail: `docs/form-evidence/sf10/README.md` (Wave 2N
+sections). Repository truth verified first: HEAD `0c6aaf8` = origin;
+Wave 2M CI (`33031801131`/`33031801110`) re-confirmed `completed/success`.
+Frozen harness not reopened.
+
+### DM 020, s. 2026 — primary-source text obtained
+
+The official PDF (`deped.gov.ph/wp-content/uploads/DM_s2026_020r-1.pdf`)
+turned out to be **partly text-extractable**: page 2 was transcribed
+verbatim with `pdftotext -layout` (bundled with Git for Windows — an
+existing tool, not new harness tooling). Pages 1/3/4 remain scanned
+images with no text layer.
+
+Verbatim para 4: the modified SF10 "shall be used **exclusively, until
+further notice, by Strengthened SHS teachers in SSHS Pilot Schools**";
+non-Strengthened-SHS SHS teachers "**shall continue using the existing
+ECR and SF 10 (formerly Form 137)**". Verbatim para 5(b): "the official
+filenames of the modified templates are as follows: ... **SSHS SF 10
+v2026.xlsx** for the Modified SF 10 for SSHS", downloadable from
+`support.lis.deped.gov.ph/support`.
+
+### SSHS workbook-to-issuance binding: CONFIRMED
+
+DM 020 para 5(b) **names the exact filename** Wave 2M downloaded from
+the exact portal it names — an explicit issuance→file binding, not
+temporal proximity.
+
+### Part B — provenance promoted
+
+`SF10_SSHS_V2026_CANDIDATE_EVIDENCE.provenance` →
+`AuthoritativeSourceConfirmed`, `authoritative_issuance` set to the DM
+020 para 5(b) citation. **The promotion is guard-satisfying, not
+guard-bypassing:** a new test asserts
+`confirm_authoritative_source(CandidateUnverified, <that citation>)`
+itself returns `AuthoritativeSourceConfirmed`. **Fidelity stays
+`NotVerified`** — a dedicated test asserts the promotion did not touch
+the fidelity axis. `Provenance != Fidelity` preserved as a hard
+invariant, now also enforced inside `resolve` (a fidelity-gated caller
+still gets `FidelityInsufficient` for the confirmed-provenance SSHS
+version).
+
+### Part C — track determination
+
+DM 020's readable page describes **one** "School Form 10 for
+Strengthened Senior High School" and lists **one** SF10 filename. **No
+evidence of a template-level Academic/TechPro split.** `track: None` on
+`sf10-sshs-v2026` is now evidence-backed, not a placeholder. No track
+split introduced. No conditional logic added to any caller.
+
+### Part D — MATATAG historical transition
+
+Modeled from converging evidence (DepEd Order No. 010, s. 2024 —
+primary-source page confirmed; Joint Memorandum ref.
+STR-250331-0910-PS, 28 Mar 2025 — secondary/division sources only,
+national PDF not obtained; Quezon Division DM 306, s. 2025): a
+previously-completed old SF10 is **preserved and attached**, not
+rewritten; the revised SF10 applies **per grade** as MATATAG phases in
+(Grade 7 from SY 2024-2025). The Wave 2M JHS applicability entry
+(`grade_levels: ["7","8","9","10"]`) was **corrected to `["7"]`** —
+an under-claim fails closed safely; an over-claim would let `resolve`
+vouch for grades whose template this project cannot yet identify. The
+"Grade 8-10" framing from user recollection is explicitly **not**
+encoded.
+
+### Part E — JHS candidates stay conservative
+
+LIS directory listing returns HTTP 403 — no clean master could be
+enumerated or checksum-matched. The `SirWedz Guides` community
+worksheet is not removed and the files are not promoted. JHS SF10 =
+**EVIDENCE BLOCKED**; debt retained.
+
+### Part F — readiness: PARTIALLY READY
+
+- SSHS SF10: provenance confirmed, applicability centrally modeled;
+  fidelity still `NotVerified`.
+- JHS MATATAG SF10: EVIDENCE BLOCKED.
+- Pre-MATATAG SF10: templates not acquired; `resolve` returns
+  `NoApplicableTemplate` (correct).
+
+### Part G / H — no generator; next slice is teacher-facing
+
+Per Part G the smallest SF10 step this wave was exactly the evidence
+closure + applicability-model integration above — **no generator, no
+persistence, no export, no UI**. Per Part H, SF10 research stops here
+and the next slice is an unrelated teacher-facing production vertical
+(recorded in `docs/CURRENT-HANDOFF.md`).
+
+### Verification (Wave 2N)
+
+`cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+clean; `cargo test` — 483 lib + all integration binaries + 0 doctests
+pass (13 SF10-related tests now, incl. the guard-satisfying-promotion
+test, the provenance-did-not-touch-fidelity test, the
+JHS-stays-unpromotable test, and the Grade-8-10-fails-closed test).
+`npm run quality` — [record at commit]. No new dependency, no
+migration, no Tauri command, no UI, no learner data.
+
+### Independent review (Wave 2N)
+
+security-reviewer + architecture-reviewer dispatched per the
+frozen-harness rules; outcome / retained debt in
+`docs/VERIFICATION-DEBT.md`'s Wave 2N entry (self-review substituted +
+debt retained if the retrieval bug recurs).

@@ -1,5 +1,59 @@
 # Verification Debt
 
+## Wave 2N — SF10 Evidence Closure (2026-08-27)
+
+Full record: `docs/adr/0053-*` Wave 2N addendum, `docs/form-evidence/sf10/README.md`.
+
+**Closed this wave:**
+
+- **SSHS SF10 provenance** — `SF10_SSHS_V2026_CANDIDATE_EVIDENCE` promoted
+  from `CandidateUnverified` to `AuthoritativeSourceConfirmed`. Binding
+  evidence: DepEd Memorandum No. 020, s. 2026 para 5(b) (verbatim via
+  `pdftotext` from the official deped.gov.ph PDF) names the exact
+  filename `SSHS SF 10 v2026.xlsx` and the LIS portal Wave 2M
+  downloaded it from. Promotion validated against
+  `confirm_authoritative_source` (test), not bypassed.
+- **Academic vs TechPro template split** — resolved as **no split** on
+  current evidence (DM 020's readable page describes one SSHS SF10, one
+  filename). `sf10-sshs-v2026` keeps `track: None`, now evidence-backed.
+- **JHS SF10 applicability over-claim** — Wave 2M's `["7","8","9","10"]`
+  band corrected to `["7"]` (MATATAG phases in per grade; DO 010
+  s. 2024). Resolver now fails closed for JHS Grades 8-10.
+
+**Still open (SF10 = PARTIALLY READY):**
+
+1. **DM 020 pages 1, 3, 4 unread** — scanned images, no text layer, no
+   OCR in the frozen harness. The full legal-scope paragraph and the
+   effectivity clause were not read directly; the scope facts come from
+   the readable page 2 + the deped.gov.ph announcement page. Promotion
+   was made on the explicit page-2 filename binding; revisit if the
+   unread pages ever become available.
+2. **SSHS SF10 render fidelity: `NotVerified`** — no SF10 generator
+   exists; no generated output has been compared to the real form.
+   Provenance promotion did not and must not change this.
+3. **JHS MATATAG SF10: EVIDENCE BLOCKED** — the national Joint
+   Memorandum (ref. STR-250331-0910-PS, 28 Mar 2025) PDF was not
+   obtained (only secondary republications + a division memo). The JHS
+   candidate files carry a non-DepEd `SirWedz Guides` worksheet; the
+   LIS directory listing returns HTTP 403 so a clean master could not
+   be enumerated/checksum-matched. Not confirmed to be Annex I/II/III.
+   Stays `CandidateUnverified`.
+4. **Pre-MATATAG SF10 templates** (DO 69 s. 2016, DO 4 s. 2014): not
+   acquired. `resolve` returns `NoApplicableTemplate` for those eras
+   (correct behaviour, but blocks historical-record SF10 generation).
+5. **Internal cell/title text** of every SF10 candidate: still not
+   transcribed (structural inspection only).
+6. **`formgen::template_version`** still has no persistence or command
+   surface — resolver seam only (by design; Part G forbids more).
+
+**Independent review**: security-reviewer + architecture-reviewer
+dispatched per ADR-0052's frozen-harness rules. [Outcome recorded here
+after they return / self-review substituted per the established
+fallback if the retrieval bug recurs — do not claim a review that did
+not happen.]
+
+**All prior verification debt (Wave 2M and earlier) remains intact.**
+
 ## Wave 2M — SF10 Authoritative Template Intake & Version Applicability (2026-08-27)
 
 Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,
