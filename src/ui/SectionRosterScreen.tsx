@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
 import type {
+  DependentRecordKind,
   EndEnrollmentResult,
+  EnrollmentCandidate,
   Section,
   SectionRosterMember,
   TransferResult,
@@ -58,6 +60,16 @@ function todayAsIsoDate(): string {
  * start date is the earliest the change can take effect. */
 function defaultEffectiveOn(member: SectionRosterMember, asOfDate: string): string {
   return asOfDate < member.startsOn ? member.startsOn : asOfDate;
+}
+
+/** Plain-language message for a `dependentRecordConflict` outcome. Names
+ * the category of blocking data (never the records themselves) and points
+ * the teacher at the fix: pick a later date. */
+function dependentRecordMessage(record: DependentRecordKind, joinedOn: string): string {
+  const noun = record === "attendance" ? "attendance records" : "grades";
+  return `This date is before ${noun} already recorded for this learner in this section (on or after ${formatIsoDate(
+    joinedOn,
+  )}). Choose a later date so those records stay within the enrollment.`;
 }
 
 type ActionKind = "transfer" | "end";
@@ -140,6 +152,25 @@ export function SectionRosterScreen({
   // The stronger "someone changed this enrollment while you had the roster
   // open" state — the panel switches to a Refresh action.
   const [staleConflict, setStaleConflict] = useState(false);
+
+  // --- "Enroll learner": place an existing eligible learner into this
+  // section. A separate inline panel (not a row action) opened from a
+  // button above the table. `enrollMembership` on the Rust side is
+  // authoritative on every eligibility rule; this only gathers the
+  // learner + start date and maps the typed outcome.
+  const [enrollOpen, setEnrollOpen] = useState(false);
+  const [enrollCandidates, setEnrollCandidates] = useState<EnrollmentCandidate[]>([]);
+  const [enrollLoadState, setEnrollLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [enrollSearch, setEnrollSearch] = useState("");
+  const [enrollLearnerId, setEnrollLearnerId] = useState("");
+  const [enrollStartsOn, setEnrollStartsOn] = useState("");
+  const [enrollSubmitting, setEnrollSubmitting] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [enrollErrorField, setEnrollErrorField] = useState<"learner" | "startsOn" | null>(null);
+  const enrollTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const enrollHeadingRef = useRef<HTMLParagraphElement>(null);
+  const enrollRestoreFocusRef = useRef(false);
+  const enrollRequestRef = useRef(0);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -255,6 +286,160 @@ export function SectionRosterScreen({
     panelHeadingRef.current?.focus();
   }
 
+  // --- Enroll-learner panel ---
+
+  useEffect(() => {
+    if (enrollOpen) {
+      enrollHeadingRef.current?.focus();
+      return;
+    }
+    if (enrollRestoreFocusRef.current) {
+      enrollRestoreFocusRef.current = false;
+      enrollTriggerRef.current?.focus();
+    }
+  }, [enrollOpen]);
+
+  function loadEnrollCandidates() {
+    const requestId = ++enrollRequestRef.current;
+    setEnrollLoadState("loading");
+    sectionService
+      .listEnrollableLearners()
+      .then((list) => {
+        if (enrollRequestRef.current !== requestId) return;
+        setEnrollCandidates(list);
+        setEnrollLoadState("ready");
+      })
+      .catch(() => {
+        if (enrollRequestRef.current === requestId) setEnrollLoadState("error");
+      });
+  }
+
+  function openEnroll() {
+    setConfirmation(null);
+    setEnrollError(null);
+    setEnrollErrorField(null);
+    setEnrollSearch("");
+    setEnrollLearnerId("");
+    setEnrollStartsOn(asOfDate);
+    setEnrollOpen(true);
+    loadEnrollCandidates();
+  }
+
+  function closeEnroll(restoreFocus: boolean) {
+    enrollRestoreFocusRef.current = restoreFocus;
+    setEnrollOpen(false);
+    setEnrollError(null);
+    setEnrollErrorField(null);
+  }
+
+  function showEnrollFieldError(field: "learner" | "startsOn", message: string) {
+    setEnrollError(message);
+    setEnrollErrorField(field);
+    enrollHeadingRef.current?.focus();
+  }
+
+  const enrollSelected = enrollCandidates.find((c) => c.learnerId === enrollLearnerId) ?? null;
+  const enrollSelectedInThisSection = enrollSelected?.currentSectionId === sectionId;
+  const enrollSelectedElsewhere =
+    enrollSelected?.currentMembershipId != null && enrollSelected.currentSectionId !== sectionId;
+  const enrollConfirmDisabled =
+    enrollSubmitting ||
+    enrollSelected == null ||
+    enrollSelectedInThisSection ||
+    enrollSelectedElsewhere;
+
+  async function handleEnrollConfirm(event: FormEvent) {
+    event.preventDefault();
+    if (!section) return;
+    if (!enrollSelected) {
+      showEnrollFieldError("learner", "Choose a learner to enroll.");
+      return;
+    }
+    setEnrollError(null);
+    setEnrollErrorField(null);
+    setEnrollSubmitting(true);
+    try {
+      const result = await sectionService.enrollMembership({
+        learnerId: enrollSelected.learnerId,
+        sectionId: section.id,
+        startsOn: enrollStartsOn,
+      });
+      switch (result.kind) {
+        case "enrolled":
+          setConfirmation(
+            `${enrollSelected.familyName}, ${enrollSelected.givenName} was enrolled in ${section.name}, effective ${formatIsoDate(
+              enrollStartsOn,
+            )}.`,
+          );
+          closeEnroll(false);
+          loadRoster(section);
+          headingRef.current?.focus();
+          return;
+        case "alreadyEnrolled":
+          if (result.currentSectionId === section.id) {
+            showEnrollFieldError("learner", "This learner is already enrolled in this section.");
+          } else {
+            const inName = enrollSelected.currentSectionName ?? "another section";
+            showEnrollFieldError(
+              "learner",
+              `This learner is currently enrolled in ${inName}. Moving them here is a transfer — open ${inName}'s roster and use “Transfer” on their row. They are not enrolled here now.`,
+            );
+          }
+          break;
+        case "learnerNotFound":
+        case "sectionNotFound":
+          setEnrollError(
+            "The learner list was out of date, so nothing was changed. It has been refreshed — check it and try again.",
+          );
+          setEnrollErrorField(null);
+          setEnrollLearnerId("");
+          loadEnrollCandidates();
+          enrollHeadingRef.current?.focus();
+          break;
+        case "overlappingMembership":
+          showEnrollFieldError(
+            "startsOn",
+            "This learner has another enrollment that overlaps this start date. Check their enrollment history, or choose a start date that does not overlap it.",
+          );
+          break;
+        case "invalidStartDate":
+          showEnrollFieldError("startsOn", "Enter the start date as a real calendar date.");
+          break;
+        case "dependentRecordConflict": {
+          const noun = result.record === "attendance" ? "attendance records" : "grades";
+          showEnrollFieldError(
+            "startsOn",
+            `This learner already has ${noun} in this section dated before your chosen start. Pick an earlier start date so those records fall within the enrollment.`,
+          );
+          break;
+        }
+        default: {
+          const exhaustive: never = result;
+          throw new Error(`unhandled enroll outcome: ${String(exhaustive)}`);
+        }
+      }
+    } catch (err) {
+      setEnrollError(
+        err instanceof ValidationError
+          ? err.message
+          : "This learner could not be enrolled. Check your device and try again.",
+      );
+      setEnrollErrorField(null);
+      enrollHeadingRef.current?.focus();
+    } finally {
+      setEnrollSubmitting(false);
+    }
+  }
+
+  const enrollFiltered = (() => {
+    const q = enrollSearch.trim().toLowerCase();
+    if (q.length === 0) return enrollCandidates;
+    return enrollCandidates.filter((c) => {
+      const hay = `${c.familyName} ${c.givenName} ${c.lrn ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  })();
+
   async function handleConfirm(event: FormEvent) {
     event.preventDefault();
     if (!activeAction || !section) return;
@@ -282,7 +467,7 @@ export function SectionRosterScreen({
           headingRef.current?.focus();
           return;
         }
-        applyTransferFailure(result.kind, member);
+        applyTransferFailure(result, member);
       } else {
         const result = await sectionService.endMembership({
           learnerId: member.learnerId,
@@ -300,7 +485,7 @@ export function SectionRosterScreen({
           headingRef.current?.focus();
           return;
         }
-        applyEndFailure(result.kind, member);
+        applyEndFailure(result, member);
       }
     } catch (err) {
       setPanelError(
@@ -316,10 +501,10 @@ export function SectionRosterScreen({
   }
 
   function applyTransferFailure(
-    kind: Exclude<TransferResult["kind"], "transferred">,
+    result: Exclude<TransferResult, { kind: "transferred" }>,
     member: SectionRosterMember,
   ) {
-    switch (kind) {
+    switch (result.kind) {
       case "membershipNotFound":
       case "notCurrent":
       case "destinationNotFound":
@@ -342,18 +527,29 @@ export function SectionRosterScreen({
           )}).`,
         );
         break;
+      case "zeroLengthInterval":
+        showFieldError(
+          "effectiveOn",
+          `The effective date must be after the day this learner joined the section (${formatIsoDate(
+            member.startsOn,
+          )}). Choose a later date.`,
+        );
+        break;
+      case "dependentRecordConflict":
+        showFieldError("effectiveOn", dependentRecordMessage(result.record, member.startsOn));
+        break;
       default: {
-        const exhaustive: never = kind;
+        const exhaustive: never = result;
         throw new Error(`unhandled transfer outcome: ${String(exhaustive)}`);
       }
     }
   }
 
   function applyEndFailure(
-    kind: Exclude<EndEnrollmentResult["kind"], "ended">,
+    result: Exclude<EndEnrollmentResult, { kind: "ended" }>,
     member: SectionRosterMember,
   ) {
-    switch (kind) {
+    switch (result.kind) {
       case "notFound":
       case "notCurrent":
         enterStaleConflict();
@@ -366,8 +562,19 @@ export function SectionRosterScreen({
           )}).`,
         );
         break;
+      case "zeroLengthInterval":
+        showFieldError(
+          "effectiveOn",
+          `The effective date must be after the day this learner joined the section (${formatIsoDate(
+            member.startsOn,
+          )}). Choose a later date.`,
+        );
+        break;
+      case "dependentRecordConflict":
+        showFieldError("effectiveOn", dependentRecordMessage(result.record, member.startsOn));
+        break;
       default: {
-        const exhaustive: never = kind;
+        const exhaustive: never = result;
         throw new Error(`unhandled end-enrollment outcome: ${String(exhaustive)}`);
       }
     }
@@ -435,12 +642,200 @@ export function SectionRosterScreen({
               shown — this is always your class as it stands today. &ldquo;Enrolled since&rdquo; is
               the date each learner&rsquo;s current placement in this section began.
               &ldquo;LRN&rdquo; is the 12-digit Learner Reference Number — add a missing one on the
-              Learners screen. Use &ldquo;Transfer&rdquo; to move a learner to another section, or
-              &ldquo;End enrollment&rdquo; when they leave — both keep the learner&rsquo;s history
-              and take effect from the date you choose. If you make a mistake, you can re-enroll the
-              learner from the Sections screen.
+              Learners screen. Use &ldquo;Enroll learner&rdquo; to add an existing learner to this
+              section, &ldquo;Transfer&rdquo; to move a learner to another section, or &ldquo;End
+              enrollment&rdquo; when they leave — all keep the learner&rsquo;s history and take
+              effect from the date you choose.
             </p>
           )}
+
+          <div className="section-roster-enroll">
+            {!enrollOpen && (
+              <button
+                type="button"
+                ref={enrollTriggerRef}
+                className="section-roster-enroll-trigger"
+                disabled={activeAction !== null}
+                aria-expanded={false}
+                onClick={openEnroll}
+              >
+                Enroll learner
+              </button>
+            )}
+            {enrollOpen && (
+              <form
+                className="section-roster-action-panel"
+                onSubmit={handleEnrollConfirm}
+                aria-label={`Enroll a learner in ${section.name}`}
+              >
+                <p
+                  className="section-roster-action-heading"
+                  ref={enrollHeadingRef}
+                  role="heading"
+                  aria-level={3}
+                  tabIndex={-1}
+                >
+                  Enroll a learner in {section.name}
+                </p>
+                <p className="section-roster-action-context">
+                  {section.name} · Grade {section.gradeLevel} · {section.schoolYear}
+                </p>
+
+                {enrollLoadState === "loading" && <Loading label="Loading learners…" />}
+
+                {enrollLoadState === "error" && (
+                  <Alert tone="error">
+                    <p>Could not load the list of learners. Your other work is not affected.</p>
+                    <button type="button" onClick={loadEnrollCandidates}>
+                      Retry
+                    </button>
+                  </Alert>
+                )}
+
+                {enrollLoadState === "ready" && enrollCandidates.length === 0 && (
+                  <p className="field-hint">
+                    There are no learners in this school yet. Add learners on the Learners screen
+                    first, then come back to enroll them.
+                  </p>
+                )}
+
+                {enrollLoadState === "ready" && enrollCandidates.length > 0 && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="section-roster-enroll-search">Find a learner</label>
+                      <input
+                        id="section-roster-enroll-search"
+                        type="search"
+                        value={enrollSearch}
+                        placeholder="Type a name or LRN"
+                        onChange={(event) => setEnrollSearch(event.target.value)}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="section-roster-enroll-learner">Learner</label>
+                      {mode === "guided" && (
+                        <p className="field-hint" id="section-roster-enroll-learner-hint">
+                          Pick the learner to place in this section. Learners already in another
+                          section are marked — moving one of those here is a transfer, done from
+                          that section&rsquo;s roster.
+                        </p>
+                      )}
+                      {enrollFiltered.length === 0 ? (
+                        <p className="field-hint">
+                          No learners match &ldquo;{enrollSearch}&rdquo;.
+                        </p>
+                      ) : (
+                        <select
+                          id="section-roster-enroll-learner"
+                          size={Math.min(6, Math.max(2, enrollFiltered.length))}
+                          value={enrollLearnerId}
+                          onChange={(event) => {
+                            setEnrollLearnerId(event.target.value);
+                            setEnrollError(null);
+                            setEnrollErrorField(null);
+                          }}
+                          aria-invalid={enrollErrorField === "learner" ? true : undefined}
+                          aria-describedby={
+                            [
+                              mode === "guided" ? "section-roster-enroll-learner-hint" : "",
+                              enrollErrorField === "learner" ? "section-roster-enroll-error" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || undefined
+                          }
+                        >
+                          {enrollFiltered.map((candidate) => {
+                            const state =
+                              candidate.currentSectionId === sectionId
+                                ? " — already in this section"
+                                : candidate.currentMembershipId != null
+                                  ? ` — in ${candidate.currentSectionName ?? "another section"}`
+                                  : "";
+                            return (
+                              <option key={candidate.learnerId} value={candidate.learnerId}>
+                                {candidate.familyName}, {candidate.givenName}
+                                {candidate.lrn ? ` · LRN ${candidate.lrn}` : " · no LRN"}
+                                {state}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                    </div>
+
+                    {enrollSelectedInThisSection && (
+                      <p className="section-roster-action-consequence">
+                        {enrollSelected?.givenName} is already enrolled in this section. Choose a
+                        different learner.
+                      </p>
+                    )}
+                    {enrollSelectedElsewhere && (
+                      <p className="section-roster-action-consequence">
+                        {enrollSelected?.givenName} is currently enrolled in{" "}
+                        <strong>{enrollSelected?.currentSectionName ?? "another section"}</strong>.
+                        Moving them here is a transfer: open that section&rsquo;s roster and use
+                        &ldquo;Transfer&rdquo; on their row. Enrolling them here would not move
+                        them.
+                      </p>
+                    )}
+
+                    <div className="field">
+                      <label htmlFor="section-roster-enroll-starts-on">Start date</label>
+                      <p className="field-hint" id="section-roster-enroll-starts-on-hint">
+                        The day this learner&rsquo;s enrollment in {section.name} begins. This is
+                        usually today — set an earlier date only if they actually joined earlier.
+                      </p>
+                      <input
+                        id="section-roster-enroll-starts-on"
+                        type="date"
+                        value={enrollStartsOn}
+                        max={asOfDate}
+                        onChange={(event) => setEnrollStartsOn(event.target.value)}
+                        aria-describedby={
+                          enrollErrorField === "startsOn"
+                            ? "section-roster-enroll-starts-on-hint section-roster-enroll-error"
+                            : "section-roster-enroll-starts-on-hint"
+                        }
+                        aria-invalid={enrollErrorField === "startsOn" ? true : undefined}
+                        required
+                      />
+                    </div>
+
+                    {mode === "guided" && (
+                      <p className="field-hint">
+                        This adds the learner to this section from the start date. It does not
+                        create a new learner or change any of their past records.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {enrollError && (
+                  <p className="field-error" id="section-roster-enroll-error" role="alert">
+                    {enrollError}
+                  </p>
+                )}
+
+                <div className="section-roster-action-buttons">
+                  <button
+                    type="submit"
+                    className="button-primary"
+                    disabled={enrollConfirmDisabled || enrollLoadState !== "ready"}
+                  >
+                    {enrollSubmitting ? "Enrolling…" : "Confirm enrollment"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={enrollSubmitting}
+                    onClick={() => closeEnroll(true)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
 
           {rosterState === "loading" && members.length === 0 && <Loading label="Loading roster…" />}
 
@@ -462,12 +857,9 @@ export function SectionRosterScreen({
           {rosterState === "ready" && members.length === 0 && (
             <EmptyState>
               <span>
-                No learners are enrolled in {section.name} as of {formatIsoDate(asOfDate)}. When you
-                enroll learners into this section on the Sections screen, they will appear here.
+                No learners are enrolled in {section.name} as of {formatIsoDate(asOfDate)}. Use
+                &ldquo;Enroll learner&rdquo; above to add an existing learner to this section.
               </span>
-              <button type="button" onClick={onBack}>
-                Go to Sections to enroll a learner
-              </button>
             </EmptyState>
           )}
 

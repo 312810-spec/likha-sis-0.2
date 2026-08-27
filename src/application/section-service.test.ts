@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -21,10 +23,14 @@ class FakeSectionRepository implements SectionRepository {
     effectiveOn: string;
   }> = [];
   endCalls: Array<{ learnerId: string; membershipId: string; effectiveOn: string }> = [];
+  enrollMembershipCalls: Array<{ learnerId: string; sectionId: string; startsOn: string }> = [];
+  listEnrollableCalls = 0;
   sectionsToReturn: Section[] = [];
   rosterToReturn: SectionRosterMember[] = [];
   transferToReturn: TransferResult = { kind: "membershipNotFound" };
   endToReturn: EndEnrollmentResult = { kind: "notFound" };
+  enrollableToReturn: EnrollmentCandidate[] = [];
+  enrollMembershipToReturn: EnrollMembershipResult = { kind: "learnerNotFound" };
 
   async list(): Promise<Section[]> {
     return this.sectionsToReturn;
@@ -81,6 +87,20 @@ class FakeSectionRepository implements SectionRepository {
   }): Promise<EndEnrollmentResult> {
     this.endCalls.push(input);
     return this.endToReturn;
+  }
+
+  async listEnrollableLearners(): Promise<EnrollmentCandidate[]> {
+    this.listEnrollableCalls += 1;
+    return this.enrollableToReturn;
+  }
+
+  async enrollMembership(input: {
+    learnerId: string;
+    sectionId: string;
+    startsOn: string;
+  }): Promise<EnrollMembershipResult> {
+    this.enrollMembershipCalls.push(input);
+    return this.enrollMembershipToReturn;
   }
 }
 
@@ -359,5 +379,97 @@ describe("SectionApplicationService", () => {
       service.endMembership({ learnerId: "l1", membershipId: "mem-1", effectiveOn: "nope" }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(repo.endCalls).toEqual([]);
+  });
+
+  it("passes listEnrollableLearners straight through to the repository", async () => {
+    const repo = new FakeSectionRepository();
+    repo.enrollableToReturn = [
+      {
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Cruz",
+        lrn: null,
+        currentMembershipId: null,
+        currentSectionId: null,
+        currentSectionName: null,
+        currentStartsOn: null,
+      },
+    ];
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.listEnrollableLearners();
+
+    expect(result).toHaveLength(1);
+    expect(repo.listEnrollableCalls).toBe(1);
+  });
+
+  it("enrolls a learner with trimmed ids and a well-formed start date", async () => {
+    const repo = new FakeSectionRepository();
+    repo.enrollMembershipToReturn = {
+      kind: "enrolled",
+      membership: {
+        id: "mem-2",
+        schoolId: "current-session-school",
+        sectionId: "sec-1",
+        learnerId: "l1",
+        startsOn: "2026-08-24",
+        endsOn: null,
+        createdAt: "now",
+      },
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.enrollMembership({
+      learnerId: " l1 ",
+      sectionId: " sec-1 ",
+      startsOn: "2026-08-24",
+    });
+
+    expect(result.kind).toBe("enrolled");
+    expect(repo.enrollMembershipCalls).toEqual([
+      { learnerId: "l1", sectionId: "sec-1", startsOn: "2026-08-24" },
+    ]);
+  });
+
+  it("passes an alreadyEnrolled outcome through unchanged (no eligibility logic in the service)", async () => {
+    const repo = new FakeSectionRepository();
+    repo.enrollMembershipToReturn = {
+      kind: "alreadyEnrolled",
+      currentMembershipId: "m-x",
+      currentSectionId: "sec-9",
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.enrollMembership({
+      learnerId: "l1",
+      sectionId: "sec-1",
+      startsOn: "2026-08-24",
+    });
+
+    expect(result).toEqual({
+      kind: "alreadyEnrolled",
+      currentMembershipId: "m-x",
+      currentSectionId: "sec-9",
+    });
+  });
+
+  it("rejects enrolling with a missing learner id before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.enrollMembership({ learnerId: "  ", sectionId: "sec-1", startsOn: "2026-08-24" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.enrollMembershipCalls).toEqual([]);
+  });
+
+  it("rejects enrolling with a malformed start date before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.enrollMembership({ learnerId: "l1", sectionId: "sec-1", startsOn: "24-08-2026" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.enrollMembershipCalls).toEqual([]);
   });
 });

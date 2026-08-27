@@ -60,6 +60,8 @@ pub fn run() {
             commands::section::enroll_learner_in_section,
             commands::section::transfer_learner_membership,
             commands::section::end_learner_membership,
+            commands::section::enroll_learner_membership,
+            commands::section::list_enrollable_learners,
             commands::section::section_roster,
             commands::section::list_learner_enrollment_history,
             commands::section::get_current_enrollment,

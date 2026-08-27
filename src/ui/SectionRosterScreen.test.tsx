@@ -1,10 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionApplicationService } from "../application/section-service";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -31,6 +33,49 @@ const SECTION_B: Section = {
   name: "Rizal",
   createdAt: "now",
 };
+
+const MEMBERSHIP: SectionMembership = {
+  id: "m-new",
+  schoolId: "s1",
+  sectionId: "sec-1",
+  learnerId: "l-free",
+  startsOn: "2025-09-01",
+  endsOn: null,
+  createdAt: "now",
+};
+
+const ENROLLABLE: EnrollmentCandidate[] = [
+  {
+    learnerId: "l-free",
+    givenName: "Dina",
+    familyName: "Adan",
+    lrn: "999888777666",
+    currentMembershipId: null,
+    currentSectionId: null,
+    currentSectionName: null,
+    currentStartsOn: null,
+  },
+  {
+    learnerId: "l-here",
+    givenName: "Ella",
+    familyName: "Bravo",
+    lrn: null,
+    currentMembershipId: "m-here",
+    currentSectionId: "sec-1",
+    currentSectionName: "Mabini",
+    currentStartsOn: "2025-06-02",
+  },
+  {
+    learnerId: "l-elsewhere",
+    givenName: "Fe",
+    familyName: "Castro",
+    lrn: null,
+    currentMembershipId: "m-else",
+    currentSectionId: "sec-2",
+    currentSectionName: "Rizal",
+    currentStartsOn: "2025-06-02",
+  },
+];
 
 const MEMBERS: SectionRosterMember[] = [
   {
@@ -68,6 +113,12 @@ class FakeSectionRepository implements SectionRepository {
   endCalls: Array<{ learnerId: string; membershipId: string; effectiveOn: string }> = [];
   transferError: Error | null = null;
   endError: Error | null = null;
+  enrollableResult: EnrollmentCandidate[] = [];
+  enrollableError: Error | null = null;
+  enrollableCalls = 0;
+  enrollMembershipResult: EnrollMembershipResult = { kind: "enrolled", membership: MEMBERSHIP };
+  enrollMembershipError: Error | null = null;
+  enrollMembershipCalls: Array<{ learnerId: string; sectionId: string; startsOn: string }> = [];
 
   async list(): Promise<Section[]> {
     if (this.listError) throw this.listError;
@@ -103,6 +154,20 @@ class FakeSectionRepository implements SectionRepository {
     if (this.endError) throw this.endError;
     return this.endResult;
   }
+  async listEnrollableLearners(): Promise<EnrollmentCandidate[]> {
+    this.enrollableCalls += 1;
+    if (this.enrollableError) throw this.enrollableError;
+    return this.enrollableResult;
+  }
+  async enrollMembership(input: {
+    learnerId: string;
+    sectionId: string;
+    startsOn: string;
+  }): Promise<EnrollMembershipResult> {
+    this.enrollMembershipCalls.push(input);
+    if (this.enrollMembershipError) throw this.enrollMembershipError;
+    return this.enrollMembershipResult;
+  }
 }
 
 function renderScreen(overrides: Partial<FakeSectionRepository> = {}, sectionId = "sec-1") {
@@ -122,9 +187,16 @@ const GUIDED_NOTE = /always your class as it stands today/;
 
 beforeEach(() => {
   window.localStorage.clear();
+  // Pin "today" so tests that assert the default effective/start date (and
+  // the date input's `max`) do not break when the wall clock rolls over.
+  // Individual tests may still call `vi.useFakeTimers`/`setSystemTime`
+  // themselves for a different instant.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-27T09:00:00"));
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -173,12 +245,12 @@ describe("SectionRosterScreen", () => {
   });
 
   it("shows a normal, non-error empty state for a section with no current members", async () => {
-    const { onBack } = renderScreen({ rosterResult: [] });
+    renderScreen({ rosterResult: [] });
 
     expect(await screen.findByText(/No learners are enrolled in Mabini/)).toBeInTheDocument();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /Go to Sections to enroll a learner/ }));
-    expect(onBack).toHaveBeenCalled();
+    // The empty state points at the "Enroll learner" control, which stays
+    // available above the (empty) table.
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeInTheDocument();
   });
 
   it("shows a recovery state when the section id no longer resolves", async () => {
@@ -591,6 +663,189 @@ describe("SectionRosterScreen", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Refresh roster" }));
     expect(repo.rosterCalls).toHaveLength(2);
+  });
+
+  // --- Wave 2Q: enroll an existing learner from the roster ---
+
+  it("opens the enroll panel, lists eligible learners, and enrolls one with a refresh", async () => {
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    expect(await screen.findByText("Enroll a learner in Mabini")).toBeInTheDocument();
+    expect(repo.enrollableCalls).toBe(1);
+
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+
+    expect(
+      await screen.findByText(/Adan, Dina was enrolled in Mabini, effective 27 Aug 2026/),
+    ).toBeInTheDocument();
+    expect(repo.enrollMembershipCalls).toEqual([
+      { learnerId: "l-free", sectionId: "sec-1", startsOn: "2026-08-27" },
+    ]);
+    // roster re-fetched (first load + refresh) and the panel closed
+    expect(repo.rosterCalls).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Confirm enrollment" })).not.toBeInTheDocument();
+    // focus returns to the page heading after success
+    expect(screen.getByRole("heading", { name: "Mabini — roster" })).toHaveFocus();
+  });
+
+  it("filters the eligible-learner list by name or LRN", async () => {
+    renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.type(screen.getByLabelText("Find a learner"), "castro");
+
+    const select = screen.getByLabelText("Learner");
+    expect(within(select).getByRole("option", { name: /Castro, Fe/ })).toBeInTheDocument();
+    expect(within(select).queryByRole("option", { name: /Adan, Dina/ })).not.toBeInTheDocument();
+  });
+
+  it("shows an empty state when there are no learners in the school", async () => {
+    renderScreen({ enrollableResult: [] });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    expect(await screen.findByText(/no learners in this school yet/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+  });
+
+  it("blocks confirm and explains a transfer is needed for a learner enrolled elsewhere", async () => {
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-elsewhere");
+
+    expect(screen.getByText(/Moving them here is a transfer/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(repo.enrollMembershipCalls).toHaveLength(0);
+  });
+
+  it("blocks confirm for a learner already in this section", async () => {
+    renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-here");
+
+    expect(screen.getByText(/already enrolled in this section/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+  });
+
+  it("surfaces an overlapping-membership outcome as a fixable date error", async () => {
+    renderScreen({
+      enrollableResult: ENROLLABLE,
+      enrollMembershipResult: { kind: "overlappingMembership" },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/overlaps this start date/i);
+    // panel stays open with the entry intact
+    expect(screen.getByLabelText("Learner")).toHaveValue("l-free");
+  });
+
+  it("names the dependent-record category on a backdated-start conflict", async () => {
+    renderScreen({
+      enrollableResult: ENROLLABLE,
+      enrollMembershipResult: { kind: "dependentRecordConflict", record: "attendance" },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/attendance records/i);
+  });
+
+  it("treats a learnerNotFound outcome as a stale list and refetches candidates", async () => {
+    const { repo } = renderScreen({
+      enrollableResult: ENROLLABLE,
+      enrollMembershipResult: { kind: "learnerNotFound" },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/out of date/i);
+    expect(repo.enrollableCalls).toBe(2);
+  });
+
+  it("surfaces a thrown enroll error inside the panel without losing the entry", async () => {
+    renderScreen({
+      enrollableResult: ENROLLABLE,
+      enrollMembershipError: new Error("device offline"),
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be enrolled/i);
+    expect(screen.getByLabelText("Learner")).toHaveValue("l-free");
+  });
+
+  it("cancelling the enroll panel restores focus to the Enroll learner button", async () => {
+    renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toHaveFocus();
+  });
+
+  it("caps the enroll start date at today", async () => {
+    renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    const input = screen.getByLabelText("Start date");
+    expect(input).toHaveAttribute("max", "2026-08-27");
+    expect(input).toHaveValue("2026-08-27");
+  });
+
+  it("offers the enroll workflow in every teacher mode", async () => {
+    for (const mode of ["efficient", "comfortable", "guided"] as const) {
+      window.localStorage.setItem("likha-sis:teacher-mode", mode);
+      const { unmount } = renderScreen({ enrollableResult: ENROLLABLE });
+      await screen.findByText("Bautista, Ana");
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+      expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeInTheDocument();
+      expect(screen.getByLabelText("Learner")).toBeInTheDocument();
+      expect(screen.getByLabelText("Start date")).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("has no detectable accessibility violations with the enroll panel open", async () => {
+    const { container } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Enroll learner" }));
+    await screen.findByText("Enroll a learner in Mabini");
+    await expectNoAccessibilityViolations(container);
   });
 
   it("has no detectable accessibility violations with an action panel open", async () => {

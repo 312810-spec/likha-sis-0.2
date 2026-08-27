@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -168,6 +170,38 @@ describe("TauriSectionRepository", () => {
     const got = await new TauriSectionRepository().endMembership(input);
 
     expect(mockInvoke).toHaveBeenCalledWith("end_learner_membership", input);
+    expect(got).toEqual(result);
+  });
+
+  it("listEnrollableLearners invokes list_enrollable_learners with no arguments", async () => {
+    const rows: EnrollmentCandidate[] = [
+      {
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Cruz",
+        lrn: null,
+        currentMembershipId: null,
+        currentSectionId: null,
+        currentSectionName: null,
+        currentStartsOn: null,
+      },
+    ];
+    mockInvoke.mockResolvedValueOnce(rows);
+
+    const got = await new TauriSectionRepository().listEnrollableLearners();
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_enrollable_learners");
+    expect(got).toEqual(rows);
+  });
+
+  it("enrollMembership invokes enroll_learner_membership with the whole input object", async () => {
+    const result: EnrollMembershipResult = { kind: "overlappingMembership" };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const input = { learnerId: "l1", sectionId: "sec-1", startsOn: "2026-08-24" };
+    const got = await new TauriSectionRepository().enrollMembership(input);
+
+    expect(mockInvoke).toHaveBeenCalledWith("enroll_learner_membership", input);
     expect(got).toEqual(result);
   });
 });

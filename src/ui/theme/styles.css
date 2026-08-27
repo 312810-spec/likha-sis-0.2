@@ -752,6 +752,20 @@ label {
   gap: calc(var(--spacing-unit) * 0.5);
 }
 
+/* "Enroll learner": an inline panel above the roster table, styled like
+   the per-row transfer/end panel but sitting on the page surface rather
+   than inside a table row. */
+.section-roster-enroll {
+  margin: var(--spacing-unit) 0;
+}
+
+.section-roster-enroll .section-roster-action-panel {
+  padding: var(--spacing-unit);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-surface);
+}
+
 /* Narrow (phone-width): mirror the .attendance-roster / .score-entry
    pattern -- each learner becomes a labelled block rather than shrinking
    a desktop table into cells nobody can read. Same data, same order. */

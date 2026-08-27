@@ -90,6 +90,27 @@ fn end_membership_as_current_session(
     section_membership::end_membership(conn, &school_id, learner_id, membership_id, effective_on)
 }
 
+/// Standing in for `commands::section::enroll_learner_membership` (Wave 2Q).
+fn enroll_membership_as_current_session(
+    conn: &mut rusqlite::Connection,
+    sessions: &SessionManager,
+    learner_id: &str,
+    section_id: &str,
+    starts_on: &str,
+) -> AppResult<section_membership::EnrollOutcome> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageLearners)?;
+    section_membership::enroll_membership(conn, &school_id, learner_id, section_id, starts_on)
+}
+
+/// Standing in for `commands::section::list_enrollable_learners` (Wave 2Q).
+fn enrollable_learners_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+) -> AppResult<Vec<section_membership::EnrollmentCandidate>> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageLearners)?;
+    section_membership::enrollable_learners(conn, &school_id)
+}
+
 /// Standing in for `commands::section::create_section` (Wave 2A.1 fix).
 fn create_section_as_current_session(
     conn: &rusqlite::Connection,
@@ -589,6 +610,193 @@ fn a_stale_roster_tab_cannot_transfer_a_membership_that_already_changed() {
     let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
     assert_eq!(history.len(), 2, "no third membership was created");
     assert_eq!(history[1].section_id, section_b.id);
+}
+
+// --- Wave 2Q: enroll_learner_membership / list_enrollable_learners ---
+
+#[test]
+fn a_registrar_can_enroll_an_eligible_learner_at_the_command_boundary() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+
+    let outcome = enroll_membership_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &section.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    match outcome {
+        section_membership::EnrollOutcome::Enrolled { membership } => {
+            assert_eq!(membership.section_id, section.id);
+            assert_eq!(membership.school_id, school.id);
+            assert_eq!(membership.ends_on, None);
+        }
+        other => panic!("expected Enrolled, got {other:?}"),
+    }
+    let roster =
+        section_roster_as_current_session(&conn, &registrar, &section.id, "2026-09-01").unwrap();
+    assert_eq!(roster.len(), 1);
+}
+
+#[test]
+fn a_school_head_can_also_enroll_a_learner_via_the_membership_verb() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let head = login_with_role_at(&conn, &school.id, "head.a", role_repo::SCHOOL_HEAD);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+
+    let outcome =
+        enroll_membership_as_current_session(&mut conn, &head, &l.id, &section.id, "2026-08-24")
+            .unwrap();
+
+    assert!(matches!(
+        outcome,
+        section_membership::EnrollOutcome::Enrolled { .. }
+    ));
+}
+
+#[test]
+fn a_teacher_cannot_enroll_a_learner_via_the_membership_verb() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let _registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+
+    let result =
+        enroll_membership_as_current_session(&mut conn, &teacher, &l.id, &section.id, "2026-08-24");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    let history = section_membership::list_by_learner_in_school(&conn, &school.id, &l.id).unwrap();
+    assert_eq!(history.len(), 0, "an unauthorized attempt persists nothing");
+}
+
+#[test]
+fn enrolling_a_learner_via_the_membership_verb_requires_a_session() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let _ = registrar;
+
+    let anon = SessionManager::new();
+    let result =
+        enroll_membership_as_current_session(&mut conn, &anon, &l.id, &section.id, "2026-08-24");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn the_membership_verb_never_silently_moves_a_learner_already_enrolled_elsewhere() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m_a = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome = enroll_membership_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &section_b.id,
+        "2026-10-01",
+    )
+    .unwrap();
+
+    assert_eq!(
+        outcome,
+        section_membership::EnrollOutcome::AlreadyEnrolled {
+            current_membership_id: m_a.id,
+            current_section_id: section_a.id.clone(),
+        }
+    );
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 1, "the learner was not moved");
+    assert_eq!(history[0].section_id, section_a.id);
+}
+
+#[test]
+fn a_caller_cannot_enroll_using_another_schools_learner_or_section_id() {
+    let mut conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let section_a1 = section::create(&conn, &school_a.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b1 = section::create(&conn, &school_b.id, "2026-2027", "7", "Rizal").unwrap();
+    let l_b = learner::create(&conn, &school_b.id, "Ben", "Reyes", None, None).unwrap();
+    let l_a = learner::create(&conn, &school_a.id, "Ana", "Cruz", None, None).unwrap();
+    let reg_a = login_with_role_at(&conn, &school_a.id, "reg.a", role_repo::REGISTRAR);
+
+    // School A tries to enroll School B's learner.
+    assert_eq!(
+        enroll_membership_as_current_session(
+            &mut conn,
+            &reg_a,
+            &l_b.id,
+            &section_a1.id,
+            "2026-08-24"
+        )
+        .unwrap(),
+        section_membership::EnrollOutcome::LearnerNotFound
+    );
+    // School A tries to enroll into School B's section.
+    assert_eq!(
+        enroll_membership_as_current_session(
+            &mut conn,
+            &reg_a,
+            &l_a.id,
+            &section_b1.id,
+            "2026-08-24"
+        )
+        .unwrap(),
+        section_membership::EnrollOutcome::SectionNotFound
+    );
+    assert_eq!(
+        section_membership::list_by_learner_in_school(&conn, &school_b.id, &l_b.id)
+            .unwrap()
+            .len(),
+        0,
+        "no membership was created in either school"
+    );
+}
+
+#[test]
+fn a_registrar_lists_enrollable_learners_but_a_teacher_cannot() {
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let enrolled = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let free = learner::create(&conn, &school.id, "Bea", "Dizon", None, None).unwrap();
+    enroll_as_current_session(&conn, &registrar, &section.id, &enrolled.id, "2026-08-24").unwrap();
+
+    let candidates = enrollable_learners_as_current_session(&conn, &registrar).unwrap();
+    assert_eq!(candidates.len(), 2);
+    let free_row = candidates.iter().find(|c| c.learner_id == free.id).unwrap();
+    assert_eq!(free_row.current_membership_id, None);
+    let enrolled_row = candidates
+        .iter()
+        .find(|c| c.learner_id == enrolled.id)
+        .unwrap();
+    assert_eq!(enrolled_row.current_section_name.as_deref(), Some("Mabini"));
+
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+    assert!(matches!(
+        enrollable_learners_as_current_session(&conn, &teacher),
+        Err(AppError::Unauthorized)
+    ));
 }
 
 // --- Wave 2A.1: create_section authorization closure ---

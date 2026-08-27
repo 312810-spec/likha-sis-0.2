@@ -239,6 +239,14 @@ export class FixtureSectionRepository implements SectionRepository {
   async endMembership(): Promise<never> {
     throw new Error("dev-preview fixture: endMembership() is not wired -- read-only fixture");
   }
+  async listEnrollableLearners(): Promise<never> {
+    throw new Error(
+      "dev-preview fixture: listEnrollableLearners() is not wired -- read-only fixture",
+    );
+  }
+  async enrollMembership(): Promise<never> {
+    throw new Error("dev-preview fixture: enrollMembership() is not wired -- read-only fixture");
+  }
 }
 
 /** A small, deterministic per-learner day pattern so the monthly legend's

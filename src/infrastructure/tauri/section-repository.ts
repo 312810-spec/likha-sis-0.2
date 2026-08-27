@@ -1,6 +1,8 @@
 import { invoke } from "./invoke";
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -49,5 +51,17 @@ export class TauriSectionRepository implements SectionRepository {
     effectiveOn: string;
   }): Promise<EndEnrollmentResult> {
     return invoke<EndEnrollmentResult>("end_learner_membership", input);
+  }
+
+  listEnrollableLearners(): Promise<EnrollmentCandidate[]> {
+    return invoke<EnrollmentCandidate[]>("list_enrollable_learners");
+  }
+
+  enrollMembership(input: {
+    learnerId: string;
+    sectionId: string;
+    startsOn: string;
+  }): Promise<EnrollMembershipResult> {
+    return invoke<EnrollMembershipResult>("enroll_learner_membership", input);
   }
 }

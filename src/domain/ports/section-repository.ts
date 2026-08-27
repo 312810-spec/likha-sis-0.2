@@ -1,5 +1,7 @@
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -40,4 +42,23 @@ export interface SectionRepository {
     membershipId: string;
     effectiveOn: string;
   }): Promise<EndEnrollmentResult>;
+  /**
+   * Every learner in the current school with their current open membership
+   * state, for the "Enroll learner" picker. The authoritative eligibility
+   * check is always {@link enrollMembership}, never this list.
+   */
+  listEnrollableLearners(): Promise<EnrollmentCandidate[]>;
+  /**
+   * Place an existing, eligible learner into a section as of `startsOn`
+   * (`YYYY-MM-DD`), opening a fresh membership. Never throws for an
+   * expected negative case — those come back as an
+   * {@link EnrollMembershipResult} variant. Never moves a learner who is
+   * already enrolled: that is `alreadyEnrolled`, and the caller must
+   * choose transfer explicitly.
+   */
+  enrollMembership(input: {
+    learnerId: string;
+    sectionId: string;
+    startsOn: string;
+  }): Promise<EnrollMembershipResult>;
 }

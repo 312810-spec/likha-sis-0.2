@@ -1,6 +1,8 @@
 import { ValidationError } from "../domain/errors";
 import type {
   EndEnrollmentResult,
+  EnrollMembershipResult,
+  EnrollmentCandidate,
   Section,
   SectionMembership,
   SectionRosterMember,
@@ -144,6 +146,47 @@ export class SectionApplicationService {
       learnerId,
       membershipId,
       effectiveOn: input.effectiveOn,
+    });
+  }
+
+  /**
+   * Every learner in the current school with their current membership
+   * state, for the "Enroll learner" picker. No eligibility logic here —
+   * the Rust `enroll_membership` is authoritative on every rule.
+   */
+  listEnrollableLearners(): Promise<EnrollmentCandidate[]> {
+    return this.sections.listEnrollableLearners();
+  }
+
+  /**
+   * Place an existing learner into a section. Validates only the shape of
+   * the request (ids present, date well-formed); the Rust side is
+   * authoritative on authorization, school scope, whether the learner is
+   * already enrolled (transfer required), an overlapping membership, and
+   * dependent-record conflicts — those come back as
+   * {@link EnrollMembershipResult} variants, not thrown errors.
+   */
+  async enrollMembership(input: {
+    learnerId: string;
+    sectionId: string;
+    startsOn: string;
+  }): Promise<EnrollMembershipResult> {
+    const learnerId = input.learnerId.trim();
+    const sectionId = input.sectionId.trim();
+    if (learnerId.length === 0) {
+      throw new ValidationError("Learner is required.");
+    }
+    if (sectionId.length === 0) {
+      throw new ValidationError("Section is required.");
+    }
+    if (!DATE_PATTERN.test(input.startsOn)) {
+      throw new ValidationError("Start date must be in YYYY-MM-DD format.");
+    }
+
+    return this.sections.enrollMembership({
+      learnerId,
+      sectionId,
+      startsOn: input.startsOn,
     });
   }
 }

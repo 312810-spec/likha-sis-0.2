@@ -8,7 +8,8 @@ use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
 use crate::repository::section_membership::{
-    self, CurrentRosterMember, EndMembershipOutcome, SectionMembership, TransferOutcome,
+    self, CurrentRosterMember, EndMembershipOutcome, EnrollOutcome, EnrollmentCandidate,
+    SectionMembership, TransferOutcome,
 };
 
 /// `school_id` is derived from the session, never a parameter — same
@@ -143,6 +144,53 @@ pub fn end_learner_membership(
         &learner_id,
         &membership_id,
         &effective_on,
+    )
+}
+
+/// Every learner in the session's school with their current open
+/// membership state, for the Section Roster "Enroll learner" picker.
+/// Gated by `ManageLearners` -- a school-wide learner lookup, the same
+/// class of read as `find_learner_candidates` (also `ManageLearners`),
+/// not the narrow open-read convention. `school_id` is session-derived;
+/// the query in `section_membership::enrollable_learners` constrains
+/// scope on learners, memberships, and sections together.
+#[tauri::command]
+pub fn list_enrollable_learners(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Vec<EnrollmentCandidate>> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    section_membership::enrollable_learners(&conn, &school_id)
+}
+
+/// Places an existing, eligible learner into a section, effective
+/// `starts_on`. `learner_id`/`section_id` identify WHO and WHERE;
+/// `school_id` comes only from the session. Gated by `ManageLearners`,
+/// the same capability as `enroll_learner_in_section` /
+/// `transfer_learner_membership` / `end_learner_membership`. The
+/// structured `EnrollOutcome` distinguishes success from an unknown or
+/// cross-school learner/section, a learner already actively enrolled
+/// (transfer required -- never performed here), an overlapping retained
+/// membership, an invalid start date, and a backdated start that would
+/// strand dependent records. None expose SQL, ids beyond the caller's
+/// school, or another school's data.
+#[tauri::command]
+pub fn enroll_learner_membership(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+    section_id: String,
+    starts_on: String,
+) -> AppResult<EnrollOutcome> {
+    let mut conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    section_membership::enroll_membership(
+        &mut conn,
+        &school_id,
+        &learner_id,
+        &section_id,
+        &starts_on,
     )
 }
 
