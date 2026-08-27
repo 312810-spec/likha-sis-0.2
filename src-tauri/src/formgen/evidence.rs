@@ -204,6 +204,94 @@ pub const SF9_SYNTHETIC_V1_EVIDENCE: TemplateEvidence = TemplateEvidence {
     ),
 };
 
+/// SF10 (Learner's Permanent Academic Record, formerly Form 137) —
+/// Strengthened Senior High School variant, `SSHS SF 10 v2026.xlsx`,
+/// retrieved Wave 2M from an official DepEd Learner Information System
+/// subdomain. Registered as `CandidateUnverified`, NOT
+/// `AuthoritativeSourceConfirmed`: the file is DepEd-hosted and a
+/// strong governing-issuance lead exists (DepEd Memorandum No. 020,
+/// s. 2026, "Modified Electronic Class Record and School Form 10 for
+/// Strengthened Senior High School Pilot Implementers in School Year
+/// 2025-2026", confirmed to exist on deped.gov.ph), but the memorandum
+/// body could not be read this wave (scanned image PDF, no text layer,
+/// no OCR in the frozen harness), so the file-to-issuance binding —
+/// whether these exact bytes are the "corrected copy" the memo refers
+/// to, and the memo's exact template/field prescriptions — is
+/// unconfirmed. Hosting is provenance evidence, never sufficient
+/// evidence of governing applicability (Wave 2M directive). Structural
+/// facts recorded in `docs/form-evidence/sf10/`, not here.
+pub const SF10_SSHS_V2026_CANDIDATE_EVIDENCE: TemplateEvidence = TemplateEvidence {
+    form_type: "SF10",
+    version: "sshs-v2026-candidate",
+    provenance: ProvenanceState::CandidateUnverified,
+    fidelity: FidelityState::NotVerified,
+    source_organization: Some("Department of Education (Philippines) — Learner Information System"),
+    source_url: Some(
+        "https://support.lis.deped.gov.ph/support/downloads/schoolforms/SSHS%20SF%2010%20v2026.xlsx",
+    ),
+    retrieved_on: Some("2026-08-27"),
+    original_filename: Some("SSHS SF 10 v2026.xlsx"),
+    // Strong lead, deliberately NOT passed to `confirm_authoritative_source`
+    // this wave — the issuance exists but its text was not read, so
+    // promotion criteria are not genuinely satisfied (Wave 2M step 5).
+    authoritative_issuance: None,
+    applicability_notes: Some(
+        "Strengthened Senior High School (SHS) SF10. Governing-issuance LEAD (unconfirmed body): \
+         DepEd Memorandum No. 020, s. 2026 (13 Mar 2026). Curriculum: Strengthened SHS (DepEd \
+         Order No. 03, s. 2025). Effectivity lead: SY 2025-2026, pilot implementers. SHA-256 \
+         a08ae34ba7f8e54d19389ba45c61d0ce18b347d877bcd8dd796d66c372ce6774; 227334 bytes; \
+         Last-Modified 2026-03-17. Sheets FRONT/BACK/ANNEX/HELPER_SUBJECTS; contains formulas \
+         and data validation.",
+    ),
+    supersedes: None,
+    superseded_by: None,
+    evidence_gap_note: Some(
+        "DM 020 s. 2026 confirmed to EXIST on deped.gov.ph but its body was unreadable this wave \
+         (scanned PDF, no OCR in the frozen harness); file-to-issuance binding, exact field \
+         prescriptions, Academic-vs-TechPro template split, and non-pilot fallback all \
+         unconfirmed. Internal cell/title text not transcribed. Render fidelity never tested — \
+         no SF10 generator exists. Do NOT promote without reading the governing issuance.",
+    ),
+};
+
+/// SF10 (Learner's Permanent Academic Record) — Junior High School
+/// variant hosted on the same official DepEd LIS subdomain, retrieved
+/// Wave 2M. `CandidateUnverified` with an ADDITIONAL provenance
+/// concern beyond the SSHS file's: every JHS candidate inspected this
+/// wave carried a non-DepEd worksheet named "SirWedz Guides" (a known
+/// Filipino teacher-blogger's annotation), so even though the portal is
+/// official, these specific files are community-touched copies, not
+/// pristine DepEd masters. No governing DepEd Order/Memorandum was
+/// pinned for the JHS revision this wave.
+pub const SF10_JHS_CANDIDATE_EVIDENCE: TemplateEvidence = TemplateEvidence {
+    form_type: "SF10",
+    version: "jhs-2025-candidate",
+    provenance: ProvenanceState::CandidateUnverified,
+    fidelity: FidelityState::NotVerified,
+    source_organization: Some("Department of Education (Philippines) — Learner Information System"),
+    source_url: Some(
+        "https://support.lis.deped.gov.ph/support/downloads/schoolforms/School-Form-10-SF10-Learners-Permanent-Academic-Record-for-Junior-High-School.xlsx",
+    ),
+    retrieved_on: Some("2026-08-27"),
+    original_filename: Some("School-Form-10-SF10-Learners-Permanent-Academic-Record-for-Junior-High-School.xlsx"),
+    authoritative_issuance: None,
+    applicability_notes: Some(
+        "Junior High School (Grades 7-10) SF10. Curriculum lead: MATATAG (revised SF10 for EOSY \
+         2024-2025 / 2025-2026). SHA-256 \
+         cbed9d14d80b3e32c4b4f5e8a909a31c360d709bdddaed1ca56b37f86a086e1d; 96785 bytes. Sheets \
+         Front/\"SirWedz Guides\"/Back; zero formulas.",
+    ),
+    supersedes: None,
+    superseded_by: None,
+    evidence_gap_note: Some(
+        "No governing DepEd Order/Memorandum pinned for the JHS SF10 revision this wave. The \
+         file carries a non-DepEd \"SirWedz Guides\" worksheet — official portal, but a \
+         community-annotated copy, not a confirmed pristine DepEd master. Three of four JHS \
+         candidates fetched showed the same annotation. Internal content not transcribed; no \
+         SF10 generator exists.",
+    ),
+};
+
 /// The only SANCTIONED function in this codebase for moving a template
 /// INTO `ProvenanceState::AuthoritativeSourceConfirmed` — a convention
 /// enforced by callers, not by the type system (`TemplateEvidence`'s
@@ -387,6 +475,40 @@ mod tests {
             FidelityState::NotVerified
         );
         assert!(!SF9_SYNTHETIC_V1_EVIDENCE.is_fully_verified());
+    }
+
+    // --- Wave 2M: real SF10 candidates stay conservative ---
+
+    #[test]
+    fn sf10_candidates_are_candidate_unverified_and_never_fully_verified() {
+        for ev in [
+            &SF10_SSHS_V2026_CANDIDATE_EVIDENCE,
+            &SF10_JHS_CANDIDATE_EVIDENCE,
+        ] {
+            assert_eq!(ev.form_type, "SF10");
+            assert_eq!(ev.provenance, ProvenanceState::CandidateUnverified);
+            assert_eq!(ev.fidelity, FidelityState::NotVerified);
+            assert!(!ev.is_fully_verified());
+            // A real candidate must carry its provenance trail...
+            assert!(ev.source_url.is_some());
+            assert!(ev.retrieved_on.is_some());
+            assert!(ev.original_filename.is_some());
+            // ...but must NOT claim a confirmed governing issuance yet.
+            assert!(ev.authoritative_issuance.is_none());
+            assert!(ev.evidence_gap_note.is_some());
+        }
+    }
+
+    #[test]
+    fn an_sf10_candidate_cannot_be_promoted_without_reading_its_issuance() {
+        // The SSHS candidate has a strong issuance LEAD (DM 020 s. 2026)
+        // but its body was never read, so `authoritative_issuance` is
+        // deliberately `None` and the guard must refuse promotion.
+        let result = confirm_authoritative_source(
+            SF10_SSHS_V2026_CANDIDATE_EVIDENCE.provenance,
+            SF10_SSHS_V2026_CANDIDATE_EVIDENCE.authoritative_issuance,
+        );
+        assert!(result.is_err());
     }
 
     // --- Wave 2K required test: no PII required anywhere in this model ---

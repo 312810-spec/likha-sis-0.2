@@ -1,5 +1,65 @@
 # Verification Debt
 
+## Wave 2M — SF10 Authoritative Template Intake & Version Applicability (2026-08-27)
+
+Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,
+`docs/form-evidence/sf10/README.md`.
+
+**SF10 template provenance is `CandidateUnverified` for all four
+acquired candidates — none was promoted.** Six enumerated authority
+gaps (see `docs/form-evidence/sf10/README.md`):
+
+1. **DepEd Memorandum No. 020, s. 2026 body was never read.** Confirmed
+   to EXIST on deped.gov.ph (official page + PDF `DM_s2026_020r-1.pdf`)
+   and its high-level scope (Strengthened SHS, SY 2025-2026 pilot
+   implementers) is confirmed from the page — but the PDF is a scanned
+   image with no text layer and the frozen harness (ADR-0052) has no
+   OCR. So the file↔issuance binding (are the bytes of
+   `SSHS SF 10 v2026.xlsx` the "corrected copy" the memo distributes?),
+   the exact field prescriptions, and whether Academic and TechPro
+   share one SF10 or split are all **unconfirmed**. The
+   `formgen::template_version` SSHS entry models `track: None`
+   (shared) — this is the single most likely thing to change once the
+   memo is read.
+2. **No governing DepEd Order/Memorandum was pinned for the JHS MATATAG
+   SF10 revision.** Its applicability window (MATATAG, Grades 7-10,
+   from SY 2024-2025) rests on secondary sources only.
+3. **The JHS candidates are community-annotated.** Three of four
+   carried a non-DepEd `SirWedz Guides` worksheet. Official portal, but
+   not confirmed pristine DepEd masters. A clean DepEd JHS SF10 master
+   was not located.
+4. **Pre-MATATAG-era SF10 templates (DO 69 s. 2016, DO 4 s. 2014) were
+   not acquired** — only their issuance citations. `resolve()` returns
+   `NoApplicableTemplate` (by design, not a bug) for a K-to-12-era JHS
+   context, which blocks historical-record SF10 generation until those
+   templates are obtained.
+5. **Internal cell/title text of every candidate was not transcribed.**
+   Wave 2M did structural inspection only (sheet names, merges,
+   formulas, defined names, data validation, page setup, hidden
+   rows/cols) — no field-level mapping.
+6. **SF10 render fidelity is `NotVerified`** — no SF10 generator exists
+   and none was built (Wave 2M scope guard).
+
+**`formgen::template_version` has no persistence or command surface.**
+It is the resolver seam only; no real SF10 generation path exercises
+it yet (by design this wave).
+
+**One transient `rustc` internal-compiler-error** was observed once on
+a full `cargo test` immediately after `cargo fmt` rewrote
+`template_version.rs` mid-build. It did NOT reproduce: `cargo test
+--lib` (478 pass), `--doc` (0), `--tests`, and a full `cargo test`
+rerun were all clean afterwards. Recorded as a stale-incremental
+artifact, not a code defect — but noted here so a future session that
+hits it knows it was seen and cleared once.
+
+**Independent review**: security-reviewer + architecture-reviewer
+dispatched per ADR-0052's frozen-harness rules. [Outcome recorded here
+after they return / self-review substituted per the established
+fallback if the retrieval bug recurs — do not claim a review happened
+that did not.]
+
+**All prior verification debt (Wave 2L and earlier) remains intact.**
+
 ## Wave 2L — Final Harness Consolidation + Production Harness v1.0 (2026-08-27)
 
 Full record: `docs/adr/0052-wave2l-production-harness-v1.md`.

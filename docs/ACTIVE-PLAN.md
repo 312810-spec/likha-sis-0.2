@@ -1,5 +1,49 @@
 # ACTIVE PLAN
 
+## Wave 2M: SF10 Authoritative Template Intake & Version Applicability (added 2026-08-27) — complete
+
+Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,
+`docs/form-evidence/sf10/README.md`. Compliance-sensitive; DEPED_OFFICIAL_FORM
+/ TEMPLATE_EVIDENCE / HISTORICAL_DATA_COMPATIBILITY. Synthetic data only.
+Verification record:
+
+- **Repo/CI truth first**: HEAD `ce15a2e` = origin, tree clean; Wave 2L
+  `e04f64f` gates `33028634953`/`33028634929` both `completed/success`
+  re-confirmed via `gh`.
+- **Candidate acquisition**: 4 SF10 `.xlsx` from
+  `support.lis.deped.gov.ph` (HTTP 200, valid OOXML). SHA-256 + size +
+  HTTP Last-Modified/ETag recorded. Bytes kept in scratchpad OUTSIDE
+  the repo (redistribution judgment deferred, per ADR-0051); only
+  hashes/URLs/structure committed (`docs/form-evidence/sf10/`).
+- **Intake tool run** against all 4 + regression against the SF1
+  fixture (reproduces known hash/structure). Tool extended with
+  per-sheet structural evidence — umya API only, no new dependency;
+  `cargo build/clippy --example` clean.
+- **`formgen::evidence`**: 2 SF10 candidate records added, both
+  `CandidateUnverified`/`NotVerified`; promotion guard confirmed to
+  refuse them (no `authoritative_issuance`).
+- **`formgen::template_version`** (new): resolver + 10 tests — exact
+  match, wrong grade band, pre-era → `NoApplicableTemplate` (NOT
+  newest), `FidelityInsufficient`, `AmbiguousTemplates`,
+  `ProvenanceUnusable`, registry conservatism.
+- **Governing issuance**: DM 020 s.2026 confirmed to exist on
+  deped.gov.ph (SSHS SF10, SY 2025-2026 pilot); body unreadable
+  (scanned PDF, no OCR). DO 69 s.2016, DO 4 s.2014 = prior generations.
+  JHS revision issuance not pinned. All recorded as leads, none used
+  to promote.
+- **10-scenario decision** (ADR-0053): Recommended = evidence-backed
+  version registry + applicability resolver; Next Best = per-record
+  frozen template-version stamp (adopt when SF10 records persist).
+- **Checks actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` 478 lib + all
+  integration + 0 doctests pass (13 new). One transient post-`cargo
+fmt` rustc ICE, non-reproducing on clean rebuild — recorded, not a
+  defect. `npm run quality` — [record at commit].
+- **Independent review**: security + architecture reviewers dispatched
+  per frozen-harness rules; results/debt in `VERIFICATION-DEBT.md`.
+- **Scope guard held**: no SF10 generation/import/UI/persistence/
+  migration.
+
 ## Wave 2L: Final Harness Consolidation + Production Harness v1.0 + ProjectForge (added 2026-08-27) — complete
 
 Full record: `docs/adr/0052-wave2l-production-harness-v1.md`,

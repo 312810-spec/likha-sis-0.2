@@ -1769,6 +1769,64 @@ education/writing/design) as capability-selection recipes. It has its
 own independent memory and is not coupled to LIKHA at runtime; LIKHA
 does not depend on it at runtime and remains independently buildable.
 
+## Wave 2M — SF10 Template Applicability & Version Resolution (added 2026-08-27)
+
+Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`;
+form-evidence detail in `docs/form-evidence/sf10/README.md`.
+
+Turned the Wave 2K SF10 lead into the first real external consumer of
+`formgen::evidence`. Compliance-sensitive; evidence precedes fidelity
+claims.
+
+- **Four DepEd-hosted SF10 `.xlsx` candidates acquired** from
+  `support.lis.deped.gov.ph` (verified `*.deped.gov.ph` subdomain),
+  hashed, and structurally inspected. All registered as
+  `ProvenanceState::CandidateUnverified` / `FidelityState::NotVerified`
+  — **none promoted.** `SSHS SF 10 v2026.xlsx` is the cleanest (has
+  formulas + data validation, no community sheet); the three JHS
+  candidates all carry a non-DepEd `SirWedz Guides` worksheet
+  (community-annotated copies on the official portal — hosting is not
+  proof of authority).
+- **Governing-issuance research (primary sources on deped.gov.ph):**
+  DepEd Memorandum No. 020, s. 2026 (13 Mar 2026) governs the
+  Strengthened SHS SF10 for SY 2025-2026 pilot implementers —
+  confirmed to EXIST, but its body is a scanned PDF with no text layer
+  and the frozen harness has no OCR, so the file↔issuance binding and
+  exact field prescriptions are unconfirmed. DepEd Order No. 69,
+  s. 2016 (ECR + Form 137 for SHS) and DepEd Order No. 4, s. 2014
+  (modified school forms) are the prior generations. No single
+  governing issuance was pinned for the JHS MATATAG revision.
+- **Intake tool** (`examples/inspect_template_candidate.rs`) extended
+  with per-sheet structural evidence (formulas, defined names / print
+  areas, data validation, hidden rows/cols, page setup) and
+  workbook-level named ranges — **umya-spreadsheet's existing API
+  only, zero new dependency.** Still dev-only, read-only, never
+  registers anything. Regression-checked against the SF1 fixture.
+- **`formgen::template_version` (NEW, pure domain — no DB / command /
+  UI / migration):** `resolve(registry, FormContext,
+require_verified_fidelity)` selects the SF10 template version that
+  was **authoritative for the record's own context** (form, school-year
+  range, grade band, curriculum, optional track) and **fails
+  explicitly** (`NoApplicableTemplate` / `AmbiguousTemplates` /
+  `FidelityInsufficient` / `ProvenanceUnusable`) — it never falls back
+  to the newest template. This is the centralized seam later SF10
+  generation plugs into instead of scattering `school_year < "2025"`
+  checks. It reads `TemplateEvidence`'s provenance and fidelity as the
+  independent axes Wave 2K designed — the axes stay uncollapsed.
+- **10-scenario decision (ADR-0053):** Recommended = evidence-backed
+  `TemplateVersion` registry + centralized applicability resolver.
+  Next Best = per-record frozen template-version stamp (adopt as a
+  _complement_ the first time an SF10 record is persisted; nothing to
+  stamp this wave).
+- **The user's historical-fidelity hypothesis is supported by evidence
+  but NOT encoded as certainty** — SF10 has had ≥3 template generations
+  (DO 4 s.2014 → DO 69 s.2016 → MATATAG 2025 → DM 020 s.2026); older
+  records must keep their era's template. Modeled as leads, marked as
+  such, promotable only after reading the governing issuances.
+- **Deliberately NOT built** (Wave 2M scope guard): SF10
+  generation/import, teacher/transcript UI, historical-grade migration,
+  persistence, production export, any migration.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

@@ -102,6 +102,11 @@ fn main() -> ExitCode {
     println!("  Size (bytes):      {}", metadata.len());
     println!("  SHA-256:           {sha256}");
 
+    let extension = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+
     match umya_spreadsheet::reader::xlsx::read(path) {
         Ok(book) => {
             let sheet_names: Vec<String> = book
@@ -110,11 +115,67 @@ fn main() -> ExitCode {
                 .map(|s| s.name().to_string())
                 .collect();
             println!("  Workbook format:   Xlsx (parsed successfully)");
+            println!(
+                "  Macro project:     {}",
+                if extension == "xlsm" || extension == "xlsb" {
+                    "possibly (macro-enabled extension) — inspect xl/vbaProject.bin separately"
+                } else {
+                    "none (plain .xlsx has no VBA project by definition)"
+                }
+            );
+            let wb_defined: Vec<String> = book
+                .defined_names()
+                .iter()
+                .map(|d| format!("{} => {}", d.name(), d.address()))
+                .collect();
+            println!(
+                "  Workbook-level named ranges ({}): {}",
+                wb_defined.len(),
+                if wb_defined.is_empty() {
+                    "(none)".to_string()
+                } else {
+                    wb_defined.join(" | ")
+                }
+            );
             println!("  Sheet names:       {}", sheet_names.join(", "));
+
+            // Per-sheet structural evidence for future fidelity verification
+            // (Wave 2M): the recognition fingerprint plus the render-fidelity
+            // surface ADR-0051 named — merges, formulas, print geometry,
+            // defined names (print areas), data validation, hidden
+            // rows/cols/sheets. Read-only inspection; nothing is written.
             for name in &sheet_names {
                 if let Ok(sheet) = book.sheet_by_name(name) {
                     let merges = sheet.merge_cells().len();
-                    println!("    [{name}] merged-cell ranges: {merges}");
+                    let formulas = sheet.cells().iter().filter(|c| c.is_formula()).count();
+                    let sheet_defined = sheet.defined_names().len();
+                    let validations = sheet
+                        .data_validations()
+                        .map(|v| v.data_validation_list().len())
+                        .unwrap_or(0);
+                    let hidden_rows = sheet.row_dimensions().iter().filter(|r| r.hidden()).count();
+                    let hidden_cols = sheet
+                        .column_dimensions()
+                        .iter()
+                        .filter(|c| c.hidden())
+                        .count();
+                    let ps = sheet.page_setup();
+                    println!(
+                        "    [{name}] state={} used={}x{} merges={merges} formulas={formulas} \
+                         defined_names={sheet_defined} data_validations={validations} \
+                         hidden_rows={hidden_rows} hidden_cols={hidden_cols} \
+                         page_orientation={:?} page_scale={} fit_to={}x{}",
+                        sheet.sheet_state(),
+                        sheet.highest_column(),
+                        sheet.highest_row(),
+                        ps.orientation(),
+                        ps.scale(),
+                        ps.fit_to_width(),
+                        ps.fit_to_height(),
+                    );
+                    for d in sheet.defined_names().iter() {
+                        println!("      defined-name: {} => {}", d.name(), d.address());
+                    }
                 }
             }
         }

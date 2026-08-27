@@ -46,6 +46,9 @@ pub mod sf1;
 pub mod sf9;
 pub mod sf9_projection;
 pub mod template;
+// SF10 template applicability / version resolution — Wave 2M, see
+// docs/adr/0053-sf10-template-applicability-and-versioning.md.
+pub mod template_version;
 pub mod umya_adapter;
 
 use std::path::Path;

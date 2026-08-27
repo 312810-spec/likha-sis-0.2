@@ -1,5 +1,66 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-27 — Wave 2M: SF10 Authoritative Template Intake & Version Applicability, COMPLETE)
+
+Full record: `docs/adr/0053-sf10-template-applicability-and-versioning.md`,
+`docs/form-evidence/sf10/README.md`, `docs/VERIFICATION-DEBT.md` top
+entry. Same branch (`claude/likha-sis-wave2a-learner-core`).
+
+**Repository/CI truth verified first**: branch/HEAD `ce15a2e` = `origin`,
+0 ahead/behind; `main` `d9ab036`; tree clean. Wave 2L code checkpoint
+`e04f64f` re-confirmed via `gh run view` — Quality Gate `33028634953`
+
+- Security Gate `33028634929` both `completed/success`. Harness not
+  reopened.
+
+**What was built**:
+
+- Four DepEd-hosted SF10 `.xlsx` candidates acquired from
+  `support.lis.deped.gov.ph`, hashed, structurally inspected. All
+  `CandidateUnverified` / `NotVerified` — **none promoted** (governing
+  issuance bodies unreadable — scanned PDFs, no OCR in the frozen
+  harness). Manifest + structural findings + issuance research:
+  `docs/form-evidence/sf10/README.md`.
+- `formgen::evidence`: +2 real SF10 candidate `TemplateEvidence`
+  records (`SF10_SSHS_V2026_CANDIDATE_EVIDENCE`,
+  `SF10_JHS_CANDIDATE_EVIDENCE`) — the registry's **first real external
+  consumer**.
+- `formgen::template_version` (NEW pure-domain module): `resolve()`
+  picks the template authoritative for a record's own
+  (form/SY/grade/curriculum/track) context and **fails explicitly**
+  rather than falling back to newest. 10 resolver tests.
+- `examples/inspect_template_candidate.rs` extended (umya API only, no
+  new dep) with per-sheet formulas / defined names / data validation /
+  hidden rows-cols / page setup + workbook named ranges.
+- ADR-0053 with the 10-scenario decision (Recommended: evidence-backed
+  version registry + applicability resolver; Next Best: per-record
+  frozen template-version stamp, adopt when SF10 records are persisted).
+
+**Verification (all actually run)**: `cargo fmt --check` clean; `cargo
+clippy --all-targets -- -D warnings` clean; `cargo test` — 478 lib +
+all integration binaries + 0 doctests pass, incl. 13 new tests. One
+transient `rustc` ICE observed once right after `cargo fmt` rewrote a
+file mid-build; did not reproduce on clean rebuild (recorded honestly,
+not a code defect). `npm run quality` — [confirm at commit]. No new
+dependency, no migration, no Tauri command, no UI, no learner data.
+
+**Independent review**: security-reviewer + architecture-reviewer
+dispatched per the frozen-harness rules. Results / retained debt in
+`docs/VERIFICATION-DEBT.md`'s Wave 2M entry (self-review substituted +
+debt retained if the known retrieval bug recurred).
+
+**Exact next product action**: SF10 is evidence-gated, not
+feature-gated — do **not** start SF10 generation yet. Highest-value
+next steps, in order: (1) obtain a readable copy of DepEd Memorandum
+No. 020, s. 2026 (and the JHS MATATAG SF10 governing issuance) so the
+SSHS/JHS candidates can be promoted and the `track: None` assumption
+confirmed or split — this unblocks everything SF10; (2) if that stays
+blocked, return to LIKHA's priority order and pick the next
+highest-value milestone that does not depend on unproven SF10
+authority (e.g. a learner-profile or attendance/grading refinement),
+recording the SF10 evidence debt as carried. Do not fabricate SF10
+completion.
+
 ## Active Task (2026-08-27 — Wave 2L: Final Harness Consolidation + LIKHA Production Harness v1.0 + ProjectForge Extraction, COMPLETE and FROZEN)
 
 Full record: `docs/adr/0052-wave2l-production-harness-v1.md`. Portable
