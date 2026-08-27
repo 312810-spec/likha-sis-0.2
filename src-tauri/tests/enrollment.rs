@@ -58,6 +58,38 @@ fn section_roster_as_current_session(
     section_membership::current_roster(conn, &school_id, section_id, as_of_date)
 }
 
+/// Standing in for `commands::section::transfer_learner_membership` (Wave 2P).
+fn transfer_membership_as_current_session(
+    conn: &mut rusqlite::Connection,
+    sessions: &SessionManager,
+    learner_id: &str,
+    from_membership_id: &str,
+    to_section_id: &str,
+    effective_on: &str,
+) -> AppResult<section_membership::TransferOutcome> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageLearners)?;
+    section_membership::transfer_membership(
+        conn,
+        &school_id,
+        learner_id,
+        from_membership_id,
+        to_section_id,
+        effective_on,
+    )
+}
+
+/// Standing in for `commands::section::end_learner_membership` (Wave 2P).
+fn end_membership_as_current_session(
+    conn: &mut rusqlite::Connection,
+    sessions: &SessionManager,
+    learner_id: &str,
+    membership_id: &str,
+    effective_on: &str,
+) -> AppResult<section_membership::EndMembershipOutcome> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageLearners)?;
+    section_membership::end_membership(conn, &school_id, learner_id, membership_id, effective_on)
+}
+
 /// Standing in for `commands::section::create_section` (Wave 2A.1 fix).
 fn create_section_as_current_session(
     conn: &rusqlite::Connection,
@@ -312,6 +344,251 @@ fn a_caller_cannot_read_another_schools_section_roster_by_knowing_its_section_id
         0,
         "cross-school section-id enumeration must return nothing, not School B's learners"
     );
+}
+
+// --- Wave 2P: transfer + end enrollment command boundary ---
+
+#[test]
+fn a_registrar_can_transfer_a_learner_between_sections_at_the_command_boundary() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome = transfer_membership_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-10-01",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        outcome,
+        section_membership::TransferOutcome::Transferred { .. }
+    ));
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 2, "the prior placement is kept as history");
+    assert_eq!(history[0].ends_on.as_deref(), Some("2026-10-01"));
+    assert_eq!(history[1].section_id, section_b.id);
+    assert_eq!(history[1].ends_on, None);
+}
+
+#[test]
+fn a_registrar_can_end_a_learners_enrollment_at_the_command_boundary() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome =
+        end_membership_as_current_session(&mut conn, &registrar, &l.id, &m.id, "2026-10-01")
+            .unwrap();
+
+    assert!(matches!(
+        outcome,
+        section_membership::EndMembershipOutcome::Ended { .. }
+    ));
+    // Row is closed, not deleted; learner remains.
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].ends_on.as_deref(), Some("2026-10-01"));
+    assert!(learner::find_by_id_in_school(&conn, &school.id, &l.id)
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn a_school_head_can_also_transfer_and_end_enrollments() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let head = login_with_role_at(&conn, &school.id, "head.a", role_repo::SCHOOL_HEAD);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &head, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let transferred = transfer_membership_as_current_session(
+        &mut conn,
+        &head,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-09-01",
+    )
+    .unwrap();
+    let new_id = match transferred {
+        section_membership::TransferOutcome::Transferred { membership } => membership.id,
+        other => panic!("expected Transferred, got {other:?}"),
+    };
+    let ended =
+        end_membership_as_current_session(&mut conn, &head, &l.id, &new_id, "2026-12-20").unwrap();
+
+    assert!(matches!(
+        ended,
+        section_membership::EndMembershipOutcome::Ended { .. }
+    ));
+}
+
+#[test]
+fn a_teacher_cannot_transfer_or_end_an_enrollment() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+
+    let transfer = transfer_membership_as_current_session(
+        &mut conn,
+        &teacher,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-10-01",
+    );
+    let end = end_membership_as_current_session(&mut conn, &teacher, &l.id, &m.id, "2026-10-01");
+
+    assert!(matches!(transfer, Err(AppError::Unauthorized)));
+    assert!(matches!(end, Err(AppError::Unauthorized)));
+    // The membership table is untouched: still one open row in section A.
+    let history = section_membership::list_by_learner_in_school(&conn, &school.id, &l.id).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].section_id, section_a.id);
+    assert_eq!(history[0].ends_on, None);
+}
+
+#[test]
+fn transferring_or_ending_requires_a_session() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let anon = SessionManager::new();
+    let transfer = transfer_membership_as_current_session(
+        &mut conn,
+        &anon,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-10-01",
+    );
+    let end = end_membership_as_current_session(&mut conn, &anon, &l.id, &m.id, "2026-10-01");
+
+    assert!(matches!(transfer, Err(AppError::Unauthorized)));
+    assert!(matches!(end, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_caller_cannot_transfer_a_learner_using_another_schools_membership_id() {
+    let mut conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let section_b1 = section::create(&conn, &school_b.id, "2026-2027", "7", "Mabini").unwrap();
+    let head_b = login_with_role_at(&conn, &school_b.id, "head.b", role_repo::SCHOOL_HEAD);
+    let l_b = learner::create(&conn, &school_b.id, "Ana", "Cruz", None, None).unwrap();
+    let m_b = enroll_as_current_session(&conn, &head_b, &section_b1.id, &l_b.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    // School A's registrar, using School B's real membership id and learner id.
+    let section_a1 = section::create(&conn, &school_a.id, "2026-2027", "7", "Rizal").unwrap();
+    let reg_a = login_with_role_at(&conn, &school_a.id, "reg.a", role_repo::REGISTRAR);
+
+    let outcome = transfer_membership_as_current_session(
+        &mut conn,
+        &reg_a,
+        &l_b.id,
+        &m_b.id,
+        &section_a1.id,
+        "2026-10-01",
+    )
+    .unwrap();
+    let ended =
+        end_membership_as_current_session(&mut conn, &reg_a, &l_b.id, &m_b.id, "2026-10-01")
+            .unwrap();
+
+    assert_eq!(
+        outcome,
+        section_membership::TransferOutcome::MembershipNotFound,
+        "another school's membership id must be unusable, indistinguishable from unknown"
+    );
+    assert_eq!(ended, section_membership::EndMembershipOutcome::NotFound);
+    // School B's membership is completely untouched.
+    let history_b =
+        section_membership::list_by_learner_in_school(&conn, &school_b.id, &l_b.id).unwrap();
+    assert_eq!(history_b.len(), 1);
+    assert_eq!(history_b[0].section_id, section_b1.id);
+    assert_eq!(history_b[0].ends_on, None);
+}
+
+#[test]
+fn a_stale_roster_tab_cannot_transfer_a_membership_that_already_changed() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let section_c = section::create(&conn, &school.id, "2026-2027", "7", "Bonifacio").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m_a = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    // Someone transfers A -> B first.
+    transfer_membership_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m_a.id,
+        &section_b.id,
+        "2026-09-01",
+    )
+    .unwrap();
+
+    // A stale tab still holding m_a tries A -> C.
+    let stale = transfer_membership_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m_a.id,
+        &section_c.id,
+        "2026-09-15",
+    )
+    .unwrap();
+
+    assert_eq!(
+        stale,
+        section_membership::TransferOutcome::NotCurrent,
+        "the stale membership id is already closed; the second transfer must be refused"
+    );
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 2, "no third membership was created");
+    assert_eq!(history[1].section_id, section_b.id);
 }
 
 // --- Wave 2A.1: create_section authorization closure ---

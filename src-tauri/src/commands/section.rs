@@ -7,7 +7,9 @@ use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
-use crate::repository::section_membership::{self, CurrentRosterMember, SectionMembership};
+use crate::repository::section_membership::{
+    self, CurrentRosterMember, EndMembershipOutcome, SectionMembership, TransferOutcome,
+};
 
 /// `school_id` is derived from the session, never a parameter — same
 /// convention as `commands::learner::list_learners_by_school`.
@@ -85,6 +87,63 @@ pub fn section_roster(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     section_membership::current_roster(&conn, &school_id, &section_id, &as_of_date)
+}
+
+/// Transfers a currently-enrolled learner to another section, effective
+/// `effective_on`. `from_membership_id`/`to_section_id`/`learner_id`
+/// identify WHICH placement and WHERE; `school_id` still comes only from the
+/// session. Gated by `ManageLearners` -- the same capability as
+/// `enroll_learner_in_section`, since "moving a learner between sections" is
+/// managing that learner's enrollment (ADR-0042). The structured
+/// `TransferOutcome` distinguishes success from stale-roster, unknown
+/// membership, unknown/`same` destination, and an effective date before the
+/// placement began -- the UI maps each to its own message; none expose SQL,
+/// ids, or another school's data.
+#[tauri::command]
+pub fn transfer_learner_membership(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+    from_membership_id: String,
+    to_section_id: String,
+    effective_on: String,
+) -> AppResult<TransferOutcome> {
+    let mut conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    section_membership::transfer_membership(
+        &mut conn,
+        &school_id,
+        &learner_id,
+        &from_membership_id,
+        &to_section_id,
+        &effective_on,
+    )
+}
+
+/// Ends a currently-enrolled learner's specific open membership, effective
+/// `effective_on`. Sets `ends_on` (never deletes), so the placement history
+/// is preserved. `membership_id`/`learner_id` identify WHICH placement;
+/// `school_id` comes only from the session. Gated by `ManageLearners`, same
+/// as transfer/enroll. The structured `EndMembershipOutcome` distinguishes
+/// success from stale-roster, unknown membership, and an effective date
+/// before the placement began.
+#[tauri::command]
+pub fn end_learner_membership(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+    membership_id: String,
+    effective_on: String,
+) -> AppResult<EndMembershipOutcome> {
+    let mut conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    section_membership::end_membership(
+        &mut conn,
+        &school_id,
+        &learner_id,
+        &membership_id,
+        &effective_on,
+    )
 }
 
 /// A learner's full enrollment (section-placement) history -- ungated

@@ -3,7 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionApplicationService } from "../application/section-service";
 import type { SectionRepository } from "../domain/ports/section-repository";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  EndEnrollmentResult,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+  TransferResult,
+} from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { SectionRosterScreen } from "./SectionRosterScreen";
@@ -17,8 +23,18 @@ const SECTION: Section = {
   createdAt: "now",
 };
 
+const SECTION_B: Section = {
+  id: "sec-2",
+  schoolId: "s1",
+  schoolYear: "2025-2026",
+  gradeLevel: "7",
+  name: "Rizal",
+  createdAt: "now",
+};
+
 const MEMBERS: SectionRosterMember[] = [
   {
+    membershipId: "m-bautista",
     learnerId: "l-bautista",
     givenName: "Ana",
     familyName: "Bautista",
@@ -26,6 +42,7 @@ const MEMBERS: SectionRosterMember[] = [
     startsOn: "2025-06-02",
   },
   {
+    membershipId: "m-cruz",
     learnerId: "l-cruz",
     givenName: "Ben",
     familyName: "Cruz",
@@ -35,11 +52,22 @@ const MEMBERS: SectionRosterMember[] = [
 ];
 
 class FakeSectionRepository implements SectionRepository {
-  sections: Section[] = [SECTION];
+  sections: Section[] = [SECTION, SECTION_B];
   rosterResult: SectionRosterMember[] = MEMBERS;
   listError: Error | null = null;
   rosterError: Error | null = null;
   rosterCalls: Array<{ sectionId: string; asOfDate: string }> = [];
+  transferResult: TransferResult = { kind: "membershipNotFound" };
+  endResult: EndEnrollmentResult = { kind: "notFound" };
+  transferCalls: Array<{
+    learnerId: string;
+    fromMembershipId: string;
+    toSectionId: string;
+    effectiveOn: string;
+  }> = [];
+  endCalls: Array<{ learnerId: string; membershipId: string; effectiveOn: string }> = [];
+  transferError: Error | null = null;
+  endError: Error | null = null;
 
   async list(): Promise<Section[]> {
     if (this.listError) throw this.listError;
@@ -55,6 +83,25 @@ class FakeSectionRepository implements SectionRepository {
     this.rosterCalls.push({ sectionId, asOfDate });
     if (this.rosterError) throw this.rosterError;
     return this.rosterResult;
+  }
+  async transferMembership(input: {
+    learnerId: string;
+    fromMembershipId: string;
+    toSectionId: string;
+    effectiveOn: string;
+  }): Promise<TransferResult> {
+    this.transferCalls.push(input);
+    if (this.transferError) throw this.transferError;
+    return this.transferResult;
+  }
+  async endMembership(input: {
+    learnerId: string;
+    membershipId: string;
+    effectiveOn: string;
+  }): Promise<EndEnrollmentResult> {
+    this.endCalls.push(input);
+    if (this.endError) throw this.endError;
+    return this.endResult;
   }
 }
 
@@ -215,6 +262,7 @@ describe("SectionRosterScreen", () => {
       "Learner",
       "LRN",
       "Enrolled since",
+      "Actions",
     ]);
     expect(screen.getAllByRole("rowheader").map((h) => h.textContent)).toEqual([
       "Bautista, Ana",
@@ -240,6 +288,208 @@ describe("SectionRosterScreen", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     await user.tab();
     expect(screen.getByRole("button", { name: "Back to sections" })).toHaveFocus();
+  });
+
+  // --- Wave 2P: transfer + end enrollment from a roster row ---
+
+  it("transfers a learner to another section and refreshes the roster", async () => {
+    const { repo } = renderScreen({
+      transferResult: {
+        kind: "transferred",
+        membership: {
+          id: "m-new",
+          schoolId: "s1",
+          sectionId: "sec-2",
+          learnerId: "l-bautista",
+          startsOn: "2026-08-27",
+          endsOn: null,
+          createdAt: "now",
+        },
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(await screen.findByText(/Bautista, Ana was transferred to Rizal/)).toBeInTheDocument();
+    expect(repo.transferCalls).toEqual([
+      {
+        learnerId: "l-bautista",
+        fromMembershipId: "m-bautista",
+        toSectionId: "sec-2",
+        effectiveOn: "2026-08-27",
+      },
+    ]);
+    // roster re-fetched after the change (first load + refresh)
+    expect(repo.rosterCalls).toHaveLength(2);
+    // panel closed
+    expect(screen.queryByRole("button", { name: "Confirm transfer" })).not.toBeInTheDocument();
+  });
+
+  it("ends a learner's enrollment and refreshes the roster", async () => {
+    const { repo } = renderScreen({
+      endResult: {
+        kind: "ended",
+        membership: {
+          id: "m-bautista",
+          schoolId: "s1",
+          sectionId: "sec-1",
+          learnerId: "l-bautista",
+          startsOn: "2025-06-02",
+          endsOn: "2026-08-27",
+          createdAt: "now",
+        },
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
+
+    expect(
+      await screen.findByText(/Bautista, Ana's enrollment in Mabini was ended/),
+    ).toBeInTheDocument();
+    expect(repo.endCalls).toEqual([
+      { learnerId: "l-bautista", membershipId: "m-bautista", effectiveOn: "2026-08-27" },
+    ]);
+    expect(repo.rosterCalls).toHaveLength(2);
+  });
+
+  it("cancels an action without calling the repository and restores focus to the trigger", async () => {
+    const { repo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    const trigger = screen.getByRole("button", { name: /Transfer Ana Bautista/ });
+    await user.click(trigger);
+    expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("button", { name: "Confirm transfer" })).not.toBeInTheDocument();
+    expect(repo.transferCalls).toEqual([]);
+    expect(trigger).toHaveFocus();
+  });
+
+  it("only lets one action panel be open at a time", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+
+    // Every other row action is disabled while a panel is open.
+    expect(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Transfer Ben Cruz/ })).toBeDisabled();
+  });
+
+  it("moves focus into the panel when it opens", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Transfer Ana Bautista", { selector: "p" })).toHaveFocus(),
+    );
+  });
+
+  it("shows a stale-conflict recovery when the membership already changed, then refreshes", async () => {
+    const { repo } = renderScreen({ transferResult: { kind: "notCurrent" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(
+      await screen.findByText(/enrollment changed since you opened this roster/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Refresh roster" }));
+
+    expect(repo.rosterCalls).toHaveLength(2);
+    expect(screen.queryByText(/enrollment changed since you opened/)).not.toBeInTheDocument();
+  });
+
+  it("shows an inline, fixable error when the destination is the learner's current section", async () => {
+    renderScreen({ transferResult: { kind: "sameSection" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(await screen.findByText(/already in/)).toBeInTheDocument();
+    // Panel stays open so the teacher can pick a different section.
+    expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeInTheDocument();
+  });
+
+  it("explains an effective date that precedes the learner's start date", async () => {
+    renderScreen({ transferResult: { kind: "invalidEffectiveDate" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(
+      await screen.findByText(/cannot be before this learner joined the section/),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the teacher to create another section when there is nowhere to transfer to", async () => {
+    renderScreen({ sections: [SECTION] });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+
+    expect(screen.getByText(/no other section to move this learner to/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeDisabled();
+  });
+
+  it("surfaces a thrown command error inside the panel without losing the entry", async () => {
+    renderScreen({ endError: new Error("device offline") });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
+
+    expect(await screen.findByText(/could not be saved/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm end of enrollment" })).toBeInTheDocument();
+  });
+
+  it("offers the same action controls in every teacher mode", async () => {
+    for (const mode of ["efficient", "comfortable", "guided"] as const) {
+      window.localStorage.setItem("likha-sis:teacher-mode", mode);
+      const { unmount } = renderScreen();
+      await screen.findByText("Bautista, Ana");
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+      expect(screen.getByLabelText("Move to section")).toBeInTheDocument();
+      expect(screen.getByLabelText("Effective date")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("has no detectable accessibility violations with an action panel open", async () => {
+    const { container } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    await userEvent.setup().click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await expectNoAccessibilityViolations(container);
   });
 
   it("has no detectable accessibility violations with a populated roster", async () => {

@@ -233,6 +233,12 @@ export class FixtureSectionRepository implements SectionRepository {
   async roster(): Promise<SectionRosterMember[]> {
     return [];
   }
+  async transferMembership(): Promise<never> {
+    throw new Error("dev-preview fixture: transferMembership() is not wired -- read-only fixture");
+  }
+  async endMembership(): Promise<never> {
+    throw new Error("dev-preview fixture: endMembership() is not wired -- read-only fixture");
+  }
 }
 
 /** A small, deterministic per-learner day pattern so the monthly legend's

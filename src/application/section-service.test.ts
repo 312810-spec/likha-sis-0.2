@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  EndEnrollmentResult,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+  TransferResult,
+} from "../domain/section";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import { SectionApplicationService } from "./section-service";
 
@@ -8,8 +14,17 @@ class FakeSectionRepository implements SectionRepository {
   createCalls: Array<{ schoolYear: string; gradeLevel: string; name: string }> = [];
   enrollCalls: Array<{ sectionId: string; learnerId: string; startsOn: string }> = [];
   rosterCalls: Array<{ sectionId: string; asOfDate: string }> = [];
+  transferCalls: Array<{
+    learnerId: string;
+    fromMembershipId: string;
+    toSectionId: string;
+    effectiveOn: string;
+  }> = [];
+  endCalls: Array<{ learnerId: string; membershipId: string; effectiveOn: string }> = [];
   sectionsToReturn: Section[] = [];
   rosterToReturn: SectionRosterMember[] = [];
+  transferToReturn: TransferResult = { kind: "membershipNotFound" };
+  endToReturn: EndEnrollmentResult = { kind: "notFound" };
 
   async list(): Promise<Section[]> {
     return this.sectionsToReturn;
@@ -47,6 +62,25 @@ class FakeSectionRepository implements SectionRepository {
   async roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
     this.rosterCalls.push({ sectionId, asOfDate });
     return this.rosterToReturn;
+  }
+
+  async transferMembership(input: {
+    learnerId: string;
+    fromMembershipId: string;
+    toSectionId: string;
+    effectiveOn: string;
+  }): Promise<TransferResult> {
+    this.transferCalls.push(input);
+    return this.transferToReturn;
+  }
+
+  async endMembership(input: {
+    learnerId: string;
+    membershipId: string;
+    effectiveOn: string;
+  }): Promise<EndEnrollmentResult> {
+    this.endCalls.push(input);
+    return this.endToReturn;
   }
 }
 
@@ -167,7 +201,14 @@ describe("SectionApplicationService", () => {
   it("fetches a roster with a trimmed section id and a well-formed date", async () => {
     const repo = new FakeSectionRepository();
     repo.rosterToReturn = [
-      { learnerId: "l1", givenName: "Ana", familyName: "Cruz", lrn: null, startsOn: "2026-08-01" },
+      {
+        membershipId: "mem-1",
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Cruz",
+        lrn: null,
+        startsOn: "2026-08-01",
+      },
     ];
     const service = new SectionApplicationService(repo);
 
@@ -191,5 +232,132 @@ describe("SectionApplicationService", () => {
 
     await expect(service.roster("sec-1", "Sept 1")).rejects.toBeInstanceOf(ValidationError);
     expect(repo.rosterCalls).toEqual([]);
+  });
+
+  it("transfers a membership with trimmed ids and a well-formed effective date", async () => {
+    const repo = new FakeSectionRepository();
+    repo.transferToReturn = {
+      kind: "transferred",
+      membership: {
+        id: "mem-2",
+        schoolId: "current-session-school",
+        sectionId: "sec-2",
+        learnerId: "l1",
+        startsOn: "2026-10-01",
+        endsOn: null,
+        createdAt: "now",
+      },
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.transferMembership({
+      learnerId: " l1 ",
+      fromMembershipId: " mem-1 ",
+      toSectionId: " sec-2 ",
+      effectiveOn: "2026-10-01",
+    });
+
+    expect(result.kind).toBe("transferred");
+    expect(repo.transferCalls).toEqual([
+      {
+        learnerId: "l1",
+        fromMembershipId: "mem-1",
+        toSectionId: "sec-2",
+        effectiveOn: "2026-10-01",
+      },
+    ]);
+  });
+
+  it("passes a negative transfer outcome straight through without throwing", async () => {
+    const repo = new FakeSectionRepository();
+    repo.transferToReturn = { kind: "sameSection" };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.transferMembership({
+      learnerId: "l1",
+      fromMembershipId: "mem-1",
+      toSectionId: "sec-1",
+      effectiveOn: "2026-10-01",
+    });
+
+    expect(result).toEqual({ kind: "sameSection" });
+  });
+
+  it("rejects a transfer with a missing destination section id before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.transferMembership({
+        learnerId: "l1",
+        fromMembershipId: "mem-1",
+        toSectionId: "   ",
+        effectiveOn: "2026-10-01",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.transferCalls).toEqual([]);
+  });
+
+  it("rejects a transfer with a malformed effective date before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.transferMembership({
+        learnerId: "l1",
+        fromMembershipId: "mem-1",
+        toSectionId: "sec-2",
+        effectiveOn: "01-10-2026",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.transferCalls).toEqual([]);
+  });
+
+  it("ends a membership with trimmed ids and a well-formed effective date", async () => {
+    const repo = new FakeSectionRepository();
+    repo.endToReturn = {
+      kind: "ended",
+      membership: {
+        id: "mem-1",
+        schoolId: "current-session-school",
+        sectionId: "sec-1",
+        learnerId: "l1",
+        startsOn: "2026-08-01",
+        endsOn: "2026-10-01",
+        createdAt: "now",
+      },
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.endMembership({
+      learnerId: " l1 ",
+      membershipId: " mem-1 ",
+      effectiveOn: "2026-10-01",
+    });
+
+    expect(result.kind).toBe("ended");
+    expect(repo.endCalls).toEqual([
+      { learnerId: "l1", membershipId: "mem-1", effectiveOn: "2026-10-01" },
+    ]);
+  });
+
+  it("rejects ending a membership with a missing membership id before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.endMembership({ learnerId: "l1", membershipId: "  ", effectiveOn: "2026-10-01" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.endCalls).toEqual([]);
+  });
+
+  it("rejects ending a membership with a malformed effective date before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.endMembership({ learnerId: "l1", membershipId: "mem-1", effectiveOn: "nope" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.endCalls).toEqual([]);
   });
 });

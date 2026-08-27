@@ -1,5 +1,11 @@
 import { ValidationError } from "../domain/errors";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  EndEnrollmentResult,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+  TransferResult,
+} from "../domain/section";
 import type { SectionRepository } from "../domain/ports/section-repository";
 
 const MAX_FIELD_LENGTH = 100;
@@ -73,5 +79,71 @@ export class SectionApplicationService {
     }
 
     return this.sections.roster(trimmedSectionId, asOfDate);
+  }
+
+  /**
+   * Transfer a currently-enrolled learner to another section. Validates the
+   * shape of the request (ids present, date well-formed); the Rust side is
+   * authoritative on authorization, same-section rejection, whether the
+   * membership is still current, and whether the destination exists — those
+   * come back as {@link TransferResult} variants, not thrown errors.
+   */
+  async transferMembership(input: {
+    learnerId: string;
+    fromMembershipId: string;
+    toSectionId: string;
+    effectiveOn: string;
+  }): Promise<TransferResult> {
+    const learnerId = input.learnerId.trim();
+    const fromMembershipId = input.fromMembershipId.trim();
+    const toSectionId = input.toSectionId.trim();
+    if (learnerId.length === 0) {
+      throw new ValidationError("Learner is required.");
+    }
+    if (fromMembershipId.length === 0) {
+      throw new ValidationError("The current enrollment is required.");
+    }
+    if (toSectionId.length === 0) {
+      throw new ValidationError("Destination section is required.");
+    }
+    if (!DATE_PATTERN.test(input.effectiveOn)) {
+      throw new ValidationError("Effective date must be in YYYY-MM-DD format.");
+    }
+
+    return this.sections.transferMembership({
+      learnerId,
+      fromMembershipId,
+      toSectionId,
+      effectiveOn: input.effectiveOn,
+    });
+  }
+
+  /**
+   * End a currently-enrolled learner's membership. As with
+   * {@link transferMembership}, negative outcomes come back as an
+   * {@link EndEnrollmentResult} variant rather than a thrown error.
+   */
+  async endMembership(input: {
+    learnerId: string;
+    membershipId: string;
+    effectiveOn: string;
+  }): Promise<EndEnrollmentResult> {
+    const learnerId = input.learnerId.trim();
+    const membershipId = input.membershipId.trim();
+    if (learnerId.length === 0) {
+      throw new ValidationError("Learner is required.");
+    }
+    if (membershipId.length === 0) {
+      throw new ValidationError("The current enrollment is required.");
+    }
+    if (!DATE_PATTERN.test(input.effectiveOn)) {
+      throw new ValidationError("Effective date must be in YYYY-MM-DD format.");
+    }
+
+    return this.sections.endMembership({
+      learnerId,
+      membershipId,
+      effectiveOn: input.effectiveOn,
+    });
   }
 }

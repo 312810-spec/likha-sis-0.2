@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { SectionApplicationService } from "../application/section-service";
+import { ValidationError } from "../domain/errors";
 import type { Section, SectionRosterMember } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
@@ -45,26 +46,46 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+/** The effective date a transfer/end panel opens with: today, unless the
+ * learner's placement starts in the future, in which case the earliest
+ * date the change can take effect is that start date. */
+function defaultEffectiveOn(member: SectionRosterMember): string {
+  const today = todayAsIsoDate();
+  return today < member.startsOn ? member.startsOn : today;
+}
+
+type ActionKind = "transfer" | "end";
+
+interface ActiveAction {
+  member: SectionRosterMember;
+  kind: ActionKind;
+}
+
 /**
- * A read-only "open my class roster" view: the learners whose placement in
- * one section is currently open (half-open membership interval contains
- * today). Deliberately narrow this wave — no transfer, no end-enrollment,
- * no bulk/import. Those are the next increment and hang off the same
- * command/domain seam: a selected roster row → a membership action
- * (transfer / end enrollment), never a client-side mutation of roster
- * state.
+ * "Open my class roster" plus the two membership changes that hang off a
+ * roster row: transfer a currently-enrolled learner to another section, or
+ * end their enrollment. Both are effective-dated, preserve the prior
+ * placement as history (the Rust side sets an end date, never deletes),
+ * and are enforced at the Tauri command boundary — this screen only
+ * gathers the effective date / destination and shows the outcome.
+ *
+ * Every membership change targets the exact `membershipId` carried on the
+ * roster row. If the placement changed in another tab/session since this
+ * roster loaded, the command refuses (returns `notCurrent` /
+ * `membershipNotFound`) rather than acting on a different membership, and
+ * this screen shows a "refresh and try again" recovery instead of a
+ * silent wrong write.
  *
  * Opening the screen makes two sequential command calls — `listSections()`
  * then `roster()` — on purpose: the section list is re-fetched (rather than
  * trusting a handed-in `Section`) so a section deleted/renamed since the
  * Sections screen was last loaded lands on a clear recovery state instead
- * of a stale header.
+ * of a stale header. The full section list is also what the transfer
+ * destination picker offers.
  *
  * Ordering is family name then given name — decided once, in the
  * repository query, matching `export::report_card` / `formgen::sf1`; this
- * screen never re-sorts. No search box: one section is tens of learners, a
- * stable sorted list scans faster than it filters, and adding a query
- * surface now would be speculative (see Wave 2O notes).
+ * screen never re-sorts.
  */
 export function SectionRosterScreen({
   sectionService,
@@ -73,12 +94,21 @@ export function SectionRosterScreen({
 }: SectionRosterScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const panelHeadingRef = useRef<HTMLParagraphElement>(null);
+  // The row action button that opened the current panel, so focus can be
+  // returned to it on cancel (the button stays in the DOM — the panel is a
+  // sibling row, not a replacement). Restored in an effect, not inline in
+  // the click handler: the trigger is `disabled` until `activeAction`
+  // clears, so `.focus()` has to wait for the re-render.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef(false);
   // Fixed for the lifetime of the screen: the roster is "who is enrolled
   // right now", evaluated once on open. Lazy initialiser so it is stable
   // without reading a ref during render.
   const [asOfDate] = useState(todayAsIsoDate);
 
   const [section, setSection] = useState<Section | null>(null);
+  const [allSections, setAllSections] = useState<Section[]>([]);
   const [sectionState, setSectionState] = useState<"loading" | "ready" | "not-found" | "error">(
     "loading",
   );
@@ -88,13 +118,35 @@ export function SectionRosterScreen({
   // newer one -- same guard AttendanceScreen uses for its roster fetch.
   const requestRef = useRef(0);
 
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<ActiveAction | null>(null);
+  const [effectiveOn, setEffectiveOn] = useState("");
+  const [destinationId, setDestinationId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  // An inline problem shown inside the open panel that the teacher can fix
+  // and retry without losing what they entered (bad date, same section).
+  const [panelError, setPanelError] = useState<string | null>(null);
+  // The stronger "someone changed this enrollment while you had the roster
+  // open" state — the panel switches to a Refresh action.
+  const [staleConflict, setStaleConflict] = useState(false);
+
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
 
-  function focusHeading() {
-    headingRef.current?.focus();
-  }
+  useEffect(() => {
+    if (activeAction) {
+      panelHeadingRef.current?.focus();
+      return;
+    }
+    // Panel just closed: if it was a cancel/close (not a successful save,
+    // which sends focus to the page heading), return focus to the row
+    // button that opened it — now re-enabled by this same render.
+    if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [activeAction]);
 
   function loadRoster(forSection: Section) {
     const requestId = ++requestRef.current;
@@ -118,6 +170,7 @@ export function SectionRosterScreen({
       .listSections()
       .then((sections) => {
         if (requestRef.current !== requestId) return;
+        setAllSections(sections);
         const found = sections.find((candidate) => candidate.id === sectionId) ?? null;
         if (!found) {
           setSectionState("not-found");
@@ -142,6 +195,139 @@ export function SectionRosterScreen({
     loadSection();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectionService, sectionId]);
+
+  const otherSections = allSections.filter((candidate) => candidate.id !== sectionId);
+
+  function openAction(member: SectionRosterMember, kind: ActionKind, trigger: HTMLButtonElement) {
+    triggerRef.current = trigger;
+    setConfirmation(null);
+    setPanelError(null);
+    setStaleConflict(false);
+    setEffectiveOn(defaultEffectiveOn(member));
+    setDestinationId("");
+    setActiveAction({ member, kind });
+  }
+
+  function closeAction(restoreFocus: boolean) {
+    restoreFocusRef.current = restoreFocus;
+    setActiveAction(null);
+    setPanelError(null);
+    setStaleConflict(false);
+  }
+
+  function refreshAfterConflict() {
+    if (section) loadRoster(section);
+    closeAction(false);
+    headingRef.current?.focus();
+  }
+
+  async function handleConfirm(event: FormEvent) {
+    event.preventDefault();
+    if (!activeAction || !section) return;
+    const { member, kind } = activeAction;
+    setPanelError(null);
+    setSubmitting(true);
+    try {
+      if (kind === "transfer") {
+        const result = await sectionService.transferMembership({
+          learnerId: member.learnerId,
+          fromMembershipId: member.membershipId,
+          toSectionId: destinationId,
+          effectiveOn,
+        });
+        if (result.kind === "transferred") {
+          const destination = otherSections.find((candidate) => candidate.id === destinationId);
+          setConfirmation(
+            `${member.familyName}, ${member.givenName} was transferred to ${
+              destination ? destination.name : "the selected section"
+            }, effective ${formatIsoDate(effectiveOn)}.`,
+          );
+          closeAction(false);
+          loadRoster(section);
+          headingRef.current?.focus();
+          return;
+        }
+        applyTransferFailure(result.kind, member);
+      } else {
+        const result = await sectionService.endMembership({
+          learnerId: member.learnerId,
+          membershipId: member.membershipId,
+          effectiveOn,
+        });
+        if (result.kind === "ended") {
+          setConfirmation(
+            `${member.familyName}, ${member.givenName}'s enrollment in ${section.name} was ended, effective ${formatIsoDate(
+              effectiveOn,
+            )}.`,
+          );
+          closeAction(false);
+          loadRoster(section);
+          headingRef.current?.focus();
+          return;
+        }
+        applyEndFailure(result.kind, member);
+      }
+    } catch (err) {
+      setPanelError(
+        err instanceof ValidationError
+          ? err.message
+          : "This change could not be saved. Check your device and try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function applyTransferFailure(
+    kind: Exclude<
+      Awaited<ReturnType<SectionApplicationService["transferMembership"]>>["kind"],
+      "transferred"
+    >,
+    member: SectionRosterMember,
+  ) {
+    switch (kind) {
+      case "membershipNotFound":
+      case "notCurrent":
+        setStaleConflict(true);
+        break;
+      case "sameSection":
+        setPanelError(
+          "That is the section this learner is already in. Choose a different section.",
+        );
+        break;
+      case "destinationNotFound":
+        setPanelError(
+          "That section could not be found — it may have been removed. Refresh and choose again.",
+        );
+        break;
+      case "invalidEffectiveDate":
+        setPanelError(
+          `The effective date cannot be before this learner joined the section (${formatIsoDate(
+            member.startsOn,
+          )}).`,
+        );
+        break;
+    }
+  }
+
+  function applyEndFailure(
+    kind: Exclude<Awaited<ReturnType<SectionApplicationService["endMembership"]>>["kind"], "ended">,
+    member: SectionRosterMember,
+  ) {
+    switch (kind) {
+      case "notFound":
+      case "notCurrent":
+        setStaleConflict(true);
+        break;
+      case "invalidEffectiveDate":
+        setPanelError(
+          `The effective date cannot be before this learner joined the section (${formatIsoDate(
+            member.startsOn,
+          )}).`,
+        );
+        break;
+    }
+  }
 
   const rosterStatusMessage =
     rosterState === "ready"
@@ -171,6 +357,8 @@ export function SectionRosterScreen({
       <p className="visually-hidden" role="status">
         {rosterStatusMessage}
       </p>
+
+      {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {sectionState === "loading" && <Loading label="Loading section…" />}
 
@@ -203,7 +391,9 @@ export function SectionRosterScreen({
               shown — this is always your class as it stands today. &ldquo;Enrolled since&rdquo; is
               the date each learner&rsquo;s current placement in this section began.
               &ldquo;LRN&rdquo; is the 12-digit Learner Reference Number — add a missing one on the
-              Learners screen.
+              Learners screen. Use &ldquo;Transfer&rdquo; to move a learner to another section, or
+              &ldquo;End enrollment&rdquo; when they leave — both keep the learner&rsquo;s history
+              and take effect from the date you choose.
             </p>
           )}
 
@@ -216,7 +406,7 @@ export function SectionRosterScreen({
                 type="button"
                 onClick={() => {
                   loadRoster(section);
-                  focusHeading();
+                  headingRef.current?.focus();
                 }}
               >
                 Retry
@@ -263,22 +453,199 @@ export function SectionRosterScreen({
                     <th role="columnheader" scope="col">
                       Enrolled since
                     </th>
+                    <th role="columnheader" scope="col">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody role="rowgroup">
-                  {members.map((member) => (
-                    <tr role="row" key={member.learnerId}>
-                      <th role="rowheader" scope="row">
-                        {member.familyName}, {member.givenName}
-                      </th>
-                      <td role="cell" data-label="LRN">
-                        {member.lrn ?? <span className="section-roster-missing">Not recorded</span>}
-                      </td>
-                      <td role="cell" data-label="Enrolled since">
-                        {formatIsoDate(member.startsOn)}
-                      </td>
-                    </tr>
-                  ))}
+                  {members.map((member) => {
+                    const panelOpen = activeAction?.member.membershipId === member.membershipId;
+                    return (
+                      <FragmentRow key={member.membershipId}>
+                        <tr role="row">
+                          <th role="rowheader" scope="row">
+                            {member.familyName}, {member.givenName}
+                          </th>
+                          <td role="cell" data-label="LRN">
+                            {member.lrn ?? (
+                              <span className="section-roster-missing">Not recorded</span>
+                            )}
+                          </td>
+                          <td role="cell" data-label="Enrolled since">
+                            {formatIsoDate(member.startsOn)}
+                          </td>
+                          <td role="cell" data-label="Actions" className="section-roster-actions">
+                            <button
+                              type="button"
+                              disabled={activeAction !== null}
+                              aria-expanded={panelOpen && activeAction?.kind === "transfer"}
+                              aria-label={`Transfer ${member.givenName} ${member.familyName}`}
+                              onClick={(event) =>
+                                openAction(member, "transfer", event.currentTarget)
+                              }
+                            >
+                              Transfer
+                            </button>
+                            <button
+                              type="button"
+                              disabled={activeAction !== null}
+                              aria-expanded={panelOpen && activeAction?.kind === "end"}
+                              aria-label={`End enrollment for ${member.givenName} ${member.familyName}`}
+                              onClick={(event) => openAction(member, "end", event.currentTarget)}
+                            >
+                              End enrollment
+                            </button>
+                          </td>
+                        </tr>
+                        {panelOpen && activeAction && (
+                          <tr role="row" className="section-roster-action-row">
+                            <td role="cell" colSpan={4}>
+                              <form
+                                className="section-roster-action-panel"
+                                onSubmit={handleConfirm}
+                                aria-label={
+                                  activeAction.kind === "transfer"
+                                    ? `Transfer ${member.givenName} ${member.familyName}`
+                                    : `End enrollment for ${member.givenName} ${member.familyName}`
+                                }
+                              >
+                                <p
+                                  className="section-roster-action-heading"
+                                  ref={panelHeadingRef}
+                                  tabIndex={-1}
+                                >
+                                  {activeAction.kind === "transfer"
+                                    ? `Transfer ${member.givenName} ${member.familyName}`
+                                    : `End ${member.givenName} ${member.familyName}'s enrollment`}
+                                </p>
+                                <p className="section-roster-action-context">
+                                  Currently in <strong>{section.name}</strong> since{" "}
+                                  {formatIsoDate(member.startsOn)}.
+                                </p>
+
+                                {staleConflict ? (
+                                  <>
+                                    <Alert tone="warning">
+                                      <p>
+                                        This learner&rsquo;s enrollment changed since you opened
+                                        this roster, so this change was not made. Refresh the roster
+                                        and try again if you still need to.
+                                      </p>
+                                    </Alert>
+                                    <div className="section-roster-action-buttons">
+                                      <button
+                                        type="button"
+                                        className="button-primary"
+                                        onClick={refreshAfterConflict}
+                                      >
+                                        Refresh roster
+                                      </button>
+                                      <button type="button" onClick={() => closeAction(true)}>
+                                        Close
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    {activeAction.kind === "transfer" && (
+                                      <div className="field">
+                                        <label htmlFor="section-roster-destination">
+                                          Move to section
+                                        </label>
+                                        {otherSections.length === 0 ? (
+                                          <p className="field-hint">
+                                            There is no other section to move this learner to.
+                                            Create another section first on the Sections screen.
+                                          </p>
+                                        ) : (
+                                          <select
+                                            id="section-roster-destination"
+                                            value={destinationId}
+                                            onChange={(event) =>
+                                              setDestinationId(event.target.value)
+                                            }
+                                            required
+                                          >
+                                            <option value="">Choose a section…</option>
+                                            {otherSections.map((candidate) => (
+                                              <option key={candidate.id} value={candidate.id}>
+                                                {candidate.name} — Grade {candidate.gradeLevel},{" "}
+                                                {candidate.schoolYear}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <div className="field">
+                                      <label htmlFor="section-roster-effective-on">
+                                        Effective date
+                                      </label>
+                                      <input
+                                        id="section-roster-effective-on"
+                                        type="date"
+                                        value={effectiveOn}
+                                        min={member.startsOn}
+                                        onChange={(event) => setEffectiveOn(event.target.value)}
+                                        required
+                                      />
+                                    </div>
+
+                                    <p className="section-roster-action-consequence">
+                                      {activeAction.kind === "transfer"
+                                        ? `${member.givenName}'s place in ${section.name} ends on this date and their place in the new section begins the same day. The time already spent in ${section.name} stays in their records.`
+                                        : `${member.givenName} will no longer appear on this section's roster from this date. The enrollment stays in their records — nothing is deleted.`}
+                                    </p>
+
+                                    {mode === "guided" && (
+                                      <p className="field-hint">
+                                        {activeAction.kind === "transfer"
+                                          ? "Use this when a learner moves to another class or section within your school. For a learner leaving the school entirely, use “End enrollment” instead."
+                                          : "Use this when a learner leaves the school or stops attending. It does not remove the learner or any of their past records."}
+                                      </p>
+                                    )}
+
+                                    {panelError && (
+                                      <p className="field-error" role="alert">
+                                        {panelError}
+                                      </p>
+                                    )}
+
+                                    <div className="section-roster-action-buttons">
+                                      <button
+                                        type="submit"
+                                        className="button-primary"
+                                        disabled={
+                                          submitting ||
+                                          (activeAction.kind === "transfer" &&
+                                            otherSections.length === 0)
+                                        }
+                                      >
+                                        {submitting
+                                          ? "Saving…"
+                                          : activeAction.kind === "transfer"
+                                            ? "Confirm transfer"
+                                            : "Confirm end of enrollment"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={submitting}
+                                        onClick={() => closeAction(true)}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </form>
+                            </td>
+                          </tr>
+                        )}
+                      </FragmentRow>
+                    );
+                  })}
                 </tbody>
               </table>
             </>
@@ -287,4 +654,12 @@ export function SectionRosterScreen({
       )}
     </section>
   );
+}
+
+/** A keyable grouping of the member row and its (optional) action-panel
+ * row without introducing a DOM node between `<tbody>` and `<tr>` (which
+ * would break table semantics). `React.Fragment` accepts only `key`, so a
+ * tiny named wrapper keeps the `.map` body readable. */
+function FragmentRow({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }

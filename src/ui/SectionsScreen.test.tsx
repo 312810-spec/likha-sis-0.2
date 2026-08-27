@@ -78,6 +78,14 @@ class FakeSectionRepository implements SectionRepository {
     };
   }
 
+  async transferMembership(): Promise<never> {
+    throw new Error("not used in this test");
+  }
+
+  async endMembership(): Promise<never> {
+    throw new Error("not used in this test");
+  }
+
   async roster(): Promise<SectionRosterMember[]> {
     return [];
   }

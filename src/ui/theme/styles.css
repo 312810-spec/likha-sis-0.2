@@ -707,6 +707,51 @@ label {
   color: var(--color-text-muted);
 }
 
+/* Per-row Transfer / End enrollment controls. Two short buttons sit
+   together on the row; on a phone they stack and take a full-width,
+   finger-sized target (see the narrow block below). */
+.section-roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+/* The inline confirmation panel: a sibling table row (not a modal --
+   the app has no dialog primitive; this matches the LearnerListScreen
+   inline-edit pattern) spanning every column, visually set apart from
+   the roster rows around it. */
+.section-roster-action-row > td {
+  background: var(--color-surface);
+}
+
+.section-roster-action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: var(--spacing-unit) 0;
+}
+
+.section-roster-action-heading {
+  margin: 0;
+  font-size: var(--font-size-large);
+  font-weight: 600;
+}
+
+.section-roster-action-context,
+.section-roster-action-consequence {
+  margin: 0;
+}
+
+.section-roster-action-consequence {
+  color: var(--color-text-muted);
+}
+
+.section-roster-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
 /* Narrow (phone-width): mirror the .attendance-roster / .score-entry
    pattern -- each learner becomes a labelled block rather than shrinking
    a desktop table into cells nobody can read. Same data, same order. */
@@ -752,6 +797,19 @@ label {
   .section-roster td::before {
     content: attr(data-label) ": ";
     font-weight: 600;
+  }
+
+  /* The full-width action-panel cell has no data-label and must not
+     render a stray "": "" pseudo-element. */
+  .section-roster-action-row td::before {
+    content: none;
+  }
+
+  /* Finger-sized targets for the row actions and the panel's own
+     buttons on a phone. */
+  .section-roster-actions button,
+  .section-roster-action-buttons button {
+    min-height: 44px;
   }
 }
 
