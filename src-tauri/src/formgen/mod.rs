@@ -39,6 +39,9 @@
 // as-is — see docs/adr/0048-official-form-engine-sf1.md.
 #[cfg(test)]
 pub(crate) mod fidelity;
+// Provenance/fidelity evidence registry — Wave 2K, see
+// docs/adr/0051-official-form-template-evidence-registry.md.
+pub mod evidence;
 pub mod sf1;
 pub mod sf9;
 pub mod sf9_projection;

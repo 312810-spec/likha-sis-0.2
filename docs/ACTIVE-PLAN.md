@@ -1,5 +1,66 @@
 # ACTIVE PLAN
 
+## Wave 2K: Official-Form Template Evidence & Provenance Registry (added 2026-08-27) — complete
+
+Full record: `docs/adr/0051-official-form-template-evidence-registry.md`,
+`docs/VERIFICATION-DEBT.md`'s top entry, `docs/CURRENT-HANDOFF.md`'s top
+entry. Compliance/evidence-architecture milestone — no learner-facing
+change, no UI. Verification record:
+
+- **Mandatory checkpoint gate verified first**: repository truth
+  confirmed clean at Wave 2J's `fb07797`; both its CI runs
+  (`33015766489`, `33015766459`) re-confirmed genuinely
+  `completed`/`success` — Quality Gate briefly re-showed `in_progress`
+  on a re-check (likely a stale/cached `gh` read) and work was
+  correctly held until it resolved.
+- **Research**: two new authoritative-source angles tried (issuance-
+  attached templates; official subdomain mirrors). No SF1/SF9
+  authoritative template found (unchanged debt). Found a genuine SF10
+  lead on `support.lis.deped.gov.ph` (official subdomain,
+  container-format personally verified) — not registered as evidence
+  this wave, since no SF10 generator exists and none was built merely
+  to exercise the framework. Full detail and disclosed gaps in
+  ADR-0051 and `docs/VERIFICATION-DEBT.md`.
+- **Architecture**: `formgen::evidence` — `ProvenanceState` and
+  `FidelityState` as two independent enums on `TemplateEvidence`, never
+  collapsed into one status field. `confirm_authoritative_source`
+  is the only citation-gated promotion path.
+  `examples/inspect_template_candidate.rs` — dev-only intake tool
+  (hash + structural inspection + suggested classification only; never
+  self-registers, never fetches a URL, refuses files over 25MB before
+  parsing).
+- **Test suite**: 11 new Rust tests in `formgen::evidence`, covering the
+  required-test categories: promotion-guard rejection (no citation,
+  blank citation, already-rejected source) and acceptance (real
+  citation); provenance/fidelity independence (both directions);
+  SF1/SF9 debt-preservation defaults; no-PII-required field check;
+  honest gap reporting.
+- **Verification**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` — all Rust tests
+  pass (formgen::evidence's 11 new + all pre-existing, no regression).
+  `npm run quality` clean, 462/462 TS tests (unchanged — no TS files
+  touched this wave). Manual smoke test of the intake tool against the
+  SF1 fixture (correct hash/structure), a non-spreadsheet file (handled
+  as a gap, no panic), and an oversized file (refused pre-parse).
+- **Independent review**: security-reviewer and architecture-reviewer
+  dispatched in parallel, both closed, **no BLOCKING findings from
+  either**. Security: 2 non-blocking items, both accepted as reasonable
+  for dev-only tooling with no runtime/security-boundary role.
+  Architecture: 6 non-blocking items, 5 fixed this wave (Superseded
+  re-promotion guard added with a regression test; ADR wording
+  corrected from "only function permitted" to "only sanctioned path";
+  intake example now prints real enum values instead of hardcoded
+  strings; unused `EvidenceKind` enum removed; `mod.rs` comment
+  placement fixed), 1 accepted as an expected, not-yet-a-defect state
+  (zero external consumers of `formgen::evidence` yet). Full detail in
+  ADR-0051's "Independent review" section. Verification re-run after
+  fixes: `cargo fmt --check`/`cargo clippy -D warnings` clean, `cargo
+test` all passing (11 `formgen::evidence` tests, net +1).
+- **Scope guards held**: no SF10 (or other) form generator added merely
+  to exercise the framework; no template-intake directory created with
+  nothing to put in it; no automatic compliance-judgment path built;
+  no PII in any evidence field; no new npm/cargo dependency added.
+
 ## Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening (added 2026-08-27) — complete
 
 Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`,

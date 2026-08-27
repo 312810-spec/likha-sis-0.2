@@ -1671,6 +1671,44 @@ built-ins (`node:fs`, `node:path`, `node:crypto`, `node:child_process`,
 `node:url`). No new database migration, no new Rust code, no
 learner-facing functionality changed.
 
+## Wave 2K: Official-Form Template Evidence & Provenance Registry (added 2026-08-27)
+
+Full record: `docs/adr/0051-official-form-template-evidence-registry.md`.
+
+`src-tauri/src/formgen/evidence.rs` (NEW) models template provenance and
+generated-output fidelity as **two independent enums**
+(`ProvenanceState`, `FidelityState`) on a `TemplateEvidence` struct —
+never one collapsed status field, per this wave's non-negotiable design
+rule. `SF1_SYNTHETIC_V1_EVIDENCE`/`SF9_SYNTHETIC_V1_EVIDENCE` are the two
+registered records, both `(Synthetic, NotVerified)`.
+`confirm_authoritative_source(current, authoritative_issuance)` is the
+only function permitted to promote a template to
+`AuthoritativeSourceConfirmed`, and refuses without a real DepEd
+Order/Memorandum citation — the coded expression of "a community source
+must never self-promote to authoritative."
+
+`src-tauri/examples/inspect_template_candidate.rs` (NEW) is a dev-only
+intake tool (same shape as `examples/gen_sf9_fixture.rs` — not a Tauri
+command, not UI) that hashes/inspects a local candidate spreadsheet and
+prints a suggested-starting-classification evidence report; it never
+registers a `TemplateDescriptor`/`TemplateEvidence` itself. Refuses
+files over 25 MB before parsing (zip-bomb defense); handles a malformed
+file as a printed evidence gap, not a panic.
+
+**Research found a genuine lead for SF10** (not SF1/SF9): four `.xlsx`
+files on `support.lis.deped.gov.ph` (an official `*.deped.gov.ph`
+subdomain), personally confirmed by direct fetch as valid xlsx
+containers. Not registered as evidence this wave — no SF10 generator
+exists, and none was built merely to exercise this framework, per the
+brief's explicit instruction. See `docs/VERIFICATION-DEBT.md` for the
+full, honestly-disclosed gaps (internal content unread; DO/DM issuance
+unresolved; the "no SF1/SF9 on this portal" claim is snippet-only, not a
+directly fetched listing).
+
+`OFFICIAL_SF1_FIDELITY`/`OFFICIAL_SF9_FIDELITY` remain `NOT_VERIFIED`,
+now also asserted by `formgen::evidence`'s own test suite rather than
+prose alone.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

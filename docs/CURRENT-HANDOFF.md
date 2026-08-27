@@ -1,6 +1,86 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-27, this session — Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening, complete)
+## Active Task (2026-08-27, this session — Wave 2K: Official-Form Template Evidence & Provenance Registry, complete, ready to commit)
+
+Full record: `docs/adr/0051-official-form-template-evidence-registry.md`.
+
+**Mandatory Wave 2J checkpoint gate, verified first**: `git fetch`
+clean; branch/HEAD at `fb07797` (Wave 2J's commit), matching `origin`;
+`main` unchanged at `d9ab036`; working tree clean; 0 ahead/behind. Both
+Wave 2J CI runs (Quality Gate `33015766489`, Security Gate
+`33015766459`) confirmed genuinely `completed`/`success` before any
+Wave 2K implementation began — Quality Gate briefly re-showed
+`in_progress` on a re-check (likely a stale/cached `gh` read; not
+investigated further), and work was correctly held until it resolved.
+
+**What was built**: `src-tauri/src/formgen/evidence.rs` (NEW) — two
+independent enums, `ProvenanceState` and `FidelityState`, on a
+`TemplateEvidence` struct, deliberately never collapsed into one status
+field (the wave's non-negotiable design rule). `confirm_authoritative_
+source(current, authoritative_issuance)` is the only function that may
+promote a template to `AuthoritativeSourceConfirmed`, and refuses
+without a real DepEd issuance citation or for an already-`Rejected`
+source. `SF1_SYNTHETIC_V1_EVIDENCE`/`SF9_SYNTHETIC_V1_EVIDENCE` are the
+two registered records (both `Synthetic`/`NotVerified`, every optional
+evidence field explicitly `None` with a gap note explaining why).
+`src-tauri/examples/inspect_template_candidate.rs` (NEW) — a dev-only
+intake tool (not a Tauri command, not UI) that hashes/inspects a local
+candidate file and prints a suggested-starting-classification report;
+refuses files over 25MB before parsing (zip-bomb defense); never
+registers anything itself.
+
+**Research**: two new search angles tried beyond prior waves' repeated
+`deped.gov.ph` homepage searches. Found no authoritative SF1/SF9
+template (unchanged verification debt). Found a genuine lead for
+**SF10**: four `.xlsx` files on `support.lis.deped.gov.ph` (a verified
+`*.deped.gov.ph` subdomain), personally confirmed by direct fetch as
+valid xlsx containers — not registered as evidence this wave (no SF10
+generator exists; the brief explicitly said not to build one merely to
+exercise the framework). Full gaps disclosed in
+`docs/VERIFICATION-DEBT.md`.
+
+**Local verification (all re-run this wave)**: `cargo fmt --check`
+clean; `cargo clippy --all-targets -- -D warnings` clean; `cargo test`
+— all Rust tests pass, including 11 new `formgen::evidence` tests
+covering the 18-item required test list (promotion-guard rejection/
+acceptance, rejected-cannot-repromote, provenance/fidelity independence,
+SF1/SF9 debt preservation, no-PII-required, malformed-file/gap
+reporting). `npm run quality` — clean (typecheck, lint, format,
+architecture check, 462/462 TS tests, no regression; TS side untouched
+this wave). Manually smoke-tested `inspect_template_candidate` against
+the SF1 fixture (reproduces its known hash/structure correctly), a
+non-spreadsheet file (handled as a gap, no panic), and a 26MB file
+(refused before parsing).
+
+**Independent review**: security-reviewer and architecture-reviewer
+dispatched in parallel, both closed, **no BLOCKING findings from
+either**. Security: 2 non-blocking items, both accepted as reasonable
+tradeoffs for dev-only tooling with no runtime/security-boundary role
+(compressed-vs-decompressed size-cap caveat now documented; the
+promotion-guard bypass, see next item). Architecture: 6 non-blocking
+items — 5 fixed this wave (added a `Superseded` guard to
+`confirm_authoritative_source`, closing a latent re-promotion gap;
+corrected this ADR's overstated "only function permitted" wording to
+"only sanctioned path" since `TemplateEvidence`'s `pub` fields mean it's
+convention, not compiler-enforced; wired the intake example to print
+real enum values via `{:?}` instead of hardcoded strings; removed the
+unused `EvidenceKind` enum and its tautological test, folding its
+content into the module doc comment; fixed a misleading comment
+placement in `mod.rs`), 1 accepted as expected-not-a-defect (zero
+external consumers of `formgen::evidence` yet — expected for a pipeline
+built ahead of its second real use). Full detail in ADR-0051's
+"Independent review" section.
+
+**Verification re-run after review fixes**: `cargo fmt --check` clean;
+`cargo clippy --all-targets -- -D warnings` clean; `cargo test` — all
+Rust tests pass, 11 `formgen::evidence` tests (net +1 after removing the
+tautological test and adding the `Superseded` regression test).
+
+**Exact next action**: commit/push this checkpoint (branch
+`claude/likha-sis-wave2a-learner-core`). Confirm CI green for the exact
+commit before considering Wave 2K fully closed.
+
+## Note: Wave 2J — Resilient Zero-Cost Memory Observer + Project-Brain Hardening, complete (superseded as "Active Task" by Wave 2K above, kept for history)
 
 Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`.
 Harness/developer-infrastructure milestone — no learner-facing change.

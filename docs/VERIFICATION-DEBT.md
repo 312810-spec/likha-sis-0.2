@@ -1,5 +1,47 @@
 # Verification Debt
 
+## Wave 2K — Official-Form Template Evidence & Provenance Registry (2026-08-27)
+
+Full record: `docs/adr/0051-official-form-template-evidence-registry.md`.
+
+**`OFFICIAL_SF1_FIDELITY = NOT_VERIFIED` and `OFFICIAL_SF9_FIDELITY =
+NOT_VERIFIED` remain unchanged** — no authoritative source found for
+either this wave; this is now also asserted by
+`formgen::evidence`'s test suite (`sf1_evidence_reports_unverified_
+provenance_and_fidelity_by_default`,
+`sf9_evidence_reports_unverified_provenance_and_fidelity_by_default`),
+not only recorded in prose.
+
+**New lead, not yet acted on: SF10 candidate templates on an official
+DepEd subdomain.** `support.lis.deped.gov.ph/support/downloads/
+schoolforms/` (a verified `*.deped.gov.ph` subdomain) serves four
+`.xlsx` files whose existence and container format were personally
+confirmed by direct fetch (HTTP 200, valid OOXML/ZIP structure) —
+`SSHS SF 10 v2026.xlsx` and three sibling SF10 files (exact URLs in
+ADR-0051). **Not registered as a `TemplateEvidence` this wave** — no
+SF10 generator exists, and none was built merely to exercise this
+wave's framework, per the brief's own instruction. Two gaps disclosed
+rather than assumed away: internal cell content/field layout was never
+read (no unzip/xlsx-content-reading tool available in this session —
+only container-level authenticity is confirmed); and the governing
+DepEd Order/Memorandum for these files is unresolved (a linked PDF and
+a separate `School-forms-matrix.docx`, both confirmed genuine DepEd-
+hosted files, could not be text-extracted with tools available here).
+
+**SF1/SF9 absence-on-this-portal is a weaker negative than it looks** —
+the claim that only SF5/SF8/SF10/SHS forms are indexed there rests on a
+search-engine snippet, not a directly fetched directory listing (a
+direct listing fetch returned HTTP 403 on every attempt this wave).
+Retry with a different fetch approach in a future session before
+treating SF1/SF9's absence from this specific portal as confirmed.
+
+**No template-intake directory was created** — nothing to put in it yet
+(deliberate scope discipline, not an oversight; see ADR-0051's "What
+belongs in Git").
+
+**All prior verification debt (Wave 2J and earlier) remains fully
+intact and unweakened by this wave.**
+
 ## Wave 2J — Resilient Zero-Cost Memory Observer + Project-Brain Hardening (2026-08-27)
 
 Full record: `docs/adr/0050-resilient-zero-cost-memory-observer.md`.
