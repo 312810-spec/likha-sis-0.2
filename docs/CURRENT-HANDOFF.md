@@ -44,10 +44,20 @@ file mid-build; did not reproduce on clean rebuild (recorded honestly,
 not a code defect). `npm run quality` — [confirm at commit]. No new
 dependency, no migration, no Tauri command, no UI, no learner data.
 
-**Independent review**: security-reviewer + architecture-reviewer
-dispatched per the frozen-harness rules. Results / retained debt in
-`docs/VERIFICATION-DEBT.md`'s Wave 2M entry (self-review substituted +
-debt retained if the known retrieval bug recurred).
+**Independent review**: architecture-reviewer returned findings in full
+(no BLOCKING; non-blocking items acted on — dead fields removed,
+`Synthetic` now refused by `resolve`, doc corrections). security-reviewer
+returned "no BLOCKING findings" + confirmed no PII-leak / promotion-bypass
+recurrence, but its itemized NB-1..NB-7 text hit the documented
+reviewer-retrieval bug and was unrecoverable — self-review substituted,
+that specific debt retained. Full detail: `docs/VERIFICATION-DEBT.md`'s
+Wave 2M entry.
+
+**Committed and CI-confirmed green**: review-fix checkpoint `16ff902` —
+Quality Gate `33031801131` (Windows + Ubuntu) and Security Gate
+`33031801110`, both `completed/success`. (Feature commit `368bdaa`
+Security Gate `33030879756` also green; its Quality Gate was superseded
+by `16ff902`'s.) Wave 2M is fully closed.
 
 **Exact next product action**: SF10 is evidence-gated, not
 feature-gated — do **not** start SF10 generation yet. Highest-value
