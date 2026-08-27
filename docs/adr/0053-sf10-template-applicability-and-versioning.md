@@ -41,6 +41,12 @@ research in `docs/form-evidence/sf10/README.md`. Key facts:
   worksheet — official portal, but community-annotated copies, not
   confirmed pristine DepEd masters. Zero formulas.
 
+> **[Superseded in part — see the Wave 2N addendum below.]** In Wave 2M
+> DM 020's body could not be read and no candidate was promoted. Wave
+> 2N read DM 020 page 2 verbatim (`pdftotext`) and promoted the SSHS
+> record to `AuthoritativeSourceConfirmed`. The two paragraphs that
+> follow are the Wave 2M position, kept for history.
+
 **Governing issuance research (primary sources on deped.gov.ph):**
 DepEd Memorandum No. 020, s. 2026 (13 Mar 2026) governs the
 Strengthened SHS SF10 for SY 2025-2026 pilot implementers —
@@ -51,7 +57,8 @@ Order No. 69, s. 2016 (ECR + Form 137 for SHS) and DepEd Order No. 4,
 s. 2014 (modified school forms) are the prior generations. No single
 governing issuance was pinned for the JHS MATATAG revision.
 
-**Decision on promotion: none.** Every candidate stays
+**Decision on promotion: none** _(Wave 2M — superseded by Wave 2N for
+the SSHS record)_. Every candidate stays
 `ProvenanceState::CandidateUnverified` / `FidelityState::NotVerified`.
 `confirm_authoritative_source` is not called for any of them —
 `authoritative_issuance` is deliberately left `None` even for the SSHS
@@ -85,11 +92,14 @@ command, no UI):
   track.
 - `TemplateApplicability` — the scope one version was authoritative
   for: form type, effective school-year range (inclusive, open-ended
-  allowed), grade levels, curriculum, optional track, `historical_only`
-  flag.
+  allowed), grade levels, curriculum, optional track. _(An initial
+  `historical_only` flag was removed in the Wave 2M review fixes as
+  redundant with the effective-range check.)_
 - `TemplateVersion` — id + optional `&TemplateDescriptor` (SF10 has
-  none yet) + `&TemplateEvidence` + `TemplateApplicability` +
-  supersedes/superseded-by links.
+  none yet) + `&TemplateEvidence` + `TemplateApplicability`.
+  _(Supersession is carried on `TemplateEvidence`, not duplicated
+  here — the initial `supersedes`/`superseded_by` fields on
+  `TemplateVersion` were removed in the Wave 2M review fixes.)_
 - `resolve(registry, ctx, require_verified_fidelity) -> Result<&TemplateVersion, ResolveError>`
   — filters the registry by `covers(ctx)`, then:
   - `[]` → `ResolveError::NoApplicableTemplate` (never a
@@ -100,8 +110,9 @@ command, no UI):
   - `[many]` → `ResolveError::AmbiguousTemplates(ids)` (a registry
     authoring bug, surfaced, never silently resolved).
 - `SF10_TEMPLATE_VERSIONS` — two modeled versions (JHS/MATATAG,
-  SSHS/DM-020-2026), **both `CandidateUnverified`**, applicability
-  windows drawn from the research above and marked as leads.
+  SSHS). _(Wave 2M shipped both as `CandidateUnverified`; Wave 2N
+  promoted the SSHS one to `AuthoritativeSourceConfirmed` — see the
+  addendum. The JHS one and its applicability window remain leads.)_
 
 This is the seam later SF10 generation plugs into. `school_year <
 "2025"`-style date checks never get scattered through form-generation
@@ -168,19 +179,29 @@ resolution path.
 
 ### Risks / spikes
 
+> **[Partly resolved in the Wave 2N addendum.]** DM 020 page 2 was
+> read; `track: None` for SSHS is now evidence-backed and the JHS band
+> was narrowed to Grade 7. Original Wave 2M risks kept for history:
+
 - **DM 020, s. 2026 body unread** — the SSHS applicability window
   (`track: None`, meaning "Academic and TechPro share one SF10") is a
   guess. If the memo splits the template by track, the SSHS
   `TemplateVersion` becomes two, each `track: Some(_)`. This is the
   single most likely thing to change; the model already has the field.
+  _(Wave 2N: DM 020's readable page describes one SSHS SF10 / one
+  filename — `track: None` is now evidence-backed, not a guess. The
+  split-later mechanism above still holds if the unread pages ever
+  contradict it.)_
 - **JHS governing issuance unpinned** — the JHS `TemplateVersion`'s
   window (MATATAG, Grades 7-10, from SY 2024-2025) rests on
-  secondary sources only.
+  secondary sources only. _(Wave 2N: still unpinned — national Joint
+  Memorandum PDF not obtained; the band was corrected to Grade 7 only,
+  fail-closed for 8-10.)_
 - **Pre-MATATAG era has no registered template** — by design, `resolve`
   returns `NoApplicableTemplate` for a K-to-12-era JHS context. That is
   correct behaviour (better an explicit gap than a wrong template), but
   it means SF10 generation for historical records is blocked until
-  those era templates are acquired.
+  those era templates are acquired. _(Unchanged after Wave 2N.)_
 
 ## Verification
 
@@ -356,16 +377,47 @@ and the next slice is an unrelated teacher-facing production vertical
 ### Verification (Wave 2N)
 
 `cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
-clean; `cargo test` — 483 lib + all integration binaries + 0 doctests
-pass (13 SF10-related tests now, incl. the guard-satisfying-promotion
-test, the provenance-did-not-touch-fidelity test, the
-JHS-stays-unpromotable test, and the Grade-8-10-fails-closed test).
-`npm run quality` — [record at commit]. No new dependency, no
-migration, no Tauri command, no UI, no learner data.
+clean; `cargo test` — **484 lib tests** + all integration binaries + 0
+doctests pass. The `formgen::evidence` and `formgen::template_version`
+test suites were reworked around the promotion; ~18 tests touch SF10,
+including: `wave2n_sshs_promotion_is_guard_satisfying_not_guard_bypassing`,
+`wave2n_sshs_provenance_promotion_did_not_touch_fidelity`,
+`the_jhs_sf10_candidate_stays_unpromoted_and_unpromotable`,
+`every_confirmed_registry_entry_would_pass_the_promotion_guard`
+(registry-wide invariant), `a_matatag_grade_9_context_does_not_yet_resolve_only_grade_7_is_modeled`,
+and `resolves_the_confirmed_sshs_v2026_for_a_strengthened_shs_grade_11_context`.
+`npm run quality` — clean (typecheck, lint, format:check, architecture
+check, 462/462 TS tests; no frontend files touched). No new dependency,
+no migration, no Tauri command, no UI, no learner data.
 
 ### Independent review (Wave 2N)
 
-security-reviewer + architecture-reviewer dispatched per the
-frozen-harness rules; outcome / retained debt in
-`docs/VERIFICATION-DEBT.md`'s Wave 2N entry (self-review substituted +
-debt retained if the retrieval bug recurs).
+`architecture-reviewer` returned findings in full: **no BLOCKING**. Two
+BLOCKING items it raised were ADR doc-integrity issues in an earlier
+draft of this addendum (an unfilled `npm run quality` placeholder; a
+pre-written independent-review paragraph) — both fixed above/here. Its
+non-blocking items were acted on this checkpoint: renamed the const
+`SF10_SSHS_V2026_CANDIDATE_EVIDENCE` → `SF10_SSHS_V2026_EVIDENCE`
+(finishing the `-candidate` drop); softened the unverified "traced by
+DM 020 to DepEd Memorandum No. 48, s. 2025" wording in
+`applicability_notes` to name it as an unverified third-party lead;
+added the registry-wide promotion-guard invariant test; reconciled the
+test count; marked the superseded Wave 2M body regions in place (below)
+and removed this ADR's stale descriptions of the `historical_only` /
+`supersedes` / `superseded_by` fields (removed in the Wave 2M review
+fixes).
+
+`security-reviewer` returned findings in full: **no BLOCKING findings.**
+Two non-blocking should-fix items — (NB-1) the same registry-wide
+invariant test the architecture review asked for, now added; (NB-2) the
+"Effectivity:" wording, softened to "Effectivity LEAD:" since DM 020's
+effectivity clause is on an unread page. Its answers confirmed: the
+promotion is guard-satisfying not guard-bypassing; `Provenance !=
+Fidelity` is preserved (SSHS `fidelity` stays `NotVerified`; a
+fidelity-gated `resolve` still returns `FidelityInsufficient`); DM 020
+para 5(b)'s verbatim filename+portal is an explicit issuance→file
+binding, sufficient for `AuthoritativeSourceConfirmed` and not an
+over-promotion; the JHS record stays unpromotable and the `["7"]`
+narrowing is genuine fail-closed behaviour; no PII/secret/architecture-
+boundary issue; neither of this project's recurring failure classes
+applies. No independent-review debt carried from Wave 2N.

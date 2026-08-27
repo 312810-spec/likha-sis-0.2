@@ -74,7 +74,7 @@ Verification record:
 --all-targets -- -D warnings` clean; `cargo test` 478 lib + all
   integration + 0 doctests pass (13 new). One transient post-`cargo
 fmt` rustc ICE, non-reproducing on clean rebuild — recorded, not a
-  defect. `npm run quality` — [record at commit].
+  defect. `npm run quality` — clean (462/462 TS tests, architecture check, format:check).
 - **Independent review**: security + architecture reviewers dispatched
   per frozen-harness rules; results/debt in `VERIFICATION-DEBT.md`.
 - **Scope guard held**: no SF10 generation/import/UI/persistence/

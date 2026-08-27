@@ -232,7 +232,7 @@ pub const SF9_SYNTHETIC_V1_EVIDENCE: TemplateEvidence = TemplateEvidence {
 /// generator exists and no generated output has been compared to this
 /// form. `AuthoritativeSourceConfirmed` provenance does NOT imply
 /// verified fidelity — the two axes are independent (see module doc).
-pub const SF10_SSHS_V2026_CANDIDATE_EVIDENCE: TemplateEvidence = TemplateEvidence {
+pub const SF10_SSHS_V2026_EVIDENCE: TemplateEvidence = TemplateEvidence {
     form_type: "SF10",
     version: "sshs-v2026",
     provenance: ProvenanceState::AuthoritativeSourceConfirmed,
@@ -253,9 +253,11 @@ pub const SF10_SSHS_V2026_CANDIDATE_EVIDENCE: TemplateEvidence = TemplateEvidenc
          \"exclusively, until further notice, by Strengthened SHS teachers in SSHS Pilot \
          Schools\"; non-Strengthened SHS teachers \"continue using the existing ECR and SF 10 \
          (formerly Form 137)\" (i.e. DepEd Order No. 69, s. 2016). ONE template for SSHS — para \
-         5 lists a single SF10 filename; no per-track file. Curriculum: Strengthened SHS (traced \
-         by DM 020 to DepEd Memorandum No. 48, s. 2025). Effectivity: SY 2025-2026 onward for \
-         pilot schools. SHA-256 \
+         5 lists a single SF10 filename; no per-track file. Curriculum: Strengthened SHS pilot \
+         (the underlying pilot issuance — cited by third parties as DepEd Memorandum No. 48, \
+         s. 2025 / DepEd Order No. 03, s. 2025 — was NOT independently verified this wave; DM \
+         020 pages 1/3/4 are unread images). Effectivity LEAD: SY 2025-2026 onward for pilot \
+         schools (title + para 4; the effectivity clause is on an unread page). SHA-256 \
          a08ae34ba7f8e54d19389ba45c61d0ce18b347d877bcd8dd796d66c372ce6774; 227334 bytes; \
          Last-Modified 2026-03-17. Sheets FRONT/BACK/ANNEX/HELPER_SUBJECTS.",
     ),
@@ -520,10 +522,7 @@ mod tests {
 
     #[test]
     fn every_sf10_record_carries_its_full_provenance_trail() {
-        for ev in [
-            &SF10_SSHS_V2026_CANDIDATE_EVIDENCE,
-            &SF10_JHS_CANDIDATE_EVIDENCE,
-        ] {
+        for ev in [&SF10_SSHS_V2026_EVIDENCE, &SF10_JHS_CANDIDATE_EVIDENCE] {
             assert_eq!(ev.form_type, "SF10");
             assert!(ev.source_url.is_some());
             assert!(ev.retrieved_on.is_some());
@@ -539,7 +538,7 @@ mod tests {
         // would allow from the prior state given the recorded citation —
         // this test IS the "use the promotion mechanism, don't bypass it"
         // check (Wave 2N part B).
-        let ev = &SF10_SSHS_V2026_CANDIDATE_EVIDENCE;
+        let ev = &SF10_SSHS_V2026_EVIDENCE;
         assert_eq!(ev.provenance, ProvenanceState::AuthoritativeSourceConfirmed);
         assert!(ev.authoritative_issuance.is_some());
         let allowed = confirm_authoritative_source(
@@ -555,10 +554,10 @@ mod tests {
         // Provenance != Fidelity — a hard invariant. The SSHS record's
         // source is now confirmed; its render fidelity is still untested.
         assert_eq!(
-            SF10_SSHS_V2026_CANDIDATE_EVIDENCE.fidelity,
+            SF10_SSHS_V2026_EVIDENCE.fidelity,
             FidelityState::NotVerified
         );
-        assert!(!SF10_SSHS_V2026_CANDIDATE_EVIDENCE.is_fully_verified());
+        assert!(!SF10_SSHS_V2026_EVIDENCE.is_fully_verified());
     }
 
     #[test]

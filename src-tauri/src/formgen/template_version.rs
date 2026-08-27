@@ -243,7 +243,7 @@ pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
     TemplateVersion {
         id: "sf10-sshs-v2026",
         descriptor: None,
-        evidence: &crate::formgen::evidence::SF10_SSHS_V2026_CANDIDATE_EVIDENCE,
+        evidence: &crate::formgen::evidence::SF10_SSHS_V2026_EVIDENCE,
         applicability: TemplateApplicability {
             form_type: "SF10",
             effective_from_school_year: "2025-2026",
@@ -512,5 +512,35 @@ mod tests {
             by_id("sf10-jhs-matatag-candidate").evidence.provenance,
             ProvenanceState::CandidateUnverified
         );
+    }
+
+    #[test]
+    fn every_confirmed_registry_entry_would_pass_the_promotion_guard() {
+        // Registry-wide invariant (not just the SSHS record): any version
+        // stored as `AuthoritativeSourceConfirmed` must carry a citation
+        // that `confirm_authoritative_source` itself would accept from the
+        // pre-promotion state. Catches a hand-edited const that flips
+        // provenance without a real issuance — `resolve` reads
+        // `.provenance` directly and never re-validates.
+        use crate::formgen::evidence::confirm_authoritative_source;
+        for v in SF10_TEMPLATE_VERSIONS {
+            if v.evidence.provenance == ProvenanceState::AuthoritativeSourceConfirmed {
+                let citation = v.evidence.authoritative_issuance;
+                assert!(
+                    citation.is_some(),
+                    "{} is AuthoritativeSourceConfirmed but records no issuance citation",
+                    v.id
+                );
+                let produced =
+                    confirm_authoritative_source(ProvenanceState::CandidateUnverified, citation)
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "{}'s citation would not satisfy the promotion guard: {e}",
+                                v.id
+                            )
+                        });
+                assert_eq!(produced, ProvenanceState::AuthoritativeSourceConfirmed);
+            }
+        }
     }
 }

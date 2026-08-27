@@ -46,11 +46,21 @@ Full record: `docs/adr/0053-*` Wave 2N addendum, `docs/form-evidence/sf10/README
 6. **`formgen::template_version`** still has no persistence or command
    surface — resolver seam only (by design; Part G forbids more).
 
-**Independent review**: security-reviewer + architecture-reviewer
-dispatched per ADR-0052's frozen-harness rules. [Outcome recorded here
-after they return / self-review substituted per the established
-fallback if the retrieval bug recurs — do not claim a review that did
-not happen.]
+**Independent review**: security-reviewer + architecture-reviewer both
+returned findings in full. **No BLOCKING findings from either.**
+Architecture: two initially-BLOCKING items were ADR doc-integrity
+issues in an earlier draft (unfilled `npm run quality` placeholder,
+pre-written review paragraph) — both fixed; non-blocking items acted
+on (const renamed `..._CANDIDATE_EVIDENCE` → `..._EVIDENCE`; unverified
+DM-48/DO-03 s.2025 wording softened to a third-party lead; registry-wide
+promotion-guard invariant test added; test count reconciled; superseded
+Wave 2M ADR regions marked in place). Security: no blocking; two
+non-blocking should-fix — the same registry invariant test (added) and
+an "Effectivity:" → "Effectivity LEAD:" wording softening (done);
+confirmed the promotion is guard-satisfying not bypassing,
+`Provenance != Fidelity` preserved, DM 020 para 5(b) is a sufficient
+issuance→file binding, JHS stays unpromotable/fail-closed, no
+PII/secret/architecture issue. **No Wave 2N independent-review debt.**
 
 **All prior verification debt (Wave 2M and earlier) remains intact.**
 

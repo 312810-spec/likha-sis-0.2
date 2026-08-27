@@ -30,11 +30,13 @@ entry. Same branch. Frozen harness not reopened.
   attached, not rewritten; revised SF10 forward.
 
 **Verification (actually run)**: `cargo fmt --check` clean; `cargo
-clippy --all-targets -- -D warnings` clean; `cargo test` 483 lib + all
-integration + 0 doctests pass (13 SF10-related tests incl.
+clippy --all-targets -- -D warnings` clean; `cargo test` 484 lib + all
+integration + 0 doctests pass (~18 SF10-touching tests incl.
 guard-satisfying-promotion, provenance-didn't-touch-fidelity,
-JHS-unpromotable, Grade-8-10-fails-closed). `npm run quality` — [record
-at commit]. No dependency / migration / command / UI / learner data.
+registry-wide promotion-guard invariant, JHS-unpromotable,
+Grade-8-10-fails-closed). `npm run quality` — clean (462/462 TS tests,
+architecture check, format:check). No dependency / migration / command
+/ UI / learner data.
 
 **Independent review**: security + architecture reviewers dispatched
 per frozen-harness rules; outcome/debt in `docs/VERIFICATION-DEBT.md`
@@ -110,8 +112,8 @@ clippy --all-targets -- -D warnings` clean; `cargo test` — 478 lib +
 all integration binaries + 0 doctests pass, incl. 13 new tests. One
 transient `rustc` ICE observed once right after `cargo fmt` rewrote a
 file mid-build; did not reproduce on clean rebuild (recorded honestly,
-not a code defect). `npm run quality` — [confirm at commit]. No new
-dependency, no migration, no Tauri command, no UI, no learner data.
+not a code defect). `npm run quality` — clean (462/462 TS tests). No
+new dependency, no migration, no Tauri command, no UI, no learner data.
 
 **Independent review**: architecture-reviewer returned findings in full
 (no BLOCKING; non-blocking items acted on — dead fields removed,
