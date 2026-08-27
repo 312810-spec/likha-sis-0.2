@@ -38,9 +38,17 @@ Grade-8-10-fails-closed). `npm run quality` — clean (462/462 TS tests,
 architecture check, format:check). No dependency / migration / command
 / UI / learner data.
 
-**Independent review**: security + architecture reviewers dispatched
-per frozen-harness rules; outcome/debt in `docs/VERIFICATION-DEBT.md`
-Wave 2N entry.
+**Independent review**: security + architecture reviewers **both
+returned findings in full — no BLOCKING from either.** Non-blocking
+items acted on this checkpoint (const rename, registry-wide
+promotion-guard invariant test, unverified-issuance wording softened,
+ADR doc-integrity). No Wave 2N independent-review debt. Detail in
+`docs/VERIFICATION-DEBT.md` Wave 2N entry + ADR-0053 addendum.
+
+**Committed and CI-confirmed green**: `6f1bdb5` (Wave 2N) — Quality
+Gate `33033895580` + Security Gate `33033895620` `completed/success`;
+`92142c9` (review fixes) — Quality Gate `33034888077` + Security Gate
+`33034888093` `completed/success`. Wave 2N is fully closed.
 
 **SF10 readiness = PARTIALLY READY.** SSHS provenance confirmed
 (fidelity not); JHS EVIDENCE BLOCKED; pre-MATATAG templates not
