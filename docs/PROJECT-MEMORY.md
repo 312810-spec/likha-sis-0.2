@@ -1709,6 +1709,66 @@ directly fetched listing).
 now also asserted by `formgen::evidence`'s own test suite rather than
 prose alone.
 
+## Wave 2L — LIKHA Production Harness v1.0 (frozen) + ProjectForge (added 2026-08-27)
+
+Full record: `docs/adr/0052-wave2l-production-harness-v1.md`. Portable
+extraction: `docs/harness/{HARNESS-IDEOLOGY,HARNESS-MEMORY,ADOPTION-GUIDE}.md`
+and `docs/harness/portable/templates/`.
+
+Final harness/tooling consolidation before accelerated production work.
+Every installed/configured/referenced harness component received a
+disposition (KEEP/UPGRADE/REPAIR/PILOT/REPLACE/DISABLE/REMOVE/DEFER)
+against current repository truth. A 40-architecture review (superseding
+the normal 10-scenario process for this wave only) was scored on the
+brief's weighted rubric and run through four elimination rounds.
+
+**Recommended = S1 "current harness + targeted cleanup" (score 92/100).**
+The harness was already CLI-first, had **zero project-scoped MCP
+servers** (no `.mcp.json`), three deterministic hooks, eight narrow
+read-only review agents, progressive-disclosure skills, a concise
+`CLAUDE.md`, repo-authoritative memory with a zero-cost local journal,
+and quality + security CI. Wave 2L's only change to it: **removed one
+dead plugin-config line** (`security-guidance@claude-plugins-official`
+was enabled in `.claude/settings.json` but never installed, absent from
+`claude plugin list`, named in no ADR — `claude-security` already
+covers that need). No code logic changed; no dependency added/removed;
+no migration.
+
+**Next Best = S3 "CLI-first minimal"** (drop the two LSP plugins + the
+vendored `impeccable` tree). Switch condition in ADR-0052: an LSP
+plugin supply-chain/telemetry concern, the rust-analyzer ~60s
+cold-start proving not worth it, or repeated onboarding failure on the
+per-user plugin cache.
+
+**Three contradictions the brief named, reconciled:**
+
+- `claude-mem` — genuinely inert: `false` at user scope, no project
+  override, no claude-mem hooks in either settings file, data
+  preserved. Wave 2J's disable stands.
+- Native Tauri smoke verification — **never executed in any wave**
+  (`cargo build` succeeds; no `tauri build` installer, no WebdriverIO
+  run ever). Retained as verification debt, not claimed done.
+- The owed Wave 2J architecture/harness review — dispatched this wave
+  (`architecture-reviewer`); it hit this project's recurring
+  reviewer-retrieval bug, so a rigorous self-review was substituted and
+  the independent-review debt retained (see `docs/VERIFICATION-DEBT.md`).
+
+**Harness experimentation is now FROZEN.** A harness change may occur
+only for: a production blocker; an important security/correctness
+defect; a genuinely missing capability; a retained component becoming
+insecure/obsolete/incompatible; or benchmarked evidence of substantial
+improvement. Popularity/novelty/stars do not qualify. Default action
+from here: **build the product.**
+
+**ProjectForge** — the reusable, non-LIKHA ideology and mechanisms were
+extracted to a standalone **private** repo `312810-spec/projectforge`
+(**ProjectForge v0.1**): provider-independent core, a Claude Code
+adapter built from the evidence-backed parts, and initial project-type
+profiles (general/software/web/native/research/business/data/automation/
+education/writing/design) as capability-selection recipes. It has its
+own independent memory and is not coupled to LIKHA at runtime; LIKHA
+does not depend on it at runtime and remains independently buildable.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

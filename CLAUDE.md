@@ -48,6 +48,16 @@ narrowly-triggered procedures live in `.claude/skills/` — read the
 relevant one when the task matches it rather than expecting this file to
 contain everything.
 
+The Claude Code harness is **LIKHA Production Harness v1.0 — frozen**
+(`docs/adr/0052-wave2l-production-harness-v1.md`). Do not open a new
+tooling/MCP/plugin/agent/skill/hook optimization wave. Change it only
+for a production blocker, an important security/correctness defect, a
+genuinely missing capability, a retained component becoming
+insecure/obsolete/incompatible, or benchmarked evidence of substantial
+improvement — never for popularity or novelty. Reusable, non-LIKHA
+parts are extracted to `docs/harness/` and the separate ProjectForge
+repository; LIKHA does not depend on ProjectForge at runtime.
+
 Inspect code before changing it.
 
 Method:

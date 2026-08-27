@@ -1,5 +1,46 @@
 # ACTIVE PLAN
 
+## Wave 2L: Final Harness Consolidation + Production Harness v1.0 + ProjectForge (added 2026-08-27) — complete
+
+Full record: `docs/adr/0052-wave2l-production-harness-v1.md`,
+`docs/CURRENT-HANDOFF.md` top entry, `docs/VERIFICATION-DEBT.md` top
+entry, `docs/SOURCE-REGISTRY.md` top entry, `docs/harness/`.
+Harness/developer-infrastructure milestone — **no product code, tests,
+migrations, or dependencies touched.** Verification record:
+
+- **Repository/CI truth verified first**: branch/HEAD `27dc534` = `origin`,
+  0 ahead/behind; `main` = `d9ab036`; tree clean. Wave 2K code
+  checkpoint `10d5efc` re-confirmed via `gh run view`: Quality Gate
+  `33026121743` + Security Gate `33026121791` both `completed/success`.
+  HEAD `27dc534` Security Gate `33027657317` green; Quality Gate
+  `33027657304` `in_progress` at start (docs-only, non-blocking).
+- **Every harness component dispositioned** — full table in ADR-0052.
+  Only change: removed the dead `security-guidance@claude-plugins-official`
+  line from `.claude/settings.json`.
+- **40-architecture rubric review + 4 elimination rounds** — Recommended
+  S1 (92/100), Next Best S3 with switch condition. Compressed appendix
+  in ADR-0052.
+- **Runtime checks executed**: `node scripts/memory/health.mjs` (all
+  HEALTHY), `recall.mjs` smoke (grep retrieval working), `claude plugin
+list` (4 official plugins enabled; claude-mem disabled;
+  security-guidance absent → dead config confirmed then removed), `npx
+knip --version` (6.32.2), `cargo-deny` present
+  (`gitleaks`/`osv-scanner` absent this machine — per-machine, CI
+  authoritative), MCP config inspection (no `.mcp.json`; one user-scope
+  `codebase-memory-mcp`).
+- **Independent review**: `architecture-reviewer` dispatched for harness
+  structure (also discharging the owed Wave 2J review) — hit the
+  recurring reviewer-retrieval bug; rigorous self-review substituted;
+  independent-review debt retained in `docs/VERIFICATION-DEBT.md`.
+- **`npm run quality`** re-run after the doc/config edits — [record
+  result at commit time].
+- **ProjectForge v0.1** extracted to private repo
+  `312810-spec/projectforge` — core + Claude Code adapter + 11 profile
+  recipes + portable templates + independent memory + provenance.
+- **Harness experimentation frozen** (ADR-0052 §freeze; `CLAUDE.md`
+  updated). Exact next product action: SF10 template intake (see
+  `docs/CURRENT-HANDOFF.md`).
+
 ## Wave 2K: Official-Form Template Evidence & Provenance Registry (added 2026-08-27) — complete
 
 Full record: `docs/adr/0051-official-form-template-evidence-registry.md`,

@@ -1,5 +1,62 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-27 — Wave 2L: Final Harness Consolidation + LIKHA Production Harness v1.0 + ProjectForge Extraction, COMPLETE and FROZEN)
+
+Full record: `docs/adr/0052-wave2l-production-harness-v1.md`. Portable
+extraction: `docs/harness/`. Same branch
+(`claude/likha-sis-wave2a-learner-core`).
+
+**Repository/CI truth verified first**: branch/HEAD `27dc534` matched
+`origin`, 0 ahead/behind; `main` unchanged at `d9ab036`; working tree
+clean. Wave 2K **code** checkpoint `10d5efc` re-confirmed directly via
+`gh run view` — Quality Gate `33026121743` and Security Gate
+`33026121791` both `completed/success`. HEAD `27dc534` (docs commit):
+Security Gate `33027657317` green; Quality Gate `33027657304` was
+`in_progress` at inventory start (docs-only, non-blocking).
+
+**What changed in the harness**: exactly one thing — removed the dead
+`security-guidance@claude-plugins-official` line from
+`.claude/settings.json` (enabled but never installed; `claude-security`
+covers the need). Everything else: KEEP. Full disposition table for
+every plugin / MCP / agent / skill / hook / script / CI gate in
+ADR-0052.
+
+**Recommended architecture S1** ("current harness + targeted cleanup",
+92/100) selected from a 40-architecture rubric review + 4 elimination
+rounds. **Next Best S3** ("CLI-first minimal") with a documented switch
+condition. The harness is now **frozen** (ADR-0052 §"Harness
+experimentation freeze").
+
+**Runtime-verified this wave**: `git`/`gh` CI re-confirmation; `node
+scripts/memory/health.mjs` (all HEALTHY) + `recall.mjs` smoke;
+`claude plugin list` (4 official plugins enabled, claude-mem disabled,
+security-guidance absent); `npx knip --version` 6.32.2; `cargo-deny`
+present (`gitleaks`/`osv-scanner` absent this machine — per-machine, CI
+authoritative); MCP inspection (no `.mcp.json`; one user-scope
+`codebase-memory-mcp` only). Independent `architecture-reviewer`
+dispatched for harness structure — recurring retrieval bug hit;
+self-review substituted; debt retained (`docs/VERIFICATION-DEBT.md`).
+
+**ProjectForge v0.1** created as **private** repo
+`312810-spec/projectforge` — provider-independent core + Claude Code
+adapter + 11 project-type profile recipes + portable templates +
+independent memory + provenance. Not coupled to LIKHA at runtime.
+
+**Exact next product action** (harness work is done — resume LIKHA
+product development from here): take the **SF10 lead** recorded in
+ADR-0051 / `docs/VERIFICATION-DEBT.md`'s Wave 2K entry. Download one of
+the four `support.lis.deped.gov.ph/support/downloads/schoolforms/`
+SF10 `.xlsx` URLs locally, run `cargo run --example
+inspect_template_candidate -- <path>` against it, and register its
+manifest as a `ProvenanceState::CandidateUnverified` `TemplateEvidence`
+entry in `formgen::evidence` (do **not** promote to
+`AuthoritativeSourceConfirmed` without a confirmed DepEd
+Order/Memorandum citation). This also gives `formgen::evidence` its
+first real consumer. If SF10 turns out blocked, the alternatives are
+unchanged from Wave 2K: retry the still-owed independent architecture
+review under a healthy harness, or live-smoke-test claude-mem's
+disable — both in `docs/VERIFICATION-DEBT.md`.
+
 ## Active Task (2026-08-27, this session — Wave 2K: Official-Form Template Evidence & Provenance Registry, complete, ready to commit)
 
 Full record: `docs/adr/0051-official-form-template-evidence-registry.md`.

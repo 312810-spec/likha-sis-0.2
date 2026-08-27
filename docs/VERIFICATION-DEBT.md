@@ -1,5 +1,62 @@
 # Verification Debt
 
+## Wave 2L — Final Harness Consolidation + Production Harness v1.0 (2026-08-27)
+
+Full record: `docs/adr/0052-wave2l-production-harness-v1.md`.
+
+**Independent architecture/harness review NOT retrieved.** An
+`architecture-reviewer` agent was dispatched read-only for the Wave 2L
+harness structure question (rules / agents / skills / hooks /
+always-loaded context / `scripts/`), which also carried the owed Wave
+2J architecture/harness review. It ran (~87.5K tokens, 40 tool uses,
+~322s) and reported completion but returned **no retrievable findings
+text** — the same recurring reviewer-retrieval failure documented
+throughout this project since M7. One `SendMessage` retry requesting
+the full text inline was attempted. Per the established
+reviewer-harness fallback rule: the failed attempt is recorded here, a
+rigorous self-review was substituted (see ADR-0052 §"Independent
+review"), and the **independent-review debt is retained** — retry under
+a healthy harness in a future session. Self-review found no blocking
+issue; the wave changed one dead config line and added documentation.
+
+**Native Tauri smoke verification — still owed, unchanged by this
+wave.** Reconciled explicitly this wave: **no wave has ever produced a
+packaged Windows installer or driven the compiled Tauri binary** with
+WebdriverIO / `@wdio/tauri-service` or any native driver. `cargo build`
+(debug, full binary) succeeding is the entire extent of native proof.
+The `KeyStore`/resource-resolution/installer paths remain
+`NOT_VERIFIED` against a real packaged build. This is a milestone of
+its own, deferred, not a harness component.
+
+**`gitleaks` and `osv-scanner` not installed on this machine.**
+`where.exe` finds neither; `cargo-deny` is present. Repo-side wiring is
+durable and machine-independent (CI `.github/workflows/security.yml`
+runs all three regardless), so this is a per-machine local-tooling gap,
+not a repo defect — but `npm run quality:security` cannot fully run
+locally on this machine until they are installed.
+
+**LSP live behaviour not re-demonstrated this wave.** The KEEP
+disposition for `typescript-lsp` / `rust-analyzer-lsp` relies on
+ADR-0045's Wave 2F grep-cross-checked demonstration as the most recent
+primary evidence; it was not independently re-run in Wave 2L.
+
+**`impeccable` vendored tree (~130 files) — maintenance-cost flag, not
+a defect.** Kept because only `SKILL.md` loads and only on an explicit
+design-work trigger (≈0 context cost when idle). Flagged for a prune
+review if it goes unused for a full production phase.
+
+**ProjectForge profiles are initial designs, not proven.** Only the
+`software` profile is backed by real use (LIKHA itself). The other ten
+profiles (general/web/native/research/business/data/automation/
+education/writing/design) are reusable scaffolding validated
+conceptually against non-LIKHA examples in `ADOPTION-GUIDE.md`, not
+matured through actual projects. Recorded in the ProjectForge repo's
+own provenance.
+
+**All prior verification debt (Wave 2K and earlier) remains fully
+intact and unweakened by this wave** — this wave touched no product
+code, no tests, no migrations, no dependencies.
+
 ## Wave 2K — Official-Form Template Evidence & Provenance Registry (2026-08-27)
 
 Full record: `docs/adr/0051-official-form-template-evidence-registry.md`.
