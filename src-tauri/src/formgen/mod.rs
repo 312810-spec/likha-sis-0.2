@@ -18,6 +18,15 @@
 //! formgen::template before any parsing is attempted)
 //! ```
 //!
+//! Two sibling domain modules answer questions the generation path
+//! depends on but the port above does not:
+//! `formgen::evidence` (Wave 2K — template provenance + output
+//! fidelity, two independent axes) and `formgen::template_version`
+//! (Wave 2M — which template version was authoritative for a record's
+//! own school-year/grade/curriculum/track context; the centralized
+//! resolver a future SF10 generator calls instead of scattering
+//! date checks). Neither touches SQLite, sessions, or Tauri.
+//!
 //! Nothing above the port knows this adapter exists, and nothing below
 //! the port knows about SQLite, sessions, or Tauri — the same discipline
 //! `import::psgc`/`repository::reference_geo` already established in

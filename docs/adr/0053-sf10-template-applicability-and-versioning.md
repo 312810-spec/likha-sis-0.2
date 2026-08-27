@@ -136,9 +136,9 @@ speed).
 
 ### Recommended
 
-**#8 — evidence-backed `TemplateVersion` registry + centralized
-`TemplateApplicabilityResolver` (`formgen::template_version::resolve`)**
-that keys on (form type, school-year range, grade levels, curriculum,
+**#8 — evidence-backed `TemplateVersion` registry + a centralized
+applicability resolver (`formgen::template_version::resolve`)** that
+keys on (form type, school-year range, grade levels, curriculum,
 optional track) and **fails explicitly** (`NoApplicableTemplate` /
 `AmbiguousTemplates` / `FidelityInsufficient` / `ProvenanceUnusable`)
 rather than ever returning a "closest" or "newest" template. Chosen
@@ -185,19 +185,22 @@ resolution path.
 ## Verification
 
 - `cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
-  clean; `cargo test` — 478 lib tests + all integration binaries + 0
-  doctests pass, including 13 new tests (`formgen::evidence` SF10
-  candidate conservatism ×2 + promotion-guard refusal; `formgen::
-template_version` resolver ×10 covering exact match, wrong grade
-  band, pre-era `NoApplicableTemplate`-not-newest, `FidelityInsufficient`,
-  `AmbiguousTemplates`, `ProvenanceUnusable`, registry conservatism).
+  clean; `cargo test` — 479 lib tests + all integration binaries + 0
+  doctests pass, including **11 new tests**: `formgen::evidence` (SF10
+  candidate conservatism ×1 covering both records, promotion-guard
+  refusal ×1) and `formgen::template_version` (×9: SSHS match, JHS
+  match, pre-era → `NoApplicableTemplate` not newest, wrong grade band,
+  `FidelityInsufficient`, `AmbiguousTemplates`, `Superseded`
+  refused-in-window, `Synthetic` refused-in-window, registry
+  conservatism).
 - One transient `rustc` internal-compiler-error was observed once on a
   full `cargo test` run immediately after `cargo fmt` rewrote
   `template_version.rs` mid-build; it did not reproduce on a clean
   rebuild (`cargo test --lib`, `--doc`, `--tests`, and full `cargo
 test` all clean afterwards). Recorded honestly as a stale-incremental
   artifact, not a code defect.
-- `npm run quality` — [record at commit].
+- `npm run quality` — clean (typecheck, lint, format:check,
+  architecture check, 462/462 TS tests; no frontend files touched).
 - No new dependency (`cargo deny` unaffected); no migration; no Tauri
   command; no UI; no learner data (synthetic-only discipline intact —
   the resolver takes `&'static str` context, touches no learner
@@ -206,11 +209,45 @@ test` all clean afterwards). Recorded honestly as a stale-incremental
 ## Independent review
 
 Dispatched per the frozen-harness rules (Wave 2L / ADR-0052) —
-security-reviewer and architecture-reviewer, read-only. Results /
-retained debt recorded in `docs/VERIFICATION-DEBT.md`'s Wave 2M entry;
-if the known reviewer-retrieval bug recurred, a rigorous self-review
-was substituted and the debt retained rather than claiming a review
-happened.
+`security-reviewer` and `architecture-reviewer`, read-only.
+
+**Architecture review** returned findings in full: **no BLOCKING**
+findings (the three it initially flagged BLOCKING were an inaccurate
+test count and an unfilled `npm run quality` placeholder in an earlier
+draft of this ADR — both corrected above; a pre-written "Independent
+review" paragraph — rewritten to this; and a stray 0-byte
+`src-tauri/String` junk file — never committed, removed before the
+Wave 2M commit). Non-blocking items acted on this checkpoint: removed
+the dead `historical_only` field from `TemplateApplicability` and the
+unused `supersedes`/`superseded_by` from `TemplateVersion` (evidence
+already carries supersession); `resolve` now also refuses a
+`Synthetic` provenance as `ProvenanceUnusable`; added a doc note that
+`TemplateApplicability.curriculum` is a plain label, deliberately not a
+foreign key to the seeded `curriculum_versions`, with the mapping seam
+named; updated `formgen/mod.rs`'s layering doc comment to mention
+`evidence` and `template_version`; corrected this ADR's reference to
+name `formgen::template_version::resolve` rather than a nonexistent
+`TemplateApplicabilityResolver` type. Non-blocking items accepted as
+recorded tradeoffs: `FormContext`'s `&'static str` typing (test-shaped,
+fine for the seam), provenance checked after the ambiguity branch (an
+overlapping-window registry is a bug regardless), `bool` fidelity gate
+(one call site), registry ids becoming durable identifiers at first
+stamp (Next Best's concern, tracked).
+
+**Security review** returned a headline — **no BLOCKING findings**;
+seven non-blocking items (NB-1..NB-7); the five review questions
+answered; and an explicit statement that neither of this project's two
+historical failure classes (PII leakage into commits/logs; promotion-
+guard bypass) recurred. The itemized NB-1..NB-7 text hit this
+project's documented reviewer-retrieval bug and could not be retrieved
+after one resume attempt. Per the established fallback: the failed
+retrieval is recorded, a rigorous self-review was substituted (the
+diff commits no workbook bytes or real data — verified; the intake
+tool stays dev-only and read-only; `resolve` cannot return an
+unauthoritative template — proven by construction and tests; the new
+SF10 records set no `authoritative_issuance` and cannot be promoted),
+and the security-review-specifics debt is retained in
+`docs/VERIFICATION-DEBT.md` for a later re-run under a healthy harness.
 
 ## Verification debt
 

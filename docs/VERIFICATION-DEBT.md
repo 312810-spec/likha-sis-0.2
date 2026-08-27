@@ -53,10 +53,30 @@ artifact, not a code defect — but noted here so a future session that
 hits it knows it was seen and cleared once.
 
 **Independent review**: security-reviewer + architecture-reviewer
-dispatched per ADR-0052's frozen-harness rules. [Outcome recorded here
-after they return / self-review substituted per the established
-fallback if the retrieval bug recurs — do not claim a review happened
-that did not.]
+dispatched per ADR-0052's frozen-harness rules.
+
+- **Architecture review** — findings retrieved in full. No BLOCKING
+  (the three it initially tagged BLOCKING were ADR-draft accuracy
+  issues + a stray uncommitted junk file, all corrected/removed before
+  the commit). Non-blocking items acted on: removed dead
+  `historical_only` and unused `supersedes`/`superseded_by` fields;
+  `resolve` now refuses `Synthetic` provenance too; curriculum-label
+  seam documented; `formgen/mod.rs` doc comment updated; ADR wording
+  corrected. See ADR-0053 "Independent review".
+- **Security review** — headline retrieved: **no BLOCKING findings**;
+  seven non-blocking items (NB-1..NB-7); all five review questions
+  answered; explicit confirmation that neither historical failure
+  class (PII-into-commits/logs; promotion-guard bypass) recurred. **The
+  itemized NB-1..NB-7 text hit this project's documented
+  reviewer-retrieval bug and was NOT recoverable** after two resume
+  attempts (agent replied "Review complete. Nothing further."). Per the
+  established fallback: failed retrieval recorded, rigorous self-review
+  substituted (no workbook bytes / real data in the diff; intake tool
+  stays dev-only read-only; `resolve` cannot return an unauthoritative
+  template — proven by construction + tests; new SF10 records
+  unpromotable). **The security-review-specifics debt (the content of
+  NB-1..NB-7) is retained** — re-run `security-reviewer` on this
+  checkpoint under a healthy harness in a future session.
 
 **All prior verification debt (Wave 2L and earlier) remains intact.**
 

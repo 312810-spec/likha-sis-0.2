@@ -68,15 +68,17 @@ pub struct TemplateApplicability {
     /// current" (open at the end).
     pub effective_to_school_year: Option<&'static str>,
     pub grade_levels: &'static [&'static str],
+    /// Curriculum label the record was taught under. A plain string,
+    /// deliberately NOT a foreign key to `repository::curriculum`'s
+    /// seeded `curriculum_versions` — this module is pure domain with
+    /// no database. The strings must match the `FormContext.curriculum`
+    /// a caller passes; a future SF10 generation path is responsible
+    /// for mapping a stored `CurriculumVersion` (e.g. "MATATAG
+    /// Curriculum") to the label used here ("MATATAG"). ADR-0053
+    /// records this seam.
     pub curriculum: &'static str,
     /// `None` = applies regardless of track; `Some(_)` = track-specific.
     pub track: Option<&'static str>,
-    /// `true` once a newer version has superseded this one for NEW
-    /// records — it stays selectable for records whose context falls in
-    /// its own effective range (that is the whole point), but the
-    /// resolver will refuse to hand it back for a context outside that
-    /// range.
-    pub historical_only: bool,
 }
 
 impl TemplateApplicability {
@@ -113,14 +115,17 @@ impl TemplateApplicability {
 /// One resolvable template version: its identity, the (optional — SF10
 /// has none yet) byte/structure descriptor, its provenance/fidelity
 /// evidence, and the context it was authoritative for.
+///
+/// Supersession is NOT modeled here — `TemplateEvidence` already
+/// carries `supersedes`/`superseded_by`, and `resolve` refuses a
+/// `Superseded` provenance outright. A version whose effective range
+/// has ended simply stops matching new contexts via `covers()`.
 #[derive(Debug, Clone, Copy)]
 pub struct TemplateVersion {
     pub id: &'static str,
     pub descriptor: Option<&'static TemplateDescriptor>,
     pub evidence: &'static TemplateEvidence,
     pub applicability: TemplateApplicability,
-    pub supersedes: Option<&'static str>,
-    pub superseded_by: Option<&'static str>,
 }
 
 /// Why a template version could not be resolved. The resolver returns
@@ -141,9 +146,9 @@ pub enum ResolveError {
         id: &'static str,
         have: FidelityState,
     },
-    /// A single version matched but its provenance is `Rejected` or
-    /// `Superseded` — not usable as an authoritative source even though
-    /// its applicability window covers the context.
+    /// A single version matched but its provenance is `Rejected`,
+    /// `Superseded`, or `Synthetic` — not usable as an authoritative
+    /// source even though its applicability window covers the context.
     ProvenanceUnusable {
         id: &'static str,
         state: ProvenanceState,
@@ -171,13 +176,23 @@ pub fn resolve<'a>(
         [] => Err(ResolveError::NoApplicableTemplate),
         [only] => {
             match only.evidence.provenance {
-                ProvenanceState::Rejected | ProvenanceState::Superseded => {
+                // `Synthetic` is refused for the same reason `Rejected`/
+                // `Superseded` are: a project-authored fixture is never
+                // authoritative for a real record's context, even if its
+                // applicability window happens to cover it. (There are no
+                // `Synthetic` SF10 versions today; this guards a future
+                // architecture-readiness fixture from leaking into a
+                // compliance-sensitive resolution.)
+                ProvenanceState::Rejected
+                | ProvenanceState::Superseded
+                | ProvenanceState::Synthetic => {
                     return Err(ResolveError::ProvenanceUnusable {
                         id: only.id,
                         state: only.evidence.provenance,
                     });
                 }
-                _ => {}
+                ProvenanceState::CandidateUnverified
+                | ProvenanceState::AuthoritativeSourceConfirmed => {}
             }
             if require_verified_fidelity && only.evidence.fidelity == FidelityState::NotVerified {
                 return Err(ResolveError::FidelityInsufficient {
@@ -213,10 +228,7 @@ pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
             grade_levels: &["7", "8", "9", "10"],
             curriculum: "MATATAG",
             track: None,
-            historical_only: false,
         },
-        supersedes: None,
-        superseded_by: None,
     },
     TemplateVersion {
         id: "sf10-sshs-dm020-2026-candidate",
@@ -229,13 +241,10 @@ pub const SF10_TEMPLATE_VERSIONS: &[TemplateVersion] = &[
             grade_levels: &["11", "12"],
             curriculum: "Strengthened SHS",
             track: None, // LEAD: DM 020 s. 2026 body unread — whether Academic
-            // and TechPro share one SF10 or split is UNCONFIRMED. Modeled as
-            // track-agnostic until the issuance is read; ADR-0053 records this
-            // as the single most likely thing to change.
-            historical_only: false,
+                         // and TechPro share one SF10 or split is UNCONFIRMED. Modeled as
+                         // track-agnostic until the issuance is read; ADR-0053 records this
+                         // as the single most likely thing to change.
         },
-        supersedes: None,
-        superseded_by: None,
     },
 ];
 
@@ -337,10 +346,7 @@ mod tests {
                     grade_levels: &["9"],
                     curriculum: "MATATAG",
                     track: None,
-                    historical_only: false,
                 },
-                supersedes: None,
-                superseded_by: None,
             },
             TemplateVersion {
                 id: "dup-b",
@@ -353,10 +359,7 @@ mod tests {
                     grade_levels: &["9"],
                     curriculum: "MATATAG",
                     track: None,
-                    historical_only: false,
                 },
-                supersedes: None,
-                superseded_by: None,
             },
         ];
         let ctx = FormContext {
@@ -392,10 +395,7 @@ mod tests {
                 grade_levels: &["9"],
                 curriculum: "MATATAG",
                 track: None,
-                historical_only: true,
             },
-            supersedes: None,
-            superseded_by: None,
         }];
         let ctx = FormContext {
             form_type: "SF10",
@@ -408,6 +408,38 @@ mod tests {
             Err(ResolveError::ProvenanceUnusable { id, state }) => {
                 assert_eq!(id, "old");
                 assert_eq!(state, ProvenanceState::Superseded);
+            }
+            other => panic!("expected ProvenanceUnusable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_synthetic_fixture_is_never_resolved_as_authoritative_for_a_real_context() {
+        static SYN: TemplateEvidence = crate::formgen::evidence::SF1_SYNTHETIC_V1_EVIDENCE;
+        let reg: &[TemplateVersion] = &[TemplateVersion {
+            id: "syn",
+            descriptor: None,
+            evidence: &SYN,
+            applicability: TemplateApplicability {
+                form_type: "SF10",
+                effective_from_school_year: "",
+                effective_to_school_year: None,
+                grade_levels: &["9"],
+                curriculum: "MATATAG",
+                track: None,
+            },
+        }];
+        let ctx = FormContext {
+            form_type: "SF10",
+            school_year: "2024-2025",
+            grade_level: "9",
+            curriculum: "MATATAG",
+            track: None,
+        };
+        match resolve(reg, &ctx, false) {
+            Err(ResolveError::ProvenanceUnusable { id, state }) => {
+                assert_eq!(id, "syn");
+                assert_eq!(state, ProvenanceState::Synthetic);
             }
             other => panic!("expected ProvenanceUnusable, got {other:?}"),
         }
