@@ -39,6 +39,18 @@ treating SF1/SF9's absence from this specific portal as confirmed.
 (deliberate scope discipline, not an oversight; see ADR-0051's "What
 belongs in Git").
 
+**`confirm_authoritative_source`'s guard blocks the state TRANSITION,
+not the contradictory RECORD** — `TemplateEvidence`'s fields are all
+`pub`, and the guard function only sees `current: ProvenanceState`, not
+`superseded_by`, so a record with `provenance:
+AuthoritativeSourceConfirmed` and a populated `superseded_by` field can
+still be constructed directly, bypassing the guard entirely (accepted
+as a reasonable tradeoff by both Wave 2K reviews, since this module has
+no runtime/security-boundary role today — see ADR-0051's "Independent
+review"). If `formgen::evidence` is ever wired into an unsupervised
+intake path (rather than a human-run review step), this gap must be
+closed first — e.g. private fields behind a checked constructor.
+
 **All prior verification debt (Wave 2J and earlier) remains fully
 intact and unweakened by this wave.**
 

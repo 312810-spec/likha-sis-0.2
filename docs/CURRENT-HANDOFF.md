@@ -80,11 +80,22 @@ tautological test and adding the `Superseded` regression test).
 commit**: Quality Gate `33026121743` and Security Gate `33026121791`,
 both `completed`/`success`. Wave 2K is fully closed.
 
-**Exact next action**: select and continue to the next highest-value
-work per LIKHA's priority order (privacy/security → correctness →
-DepEd compliance → teacher usability → offline reliability →
-maintainability → zero billing → performance → speed) — this is a
-checkpoint, not a stopping point.
+**Exact next action**: this session is ending at a practical
+session/context boundary (three waves, a compaction, and a usage-limit
+interruption already in this session) — a valid stopping point per
+`.claude/rules/autonomous-development.md`. The concrete next step for a
+future session, not just a priority-order restatement: pick one of the
+two retained-debt items below and act on it. Recommended first: take
+the SF10 lead from ADR-0051/this wave's entry above — download one of
+the four `support.lis.deped.gov.ph` SF10 URLs locally, run `cargo run
+--example inspect_template_candidate -- <path>` against it, and record
+its manifest as a `ProvenanceState::CandidateUnverified` evidence entry
+in `formgen::evidence` (do NOT promote to `AuthoritativeSourceConfirmed`
+without a confirmed DepEd Order/Memorandum citation) — this also gives
+the evidence registry its first real consumer. Alternative: retry the
+still-undispatched architecture/harness review owed since Wave 2J, or
+live-smoke-test claude-mem's disable (both recorded in
+`docs/VERIFICATION-DEBT.md`).
 
 ## Note: Wave 2J — Resilient Zero-Cost Memory Observer + Project-Brain Hardening, complete (superseded as "Active Task" by Wave 2K above, kept for history)
 
