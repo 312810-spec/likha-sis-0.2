@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
-import type { Section, SectionRosterMember } from "../domain/section";
+import type {
+  EndEnrollmentResult,
+  Section,
+  SectionRosterMember,
+  TransferResult,
+} from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -46,12 +51,13 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-/** The effective date a transfer/end panel opens with: today, unless the
- * learner's placement starts in the future, in which case the earliest
- * date the change can take effect is that start date. */
-function defaultEffectiveOn(member: SectionRosterMember): string {
-  const today = todayAsIsoDate();
-  return today < member.startsOn ? member.startsOn : today;
+/** The effective date a transfer/end panel opens with. `asOfDate` (the
+ * roster's frozen "today") is passed in rather than read fresh, so the
+ * panel default and the header date can never disagree on a machine left
+ * open past midnight. If the placement itself starts in the future, that
+ * start date is the earliest the change can take effect. */
+function defaultEffectiveOn(member: SectionRosterMember, asOfDate: string): string {
+  return asOfDate < member.startsOn ? member.startsOn : asOfDate;
 }
 
 type ActionKind = "transfer" | "end";
@@ -60,6 +66,10 @@ interface ActiveAction {
   member: SectionRosterMember;
   kind: ActionKind;
 }
+
+/** Which field, if any, an inline `panelError` belongs to — drives
+ * `aria-invalid` so a screen reader ties the message to the control. */
+type PanelErrorField = "destination" | "effectiveOn" | null;
 
 /**
  * "Open my class roster" plus the two membership changes that hang off a
@@ -72,9 +82,9 @@ interface ActiveAction {
  * Every membership change targets the exact `membershipId` carried on the
  * roster row. If the placement changed in another tab/session since this
  * roster loaded, the command refuses (returns `notCurrent` /
- * `membershipNotFound`) rather than acting on a different membership, and
- * this screen shows a "refresh and try again" recovery instead of a
- * silent wrong write.
+ * `membershipNotFound` / `destinationNotFound`) rather than acting on a
+ * different membership, and this screen shows a "refresh and try again"
+ * recovery instead of a silent wrong write.
  *
  * Opening the screen makes two sequential command calls — `listSections()`
  * then `roster()` — on purpose: the section list is re-fetched (rather than
@@ -126,6 +136,7 @@ export function SectionRosterScreen({
   // An inline problem shown inside the open panel that the teacher can fix
   // and retry without losing what they entered (bad date, same section).
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [panelErrorField, setPanelErrorField] = useState<PanelErrorField>(null);
   // The stronger "someone changed this enrollment while you had the roster
   // open" state — the panel switches to a Refresh action.
   const [staleConflict, setStaleConflict] = useState(false);
@@ -150,7 +161,11 @@ export function SectionRosterScreen({
 
   function loadRoster(forSection: Section) {
     const requestId = ++requestRef.current;
-    setRosterState("loading");
+    // Only blank the table to a spinner when there is nothing to show yet.
+    // A refresh after a confirmed transfer/end keeps the existing rows
+    // visible and lets them update in place, so the class list never
+    // appears to vanish.
+    setRosterState((current) => (current === "ready" ? "ready" : "loading"));
     sectionService
       .roster(forSection.id, asOfDate)
       .then((result) => {
@@ -202,8 +217,9 @@ export function SectionRosterScreen({
     triggerRef.current = trigger;
     setConfirmation(null);
     setPanelError(null);
+    setPanelErrorField(null);
     setStaleConflict(false);
-    setEffectiveOn(defaultEffectiveOn(member));
+    setEffectiveOn(defaultEffectiveOn(member, asOfDate));
     setDestinationId("");
     setActiveAction({ member, kind });
   }
@@ -212,13 +228,31 @@ export function SectionRosterScreen({
     restoreFocusRef.current = restoreFocus;
     setActiveAction(null);
     setPanelError(null);
+    setPanelErrorField(null);
     setStaleConflict(false);
   }
 
-  function refreshAfterConflict() {
+  /** Leave the stale-conflict panel AND reload the roster, so the teacher
+   * is never returned to the same out-of-date list they just failed
+   * against. `focusHeading` picks the landing spot: the page heading after
+   * the explicit "Refresh roster", the trigger button after "Close". */
+  function dismissConflict(focusHeading: boolean) {
     if (section) loadRoster(section);
-    closeAction(false);
-    headingRef.current?.focus();
+    closeAction(!focusHeading);
+    if (focusHeading) headingRef.current?.focus();
+  }
+
+  function showFieldError(field: Exclude<PanelErrorField, null>, message: string) {
+    setPanelError(message);
+    setPanelErrorField(field);
+    // The submit button was disabled while the request ran, so focus is on
+    // <body>; move it somewhere useful and inside the still-open panel.
+    panelHeadingRef.current?.focus();
+  }
+
+  function enterStaleConflict() {
+    setStaleConflict(true);
+    panelHeadingRef.current?.focus();
   }
 
   async function handleConfirm(event: FormEvent) {
@@ -226,6 +260,7 @@ export function SectionRosterScreen({
     if (!activeAction || !section) return;
     const { member, kind } = activeAction;
     setPanelError(null);
+    setPanelErrorField(null);
     setSubmitting(true);
     try {
       if (kind === "transfer") {
@@ -273,59 +308,68 @@ export function SectionRosterScreen({
           ? err.message
           : "This change could not be saved. Check your device and try again.",
       );
+      setPanelErrorField(null);
+      panelHeadingRef.current?.focus();
     } finally {
       setSubmitting(false);
     }
   }
 
   function applyTransferFailure(
-    kind: Exclude<
-      Awaited<ReturnType<SectionApplicationService["transferMembership"]>>["kind"],
-      "transferred"
-    >,
+    kind: Exclude<TransferResult["kind"], "transferred">,
     member: SectionRosterMember,
   ) {
     switch (kind) {
       case "membershipNotFound":
       case "notCurrent":
-        setStaleConflict(true);
+      case "destinationNotFound":
+        // All three mean "the roster you acted from is out of date" — the
+        // membership moved, or the section you picked is gone. One
+        // recovery: refresh and start over.
+        enterStaleConflict();
         break;
       case "sameSection":
-        setPanelError(
+        showFieldError(
+          "destination",
           "That is the section this learner is already in. Choose a different section.",
         );
         break;
-      case "destinationNotFound":
-        setPanelError(
-          "That section could not be found — it may have been removed. Refresh and choose again.",
-        );
-        break;
       case "invalidEffectiveDate":
-        setPanelError(
+        showFieldError(
+          "effectiveOn",
           `The effective date cannot be before this learner joined the section (${formatIsoDate(
             member.startsOn,
           )}).`,
         );
         break;
+      default: {
+        const exhaustive: never = kind;
+        throw new Error(`unhandled transfer outcome: ${String(exhaustive)}`);
+      }
     }
   }
 
   function applyEndFailure(
-    kind: Exclude<Awaited<ReturnType<SectionApplicationService["endMembership"]>>["kind"], "ended">,
+    kind: Exclude<EndEnrollmentResult["kind"], "ended">,
     member: SectionRosterMember,
   ) {
     switch (kind) {
       case "notFound":
       case "notCurrent":
-        setStaleConflict(true);
+        enterStaleConflict();
         break;
       case "invalidEffectiveDate":
-        setPanelError(
+        showFieldError(
+          "effectiveOn",
           `The effective date cannot be before this learner joined the section (${formatIsoDate(
             member.startsOn,
           )}).`,
         );
         break;
+      default: {
+        const exhaustive: never = kind;
+        throw new Error(`unhandled end-enrollment outcome: ${String(exhaustive)}`);
+      }
     }
   }
 
@@ -393,11 +437,12 @@ export function SectionRosterScreen({
               &ldquo;LRN&rdquo; is the 12-digit Learner Reference Number — add a missing one on the
               Learners screen. Use &ldquo;Transfer&rdquo; to move a learner to another section, or
               &ldquo;End enrollment&rdquo; when they leave — both keep the learner&rsquo;s history
-              and take effect from the date you choose.
+              and take effect from the date you choose. If you make a mistake, you can re-enroll the
+              learner from the Sections screen.
             </p>
           )}
 
-          {rosterState === "loading" && <Loading label="Loading roster…" />}
+          {rosterState === "loading" && members.length === 0 && <Loading label="Loading roster…" />}
 
           {rosterState === "error" && (
             <Alert tone="error">
@@ -426,7 +471,7 @@ export function SectionRosterScreen({
             </EmptyState>
           )}
 
-          {rosterState === "ready" && members.length > 0 && (
+          {members.length > 0 && (rosterState === "ready" || rosterState === "loading") && (
             <>
               <p className="section-roster-count">
                 <strong>
@@ -480,7 +525,7 @@ export function SectionRosterScreen({
                               type="button"
                               disabled={activeAction !== null}
                               aria-expanded={panelOpen && activeAction?.kind === "transfer"}
-                              aria-label={`Transfer ${member.givenName} ${member.familyName}`}
+                              aria-label={`Transfer ${member.familyName}, ${member.givenName}`}
                               onClick={(event) =>
                                 openAction(member, "transfer", event.currentTarget)
                               }
@@ -491,7 +536,7 @@ export function SectionRosterScreen({
                               type="button"
                               disabled={activeAction !== null}
                               aria-expanded={panelOpen && activeAction?.kind === "end"}
-                              aria-label={`End enrollment for ${member.givenName} ${member.familyName}`}
+                              aria-label={`End enrollment for ${member.familyName}, ${member.givenName}`}
                               onClick={(event) => openAction(member, "end", event.currentTarget)}
                             >
                               End enrollment
@@ -506,20 +551,25 @@ export function SectionRosterScreen({
                                 onSubmit={handleConfirm}
                                 aria-label={
                                   activeAction.kind === "transfer"
-                                    ? `Transfer ${member.givenName} ${member.familyName}`
-                                    : `End enrollment for ${member.givenName} ${member.familyName}`
+                                    ? `Transfer ${member.familyName}, ${member.givenName}`
+                                    : `End enrollment for ${member.familyName}, ${member.givenName}`
                                 }
                               >
                                 <p
                                   className="section-roster-action-heading"
                                   ref={panelHeadingRef}
+                                  role="heading"
+                                  aria-level={3}
                                   tabIndex={-1}
                                 >
                                   {activeAction.kind === "transfer"
-                                    ? `Transfer ${member.givenName} ${member.familyName}`
-                                    : `End ${member.givenName} ${member.familyName}'s enrollment`}
+                                    ? `Transfer ${member.familyName}, ${member.givenName}`
+                                    : `End ${member.familyName}, ${member.givenName}'s enrollment`}
                                 </p>
-                                <p className="section-roster-action-context">
+                                <p
+                                  className="section-roster-action-context"
+                                  id="section-roster-action-context"
+                                >
                                   Currently in <strong>{section.name}</strong> since{" "}
                                   {formatIsoDate(member.startsOn)}.
                                 </p>
@@ -529,19 +579,20 @@ export function SectionRosterScreen({
                                     <Alert tone="warning">
                                       <p>
                                         This learner&rsquo;s enrollment changed since you opened
-                                        this roster, so this change was not made. Refresh the roster
-                                        and try again if you still need to.
+                                        this roster, so this change was not made. The roster is
+                                        being refreshed — check it and try again if you still need
+                                        to.
                                       </p>
                                     </Alert>
                                     <div className="section-roster-action-buttons">
                                       <button
                                         type="button"
                                         className="button-primary"
-                                        onClick={refreshAfterConflict}
+                                        onClick={() => dismissConflict(true)}
                                       >
                                         Refresh roster
                                       </button>
-                                      <button type="button" onClick={() => closeAction(true)}>
+                                      <button type="button" onClick={() => dismissConflict(false)}>
                                         Close
                                       </button>
                                     </div>
@@ -554,7 +605,10 @@ export function SectionRosterScreen({
                                           Move to section
                                         </label>
                                         {otherSections.length === 0 ? (
-                                          <p className="field-hint">
+                                          <p
+                                            className="field-hint"
+                                            id="section-roster-destination-hint"
+                                          >
                                             There is no other section to move this learner to.
                                             Create another section first on the Sections screen.
                                           </p>
@@ -564,6 +618,14 @@ export function SectionRosterScreen({
                                             value={destinationId}
                                             onChange={(event) =>
                                               setDestinationId(event.target.value)
+                                            }
+                                            aria-invalid={
+                                              panelErrorField === "destination" ? true : undefined
+                                            }
+                                            aria-describedby={
+                                              panelErrorField === "destination"
+                                                ? "section-roster-panel-error"
+                                                : undefined
                                             }
                                             required
                                           >
@@ -583,12 +645,29 @@ export function SectionRosterScreen({
                                       <label htmlFor="section-roster-effective-on">
                                         Effective date
                                       </label>
+                                      <p
+                                        className="field-hint"
+                                        id="section-roster-effective-on-hint"
+                                      >
+                                        The day the change takes effect. This is usually today —
+                                        change it only if the learner already moved or left on an
+                                        earlier date.
+                                      </p>
                                       <input
                                         id="section-roster-effective-on"
                                         type="date"
                                         value={effectiveOn}
                                         min={member.startsOn}
+                                        max={asOfDate}
                                         onChange={(event) => setEffectiveOn(event.target.value)}
+                                        aria-describedby={
+                                          panelErrorField === "effectiveOn"
+                                            ? "section-roster-effective-on-hint section-roster-panel-error"
+                                            : "section-roster-effective-on-hint"
+                                        }
+                                        aria-invalid={
+                                          panelErrorField === "effectiveOn" ? true : undefined
+                                        }
                                         required
                                       />
                                     </div>
@@ -608,7 +687,11 @@ export function SectionRosterScreen({
                                     )}
 
                                     {panelError && (
-                                      <p className="field-error" role="alert">
+                                      <p
+                                        className="field-error"
+                                        id="section-roster-panel-error"
+                                        role="alert"
+                                      >
                                         {panelError}
                                       </p>
                                     )}

@@ -310,7 +310,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
     await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
     await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
 
@@ -347,7 +347,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }));
     await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
 
     expect(
@@ -364,7 +364,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    const trigger = screen.getByRole("button", { name: /Transfer Ana Bautista/ });
+    const trigger = screen.getByRole("button", { name: /Transfer Bautista, Ana/ });
     await user.click(trigger);
     expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeInTheDocument();
 
@@ -380,11 +380,11 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     // Every other row action is disabled while a panel is open.
-    expect(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Transfer Ben Cruz/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Transfer Cruz, Ben/ })).toBeDisabled();
   });
 
   it("moves focus into the panel when it opens", async () => {
@@ -392,10 +392,10 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     await waitFor(() =>
-      expect(screen.getByText("Transfer Ana Bautista", { selector: "p" })).toHaveFocus(),
+      expect(screen.getByText("Transfer Bautista, Ana", { selector: "p" })).toHaveFocus(),
     );
   });
 
@@ -404,7 +404,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
     await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
     await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
 
@@ -423,7 +423,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
     await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
     await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
 
@@ -437,7 +437,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
     await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
     await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
 
@@ -451,7 +451,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     expect(screen.getByText(/no other section to move this learner to/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeDisabled();
@@ -462,7 +462,7 @@ describe("SectionRosterScreen", () => {
     await screen.findByText("Bautista, Ana");
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /End enrollment for Ana Bautista/ }));
+    await user.click(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }));
     await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
 
     expect(await screen.findByText(/could not be saved/)).toBeInTheDocument();
@@ -476,7 +476,7 @@ describe("SectionRosterScreen", () => {
       await screen.findByText("Bautista, Ana");
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+      await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
       expect(screen.getByLabelText("Move to section")).toBeInTheDocument();
       expect(screen.getByLabelText("Effective date")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeInTheDocument();
@@ -484,10 +484,149 @@ describe("SectionRosterScreen", () => {
     }
   });
 
+  it("caps the effective date at today so a change cannot be silently future-dated", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-27T09:00:00"));
+    try {
+      renderScreen();
+      await screen.findByText("Bautista, Ana");
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+
+      const input = screen.getByLabelText("Effective date");
+      expect(input).toHaveAttribute("max", "2026-08-27");
+      expect(input).toHaveValue("2026-08-27");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the learner the same way in the panel heading and the success banner", async () => {
+    const { repo } = renderScreen({
+      endResult: {
+        kind: "ended",
+        membership: {
+          id: "m-bautista",
+          schoolId: "s1",
+          sectionId: "sec-1",
+          learnerId: "l-bautista",
+          startsOn: "2025-06-02",
+          endsOn: "2026-08-27",
+          createdAt: "now",
+        },
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }));
+    // Panel heading uses "Family, Given".
+    expect(
+      screen.getByText("End Bautista, Ana's enrollment", { selector: "p" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
+    // Success banner uses the same order.
+    expect(
+      await screen.findByText(/Bautista, Ana's enrollment in Mabini was ended/),
+    ).toBeInTheDocument();
+    expect(repo.endCalls).toHaveLength(1);
+  });
+
+  it("moves focus to the panel heading when a submit outcome is an error", async () => {
+    renderScreen({ transferResult: { kind: "invalidEffectiveDate" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    await screen.findByText(/cannot be before this learner joined the section/);
+    await waitFor(() =>
+      expect(screen.getByText("Transfer Bautista, Ana", { selector: "p" })).toHaveFocus(),
+    );
+    // The field is marked invalid for assistive tech.
+    expect(screen.getByLabelText("Effective date")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("keeps the class list visible while it refreshes after a confirmed action", async () => {
+    renderScreen({
+      endResult: {
+        kind: "ended",
+        membership: {
+          id: "m-bautista",
+          schoolId: "s1",
+          sectionId: "sec-1",
+          learnerId: "l-bautista",
+          startsOn: "2025-06-02",
+          endsOn: "2026-08-27",
+          createdAt: "now",
+        },
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }));
+    await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
+
+    await screen.findByText(/enrollment in Mabini was ended/);
+    // The roster table never blanked to a "Loading roster…" placeholder.
+    expect(screen.queryByText("Loading roster…")).not.toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: "Cruz, Ben" })).toBeInTheDocument();
+  });
+
+  it("routes a vanished destination section to the same refresh recovery as a stale membership", async () => {
+    const { repo } = renderScreen({ transferResult: { kind: "destinationNotFound" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(
+      await screen.findByText(/enrollment changed since you opened this roster/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh roster" }));
+    expect(repo.rosterCalls).toHaveLength(2);
+  });
+
   it("has no detectable accessibility violations with an action panel open", async () => {
     const { container } = renderScreen();
     await screen.findByText("Bautista, Ana");
-    await userEvent.setup().click(screen.getByRole("button", { name: /Transfer Ana Bautista/ }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations in the inline-error panel state", async () => {
+    const { container } = renderScreen({ transferResult: { kind: "sameSection" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+    await screen.findByText(/already in/);
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations in the stale-conflict panel state", async () => {
+    const { container } = renderScreen({ endResult: { kind: "notCurrent" } });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }));
+    await user.click(screen.getByRole("button", { name: "Confirm end of enrollment" }));
+    await screen.findByText(/enrollment changed since you opened this roster/);
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with an open panel in Guided mode", async () => {
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    const { container } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    await userEvent.setup().click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
     await screen.findByRole("button", { name: "Confirm transfer" });
     await expectNoAccessibilityViolations(container);
   });

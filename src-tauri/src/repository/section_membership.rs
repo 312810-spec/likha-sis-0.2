@@ -107,6 +107,32 @@ pub enum TransferOutcome {
     InvalidEffectiveDate,
 }
 
+/// A dependency-free `YYYY-MM-DD` shape check. The repository layer stores
+/// dates as opaque ISO strings and SQLite compares them lexically, so a
+/// malformed `effective_on` arriving straight over IPC — bypassing the
+/// TypeScript `DATE_PATTERN` guard in `SectionApplicationService` — could
+/// otherwise be persisted and then sort incorrectly against `starts_on` /
+/// `ends_on`, silently misplacing a learner on rosters and attendance.
+/// This is a shape guard, not a calendar: it rejects the wrong length,
+/// missing dashes, non-digits, and impossible month/day numbers, which is
+/// enough to keep the lexical comparisons meaningful without adding a
+/// date crate. Flagged by the Wave 2P security and reliability reviews;
+/// `enroll` has the same latent gap and is tracked in
+/// `docs/VERIFICATION-DEBT.md`.
+fn is_iso_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let all_digits = |range: std::ops::Range<usize>| bytes[range].iter().all(u8::is_ascii_digit);
+    if !(all_digits(0..4) && all_digits(5..7) && all_digits(8..10)) {
+        return false;
+    }
+    let month: u32 = value[5..7].parse().unwrap_or(0);
+    let day: u32 = value[8..10].parse().unwrap_or(0);
+    (1..=12).contains(&month) && (1..=31).contains(&day)
+}
+
 /// Enrolls a learner into a section as of `starts_on`, transferring them out
 /// of any other section they currently hold an open membership in.
 ///
@@ -209,7 +235,20 @@ pub fn end_membership(
     membership_id: &str,
     effective_on: &str,
 ) -> AppResult<EndMembershipOutcome> {
+    if !is_iso_date(effective_on) {
+        return Ok(EndMembershipOutcome::InvalidEffectiveDate);
+    }
+
     let tx = conn.transaction()?;
+
+    // Defense in depth, matching `enroll`: a `section_memberships` row that
+    // matched the `(id, school_id, learner_id)` triple normally guarantees
+    // the learner belongs to this school, but a hand-forged row could pair
+    // this school with a foreign learner. Constrain the learner too, and
+    // report it as an ordinary `NotFound`.
+    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
+        return Ok(EndMembershipOutcome::NotFound);
+    }
 
     let existing: Option<(String, Option<String>)> = tx
         .query_row(
@@ -277,7 +316,19 @@ pub fn transfer_membership(
     to_section_id: &str,
     effective_on: &str,
 ) -> AppResult<TransferOutcome> {
+    if !is_iso_date(effective_on) {
+        return Ok(TransferOutcome::InvalidEffectiveDate);
+    }
+
     let tx = conn.transaction()?;
+
+    // Defense in depth, matching `enroll`: constrain the learner to this
+    // school independently of the membership row, so a forged row pairing
+    // this school with a foreign learner cannot be moved. Reported as an
+    // ordinary `MembershipNotFound`.
+    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
+        return Ok(TransferOutcome::MembershipNotFound);
+    }
 
     let existing: Option<(String, String, Option<String>)> = tx
         .query_row(
@@ -1354,6 +1405,101 @@ mod tests {
 
         assert!(matches!(outcome, TransferOutcome::Transferred { .. }));
         assert_eq!(open_membership_count(&conn, &l.id), 1);
+    }
+
+    #[test]
+    fn end_membership_rejects_a_malformed_effective_date() {
+        let mut conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
+            .unwrap()
+            .unwrap();
+
+        for bad in [
+            "08/01/2025",
+            "2025-8-1",
+            "2025-13-01",
+            "2025-01-32",
+            "not-a-date",
+            "",
+        ] {
+            let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, bad).unwrap();
+            assert_eq!(
+                outcome,
+                EndMembershipOutcome::InvalidEffectiveDate,
+                "a malformed effective_on ({bad:?}) arriving over IPC must be refused, not written"
+            );
+        }
+        assert_eq!(
+            open_membership_count(&conn, &l.id),
+            1,
+            "nothing was written"
+        );
+    }
+
+    #[test]
+    fn transfer_membership_rejects_a_malformed_effective_date() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m_a = enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01")
+            .unwrap()
+            .unwrap();
+
+        for bad in [
+            "10/01/2025",
+            "2025-10-1",
+            "2025-00-10",
+            "2025-10-00",
+            "20251001",
+        ] {
+            let outcome =
+                transfer_membership(&mut conn, &school_id, &l.id, &m_a.id, &section_b.id, bad)
+                    .unwrap();
+            assert_eq!(outcome, TransferOutcome::InvalidEffectiveDate);
+        }
+        assert_eq!(open_membership_count(&conn, &l.id), 1);
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+        assert_eq!(history.len(), 1, "nothing was written");
+    }
+
+    #[test]
+    fn transfer_and_end_refuse_a_forged_membership_row_pointing_at_a_foreign_learner() {
+        // A hand-crafted membership row pairing THIS school with a learner
+        // that belongs to another school -- something `enroll` refuses to
+        // create. The `(id, school_id, learner_id)` triple matches, so the
+        // independent `learner::find_by_id_in_school` guard is what catches
+        // it.
+        let mut conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let foreign = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged', ?1, ?2, ?3, '2025-08-01')",
+            (&school_id, &section_id, &foreign.id),
+        )
+        .unwrap();
+
+        assert_eq!(
+            transfer_membership(
+                &mut conn,
+                &school_id,
+                &foreign.id,
+                "m-forged",
+                &section_b.id,
+                "2025-10-01"
+            )
+            .unwrap(),
+            TransferOutcome::MembershipNotFound
+        );
+        assert_eq!(
+            end_membership(&mut conn, &school_id, &foreign.id, "m-forged", "2025-10-01").unwrap(),
+            EndMembershipOutcome::NotFound
+        );
     }
 
     #[test]

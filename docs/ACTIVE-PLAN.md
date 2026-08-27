@@ -1,5 +1,63 @@
 # ACTIVE PLAN
 
+## Wave 2P: transfer learner + end enrollment (added 2026-08-27) — complete
+
+Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2P entry;
+`docs/VERIFICATION-DEBT.md` Wave 2P entry. Same branch
+(`claude/likha-sis-wave2a-learner-core`).
+
+**Scope**: from a Section Roster row, an authorized user transfers a
+currently enrolled learner to another section, or ends their enrollment.
+Both effective-dated, history-preserving (end-date, never delete),
+half-open interval, enforced at the Rust command boundary,
+stale-mutation- and cross-school-safe. Excluded (directed): learner
+deletion, bulk transfer / bulk end, CSV/XLS import, cloud sync,
+enrollment-history editor.
+
+**Repository truth verified first**: HEAD `eabed41` = origin, 0/0, tree
+clean; `main` `d9ab036` untouched. Wave 2O CI re-confirmed
+`completed/success` — `8e782e4` Quality `33042106266` + Security
+`33042106188`; docs `eabed41` Quality `33043125049` + Security
+`33043125095`.
+
+**Central design call**: `enroll` (closes "whatever is open",
+non-transactional on `&Connection`, same-section = silent no-op) is
+unsafe as a roster-driven transfer. Per the wave's own instruction,
+_strengthened the authoritative implementation_ — added dedicated
+transactional, stale-safe `section_membership::transfer_membership` /
+`end_membership` targeting an exact `membership_id`, rather than a second
+transfer path. `enroll` stays the create-and-place primitive. No new
+capability (`ManageLearners`, as ADR-0042 already scoped
+"transferring a learner" to). Recorded in the ADR-0042 Wave 2P addendum.
+
+**Verification record** (all run this session):
+
+- `npm run quality` — **514 vitest** (58 files), typecheck (`tsc -b`),
+  eslint, `prettier --check .`, `check:architecture` — all green.
+- `cargo test` — **509 lib** + every integration binary; `enrollment`
+  24/24 (7 new for transfer/end command boundary).
+- `cargo nextest run` — `section_membership` 36/36 (18 new unit tests:
+  outcomes, atomicity, stale-id refusal, double-submit, cross-school /
+  forged-row rejection, malformed-date rejection, same-day validity,
+  one-open invariant, zero-length-range behavior), `enrollment` 24/24.
+- `cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+  clean.
+- `check:dev-preview-isolation` pass; `knip` — no new findings.
+- `quality:security`: `cargo deny check` pass (no dependency change);
+  gitleaks + OSV not on this machine's PATH — CI authoritative.
+- **Independent review**: 5 fresh reviewers (security, reliability,
+  architecture, teacher-ux, accessibility) against `59f9440` — **no
+  blocking findings**. Fixes + deferred debt in the ADR addendum and
+  `VERIFICATION-DEBT.md`.
+
+**Checkpoint**: feature `59f9440` — Quality `33046336519` + Security
+`33046336518` both `completed/success`. Review-fix commit + a
+`docs: record Wave 2P CI-green checkpoint` commit carry the final CI
+ids (established pattern).
+
+---
+
 ## Wave 2O: Section Roster read-only foundation (added 2026-08-27) — complete
 
 Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/CURRENT-HANDOFF.md`

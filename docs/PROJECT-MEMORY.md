@@ -1864,6 +1864,67 @@ Fidelity` preserved and now enforced inside `resolve`).
   persistence/migration was built. Next work is an unrelated
   teacher-facing production slice (see `CURRENT-HANDOFF.md`).
 
+## Wave 2P — transfer learner + end enrollment (added 2026-08-27)
+
+Full record: `docs/adr/0042-*` Wave 2P addendum;
+`docs/VERIFICATION-DEBT.md` Wave 2P entry. Second teacher-visible
+increment: the two membership changes that hang off a Section Roster row.
+
+- **`section_membership::transfer_membership` / `end_membership` are the
+  authoritative roster-driven membership operations**, distinct from
+  `enroll`. `enroll` (closes "whatever is open", non-transactional on a
+  bare `&Connection`, same-section = silent no-op) stays the
+  create-and-place primitive for SF1 import / first placement. The two
+  new functions take `&mut Connection`, run read→close→insert in one
+  `conn.transaction()`, target an **exact `membership_id`**, and _fail_
+  (`NotCurrent` / `MembershipNotFound`) rather than mutate a different
+  row — this is what makes a minutes-stale roster tab safe (double
+  submit → exactly one change). Closing `UPDATE` is
+  `... WHERE ends_on IS NULL` + affected-row check; the destination
+  `INSERT` leans on `idx_one_active_membership_per_learner`. History is
+  end-dated, never deleted.
+- **No new capability.** Both commands
+  (`transfer_learner_membership` / `end_learner_membership`) are gated by
+  `Capability::ManageLearners` (Registrar / School Head) — ADR-0042
+  already scoped "transferring a learner" to that capability.
+  `school_id` session-derived; `learner_id` / `membership_id` /
+  `to_section_id` are client identifiers, every query scoped on
+  `school_id` **and** the id together. Both functions also call
+  `learner::find_by_id_in_school` independently, so a forged
+  `section_memberships` row pairing this school with a foreign learner is
+  refused (defense-in-depth parity with `enroll`).
+- **Rust now shape-validates `effective_on`** (`is_iso_date`: length,
+  dashes, digits, plausible month/day) because the TS `DATE_PATTERN`
+  guard is bypassable over raw IPC and SQLite compares dates lexically.
+  `effective_on < starts_on` still rejected; same-day
+  (`== starts_on`) is a legal `[D, D)` empty interval. `enroll` has the
+  same latent gap — deferred to `VERIFICATION-DEBT.md`.
+- **TS mirror**: `TransferResult` / `EndEnrollmentResult` discriminated
+  unions (serde `tag = "kind"`, camelCase) in `domain/section.ts`;
+  `SectionApplicationService` does shape + date-format validation only,
+  Rust stays authoritative on same-section / date-order / stale.
+- **UI**: `SectionRosterScreen` gains per-row Transfer / End actions →
+  one inline confirmation panel (house pattern, no dialog primitive),
+  effective-date input (default today, `min` = start, `max` = today),
+  school-scoped destination select. Outcomes: stale/gone → a refresh
+  recovery that reloads the roster; `sameSection` / `invalidEffectiveDate`
+  → inline field error, panel kept open; thrown → generic retry. Focus
+  moves into the panel on open and on every error/conflict; back to the
+  trigger on cancel. Class list stays visible during the post-action
+  refresh. 3-mode parity. `App.tsx` unchanged.
+- **Independent review**: 5 fresh reviewers (security, reliability,
+  architecture, teacher-ux, accessibility) against feature commit
+  `59f9440` — **no blocking findings**. Fixes folded into the
+  review-fix commit; non-blocking items (native SR pass, two-connection
+  race test, `enroll` hardening, backdating-vs-existing-records,
+  zero-length-membership product question) in `VERIFICATION-DEBT.md`.
+- **Verification**: `npm run quality` 514 vitest + gates green;
+  `cargo test` 509 lib + integration (`enrollment` 24); `section_membership`
+  36 unit tests; clippy/fmt clean. Feature CI `59f9440` — Quality
+  `33046336519` + Security `33046336518` `completed/success`.
+- **Still NOT built** (later waves): learner deletion, bulk transfer /
+  bulk end, CSV/XLS import, cloud sync, an enrollment-history editor.
+
 ## Wave 2O — Section Roster read-only foundation (added 2026-08-27)
 
 Full record: `docs/adr/0042-*` Wave 2O addendum. First teacher-visible

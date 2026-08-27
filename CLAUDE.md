@@ -104,3 +104,17 @@ Report only:
 - Blockers/Risks
 - Memory/ADR changes
 - Exact next task
+
+## Wave completion reports
+
+After a wave's final CI completes green, produce a copy-ready Markdown
+delivery report for that wave. Keep it **outside tracked source
+changes** — write it to the sibling directory
+`../LIKHA-SIS-DELIVERY-REPORTS/WAVE-<id>-FINAL-REPORT.md` (or a
+git-ignored path such as `.planning/`), never into `docs/` or anywhere
+that would land in the wave's own commit. The report must be complete
+and self-contained (no "see above"/link-only), state repository truth
+before/after, list what shipped, the verification actually run, the
+independent reviews and their outcomes, the checkpoint commit + CI run
+ids, retained debt, and the exact next slice. Do not let writing it
+modify or invalidate the checkpoint it documents.

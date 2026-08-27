@@ -1,6 +1,95 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-27 — Wave 2O: Section Roster read-only foundation, COMPLETE)
+## Active Task (2026-08-27 — Wave 2P: transfer learner + end enrollment, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/PROJECT-MEMORY.md`
+Wave 2P entry; `docs/ACTIVE-PLAN.md` Wave 2P verification record;
+`docs/VERIFICATION-DEBT.md` Wave 2P entry. Same branch
+(`claude/likha-sis-wave2a-learner-core`). Frozen harness not reopened.
+SF10 research not reopened.
+
+**Repository/CI truth verified first**: at start, HEAD `eabed41` =
+origin, 0 ahead / 0 behind; `main` `d9ab036` (untouched throughout).
+Wave 2O CI independently re-confirmed `completed/success`: `8e782e4` —
+Quality `33042106266` + Security `33042106188`; docs `eabed41` — Quality
+`33043125049` + Security `33043125095`.
+
+**What was built** (feature commit `59f9440`):
+
+- **`section_membership::transfer_membership` / `end_membership` (NEW)**
+  — transactional (`&mut Connection` + `conn.transaction()`), targeting
+  an exact `membership_id`, returning typed outcomes
+  (`TransferOutcome` / `EndMembershipOutcome`, serde `tag = "kind"`).
+  A stale roster row is refused, never applied to a different
+  membership; the source close is `UPDATE ... WHERE ends_on IS NULL`
+  with an affected-row check; a double-submit yields exactly one change.
+  History rows are end-dated, never deleted. `enroll`,
+  `roster_for_section`, `roster_for_section_over_range` untouched.
+  `CurrentRosterMember` gained `membership_id`.
+- **Commands `transfer_learner_membership` / `end_learner_membership`**
+  — gated by `Capability::ManageLearners` (Registrar / School Head),
+  `school_id` session-derived, registered in `lib.rs`.
+- **TS**: `TransferResult` / `EndEnrollmentResult` discriminated unions
+  in `domain/section.ts`; `SectionRepository` + `SectionApplicationService`
+  gained `transferMembership` / `endMembership` (shape + date-format
+  validation only; Rust authoritative). Tauri adapter invokes the two
+  new commands. Six other `SectionRepository` stub implementations
+  (fixtures + 5 test fakes) updated for the widened port.
+- **UI** (`SectionRosterScreen.tsx`): per-row "Transfer" / "End
+  enrollment" opening one inline confirmation panel (effective-date
+  input default today / `min` = start / `max` = today; school-scoped
+  destination `<select>`; plain-language consequence; Guided help).
+  Stale/gone → a refresh recovery whose buttons both reload the roster;
+  `sameSection` / `invalidEffectiveDate` → inline field error
+  (`aria-invalid` + `aria-describedby`) with the panel kept open; thrown
+  → generic retry. Focus moves into the panel on open and on any
+  error/conflict; back to the trigger on cancel. Class list stays
+  visible during the post-action refresh. 3-mode parity; 44px mobile
+  targets. `App.tsx` unchanged.
+
+**Independent review**: five fresh reviewers (security, reliability,
+architecture, teacher-ux, accessibility) ran against `59f9440`.
+**No blocking findings.** Review-fix commit acted on: Rust
+`effective_on` shape validation (`is_iso_date`) in both new functions,
+an independent `learner::find_by_id_in_school` check (forged-row
+defense), focus-to-panel-heading on error outcomes, `destinationNotFound`
+routed to the refresh recovery, the date `max` cap, `aria-invalid` /
+`aria-describedby` on panel fields, roster kept visible during refresh,
+consistent "Family, Given" naming (panel vs. success banner), an
+all-modes effective-date hint, a "you can re-enroll from Sections"
+correction note, and added axe coverage for the error / stale-conflict /
+Guided panel states. Deferred to `docs/VERIFICATION-DEBT.md`: native
+NVDA/Narrator pass for the interactive surface, a two-connection
+guarded-`UPDATE` race test, the pre-existing `enroll` date/transaction
+gaps, the no-lower-bound-vs-existing-records backdating gap, and the
+zero-length-membership product question.
+
+**Verification** (all run this session): `npm run quality` green — 514
+vitest, typecheck, eslint, `prettier --check .`, `check:architecture`;
+`cargo test` 509 lib + all integration binaries (24 in
+`tests/enrollment.rs`); `cargo nextest run` on `section_membership`
+(36) + `enrollment` (24); `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `check:dev-preview-isolation` pass;
+`knip` — no new findings. `quality:security`: `cargo deny check` pass
+(no dependency change); gitleaks + OSV not on this machine's PATH (CI
+authoritative, same disclosed per-machine gap as prior waves).
+
+**Checkpoint**: feature commit `59f9440` — Quality Gate `33046336519` +
+Security Gate `33046336518`, both `completed/success`. Review-fix commit
+pushed next; its CI ids recorded in the follow-up
+`docs: record Wave 2P CI-green checkpoint` commit (established pattern).
+
+**Exact next task**: no milestone pre-selected. Highest-value candidates
+by LIKHA priority order — (a) harden `enroll` (Rust date-shape check +
+transactional close), closing the debt this wave opened; (b) the
+two-connection membership-race test; (c) the next teacher-visible
+enrollment slice (e.g. a learner's enrollment-history view, or SF1
+export of the current roster). Pick using current evidence per
+`.claude/rules/autonomous-development.md`.
+
+---
+
+## Superseded — Active Task (2026-08-27 — Wave 2O: Section Roster read-only foundation, COMPLETE)
 
 Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/PROJECT-MEMORY.md`
 Wave 2O entry; `docs/ACTIVE-PLAN.md` Wave 2O verification record. Same

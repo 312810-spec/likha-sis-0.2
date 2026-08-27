@@ -1,5 +1,73 @@
 # Verification Debt
 
+## Wave 2P — transfer learner + end enrollment (2026-08-27)
+
+Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/CURRENT-HANDOFF.md`
+top entry. Feature commit `59f9440`, review-fix commit follows.
+
+**Independent review**: five fresh reviewers (security, reliability/
+membership-invariants, architecture, teacher-ux, accessibility) ran
+against `59f9440`. **No blocking findings.** Findings acted on in the
+review-fix commit are listed in the ADR addendum. The items below are
+verified-as-far-as-checked but not by the missing means, or are
+deliberately out of Wave 2P scope:
+
+- **Native screen-reader pass owed for the new interactive surface.**
+  `SectionRosterScreen.test.tsx` runs `axe` on the populated roster, the
+  open panel, the inline-error panel, the stale-conflict panel, and a
+  Guided-mode open panel — all clean — plus a static accessibility
+  review. That is necessary, not sufficient: a human NVDA **and**
+  Narrator pass on the compiled Tauri binary is still owed for (a) focus
+  actually landing on the panel heading on open / error / conflict and
+  on the trigger on cancel, (b) freshly-mounted `role="alert"` /
+  `role="status"` nodes actually announcing, (c) no clobbering when the
+  success `Alert` and the visually-hidden roster-count `role="status"`
+  update near-simultaneously, (d) the `colSpan={4}` action row announced
+  coherently in the ≤640px stacked layout, (e) `aria-expanded` state
+  announced on the row trigger. Extends the Wave 2O NVDA/Narrator debt,
+  which only scoped the read-only roster.
+
+- **`transfer_membership` / `end_membership` guarded-`UPDATE` race is
+  reasoning-verified only.** The `affected != 1 -> NotCurrent` branch is
+  not exercised by a two-connection test (the single-`Connection` unit
+  tests always hit the earlier `ends_on.is_some()` check first).
+  Correctness rests on: the `UPDATE ... WHERE ends_on IS NULL` guard +
+  affected-row-count check, the partial unique index
+  `idx_one_active_membership_per_learner` on the destination `INSERT`,
+  and the app-wide `Mutex<Connection>` that serialises all in-process
+  writes. A dedicated two-connection same-file test (like
+  `tests/bootstrap.rs`) for the guarded-`UPDATE` and unique-index
+  rollback paths is owed.
+
+- **`enroll` still has the gaps `transfer_membership` / `end_membership`
+  closed.** `enroll` does not shape-validate its `starts_on` in Rust and
+  its close+insert is not wrapped in a transaction (a failure between
+  the two writes would leave the learner with zero open memberships).
+  Pre-existing, out of Wave 2P scope; harden when `enroll` is next
+  touched.
+
+- **No lower bound on `effective_on` vs. existing records.** Neither
+  `transfer_membership` nor `end_membership` rejects an `effective_on`
+  that predates an attendance or score record already written for the
+  learner in the source section. Back-dating that far shrinks the source
+  interval so `roster_for_section_over_range` drops the learner, and
+  `monthly_grid_for_section` then skips the orphaned `attendance_records`
+  row — an SF2 grid and its present/absent/tardy totals would silently
+  under-report. The UI caps the date at today (`max={asOfDate}`), which
+  blocks future-dating but not this. A full fix needs a query for the
+  latest recorded mark in the source section and a new outcome variant;
+  it crosses into the attendance/scoring layer and is out of Wave 2P
+  scope.
+
+- **Zero-length `[D, D)` membership in the range roster is an open
+  product question.** A same-day transfer/end leaves the source as an
+  empty interval that still appears in `roster_for_section_over_range`
+  (pinned by
+  `zero_length_membership_still_appears_in_the_historical_range_roster`).
+  Whether a monthly grid should show a row that can never hold a valid
+  mark needs a product decision; the current behaviour is deliberate
+  historical row coverage.
+
 ## Wave 2O — Section Roster read-only foundation (2026-08-27)
 
 Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/CURRENT-HANDOFF.md`

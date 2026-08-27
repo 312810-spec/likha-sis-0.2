@@ -405,3 +405,128 @@ moved above the table and linked by `aria-describedby`, and axe
 coverage extended to the not-found and roster-error states. A native
 NVDA/Narrator pass on the compiled binary at 400% zoom remains owed —
 see `docs/VERIFICATION-DEBT.md`.
+
+## Addendum (Wave 2P, 2026-08-27): transfer learner + end enrollment — dedicated `transfer_membership` / `end_membership`
+
+Wave 2P adds the two roster-driven membership changes the Wave 2O
+addendum said would "hang off the same command/domain seam": from a
+Section Roster row, an authorized user can **transfer** a currently
+enrolled learner to another section, or **end** their enrollment. Both
+are effective-dated, preserve the prior placement as history, and are
+enforced at the Tauri command boundary. Excluded, as directed: learner
+deletion, bulk transfer, bulk end-enrollment, CSV/XLS import, cloud
+sync, an enrollment-history editor.
+
+**`enroll` was not reused for transfer — a deliberate, reviewed call.**
+`enroll` closes _whatever membership is currently open_ for the learner,
+is not transactional on a bare `&Connection`, and treats
+enroll-into-the-current-section as a silent idempotent no-op. Those are
+correct for its job (SF1 import, first placement) but wrong for a
+teacher pressing "Transfer" from a roster row that may be minutes stale.
+Rather than add a second, weaker transfer path, Wave 2P adds
+`section_membership::transfer_membership` and `end_membership` as the
+strengthened authoritative roster-management operations:
+
+- They take `&mut Connection` and run the whole read→close→insert
+  sequence in one `conn.transaction()` — a failure at any step leaves
+  the learner in their original section.
+- They target an **exact `from_membership_id` / `membership_id`** and
+  _fail_ (`NotCurrent` / `MembershipNotFound`) rather than mutate a
+  different row if that id is no longer the open one. This is what makes
+  a stale roster tab safe: a double-submit produces exactly one change,
+  the second call finding the source already closed.
+- The closing `UPDATE` is guarded `... WHERE ends_on IS NULL` with an
+  affected-row-count check; the destination `INSERT` relies on the
+  partial unique index `idx_one_active_membership_per_learner` as the
+  structural backstop.
+- Every negative case is a typed outcome
+  (`TransferOutcome` / `EndMembershipOutcome`, serde `tag = "kind"`,
+  camelCase) mirrored 1:1 by TS discriminated unions
+  (`TransferResult` / `EndEnrollmentResult` in `src/domain/section.ts`).
+  No outcome exposes SQL, a DB path, an internal id, or a stack trace.
+  `AppError::Unauthorized` still covers "no session" **and** "wrong
+  role" — not split into a `Forbidden` variant, which would be a
+  cross-cutting change.
+
+`enroll`, `roster_for_section`, and `roster_for_section_over_range` are
+untouched. `CurrentRosterMember` gained `membership_id` so a roster row
+can name the exact membership an action targets.
+
+**Capability.** Both commands are gated by `Capability::ManageLearners`
+(Registrar or School Head) — the same capability as
+`enroll_learner_in_section`, per this ADR's original "enrolling /
+transferring a learner is 'manage learners'" decision. No new
+capability. `school_id` is session-derived
+(`authorize_capability`); `learner_id` / `membership_id` /
+`to_section_id` are legitimate client identifiers, and every query is
+scoped on `school_id` **and** the id together. Following the same
+review, `transfer_membership` / `end_membership` also call
+`learner::find_by_id_in_school` independently, so a hand-forged
+`section_memberships` row pairing this school with a foreign learner is
+refused rather than moved — the same defense-in-depth the Wave 2O
+`current_roster` query got.
+
+**Date handling (Wave 2P security + reliability review).** The
+repository layer keeps dates as opaque ISO strings and SQLite compares
+them lexically. The TypeScript `DATE_PATTERN` guard is bypassable over
+raw IPC, so `transfer_membership` / `end_membership` now shape-check
+`effective_on` in Rust (`is_iso_date`: length, dashes, digits,
+plausible month/day) and return `InvalidEffectiveDate` for anything
+malformed. `effective_on < starts_on` is still rejected; same-day
+(`effective_on == starts_on`) is still a legal `[D, D)` empty interval.
+The Section Roster panel additionally caps its date input at today
+(`max={asOfDate}`) so a mistyped future year cannot silently create a
+change that "takes effect" months later. Two gaps are recorded as
+verification debt rather than fixed here: (1) `enroll` has the same
+Rust-side date-shape and non-transactional-close gaps and should be
+hardened when next touched; (2) neither operation rejects an
+`effective_on` that predates an **existing attendance/score record** in
+the source section — back-dating that far would orphan those rows from
+`roster_for_section_over_range` and under-report an SF2 grid. Both are
+out of Wave 2P's scope (they cross into the attendance/scoring layer)
+and are logged in `docs/VERIFICATION-DEBT.md`.
+
+**A zero-length `[D, D)` source membership** (same-day transfer/end)
+still appears in `roster_for_section_over_range` — pinned by
+`zero_length_membership_still_appears_in_the_historical_range_roster`.
+This is deliberate historical row coverage, but whether a monthly grid
+should show a row that can never hold a valid mark is an open product
+question, noted here so a future change is a decision, not a surprise.
+
+**UI.** The Section Roster gains a per-row "Transfer" / "End enrollment"
+pair opening **one inline confirmation panel at a time**, rendered as a
+sibling `<tr>` with a `colSpan` cell — the house inline-panel pattern
+(`LearnerListScreen` edit), not a modal (the app has no dialog
+primitive). The panel carries an effective-date input (default today,
+`min` = the learner's start date, `max` = today), a school-scoped
+destination `<select>` for transfer, a plain-language consequence
+sentence, and mode-specific Guided help. Outcomes split three ways:
+`notCurrent` / `membershipNotFound` / `destinationNotFound` →
+a "the roster changed — it is being refreshed" recovery whose buttons
+both reload the roster; `sameSection` / `invalidEffectiveDate` → an
+inline field error (`aria-invalid` + `aria-describedby` on the
+offending control) with the panel kept open; a thrown error → a generic
+retry message. Focus moves into the panel heading on open **and on any
+error/conflict outcome** (fixing a focus-to-`<body>` drop the
+accessibility review found), and back to the trigger button on cancel.
+The class list stays visible during the post-action refresh instead of
+blanking to a spinner. `npm run check:architecture` passes; UI/domain/
+application still import no infrastructure.
+
+**Independent review.** Five fresh reviewers (security, reliability/
+membership-invariants, architecture, teacher-UX, accessibility) ran
+against the feature commit. **No blocking findings.** Acted on in the
+review-fix commit: Rust `effective_on` shape validation, the
+independent learner-school check, the focus-on-error fix, routing
+`destinationNotFound` to the refresh recovery, the date `max` cap,
+`aria-invalid`/`aria-describedby` on panel fields, keeping the roster
+visible during refresh, consistent "Family, Given" naming between the
+panel and the success banner, an effective-date hint shown in all
+modes, and added axe coverage for the error / stale-conflict / Guided
+panel states. Non-blocking items deferred to `docs/VERIFICATION-DEBT.md`:
+the two `enroll`/backdating gaps above, a two-connection race test for
+the guarded-`UPDATE` path (correctness is currently reasoning-verified
+via the guard + affected-row check + partial unique index + the
+app-wide `Mutex<Connection>`), and a native NVDA/Narrator pass on the
+compiled binary for the new interactive surface. This addendum is the
+durable record; no separate ADR.
