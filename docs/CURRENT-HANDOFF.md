@@ -38,9 +38,15 @@ dispatched for harness structure — recurring retrieval bug hit;
 self-review substituted; debt retained (`docs/VERIFICATION-DEBT.md`).
 
 **ProjectForge v0.1** created as **private** repo
-`312810-spec/projectforge` — provider-independent core + Claude Code
+`312810-spec/projectforge` (https://github.com/312810-spec/projectforge,
+initial commit `feb9997`) — provider-independent core + Claude Code
 adapter + 11 project-type profile recipes + portable templates +
 independent memory + provenance. Not coupled to LIKHA at runtime.
+
+**Wave 2L LIKHA checkpoint committed and pushed: `e04f64f`. CI
+confirmed green for this exact commit** — Quality Gate `33028634953`
+and Security Gate `33028634929`, both `completed/success`. Wave 2L is
+fully closed and the harness is frozen.
 
 **Exact next product action** (harness work is done — resume LIKHA
 product development from here): take the **SF10 lead** recorded in
