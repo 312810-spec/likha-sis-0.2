@@ -30,6 +30,27 @@ pub struct SectionRosterMember {
     pub sex: Option<String>,
 }
 
+/// The Section Roster screen's row projection: identity plus the day this
+/// learner's *current* placement in the section began. Deliberately a
+/// separate struct from `SectionRosterMember` (which `formgen::sf1` and the
+/// attendance-adjacent callers share) so adding `starts_on` for the roster
+/// UI does not perturb those queries — this codebase already keeps one
+/// projection per use case (`AttendanceRosterEntry`, `LearnerScoreRosterEntry`).
+/// Only what the roster screen renders: `sex` is intentionally *not* here
+/// (it is not shown on a "who is in my class" view); the SF2/report-card
+/// path uses `SectionRosterMember`, which carries it.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentRosterMember {
+    pub learner_id: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub lrn: Option<String>,
+    /// `section_memberships.starts_on` for the open membership — the start
+    /// of the half-open interval `[starts_on, ends_on)`; see `enroll`.
+    pub starts_on: String,
+}
+
 /// Enrolls a learner into a section as of `starts_on`, transferring them out
 /// of any other section they currently hold an open membership in.
 ///
@@ -132,6 +153,52 @@ pub fn roster_for_section(
             family_name: row.get(2)?,
             lrn: row.get(3)?,
             sex: row.get(4)?,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// The roster of learners whose placement in `section_id` is open on
+/// `as_of_date` — i.e. the half-open interval `[starts_on, ends_on)`
+/// contains that date, the same "current member" definition
+/// `idx_one_active_membership_per_learner` and `enroll` already use
+/// (ADR-0042). A learner whose `starts_on` is still in the future, or whose
+/// membership has already ended (`ends_on <= as_of_date`), is deliberately
+/// absent — this is not a bug, it is the domain's temporal model, and the
+/// Section Roster screen shows the "as of" date so a teacher can see why.
+///
+/// School scope is enforced in the query itself — `section_memberships` is
+/// filtered by `school_id` AND `section_id` together, and the joined
+/// `learners` row is independently constrained to the same `school_id` —
+/// so a `section_id` (or a corrupted membership row) belonging to another
+/// school yields an empty roster rather than leaking rows. It never depends
+/// on the caller having pre-checked that the section belongs to the school.
+///
+/// One indexed JOIN, ordered `family_name, given_name` — the alphabetical
+/// convention `export::report_card` / `formgen::sf1` already use — with no
+/// per-learner follow-up query.
+pub fn current_roster(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<Vec<CurrentRosterMember>> {
+    let mut stmt = conn.prepare(
+        "SELECT l.id, l.given_name, l.family_name, l.lrn, sm.starts_on \
+         FROM learners l \
+         JOIN section_memberships sm ON sm.learner_id = l.id \
+         WHERE sm.section_id = ?1 AND sm.school_id = ?2 AND l.school_id = ?2 \
+           AND sm.starts_on <= ?3 \
+           AND (sm.ends_on IS NULL OR ?3 < sm.ends_on) \
+         ORDER BY l.family_name, l.given_name",
+    )?;
+    let rows = stmt.query_map((section_id, school_id, as_of_date), |row| {
+        Ok(CurrentRosterMember {
+            learner_id: row.get(0)?,
+            given_name: row.get(1)?,
+            family_name: row.get(2)?,
+            lrn: row.get(3)?,
+            starts_on: row.get(4)?,
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
@@ -462,5 +529,159 @@ mod tests {
         let current = current_membership_for_learner_in_school(&conn, &school_id, &l.id).unwrap();
 
         assert_eq!(current, None);
+    }
+
+    // --- Wave 2O: current_roster (Section Roster screen projection) ---
+
+    #[test]
+    fn current_roster_includes_an_open_member_with_their_enrollment_date() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(
+            &conn,
+            &school_id,
+            "Ana",
+            "Cruz",
+            Some("123456789012"),
+            Some("F"),
+        )
+        .unwrap();
+        enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01").unwrap();
+
+        let roster = current_roster(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        assert_eq!(roster.len(), 1);
+        assert_eq!(roster[0].learner_id, l.id);
+        assert_eq!(roster[0].family_name, "Cruz");
+        assert_eq!(roster[0].lrn.as_deref(), Some("123456789012"));
+        assert_eq!(
+            roster[0].starts_on, "2025-08-01",
+            "the roster carries the day this placement began"
+        );
+    }
+
+    #[test]
+    fn current_roster_join_independently_constrains_the_learner_to_the_same_school() {
+        // Defense in depth: even a hand-crafted membership row pointing a
+        // foreign-school learner at this section (something `enroll` itself
+        // refuses to create) must not leak that learner, because the query
+        // constrains `l.school_id` too, not only `sm.*`.
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let foreign = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged', ?1, ?2, ?3, '2025-08-01')",
+            (&school_id, &section_id, &foreign.id),
+        )
+        .unwrap();
+
+        let roster = current_roster(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "a learner belonging to another school must never appear, even via a forged membership row"
+        );
+    }
+
+    #[test]
+    fn current_roster_excludes_a_future_dated_enrollment() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        // Enrolled to start next month; as-of "today" they are not yet a member.
+        enroll(&conn, &school_id, &section_id, &l.id, "2025-09-01").unwrap();
+
+        let roster = current_roster(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "a placement that has not started yet is not on the current roster"
+        );
+    }
+
+    #[test]
+    fn current_roster_excludes_a_membership_that_has_already_ended() {
+        let conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01").unwrap();
+        // Transfer out of section A on 2025-10-01 (closes A with ends_on = that day).
+        enroll(&conn, &school_id, &section_b.id, &l.id, "2025-10-01").unwrap();
+
+        let roster = current_roster(&conn, &school_id, &section_a, "2025-10-01").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "on the transfer day the learner is no longer a current member of section A"
+        );
+    }
+
+    #[test]
+    fn current_roster_is_empty_for_a_section_with_no_members() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+
+        let roster = current_roster(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "an empty section is a normal, non-error state"
+        );
+    }
+
+    #[test]
+    fn current_roster_returns_empty_for_a_section_belonging_to_another_school() {
+        let conn = open_test_db();
+        let (school_id, _section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_section =
+            section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
+        let l = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        enroll(
+            &conn,
+            &other_school.id,
+            &other_section.id,
+            &l.id,
+            "2025-08-01",
+        )
+        .unwrap()
+        .expect("enroll within the section's own school must succeed");
+
+        // Query the other school's section id, but scoped to `school_id`.
+        let roster = current_roster(&conn, &school_id, &other_section.id, "2025-08-15").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "knowing another school's section id must never leak its roster"
+        );
+    }
+
+    #[test]
+    fn current_roster_is_ordered_by_family_then_given_name() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let bautista = learner::create(&conn, &school_id, "Ana", "Bautista", None, None).unwrap();
+        let cruz_bea = learner::create(&conn, &school_id, "Bea", "Cruz", None, None).unwrap();
+        let cruz_ana = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        for id in [&cruz_bea.id, &bautista.id, &cruz_ana.id] {
+            enroll(&conn, &school_id, &section_id, id, "2025-08-01").unwrap();
+        }
+
+        let roster = current_roster(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        let order: Vec<_> = roster.iter().map(|m| m.learner_id.clone()).collect();
+        assert_eq!(
+            order,
+            vec![bautista.id, cruz_ana.id, cruz_bea.id],
+            "Bautista, then Cruz/Ana, then Cruz/Bea"
+        );
     }
 }

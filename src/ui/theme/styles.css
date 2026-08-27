@@ -659,6 +659,102 @@ label {
   }
 }
 
+/* Section Roster (Wave 2O) -- a focused "open my class roster" table.
+   Density (spacing/font/target size) already follows the global
+   [data-teacher-mode] custom properties; only explanatory copy differs
+   per mode, handled in the component. */
+.section-roster-back {
+  margin-bottom: var(--spacing-unit);
+}
+
+.section-roster-context {
+  margin: 0 0 var(--spacing-unit) 0;
+  color: var(--color-text-muted);
+}
+
+.section-roster-intro {
+  margin: 0 0 var(--spacing-unit) 0;
+}
+
+.section-roster-count {
+  font-size: var(--font-size-large);
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.section-roster {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--spacing-unit);
+}
+
+.section-roster th,
+.section-roster td {
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+}
+
+.section-roster thead th {
+  border-top: none;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.section-roster tbody tr:focus-within {
+  background: var(--color-surface);
+}
+
+.section-roster-missing {
+  color: var(--color-text-muted);
+}
+
+/* Narrow (phone-width): mirror the .attendance-roster / .score-entry
+   pattern -- each learner becomes a labelled block rather than shrinking
+   a desktop table into cells nobody can read. Same data, same order. */
+@media (max-width: 640px) {
+  .section-roster thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .section-roster,
+  .section-roster tbody,
+  .section-roster tr,
+  .section-roster th,
+  .section-roster td {
+    display: block;
+    width: 100%;
+  }
+
+  .section-roster tr {
+    padding: var(--spacing-unit) 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .section-roster tr:first-child {
+    border-top: none;
+  }
+
+  .section-roster th[scope="row"] {
+    font-size: var(--font-size-large);
+    padding: 0 0 calc(var(--spacing-unit) * 0.5) 0;
+    border-top: none;
+  }
+
+  .section-roster td {
+    padding: calc(var(--spacing-unit) * 0.25) 0;
+    border-top: none;
+  }
+
+  .section-roster td::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
+  }
+}
+
 .term-grades {
   margin-top: calc(var(--spacing-unit) * 1.5);
 }
@@ -787,6 +883,16 @@ label {
 
 .learner-list li + li {
   border-top: 1px solid var(--color-border);
+}
+
+/* Sections list row: label on the left, "Open roster" action on the
+   right; wraps instead of overflowing on a narrow screen. */
+.section-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
 }
 
 /* Teacher Workspace's "Today's priority" rail (UX-02) -- the one

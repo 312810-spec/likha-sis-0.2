@@ -312,3 +312,96 @@ themselves — this mirrors real Philippine school administrative
 practice (School Head/Registrar jointly plan the year's sections;
 Registrar handles day-to-day enrollment into them) and is not an
 oversight. Full independent review record: `docs/VERIFICATION-DEBT.md`.
+
+## Addendum (Wave 2O, 2026-08-27): Section Roster read-only view — `current_roster` is the current-members query
+
+Wave 2O delivered the first teacher-visible increment of Section Roster +
+Enrollment Management: a read-only "open my class roster" screen
+(`src/ui/SectionRosterScreen.tsx`), reached from `SectionsScreen` via a
+per-section "Open roster" button. No transfer, end-enrollment, bulk, or
+import — those are the next increment (Wave 2P) and hang off the same
+command/domain seam (a selected roster row → a membership action).
+
+**Deviation from the wave brief's §5.** The brief proposed a new
+repository function named `list_current_members_in_school(section_id, …)`.
+It was instead implemented as
+`section_membership::current_roster(conn, school_id, section_id,
+as_of_date)`, reusing the exact query shape already proven by
+`roster_for_section` (a single indexed `learners ⋈ section_memberships`
+JOIN, `ORDER BY family_name, given_name`, school-scoped by `school_id`
+**and** `section_id` together). Creating a second, near-identical query
+under a different name would have been a parallel representation with no
+benefit. This is recorded as an explicit, considered departure from the
+brief's suggested shape — in the same spirit as Wave 3's departure from
+its own Java/POI working hypothesis — not an omission.
+
+**"Current member" is not a new temporal semantic.** It is exactly the
+existing half-open-interval definition: a learner is on the roster for
+`as_of_date` iff `starts_on <= as_of_date < ends_on` (with `ends_on IS
+NULL` meaning still open) — the same condition
+`idx_one_active_membership_per_learner` and `enroll` already encode. A
+future-dated enrollment and an already-ended membership are both
+deliberately absent; the screen shows the "as of" date so a teacher can
+see why. Covered by unit tests
+(`current_roster_excludes_a_future_dated_enrollment`,
+`…_excludes_a_membership_that_has_already_ended`,
+`…_is_empty_for_a_section_with_no_members`,
+`…_returns_empty_for_a_section_belonging_to_another_school`,
+`…_is_ordered_by_family_then_given_name`) and command-boundary tests in
+`tests/enrollment.rs` (authorized same-school; no session denied;
+nonexistent `section_id` → `[]`; cross-school `section_id` → `[]`).
+
+**New projection, not a changed one.** `CurrentRosterMember` (identity +
+`lrn` + `starts_on`) is a separate struct from the shared
+`SectionRosterMember` that `formgen::sf1` and the attendance-adjacent
+callers use, so adding `starts_on` for the roster UI does not perturb
+those queries. This matches the codebase's existing
+one-projection-per-use-case pattern (`AttendanceRosterEntry`,
+`LearnerScoreRosterEntry`). `roster_for_section` and
+`roster_for_section_over_range` are untouched. `sex` was in the first
+draft of this projection but was removed after the security and
+architecture reviews both flagged it as serialized over IPC with no
+consumer — the roster screen renders only name, LRN, and enrolment date.
+
+**School scope in the query.** `current_roster` filters
+`section_memberships` by `school_id` AND `section_id`, **and**
+independently constrains the joined `learners` row to the same
+`school_id` — so a forged/corrupted membership row pointing a
+foreign-school learner at this section (which `enroll` itself refuses to
+create) still cannot leak that learner. Added after the security review;
+proven by a hand-crafted-row regression test.
+
+**Ordering** is family name then given name — already this project's
+convention (`export::report_card` formats `"{family}, {given}"`;
+`formgen::sf1`; `roster_for_section`) — applied in the SQL, never
+re-sorted client-side. **No search box:** one section is tens of
+learners; a stable sorted list scans faster than it filters, and a query
+surface now would be speculative. Dates are shown `2 Jun 2025` via a
+small screen-local formatter (no shared date utility exists yet; adding
+one is out of scope).
+
+**Navigation** uses the same narrowly-typed parent-state handoff as
+Attendance→Monthly Summary and Workspace→Audit Log: `App.tsx` holds
+`rosterSectionId`, `SectionsScreen` calls `onOpenRoster(id)`, the screen
+has its own "← Back to sections". `"section-roster"` is a `SignedInTab`
+value but intentionally **not** a `NAV_GROUPS` destination (it needs a
+selected section); `WorkbenchNav` keeps "Sections" visually active while
+the sub-screen is open. `TAB_LABELS` is an explicit
+`Record<SignedInTab, string>` literal (compiler-enforced), and `App.tsx`
+no longer falls through to the audit-log screen for an unhandled tab —
+both tightened after the architecture review. No new ADR — this addendum
+is the durable record.
+
+**Accessibility (independent review).** The one BLOCKING finding: the
+`@media (max-width: 640px)` layout applies `display:block` to the
+`<table>`, which strips the browser's implicit ARIA table roles (and is
+reachable on desktop at 400% zoom, not only on phones), leaving the
+`data-label` generated content as the sole column-label carrier. Fixed
+by adding **explicit** `role="table|rowgroup|row|columnheader|rowheader|
+cell"` to the table — explicit roles survive `display:block`. Also
+fixed: a polite `role="status"` region announcing the roster result,
+focus returned to the heading on retry, the Guided column explanation
+moved above the table and linked by `aria-describedby`, and axe
+coverage extended to the not-found and roster-error states. A native
+NVDA/Narrator pass on the compiled binary at 400% zoom remains owed —
+see `docs/VERIFICATION-DEBT.md`.

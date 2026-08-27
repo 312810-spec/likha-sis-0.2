@@ -1,5 +1,68 @@
 # ACTIVE PLAN
 
+## Wave 2O: Section Roster read-only foundation (added 2026-08-27) — complete
+
+Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2O entry. Teacher-facing UI
+milestone; local-first; no migration; no dependency. Verification record:
+
+- **Repo/CI truth first**: HEAD `2bc0d7b` = origin, 0/0; `main`
+  `d9ab036`; tree clean. Wave 2N CI re-confirmed `completed/success` —
+  `6f1bdb5` (Quality `33033895580` / Security `33033895620`) and
+  `92142c9` (Quality `33034888077` / Security `33034888093`).
+- **Reused, not rebuilt**: the roster pipeline already existed
+  (`section_membership::roster_for_section` + `commands::section::
+section_roster`; TS `SectionRosterMember` type / port / adapter /
+  `SectionApplicationService.roster()`; `AttendanceScreen` already
+  consumes an equivalent). Half-open `[starts_on, ends_on)` membership
+  intervals and the one-open-membership invariant (ADR-0008/0042) are
+  the authoritative domain — no parallel enrollment representation
+  added, no membership state duplicated in the frontend.
+- **Rust**: `CurrentRosterMember` projection (identity + `lrn` + `sex`
+  - `starts_on`) + `current_roster(school_id, section_id, as_of_date)`
+    — one indexed `learners ⋈ section_memberships` JOIN, no N+1, `ORDER
+BY family_name, given_name`, scoped by `school_id` AND `section_id`
+    together. Kept separate from `roster_for_section` /
+    `roster_for_section_over_range` so `formgen::sf1` + attendance
+    callers are untouched. `commands::section::section_roster` rewired to
+    it; session-derived `school_id`, ungated read.
+- **"Current member"** = existing half-open-interval semantics
+  (`starts_on <= as_of_date < ends_on`); future-dated and ended
+  memberships correctly excluded; screen shows the "as of" date.
+- **TS**: `SectionRosterMember` gains `lrn` / `sex` / `startsOn`;
+  `SectionApplicationService.roster()` trims `sectionId` + validates
+  `YYYY-MM-DD`. `SectionRosterScreen.tsx` (new) with all required
+  states + Efficient/Comfortable/Guided parity + desktop→narrow
+  layout. `SectionsScreen` "Open roster" per row; `App.tsx`
+  `rosterSectionId` handoff; `"section-roster"` `SignedInTab` +
+  `TAB_LABELS` literal (not a `NAV_GROUPS` destination).
+- **Decisions**: no search (single section, tens of learners); sort =
+  family-then-given (project convention, applied in SQL); `sex` dropped
+  from the projection after review (no consumer); friendly `2 Jun 2025`
+  dates via a screen-local formatter; `membership_id` deferred to Wave 2P.
+- **Checks actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` 491 lib (+7) + all
+  integration incl. `tests/enrollment.rs` 17 (+4) + 0 doctests; `cargo
+nextest run` 595/595 (one transient `learner_management.rs` `db::open`
+  parallel-load flake on a single `cargo test` run, not reproduced,
+  unrelated). `npm run quality` clean — 484 vitest tests, architecture
+  check, format:check. `check:dev-preview-isolation` pass; `knip` zero
+  new. `cargo-deny` clean (no dep change); gitleaks/osv not on PATH
+  locally (CI Security Gate authoritative). No packaged-native Tauri run
+  (standing gap).
+- **Independent review**: teacher-ux + accessibility + security +
+  architecture reviewers ran in parallel; all four returned complete
+  findings. One BLOCKING (a11y: `@media` `display:block` strips implicit
+  table ARIA roles at 400% zoom) — fixed with explicit
+  `role="table|row|columnheader|rowheader|cell"`. No other blocking;
+  ~15 non-blocking items acted on (see `VERIFICATION-DEBT.md` Wave 2O +
+  ADR-0042 addendum). Owed: native NVDA/Narrator pass at 400% zoom.
+- **Scope guard held**: no transfer / end-enrollment / bulk / import /
+  SF1 export / learner edit-delete / history editor; no dead buttons;
+  no migration; no new dependency; synthetic data only.
+- **Next**: Wave 2P — Transfer learner + End enrollment (see
+  `CURRENT-HANDOFF.md`).
+
 ## Wave 2N: SF10 Evidence Closure (added 2026-08-27) — complete
 
 Full record: `docs/adr/0053-*` Wave 2N addendum,

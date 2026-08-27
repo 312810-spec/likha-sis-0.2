@@ -2,6 +2,7 @@ export type SignedInTab =
   | "workspace"
   | "learners"
   | "sections"
+  | "section-roster"
   | "sf1-import"
   | "attendance"
   | "monthly-summary"
@@ -9,46 +10,57 @@ export type SignedInTab =
   | "class-records"
   | "audit-log";
 
+/**
+ * The display label for every tab. An explicit object literal, not a
+ * derived map, so the compiler enforces that every `SignedInTab` has a
+ * label — including `section-roster`, which is a contextual sub-screen
+ * reached from Sections (it needs a selected section) and therefore has no
+ * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
+ */
+export const TAB_LABELS: Record<SignedInTab, string> = {
+  workspace: "Workspace",
+  learners: "Learners",
+  sections: "Sections",
+  "section-roster": "Section Roster",
+  "sf1-import": "SF1: Enrollment",
+  attendance: "Attendance",
+  "monthly-summary": "Monthly Summary",
+  "grading-periods": "Grading Periods",
+  "class-records": "Class Records",
+  "audit-log": "Sign-in Activity",
+};
+
 interface NavGroup {
   label: string;
   tabs: readonly { id: SignedInTab; label: string }[];
 }
 
-/** Groups every destination (none removed, none renamed) into a
- * teacher's actual daily rhythm instead of one flat button row -- see
- * docs/adr/0031-design-system-and-app-shell.md. Kept in its own
- * data-only module (not `WorkbenchNav.tsx`) so that component file can
- * stay component-only for React Fast Refresh. */
+function tab(id: SignedInTab): { id: SignedInTab; label: string } {
+  return { id, label: TAB_LABELS[id] };
+}
+
+/** Groups every navigable destination into a teacher's actual daily
+ * rhythm instead of one flat button row -- see
+ * docs/adr/0031-design-system-and-app-shell.md. `section-roster` is
+ * deliberately absent: it is only ever reached from the "Sections" screen
+ * with a section already chosen. Kept in its own data-only module (not
+ * `WorkbenchNav.tsx`) so that component file can stay component-only for
+ * React Fast Refresh. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
-    tabs: [
-      { id: "workspace", label: "Workspace" },
-      { id: "attendance", label: "Attendance" },
-      { id: "monthly-summary", label: "Monthly Summary" },
-    ],
+    tabs: [tab("workspace"), tab("attendance"), tab("monthly-summary")],
   },
   {
     label: "Learner Records",
-    tabs: [
-      { id: "learners", label: "Learners" },
-      { id: "sections", label: "Sections" },
-      { id: "sf1-import", label: "SF1: Enrollment" },
-    ],
+    tabs: [tab("learners"), tab("sections"), tab("sf1-import")],
   },
   {
     label: "Grading",
-    tabs: [
-      { id: "grading-periods", label: "Grading Periods" },
-      { id: "class-records", label: "Class Records" },
-    ],
+    tabs: [tab("grading-periods"), tab("class-records")],
   },
   {
     label: "Security",
-    tabs: [{ id: "audit-log", label: "Sign-in Activity" }],
+    tabs: [tab("audit-log")],
   },
 ];
-
-export const TAB_LABELS: Record<SignedInTab, string> = Object.fromEntries(
-  NAV_GROUPS.flatMap((group) => group.tabs.map((tab) => [tab.id, tab.label])),
-) as Record<SignedInTab, string>;

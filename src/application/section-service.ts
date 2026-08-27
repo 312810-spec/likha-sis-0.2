@@ -63,7 +63,15 @@ export class SectionApplicationService {
     return this.sections.enroll(trimmedSectionId, trimmedLearnerId, startsOn);
   }
 
-  roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
-    return this.sections.roster(sectionId, asOfDate);
+  async roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
+    const trimmedSectionId = sectionId.trim();
+    if (trimmedSectionId.length === 0) {
+      throw new ValidationError("Section is required.");
+    }
+    if (!DATE_PATTERN.test(asOfDate)) {
+      throw new ValidationError("Date must be in YYYY-MM-DD format.");
+    }
+
+    return this.sections.roster(trimmedSectionId, asOfDate);
   }
 }

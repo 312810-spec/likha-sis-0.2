@@ -1,5 +1,89 @@
 # Verification Debt
 
+## Wave 2O — Section Roster read-only foundation (2026-08-27)
+
+Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/CURRENT-HANDOFF.md`
+top entry.
+
+**Independent review**: teacher-ux, accessibility, security, and
+architecture reviewers were dispatched in parallel and **all four
+returned complete findings** before the shared session hit its usage
+limit. One BLOCKING finding (accessibility B1) was fixed this wave; no
+blocking findings from the other three. Acted-on findings:
+
+- **A11y B1 (was BLOCKING) — fixed.** The `@media (max-width: 640px)`
+  `display:block` layout strips implicit ARIA table roles in browsers,
+  which at 400% zoom (Reflow) left `attr(data-label)` generated content
+  as the only column-label carrier. Fixed by adding **explicit**
+  `role="table|rowgroup|row|columnheader|rowheader|cell"` to
+  `SectionRosterScreen`'s table — explicit roles survive `display:block`.
+- **A11y N2/N3 — fixed.** Added a persistent visually-hidden
+  `role="status"` region announcing the roster result; Retry now returns
+  focus to the heading.
+- **A11y N4 — fixed.** The Guided-mode column explanation moved above the
+  table and linked via `aria-describedby`.
+- **A11y N5 — fixed.** axe assertions added for the section-not-found and
+  roster-error states (was 2 of 6 render states; now 4).
+- **Security #1 / Architecture NB-2 — fixed.** `current_roster` now
+  constrains `l.school_id = ?2` in the JOIN too (not only `sm.*`), with a
+  regression test using a hand-forged cross-school membership row.
+- **Security #3 / Architecture NB-2 — fixed.** `sex` removed from
+  `CurrentRosterMember` (Rust + SQL + TS `SectionRosterMember`) — it was
+  serialized over IPC with no consumer.
+- **Architecture NB-1 — fixed.** `TAB_LABELS` is now an explicit
+  `Record<SignedInTab, string>` literal (compiler-enforced
+  exhaustiveness); `NAV_GROUPS` derives its labels from it.
+- **Architecture NB-4 / Teacher-UX #10 — fixed.** `App.tsx` no longer
+  falls through to `<AuditLogScreen>` for an unhandled `activeTab`; the
+  `section-roster` branch with a null section falls back to Sections.
+- **Teacher-UX #1, #3, #4, #6, #7, #8 — fixed.** Purpose line shown in
+  all modes; section-load error gained a Retry; redundant in-alert "Back
+  to sections" buttons removed (the persistent top link is the single
+  back affordance); "Enrolled" column renamed "Enrolled since"; dates
+  formatted `2 Jun 2025` via a small local formatter; Guided hint moved
+  above the table.
+
+**Deliberately not done (recorded debt, not blocking):**
+
+1. **No native NVDA / Narrator pass on the compiled Tauri binary.** This
+   is the standing environment gap for every UI milestone (see the Wave
+   2C item-2 entry). Specific owed check for this screen: NVDA **and**
+   Narrator, compiled binary, at 400% zoom (Reflow), confirming each
+   learner's LRN and "Enrolled since" date are announced _with their
+   column labels_ in the stacked ≤640px layout. `npm run quality:ui` is
+   an explicit placeholder; jsdom does not evaluate `@media`, so no
+   automated test exercises the narrow layout — only its structural
+   hooks (explicit roles, `data-label`).
+2. **Rust-side `as_of_date` shape validation not added** (Security #2).
+   `AppError` has no generic validation variant, and this project's
+   architecture rule puts input-shape validation in the TS application
+   service (`section-service.ts` now trims `sectionId` and checks
+   `YYYY-MM-DD`). A malformed `as_of_date` reaching `current_roster` can
+   only produce an empty/lexicographically-filtered result set — it is a
+   bound parameter, comparison-only, and can never cross `school_id`.
+   Revisit if/when a shared Rust request-validation seam is introduced.
+3. **`roster_for_section` / `roster_for_section_over_range` not given the
+   same `l.school_id` JOIN predicate** (Security #1, shared root). They
+   are pre-existing, used by `formgen::sf1`, and out of scope for this
+   wave; the same one-line hardening should be applied next time that
+   area is touched.
+4. **Half-open "current member" SQL predicate now duplicated in 4
+   functions** in `section_membership.rs` (Architecture NB-3). A shared
+   SQL-fragment `const` was not extracted (would touch the two untouched
+   `roster_for_section*` functions — no unrelated refactors). A
+   temporal-model change is 4 synchronized edits until then.
+5. **Not-found / section-load-error states cannot name the section**
+   (Teacher-UX #2). Naming it would require threading the section name
+   through the `App.tsx` handoff, not just the id. Minor; deferred.
+6. **Transient `cargo test` flake observed once**: on one full-suite run,
+   `tests/learner_management.rs` had 4 `db::open().unwrap()` panics
+   (SQLCipher key derivation under heavy parallel load); did not
+   reproduce on isolated re-run (7/7) or on a full-suite retry, and
+   `cargo nextest run` (isolated processes) was 595/595. Unrelated to
+   this wave's changes (no db/migration/crypto code touched). Consistent
+   with this project's documented history of transient parallel-open
+   flakes.
+
 ## Wave 2N — SF10 Evidence Closure (2026-08-27)
 
 Full record: `docs/adr/0053-*` Wave 2N addendum, `docs/form-evidence/sf10/README.md`.

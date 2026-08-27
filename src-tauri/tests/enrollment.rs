@@ -47,6 +47,17 @@ fn current_enrollment_as_current_session(
     section_membership::current_membership_for_learner_in_school(conn, &school_id, learner_id)
 }
 
+/// Standing in for `commands::section::section_roster` (Wave 2O).
+fn section_roster_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<Vec<section_membership::CurrentRosterMember>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    section_membership::current_roster(conn, &school_id, section_id, as_of_date)
+}
+
 /// Standing in for `commands::section::create_section` (Wave 2A.1 fix).
 fn create_section_as_current_session(
     conn: &rusqlite::Connection,
@@ -224,6 +235,82 @@ fn a_registrar_can_check_for_duplicate_candidates_before_creating_a_learner() {
         candidates.len(),
         1,
         "the near-duplicate must surface as a candidate, never auto-merged or auto-blocked"
+    );
+}
+
+// --- Wave 2O: Section Roster (read-only) command boundary ---
+
+#[test]
+fn the_section_roster_shows_current_members_for_an_authorized_same_school_caller() {
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(
+        &conn,
+        &school.id,
+        "Ana",
+        "Cruz",
+        Some("123456789012"),
+        Some("F"),
+    )
+    .unwrap();
+    enroll_as_current_session(&conn, &registrar, &section.id, &l.id, "2026-08-24").unwrap();
+
+    // Any active session may read (no capability required).
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+    let roster =
+        section_roster_as_current_session(&conn, &teacher, &section.id, "2026-09-01").unwrap();
+
+    assert_eq!(roster.len(), 1);
+    assert_eq!(roster[0].learner_id, l.id);
+    assert_eq!(roster[0].starts_on, "2026-08-24");
+}
+
+#[test]
+fn viewing_a_section_roster_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = section_roster_as_current_session(&conn, &sessions, &section.id, "2026-09-01");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_section_roster_request_for_a_nonexistent_section_returns_an_empty_roster_not_an_error() {
+    let conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+
+    let roster =
+        section_roster_as_current_session(&conn, &registrar, "no-such-section", "2026-09-01")
+            .unwrap();
+
+    assert_eq!(roster.len(), 0);
+}
+
+#[test]
+fn a_caller_cannot_read_another_schools_section_roster_by_knowing_its_section_id() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let section_b = section::create(&conn, &school_b.id, "2026-2027", "7", "Mabini").unwrap();
+    let head_b = login_with_role_at(&conn, &school_b.id, "head.b", role_repo::SCHOOL_HEAD);
+    let l = learner::create(&conn, &school_b.id, "Ana", "Cruz", None, None).unwrap();
+    enroll_as_current_session(&conn, &head_b, &section_b.id, &l.id, "2026-08-24").unwrap();
+
+    // School A's session, using School B's real section id.
+    let head_a = login_with_role_at(&conn, &school_a.id, "head.a", role_repo::SCHOOL_HEAD);
+    let roster =
+        section_roster_as_current_session(&conn, &head_a, &section_b.id, "2026-09-01").unwrap();
+
+    assert_eq!(
+        roster.len(),
+        0,
+        "cross-school section-id enumeration must return nothing, not School B's learners"
     );
 }
 

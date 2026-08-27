@@ -82,7 +82,13 @@ describe("TauriSectionRepository", () => {
 
   it("roster invokes section_roster with sectionId/asOfDate", async () => {
     const roster: SectionRosterMember[] = [
-      { learnerId: "l1", givenName: "Ana", familyName: "Santos" },
+      {
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: "123456789012",
+        startsOn: "2026-08-01",
+      },
     ];
     mockInvoke.mockResolvedValueOnce(roster);
 

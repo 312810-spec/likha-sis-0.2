@@ -7,7 +7,7 @@ use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
-use crate::repository::section_membership::{self, SectionMembership, SectionRosterMember};
+use crate::repository::section_membership::{self, CurrentRosterMember, SectionMembership};
 
 /// `school_id` is derived from the session, never a parameter — same
 /// convention as `commands::learner::list_learners_by_school`.
@@ -67,21 +67,24 @@ pub fn enroll_learner_in_section(
     section_membership::enroll(&conn, &school_id, &section_id, &learner_id, &starts_on)
 }
 
-/// `section_id` is client-supplied the same way `learner_id` already is
-/// elsewhere — isolation holds because
-/// `repository::section_membership::roster_for_section` scopes its query by
+/// The current roster for the Section Roster screen. `section_id` is
+/// client-supplied the same way `learner_id` already is elsewhere —
+/// isolation holds because
+/// `repository::section_membership::current_roster` scopes its query by
 /// `school_id` AND `section_id` together, so a `section_id` from another
-/// school returns an empty roster rather than leaking rows.
+/// school returns an empty roster rather than leaking rows. Ungated beyond
+/// an active session, matching this codebase's "reads stay open, writes are
+/// capability-gated" convention.
 #[tauri::command]
 pub fn section_roster(
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     section_id: String,
     as_of_date: String,
-) -> AppResult<Vec<SectionRosterMember>> {
+) -> AppResult<Vec<CurrentRosterMember>> {
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
-    section_membership::roster_for_section(&conn, &school_id, &section_id, &as_of_date)
+    section_membership::current_roster(&conn, &school_id, &section_id, &as_of_date)
 }
 
 /// A learner's full enrollment (section-placement) history -- ungated

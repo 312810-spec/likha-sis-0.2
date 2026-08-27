@@ -1,5 +1,134 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-27 — Wave 2O: Section Roster read-only foundation, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2O addendum; `docs/PROJECT-MEMORY.md`
+Wave 2O entry; `docs/ACTIVE-PLAN.md` Wave 2O verification record. Same
+branch (`claude/likha-sis-wave2a-learner-core`). Frozen harness not
+reopened. SF10 research not reopened.
+
+**Repository/CI truth verified first**: HEAD `2bc0d7b` = origin, 0
+ahead/0 behind; `main` `d9ab036`; working tree clean. Wave 2N CI
+independently re-confirmed `completed/success` for both feature commits:
+`6f1bdb5` — Quality `33033895580` + Security `33033895620`; `92142c9` —
+Quality `33034888077` + Security `33034888093`.
+
+**Central finding**: the roster data pipeline already existed end to end
+(`section_membership::roster_for_section` + `commands::section::
+section_roster`; the TS `SectionRosterMember` type, port, Tauri adapter,
+and `SectionApplicationService.roster()` — all from Wave 2A / attendance
+work, and `AttendanceScreen` already consumes an equivalent). Wave 2O
+added the missing **UI** plus a small projection enrichment; it did not
+build a new query or a parallel enrollment model.
+
+**What was built**:
+
+- **`section_membership::current_roster(school_id, section_id,
+as_of_date)` (NEW)** returning a **separate `CurrentRosterMember`
+  projection** (identity + `lrn` + `sex` + `starts_on`). Same query
+  shape as `roster_for_section` (one indexed JOIN, `ORDER BY
+family_name, given_name`, scoped by `school_id` AND `section_id`
+  together) so `roster_for_section` / `roster_for_section_over_range`
+  (used by `formgen::sf1` + attendance-adjacent callers) stay
+  untouched. The brief's §5 proposed `list_current_members_in_school`;
+  reusing the proven shape under a name that fits the domain was the
+  deliberate call — recorded in the ADR-0042 addendum, in the same
+  spirit as Wave 3's departure from its Java/POI hypothesis.
+- **`commands::section::section_roster`** rewired to `current_roster`;
+  still session-derived `school_id`, ungated beyond an active session
+  (reads-open convention, matching `list_learner_enrollment_history`).
+- **`SectionRosterScreen.tsx` (NEW)** — reached from `SectionsScreen`
+  via a per-section "Open roster" button (`App.tsx` `rosterSectionId`
+  handoff, same narrowly-typed pattern as Attendance→Monthly Summary);
+  its own "← Back to sections". `"section-roster"` is a `SignedInTab`
+  value but not a `NAV_GROUPS` destination (needs a selected section);
+  `WorkbenchNav` keeps "Sections" active while it is open. States:
+  loading / populated / empty ("no learners as of <date>" + route to
+  Sections) / section-not-found recovery / roster-load error + retry.
+  Efficient / Comfortable / Guided parity (density is global CSS vars;
+  the component varies only explanatory copy). Desktop `<table>` →
+  `@media (max-width: 640px)` stacked-card layout mirroring
+  `.attendance-roster`.
+- **`SectionApplicationService.roster()`** now trims `sectionId` and
+  validates the `YYYY-MM-DD` date (parity with `enrollLearner`).
+- Decisions: **no search** (one section = tens of learners; a stable
+  sorted list scans faster than it filters). **Sort** = family then
+  given name, already this project's convention (`export::report_card`
+  formats `"{family}, {given}"`; `formgen::sf1`), applied in SQL, never
+  re-sorted client-side. **`sex` dropped** from the projection (no
+  consumer — security + architecture review); `lrn` shown for identity
+  confirmation. Dates shown `2 Jun 2025` via a small screen-local
+  formatter.
+
+**"Current member"** is the existing half-open-interval definition
+(`starts_on <= as_of_date < ends_on`, NULL `ends_on` = open) — not a new
+temporal semantic. Future-dated enrollments and ended memberships are
+correctly absent; the screen shows the "as of" date so a teacher can
+see why (covered by unit + command-boundary tests).
+
+**Independent review**: teacher-ux, accessibility, security, and
+architecture reviewers ran in parallel and **all four returned complete
+findings** before the shared session hit its usage limit. **One
+BLOCKING** (accessibility): the `@media (max-width: 640px)`
+`display:block` layout strips implicit ARIA table roles (reachable at
+400% zoom, not only phones), leaving `data-label` generated content as
+the sole column-label carrier — **fixed** by adding explicit
+`role="table|rowgroup|row|columnheader|rowheader|cell"`. No blocking
+from security / architecture / teacher-ux; ~15 non-blocking items acted
+on (status live region + focus-on-retry; `l.school_id` JOIN predicate +
+forged-row regression test; `sex` removed; `TAB_LABELS` exhaustive
+literal; `App.tsx` no longer falls through to audit-log for an unhandled
+tab; all-mode purpose line; "Enrolled since"; friendly dates; Guided
+hint above the table + `aria-describedby`; section-load-error Retry;
+duplicate in-alert back buttons removed; axe extended to not-found +
+roster-error states). Retained debt (`docs/VERIFICATION-DEBT.md` Wave
+2O): native NVDA/Narrator pass at 400% zoom; no Rust-side `as_of_date`
+shape check (TS boundary per `architecture.md`; non-exploitable);
+`roster_for_section*` not given the same `l.school_id` predicate
+(pre-existing, `formgen`-shared, out of scope); half-open predicate now
+in 4 functions (shared const not extracted — no unrelated refactor);
+not-found state cannot name the section.
+
+**Verification (actually run this session)**: `cargo fmt --check` clean;
+`cargo clippy --all-targets -- -D warnings` clean; `cargo test` — 491
+lib (+7 `current_roster` unit tests: open member w/ enrollment date,
+future-dated excluded, ended excluded, empty section, cross-school
+section → empty, forged-row cross-school → empty, family-then-given
+order) + all integration binaries incl. `tests/enrollment.rs` 17 (+4
+command-boundary: authorized same-school read, no session denied,
+nonexistent `section_id` → `[]`, cross-school `section_id` → `[]`), 0
+doctests; `cargo nextest run` 595/595. One transient
+`learner_management.rs` `db::open` flake on a single full-suite run
+(SQLCipher key derivation under parallel load; not reproduced;
+unrelated — no db/crypto code touched). `npm run quality` green —
+typecheck / lint / format:check / architecture check + 484 vitest
+tests. `npm run check:dev-preview-isolation` pass; `npx knip` — zero new
+findings. `cargo-deny` clean (no dependency change); `gitleaks` /
+`osv-scanner` not on PATH locally (standing gap — CI Security Gate
+authoritative). No packaged-native Tauri run (standing environment gap;
+`quality:ui` is an explicit placeholder — recorded, not claimed).
+
+**Committed and CI-confirmed**: `<commit>` — Quality Gate `<id>` +
+Security Gate `<id>` `completed/success` [record at checkpoint].
+
+**Deliberately NOT built** (Wave 2P onward): transfer between sections,
+end enrollment, bulk enrollment, CSV/XLS import, drag-and-drop, SF1
+export, learner editing/deletion, historical membership editor. The
+transfer/end-enrollment seam is documented in prose in the screen's doc
+comment; no dead buttons.
+
+**Exact next highest-value production slice**: **Wave 2P — Transfer
+learner + End enrollment** on top of this roster. The seam is already
+shaped: a selected `SectionRosterScreen` row → a membership action
+(transfer to another section / end enrollment as of a date), driven by
+new capability-gated commands over `section_membership::enroll` (which
+already performs a transfer as a close-old-open-new atomic step) plus a
+new `end_membership` verb. Add `membership_id` to `CurrentRosterMember`
+at that point (deferred here — no consumer yet). Then reuse the
+resulting learner-list / membership patterns in attendance, class
+records, and official-form workflows. Re-evaluate against repository
+evidence at the checkpoint before committing to the label.
+
 ## Active Task (2026-08-27 — Wave 2N: SF10 Evidence Closure, COMPLETE — SF10 = PARTIALLY READY)
 
 Full record: `docs/adr/0053-*` Wave 2N addendum,

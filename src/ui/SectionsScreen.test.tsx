@@ -87,12 +87,17 @@ function renderScreen(sections: Section[] = []) {
   const sectionRepo = new FakeSectionRepository(sections);
   const sectionService = new SectionApplicationService(sectionRepo);
   const learnerService = new LearnerApplicationService(new FakeLearnerRepository());
+  const openRosterCalls: string[] = [];
   const result = render(
     <ModeProvider>
-      <SectionsScreen sectionService={sectionService} learnerService={learnerService} />
+      <SectionsScreen
+        sectionService={sectionService}
+        learnerService={learnerService}
+        onOpenRoster={(sectionId) => openRosterCalls.push(sectionId)}
+      />
     </ModeProvider>,
   );
-  return { ...result, sectionRepo };
+  return { ...result, sectionRepo, openRosterCalls };
 }
 
 beforeEach(() => {
@@ -145,6 +150,24 @@ describe("SectionsScreen", () => {
     expect(sectionRepo.enrollCalls).toEqual([
       { sectionId: "sec-1", learnerId: "l1", startsOn: expect.any(String) },
     ]);
+  });
+
+  it("opens the roster for a section via its Open roster button", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { openRosterCalls } = renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    await user.click(screen.getByRole("button", { name: "Open roster for Mabini" }));
+
+    expect(openRosterCalls).toEqual(["sec-1"]);
   });
 
   it("moves focus to the heading on mount", async () => {

@@ -12,6 +12,10 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface SectionsScreenProps {
   sectionService: SectionApplicationService;
   learnerService: LearnerApplicationService;
+  /** Open the read-only roster for one section (Wave 2O). A callback +
+   * parent state handoff, not a route -- the same pattern
+   * TeacherWorkspaceScreen uses for "open attendance for this section". */
+  onOpenRoster: (sectionId: string) => void;
 }
 
 function todayAsIsoDate(): string {
@@ -22,7 +26,11 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-export function SectionsScreen({ sectionService, learnerService }: SectionsScreenProps) {
+export function SectionsScreen({
+  sectionService,
+  learnerService,
+  onOpenRoster,
+}: SectionsScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -128,8 +136,17 @@ export function SectionsScreen({ sectionService, learnerService }: SectionsScree
       ) : (
         <ul className="learner-list">
           {sections.map((section) => (
-            <li key={section.id}>
-              {section.name} — Grade {section.gradeLevel} ({section.schoolYear})
+            <li key={section.id} className="section-list-row">
+              <span>
+                {section.name} — Grade {section.gradeLevel} ({section.schoolYear})
+              </span>
+              <button
+                type="button"
+                onClick={() => onOpenRoster(section.id)}
+                aria-label={`Open roster for ${section.name}`}
+              >
+                Open roster
+              </button>
             </li>
           ))}
         </ul>

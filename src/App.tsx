@@ -26,6 +26,7 @@ import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
+import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
@@ -45,6 +46,10 @@ function App() {
   // selected -- a narrowly-typed prop, not a router/URL param/global
   // store. See docs/adr/0032-teacher-workspace-polish.md.
   const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
+  // Set only by SectionsScreen's "Open roster" action, so
+  // SectionRosterScreen opens for that section -- same narrowly-typed
+  // handoff as attendanceSectionId above, not a router/global store.
+  const [rosterSectionId, setRosterSectionId] = useState<string | null>(null);
   // Set only by AttendanceScreen's "View monthly summary" action, so
   // MonthlySummaryScreen can open with the same section and year/month
   // already selected -- same narrowly-typed handoff pattern as above, not
@@ -122,7 +127,10 @@ function App() {
         ) : session ? (
           <>
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
-            <WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />
+            <WorkbenchNav
+              activeTab={activeTab === "section-roster" ? "sections" : activeTab}
+              onTabChange={setActiveTab}
+            />
             {activeTab === "workspace" ? (
               <TeacherWorkspaceScreen
                 displayName={session.displayName}
@@ -141,7 +149,34 @@ function App() {
             ) : activeTab === "learners" ? (
               <LearnerListScreen learnerService={learnerService} exportService={exportService} />
             ) : activeTab === "sections" ? (
-              <SectionsScreen sectionService={sectionService} learnerService={learnerService} />
+              <SectionsScreen
+                sectionService={sectionService}
+                learnerService={learnerService}
+                onOpenRoster={(sectionId) => {
+                  setRosterSectionId(sectionId);
+                  setActiveTab("section-roster");
+                }}
+              />
+            ) : activeTab === "section-roster" ? (
+              rosterSectionId ? (
+                <SectionRosterScreen
+                  sectionService={sectionService}
+                  sectionId={rosterSectionId}
+                  onBack={() => setActiveTab("sections")}
+                />
+              ) : (
+                // Reached only if the roster tab is active with no section
+                // context (e.g. a stale state after a reload) -- fall back
+                // to Sections rather than render a blank or wrong screen.
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                />
+              )
             ) : activeTab === "sf1-import" ? (
               <Sf1ImportScreen
                 sf1ImportService={sf1ImportService}
@@ -182,9 +217,9 @@ function App() {
                 learnerScoreService={learnerScoreService}
                 exportService={exportService}
               />
-            ) : (
+            ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
-            )}
+            ) : null}
           </>
         ) : (
           <LoginScreen

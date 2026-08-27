@@ -7,6 +7,7 @@ import { SectionApplicationService } from "./section-service";
 class FakeSectionRepository implements SectionRepository {
   createCalls: Array<{ schoolYear: string; gradeLevel: string; name: string }> = [];
   enrollCalls: Array<{ sectionId: string; learnerId: string; startsOn: string }> = [];
+  rosterCalls: Array<{ sectionId: string; asOfDate: string }> = [];
   sectionsToReturn: Section[] = [];
   rosterToReturn: SectionRosterMember[] = [];
 
@@ -43,7 +44,8 @@ class FakeSectionRepository implements SectionRepository {
     };
   }
 
-  async roster(): Promise<SectionRosterMember[]> {
+  async roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
+    this.rosterCalls.push({ sectionId, asOfDate });
     return this.rosterToReturn;
   }
 }
@@ -160,5 +162,34 @@ describe("SectionApplicationService", () => {
       ValidationError,
     );
     expect(repo.enrollCalls).toEqual([]);
+  });
+
+  it("fetches a roster with a trimmed section id and a well-formed date", async () => {
+    const repo = new FakeSectionRepository();
+    repo.rosterToReturn = [
+      { learnerId: "l1", givenName: "Ana", familyName: "Cruz", lrn: null, startsOn: "2026-08-01" },
+    ];
+    const service = new SectionApplicationService(repo);
+
+    const roster = await service.roster(" sec-1 ", "2026-09-01");
+
+    expect(roster).toBe(repo.rosterToReturn);
+    expect(repo.rosterCalls).toEqual([{ sectionId: "sec-1", asOfDate: "2026-09-01" }]);
+  });
+
+  it("rejects an empty section id for a roster without calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(service.roster("  ", "2026-09-01")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.rosterCalls).toEqual([]);
+  });
+
+  it("rejects a malformed as-of date for a roster without calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(service.roster("sec-1", "Sept 1")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.rosterCalls).toEqual([]);
   });
 });
