@@ -76,9 +76,15 @@ built ahead of its second real use). Full detail in ADR-0051's
 Rust tests pass, 11 `formgen::evidence` tests (net +1 after removing the
 tautological test and adding the `Superseded` regression test).
 
-**Exact next action**: commit/push this checkpoint (branch
-`claude/likha-sis-wave2a-learner-core`). Confirm CI green for the exact
-commit before considering Wave 2K fully closed.
+**Committed and pushed**: `10d5efc`. **CI confirmed green for this exact
+commit**: Quality Gate `33026121743` and Security Gate `33026121791`,
+both `completed`/`success`. Wave 2K is fully closed.
+
+**Exact next action**: select and continue to the next highest-value
+work per LIKHA's priority order (privacy/security → correctness →
+DepEd compliance → teacher usability → offline reliability →
+maintainability → zero billing → performance → speed) — this is a
+checkpoint, not a stopping point.
 
 ## Note: Wave 2J — Resilient Zero-Cost Memory Observer + Project-Brain Hardening, complete (superseded as "Active Task" by Wave 2K above, kept for history)
 

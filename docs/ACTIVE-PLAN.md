@@ -60,6 +60,9 @@ test` all passing (11 `formgen::evidence` tests, net +1).
   to exercise the framework; no template-intake directory created with
   nothing to put in it; no automatic compliance-judgment path built;
   no PII in any evidence field; no new npm/cargo dependency added.
+- **Committed and pushed**: `10d5efc`. **CI confirmed green**: Quality
+  Gate `33026121743` and Security Gate `33026121791`, both
+  `completed`/`success` for this exact commit.
 
 ## Wave 2J: Resilient Zero-Cost Memory Observer + Project-Brain Hardening (added 2026-08-27) — complete
 
