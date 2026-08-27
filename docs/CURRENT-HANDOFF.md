@@ -75,9 +75,10 @@ vitest, typecheck, eslint, `prettier --check .`, `check:architecture`;
 authoritative, same disclosed per-machine gap as prior waves).
 
 **Checkpoint**: feature commit `59f9440` — Quality Gate `33046336519` +
-Security Gate `33046336518`, both `completed/success`. Review-fix commit
-pushed next; its CI ids recorded in the follow-up
-`docs: record Wave 2P CI-green checkpoint` commit (established pattern).
+Security Gate `33046336518`, both `completed/success`. Review-fix +
+docs commit `b3b6262` — Quality Gate `33048615959` + Security Gate
+`33048615965`, both `completed/success`. `b3b6262` is the final Wave 2P
+HEAD; `main` `d9ab036` untouched.
 
 **Exact next task**: no milestone pre-selected. Highest-value candidates
 by LIKHA priority order — (a) harden `enroll` (Rust date-shape check +

@@ -52,9 +52,9 @@ capability (`ManageLearners`, as ADR-0042 already scoped
   `VERIFICATION-DEBT.md`.
 
 **Checkpoint**: feature `59f9440` — Quality `33046336519` + Security
-`33046336518` both `completed/success`. Review-fix commit + a
-`docs: record Wave 2P CI-green checkpoint` commit carry the final CI
-ids (established pattern).
+`33046336518` both `completed/success`. Review-fix + docs `b3b6262` —
+Quality `33048615959` + Security `33048615965` both `completed/success`.
+`b3b6262` is the final Wave 2P HEAD.
 
 ---
 
