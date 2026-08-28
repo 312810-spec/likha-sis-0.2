@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionApplicationService } from "../application/section-service";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -96,6 +97,22 @@ const MEMBERS: SectionRosterMember[] = [
   },
 ];
 
+// "Today" is pinned to 2026-08-27 by the `beforeEach` below. Only a member
+// whose placement started today is offered the "Correct today's placement"
+// action -- a separate fixture so the many pre-existing roster-shape
+// assertions above are not disturbed.
+const MEMBERS_WITH_TODAY_PLACEMENT: SectionRosterMember[] = [
+  ...MEMBERS,
+  {
+    membershipId: "m-dris",
+    learnerId: "l-dris",
+    givenName: "Eli",
+    familyName: "Dris",
+    lrn: null,
+    startsOn: "2026-08-27",
+  },
+];
+
 class FakeSectionRepository implements SectionRepository {
   sections: Section[] = [SECTION, SECTION_B];
   rosterResult: SectionRosterMember[] = MEMBERS;
@@ -119,6 +136,14 @@ class FakeSectionRepository implements SectionRepository {
   enrollMembershipResult: EnrollMembershipResult = { kind: "enrolled", membership: MEMBERSHIP };
   enrollMembershipError: Error | null = null;
   enrollMembershipCalls: Array<{ learnerId: string; sectionId: string; startsOn: string }> = [];
+  correctResult: CorrectPlacementResult = { kind: "notFound" };
+  correctError: Error | null = null;
+  correctCalls: Array<{
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }> = [];
 
   async list(): Promise<Section[]> {
     if (this.listError) throw this.listError;
@@ -167,6 +192,16 @@ class FakeSectionRepository implements SectionRepository {
     this.enrollMembershipCalls.push(input);
     if (this.enrollMembershipError) throw this.enrollMembershipError;
     return this.enrollMembershipResult;
+  }
+  async correctSameDayPlacement(input: {
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }): Promise<CorrectPlacementResult> {
+    this.correctCalls.push(input);
+    if (this.correctError) throw this.correctError;
+    return this.correctResult;
   }
 }
 
@@ -518,6 +553,23 @@ describe("SectionRosterScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("points a same-day zero-length transfer at the correction action instead", async () => {
+    renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      transferResult: { kind: "zeroLengthInterval" },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Dris, Eli/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+
+    expect(
+      await screen.findByText(/Correct today's placement/, { selector: "p" }),
+    ).toBeInTheDocument();
+  });
+
   it("tells the teacher to create another section when there is nowhere to transfer to", async () => {
     renderScreen({ sections: [SECTION] });
     await screen.findByText("Bautista, Ana");
@@ -838,6 +890,216 @@ describe("SectionRosterScreen", () => {
       expect(screen.getByLabelText("Start date")).toBeInTheDocument();
       unmount();
     }
+  });
+
+  // --- Wave 2S: correct today's placement ---
+
+  it("only offers the correction action for a placement that started today", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+
+    // Bautista (2025-06-02) and Cruz (2025-08-15) did not start today.
+    expect(
+      screen.queryByRole("button", { name: /Correct today's placement/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers the correction action only for the row that started today", async () => {
+    renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+    await screen.findByText("Dris, Eli");
+
+    expect(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Correct today's placement for Bautista, Ana/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("corrects a today's placement to another section and refreshes the roster", async () => {
+    const { repo } = renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      correctResult: {
+        kind: "corrected",
+        membership: {
+          id: "m-dris",
+          schoolId: "s1",
+          sectionId: "sec-2",
+          learnerId: "l-dris",
+          startsOn: "2026-08-27",
+          endsOn: null,
+          createdAt: "now",
+        },
+      },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+    // No effective-date field for a correction -- it is always today.
+    expect(screen.queryByLabelText("Effective date")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Correct to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+
+    expect(
+      await screen.findByText(/Dris, Eli's placement today was corrected to Rizal/),
+    ).toBeInTheDocument();
+    expect(repo.correctCalls).toEqual([
+      {
+        learnerId: "l-dris",
+        membershipId: "m-dris",
+        toSectionId: "sec-2",
+        asOfDate: "2026-08-27",
+      },
+    ]);
+    expect(repo.rosterCalls).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Confirm correction" })).not.toBeInTheDocument();
+  });
+
+  it("shows a stale-conflict recovery when the placement was already corrected, then refreshes", async () => {
+    const { repo } = renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      correctResult: { kind: "alreadyCorrected" },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+    await user.selectOptions(screen.getByLabelText("Correct to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+
+    expect(
+      await screen.findByText(/enrollment changed since you opened this roster/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Refresh roster" }));
+
+    expect(repo.rosterCalls).toHaveLength(2);
+  });
+
+  it("treats a not-entered-today outcome as a stale conflict", async () => {
+    renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      correctResult: { kind: "notEnteredToday" },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+    await user.selectOptions(screen.getByLabelText("Correct to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+
+    expect(
+      await screen.findByText(/enrollment changed since you opened this roster/),
+    ).toBeInTheDocument();
+  });
+
+  it("names the dependent-record category on a correction conflict, without an effective date to change", async () => {
+    renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      correctResult: { kind: "dependentRecordConflict", record: "attendance" },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+    await user.selectOptions(screen.getByLabelText("Correct to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+
+    expect(await screen.findByText(/attendance records/)).toBeInTheDocument();
+    // Panel stays open so the teacher can see the message; there is no
+    // later date to pick, unlike a backdated transfer/end conflict.
+    expect(screen.getByRole("button", { name: "Confirm correction" })).toBeInTheDocument();
+  });
+
+  it("cancelling the correction panel restores focus to its trigger", async () => {
+    renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    const trigger = screen.getByRole("button", {
+      name: "Correct today's placement for Dris, Eli",
+    });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(trigger).toHaveFocus();
+  });
+
+  it("moves focus to the correction panel heading when it opens", async () => {
+    renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("Correct Dris, Eli's placement today", { selector: "p" }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it("offers the correction workflow identically in every teacher mode", async () => {
+    for (const mode of ["efficient", "comfortable", "guided"] as const) {
+      window.localStorage.setItem("likha-sis:teacher-mode", mode);
+      const { unmount } = renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+      await screen.findByText("Dris, Eli");
+      const user = userEvent.setup();
+      await user.click(
+        screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+      );
+      expect(screen.getByLabelText("Correct to section")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Confirm correction" })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("has no detectable accessibility violations with the correction panel open", async () => {
+    const { container } = renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+    await screen.findByText("Dris, Eli");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }));
+    await screen.findByRole("button", { name: "Confirm correction" });
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations in the correction dependent-record-conflict state", async () => {
+    const { container } = renderScreen({
+      rosterResult: MEMBERS_WITH_TODAY_PLACEMENT,
+      correctResult: { kind: "dependentRecordConflict", record: "grades" },
+    });
+    await screen.findByText("Dris, Eli");
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }),
+    );
+    await user.selectOptions(screen.getByLabelText("Correct to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm correction" }));
+    await screen.findByText(/grades/);
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with an open correction panel in Guided mode", async () => {
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    const { container } = renderScreen({ rosterResult: MEMBERS_WITH_TODAY_PLACEMENT });
+    await screen.findByText("Dris, Eli");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }));
+    await screen.findByRole("button", { name: "Confirm correction" });
+    await expectNoAccessibilityViolations(container);
   });
 
   it("has no detectable accessibility violations with the enroll panel open", async () => {

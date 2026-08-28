@@ -248,6 +248,11 @@ export class FixtureSectionRepository implements SectionRepository {
   async enrollMembership(): Promise<never> {
     throw new Error("dev-preview fixture: enrollMembership() is not wired -- read-only fixture");
   }
+  async correctSameDayPlacement(): Promise<never> {
+    throw new Error(
+      "dev-preview fixture: correctSameDayPlacement() is not wired -- read-only fixture",
+    );
+  }
 }
 
 const FIXTURE_ENROLLMENT_HISTORY: SectionMembership[] = [

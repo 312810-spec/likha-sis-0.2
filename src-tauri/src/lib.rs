@@ -61,6 +61,7 @@ pub fn run() {
             commands::section::transfer_learner_membership,
             commands::section::end_learner_membership,
             commands::section::enroll_learner_membership,
+            commands::section::correct_same_day_placement,
             commands::section::list_enrollable_learners,
             commands::section::section_roster,
             commands::section::list_learner_enrollment_history,

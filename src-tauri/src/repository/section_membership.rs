@@ -722,6 +722,164 @@ pub fn enroll_membership(
     Ok(EnrollOutcome::Enrolled { membership })
 }
 
+/// Outcome of [`correct_same_day_placement`]. A non-`Corrected` variant
+/// means the transaction wrote nothing. Mirrors the `tag = "kind"` shape of
+/// the other membership-change outcomes.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CorrectPlacementOutcome {
+    /// `section_id` was updated in place; `membership` is the row as
+    /// persisted. The row keeps its original `id`/`created_at`/`starts_on`
+    /// and stays open (`ends_on` untouched).
+    Corrected { membership: SectionMembership },
+    /// No membership with this `(id, school_id, learner_id)` triple exists
+    /// — a forged/cross-school id, or a wrong learner, is indistinguishable
+    /// from a genuinely unknown id, matching this module's convention.
+    NotFound,
+    /// The membership exists but is no longer the open one — either it was
+    /// already ended/transferred, or another correction committed between
+    /// this call's read and write. The roster the caller acted from is
+    /// stale either way. No-op.
+    NotCurrent,
+    /// `starts_on` is not today (per the caller-supplied `as_of_date`) —
+    /// this correction path only ever applies to a placement entered
+    /// today; anything older needs a transfer or end instead.
+    NotEnteredToday,
+    /// This membership was already corrected once. A correction is a
+    /// one-time fix for a same-day data-entry slip, not a repeatable edit
+    /// — a second attempt (including an exact double-submit) is refused
+    /// rather than silently overwriting `original_section_id` again.
+    AlreadyCorrected,
+    /// `to_section_id` does not resolve within the caller's school.
+    DestinationNotFound,
+    /// `to_section_id` is the section the row is already in — nothing to
+    /// correct.
+    SameSection,
+    /// An attendance or scored-grade record already exists for this
+    /// learner in the *current* section — moving the row to a different
+    /// section now would strand it outside every membership that still
+    /// covers it. Nothing was written; see [`DependentRecordKind`].
+    DependentRecordConflict { record: DependentRecordKind },
+}
+
+/// Corrects a data-entry mistake in a placement entered *today*: the
+/// learner was placed in the wrong section, and the strict half-open
+/// interval policy (ADR-0042 Wave 2Q addendum) refuses the obvious fix — a
+/// same-day transfer — because closing the source with
+/// `ends_on = starts_on` would be a zero-length interval. This is not a
+/// transfer: it updates `section_id` on the *same* row, in place, exactly
+/// once. No new membership row is created, `starts_on`/`ends_on` are never
+/// touched, and the original section is retained in
+/// `original_section_id` — so this can never produce an overlapping,
+/// multiple-open, or zero-length membership, and every existing "current
+/// membership" query (`current_roster`, `roster_for_section`,
+/// `is_active_member`, the one-open-per-learner unique index, and Wave
+/// 2R's read-only history) sees the corrected row exactly as if it had
+/// always been enrolled in the corrected section, with no change of its
+/// own required.
+///
+/// Bounded deliberately narrow, matching the ADR-0042 Wave 2S decision:
+/// only a placement whose `starts_on` equals `as_of_date` (the caller's
+/// own "today", the same client-supplied convention every other date in
+/// this module already uses — `effective_on`/`as_of_date`/`starts_on`),
+/// only once (`corrected_at IS NULL`), and only when nothing already
+/// depends on the current section placement (see
+/// [`dependent_records_stranded`] — called with a zero-width interval, so
+/// *any* attendance/scored-grade record for this learner in the current
+/// section is treated as stranded, since the row is about to stop
+/// covering this section at all).
+///
+/// Runs in one transaction; the correcting `UPDATE` is guarded by
+/// `ends_on IS NULL AND corrected_at IS NULL`, and its affected-row count
+/// is checked, so two concurrent corrections cannot both succeed and a
+/// double-submit is a no-op past the first.
+pub fn correct_same_day_placement(
+    conn: &mut Connection,
+    school_id: &str,
+    learner_id: &str,
+    membership_id: &str,
+    to_section_id: &str,
+    as_of_date: &str,
+) -> AppResult<CorrectPlacementOutcome> {
+    if !is_iso_date(as_of_date) {
+        return Ok(CorrectPlacementOutcome::NotEnteredToday);
+    }
+
+    let tx = conn.transaction()?;
+
+    // Defense in depth, matching `end_membership`/`transfer_membership`: a
+    // forged row could pair this school with a foreign learner.
+    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
+        return Ok(CorrectPlacementOutcome::NotFound);
+    }
+
+    let existing: Option<(String, String, Option<String>, Option<String>)> = tx
+        .query_row(
+            "SELECT section_id, starts_on, ends_on, corrected_at FROM section_memberships \
+             WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
+            (membership_id, school_id, learner_id),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            e => Err(e),
+        })?;
+
+    let (current_section_id, starts_on, ends_on, corrected_at) = match existing {
+        None => return Ok(CorrectPlacementOutcome::NotFound),
+        Some(row) => row,
+    };
+    if ends_on.is_some() {
+        return Ok(CorrectPlacementOutcome::NotCurrent);
+    }
+    if starts_on != as_of_date {
+        return Ok(CorrectPlacementOutcome::NotEnteredToday);
+    }
+    if corrected_at.is_some() {
+        return Ok(CorrectPlacementOutcome::AlreadyCorrected);
+    }
+    if section::find_by_id_in_school(&tx, school_id, to_section_id)?.is_none() {
+        return Ok(CorrectPlacementOutcome::DestinationNotFound);
+    }
+    if to_section_id == current_section_id {
+        return Ok(CorrectPlacementOutcome::SameSection);
+    }
+    // Zero-width interval: since the row is leaving `current_section_id`
+    // entirely, any dependent record in that section (on any date) counts
+    // as stranded unless some *other* retained membership already covers
+    // it -- `dependent_records_stranded` already checks that.
+    if let Some(record) = dependent_records_stranded(
+        &tx,
+        school_id,
+        learner_id,
+        &current_section_id,
+        membership_id,
+        &starts_on,
+        Some(&starts_on),
+    )? {
+        return Ok(CorrectPlacementOutcome::DependentRecordConflict { record });
+    }
+
+    let affected = tx.execute(
+        "UPDATE section_memberships \
+         SET section_id = ?1, \
+             original_section_id = COALESCE(original_section_id, section_id), \
+             corrected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+         WHERE id = ?2 AND ends_on IS NULL AND corrected_at IS NULL",
+        (to_section_id, membership_id),
+    )?;
+    if affected != 1 {
+        // Lost a race: another correction (or an end/transfer) committed
+        // between the SELECT above and here.
+        return Ok(CorrectPlacementOutcome::NotCurrent);
+    }
+
+    let membership = find_by_id(&tx, membership_id)?.expect("row just updated must exist");
+    tx.commit()?;
+    Ok(CorrectPlacementOutcome::Corrected { membership })
+}
+
 /// A candidate for the Section Roster "Enroll learner" picker: a learner
 /// in the school plus their current *open* membership, if any. `current_*`
 /// are all `None` together (not enrolled anywhere → eligible to place
@@ -2497,6 +2655,519 @@ mod tests {
         assert_eq!(
             candidates[0].current_membership_id, None,
             "an ended membership is not a current placement"
+        );
+    }
+
+    // --- Wave 2S: correct_same_day_placement ---
+
+    use crate::repository::{assessment_item, class_record, grading, subject, user};
+
+    // Seeded reference-data ids (migrations 6/9/12) — same constants
+    // `grading_computation`'s own integration tests use.
+    const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+    const WRITTEN_WORKS: &str = "00000000-0000-7000-8000-000000000311";
+    const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+    fn enroll_via_membership(
+        conn: &mut Connection,
+        school_id: &str,
+        section_id: &str,
+        learner_id: &str,
+        starts_on: &str,
+    ) -> SectionMembership {
+        match enroll_membership(conn, school_id, learner_id, section_id, starts_on).unwrap() {
+            EnrollOutcome::Enrolled { membership } => membership,
+            other => panic!("expected Enrolled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn correct_same_day_placement_updates_the_section_in_place() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        let corrected = match outcome {
+            CorrectPlacementOutcome::Corrected { membership } => membership,
+            other => panic!("expected Corrected, got {other:?}"),
+        };
+        assert_eq!(corrected.id, m.id, "same row, not a new membership");
+        assert_eq!(corrected.section_id, section_b.id);
+        assert_eq!(corrected.starts_on, "2025-08-01", "starts_on is untouched");
+        assert_eq!(corrected.ends_on, None, "still open, not a transfer");
+        assert_eq!(
+            open_membership_count(&conn, &l.id),
+            1,
+            "no second row was created"
+        );
+
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+        assert_eq!(
+            history.len(),
+            1,
+            "history shows exactly one span for this placement"
+        );
+        assert_eq!(
+            history[0].section_id, section_b.id,
+            "the read-only history view reflects the corrected section truthfully"
+        );
+
+        let (original_section_id, corrected_at): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT original_section_id, corrected_at FROM section_memberships WHERE id = ?1",
+                [&m.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            original_section_id.as_deref(),
+            Some(section_a.as_str()),
+            "the wrong section is retained, not erased"
+        );
+        assert!(corrected_at.is_some());
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_membership_from_a_different_learner() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let other = learner::create(&conn, &school_id, "Ben", "Reyes", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &other.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::NotFound);
+        assert_eq!(
+            list_by_learner_in_school(&conn, &school_id, &l.id).unwrap()[0].section_id,
+            section_a,
+            "the real learner's row is untouched"
+        );
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_membership_from_a_different_school() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_section =
+            section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        // A forged/cross-school call: right membership id and learner id,
+        // but claiming a different school.
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &other_school.id,
+            &l.id,
+            &m.id,
+            &other_section.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::NotFound);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_forged_membership_id() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            "not-a-real-membership-id",
+            &section_a,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::NotFound);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_stale_already_ended_membership() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        // Ended on a later day, so this is no longer the open row.
+        end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-10").unwrap();
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::NotCurrent);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_placement_not_entered_today() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        // Called with a later "today" -- the placement is no longer today's.
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-02",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::NotEnteredToday);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_second_correction_double_submit() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let section_c = section::create(&conn, &school_id, "2025-2026", "7", "Luna").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let first = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+        assert!(matches!(first, CorrectPlacementOutcome::Corrected { .. }));
+
+        // An exact double-submit (retry) and a second, different attempted
+        // correction must both be refused identically -- a correction is a
+        // one-time fix, not a repeatable edit.
+        let retry = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+        assert_eq!(retry, CorrectPlacementOutcome::AlreadyCorrected);
+
+        let second_attempt = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_c.id,
+            "2025-08-01",
+        )
+        .unwrap();
+        assert_eq!(second_attempt, CorrectPlacementOutcome::AlreadyCorrected);
+
+        let current = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+        assert_eq!(current.len(), 1);
+        assert_eq!(
+            current[0].section_id, section_b.id,
+            "still the first correction's result, not the second"
+        );
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_an_unknown_destination_section() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            "not-a-real-section-id",
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::DestinationNotFound);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_destination_from_another_school() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_section =
+            section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &other_section.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::DestinationNotFound);
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_correcting_to_the_same_section() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_a,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CorrectPlacementOutcome::SameSection);
+    }
+
+    #[test]
+    fn correct_same_day_placement_blocks_an_existing_attendance_record_in_the_current_section() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        // Attendance was already taken today, in the section being
+        // corrected away from.
+        mark_attendance(&conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome,
+            CorrectPlacementOutcome::DependentRecordConflict {
+                record: DependentRecordKind::Attendance
+            }
+        );
+        assert_eq!(
+            list_by_learner_in_school(&conn, &school_id, &l.id).unwrap()[0].section_id,
+            section_a,
+            "nothing was written"
+        );
+    }
+
+    #[test]
+    fn correct_same_day_placement_is_unaffected_by_attendance_covered_by_a_retained_prior_stint() {
+        // The learner was in section A before (a retained, closed stint),
+        // left, and was re-enrolled in section A again today by mistake --
+        // the old attendance is explained by the *prior* stint, not this
+        // one, so correcting today's mistaken placement must not be
+        // falsely blocked by it.
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m_old = enroll(&conn, &school_id, &section_a, &l.id, "2024-06-01")
+            .unwrap()
+            .unwrap();
+        mark_attendance(&conn, &school_id, &section_a, &l.id, "2024-09-10");
+        end_membership(&mut conn, &school_id, &l.id, &m_old.id, "2025-04-01").unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, CorrectPlacementOutcome::Corrected { .. }));
+    }
+
+    #[test]
+    fn correct_same_day_placement_blocks_a_scored_grade_in_the_current_section() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        // A scored grade in section A, in a grading period wholly before
+        // today -- constructed directly (bypassing `learner_score::record`'s
+        // own roster-membership check), the same technique this module's
+        // pre-existing "orphan attendance" tests already use, standing in
+        // for a grade this correction would otherwise strand.
+        let sub = subject::create(&conn, &school_id, "Science").unwrap();
+        let period = grading::create(
+            &conn,
+            &school_id,
+            "2025-2026",
+            TERM_1,
+            "2025-01-01",
+            "2025-03-01",
+        )
+        .unwrap()
+        .unwrap();
+        let cr = class_record::create(
+            &conn, &school_id, &section_a, &sub.id, &period.id, K10_POLICY, None,
+        )
+        .unwrap()
+        .unwrap();
+        let item =
+            assessment_item::create(&conn, &school_id, &cr.id, WRITTEN_WORKS, "Quiz 1", 10.0)
+                .unwrap()
+                .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
+        conn.execute(
+            "INSERT INTO learner_scores \
+                 (id, school_id, assessment_item_id, learner_id, status, score, recorded_by_user_id) \
+             VALUES ('score-orphan', ?1, ?2, ?3, 'scored', 8.0, ?4)",
+            (&school_id, &item.id, &l.id, &teacher.id),
+        )
+        .unwrap();
+
+        let outcome = correct_same_day_placement(
+            &mut conn,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        assert_eq!(
+            outcome,
+            CorrectPlacementOutcome::DependentRecordConflict {
+                record: DependentRecordKind::Grades
+            }
+        );
+    }
+
+    #[test]
+    fn correct_same_day_placement_rejects_a_malformed_as_of_date() {
+        let mut conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+
+        for bad in ["08/01/2025", "2025-8-1", "not-a-date", ""] {
+            let outcome =
+                correct_same_day_placement(&mut conn, &school_id, &l.id, &m.id, &section_a, bad)
+                    .unwrap();
+            assert_eq!(outcome, CorrectPlacementOutcome::NotEnteredToday);
+        }
+    }
+
+    #[test]
+    fn correct_same_day_placement_two_connections_only_one_correction_commits() {
+        // Two independent connections against the same file, both racing
+        // to correct the same membership -- mirrors
+        // `enrollment_concurrency.rs`'s pattern at the unit level: exactly
+        // one write must commit, the other must see a clean typed outcome,
+        // never a partial/duplicate write.
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("race.sqlite3");
+        let key = crate::crypto::generate_key();
+        let mut conn_a = db::open(&db_path, &key).unwrap();
+        let mut conn_b = db::open(&db_path, &key).unwrap();
+
+        let (school_id, section_a) = setup(&conn_a);
+        let section_b = section::create(&conn_a, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let section_c = section::create(&conn_a, &school_id, "2025-2026", "7", "Luna").unwrap();
+        let l = learner::create(&conn_a, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll_via_membership(&mut conn_a, &school_id, &section_a, &l.id, "2025-08-01");
+
+        let outcome_a = correct_same_day_placement(
+            &mut conn_a,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_b.id,
+            "2025-08-01",
+        )
+        .unwrap();
+        let outcome_b = correct_same_day_placement(
+            &mut conn_b,
+            &school_id,
+            &l.id,
+            &m.id,
+            &section_c.id,
+            "2025-08-01",
+        )
+        .unwrap();
+
+        let outcomes = [outcome_a, outcome_b];
+        let corrected_count = outcomes
+            .iter()
+            .filter(|o| matches!(o, CorrectPlacementOutcome::Corrected { .. }))
+            .count();
+        assert_eq!(corrected_count, 1, "exactly one correction commits");
+        assert!(
+            outcomes
+                .iter()
+                .any(|o| matches!(o, CorrectPlacementOutcome::AlreadyCorrected)),
+            "the loser sees a clean typed outcome, not a duplicate write"
+        );
+
+        let final_state = list_by_learner_in_school(&conn_a, &school_id, &l.id).unwrap();
+        assert_eq!(final_state.len(), 1, "still exactly one membership row");
+        assert!(
+            final_state[0].section_id == section_b.id || final_state[0].section_id == section_c.id,
+            "the winner's section was applied"
         );
     }
 }

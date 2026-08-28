@@ -1,5 +1,6 @@
 import { ValidationError } from "../domain/errors";
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -187,6 +188,44 @@ export class SectionApplicationService {
       learnerId,
       sectionId,
       startsOn: input.startsOn,
+    });
+  }
+
+  /**
+   * Correct a placement entered today into the wrong section. Validates
+   * only the shape of the request; the Rust side is authoritative on
+   * authorization, whether the placement is still current and was
+   * actually entered today, whether it was already corrected, and
+   * dependent-record conflicts — those come back as
+   * {@link CorrectPlacementResult} variants, not thrown errors.
+   */
+  async correctSameDayPlacement(input: {
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }): Promise<CorrectPlacementResult> {
+    const learnerId = input.learnerId.trim();
+    const membershipId = input.membershipId.trim();
+    const toSectionId = input.toSectionId.trim();
+    if (learnerId.length === 0) {
+      throw new ValidationError("Learner is required.");
+    }
+    if (membershipId.length === 0) {
+      throw new ValidationError("The current enrollment is required.");
+    }
+    if (toSectionId.length === 0) {
+      throw new ValidationError("Destination section is required.");
+    }
+    if (!DATE_PATTERN.test(input.asOfDate)) {
+      throw new ValidationError("Date must be in YYYY-MM-DD format.");
+    }
+
+    return this.sections.correctSameDayPlacement({
+      learnerId,
+      membershipId,
+      toSectionId,
+      asOfDate: input.asOfDate,
     });
   }
 }

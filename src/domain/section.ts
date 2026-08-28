@@ -123,6 +123,38 @@ export type EnrollMembershipResult =
   | { kind: "dependentRecordConflict"; record: DependentRecordKind };
 
 /**
+ * Result of a same-day placement correction — the TS mirror of the Rust
+ * `section_membership::CorrectPlacementOutcome`. Fixes a placement entered
+ * *today* into the wrong section: the strict half-open interval policy
+ * refuses the obvious fix (a same-day transfer, which would leave a
+ * zero-length interval), so this updates the same membership row's section
+ * in place instead — no new membership is created, and `startsOn`/`endsOn`
+ * never change. A non-`corrected` case means nothing was written.
+ */
+export type CorrectPlacementResult =
+  | { kind: "corrected"; membership: SectionMembership }
+  /** The membership id is unknown, belongs to another school, or does not
+   * match the learner — deliberately indistinguishable. */
+  | { kind: "notFound" }
+  /** The membership exists but is no longer the open one — already ended
+   * or transferred, or another correction committed first. */
+  | { kind: "notCurrent" }
+  /** The placement's start date is not today — this correction path only
+   * ever applies to a placement entered today. */
+  | { kind: "notEnteredToday" }
+  /** This membership was already corrected once; a correction is a
+   * one-time fix, not a repeatable edit. */
+  | { kind: "alreadyCorrected" }
+  /** The destination section is unknown or belongs to another school. */
+  | { kind: "destinationNotFound" }
+  /** The destination is the section the row is already in — nothing to
+   * correct. */
+  | { kind: "sameSection" }
+  /** An attendance or grade record already exists for this learner in the
+   * current section, so moving it now would strand that record. */
+  | { kind: "dependentRecordConflict"; record: DependentRecordKind };
+
+/**
  * A learner the current user could place into a section, plus their
  * current open membership state — the TS mirror of the Rust
  * `section_membership::EnrollmentCandidate`. `current*` fields are all

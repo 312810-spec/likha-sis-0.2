@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -24,6 +25,12 @@ class FakeSectionRepository implements SectionRepository {
   }> = [];
   endCalls: Array<{ learnerId: string; membershipId: string; effectiveOn: string }> = [];
   enrollMembershipCalls: Array<{ learnerId: string; sectionId: string; startsOn: string }> = [];
+  correctSameDayPlacementCalls: Array<{
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }> = [];
   listEnrollableCalls = 0;
   sectionsToReturn: Section[] = [];
   rosterToReturn: SectionRosterMember[] = [];
@@ -31,6 +38,7 @@ class FakeSectionRepository implements SectionRepository {
   endToReturn: EndEnrollmentResult = { kind: "notFound" };
   enrollableToReturn: EnrollmentCandidate[] = [];
   enrollMembershipToReturn: EnrollMembershipResult = { kind: "learnerNotFound" };
+  correctSameDayPlacementToReturn: CorrectPlacementResult = { kind: "notFound" };
 
   async list(): Promise<Section[]> {
     return this.sectionsToReturn;
@@ -101,6 +109,16 @@ class FakeSectionRepository implements SectionRepository {
   }): Promise<EnrollMembershipResult> {
     this.enrollMembershipCalls.push(input);
     return this.enrollMembershipToReturn;
+  }
+
+  async correctSameDayPlacement(input: {
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }): Promise<CorrectPlacementResult> {
+    this.correctSameDayPlacementCalls.push(input);
+    return this.correctSameDayPlacementToReturn;
   }
 }
 
@@ -471,5 +489,97 @@ describe("SectionApplicationService", () => {
       service.enrollMembership({ learnerId: "l1", sectionId: "sec-1", startsOn: "24-08-2026" }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(repo.enrollMembershipCalls).toEqual([]);
+  });
+
+  it("corrects a same-day placement with trimmed ids and a well-formed date", async () => {
+    const repo = new FakeSectionRepository();
+    repo.correctSameDayPlacementToReturn = {
+      kind: "corrected",
+      membership: {
+        id: "mem-1",
+        schoolId: "current-session-school",
+        sectionId: "sec-2",
+        learnerId: "l1",
+        startsOn: "2026-08-24",
+        endsOn: null,
+        createdAt: "now",
+      },
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.correctSameDayPlacement({
+      learnerId: " l1 ",
+      membershipId: " mem-1 ",
+      toSectionId: " sec-2 ",
+      asOfDate: "2026-08-24",
+    });
+
+    expect(result.kind).toBe("corrected");
+    expect(repo.correctSameDayPlacementCalls).toEqual([
+      { learnerId: "l1", membershipId: "mem-1", toSectionId: "sec-2", asOfDate: "2026-08-24" },
+    ]);
+  });
+
+  it("passes a dependentRecordConflict outcome through unchanged (no eligibility logic in the service)", async () => {
+    const repo = new FakeSectionRepository();
+    repo.correctSameDayPlacementToReturn = {
+      kind: "dependentRecordConflict",
+      record: "attendance",
+    };
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.correctSameDayPlacement({
+      learnerId: "l1",
+      membershipId: "mem-1",
+      toSectionId: "sec-2",
+      asOfDate: "2026-08-24",
+    });
+
+    expect(result).toEqual({ kind: "dependentRecordConflict", record: "attendance" });
+  });
+
+  it("rejects correcting with a missing membership id before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.correctSameDayPlacement({
+        learnerId: "l1",
+        membershipId: "  ",
+        toSectionId: "sec-2",
+        asOfDate: "2026-08-24",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.correctSameDayPlacementCalls).toEqual([]);
+  });
+
+  it("rejects correcting with a missing destination section before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.correctSameDayPlacement({
+        learnerId: "l1",
+        membershipId: "mem-1",
+        toSectionId: "  ",
+        asOfDate: "2026-08-24",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.correctSameDayPlacementCalls).toEqual([]);
+  });
+
+  it("rejects correcting with a malformed as-of date before calling the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const service = new SectionApplicationService(repo);
+
+    await expect(
+      service.correctSameDayPlacement({
+        learnerId: "l1",
+        membershipId: "mem-1",
+        toSectionId: "sec-2",
+        asOfDate: "24-08-2026",
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.correctSameDayPlacementCalls).toEqual([]);
   });
 });

@@ -8,8 +8,8 @@ use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
 use crate::repository::section_membership::{
-    self, CurrentRosterMember, EndMembershipOutcome, EnrollOutcome, EnrollmentCandidate,
-    SectionMembership, TransferOutcome,
+    self, CorrectPlacementOutcome, CurrentRosterMember, EndMembershipOutcome, EnrollOutcome,
+    EnrollmentCandidate, SectionMembership, TransferOutcome,
 };
 
 /// `school_id` is derived from the session, never a parameter — same
@@ -191,6 +191,42 @@ pub fn enroll_learner_membership(
         &learner_id,
         &section_id,
         &starts_on,
+    )
+}
+
+/// Corrects a same-day data-entry mistake: `membership_id` was placed in
+/// the wrong section *today*, and the strict half-open interval policy
+/// (ADR-0042 Wave 2Q addendum) refuses the obvious fix -- a same-day
+/// transfer -- because it would create a zero-length interval. This is not
+/// a transfer: it updates the *same* row's section in place, exactly once,
+/// retaining the original section. `learner_id`/`membership_id`/
+/// `to_section_id` identify WHO and WHICH placement; `school_id` comes only
+/// from the session. Gated by `ManageLearners`, same as
+/// `enroll_learner_membership`/`transfer_learner_membership`. The
+/// structured `CorrectPlacementOutcome` distinguishes success from a stale
+/// or forged membership, a placement not entered today, an
+/// already-corrected double submit, an unknown/same destination, and a
+/// dependent-record conflict -- see
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`'s Wave 2S
+/// addendum for the full decision record.
+#[tauri::command]
+pub fn correct_same_day_placement(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+    membership_id: String,
+    to_section_id: String,
+    as_of_date: String,
+) -> AppResult<CorrectPlacementOutcome> {
+    let mut conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    section_membership::correct_same_day_placement(
+        &mut conn,
+        &school_id,
+        &learner_id,
+        &membership_id,
+        &to_section_id,
+        &as_of_date,
     )
 }
 

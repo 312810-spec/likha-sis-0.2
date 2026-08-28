@@ -111,6 +111,27 @@ fn enrollable_learners_as_current_session(
     section_membership::enrollable_learners(conn, &school_id)
 }
 
+/// Standing in for `commands::section::correct_same_day_placement` (Wave 2S).
+#[allow(clippy::too_many_arguments)]
+fn correct_same_day_placement_as_current_session(
+    conn: &mut rusqlite::Connection,
+    sessions: &SessionManager,
+    learner_id: &str,
+    membership_id: &str,
+    to_section_id: &str,
+    as_of_date: &str,
+) -> AppResult<section_membership::CorrectPlacementOutcome> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageLearners)?;
+    section_membership::correct_same_day_placement(
+        conn,
+        &school_id,
+        learner_id,
+        membership_id,
+        to_section_id,
+        as_of_date,
+    )
+}
+
 /// Standing in for `commands::section::create_section` (Wave 2A.1 fix).
 fn create_section_as_current_session(
     conn: &rusqlite::Connection,
@@ -899,4 +920,281 @@ fn existing_legitimate_section_creation_still_works_end_to_end() {
     let sections = section::list_by_school(&conn, &school.id).unwrap();
 
     assert_eq!(sections, vec![section]);
+}
+
+// --- Wave 2S: correct_same_day_placement at the command boundary ---
+
+#[test]
+fn a_registrar_can_correct_a_same_day_placement_at_the_command_boundary() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    let corrected = match outcome {
+        section_membership::CorrectPlacementOutcome::Corrected { membership } => membership,
+        other => panic!("expected Corrected, got {other:?}"),
+    };
+    assert_eq!(corrected.id, m.id);
+    assert_eq!(corrected.section_id, section_b.id);
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 1, "no second membership row was created");
+    assert_eq!(history[0].section_id, section_b.id);
+}
+
+#[test]
+fn a_school_head_can_also_correct_a_same_day_placement() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let head = login_with_role_at(&conn, &school.id, "head.a", role_repo::SCHOOL_HEAD);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &head, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &head,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    assert!(matches!(
+        outcome,
+        section_membership::CorrectPlacementOutcome::Corrected { .. }
+    ));
+}
+
+#[test]
+fn a_teacher_cannot_correct_a_same_day_placement() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let teacher = login_with_role_at(&conn, &school.id, "teacher.a", role_repo::TEACHER);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let result = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &teacher,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(
+        history[0].section_id, section_a.id,
+        "nothing was written by the rejected attempt"
+    );
+}
+
+#[test]
+fn correcting_a_same_day_placement_requires_a_session() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+    let no_session = SessionManager::new(); // nobody logged in
+
+    let result = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &no_session,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_caller_cannot_correct_a_placement_using_another_schools_membership_id() {
+    let mut conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let section_a1 = section::create(&conn, &school_a.id, "2026-2027", "7", "Rizal").unwrap();
+    let section_b1 = section::create(&conn, &school_b.id, "2026-2027", "7", "Mabini").unwrap();
+    let head_b = login_with_role_at(&conn, &school_b.id, "head.b", role_repo::SCHOOL_HEAD);
+    let l_b = learner::create(&conn, &school_b.id, "Ana", "Cruz", None, None).unwrap();
+    let m_b = enroll_as_current_session(&conn, &head_b, &section_b1.id, &l_b.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    // School A's registrar, using School B's real membership id, learner
+    // id, and destination section id.
+    let reg_a = login_with_role_at(&conn, &school_a.id, "reg.a", role_repo::REGISTRAR);
+
+    let outcome = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &reg_a,
+        &l_b.id,
+        &m_b.id,
+        &section_a1.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    assert_eq!(
+        outcome,
+        section_membership::CorrectPlacementOutcome::NotFound,
+        "another school's membership id must be unusable, indistinguishable from unknown"
+    );
+    // School B's membership is completely untouched.
+    let history_b =
+        section_membership::list_by_learner_in_school(&conn, &school_b.id, &l_b.id).unwrap();
+    assert_eq!(history_b.len(), 1);
+    assert_eq!(history_b[0].section_id, section_b1.id);
+}
+
+#[test]
+fn a_forged_membership_row_cannot_be_corrected() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let outcome = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        "not-a-real-membership-id",
+        &section_a.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    assert_eq!(
+        outcome,
+        section_membership::CorrectPlacementOutcome::NotFound
+    );
+}
+
+#[test]
+fn a_stale_membership_and_an_already_corrected_double_submit_are_both_refused() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let section_c = section::create(&conn, &school.id, "2026-2027", "7", "Bonifacio").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-24")
+        .unwrap()
+        .unwrap();
+
+    let first = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    )
+    .unwrap();
+    assert!(matches!(
+        first,
+        section_membership::CorrectPlacementOutcome::Corrected { .. }
+    ));
+
+    // An exact double-submit (retry) of the same request.
+    let retry = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    )
+    .unwrap();
+    assert_eq!(
+        retry,
+        section_membership::CorrectPlacementOutcome::AlreadyCorrected
+    );
+
+    // A stale roster tab attempting a second, different correction on the
+    // same already-corrected row.
+    let stale = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_c.id,
+        "2026-08-24",
+    )
+    .unwrap();
+    assert_eq!(
+        stale,
+        section_membership::CorrectPlacementOutcome::AlreadyCorrected
+    );
+
+    let history = enrollment_history_as_current_session(&conn, &registrar, &l.id).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].section_id, section_b.id);
+}
+
+#[test]
+fn a_placement_not_entered_today_cannot_be_corrected() {
+    let mut conn = open_test_db();
+    let school = school::create(&conn, "Rizal Elementary").unwrap();
+    let section_a = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+    let section_b = section::create(&conn, &school.id, "2026-2027", "7", "Rizal").unwrap();
+    let registrar = login_with_role_at(&conn, &school.id, "registrar.a", role_repo::REGISTRAR);
+    let l = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+    let m = enroll_as_current_session(&conn, &registrar, &section_a.id, &l.id, "2026-08-01")
+        .unwrap()
+        .unwrap();
+
+    // Called on a later day -- the placement is no longer today's.
+    let outcome = correct_same_day_placement_as_current_session(
+        &mut conn,
+        &registrar,
+        &l.id,
+        &m.id,
+        &section_b.id,
+        "2026-08-24",
+    )
+    .unwrap();
+
+    assert_eq!(
+        outcome,
+        section_membership::CorrectPlacementOutcome::NotEnteredToday
+    );
 }

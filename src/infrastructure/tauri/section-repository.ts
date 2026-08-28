@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -63,5 +64,14 @@ export class TauriSectionRepository implements SectionRepository {
     startsOn: string;
   }): Promise<EnrollMembershipResult> {
     return invoke<EnrollMembershipResult>("enroll_learner_membership", input);
+  }
+
+  correctSameDayPlacement(input: {
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }): Promise<CorrectPlacementResult> {
+    return invoke<CorrectPlacementResult>("correct_same_day_placement", input);
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
 import type {
+  CorrectPlacementResult,
   DependentRecordKind,
   EndEnrollmentResult,
   EnrollmentCandidate,
@@ -72,7 +73,16 @@ function dependentRecordMessage(record: DependentRecordKind, joinedOn: string): 
   )}). Choose a later date so those records stay within the enrollment.`;
 }
 
-type ActionKind = "transfer" | "end";
+/** Plain-language message for a `dependentRecordConflict` outcome on a
+ * same-day correction. Unlike a backdated transfer/end, there is no later
+ * date to pick — the fix is to leave the placement as recorded and use an
+ * ordinary transfer once it is no longer today's placement. */
+function correctionDependentRecordMessage(record: DependentRecordKind): string {
+  const noun = record === "attendance" ? "attendance records" : "grades";
+  return `This learner already has ${noun} recorded for this placement, so the section can no longer be corrected this way. Use “Transfer” instead once today has passed.`;
+}
+
+type ActionKind = "transfer" | "end" | "correct";
 
 interface ActiveAction {
   member: SectionRosterMember;
@@ -84,19 +94,25 @@ interface ActiveAction {
 type PanelErrorField = "destination" | "effectiveOn" | null;
 
 /**
- * "Open my class roster" plus the two membership changes that hang off a
- * roster row: transfer a currently-enrolled learner to another section, or
- * end their enrollment. Both are effective-dated, preserve the prior
- * placement as history (the Rust side sets an end date, never deletes),
- * and are enforced at the Tauri command boundary — this screen only
- * gathers the effective date / destination and shows the outcome.
+ * "Open my class roster" plus the membership changes that hang off a
+ * roster row: transfer a currently-enrolled learner to another section, end
+ * their enrollment, or — only for a placement entered *today* — correct it
+ * into the right section. Transfer/end are effective-dated and preserve the
+ * prior placement as history (the Rust side sets an end date, never
+ * deletes); a same-day correction has no effective date at all — it
+ * updates the same placement's section in place, once, because the strict
+ * half-open interval policy refuses a same-day transfer as a zero-length
+ * interval (see `docs/adr/0042-*`'s Wave 2S addendum). All three are
+ * enforced at the Tauri command boundary — this screen only gathers the
+ * inputs and shows the outcome.
  *
  * Every membership change targets the exact `membershipId` carried on the
  * roster row. If the placement changed in another tab/session since this
  * roster loaded, the command refuses (returns `notCurrent` /
- * `membershipNotFound` / `destinationNotFound`) rather than acting on a
- * different membership, and this screen shows a "refresh and try again"
- * recovery instead of a silent wrong write.
+ * `membershipNotFound` / `destinationNotFound` / `alreadyCorrected` /
+ * `notEnteredToday`) rather than acting on a different membership, and this
+ * screen shows a "refresh and try again" recovery instead of a silent
+ * wrong write.
  *
  * Opening the screen makes two sequential command calls — `listSections()`
  * then `roster()` — on purpose: the section list is re-fetched (rather than
@@ -468,7 +484,7 @@ export function SectionRosterScreen({
           return;
         }
         applyTransferFailure(result, member);
-      } else {
+      } else if (kind === "end") {
         const result = await sectionService.endMembership({
           learnerId: member.learnerId,
           membershipId: member.membershipId,
@@ -486,6 +502,26 @@ export function SectionRosterScreen({
           return;
         }
         applyEndFailure(result, member);
+      } else {
+        const result = await sectionService.correctSameDayPlacement({
+          learnerId: member.learnerId,
+          membershipId: member.membershipId,
+          toSectionId: destinationId,
+          asOfDate,
+        });
+        if (result.kind === "corrected") {
+          const destination = otherSections.find((candidate) => candidate.id === destinationId);
+          setConfirmation(
+            `${member.familyName}, ${member.givenName}'s placement today was corrected to ${
+              destination ? destination.name : "the selected section"
+            }.`,
+          );
+          closeAction(false);
+          loadRoster(section);
+          headingRef.current?.focus();
+          return;
+        }
+        applyCorrectionFailure(result);
       }
     } catch (err) {
       setPanelError(
@@ -532,7 +568,7 @@ export function SectionRosterScreen({
           "effectiveOn",
           `The effective date must be after the day this learner joined the section (${formatIsoDate(
             member.startsOn,
-          )}). Choose a later date.`,
+          )}). Choose a later date — or, if this placement was entered today by mistake, cancel and use “Correct today's placement” instead.`,
         );
         break;
       case "dependentRecordConflict":
@@ -567,7 +603,7 @@ export function SectionRosterScreen({
           "effectiveOn",
           `The effective date must be after the day this learner joined the section (${formatIsoDate(
             member.startsOn,
-          )}). Choose a later date.`,
+          )}). Choose a later date — or, if this placement was entered today by mistake, cancel and use “Correct today's placement” instead.`,
         );
         break;
       case "dependentRecordConflict":
@@ -576,6 +612,34 @@ export function SectionRosterScreen({
       default: {
         const exhaustive: never = result;
         throw new Error(`unhandled end-enrollment outcome: ${String(exhaustive)}`);
+      }
+    }
+  }
+
+  function applyCorrectionFailure(result: Exclude<CorrectPlacementResult, { kind: "corrected" }>) {
+    switch (result.kind) {
+      case "notFound":
+      case "notCurrent":
+      case "notEnteredToday":
+      case "alreadyCorrected":
+      case "destinationNotFound":
+        // The roster you acted from is out of date -- the placement moved,
+        // was already corrected, or is no longer today's. One recovery:
+        // refresh and start over.
+        enterStaleConflict();
+        break;
+      case "sameSection":
+        showFieldError(
+          "destination",
+          "That is the section this placement is already recorded in. Choose a different section.",
+        );
+        break;
+      case "dependentRecordConflict":
+        showFieldError("destination", correctionDependentRecordMessage(result.record));
+        break;
+      default: {
+        const exhaustive: never = result;
+        throw new Error(`unhandled correction outcome: ${String(exhaustive)}`);
       }
     }
   }
@@ -933,6 +997,19 @@ export function SectionRosterScreen({
                             >
                               End enrollment
                             </button>
+                            {member.startsOn === asOfDate && (
+                              <button
+                                type="button"
+                                disabled={activeAction !== null}
+                                aria-expanded={panelOpen && activeAction?.kind === "correct"}
+                                aria-label={`Correct today's placement for ${member.familyName}, ${member.givenName}`}
+                                onClick={(event) =>
+                                  openAction(member, "correct", event.currentTarget)
+                                }
+                              >
+                                Correct today&rsquo;s placement
+                              </button>
+                            )}
                           </td>
                         </tr>
                         {panelOpen && activeAction && (
@@ -944,7 +1021,9 @@ export function SectionRosterScreen({
                                 aria-label={
                                   activeAction.kind === "transfer"
                                     ? `Transfer ${member.familyName}, ${member.givenName}`
-                                    : `End enrollment for ${member.familyName}, ${member.givenName}`
+                                    : activeAction.kind === "end"
+                                      ? `End enrollment for ${member.familyName}, ${member.givenName}`
+                                      : `Correct today's placement for ${member.familyName}, ${member.givenName}`
                                 }
                               >
                                 <p
@@ -956,7 +1035,9 @@ export function SectionRosterScreen({
                                 >
                                   {activeAction.kind === "transfer"
                                     ? `Transfer ${member.familyName}, ${member.givenName}`
-                                    : `End ${member.familyName}, ${member.givenName}'s enrollment`}
+                                    : activeAction.kind === "end"
+                                      ? `End ${member.familyName}, ${member.givenName}'s enrollment`
+                                      : `Correct ${member.familyName}, ${member.givenName}'s placement today`}
                                 </p>
                                 <p
                                   className="section-roster-action-context"
@@ -991,10 +1072,13 @@ export function SectionRosterScreen({
                                   </>
                                 ) : (
                                   <>
-                                    {activeAction.kind === "transfer" && (
+                                    {(activeAction.kind === "transfer" ||
+                                      activeAction.kind === "correct") && (
                                       <div className="field">
                                         <label htmlFor="section-roster-destination">
-                                          Move to section
+                                          {activeAction.kind === "transfer"
+                                            ? "Move to section"
+                                            : "Correct to section"}
                                         </label>
                                         {otherSections.length === 0 ? (
                                           <p
@@ -1033,48 +1117,54 @@ export function SectionRosterScreen({
                                       </div>
                                     )}
 
-                                    <div className="field">
-                                      <label htmlFor="section-roster-effective-on">
-                                        Effective date
-                                      </label>
-                                      <p
-                                        className="field-hint"
-                                        id="section-roster-effective-on-hint"
-                                      >
-                                        The day the change takes effect. This is usually today —
-                                        change it only if the learner already moved or left on an
-                                        earlier date.
-                                      </p>
-                                      <input
-                                        id="section-roster-effective-on"
-                                        type="date"
-                                        value={effectiveOn}
-                                        min={member.startsOn}
-                                        max={asOfDate}
-                                        onChange={(event) => setEffectiveOn(event.target.value)}
-                                        aria-describedby={
-                                          panelErrorField === "effectiveOn"
-                                            ? "section-roster-effective-on-hint section-roster-panel-error"
-                                            : "section-roster-effective-on-hint"
-                                        }
-                                        aria-invalid={
-                                          panelErrorField === "effectiveOn" ? true : undefined
-                                        }
-                                        required
-                                      />
-                                    </div>
+                                    {activeAction.kind !== "correct" && (
+                                      <div className="field">
+                                        <label htmlFor="section-roster-effective-on">
+                                          Effective date
+                                        </label>
+                                        <p
+                                          className="field-hint"
+                                          id="section-roster-effective-on-hint"
+                                        >
+                                          The day the change takes effect. This is usually today —
+                                          change it only if the learner already moved or left on an
+                                          earlier date.
+                                        </p>
+                                        <input
+                                          id="section-roster-effective-on"
+                                          type="date"
+                                          value={effectiveOn}
+                                          min={member.startsOn}
+                                          max={asOfDate}
+                                          onChange={(event) => setEffectiveOn(event.target.value)}
+                                          aria-describedby={
+                                            panelErrorField === "effectiveOn"
+                                              ? "section-roster-effective-on-hint section-roster-panel-error"
+                                              : "section-roster-effective-on-hint"
+                                          }
+                                          aria-invalid={
+                                            panelErrorField === "effectiveOn" ? true : undefined
+                                          }
+                                          required
+                                        />
+                                      </div>
+                                    )}
 
                                     <p className="section-roster-action-consequence">
                                       {activeAction.kind === "transfer"
                                         ? `${member.givenName}'s place in ${section.name} ends on this date and their place in the new section begins the same day. The time already spent in ${section.name} stays in their records.`
-                                        : `${member.givenName} will no longer appear on this section's roster from this date. The enrollment stays in their records — nothing is deleted.`}
+                                        : activeAction.kind === "end"
+                                          ? `${member.givenName} will no longer appear on this section's roster from this date. The enrollment stays in their records — nothing is deleted.`
+                                          : `This placement was entered today, in ${section.name}. Correcting it changes the recorded section only — it does not create a new enrollment or a new date, and it can only be done once.`}
                                     </p>
 
                                     {mode === "guided" && (
                                       <p className="field-hint">
                                         {activeAction.kind === "transfer"
                                           ? "Use this when a learner moves to another class or section within your school. For a learner leaving the school entirely, use “End enrollment” instead."
-                                          : "Use this when a learner leaves the school or stops attending. It does not remove the learner or any of their past records."}
+                                          : activeAction.kind === "end"
+                                            ? "Use this when a learner leaves the school or stops attending. It does not remove the learner or any of their past records."
+                                            : "Use this only to fix a section chosen by mistake when you enrolled this learner today. For any other change, or once today has passed, use “Transfer” or “End enrollment” instead."}
                                       </p>
                                     )}
 
@@ -1094,7 +1184,8 @@ export function SectionRosterScreen({
                                         className="button-primary"
                                         disabled={
                                           submitting ||
-                                          (activeAction.kind === "transfer" &&
+                                          ((activeAction.kind === "transfer" ||
+                                            activeAction.kind === "correct") &&
                                             otherSections.length === 0)
                                         }
                                       >
@@ -1102,7 +1193,9 @@ export function SectionRosterScreen({
                                           ? "Saving…"
                                           : activeAction.kind === "transfer"
                                             ? "Confirm transfer"
-                                            : "Confirm end of enrollment"}
+                                            : activeAction.kind === "end"
+                                              ? "Confirm end of enrollment"
+                                              : "Confirm correction"}
                                       </button>
                                       <button
                                         type="button"

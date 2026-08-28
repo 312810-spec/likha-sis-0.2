@@ -1,4 +1,5 @@
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -61,4 +62,18 @@ export interface SectionRepository {
     sectionId: string;
     startsOn: string;
   }): Promise<EnrollMembershipResult>;
+  /**
+   * Correct a placement entered *today* into the wrong section — a
+   * same-day data-entry fix, not a transfer (the strict interval policy
+   * refuses a same-day transfer as a zero-length interval). Updates the
+   * same membership row's section in place, once. Never throws for an
+   * expected negative case — those come back as a
+   * {@link CorrectPlacementResult} variant.
+   */
+  correctSameDayPlacement(input: {
+    learnerId: string;
+    membershipId: string;
+    toSectionId: string;
+    asOfDate: string;
+  }): Promise<CorrectPlacementResult>;
 }

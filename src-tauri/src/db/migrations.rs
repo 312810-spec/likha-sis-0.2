@@ -1091,6 +1091,41 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_reference_geo_units_snapshot_level ON reference_geo_units(snapshot_id, level, name);
         "#,
         ),
+        M::up(
+            r#"
+        -- Wave 2S: same-day placement correction. The strict half-open
+        -- membership policy (Wave 2Q) correctly refuses a same-day
+        -- transfer or end -- either would create a zero-length interval --
+        -- which left a placement entered in error today with no safe
+        -- correction path (docs/adr/0042-*, Wave 2Q/2R addenda). Rather
+        -- than a new state machine (a void/re-open pair, which would need
+        -- `idx_one_active_membership_per_learner` widened to admit a
+        -- second `ends_on IS NULL` row per learner -- a much larger,
+        -- higher-risk change touching every "is this membership open"
+        -- query in this schema), the chosen representation is a narrow,
+        -- provenance-preserving in-place correction: the existing open row
+        -- is updated, once, in place. It stays the same row, with the
+        -- same `id`/`created_at`/`starts_on`/`ends_on IS NULL` -- every
+        -- existing query (`current_roster`, `roster_for_section`,
+        -- `is_active_member`, `enrollable_learners`, the one-open-per-
+        -- learner unique index, and Wave 2R's read-only history) needs no
+        -- change and stays truthful automatically.
+        --
+        -- `original_section_id` retains the section the row was first
+        -- created with -- set once, on the first correction only ("this
+        -- is where it started"), never overwritten by a second correction
+        -- attempt (there is no second attempt: `corrected_at IS NOT NULL`
+        -- refuses one). `corrected_at` is both the correction timestamp
+        -- and the single-correction guard. Nothing is deleted and no
+        -- second row is created, so this cannot produce an overlapping,
+        -- multiple-open, or zero-length membership -- see
+        -- `repository::section_membership::correct_same_day_placement`
+        -- and the ADR-0042 Wave 2S addendum for the full decision record
+        -- and the option set it was chosen from.
+        ALTER TABLE section_memberships ADD COLUMN original_section_id TEXT REFERENCES sections(id);
+        ALTER TABLE section_memberships ADD COLUMN corrected_at TEXT;
+        "#,
+        ),
     ])
 }
 

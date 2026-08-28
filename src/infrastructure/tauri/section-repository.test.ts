@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
 import type {
+  CorrectPlacementResult,
   EndEnrollmentResult,
   EnrollMembershipResult,
   EnrollmentCandidate,
@@ -203,5 +204,46 @@ describe("TauriSectionRepository", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("enroll_learner_membership", input);
     expect(got).toEqual(result);
+  });
+
+  it("correctSameDayPlacement invokes correct_same_day_placement with the whole input object", async () => {
+    const result: CorrectPlacementResult = {
+      kind: "corrected",
+      membership: {
+        id: "mem-1",
+        schoolId: "s1",
+        sectionId: "sec-2",
+        learnerId: "l1",
+        startsOn: "2026-08-24",
+        endsOn: null,
+        createdAt: "now",
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const input = {
+      learnerId: "l1",
+      membershipId: "mem-1",
+      toSectionId: "sec-2",
+      asOfDate: "2026-08-24",
+    };
+    const got = await new TauriSectionRepository().correctSameDayPlacement(input);
+
+    expect(mockInvoke).toHaveBeenCalledWith("correct_same_day_placement", input);
+    expect(got).toEqual(result);
+  });
+
+  it("correctSameDayPlacement passes a structured negative outcome back unchanged", async () => {
+    const result: CorrectPlacementResult = { kind: "alreadyCorrected" };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const got = await new TauriSectionRepository().correctSameDayPlacement({
+      learnerId: "l1",
+      membershipId: "mem-1",
+      toSectionId: "sec-2",
+      asOfDate: "2026-08-24",
+    });
+
+    expect(got).toEqual({ kind: "alreadyCorrected" });
   });
 });

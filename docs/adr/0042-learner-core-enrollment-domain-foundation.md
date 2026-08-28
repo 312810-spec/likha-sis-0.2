@@ -828,3 +828,241 @@ entered today. Wave 2S is the next bounded, decision-first slice: evaluate
 an authorized and auditable correction representation that preserves
 history integrity and rejects dependent-record conflicts. It must not
 become a general enrollment-history editor or silent deletion path.
+
+## Addendum (Wave 2S, 2026-08-28): same-day placement correction — in-place section update, not a transfer
+
+Wave 2S closes the gap the Wave 2Q/2R addenda both named: under the strict
+half-open interval policy, a placement whose `starts_on` is today cannot be
+transferred or ended effective-today (both would create `[today, today)`,
+rejected as `ZeroLengthInterval`), and the row cannot be deleted. A teacher
+who fat-fingers the destination section during "Enroll learner" had no safe
+recovery path before this wave.
+
+### Options evaluated
+
+1. **Silent physical deletion** of the erroneous row — rejected outright:
+   an explicit non-goal ("no silent row deletion"), and it also fails
+   "auditable and recoverable" — nothing survives to show a correction
+   happened.
+2. **Physical deletion plus an audit event** — rejected. `audit_log`
+   (ADR-0021) is _deliberately_ scoped to authentication events only —
+   "not a general data-mutation trail, which would be a separate, much
+   larger milestone." Widening that boundary is exactly the kind of
+   layer-reopening `.claude/rules/architecture.md` says to avoid without
+   re-deriving the original decision; it is a bigger call than this wave's
+   brief authorizes. It would also still make the row vanish from Wave
+   2R's history view, reconstructable only by cross-referencing a second
+   table — a materially different (and worse) shape than the alternatives
+   below.
+3. **A retained void/re-open pair** (mark the wrong row `voided_at`, open
+   a fresh membership in the correct section) — the most "generic"-looking
+   option, but its true cost is a foundational one:
+   `idx_one_active_membership_per_learner` (`UNIQUE(learner_id) WHERE
+ends_on IS NULL`) would have to become `WHERE ends_on IS NULL AND
+voided_at IS NULL` so a learner can hold a voided-but-still-`ends_on
+NULL` row alongside a real open one — and every "is this membership
+   current" query in the module (`enroll`, `current_roster`,
+   `roster_for_section`, `roster_for_section_over_range`,
+   `is_active_member`, `enrollable_learners`,
+   `current_membership_for_learner_in_school`) would need the same added
+   predicate to stay correct. That is a structural-invariant change
+   touching the whole domain for a narrow same-day fix — real correctness
+   risk for a wave whose own rules call for "small, reversible changes."
+   It also mints two rows dated the same day, which Wave 2R's history view
+   would show as two spans on one date unless taught a new "voided" display
+   state — a teacher-usability cost with no offsetting benefit here. Kept
+   as **Next Best** (see below), not discarded.
+4. **A separate immutable correction/void ledger** — inherits option 3's
+   same-day-pair display problem, plus its own new table, without
+   resolving option 3's index-widening cost (the membership row still
+   needs a way to stop being "the open one" while `ends_on` stays `NULL`).
+   Strictly worse than option 3 for no offsetting benefit; not adopted.
+5. **Correct the destination section in place, on the same row, once**
+   (RECOMMENDED — see below).
+6. **Retain today's "wait until tomorrow" behavior** (do nothing) —
+   rejected: leaves a real, disclosed teacher-usability gap open when a
+   bounded, safe fix exists; teacher usability sits above offline
+   reliability/maintainability/zero-billing/performance/speed in LIKHA's
+   own priority order.
+7. **Correct the _start date_ in place instead of the section** —
+   considered and dropped: `starts_on` is already defaulted to today and
+   capped at today by the Enroll panel's own date input (`max={asOfDate}`),
+   so a wrong start date on a same-day row has no realistic occurrence;
+   the actual reported failure mode (and the one the Wave 2Q addendum
+   names) is a wrong _section_ choice.
+8. **Reuse `enroll`'s existing same-day `[D, D)` exemption** as the
+   correction primitive (close-old/open-new, same idiom `import::commit`
+   already uses) — rejected: that exemption is scoped and justified
+   specifically for the bulk SF1-import path inside a caller-owned
+   transaction (recorded in the Wave 2Q addendum), not for a
+   teacher-initiated roster action. Reusing it here would both mint the
+   exact zero-length-looking history row option 3/4 already rejected on
+   usability grounds, and quietly widen a debt this project has recorded
+   as "narrow to SF1 import, close when the importer is next reworked" —
+   the opposite of narrowing it.
+
+### Scoring (LIKHA priority order: security/privacy → correctness → DepEd
+
+compliance → teacher usability → offline reliability → maintainability →
+zero billing → performance → speed)
+
+| Option                        | Security                                 | Correctness                                           | Usability                            | Maintainability                                           | Verdict         |
+| ----------------------------- | ---------------------------------------- | ----------------------------------------------------- | ------------------------------------ | --------------------------------------------------------- | --------------- |
+| 1 Silent deletion             | fails (no audit)                         | fails (erases)                                        | n/a                                  | trivial                                                   | Rejected        |
+| 2 Delete + audit event        | reopens ADR-0021 boundary                | history-reconstruction cost                           | poor (row vanishes)                  | widens audit_log's scope                                  | Rejected        |
+| 3 Void + re-open              | sound if built correctly                 | sound but wide blast radius                           | same-day-pair display gap            | touches 7 existing queries + the structural index         | Next Best       |
+| 4 Separate ledger             | sound                                    | same index gap as #3, plus a new table                | same display gap                     | worst                                                     | Rejected        |
+| 5 In-place section correction | sound (capability-gated, session-scoped) | sound, narrow, reuses existing dependent-record guard | clean (row unchanged except section) | smallest (2 nullable columns, 0 existing queries touched) | **Recommended** |
+| 6 Status quo                  | n/a                                      | n/a                                                   | fails (leaves the gap)               | trivial                                                   | Rejected        |
+| 7 Correct start date          | n/a                                      | doesn't address the real defect                       | n/a                                  | n/a                                                       | Rejected        |
+| 8 Reuse `enroll` exemption    | sound                                    | widens an already-flagged debt                        | same display gap                     | reuses code but for the wrong scope                       | Rejected        |
+
+### Recommended: in-place section correction (Option 5)
+
+`section_membership::correct_same_day_placement(school_id, learner_id,
+membership_id, to_section_id, as_of_date)` updates the _same_ membership
+row's `section_id` in place, exactly once, when and only when:
+
+- the row resolves for `(id, school_id, learner_id)` — a forged/cross-
+  school/wrong-learner id is `NotFound`, indistinguishable from unknown
+  (this module's standing convention);
+- it is still open (`ends_on IS NULL` — otherwise `NotCurrent`, matching
+  `end_membership`/`transfer_membership`'s stale-roster handling exactly);
+- `starts_on` equals the caller-supplied `as_of_date` — otherwise
+  `NotEnteredToday`. `as_of_date` is client-supplied, the same established
+  convention every other date in this module already uses
+  (`effective_on`/`as_of_date`/`starts_on` are never server-clock-derived
+  anywhere in this codebase); this is a workflow guard, not a security
+  boundary — the Tauri IPC boundary here is same-device, not adversarial,
+  so trusting the client's own "today" is consistent with the existing
+  threat model, not a new gap;
+- it has not already been corrected — `corrected_at IS NULL`, otherwise
+  `AlreadyCorrected`. A correction is a one-time fix for a data-entry slip,
+  not a repeatable edit;
+- `to_section_id` resolves within the school (`DestinationNotFound`) and
+  differs from the current section (`SameSection`);
+- no attendance or scored-grade record already exists for this learner in
+  the _current_ section — reusing `dependent_records_stranded` with a
+  **zero-width interval** (`interval_end = Some(starts_on)`), which makes
+  every existing record in that section count as stranded unless another
+  retained membership already explains it. This is deliberate reuse, not
+  new SQL: since the row is about to stop covering the current section
+  entirely, _any_ dependent record there is now orphaned, which is exactly
+  what a zero-width call to the existing helper already expresses.
+
+On success the row keeps its original `id`/`created_at`/`starts_on`/
+`ends_on` — only `section_id` changes — and gains
+`original_section_id` (the section it was first created with, set once)
+and `corrected_at` (also the single-correction guard). Migration 21 adds
+both as nullable columns; no existing query, index, or struct changes,
+because "is this membership open/current" is still exactly `ends_on IS
+NULL` everywhere. Wave 2R's read-only history view reflects the corrected
+section automatically, with no code change of its own, because it is the
+same row.
+
+This satisfies every implementation-boundary gate the brief requires:
+authorized by `Capability::ManageLearners` at the command boundary;
+`school_id` session-derived; targets one exact membership and refuses
+stale/forged ids; limited to today; refuses on a dependent-record
+conflict; atomic (one transaction, one guarded `UPDATE` with an
+affected-row check); auditable and recoverable (the original section is
+retained in the row itself, not merely implied); never erases anything —
+by construction, a same-day row this operation is allowed to touch has, by
+the same dependent-record guard, never yet been depended on by any other
+record, so there is nothing "historical" about the value being replaced;
+creates no new row, so it structurally cannot produce an overlapping,
+multiple-open, or zero-length membership; returns a typed
+`CorrectPlacementOutcome`, never a leaked SQL/internal error; safe on
+retry/double-submit (`corrected_at IS NULL` in the guarded `UPDATE`'s
+`WHERE` clause makes a race or a resubmission land on `NotCurrent` /
+`AlreadyCorrected`, never a second write); identical in Efficient/
+Comfortable/Guided (mode only varies explanatory copy, same as
+Transfer/End); and accessible loading/confirmation/conflict/error/focus
+behavior, reusing the exact house pattern Transfer/End already established.
+
+### Next Best: void + re-open (Option 3)
+
+Recorded as the durable fallback with an explicit switch condition:
+**adopt this when a correction is needed for a placement that already has
+dependent records, or beyond the same-day window** — cases Option 5
+deliberately fails closed on rather than attempting. That is a genuinely
+different, larger product decision (what does "correcting" a placement
+with real attendance/grades under it even mean — a new span, a note, a
+supersession chain?) and was not evidence-backed enough to build
+speculatively this wave.
+
+### UI
+
+`SectionRosterScreen` gains a third row action, **"Correct today's
+placement,"** shown only when a row's `startsOn` equals the roster's own
+frozen "today" (`asOfDate`) — every other row still shows only Transfer
+and End, unchanged. It opens the same inline-panel house pattern as
+Transfer/End: a destination-section picker (reusing the exact
+`otherSections` list transfer already computes, so the current section is
+never offerable), **no effective-date field at all** (there is nothing to
+date — it is always today, and showing a redundant always-today date input
+would be pure noise), one Confirm, and mode-invariant explanatory copy.
+Outcomes: `corrected` → success banner + roster refresh + focus to the
+page heading; `notFound`/`notCurrent`/`notEnteredToday`/`alreadyCorrected`/
+`destinationNotFound` → the same stale-conflict refresh recovery
+Transfer/End already use (all five mean "the world moved since this
+roster loaded"); `sameSection` → inline fixable field error; a
+`dependentRecordConflict` → an inline message naming the category and
+explaining there is no later date to pick this time (unlike a backdated
+transfer/end conflict) — the fix is to leave the placement as recorded
+and use an ordinary transfer once today has passed.
+
+### Verification (run this session)
+
+Rust: 15 new unit tests in `repository::section_membership` (in-place
+update; forged learner; cross-school forged row; forged membership id;
+stale/already-ended row; not-entered-today; double-submit/second-attempt-
+after-correction both refused; unknown/cross-school destination; same-
+section refusal; attendance conflict; attendance covered by a retained
+prior stint is _not_ a false conflict; a real scored-grade conflict built
+via the full grading-computation chain, mirroring
+`grading_computation`'s own integration-test setup; malformed date shapes;
+a real two-SQLCipher-connection race proving exactly one correction
+commits) plus 9 new command-boundary tests in `tests/enrollment.rs`
+(authorized Registrar/School Head success, Teacher rejection, no-session
+rejection, cross-school membership id, forged membership id, stale +
+already-corrected double submit, not-entered-today). `cargo test` — 539
+lib (up from 524) + all integration binaries green, including the new
+`enrollment.rs` cases (39/39). `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean.
+
+TypeScript: `CorrectPlacementResult` mirrors `CorrectPlacementOutcome`
+exactly (serde `tag = "kind"` ↔ discriminated union). `SectionRepository`
+port + `TauriSectionRepository` adapter + `SectionApplicationService`
+(shape validation only, Rust authoritative) gained
+`correctSameDayPlacement`; every existing `SectionRepository`
+implementer (9: the Tauri adapter, the dev-preview fixture, and 7 test
+doubles) updated for the widened port. `SectionRosterScreen.test.tsx`
+gained 19 tests: action visibility gated to today's-own row only, success
+
+- refresh, stale-conflict + not-entered-today (via the same recovery),
+  dependent-record-conflict messaging, cancel-restores-focus, focus-to-
+  panel-heading on open, three-mode parity, and axe coverage of the open
+  panel, the dependent-record-conflict state, and Guided mode. `npm run
+quality` green: typecheck, eslint, `prettier --check`,
+  `check:architecture`, 562/562 vitest (60 files, up from 543). `npm run
+build` and `check:dev-preview-isolation` pass. `npm run harness:verify`
+  still exactly 100/100, certified, unchanged — the harness was not
+  reopened.
+
+### Independent review + retained debt
+
+A bounded self-review covered: school isolation/probe resistance (forged
+membership and forged learner both collapse to `NotFound`, matching every
+sibling verb); the atomic guarded-`UPDATE` race behavior (proven with a
+real two-connection test, not just asserted); that the dependent-record
+reuse is sound reasoning, not a coincidence (a zero-width interval makes
+`dependent_records_stranded`'s existing "is this record covered by
+_some_ retained membership" check do exactly the right thing without new
+SQL); that no existing query's "is this membership current" definition
+changed; and the UI's stale-conflict/focus/mode-parity conventions match
+Transfer/End exactly rather than diverging. Retained debt, recorded in
+`docs/VERIFICATION-DEBT.md`: the native NVDA/Narrator pass (now also
+covering the correction panel and its dependent-record-conflict state);
+no independent (non-self) review was dispatched for this bounded,
+narrowly-scoped slice.
