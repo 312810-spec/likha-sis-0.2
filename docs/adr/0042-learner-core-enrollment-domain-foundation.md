@@ -759,3 +759,72 @@ debt after this wave: the native NVDA/Narrator pass (now covering
 Enroll + Transfer + End), `enroll`'s same-day `[D, D)` exemption, and
 the "correct a placement entered today" affordance. This addendum is
 the durable record; no separate ADR.
+
+## Addendum (Wave 2R, 2026-08-28): read-only learner enrollment history — reuse the school-scoped query
+
+Wave 2R exposes the history query established by the original Wave 2A
+decision to teachers from the existing Learner List. It is deliberately
+a read-only vertical slice: no schema migration, new Rust command,
+membership mutation, history deletion/editor, SF1 importer change,
+cloud path, or authorization-policy change.
+
+### Reuse and boundary decisions
+
+The authoritative path remains
+`commands::section::list_learner_enrollment_history` →
+`section_membership::list_by_learner_in_school`. The command derives
+`school_id` from the active session; the SQL constrains both `school_id`
+and `learner_id`, returns closed and open spans, and orders by
+`starts_on ASC`. Reads retain ADR-0042's existing active-session
+convention; Wave 2R does not invent a capability for data the signed-in
+teacher could already read through the command.
+
+The frontend adds a purpose-specific `EnrollmentHistoryRepository`
+rather than widening `SectionRepository` and forcing every unrelated
+section/attendance/class-record test double to implement a learner-centric
+query. `TauriEnrollmentHistoryRepository` invokes only the existing
+command and sends only `learnerId`; school scope remains impossible for
+the client to select.
+
+`EnrollmentHistoryApplicationService` validates the id and maps raw
+memberships to a minimal UI projection: membership id for React identity,
+section name/grade/school year, and start/end dates. It resolves labels
+through the already session-scoped section directory. A retained
+membership whose section label cannot resolve is still shown as
+`Section record unavailable`; silently dropping it would falsify history.
+An empty membership result returns immediately without depending on the
+separate label lookup.
+
+### Teacher surface and failure behavior
+
+Each Learner List row has one disclosure button. Opening it loads on
+demand and shows oldest-first placements with `Started`, `Ended`, or
+`Current placement` copy. Loading, authoritative empty, generic error +
+retry, and unresolved-section states are explicit. A request token stops
+a slower response from an earlier learner selection replacing the active
+panel. Starting profile editing closes history, so the row never exposes
+two competing interaction modes.
+
+Efficient, Comfortable, and Guided have functional parity; Guided adds
+only a short explanation that the record is read-only and ordered oldest
+to newest. The synthetic dev preview wires the exact production screen.
+The browser gate opens a past+current history, verifies the displayed
+dates/states, checks 390px horizontal overflow, and runs axe WCAG A/AA.
+
+### Verification and retained decisions
+
+Local frontend canonical verification passed 543/543 tests (60 files),
+plus production build, dev-preview isolation, 31/31 targeted history
+tests, `git diff --check`, and the locked harness verifier at 100/100.
+Feature `05ad2e85` passed Security `33180045501` and Quality
+`33180045507`: Rust and frontend canonical suites, Ubuntu
+Playwright/axe/reflow, Windows canonical, and Windows-native Tauri build.
+The first loaded local full-suite attempt produced three unrelated
+user-event timing failures; each passed in isolation and the canonical
+rerun passed completely, so no timeout was raised to hide the signal.
+
+Wave 2R does not resolve the strict-policy recovery gap for a placement
+entered today. Wave 2S is the next bounded, decision-first slice: evaluate
+an authorized and auditable correction representation that preserves
+history integrity and rejects dependent-record conflicts. It must not
+become a general enrollment-history editor or silent deletion path.

@@ -1,5 +1,39 @@
 # ACTIVE PLAN
 
+## Wave 2R: read-only learner enrollment history (added 2026-08-28) — complete
+
+Full record: `docs/adr/0042-*` Wave 2R addendum;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 2R
+entry; `docs/VERIFICATION-DEBT.md` Wave 2R entry.
+
+**Scope delivered:** from each Learner List row, load and display the
+learner's retained section-placement spans, oldest first, using the
+already school-scoped `list_learner_enrollment_history` command. Show
+section/grade/school-year labels, start/end/current state, and complete
+loading/empty/error/retry behavior. No write surface, migration, new
+capability, SF1 change, cloud path, or history deletion.
+
+**Architecture:** new narrow `EnrollmentHistoryRepository` → Tauri
+adapter → `EnrollmentHistoryApplicationService` → existing
+`LearnerListScreen`. The service maps raw memberships to a minimal UI
+projection and resolves labels through the existing session-scoped
+section directory. It preserves retained rows whose label cannot resolve
+and avoids the label query entirely for an authoritative empty history.
+
+**Verification:** local canonical frontend gate 543/543 tests; build and
+dev-preview isolation green; harness 100/100; targeted history 31/31.
+Feature `05ad2e85` passed Security `33180045501` and Quality
+`33180045507`, including Rust, Playwright/axe, phone-width overflow,
+Windows canonical, and Windows-native Tauri build.
+
+**Next planned wave (not started): Wave 2S** — decide and prove a
+narrow, authorized, auditable same-day correction path for a current
+placement entered in error. It must preserve history integrity, reject
+dependent-record conflicts, and must not become a general history editor
+or deletion surface.
+
+---
+
 ## Harness v2 certification (added 2026-08-28) — complete
 
 Corrected candidate `5a4b75d3` passed Quality `33175058626` and Security
@@ -7,9 +41,8 @@ Corrected candidate `5a4b75d3` passed Quality `33175058626` and Security
 Operating mode is now one wave per user continuation: finish final CI,
 write the wave report, record the exact next slice, and stop.
 
-**Next planned wave (not started): Wave 2R** — read-only learner
-enrollment history, reusing `list_learner_enrollment_history`; no editor,
-deletion, SF1 import change, cloud sync, or authorization-policy change.
+Wave 2R completed at feature `05ad2e85`; the harness remained locked.
+The exact next slice is Wave 2S above.
 
 ---
 

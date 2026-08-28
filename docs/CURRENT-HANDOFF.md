@@ -1,5 +1,70 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-28 — Wave 2R: read-only learner enrollment history, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2R addendum;
+`docs/PROJECT-MEMORY.md` Wave 2R entry; `docs/ACTIVE-PLAN.md` Wave 2R
+entry; `docs/VERIFICATION-DEBT.md` Wave 2R entry. Same branch
+(`claude/likha-sis-wave2a-learner-core`). Harness v2 stayed locked and
+still computes **100/100**.
+
+**Repository truth verified first:** branch and fresh clone both started
+at certified lock commit `cd6462b`; Security `33177160647` and Quality
+`33177160646` completed successfully (Ubuntu canonical + Playwright/axe;
+Windows canonical + native Tauri build). `main` remained untouched.
+
+**What shipped** (feature commit `05ad2e85`):
+
+- Reused the existing Rust/SQLite path exactly as scoped:
+  `list_learner_enrollment_history` →
+  `section_membership::list_by_learner_in_school`. No migration, new
+  command, history editor, deletion, or authorization-policy change.
+- Added a narrow TS `EnrollmentHistoryRepository`, Tauri adapter, and
+  `EnrollmentHistoryApplicationService`. The service validates the
+  learner id, discards raw school/learner ids from its UI projection,
+  and joins same-school section name/grade/year labels. Empty history is
+  authoritative without requiring the label lookup; a missing retained
+  section label remains visible as `Section record unavailable` rather
+  than dropping the history row.
+- Learner List now has one per-row disclosure. It loads on demand and
+  shows oldest-first past/current placements, teacher-friendly dates,
+  loading, empty, error + retry, and stale-request protection. Efficient,
+  Comfortable, and Guided keep identical functionality; Guided adds one
+  read-only explanation. Editing closes the disclosure rather than
+  allowing competing row modes.
+- The synthetic dev preview now wires this exact production screen and
+  repository seam. `quality:ui` opens Ana Santos's two-span history,
+  verifies past/current copy, checks phone-width horizontal reflow, and
+  runs axe WCAG A/AA.
+
+**Verification:** local `npm run quality` completed with **543/543**
+Vitest tests (60 files), plus build, dev-preview isolation, targeted
+history 31/31, `git diff --check`, and `npm run harness:verify` exactly
+100/100. One loaded full-suite attempt exposed three pre-existing
+user-event timing flakes; all passed in isolation and the unchanged
+canonical rerun passed; the final post-record run passed 543/543. Local Playwright execution was unavailable
+because this machine has no Chromium binary; CI ran it authoritatively.
+Feature CI: Security `33180045501` + Quality `33180045507`, both
+`completed/success`, including all Rust tests, Ubuntu browser/a11y/reflow,
+Windows canonical checks, and the native Tauri build.
+
+**Review:** bounded self-review covered school isolation/probe resistance,
+architecture boundaries, stale async responses, empty/error recovery,
+three-mode parity, heading order, keyboard disclosure semantics, and
+phone overflow. The heading-order defect found by axe was fixed before
+the feature checkpoint. No independent agent review was performed for
+this read-only reuse slice; native NVDA/Narrator remains recorded debt.
+
+**Exact next wave (not started): Wave 2S — controlled same-day placement
+correction decision + proof.** First evaluate a narrowly authorized,
+auditable way to correct a current placement entered today without a
+general history editor or silent deletion. Implement only if the policy
+preserves membership/history integrity and blocks corrections once
+dependent attendance/grade records exist. No learner deletion, bulk
+history editing, SF1 redesign, cloud sync, or learner-photo work.
+
+---
+
 ## Harness v2 certification (2026-08-28 — COMPLETE, 100/100, LOCKED)
 
 Full record: `docs/adr/0054-final-harness-v2-certification.md`;
@@ -18,10 +83,9 @@ Full record: `docs/adr/0054-final-harness-v2-certification.md`;
   after final CI green, write the wave report, identify the next slice,
   and stop. Never begin the next wave without a new user instruction.
 
-**Exact next wave:** Wave 2R — read-only learner enrollment history in
-the existing learner/section workflow, reusing
-`list_learner_enrollment_history`; no history editing, deletion, SF1
-import changes, cloud sync, or new authorization policy.
+Wave 2R completed at feature checkpoint `05ad2e85` without reopening
+the harness. Exact next wave is the bounded Wave 2S correction decision
+described above.
 
 ---
 

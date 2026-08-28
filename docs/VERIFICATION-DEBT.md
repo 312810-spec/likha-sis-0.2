@@ -1,5 +1,36 @@
 # Verification Debt
 
+## Wave 2R — read-only learner enrollment history (2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2R addendum;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/ACTIVE-PLAN.md` Wave 2R entry.
+
+- **Native screen-reader pass remains owed.** Automated axe is clean in
+  jsdom and the Ubuntu Playwright gate; the browser gate also proves the
+  history disclosure at 390px has no horizontal overflow. A packaged
+  Windows NVDA/Narrator pass must still confirm disclosure-state
+  announcement, loading/error live announcements, ordered-list reading,
+  and 200%/400% reflow. This extends the standing Learner List native
+  accessibility debt; it is not evidence that the surface is inaccessible.
+- **Local browser binary unavailable.** `npm run quality:ui` could not
+  launch locally because Playwright Chromium is not installed on this
+  machine. CI Quality `33180045507` installed Chromium and passed the
+  exact workflow, axe, and phone-reflow assertions. Closure on this
+  machine: install the pinned Playwright browser without changing project
+  dependencies; CI remains authoritative meanwhile.
+- **Same-day correction is deliberately still open.** Wave 2R is
+  read-only and does not weaken the strict no-zero-length policy or add a
+  deletion/editor path. Wave 2S must evaluate an auditable correction
+  representation and dependent-record gate before adding any mutation.
+- **Enrollment status/end reason remains deferred.** The history can
+  truthfully show dates and current/past state, but not why a placement
+  ended; no reason taxonomy was guessed. Revisit with authoritative SF1
+  requirements.
+
+**Review note:** a bounded security/architecture/UX/accessibility
+self-review found and fixed one heading-order defect. No independent
+agent review was performed for this read-only reuse slice.
+
 ## Wave 2Q — safe learner enrollment + membership-integrity closure (2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/CURRENT-HANDOFF.md`

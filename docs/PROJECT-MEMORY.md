@@ -1870,6 +1870,40 @@ Fidelity` preserved and now enforced inside `resolve`).
   persistence/migration was built. Next work is an unrelated
   teacher-facing production slice (see `CURRENT-HANDOFF.md`).
 
+## Wave 2R — read-only learner enrollment history (added 2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2R addendum;
+`docs/VERIFICATION-DEBT.md` Wave 2R entry. Fourth teacher-visible
+enrollment increment.
+
+- **Reused the authoritative read path:**
+  `list_learner_enrollment_history` →
+  `section_membership::list_by_learner_in_school`, whose SQL constrains
+  both `school_id` and `learner_id`, returns every retained span, and
+  orders oldest first. No Rust/domain write, migration, or capability
+  change.
+- **Narrow frontend seam:** `EnrollmentHistoryRepository` +
+  `TauriEnrollmentHistoryRepository` +
+  `EnrollmentHistoryApplicationService`. Raw membership scope ids do not
+  enter the UI projection. Same-school section labels are resolved via
+  the existing section directory; missing labels do not erase history.
+  Empty history skips the independent label lookup.
+- **UI:** one per-learner disclosure on Learner List; past/current spans,
+  friendly dates, loading/empty/error+retry, async stale-response guard,
+  only one history panel at a time, edit/history conflict avoided.
+  Efficient/Comfortable/Guided parity; Guided explanation only.
+- **Deterministic browser proof:** synthetic dev preview wires the exact
+  production screen; Playwright opens a two-span history, verifies past
+  and current content, asserts no phone-width horizontal overflow, then
+  runs axe.
+- **Verification/checkpoint:** local `npm run quality` 543/543, build,
+  dev-preview isolation, history 31/31, harness 100/100. Feature
+  `05ad2e85` — Security `33180045501` + Quality `33180045507`, both
+  successful, including Windows-native build. `main` untouched.
+- **Next:** Wave 2S is a decision-first, narrowly authorized and
+  auditable same-day placement-correction proof; not a general history
+  editor or silent deletion path.
+
 ## Wave 2Q — safe learner enrollment + membership-integrity closure (added 2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/VERIFICATION-DEBT.md`
