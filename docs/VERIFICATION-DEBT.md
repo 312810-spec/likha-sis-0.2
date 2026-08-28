@@ -1,5 +1,53 @@
 # Verification Debt
 
+## Wave 2T — SF1/SF9 official-form generation UI (2026-08-28)
+
+Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/ACTIVE-PLAN.md` Wave 2T entry.
+
+**Closed:**
+
+- **SF1/SF9 generation is now reachable from a real teacher screen** —
+  previously fully built and tested but completely unreachable from the
+  UI (Wave 3/2I). Not a fidelity closure (see below, unchanged) — a
+  reachability closure.
+
+**Newly recorded debt:**
+
+1. **`SectionRosterScreen` still has no Playwright/axe browser
+   coverage.** Pre-existing since Wave 2O (that screen was never wired
+   into the dev-preview fixture by any prior wave) — not newly caused
+   or newly closed this wave. The new SF1/SF9 actions inherit this gap
+   along with Enroll/Transfer/End/Correct. jsdom + axe cover the SF1
+   success state; the SF9 success/error states reuse the identical
+   `Alert` component and were judged low marginal risk but were not
+   separately axe-checked — disclosed rather than assumed covered.
+2. **Official SF1/SF9 fidelity remains `NOT_VERIFIED`** — unchanged
+   from Wave 3/2I; this wave changes who can reach the generator, not
+   its evidence state. The on-screen disclosure states this plainly.
+3. **The Next Best candidate (duplicate-learner-candidate warning on
+   Create Learner) remains unbuilt** — evaluated, scored, recorded with
+   its own switch condition, not implemented this wave (exactly one
+   bounded slice was in scope).
+4. **Teaching Assignment / Class Schedule UI (7 commands) and a
+   PSGC/address-entry UI remain unbuilt** — evaluated and explicitly
+   not selected this wave (too large / no evidenced need), not silently
+   dropped. See the ADR-0049 Wave 2T addendum for the full scoring.
+5. **Native NVDA/Narrator verification remains owed and was newly
+   confirmed infeasible in this specific session's environment** — a
+   remote Linux container with no Windows machine, no screen-reader
+   software, and no physical device. Recorded honestly per this wave's
+   own brief rather than skipped silently or faked.
+6. **SF1-importer integrity debt (strict zero-length rule +
+   `l.school_id` JOIN predicate on `enroll`/`roster_for_section*`)
+   remains open** — evaluated this wave; repository evidence does not
+   currently justify reopening the importer (`tests/sf1_import.rs`
+   stayed 12/12 green, no new defect found). Unchanged from its Wave
+   2P/2Q recording.
+7. **This branch (`claude/likha-sis-wave2t-teacher-slice`) has not been
+   pushed** — owner authorization needed before push; see
+   `docs/CURRENT-HANDOFF.md`.
+
 ## Wave 2S — same-day placement correction (2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/CURRENT-HANDOFF.md`

@@ -1,6 +1,117 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-28 — Wave 2S: same-day placement correction, COMPLETE)
+## Active Task (2026-08-28 — Wave 2T: SF1/SF9 official-form generation UI, COMPLETE)
+
+Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/PROJECT-MEMORY.md`
+Wave 2T entry; `docs/ACTIVE-PLAN.md` Wave 2T entry;
+`docs/VERIFICATION-DEBT.md` Wave 2T entry. **New dedicated branch**
+`claude/likha-sis-wave2t-teacher-slice`, created from exactly
+`49695d3a8547daacaa31c9b7506792e04ed3a267` (Wave 2S's own final,
+CI-confirmed HEAD on `claude/likha-sis-wave2a-learner-core`/
+`claude/likha-sis-wave2s-placement-0ixw5v`) — the Wave 2S branch itself
+was not modified or force-updated. Harness v2 stayed locked and still
+computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`; the assigned checkpoint
+`49695d3a` confirmed a genuine ancestor of the live
+`claude/likha-sis-wave2s-placement-0ixw5v` branch tip (`8258c8c`, one
+purely-documentation commit ahead, itself independently CI-green) — the
+checkpoint was not stale or divergent. Final Security Gate `33208042186`
+and final Quality Gate `33208042221` reconfirmed `completed/success` for
+`49695d3a` (both the Ubuntu canonical `quality:full` + Playwright/axe UI
+gate and the Windows canonical `quality:full` + native Tauri build, per
+each job's own step list). `npm run harness:verify` reconfirmed exactly
+100/100, certified, unchanged, before any Wave 2T work began.
+
+**No candidate was pre-selected.** Every registered Tauri command (69)
+was cross-checked against every frontend `invoke()` call site to find
+real, evidence-backed unfinished teacher workflows rather than inferring
+gaps from filenames — 16 commands had zero frontend caller. At least six
+credible candidates were scored against LIKHA's priorities (full table
+in the ADR-0049 Wave 2T addendum): SF1/SF9 official-form generation UI
+(**Recommended**); a duplicate-learner-candidate warning on Create
+Learner (**Next Best**); a Teaching Assignment/Class Schedule UI (7
+unwired commands — real value, but too large for one bounded slice);
+a PSGC/address-entry UI (rejected — no shipped form/export reads address
+data, repeating a "collect ahead of evidenced need" mistake this project
+already declined once at M17); the carried SF1-importer-integrity debt
+(repository evidence does not currently justify reopening the importer —
+`tests/sf1_import.rs` stayed 12/12 green, no new defect found); and the
+carried native NVDA/Narrator verification (genuinely infeasible in this
+remote Linux-container session — no Windows machine, no screen reader,
+no physical device — recorded honestly, not faked or silently skipped).
+
+**What shipped**: `SectionRosterScreen` gained a section-level "Generate
+SF1 (School Register)" button and a per-row "Generate SF9 (Report Card)"
+action, exposing the already-built, already-tested
+`generate_sf1_form`/`generate_sf9_form` Tauri commands (Wave 3/2I) to
+teachers for the first time. **No Rust change was needed at all** — the
+commands, their session-only authorization convention (already matching
+every sibling export command), and their command-boundary test coverage
+already existed; this wave is purely a new TS port
+(`FormGenerationRepository`, kept separate from `SectionRepository`/
+`ExportRepository` per this codebase's one-port-per-concern convention)
+→ Tauri adapter → `FormGenerationApplicationService` → UI. Neither
+action opens a confirmation panel (unlike Transfer/End/Correct — form
+generation mutates no membership state and is safely repeatable), and
+both share the screen's existing `anyActionInFlight` gate with every
+membership action so nothing can run concurrently. An always-visible
+(all three modes) disclosure states both templates are synthetic and
+`NOT_VERIFIED` against an authoritative DepEd source — not a new policy
+call, but the same disclosure-not-refusal stance this project has
+shipped since M10's SF2 export, applied to a new surface.
+
+**Verification** (all run this session): no Rust change; `cargo test`
+re-confirmed zero regression — 539 lib + every integration binary,
+including `tests/formgen.rs` 10/10, unchanged from the Wave 2S
+checkpoint. `cargo fmt --check`/`cargo clippy --all-targets -- -D
+warnings` clean. `npm run quality` — **585/585 vitest** (60 files; +22:
+4 adapter, 8 service, ~10 net new UI tests covering action visibility,
+success/error/recovery for both forms, the shared in-flight gate, three-
+mode parity, and one axe pass), typecheck/eslint/format/architecture
+clean. `npm run build` + `check:dev-preview-isolation` pass. `npm run
+harness:verify` still exactly 100/100, unchanged — not reopened. `npm
+run quality:full` green end to end. `gitleaks`/`cargo-deny`/
+`osv-scanner` (installed in the Wave 2S session, still present this
+session) all ran clean — no new dependency was added this wave.
+`git diff --check` clean. `npx knip` — no new findings.
+
+**Review**: a bounded self-review covered authorization (unchanged,
+session-only, matching every sibling export command's own already-
+reviewed convention), staleness (a `null` result from either command —
+a section/learner/membership no longer resolving — surfaces as a plain-
+language recovery message, never a crash or silent no-op), concurrency
+(the shared `anyActionInFlight` gate proven by a dedicated test), the
+`Alert` component's existing `role="alert"`/`role="status"` convention
+(confirmed correct for both success and error banners, no new ARIA
+authored), and teacher-facing copy (the SF9 button's visible label was
+widened from "Generate SF9" to "Generate SF9 (Report Card)" during this
+review, for the same explicit clarity the SF1 button's label already
+had — its `aria-label` was already fully descriptive, so this was a
+visible-label-only fix, not an accessibility defect). No independent
+(non-self) agent review was dispatched for this bounded slice.
+
+**Checkpoint**: feature commit `820d1b2` (full SHA
+`820d1b22616a8836d5553d5ed496039724a7aa65`), local only — CI run ids
+recorded once pushed. **This branch has not been pushed**; see "Push
+authorization needed" below. `main`
+`d9ab0368dbc9218186578c9617810f48fe7a41fc` untouched throughout,
+confirmed both before and after this wave's work.
+
+**Exact next wave (not started)**: the Next Best candidate from this
+wave — a duplicate-learner-candidate warning wired into `LearnerListScreen`'s
+existing Create Learner flow, using the already-built, already-tested
+`find_learner_candidates` command (currently unreachable from any UI, exactly
+like SF1/SF9 were before this wave). Alternatives by LIKHA priority order,
+carried forward: the native NVDA/Narrator pass (now also covering the SF1/SF9
+actions); a narrower, purpose-scoped slice of the Teaching Assignment/Class
+Schedule UI, if a bounded first increment can be identified; the SF1-importer
+debt, once genuine evidence justifies reopening it.
+
+---
+
+## Note — Active Task (2026-08-28 — Wave 2S: same-day placement correction, COMPLETE, superseded above)
 
 Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/PROJECT-MEMORY.md`
 Wave 2S entry; `docs/ACTIVE-PLAN.md` Wave 2S entry;

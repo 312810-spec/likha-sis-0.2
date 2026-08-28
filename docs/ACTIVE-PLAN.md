@@ -1,5 +1,82 @@
 # ACTIVE PLAN
 
+## Wave 2T: SF1/SF9 official-form generation UI (added 2026-08-28) — complete
+
+Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2T entry;
+`docs/VERIFICATION-DEBT.md` Wave 2T entry. **New branch**
+`claude/likha-sis-wave2t-teacher-slice`, created from `49695d3a` (Wave
+2S's own CI-confirmed final HEAD) — Wave 2S's branch was not modified.
+
+**Repository truth verified first**: `main` untouched at `d9ab0368`;
+`49695d3a` confirmed a genuine, non-stale ancestor of the live
+`claude/likha-sis-wave2s-placement-0ixw5v` tip; final Security Gate
+`33208042186` + Quality Gate `33208042221` reconfirmed
+`completed/success` for that exact commit via each job's own step list;
+`npm run harness:verify` reconfirmed 100/100 before any work began.
+
+**No candidate pre-selected — evaluated from repository evidence.** All
+69 registered Tauri commands cross-checked against every frontend
+`invoke()` call site: 16 had zero caller. Scored at least six credible
+candidates (full table + scoring in the ADR-0049 addendum):
+**Recommended and built** — SF1/SF9 official-form generation UI, exposing
+`generate_sf1_form`/`generate_sf9_form` (fully built and tested since
+Wave 3/2I, never reachable from any screen). **Next Best** — a
+duplicate-learner-candidate warning on Create Learner, using the
+already-built `find_learner_candidates` command (also never wired to
+any UI); switch condition: pick this instead if the SF1/SF9 fidelity
+disclosure had turned out to require product-policy input this session
+could not safely give itself — it did not, since the disclosure-not-
+refusal stance was already independently decided and shipped repeatedly
+since M10. Evaluated and correctly not selected: a Teaching Assignment/
+Class Schedule UI (7 unwired commands, too large for one bounded slice);
+a PSGC/address-entry UI (no evidenced consumer); the carried SF1-
+importer debt (no fresh evidence justifies reopening it); the carried
+native NVDA/Narrator pass (genuinely infeasible in this remote Linux
+session — disclosed, not faked).
+
+**Scope delivered**: a section-level "Generate SF1 (School Register)"
+button and a per-row "Generate SF9 (Report Card)" action on
+`SectionRosterScreen`. Zero Rust changes — the backend, its
+session-only authorization convention, and its command-boundary tests
+already existed; this wave is a new `FormGenerationRepository` port →
+`TauriFormGenerationRepository` adapter → `FormGenerationApplicationService`
+→ UI. No confirmation panel for either action (no membership state is
+mutated, both are safely repeatable) — reuses the plain single-click
+export-button pattern `MonthlySummaryScreen`'s SF2 export already
+established. An always-visible (all three modes) notice discloses both
+templates are synthetic/`NOT_VERIFIED`, before either button is used.
+
+**Architecture**: `FormGenerationRepository` kept separate from
+`SectionRepository`/`ExportRepository`, matching the established
+one-port-per-concern convention. Both new actions and every existing
+membership action on the screen now share one `anyActionInFlight` gate.
+
+**Verification**: no Rust change; `cargo test` 539 lib + all
+integration binaries incl. `tests/formgen.rs` 10/10, unchanged from
+Wave 2S — zero regression. `cargo fmt --check`/`cargo clippy
+--all-targets -- -D warnings` clean. `npm run quality` 585/585 vitest
+(+22), typecheck/eslint/format/architecture clean. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run harness:verify` still
+exactly 100/100, unchanged. `npm run quality:full` green end to end.
+`gitleaks`/`cargo-deny`/`osv-scanner` all clean (no new dependency).
+`git diff --check` clean; `npx knip` no new findings.
+
+**Checkpoint**: feature commit `820d1b2` (full SHA
+`820d1b22616a8836d5553d5ed496039724a7aa65`), local only — CI run ids
+recorded once pushed. This branch is **not yet pushed**; owner
+authorization needed (see
+`docs/CURRENT-HANDOFF.md`). `main` `d9ab0368` untouched.
+
+**Next planned wave (not started)**: the Next Best candidate — a
+duplicate-learner-candidate warning on Create Learner. Alternatives
+carried forward, by LIKHA priority order: the native NVDA/Narrator pass
+(now also covering SF1/SF9); a narrower first increment of the Teaching
+Assignment/Class Schedule UI, if one can be bounded; the SF1-importer
+debt, once evidence justifies it.
+
+---
+
 ## Wave 2S: same-day placement correction (added 2026-08-28) — complete
 
 Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/CURRENT-HANDOFF.md`

@@ -1870,6 +1870,61 @@ Fidelity` preserved and now enforced inside `resolve`).
   persistence/migration was built. Next work is an unrelated
   teacher-facing production slice (see `CURRENT-HANDOFF.md`).
 
+## Wave 2T — SF1/SF9 official-form generation UI (added 2026-08-28)
+
+Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/VERIFICATION-DEBT.md`
+Wave 2T entry. **New branch** `claude/likha-sis-wave2t-teacher-slice`,
+created from `49695d3a` (Wave 2S's CI-confirmed final HEAD); the Wave
+2S branch itself was not modified. No candidate was pre-selected — all
+69 registered Tauri commands were cross-checked against every frontend
+`invoke()` call site (16 had zero caller) to find real unfinished
+teacher workflows, not inferred from filenames.
+
+- **Recommended and built**: expose the already-built, already-tested
+  `generate_sf1_form`/`generate_sf9_form` commands (Wave 3/2I,
+  registered since those waves but never reachable from any screen) via
+  a new section-level "Generate SF1" button and per-row "Generate SF9"
+  action on `SectionRosterScreen`. **Zero Rust changes** — only a new
+  `FormGenerationRepository` port (kept separate from
+  `SectionRepository`/`ExportRepository`, one-port-per-concern
+  convention) → adapter → `FormGenerationApplicationService` → UI.
+  Neither action opens a confirmation panel (no membership state is
+  mutated, both are safely repeatable) — reuses the plain single-click
+  export-button pattern already established for SF2/report-card CSV
+  exports. An always-visible (all three modes) notice discloses both
+  templates remain `Synthetic`/`NOT_VERIFIED` (`formgen::evidence`'s own
+  registered state, unchanged since Wave 3/2I) — the same disclosure-
+  not-refusal stance this project has shipped since M10, applied to a
+  new surface, not a new policy call.
+- **Next Best (not built, recorded)**: a duplicate-learner-candidate
+  warning wired into Create Learner, using the already-built
+  `find_learner_candidates` command (also never wired to any UI —
+  "for a Registrar to compare before deciding... never auto-merged," per
+  its own doc comment).
+- **Evaluated and correctly not selected**: a Teaching Assignment/Class
+  Schedule UI (7 unwired `teaching_assignment::*` commands — real value,
+  but too large for one bounded slice, and more School-Head-
+  administrative than a daily teacher workflow); a PSGC/address-entry UI
+  (no shipped form/export reads address data — building it now would
+  repeat the "collect ahead of evidenced need" mistake M17 already
+  declined once); the carried SF1-importer debt (no fresh evidence
+  justifies reopening it — `tests/sf1_import.rs` stayed 12/12 green);
+  the carried native NVDA/Narrator pass (genuinely infeasible in this
+  remote Linux-container session — no Windows machine, no screen reader
+  — disclosed honestly rather than faked or silently skipped).
+- **Verification/checkpoint**: no Rust change; `cargo test` 539 lib + all
+  integration binaries incl. `formgen.rs` 10/10, unchanged from Wave
+  2S — zero regression. `npm run quality` 585/585 vitest (+22); build +
+  dev-preview isolation pass; harness 100/100, unchanged.
+  `gitleaks`/`cargo-deny`/`osv-scanner` all clean, no new dependency.
+  `npm run quality:full` green end to end. Feature commit `820d1b2`,
+  local only — CI run ids recorded once pushed; this branch awaits
+  owner push authorization (see `docs/CURRENT-HANDOFF.md`). `main`
+  untouched.
+- **Next**: the Next Best duplicate-learner-candidate warning, or the
+  native screen-reader pass, or a bounded first increment of the
+  Teaching Assignment/Class Schedule UI — no candidate pre-selected.
+
 ## Wave 2S — same-day placement correction (added 2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/VERIFICATION-DEBT.md`
