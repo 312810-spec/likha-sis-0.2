@@ -55,8 +55,12 @@ green end to end. `gitleaks`/`cargo-deny`/`osv-scanner` were installed
 fresh this session (none present at session start) and all three passed
 clean locally — a first for this project; every prior wave disclosed
 this as a per-machine gap with CI as the only authority. Feature commit
-`1ca2103`; final commit + CI run ids recorded in `CURRENT-HANDOFF.md`
-once green.
+`1ca2103` (Security Gate `33207512841` `completed/success`); final
+commit `49695d3` — Security Gate `33208042186` + Quality Gate
+`33208042221`, both `completed/success` (Ubuntu canonical
+`quality:full` + Playwright/axe/reflow; Windows canonical `quality:full`
+
+- native Tauri build).
 
 **Next planned wave (not started):** re-evaluate against repository
 evidence at the next checkpoint — no candidate pre-selected. Candidates
