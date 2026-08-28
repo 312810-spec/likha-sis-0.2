@@ -1,37 +1,34 @@
-# Autonomous Continuous Development Mode
+# Autonomous Wave Development Mode
 
-This is LIKHA's default operating mode (adopted 2026-08-24, directed by
-the user). It supersedes any older instruction, ADR note, or handoff
-text implying "finish a milestone → stop → ask the user what's next."
-Where such text still exists in `docs/`, treat it as historical record,
-not current instruction — mark it superseded in place rather than
-deleting it (see `docs/CURRENT-HANDOFF.md`'s "Current Goal" section for
-an example of a marked-superseded block).
+This is LIKHA's default operating mode, revised by the owner on
+2026-08-28. Work autonomously within one active wave. A wave ends only
+after its required verification and final CI complete. At that boundary,
+record the checkpoint, produce the required summary, identify the exact
+next slice, and stop. Never begin the next wave without a new user
+instruction to continue.
 
 ## The loop
 
 Understand → Research → Specify → Plan → Implement → Test → Review →
-Update Memory → Stable Checkpoint → Select Next Highest-Value Work →
-Continue.
+Update Memory → Stable Checkpoint → Wave Summary → Stop.
 
-**A Stable Checkpoint does not mean stop.** At each milestone boundary:
+At each wave boundary:
 
 1. Run the required verification.
 2. Record the real results (never claim a check passed unless it
    actually ran).
 3. Update ADRs, memory, handoff, source registry, and roadmap as
    appropriate.
-4. Evaluate the next work using current evidence and LIKHA's priorities.
-5. Use the 10-scenario decision process where a genuine architecture
-   decision is required (see below — it is not an approval request).
-6. Select the next milestone autonomously.
-7. Continue implementation.
+4. Produce the copy-ready Markdown delivery report required by
+   `CLAUDE.md`.
+5. Evaluate and record the exact next slice using current evidence and
+   LIKHA's priorities, without implementing it.
+6. Stop and wait for the user to continue.
 
-Do not wait for the user merely because an M-number has completed.
+## Wave and next-slice selection
 
-## Autonomous milestone selection
-
-When several next tasks are viable, select using LIKHA's established
+When several tasks inside the active wave—or candidates for the recorded
+next slice—are viable, select using LIKHA's established
 priority order (from `CLAUDE.md`):
 
 privacy/security → correctness → DepEd compliance → teacher usability →
@@ -54,17 +51,16 @@ applies. Do not run it when an existing ADR's pattern already settles
 the question — extending an established pattern (e.g. seeding another
 versioned reference-data row) is not a new architecture decision.
 
-## Do NOT stop for these
+## Do NOT stop before the active wave is complete for these
 
-Do not stop merely because: a milestone completed; tests passed; an ADR
-was written; a stable checkpoint was reached; the roadmap lists a "next
-candidate"; several technical candidates exist; the next milestone needs
-research; a new architecture decision requires the scenario process;
+Do not stop mid-wave merely because: an internal milestone completed;
+tests passed; an ADR was written; the roadmap lists a "next candidate";
+several technical candidates exist; the current wave needs research; a
+new architecture decision requires the scenario process;
 independent review has debt; a reviewer harness fails under the
 established retry rule (below); documentation says "pick M_/M_/etc.";
-or an earlier handoff says "no candidate pre-selected." Where the
-documentation itself says one of these things, that documentation
-statement is superseded by this rule, not still-current guidance.
+or an earlier handoff says "no candidate pre-selected." The completed
+wave boundary is the mandatory stopping point.
 
 ## Genuine human approval gates
 
@@ -123,7 +119,7 @@ reviews in later sessions when the harness appears healthy.
 
 ## Verification still matters
 
-Continuous development does not mean skipping checkpoints. Before
+Autonomous wave development does not mean skipping checkpoints. Before
 considering a milestone complete: run the relevant test suites; run
 lint/clippy/typecheck/build/architecture checks; verify migrations;
 verify authorization/isolation; run relevant native smoke checks when
@@ -134,7 +130,7 @@ failure is proven unrelated and explicitly documented.
 
 ## Scope discipline still applies
 
-Autonomous continuation does not mean implementing everything. At every
+Autonomous wave execution does not mean implementing everything. At every
 milestone: keep scope tight; prefer one excellent reusable pattern;
 avoid unrelated refactors; do not invent missing DepEd rules; do not
 expand PII collection unnecessarily; do not broaden a milestone merely
@@ -146,19 +142,16 @@ uncontrolled feature expansion.
 ## Roadmap behavior
 
 Treat the roadmap (`docs/CURRENT-HANDOFF.md`, `docs/PROGRESS-MAP.md`) as
-a living priority map, not a sequence of mandatory approval gates. After
-every milestone: if new evidence changes the best sequence, update the
-roadmap and proceed with the better sequence; if an old candidate
+a living priority map. Within the active wave, if new evidence changes
+the best sequence, update the roadmap and proceed safely; if an old candidate
 becomes obsolete, record why it was superseded; if a newly discovered
 foundational defect exists, prefer repairing the foundation before
-adding dependent features; if no new evidence changes the roadmap,
-continue directly to the next planned milestone. Do not ask the user to
-"pick the next milestone" unless the choice genuinely meets one of the
-approval gates above.
+adding dependent features. At final CI green, record the next planned
+slice and stop without implementing it.
 
 ## Session/context safety
 
-Autonomous continuation applies within practical session limits. Before
+Autonomous execution applies within one wave and practical session limits. Before
 context becomes unsafe or the session clearly approaches resource
 exhaustion: finish the smallest safe unit of work; run relevant
 verification; update `CURRENT-HANDOFF.md` and `ACTIVE-PLAN.md`; record
@@ -169,8 +162,8 @@ insufficient context/time left to complete and verify it safely.
 
 ## Final rule
 
-Checkpoint ≠ Stop. Milestone completion ≠ Ask permission. Research or
-decision work ≠ Human approval gate. Default behavior: verify → document
-→ decide → continue. Stop only for a real approval gate, a blocking
-safety/correctness issue, an explicit user instruction, or a practical
-session/resource boundary.
+Internal checkpoint ≠ wave completion. Once the active wave's final CI
+is green: verify → document → summarize → record the exact next slice →
+stop. Earlier stops remain required for real approval gates, blocking
+safety/correctness issues, explicit user instructions, or practical
+session/resource boundaries.

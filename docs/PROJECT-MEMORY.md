@@ -673,23 +673,29 @@ vector before any code from it was ever run on this machine. See
 
 ## Operating Mode
 
-**Autonomous Continuous Development Mode (adopted 2026-08-24, directed
-by the user)** — full rule in `.claude/rules/autonomous-development.md`,
-concise pointer in `CLAUDE.md`. A completed milestone is a checkpoint,
-not a stopping point: verify it, record it in ADRs/handoff/memory, then
-autonomously select and continue to the next highest-value work using
-LIKHA's priority order, without waiting for the user to name the next
-M-number. This supersedes prior handoff language implying "stop after a
-milestone and ask what's next" — that language is marked superseded in
-place in `docs/CURRENT-HANDOFF.md`, not deleted. Stopping is still
-required for a short, fixed list of genuine human approval gates
+**Autonomous Wave Development Mode (revised 2026-08-28, owner-directed)**
+— full rule in `.claude/rules/autonomous-development.md`, concise pointer
+in `CLAUDE.md`. Work continues autonomously within one active wave. Once
+that wave's final CI is green, verify and record the checkpoint, produce
+the copy-ready wave summary, identify the exact next slice, and stop.
+Never begin another wave until the user asks to continue. This
+supersedes the 2026-08-24 cross-wave Continuous Development instruction.
+Stopping earlier is still required for genuine human approval gates
 (irreducible product-policy choices, external material only the user can
 provide, paid infrastructure, a production PII/security gate, a
 destructive/irreversible operation, unresolvable missing DepEd
 compliance evidence, or an explicit user instruction to stop) and for
 practical session/context boundaries — see the rule file for the full
 list and for how reviewer-harness failures are handled without becoming
-an automatic stop.
+an automatic mid-wave stop.
+
+**LIKHA Production Harness v2.0 (certified 2026-08-28, 100/100,
+locked).** ADR-0054 adds a repository-local inventory/state/scorecard,
+deterministic anti-drift certification, 14-day metadata health checks,
+a real Playwright + axe UI gate, and a Windows-native Tauri build gate.
+Corrected candidate `5a4b75d3` passed Quality `33175058626` and Security
+`33175058671`; zero fatal overrides. Future harness changes require a
+new owner-authorized unlock and the same certification protocol.
 
 ## Development Resource Assumption
 

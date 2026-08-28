@@ -48,7 +48,7 @@ narrowly-triggered procedures live in `.claude/skills/` — read the
 relevant one when the task matches it rather than expecting this file to
 contain everything.
 
-The Claude Code harness is **LIKHA Production Harness v2.0 — candidate**
+The Claude Code harness is **LIKHA Production Harness v2.0 — certified and locked**
 (`docs/adr/0054-final-harness-v2-certification.md`). Do not open a new
 tooling/MCP/plugin/agent/skill/hook optimization wave. Change it only
 for a production blocker, an important security/correctness defect, a
@@ -75,17 +75,13 @@ Rules:
 - Never reopen a milestone already marked complete without a new
   instruction to do so.
 
-**Default mode is Autonomous Continuous Development** — see
+**Default mode is Autonomous Wave Development** — see
 `.claude/rules/autonomous-development.md` for the full loop and rules.
-In short: a completed milestone is a checkpoint, not a stopping point.
-Verify it, record it, then autonomously select and continue to the next
-highest-value work using LIKHA's priority order above. Stop only for a
-genuine human approval gate (irreducible product-policy choice, external
-material only the user can provide, paid infrastructure, a production
-PII/security gate, a destructive/irreversible operation, unresolvable
-missing compliance evidence, explicit user instruction to stop) or a
-practical session/context boundary — never merely because an M-number
-completed.
+Work autonomously within the active wave. After that wave's final CI is
+green, record the checkpoint, produce the wave summary, identify the
+exact next slice, and **stop**. Do not begin another wave until the user
+asks to continue. Genuine approval and safety gates can still stop a
+wave earlier.
 
 ## Completion
 

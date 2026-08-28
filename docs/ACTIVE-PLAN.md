@@ -1,5 +1,18 @@
 # ACTIVE PLAN
 
+## Harness v2 certification (added 2026-08-28) — complete
+
+Corrected candidate `5a4b75d3` passed Quality `33175058626` and Security
+`33175058671`; deterministic harness score exactly 100/100; v2 relocked.
+Operating mode is now one wave per user continuation: finish final CI,
+write the wave report, record the exact next slice, and stop.
+
+**Next planned wave (not started): Wave 2R** — read-only learner
+enrollment history, reusing `list_learner_enrollment_history`; no editor,
+deletion, SF1 import change, cloud sync, or authorization-policy change.
+
+---
+
 ## Wave 2Q: safe learner enrollment + membership-integrity closure (added 2026-08-28) — complete
 
 Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/CURRENT-HANDOFF.md`

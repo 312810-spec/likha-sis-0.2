@@ -1,6 +1,6 @@
 # ADR-0054 — Final LIKHA Production Harness v2 certification
 
-- Status: Candidate (owner-authorized update window open)
+- Status: Accepted — certified and locked at 100/100
 - Date: 2026-08-28
 - Extends: ADR-0052
 
@@ -22,4 +22,10 @@ This certifies harness capability, not release readiness. Native NVDA/Narrator v
 
 ## Evidence
 
-Pending unlocked-candidate CI. Final workflow run identifiers and the locked commit will be recorded here before the harness is relocked.
+The first remote candidate (`c803c9c`) passed Security and the canonical Ubuntu gate but exposed a stale UI-smoke fixture count; it remained unlocked. Corrected candidate `5a4b75d3fae256ceb2eb23916d11f1d88512c914` then passed:
+
+- Quality Gate `33175058626`: Ubuntu canonical gate, Playwright workflow, axe WCAG A/AA smoke, Windows canonical gate, and Windows-native Tauri debug build — all `completed/success`.
+- Security Gate `33175058671`: gitleaks, cargo-deny, and OSV-Scanner — all `completed/success`.
+- `npm run harness:verify`: all immutable ADR-0052 dimensions pass, exactly **100/100**, zero fatal overrides.
+
+The harness is therefore relocked. Future harness changes require a new owner-authorized unlock and must repeat this certification protocol.

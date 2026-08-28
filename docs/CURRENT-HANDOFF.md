@@ -1,5 +1,30 @@
 # CURRENT HANDOFF
 
+## Harness v2 certification (2026-08-28 — COMPLETE, 100/100, LOCKED)
+
+Full record: `docs/adr/0054-final-harness-v2-certification.md`;
+`.harness/{state,inventory,scorecard}.json`.
+
+- Owner-authorized final unlock completed without changing ADR-0052's
+  weights or fatal overrides.
+- Corrected candidate `5a4b75d3` passed Quality Gate `33175058626`
+  (Ubuntu canonical + Playwright/axe; Windows canonical + native Tauri
+  build) and Security Gate `33175058671` (gitleaks, cargo-deny, OSV), all
+  `completed/success`.
+- `npm run harness:verify` computes exactly **100/100**, certification
+  `certified`, with zero fatal overrides. Harness v2 is relocked; future
+  changes require a new owner-authorized unlock and full recertification.
+- Operating mode revised by owner: work autonomously within one wave;
+  after final CI green, write the wave report, identify the next slice,
+  and stop. Never begin the next wave without a new user instruction.
+
+**Exact next wave:** Wave 2R — read-only learner enrollment history in
+the existing learner/section workflow, reusing
+`list_learner_enrollment_history`; no history editing, deletion, SF1
+import changes, cloud sync, or new authorization policy.
+
+---
+
 ## Active Task (2026-08-28 — Wave 2Q: safe learner enrollment + membership-integrity closure, COMPLETE)
 
 Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/PROJECT-MEMORY.md`
