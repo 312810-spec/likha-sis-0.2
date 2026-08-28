@@ -4,6 +4,7 @@ import { AttendanceApplicationService } from "../application/attendance-service"
 import { AuthApplicationService } from "../application/auth-service";
 import { ClassRecordApplicationService } from "../application/class-record-service";
 import { ExportApplicationService } from "../application/export-service";
+import { EnrollmentHistoryApplicationService } from "../application/enrollment-history-service";
 import { GradingApplicationService } from "../application/grading-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import { LearnerScoreApplicationService } from "../application/learner-score-service";
@@ -14,6 +15,7 @@ import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
+import { LearnerListScreen } from "../ui/LearnerListScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "../ui/components/WorkbenchNav";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
@@ -26,6 +28,7 @@ import {
   FixtureAuthRepository,
   FixtureClassRecordRepository,
   FixtureExportRepository,
+  FixtureEnrollmentHistoryRepository,
   FixtureGradingRepository,
   FixtureLearnerRepository,
   FixtureLearnerScoreRepository,
@@ -57,7 +60,12 @@ const authService = new AuthApplicationService(new FixtureAuthRepository());
 const exportService = new ExportApplicationService(new FixtureExportRepository());
 const gradingService = new GradingApplicationService(new FixtureGradingRepository());
 const learnerService = new LearnerApplicationService(new FixtureLearnerRepository());
-const sectionService = new SectionApplicationService(new FixtureSectionRepository());
+const sectionRepository = new FixtureSectionRepository();
+const sectionService = new SectionApplicationService(sectionRepository);
+const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
+  new FixtureEnrollmentHistoryRepository(),
+  sectionRepository,
+);
 const subjectService = new SubjectApplicationService(new FixtureSubjectRepository());
 const classRecordService = new ClassRecordApplicationService(new FixtureClassRecordRepository());
 const assessmentService = new AssessmentApplicationService(new FixtureAssessmentRepository());
@@ -120,6 +128,12 @@ export function DevPreviewApp() {
                 ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
                 : undefined
             }
+          />
+        ) : activeTab === "learners" ? (
+          <LearnerListScreen
+            learnerService={learnerService}
+            exportService={exportService}
+            enrollmentHistoryService={enrollmentHistoryService}
           />
         ) : activeTab === "class-records" ? (
           <ClassRecordsScreen

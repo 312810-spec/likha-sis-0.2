@@ -4,6 +4,7 @@ import {
   attendanceService,
   authService,
   classRecordService,
+  enrollmentHistoryService,
   exportService,
   gradingService,
   learnerScoreService,
@@ -147,7 +148,11 @@ function App() {
                 onViewAuditLog={() => setActiveTab("audit-log")}
               />
             ) : activeTab === "learners" ? (
-              <LearnerListScreen learnerService={learnerService} exportService={exportService} />
+              <LearnerListScreen
+                learnerService={learnerService}
+                exportService={exportService}
+                enrollmentHistoryService={enrollmentHistoryService}
+              />
             ) : activeTab === "sections" ? (
               <SectionsScreen
                 sectionService={sectionService}

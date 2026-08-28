@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { EnrollmentHistoryApplicationService } from "../application/enrollment-history-service";
 import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerApplicationService } from "../application/learner-service";
+import type { EnrollmentHistoryEntry } from "../domain/enrollment-history";
 import { ValidationError } from "../domain/errors";
 import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
@@ -11,6 +13,26 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface LearnerListScreenProps {
   learnerService: LearnerApplicationService;
   exportService: ExportApplicationService;
+  enrollmentHistoryService: EnrollmentHistoryApplicationService;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatIsoDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return iso;
+  const [, year, month, day] = match;
+  const monthName = MONTHS[Number(month) - 1];
+  if (!monthName) return iso;
+  return `${Number(day)} ${monthName} ${year}`;
+}
+
+interface OpenHistory {
+  learnerId: string;
+  learnerName: string;
+  entries: EnrollmentHistoryEntry[] | null;
+  loading: boolean;
+  error: boolean;
 }
 
 /** Case-insensitive substring match against given name, family name, or
@@ -28,7 +50,11 @@ function matchesSearch(learner: Learner, query: string): boolean {
   );
 }
 
-export function LearnerListScreen({ learnerService, exportService }: LearnerListScreenProps) {
+export function LearnerListScreen({
+  learnerService,
+  exportService,
+  enrollmentHistoryService,
+}: LearnerListScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editFirstFieldRef = useRef<HTMLInputElement>(null);
@@ -50,6 +76,8 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
   const [savingEdit, setSavingEdit] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<LearnerRosterExportResult | null>(null);
+  const [openHistory, setOpenHistory] = useState<OpenHistory | null>(null);
+  const historyRequestId = useRef(0);
   const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
 
   useEffect(() => {
@@ -87,6 +115,57 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
     };
   }, [learnerService]);
 
+  useEffect(
+    () => () => {
+      historyRequestId.current += 1;
+    },
+    [],
+  );
+
+  async function loadHistory(learner: Learner) {
+    const requestId = historyRequestId.current + 1;
+    historyRequestId.current = requestId;
+    const learnerName = `${learner.givenName} ${learner.familyName}`;
+    setOpenHistory({
+      learnerId: learner.id,
+      learnerName,
+      entries: null,
+      loading: true,
+      error: false,
+    });
+    try {
+      const entries = await enrollmentHistoryService.listForLearner(learner.id);
+      if (historyRequestId.current === requestId) {
+        setOpenHistory({
+          learnerId: learner.id,
+          learnerName,
+          entries,
+          loading: false,
+          error: false,
+        });
+      }
+    } catch {
+      if (historyRequestId.current === requestId) {
+        setOpenHistory({
+          learnerId: learner.id,
+          learnerName,
+          entries: null,
+          loading: false,
+          error: true,
+        });
+      }
+    }
+  }
+
+  function handleToggleHistory(learner: Learner) {
+    if (openHistory?.learnerId === learner.id) {
+      historyRequestId.current += 1;
+      setOpenHistory(null);
+      return;
+    }
+    void loadHistory(learner);
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -115,6 +194,8 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
   function handleStartEdit(learner: Learner) {
     setError(null);
     setConfirmation(null);
+    historyRequestId.current += 1;
+    setOpenHistory(null);
     setEditingId(learner.id);
     setEditGivenName(learner.givenName);
     setEditFamilyName(learner.familyName);
@@ -293,16 +374,86 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
               </li>
             ) : (
               <li key={learner.id}>
-                {learner.givenName} {learner.familyName}
-                {learner.lrn && <span className="learner-lrn"> — LRN {learner.lrn}</span>}
-                <button
-                  type="button"
-                  disabled={editingId !== null}
-                  onClick={() => handleStartEdit(learner)}
-                  aria-label={`Edit ${learner.givenName} ${learner.familyName}`}
-                >
-                  Edit
-                </button>
+                <div className="learner-list-row">
+                  <span>
+                    {learner.givenName} {learner.familyName}
+                    {learner.lrn && <span className="learner-lrn"> — LRN {learner.lrn}</span>}
+                  </span>
+                  <span className="learner-row-actions">
+                    <button
+                      type="button"
+                      disabled={editingId !== null}
+                      aria-expanded={openHistory?.learnerId === learner.id}
+                      aria-controls={`enrollment-history-${learner.id}`}
+                      aria-label={`${
+                        openHistory?.learnerId === learner.id ? "Hide" : "View"
+                      } enrollment history for ${learner.givenName} ${learner.familyName}`}
+                      onClick={() => handleToggleHistory(learner)}
+                    >
+                      {openHistory?.learnerId === learner.id ? "Hide history" : "View history"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={editingId !== null}
+                      onClick={() => handleStartEdit(learner)}
+                      aria-label={`Edit ${learner.givenName} ${learner.familyName}`}
+                    >
+                      Edit
+                    </button>
+                  </span>
+                </div>
+
+                {openHistory?.learnerId === learner.id && (
+                  <section
+                    id={`enrollment-history-${learner.id}`}
+                    className="enrollment-history"
+                    aria-label={`Enrollment history for ${openHistory.learnerName}`}
+                  >
+                    <h3>Enrollment history</h3>
+                    {mode === "guided" && (
+                      <p className="field-hint">
+                        This read-only record shows each section placement from oldest to newest.
+                      </p>
+                    )}
+                    {openHistory.loading && (
+                      <Loading
+                        label={`Loading enrollment history for ${openHistory.learnerName}…`}
+                      />
+                    )}
+                    {openHistory.error && (
+                      <Alert tone="error">
+                        <p>Could not load this learner&rsquo;s enrollment history.</p>
+                        <button type="button" onClick={() => void loadHistory(learner)}>
+                          Try again
+                        </button>
+                      </Alert>
+                    )}
+                    {openHistory.entries?.length === 0 && (
+                      <p>No section placements have been recorded for this learner.</p>
+                    )}
+                    {openHistory.entries && openHistory.entries.length > 0 && (
+                      <ol className="enrollment-history-list">
+                        {openHistory.entries.map((entry) => (
+                          <li key={entry.membershipId}>
+                            <strong>
+                              {entry.sectionName ?? "Section record unavailable"}
+                              {entry.gradeLevel ? ` · Grade ${entry.gradeLevel}` : ""}
+                            </strong>
+                            {entry.schoolYear && (
+                              <span className="field-hint">School year {entry.schoolYear}</span>
+                            )}
+                            <span>
+                              Started {formatIsoDate(entry.startsOn)} ·{" "}
+                              {entry.endsOn
+                                ? `Ended ${formatIsoDate(entry.endsOn)}`
+                                : "Current placement"}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </section>
+                )}
               </li>
             ),
           )}

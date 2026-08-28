@@ -47,6 +47,18 @@ try {
     throw new Error("workspace-to-attendance context was not preserved");
   await page.getByText("0 of 2 marked").waitFor();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("button", { name: "Learners", exact: true }).click();
+  await page.getByRole("heading", { name: "Learners", exact: true }).waitFor();
+  await page.getByRole("button", { name: "View enrollment history for Ana Santos" }).click();
+  await page.getByText("Started 2 Jun 2025 · Ended 1 Apr 2026").waitFor();
+  await page.getByText("Started 1 Jun 2026 · Current placement").waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  if (hasHorizontalOverflow) throw new Error("learner enrollment history overflows at phone width");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("button", { name: "View all sign-in activity" }).click();
   await page
     .getByText(/Sign-in Activity/i)
@@ -62,7 +74,7 @@ try {
   if (blocking.length)
     throw new Error(`axe found blocking violations: ${blocking.map(({ id }) => id).join(", ")}`);
   console.log(
-    `quality:ui PASS — workflow, context handoff, and axe WCAG A/AA (${result.violations.length} non-blocking findings).`,
+    `quality:ui PASS — workflow, enrollment history, phone reflow, context handoff, and axe WCAG A/AA (${result.violations.length} non-blocking findings).`,
   );
 } finally {
   if (browser) await browser.close();

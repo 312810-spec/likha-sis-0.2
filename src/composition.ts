@@ -3,6 +3,7 @@ import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
 import { ExportApplicationService } from "./application/export-service";
+import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
@@ -17,6 +18,7 @@ import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-rep
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
+import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
@@ -41,7 +43,12 @@ export const learnerService = new LearnerApplicationService(new TauriLearnerRepo
 export const userService = new UserApplicationService(new TauriUserRepository());
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());
-export const sectionService = new SectionApplicationService(new TauriSectionRepository());
+const sectionRepository = new TauriSectionRepository();
+export const sectionService = new SectionApplicationService(sectionRepository);
+export const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
+  new TauriEnrollmentHistoryRepository(),
+  sectionRepository,
+);
 export const exportService = new ExportApplicationService(new TauriExportRepository());
 export const gradingService = new GradingApplicationService(new TauriGradingRepository());
 export const subjectService = new SubjectApplicationService(new TauriSubjectRepository());

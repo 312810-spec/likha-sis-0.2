@@ -23,6 +23,7 @@ import type { AttendanceRepository } from "../domain/ports/attendance-repository
 import type { AuthRepository } from "../domain/ports/auth-repository";
 import type { ClassRecordRepository } from "../domain/ports/class-record-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
+import type { EnrollmentHistoryRepository } from "../domain/ports/enrollment-history-repository";
 import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
@@ -246,6 +247,33 @@ export class FixtureSectionRepository implements SectionRepository {
   }
   async enrollMembership(): Promise<never> {
     throw new Error("dev-preview fixture: enrollMembership() is not wired -- read-only fixture");
+  }
+}
+
+const FIXTURE_ENROLLMENT_HISTORY: SectionMembership[] = [
+  {
+    id: "history-l1-past",
+    schoolId: "fixture-school",
+    sectionId: "sec-complete",
+    learnerId: "l1",
+    startsOn: "2025-06-02",
+    endsOn: "2026-04-01",
+    createdAt: "2025-06-02T00:00:00.000Z",
+  },
+  {
+    id: "history-l1-current",
+    schoolId: "fixture-school",
+    sectionId: "sec-not-started",
+    learnerId: "l1",
+    startsOn: "2026-06-01",
+    endsOn: null,
+    createdAt: "2026-06-01T00:00:00.000Z",
+  },
+];
+
+export class FixtureEnrollmentHistoryRepository implements EnrollmentHistoryRepository {
+  async listByLearner(learnerId: string): Promise<SectionMembership[]> {
+    return FIXTURE_ENROLLMENT_HISTORY.filter((entry) => entry.learnerId === learnerId);
   }
 }
 

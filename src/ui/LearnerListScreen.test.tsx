@@ -2,11 +2,14 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExportApplicationService } from "../application/export-service";
+import { EnrollmentHistoryApplicationService } from "../application/enrollment-history-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
+import type { EnrollmentHistoryRepository } from "../domain/ports/enrollment-history-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
+import type { Section, SectionMembership } from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { LearnerListScreen } from "./LearnerListScreen";
@@ -81,18 +84,59 @@ class FakeExportRepository implements ExportRepository {
   }
 }
 
-function renderScreen(learners: Learner[] = []) {
+class FakeEnrollmentHistoryRepository implements EnrollmentHistoryRepository {
+  calls: string[] = [];
+  failuresRemaining = 0;
+
+  constructor(public entries: SectionMembership[] = []) {}
+
+  async listByLearner(learnerId: string): Promise<SectionMembership[]> {
+    this.calls.push(learnerId);
+    if (this.failuresRemaining > 0) {
+      this.failuresRemaining -= 1;
+      throw new Error("offline");
+    }
+    return this.entries.filter((entry) => entry.learnerId === learnerId);
+  }
+}
+
+const HISTORY_SECTIONS: Section[] = [
+  {
+    id: "sec-1",
+    schoolId: "s1",
+    schoolYear: "2025-2026",
+    gradeLevel: "6",
+    name: "Mabini",
+    createdAt: "now",
+  },
+  {
+    id: "sec-2",
+    schoolId: "s1",
+    schoolYear: "2026-2027",
+    gradeLevel: "7",
+    name: "Rizal",
+    createdAt: "now",
+  },
+];
+
+function renderScreen(learners: Learner[] = [], historyEntries: SectionMembership[] = []) {
   const repo = new FakeLearnerRepository(learners);
   const exportRepo = new FakeExportRepository();
+  const historyRepo = new FakeEnrollmentHistoryRepository(historyEntries);
   const result = render(
     <ModeProvider>
       <LearnerListScreen
         learnerService={new LearnerApplicationService(repo)}
         exportService={new ExportApplicationService(exportRepo)}
+        enrollmentHistoryService={
+          new EnrollmentHistoryApplicationService(historyRepo, {
+            list: async () => HISTORY_SECTIONS,
+          })
+        }
       />
     </ModeProvider>,
   );
-  return { ...result, repo, exportRepo };
+  return { ...result, repo, exportRepo, historyRepo };
 }
 
 beforeEach(() => {
@@ -378,6 +422,134 @@ describe("LearnerListScreen", () => {
     await waitFor(() => expect(within(editForm).getByLabelText("Given name")).toHaveFocus());
   });
 
+  it("shows retained past and current section placements in oldest-first order", async () => {
+    const user = userEvent.setup();
+    renderScreen(
+      [
+        {
+          id: "l1",
+          schoolId: "s1",
+          givenName: "Ana",
+          familyName: "Santos",
+          lrn: null,
+          sex: null,
+          createdAt: "now",
+        },
+      ],
+      [
+        {
+          id: "mem-1",
+          schoolId: "s1",
+          sectionId: "sec-1",
+          learnerId: "l1",
+          startsOn: "2025-06-02",
+          endsOn: "2026-04-01",
+          createdAt: "now",
+        },
+        {
+          id: "mem-2",
+          schoolId: "s1",
+          sectionId: "sec-2",
+          learnerId: "l1",
+          startsOn: "2026-06-01",
+          endsOn: null,
+          createdAt: "now",
+        },
+      ],
+    );
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
+    );
+
+    const history = await screen.findByRole("region", {
+      name: "Enrollment history for Ana Santos",
+    });
+    expect(within(history).getByText(/Mabini · Grade 6/)).toBeInTheDocument();
+    expect(within(history).getByText("School year 2025-2026")).toBeInTheDocument();
+    expect(within(history).getByText("Started 2 Jun 2025 · Ended 1 Apr 2026")).toBeInTheDocument();
+    expect(within(history).getByText(/Rizal · Grade 7/)).toBeInTheDocument();
+    expect(within(history).getByText("Started 1 Jun 2026 · Current placement")).toBeInTheDocument();
+  });
+
+  it("shows a distinct empty history state", async () => {
+    const user = userEvent.setup();
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
+    );
+
+    expect(
+      await screen.findByText("No section placements have been recorded for this learner."),
+    ).toBeInTheDocument();
+  });
+
+  it("offers a working retry when history loading fails", async () => {
+    const user = userEvent.setup();
+    const { historyRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    historyRepo.failuresRemaining = 1;
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not load/i);
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByText("No section placements have been recorded for this learner."),
+    ).toBeInTheDocument();
+    expect(historyRepo.calls).toEqual(["l1", "l1"]);
+  });
+
+  it("shows the read-only history explanation only in Guided mode", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
+    );
+
+    expect(
+      await screen.findByText(/read-only record shows each section placement/i),
+    ).toBeInTheDocument();
+  });
+
   it("disables editing another learner while one edit is already in progress", async () => {
     const user = userEvent.setup();
     renderScreen([
@@ -491,6 +663,42 @@ describe("LearnerListScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
     await screen.findByRole("form", { name: "Edit Ana Santos" });
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with enrollment history open", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen(
+      [
+        {
+          id: "l1",
+          schoolId: "s1",
+          givenName: "Ana",
+          familyName: "Santos",
+          lrn: null,
+          sex: null,
+          createdAt: "now",
+        },
+      ],
+      [
+        {
+          id: "mem-1",
+          schoolId: "s1",
+          sectionId: "sec-1",
+          learnerId: "l1",
+          startsOn: "2025-06-02",
+          endsOn: null,
+          createdAt: "now",
+        },
+      ],
+    );
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
+    );
+    await screen.findByText("Started 2 Jun 2025 · Current placement");
 
     await expectNoAccessibilityViolations(container);
   });
