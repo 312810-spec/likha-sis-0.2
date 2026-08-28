@@ -6,6 +6,7 @@ import {
   classRecordService,
   enrollmentHistoryService,
   exportService,
+  formGenerationService,
   gradingService,
   learnerScoreService,
   learnerService,
@@ -166,6 +167,7 @@ function App() {
               rosterSectionId ? (
                 <SectionRosterScreen
                   sectionService={sectionService}
+                  formGenerationService={formGenerationService}
                   sectionId={rosterSectionId}
                   onBack={() => setActiveTab("sections")}
                 />

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { FormGenerationApplicationService } from "../application/form-generation-service";
 import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
+import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
 import type {
   CorrectPlacementResult,
   DependentRecordKind,
@@ -17,6 +19,14 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionRosterScreenProps {
   sectionService: SectionApplicationService;
+  /** Generates the SF1 (School Register) / SF9 (Progress Report Card)
+   * official-form workbooks this screen's "Generate SF1" and per-row
+   * "Generate SF9" actions trigger. A separate service (not folded into
+   * `sectionService`) — form generation is a distinct concern from
+   * membership management, matching the codebase's established
+   * one-port-per-concern convention (e.g. `EnrollmentHistoryRepository`
+   * staying separate from `SectionRepository`). */
+  formGenerationService: FormGenerationApplicationService;
   /** The section whose roster to show. Supplied by the Sections workflow
    * (App.tsx state handoff), never a URL/route param — the same
    * narrowly-typed pattern AttendanceScreen uses for `initialSectionId`.
@@ -127,6 +137,7 @@ type PanelErrorField = "destination" | "effectiveOn" | null;
  */
 export function SectionRosterScreen({
   sectionService,
+  formGenerationService,
   sectionId,
   onBack,
 }: SectionRosterScreenProps) {
@@ -187,6 +198,25 @@ export function SectionRosterScreen({
   const enrollHeadingRef = useRef<HTMLParagraphElement>(null);
   const enrollRestoreFocusRef = useRef(false);
   const enrollRequestRef = useRef(0);
+
+  // --- Official-form generation: "Generate SF1" (section-level, above
+  // the table) and a per-row "Generate SF9" action. Neither mutates
+  // membership state or needs confirmation -- both write a file and
+  // report the result via the same top-of-screen banner area every
+  // other action here already uses. Only one form generates at a time,
+  // and it disables every membership action (and vice versa) so a
+  // teacher never has two writes in flight together.
+  const [sf1Generating, setSf1Generating] = useState(false);
+  const [sf1Result, setSf1Result] = useState<Sf1GenerationResult | null>(null);
+  const [sf1Error, setSf1Error] = useState<string | null>(null);
+  const [sf9GeneratingLearnerId, setSf9GeneratingLearnerId] = useState<string | null>(null);
+  const [sf9Result, setSf9Result] = useState<{
+    member: SectionRosterMember;
+    result: Sf9GenerationResult;
+  } | null>(null);
+  const [sf9Error, setSf9Error] = useState<{ member: SectionRosterMember; message: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -456,6 +486,69 @@ export function SectionRosterScreen({
     });
   })();
 
+  // True while any write -- a membership change or a form generation --
+  // is in flight, or a membership panel is open. Every action button
+  // disables on this, so a teacher never has two writes racing.
+  const anyActionInFlight =
+    activeAction !== null || sf1Generating || sf9GeneratingLearnerId !== null || enrollOpen;
+
+  async function handleGenerateSf1() {
+    if (!section) return;
+    setSf1Error(null);
+    setSf1Result(null);
+    setSf9Result(null);
+    setSf9Error(null);
+    setSf1Generating(true);
+    try {
+      const result = await formGenerationService.generateSf1(section.id, asOfDate);
+      if (result) {
+        setSf1Result(result);
+      } else {
+        setSf1Error(
+          "This section could not be found. It may have been removed since you opened this roster — use “Back to sections” and try again.",
+        );
+      }
+    } catch (err) {
+      setSf1Error(
+        err instanceof ValidationError
+          ? err.message
+          : "This form could not be generated. Check your device and try again.",
+      );
+    } finally {
+      setSf1Generating(false);
+    }
+  }
+
+  async function handleGenerateSf9(member: SectionRosterMember) {
+    setSf9Error(null);
+    setSf9Result(null);
+    setSf1Result(null);
+    setSf1Error(null);
+    setSf9GeneratingLearnerId(member.learnerId);
+    try {
+      const result = await formGenerationService.generateSf9(sectionId, member.learnerId, asOfDate);
+      if (result) {
+        setSf9Result({ member, result });
+      } else {
+        setSf9Error({
+          member,
+          message:
+            "This learner's placement could not be confirmed. Refresh the roster and try again.",
+        });
+      }
+    } catch (err) {
+      setSf9Error({
+        member,
+        message:
+          err instanceof ValidationError
+            ? err.message
+            : "This report card could not be generated. Check your device and try again.",
+      });
+    } finally {
+      setSf9GeneratingLearnerId(null);
+    }
+  }
+
   async function handleConfirm(event: FormEvent) {
     event.preventDefault();
     if (!activeAction || !section) return;
@@ -719,7 +812,7 @@ export function SectionRosterScreen({
                 type="button"
                 ref={enrollTriggerRef}
                 className="section-roster-enroll-trigger"
-                disabled={activeAction !== null}
+                disabled={anyActionInFlight}
                 aria-expanded={false}
                 onClick={openEnroll}
               >
@@ -901,6 +994,42 @@ export function SectionRosterScreen({
             )}
           </div>
 
+          <div className="section-roster-forms">
+            <button type="button" disabled={anyActionInFlight} onClick={handleGenerateSf1}>
+              {sf1Generating ? "Generating…" : "Generate SF1 (School Register)"}
+            </button>
+            <p className="field-hint">
+              SF1 and SF9 use a synthetic, DepEd-style template — neither has been verified against
+              an official DepEd source. Confirm your school&rsquo;s actual SF1/SF9 requirements
+              before treating a generated file as an official record.
+            </p>
+          </div>
+
+          {sf1Error && <Alert tone="error">{sf1Error}</Alert>}
+          {sf1Result && (
+            <Alert tone="success">
+              <p>
+                Saved to <code>{sf1Result.outputPath}</code> ({sf1Result.learnerCount} learner
+                {sf1Result.learnerCount === 1 ? "" : "s"}).
+              </p>
+            </Alert>
+          )}
+          {sf9Error && (
+            <Alert tone="error">
+              Could not generate a report card for {sf9Error.member.familyName},{" "}
+              {sf9Error.member.givenName}: {sf9Error.message}
+            </Alert>
+          )}
+          {sf9Result && (
+            <Alert tone="success">
+              <p>
+                Report card for {sf9Result.member.familyName}, {sf9Result.member.givenName} saved to{" "}
+                <code>{sf9Result.result.outputPath}</code> ({sf9Result.result.subjectCount} subject
+                {sf9Result.result.subjectCount === 1 ? "" : "s"}).
+              </p>
+            </Alert>
+          )}
+
           {rosterState === "loading" && members.length === 0 && <Loading label="Loading roster…" />}
 
           {rosterState === "error" && (
@@ -979,7 +1108,7 @@ export function SectionRosterScreen({
                           <td role="cell" data-label="Actions" className="section-roster-actions">
                             <button
                               type="button"
-                              disabled={activeAction !== null}
+                              disabled={anyActionInFlight}
                               aria-expanded={panelOpen && activeAction?.kind === "transfer"}
                               aria-label={`Transfer ${member.familyName}, ${member.givenName}`}
                               onClick={(event) =>
@@ -990,7 +1119,7 @@ export function SectionRosterScreen({
                             </button>
                             <button
                               type="button"
-                              disabled={activeAction !== null}
+                              disabled={anyActionInFlight}
                               aria-expanded={panelOpen && activeAction?.kind === "end"}
                               aria-label={`End enrollment for ${member.familyName}, ${member.givenName}`}
                               onClick={(event) => openAction(member, "end", event.currentTarget)}
@@ -1000,7 +1129,7 @@ export function SectionRosterScreen({
                             {member.startsOn === asOfDate && (
                               <button
                                 type="button"
-                                disabled={activeAction !== null}
+                                disabled={anyActionInFlight}
                                 aria-expanded={panelOpen && activeAction?.kind === "correct"}
                                 aria-label={`Correct today's placement for ${member.familyName}, ${member.givenName}`}
                                 onClick={(event) =>
@@ -1010,6 +1139,16 @@ export function SectionRosterScreen({
                                 Correct today&rsquo;s placement
                               </button>
                             )}
+                            <button
+                              type="button"
+                              disabled={anyActionInFlight}
+                              aria-label={`Generate SF9 report card for ${member.familyName}, ${member.givenName}`}
+                              onClick={() => handleGenerateSf9(member)}
+                            >
+                              {sf9GeneratingLearnerId === member.learnerId
+                                ? "Generating…"
+                                : "Generate SF9 (Report Card)"}
+                            </button>
                           </td>
                         </tr>
                         {panelOpen && activeAction && (

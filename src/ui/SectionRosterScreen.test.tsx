@@ -1,7 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FormGenerationApplicationService } from "../application/form-generation-service";
 import { SectionApplicationService } from "../application/section-service";
+import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
+import type { FormGenerationRepository } from "../domain/ports/form-generation-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
   CorrectPlacementResult,
@@ -205,17 +208,54 @@ class FakeSectionRepository implements SectionRepository {
   }
 }
 
-function renderScreen(overrides: Partial<FakeSectionRepository> = {}, sectionId = "sec-1") {
+class FakeFormGenerationRepository implements FormGenerationRepository {
+  sf1Calls: Array<{ sectionId: string; asOfDate: string }> = [];
+  sf9Calls: Array<{ sectionId: string; learnerId: string; asOfDate: string }> = [];
+  sf1ToReturn: Sf1GenerationResult | null = null;
+  sf9ToReturn: Sf9GenerationResult | null = null;
+  sf1Error: Error | null = null;
+  sf9Error: Error | null = null;
+
+  async generateSf1(sectionId: string, asOfDate: string): Promise<Sf1GenerationResult | null> {
+    this.sf1Calls.push({ sectionId, asOfDate });
+    if (this.sf1Error) throw this.sf1Error;
+    return this.sf1ToReturn;
+  }
+
+  async generateSf9(
+    sectionId: string,
+    learnerId: string,
+    asOfDate: string,
+  ): Promise<Sf9GenerationResult | null> {
+    this.sf9Calls.push({ sectionId, learnerId, asOfDate });
+    if (this.sf9Error) throw this.sf9Error;
+    return this.sf9ToReturn;
+  }
+}
+
+function renderScreen(
+  overrides: Partial<FakeSectionRepository> = {},
+  sectionId = "sec-1",
+  formOverrides: Partial<FakeFormGenerationRepository> = {},
+) {
   const repo = new FakeSectionRepository();
   Object.assign(repo, overrides);
   const service = new SectionApplicationService(repo);
+  const formRepo = new FakeFormGenerationRepository();
+  Object.assign(formRepo, formOverrides);
+  const formGenerationService = new FormGenerationApplicationService(formRepo);
   const onBack = vi.fn();
   const result = render(
     <ModeProvider>
-      <SectionRosterScreen sectionService={service} sectionId={sectionId} onBack={onBack} />
+      <SectionRosterScreen
+        sectionService={service}
+        formGenerationService={formGenerationService}
+        sectionId={sectionId}
+        onBack={onBack}
+      />
     </ModeProvider>,
   );
-  return { ...result, repo, onBack };
+  return { ...result, repo, formRepo, onBack };
 }
 
 const GUIDED_NOTE = /always your class as it stands today/;
@@ -301,9 +341,17 @@ describe("SectionRosterScreen", () => {
     const repo = new FakeSectionRepository();
     repo.listError = new Error("offline");
     const service = new SectionApplicationService(repo);
+    const formGenerationService = new FormGenerationApplicationService(
+      new FakeFormGenerationRepository(),
+    );
     render(
       <ModeProvider>
-        <SectionRosterScreen sectionService={service} sectionId="sec-1" onBack={vi.fn()} />
+        <SectionRosterScreen
+          sectionService={service}
+          formGenerationService={formGenerationService}
+          sectionId="sec-1"
+          onBack={vi.fn()}
+        />
       </ModeProvider>,
     );
 
@@ -1099,6 +1147,171 @@ describe("SectionRosterScreen", () => {
       .setup()
       .click(screen.getByRole("button", { name: "Correct today's placement for Dris, Eli" }));
     await screen.findByRole("button", { name: "Confirm correction" });
+    await expectNoAccessibilityViolations(container);
+  });
+
+  // --- Wave 2T: official-form generation (SF1/SF9) ---
+
+  it("shows the synthetic-template fidelity notice whenever the roster is ready", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+
+    expect(
+      screen.getByText(/neither has been verified against an official DepEd source/),
+    ).toBeInTheDocument();
+  });
+
+  it("generates an SF1 workbook for the whole section", async () => {
+    const { formRepo } = renderScreen(undefined, "sec-1", {
+      sf1ToReturn: {
+        outputPath: "C:\\Documents\\LIKHA-SIS\\SF1_Mabini.xlsx",
+        learnerCount: 2,
+        templateFormType: "SF1",
+        templateVersion: "synthetic-v1",
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
+
+    expect(
+      await screen.findByText("C:\\Documents\\LIKHA-SIS\\SF1_Mabini.xlsx"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/\(2 learners\)/)).toBeInTheDocument();
+    expect(formRepo.sf1Calls).toEqual([{ sectionId: "sec-1", asOfDate: "2026-08-27" }]);
+  });
+
+  it("shows a recovery message when SF1 generation reports the section as gone", async () => {
+    renderScreen(undefined, "sec-1", { sf1ToReturn: null });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
+
+    expect(await screen.findByText(/could not be found/)).toBeInTheDocument();
+  });
+
+  it("surfaces a thrown SF1 generation error without crashing", async () => {
+    renderScreen(undefined, "sec-1", { sf1Error: new Error("disk full") });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
+
+    expect(await screen.findByText(/could not be generated/)).toBeInTheDocument();
+  });
+
+  it("generates an SF9 report card for one learner", async () => {
+    const { formRepo } = renderScreen(undefined, "sec-1", {
+      sf9ToReturn: {
+        outputPath: "C:\\Documents\\LIKHA-SIS\\SF9_Bautista.xlsx",
+        subjectCount: 3,
+        templateFormType: "SF9",
+        templateVersion: "synthetic-v1",
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Generate SF9 report card for Bautista, Ana" }),
+    );
+
+    expect(await screen.findByText(/Report card for Bautista, Ana saved to/)).toBeInTheDocument();
+    expect(screen.getByText(/3 subjects/)).toBeInTheDocument();
+    expect(formRepo.sf9Calls).toEqual([
+      { sectionId: "sec-1", learnerId: "l-bautista", asOfDate: "2026-08-27" },
+    ]);
+  });
+
+  it("names the learner in an SF9 recovery message when the membership can no longer be confirmed", async () => {
+    renderScreen(undefined, "sec-1", { sf9ToReturn: null });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Generate SF9 report card for Bautista, Ana" }),
+    );
+
+    expect(
+      await screen.findByText(/Could not generate a report card for Bautista, Ana/),
+    ).toBeInTheDocument();
+  });
+
+  it("generating one learner's SF9 does not disturb another learner's row", async () => {
+    renderScreen(undefined, "sec-1", {
+      sf9ToReturn: {
+        outputPath: "C:\\Documents\\LIKHA-SIS\\SF9_Bautista.xlsx",
+        subjectCount: 1,
+        templateFormType: "SF9",
+        templateVersion: "synthetic-v1",
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Generate SF9 report card for Bautista, Ana" }),
+    );
+
+    expect(await screen.findByText(/Report card for Bautista, Ana saved to/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Generate SF9 report card for Cruz, Ben" }),
+    ).toBeInTheDocument();
+  });
+
+  it("disables every other action while a form is generating, and re-enables after", async () => {
+    let resolveSf1: () => void = () => {};
+    const pending = new Promise<null>((resolve) => {
+      resolveSf1 = () => resolve(null);
+    });
+    const { formRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    formRepo.generateSf1 = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
+
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+
+    resolveSf1();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeEnabled(),
+    );
+  });
+
+  it("offers SF1/SF9 generation identically in every teacher mode", async () => {
+    for (const mode of ["efficient", "comfortable", "guided"] as const) {
+      window.localStorage.setItem("likha-sis:teacher-mode", mode);
+      const { unmount } = renderScreen();
+      await screen.findByText("Bautista, Ana");
+      expect(
+        screen.getByRole("button", { name: "Generate SF1 (School Register)" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Generate SF9 report card for Bautista, Ana" }),
+      ).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("has no detectable accessibility violations after generating an SF1 workbook", async () => {
+    const { container } = renderScreen(undefined, "sec-1", {
+      sf1ToReturn: {
+        outputPath: "C:\\Documents\\LIKHA-SIS\\SF1_Mabini.xlsx",
+        learnerCount: 2,
+        templateFormType: "SF1",
+        templateVersion: "synthetic-v1",
+      },
+    });
+    await screen.findByText("Bautista, Ana");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
+    await screen.findByText(/Saved to/);
     await expectNoAccessibilityViolations(container);
   });
 

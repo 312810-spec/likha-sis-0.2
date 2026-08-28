@@ -4,6 +4,7 @@ import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
+import { FormGenerationApplicationService } from "./application/form-generation-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
@@ -20,6 +21,7 @@ import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
+import { TauriFormGenerationRepository } from "./infrastructure/tauri/form-generation-repository";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
@@ -50,6 +52,9 @@ export const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
   sectionRepository,
 );
 export const exportService = new ExportApplicationService(new TauriExportRepository());
+export const formGenerationService = new FormGenerationApplicationService(
+  new TauriFormGenerationRepository(),
+);
 export const gradingService = new GradingApplicationService(new TauriGradingRepository());
 export const subjectService = new SubjectApplicationService(new TauriSubjectRepository());
 export const classRecordService = new ClassRecordApplicationService(
