@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -119,11 +119,11 @@ describe("App", () => {
 
     render(<App />);
     await screen.findByRole("region", { name: "Workspace" });
-    expect(document.title).toBe("Workspace · LIKHA-SIS");
+    await waitFor(() => expect(document.title).toBe("Workspace · LIKHA-SIS"));
 
     await user.click(screen.getByRole("button", { name: "Learners" }));
 
-    expect(document.title).toBe("Learners · LIKHA-SIS");
+    await waitFor(() => expect(document.title).toBe("Learners · LIKHA-SIS"));
   });
 
   it("shows the learner screen after switching to the Learners tab", async () => {
