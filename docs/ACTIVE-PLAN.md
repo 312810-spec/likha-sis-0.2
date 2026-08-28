@@ -62,11 +62,13 @@ exactly 100/100, unchanged. `npm run quality:full` green end to end.
 `gitleaks`/`cargo-deny`/`osv-scanner` all clean (no new dependency).
 `git diff --check` clean; `npx knip` no new findings.
 
-**Checkpoint**: feature commit `820d1b2` (full SHA
-`820d1b22616a8836d5553d5ed496039724a7aa65`), local only — CI run ids
-recorded once pushed. This branch is **not yet pushed**; owner
-authorization needed (see
-`docs/CURRENT-HANDOFF.md`). `main` `d9ab0368` untouched.
+**Checkpoint**: feature commit `820d1b2`; docs commit `54dc8fc` is the
+pushed branch HEAD (owner-authorized push completed). **Final Security
+Gate `33212130131` + final Quality Gate `33212130223`, both
+`completed/success`** (Ubuntu canonical `quality:full` + Playwright/axe
+UI gate; Windows canonical `quality:full` + native Tauri build).
+`npm run harness:verify` reconfirmed 100/100 after the push. `main`
+`d9ab0368` untouched.
 
 **Next planned wave (not started)**: the Next Best candidate — a
 duplicate-learner-candidate warning on Create Learner. Alternatives

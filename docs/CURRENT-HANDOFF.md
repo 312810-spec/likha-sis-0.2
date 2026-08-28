@@ -93,9 +93,16 @@ visible-label-only fix, not an accessibility defect). No independent
 (non-self) agent review was dispatched for this bounded slice.
 
 **Checkpoint**: feature commit `820d1b2` (full SHA
-`820d1b22616a8836d5553d5ed496039724a7aa65`), local only — CI run ids
-recorded once pushed. **This branch has not been pushed**; see "Push
-authorization needed" below. `main`
+`820d1b22616a8836d5553d5ed496039724a7aa65`); docs commit `54dc8fc` (full
+SHA `54dc8fc5964745f10ed9ff68ae0c27546d862ba2`) is the pushed branch
+HEAD. Owner-authorized push completed. **Final Security Gate
+`33212130131` and final Quality Gate `33212130223`, both
+`completed/success`**, confirmed via each job's own step list: Ubuntu
+canonical `npm run quality:full` + the Playwright/axe UI-and-
+accessibility smoke gate, both green; Windows canonical `npm run
+quality:full` + the native Tauri application build, both green.
+`npm run harness:verify` reconfirmed exactly 100/100, certified,
+unchanged, immediately after this push. `main`
 `d9ab0368dbc9218186578c9617810f48fe7a41fc` untouched throughout,
 confirmed both before and after this wave's work.
 

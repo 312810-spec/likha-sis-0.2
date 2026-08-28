@@ -44,8 +44,9 @@ top entry; `docs/ACTIVE-PLAN.md` Wave 2T entry.
    currently justify reopening the importer (`tests/sf1_import.rs`
    stayed 12/12 green, no new defect found). Unchanged from its Wave
    2P/2Q recording.
-7. **This branch (`claude/likha-sis-wave2t-teacher-slice`) has not been
-   pushed** — owner authorization needed before push; see
+7. ~~This branch has not been pushed~~ — **CLOSED**: owner-authorized
+   push completed; final Security Gate `33212130131` + Quality Gate
+   `33212130223`, both `completed/success`. See
    `docs/CURRENT-HANDOFF.md`.
 
 ## Wave 2S — same-day placement correction (2026-08-28)

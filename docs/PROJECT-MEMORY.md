@@ -1917,10 +1917,12 @@ teacher workflows, not inferred from filenames.
   2S — zero regression. `npm run quality` 585/585 vitest (+22); build +
   dev-preview isolation pass; harness 100/100, unchanged.
   `gitleaks`/`cargo-deny`/`osv-scanner` all clean, no new dependency.
-  `npm run quality:full` green end to end. Feature commit `820d1b2`,
-  local only — CI run ids recorded once pushed; this branch awaits
-  owner push authorization (see `docs/CURRENT-HANDOFF.md`). `main`
-  untouched.
+  `npm run quality:full` green end to end. Feature commit `820d1b2`;
+  docs commit `54dc8fc` pushed (owner-authorized) as the branch HEAD —
+  final Security Gate `33212130131` + Quality Gate `33212130223`, both
+  `completed/success` (Ubuntu canonical + Playwright/axe; Windows
+  canonical + native Tauri build). Harness reconfirmed 100/100 after
+  the push. `main` untouched.
 - **Next**: the Next Best duplicate-learner-candidate warning, or the
   native screen-reader pass, or a bounded first increment of the
   Teaching Assignment/Class Schedule UI — no candidate pre-selected.
