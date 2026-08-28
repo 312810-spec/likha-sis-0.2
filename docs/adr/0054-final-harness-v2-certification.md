@@ -6,7 +6,7 @@
 
 ## Decision
 
-The owner authorized a final harness update on 2026-08-28. The ADR-0052 weights and fatal overrides remain immutable. This update adds a small, repository-local control plane under `.harness/`, a deterministic certifier, a real Playwright UI/accessibility smoke gate, and a Windows-native Tauri build gate. It removes the accidental zero-byte root artifacts `B` and `C`.
+The owner authorized a final harness update on 2026-08-28. The ADR-0052 weights and fatal overrides remain immutable. This update adds a small, repository-local control plane under `.harness/`, a deterministic certifier, a real Playwright UI/accessibility smoke gate, and a Windows-native Tauri build gate.
 
 No new agent, MCP, standing credential, paid service, or inference dependency is introduced. The existing eight agents remain the smallest distinct roster found by ADR-0052. Skills remain task-triggered. The update also removes three tracked root command-output artifacts (`B`, `C`, and `tatus --short .claude`) and makes their absence a certification invariant.
 
