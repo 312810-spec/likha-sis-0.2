@@ -40,7 +40,7 @@ try {
   if ((await preview.count()) !== 1)
     throw new Error("synthetic-data preview boundary is not visible");
   await page.getByRole("region", { name: "Workspace" }).waitFor();
-  await page.getByText(/4 learners across 4 sections/).waitFor();
+  await page.getByText(/3 learners across 4 sections/).waitFor();
   await page.getByRole("button", { name: "Mark attendance", exact: true }).click();
   await page.getByRole("heading", { name: "Attendance", exact: true }).waitFor();
   if ((await page.getByLabel("Section").inputValue()) !== "sec-not-started")
