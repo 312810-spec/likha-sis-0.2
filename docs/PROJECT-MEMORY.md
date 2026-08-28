@@ -1870,6 +1870,48 @@ Fidelity` preserved and now enforced inside `resolve`).
   persistence/migration was built. Next work is an unrelated
   teacher-facing production slice (see `CURRENT-HANDOFF.md`).
 
+## Wave 2S — same-day placement correction (added 2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/VERIFICATION-DEBT.md`
+Wave 2S entry. Fifth teacher-visible enrollment increment; closes the
+Wave 2Q/2R same-day-correction gap.
+
+- **Decision-first**: 8 correction representations scored against LIKHA's
+  priority order (full table in the ADR-0042 Wave 2S addendum).
+  **Recommended (built)**: in-place, single-use correction of a same-day
+  membership's `section_id` — no new row, no deletion, `starts_on`/
+  `ends_on` untouched, zero changes to any existing "is this membership
+  open" query. **Next Best (recorded, not built)**: a retained void/
+  re-open representation, for a placement with real dependent records or
+  outside the same-day window.
+- **`section_membership::correct_same_day_placement` (NEW)**: one
+  transaction, one guarded `UPDATE`, gated on exact-membership resolution
+  (forged/cross-school → `NotFound`), still-open, `starts_on == as_of_date`
+  (`NotEnteredToday`), not already corrected (`AlreadyCorrected` —
+  one-time, not repeatable), a resolvable different destination, and no
+  dependent attendance/scored-grade record in the current section —
+  reusing `dependent_records_stranded` with a **zero-width interval**
+  rather than new SQL. Migration 21 adds nullable
+  `original_section_id`/`corrected_at` provenance columns (written, not
+  yet surfaced anywhere — disclosed debt).
+- **UI:** `SectionRosterScreen` gains a third row action, "Correct
+  today's placement," shown only when a row's placement started today;
+  reuses the Transfer/End inline-panel pattern with no effective-date
+  field. The pre-existing zero-length-interval Transfer/End error now
+  points a teacher at this action instead of leaving them stuck.
+- **Verification/checkpoint:** `cargo test` 539 lib (+15) + all
+  integration binaries incl. `enrollment.rs` 39/39 (+9); `cargo fmt`/
+  `clippy` clean. `npm run quality` 563/563 vitest; build + dev-preview
+  isolation pass; harness 100/100, unchanged. `gitleaks`/`cargo-deny`/
+  `osv-scanner` installed fresh this session and all three passed
+  clean locally — a first for this project (every prior wave disclosed
+  this as a per-machine gap). Feature `1ca2103`; CI run ids recorded in
+  `CURRENT-HANDOFF.md`. `main` untouched.
+- **Next:** no candidate pre-selected — native NVDA/Narrator pass (now
+  covering Enroll/Transfer/End/Correct), the `enroll`/SF1-importer
+  zero-length-rule debt, or a new teacher-facing slice now that the
+  enrollment lifecycle is complete end to end.
+
 ## Wave 2R — read-only learner enrollment history (added 2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2R addendum;

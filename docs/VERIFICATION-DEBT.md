@@ -1,5 +1,55 @@
 # Verification Debt
 
+## Wave 2S — same-day placement correction (2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/ACTIVE-PLAN.md` Wave 2S entry.
+
+**Closed from the Wave 2R list above:**
+
+- **Same-day correction — CLOSED (narrow scope).** A placement entered
+  today can now be corrected to a different section via
+  `correct_same_day_placement`, in place, once, gated on no dependent
+  attendance/grade records. Deliberately does **not** cover a placement
+  that already has dependent records, or one outside the same-day
+  window — those still have no correction path, by design (see the
+  ADR-0042 Wave 2S addendum's Next Best option for the closure gate).
+  Deliberately does **not** cover "undo this enrollment entirely" (as
+  opposed to fixing its section) — that is a different question (does
+  it need a void/delete representation?) not evidence-backed enough to
+  answer this wave.
+
+**Newly recorded debt:**
+
+1. **Native NVDA/Narrator pass — still owed, scope widened again.** Now
+   also covers the correction panel (destination picker, no
+   effective-date field, dependent-record-conflict messaging) and the
+   updated zero-length-interval Transfer/End message that now
+   cross-references the correction action. jsdom + axe are clean; the
+   Ubuntu Playwright gate is not extended to click through the
+   correction panel specifically this wave (the existing Transfer/End
+   panel coverage there is unchanged) — CI remains authoritative for
+   phone-width reflow of the whole roster screen generally, not this one
+   new panel's rendering specifically.
+2. **The retained provenance (`original_section_id`/`corrected_at`) is
+   not surfaced anywhere.** Both columns are written and are genuinely
+   recoverable by inspecting the database, but no UI, export, or read
+   command currently shows "this placement was corrected from X" to a
+   teacher or admin. Deliberate, disclosed scope limit for this wave —
+   add a display/read path if a real need for it is ever evidenced (e.g.
+   an audit view), rather than building one speculatively now.
+3. **Local `gitleaks` / `cargo-deny` / `osv-scanner` were all
+   installed fresh this session** (not present at session start,
+   consistent with the standing per-machine gap prior waves recorded)
+   and ran clean locally: gitleaks (`8.16.0`, via `apt`) found no leaks;
+   `cargo-deny` (installed via `cargo install --locked`) reported
+   advisories/bans/licenses/sources all `ok`; `osv-scanner` (`v2.5.1`,
+   the official static binary, SHA-256 verified against the value
+   already recorded in `docs/SOURCE-REGISTRY.md`) found "No issues
+   found." after its pre-existing ignore list. None of the three are
+   guaranteed present on a _different_ future machine — CI's Security
+   Gate remains the authoritative, always-available check.
+
 ## Wave 2R — read-only learner enrollment history (2026-08-28)
 
 Full record: `docs/adr/0042-*` Wave 2R addendum;

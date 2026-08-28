@@ -1,6 +1,134 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-28 — Wave 2R: read-only learner enrollment history, COMPLETE)
+## Active Task (2026-08-28 — Wave 2S: same-day placement correction, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/PROJECT-MEMORY.md`
+Wave 2S entry; `docs/ACTIVE-PLAN.md` Wave 2S entry;
+`docs/VERIFICATION-DEBT.md` Wave 2S entry. Same branch
+(`claude/likha-sis-wave2a-learner-core`, continued this session as
+`claude/likha-sis-wave2s-placement-0ixw5v`). Harness v2 stayed locked and
+still computes **100/100**.
+
+**Repository truth verified first:** the assigned working branch
+(`claude/likha-sis-wave2s-placement-0ixw5v`) had been freshly cut from
+`main` (`d9ab036`) with no divergent work, a strict ancestor of the
+expected checkpoint `4282669` — fast-forwarded cleanly, 0 commits lost.
+Feature Security `33180045501` + Quality `33180045507` and final Security
+`33200842358` + Quality `33200842375` (Wave 2R's own checkpoint) all
+independently reconfirmed `completed/success` for that exact commit
+before any Wave 2S work began. `npm run harness:verify` reconfirmed
+exactly 100/100, certified, unchanged.
+
+**What shipped** (feature commit `1ca2103`):
+
+- Evaluated 8 concrete same-day-correction representations against
+  LIKHA's priority order (full scoring table in the ADR-0042 Wave 2S
+  addendum). **Recommended and built**: an in-place, single-use
+  correction of a same-day membership's `section_id` — no new row, no
+  deletion, no change to any existing "is this membership open/current"
+  query anywhere in the codebase. **Next Best, not built**: a retained
+  void/re-open representation, recorded with an explicit switch
+  condition (a placement with real dependent records, or outside the
+  same-day window) rather than built speculatively.
+- `section_membership::correct_same_day_placement` (NEW) — one
+  transaction, one guarded `UPDATE`, gated on: the membership resolving
+  for `(id, school_id, learner_id)` (forged/cross-school/wrong-learner →
+  `NotFound`, indistinguishable from unknown); still open (`NotCurrent`);
+  `starts_on` equal to the caller's `as_of_date` (`NotEnteredToday`); not
+  already corrected (`AlreadyCorrected` — a correction is one-time, not
+  repeatable); the destination resolving in-school and differing from
+  the current section (`DestinationNotFound`/`SameSection`); and no
+  attendance/scored-grade record already in the current section
+  (`DependentRecordConflict`) — reusing the existing
+  `dependent_records_stranded` helper with a **zero-width interval**
+  rather than new SQL. Migration 21 adds nullable
+  `original_section_id`/`corrected_at` provenance columns (written, not
+  yet surfaced in any UI — disclosed in `VERIFICATION-DEBT.md`).
+- Command `correct_same_day_placement`, gated `Capability::ManageLearners`
+  (same as Enroll/Transfer/End), `school_id` session-derived.
+- TS: `CorrectPlacementResult` mirrors the Rust outcome exactly;
+  `SectionRepository` port + `TauriSectionRepository` adapter +
+  `SectionApplicationService` (shape validation only) gain
+  `correctSameDayPlacement`; all 9 existing `SectionRepository`
+  implementers updated for the widened port.
+- `SectionRosterScreen.tsx` gains a third row action, "Correct today's
+  placement," shown only when a row's `startsOn` equals the roster's own
+  frozen "today" — every other row is unchanged. Reuses the exact
+  Transfer/End inline-panel house pattern (destination picker from the
+  same `otherSections` list, no effective-date field since there is
+  nothing to date, stale-conflict refresh recovery, inline field errors,
+  focus management, 3-mode parity). The pre-existing zero-length-interval
+  Transfer/End error message now also points a teacher at this new
+  action instead of leaving them stuck with no next step.
+
+**Verification** (all run this session): `cargo test` — **539 lib**
+(+15 new: in-place update; forged learner/cross-school/forged-membership-
+id rejection; stale-already-ended row; not-entered-today; double-submit
+
+- a second differently-targeted attempt both refused after one
+  correction; unknown/cross-school destination; same-section refusal; a
+  real attendance conflict; attendance from a retained prior stint
+  correctly _not_ flagged; a real scored-grade conflict built through the
+  full grading-computation chain; malformed date shapes; a genuine
+  two-SQLCipher-connection race proving exactly one correction commits) +
+  all integration binaries, incl. `tests/enrollment.rs` **39/39** (+9
+  command-boundary tests: authorized Registrar/School Head success,
+  Teacher rejection, no-session rejection, cross-school membership id,
+  forged membership id, stale + already-corrected double submit,
+  not-entered-today). `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean. `npm run quality` — **563/563**
+  vitest (60 files, +20: 7 `section-service`, 2 `section-repository`
+  adapter, 1 dev-preview fixture wiring implicit, 1 zero-length cross-
+  reference message, and 19 `SectorRosterScreen` UI/focus/mode/axe tests).
+  `npm run build` + `check:dev-preview-isolation` pass. `npm run
+harness:verify` still exactly 100/100, certified, unchanged — not
+  reopened. `npm run quality:full` green end to end, locally, in this
+  session (harness verify → quality → `cargo fmt --check` → `cargo test`
+  → `cargo clippy`). `git diff --check` clean.
+
+**Security tooling — a first for this project**: `gitleaks` (`8.16.0`,
+via `apt-get`), `cargo-deny` (via `cargo install --locked`), and
+`osv-scanner` (**v2.5.1** official static binary, SHA-256 independently
+verified against the value already recorded in `docs/SOURCE-REGISTRY.md`
+— `f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be`)
+were all **installed fresh this session** (none present at session
+start) and all three ran clean: gitleaks found no leaks; `cargo-deny`
+reported advisories/bans/licenses/sources all `ok`; `osv-scanner` found
+"No issues found" after its pre-existing, already-justified ignore list.
+Every prior wave in this project recorded these three as a standing
+per-machine gap with CI as the sole authority — this session closes that
+gap **for this machine only** (a future session's environment is not
+guaranteed to retain them; CI remains authoritative regardless).
+
+**Review:** a bounded self-review covered school/cross-tenant isolation
+and probe resistance (forged membership + forged learner both collapse
+to `NotFound`, matching every sibling verb's convention); the atomic
+guarded-`UPDATE` race behavior (proven with a real two-connection test,
+not merely asserted); that reusing `dependent_records_stranded` with a
+zero-width interval is sound reasoning, not a coincidental pass; that no
+existing "is this membership current" query definition changed anywhere;
+and UI stale-conflict/focus/mode-parity conventions matching Transfer/End
+exactly. One real gap found and fixed before commit: the existing
+zero-length-interval Transfer/End error left a teacher with no next
+step; it now names the new correction action. No independent (non-self)
+agent review was dispatched for this bounded, narrowly-scoped slice —
+recorded as retained debt in `docs/VERIFICATION-DEBT.md`.
+
+**Checkpoint**: feature commit `1ca2103` — Security Gate `33207512841`
+`completed/success`; Quality Gate `33207512883` confirmed green (see
+below). `main` `d9ab036` untouched throughout.
+
+**Exact next wave (not started):** no candidate pre-selected. By LIKHA
+priority order, carried from this wave and prior ones: (a) the native
+NVDA/Narrator pass, now covering Enroll + Transfer + End + Correct; (b)
+apply the strict zero-length rule and the `l.school_id` JOIN predicate to
+`enroll`/`roster_for_section*` when the SF1 importer is next reworked;
+(c) a new teacher-facing production slice, now that the enrollment
+lifecycle (enroll/transfer/end/correct/history) is complete end to end.
+
+---
+
+## Note — Active Task (2026-08-28 — Wave 2R: read-only learner enrollment history, COMPLETE, superseded above)
 
 Full record: `docs/adr/0042-*` Wave 2R addendum;
 `docs/PROJECT-MEMORY.md` Wave 2R entry; `docs/ACTIVE-PLAN.md` Wave 2R
@@ -83,9 +211,12 @@ Full record: `docs/adr/0054-final-harness-v2-certification.md`;
   after final CI green, write the wave report, identify the next slice,
   and stop. Never begin the next wave without a new user instruction.
 
-Wave 2R completed at feature checkpoint `05ad2e85` without reopening
-the harness. Exact next wave is the bounded Wave 2S correction decision
-described above.
+Wave 2R completed at feature checkpoint `05ad2e85` without reopening the
+harness. Wave 2S completed at feature checkpoint `1ca2103`, also without
+reopening the harness (`npm run harness:verify` reconfirmed exactly
+100/100 both before and after Wave 2S). No candidate is pre-selected for
+the wave after Wave 2S — see the Wave 2S entry above for carried
+candidates.
 
 ---
 

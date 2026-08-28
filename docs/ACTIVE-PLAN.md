@@ -1,5 +1,74 @@
 # ACTIVE PLAN
 
+## Wave 2S: same-day placement correction (added 2026-08-28) — complete
+
+Full record: `docs/adr/0042-*` Wave 2S addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2S entry;
+`docs/VERIFICATION-DEBT.md` Wave 2S entry.
+
+**Repository truth verified first:** branch/local HEAD fast-forwarded
+cleanly from `d9ab036` (main) to the expected checkpoint `4282669`
+(Wave 2R's close), 0 divergent commits lost. Feature Security
+`33180045501` + Quality `33180045507` and final Security `33200842358` +
+Quality `33200842375` all reconfirmed `completed/success` for that exact
+commit; `npm run harness:verify` reconfirmed exactly 100/100, certified,
+before any Wave 2S work began.
+
+**Scope delivered:** a decision-first evaluation of 8 concrete
+correction representations (silent deletion, deletion + audit event,
+void + re-open, a separate ledger, in-place section correction, status
+quo, correcting the start date instead, reusing `enroll`'s existing
+same-day exemption), scored against LIKHA's priority order, recorded in
+the ADR-0042 Wave 2S addendum. **Recommended and implemented:**
+`section_membership::correct_same_day_placement` — updates a same-day
+membership row's `section_id` in place, exactly once, gated on
+authorization, school scope, an exact non-stale membership id, the
+placement actually starting today, not already corrected, a resolvable
+different destination, and no dependent attendance/grade record in the
+current section. No new row, no deletion, no change to `starts_on`/
+`ends_on`, no change to any existing "is this membership open" query.
+**Next Best (not built, recorded with an explicit switch condition):** a
+retained void/re-open representation, for if this project ever needs to
+correct a placement that already has dependent records or is outside the
+same-day window.
+
+**Architecture:** migration 21 adds two nullable provenance columns
+(`original_section_id`, `corrected_at`) to `section_memberships` — no
+other schema change. New Rust verb + typed `CorrectPlacementOutcome`,
+gated `ManageLearners`, `school_id` session-derived. New TS
+`CorrectPlacementResult` mirrors it exactly; `SectionRepository` port +
+Tauri adapter + `SectionApplicationService` gain
+`correctSameDayPlacement`; every implementer (9) updated.
+`SectionRosterScreen` gains a "Correct today's placement" row action,
+visible only for a placement whose `startsOn` equals the roster's frozen
+"today," reusing the existing Transfer/End inline-panel pattern with no
+effective-date field. The pre-existing zero-length-interval Transfer/End
+error message now points a teacher at this new action.
+
+**Verification:** `cargo test` 539 lib (+15) and all integration
+binaries incl. `enrollment.rs` 39/39 (+9); `cargo fmt --check`/`cargo
+clippy --all-targets -- -D warnings` clean. `npm run quality` 563/563
+vitest (+20), typecheck/eslint/format/architecture clean. `npm run
+build` + `check:dev-preview-isolation` pass. `npm run harness:verify`
+still exactly 100/100, unchanged, not reopened. `npm run quality:full`
+green end to end. `gitleaks`/`cargo-deny`/`osv-scanner` were installed
+fresh this session (none present at session start) and all three passed
+clean locally — a first for this project; every prior wave disclosed
+this as a per-machine gap with CI as the only authority. Feature commit
+`1ca2103`; final commit + CI run ids recorded in `CURRENT-HANDOFF.md`
+once green.
+
+**Next planned wave (not started):** re-evaluate against repository
+evidence at the next checkpoint — no candidate pre-selected. Candidates
+by LIKHA priority order carried from prior waves: (a) the native
+NVDA/Narrator pass across every accumulated interactive surface
+(Enroll/Transfer/End/Correct); (b) apply the strict zero-length rule and
+the `l.school_id` JOIN predicate to `enroll`/`roster_for_section*` when
+the SF1 importer is next reworked; (c) a new teacher-facing production
+slice built on the now-complete enrollment lifecycle.
+
+---
+
 ## Wave 2R: read-only learner enrollment history (added 2026-08-28) — complete
 
 Full record: `docs/adr/0042-*` Wave 2R addendum;
