@@ -1,5 +1,65 @@
 # ACTIVE PLAN
 
+## Wave 2Q: safe learner enrollment + membership-integrity closure (added 2026-08-28) — complete
+
+Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2Q entry; `docs/VERIFICATION-DEBT.md`
+Wave 2Q entry. Same branch (`claude/likha-sis-wave2a-learner-core`).
+
+**Scope**: from the Section Roster, a `ManageLearners` user places an
+existing eligible same-school learner into the section safely; plus
+closure of the four Wave 2P membership-correctness debts (enroll
+hardening, two-connection race test, zero-length policy, backdating vs.
+dependent records). Excluded (directed): learner creation, SF1 import
+redesign, cloud sync, attendance/grading UI changes beyond the narrow
+dependent-record check.
+
+**Repository truth verified first**: HEAD `7807e5e` = origin, 0/0, tree
+clean; `main` `d9ab036` untouched. Wave 2P CI re-confirmed
+`completed/success` — `7807e5e` Quality `33049989425` + Security
+`33049989470`.
+
+**Central design calls**:
+
+- New typed verb `enroll_membership` (mirrors Wave 2P's transfer
+  choice); `section_membership::enroll` stays the create-and-place
+  primitive but is hardened in place (`is_iso_date` guard + `SAVEPOINT`
+  — `Connection::transaction` cannot nest inside `import::commit`).
+- Zero-length interval policy: **strict** (`starts_on` strictly `<`
+  `ends_on`); typed `ZeroLengthInterval` on transfer/end; `enroll`
+  primitive exempted with a documented reason + closure gate.
+- Dependent-record guard: bounded `dependent_records_stranded()`
+  (attendance + wholly-outside grading periods), "covered by another
+  retained membership" refinement so routine re-enrolment is not
+  false-flagged.
+- Concurrency: new file `tests/enrollment_concurrency.rs` with two real
+  `db::open` connections on one SQLCipher file; deterministic
+  logical-race + stale-snapshot + guarded-`UPDATE` + `Immediate`
+  bounded-retry coverage.
+
+**Verification record** (all run this session):
+
+- `npm run quality` — **534 vitest** (58 files), typecheck (`tsc -b`),
+  eslint, `prettier --check .`, `check:architecture` — all green.
+- `cargo test` — **528 lib** + every integration binary; `enrollment`
+  31/31 (7 new Wave 2Q command-boundary), `enrollment_concurrency` 5/5
+  (new).
+- `cargo nextest run` — `section_membership` 55 (19 new Wave 2Q).
+- `cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+  clean.
+- `check:dev-preview-isolation` pass; `knip` — no new findings;
+  `cargo deny check` ok (no dependency change); gitleaks + OSV not on
+  this machine's PATH — CI authoritative.
+- **Independent review**: five fresh reviewers (security/isolation,
+  SQLite concurrency, domain/architecture, teacher-UX/parity,
+  accessibility) — [outcome + fixes recorded at the review-fix commit].
+
+**Checkpoint**: [feature commit + review-fix/docs commit SHAs and CI run
+ids recorded in `CURRENT-HANDOFF.md` once green]. `main` `d9ab036`
+untouched.
+
+---
+
 ## Wave 2P: transfer learner + end enrollment (added 2026-08-27) — complete
 
 Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/CURRENT-HANDOFF.md`

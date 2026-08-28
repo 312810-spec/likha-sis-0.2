@@ -530,3 +530,231 @@ via the guard + affected-row check + partial unique index + the
 app-wide `Mutex<Connection>`), and a native NVDA/Narrator pass on the
 compiled binary for the new interactive surface. This addendum is the
 durable record; no separate ADR.
+
+## Addendum (Wave 2Q, 2026-08-28): safe learner enrollment + membership-integrity closure
+
+Wave 2Q completes the Section Roster's core enrollment lifecycle: an
+authorized user (`ManageLearners` — Registrar or School Head) can now
+place an **existing, eligible** learner into a section from the roster.
+It also closes the four highest-value membership-correctness debts Wave
+2P recorded. Excluded, as directed: learner creation, SF1 import
+redesign, cloud sync, attendance/grading UI changes beyond the narrow
+dependent-record check.
+
+### `enroll_membership` — the typed, stale-safe placement verb
+
+`section_membership::enroll_membership(&mut Connection, school_id,
+learner_id, section_id, starts_on) -> EnrollOutcome` runs the whole
+eligibility-check → `INSERT` sequence in one `conn.transaction()`. It
+mirrors Wave 2P's choice: `section_membership::enroll` stays the bulk
+create-and-place primitive (SF1 import, first placement), and a
+separate typed verb serves the roster. `EnrollOutcome` (serde
+`tag = "kind"`, camelCase; TS mirror `EnrollMembershipResult` in
+`src/domain/section.ts`) distinguishes:
+
+- `Enrolled { membership }`
+- `LearnerNotFound` / `SectionNotFound` — id unknown or cross-school,
+  indistinguishable from each other's absence (probe resistance)
+- `AlreadyEnrolled { currentMembershipId, currentSectionId }` — the
+  learner already holds an open membership. **Never moved implicitly**;
+  the UI compares `currentSectionId` to the target and either says
+  "already here" or routes the teacher to Transfer. Distinct from
+  `OverlappingMembership` on purpose (open placement vs. a retained
+  historical span).
+- `OverlappingMembership` — a retained (closed or future) membership
+  ends strictly after the proposed `starts_on`, so `[starts_on, ∞)`
+  would double-count a day. Enrolling exactly on a prior stint's end
+  date is allowed (half-open).
+- `InvalidStartDate` — `is_iso_date` shape check fails. A zero-length
+  interval cannot arise from this verb (it only ever opens
+  `[starts_on, NULL)`), so there is no `ZeroLengthInterval` variant
+  here; documented rather than added speculatively.
+- `DependentRecordConflict { record }` — see below.
+
+Authorization: `authorize_capability(ManageLearners)` at the command
+boundary, `school_id` session-derived; `learner`/`section` are
+independently constrained to that school in every query, and
+`learner::find_by_id_in_school` is checked directly (forged-row
+defense, matching Wave 2O/2P). Command `enroll_learner_membership`;
+read `list_enrollable_learners`.
+
+`enrollable_learners(conn, school_id) -> Vec<EnrollmentCandidate>` is
+one `LEFT JOIN` from `learners` to the open membership and to
+`sections`, `school_id`-constrained on all three tables, ordered
+`family_name, given_name` in SQL. Gated by `ManageLearners` (not the
+open-read convention) because it is a **school-wide learner lookup** —
+the same class as `learner::find_candidates`, which is also
+`ManageLearners`-gated. It returns every school learner with their
+current membership state; the UI renders eligible / already-here /
+enrolled-elsewhere, and `enroll_membership` re-checks every rule
+regardless of what the list said.
+
+### Debt 1 — `enroll` hardened in place
+
+`section_membership::enroll` now (a) shape-checks `starts_on` with
+`is_iso_date` and returns `Ok(None)` for a malformed date (the same
+"unresolvable request" signal it already uses; both production callers
+validate upstream), and (b) wraps its close-old + open-new pair in a
+`SAVEPOINT` (**not** `Connection::transaction()` — `import::commit`
+calls `enroll` inside its own `Transaction` and rusqlite transactions
+do not nest). A failure between the two writes now rolls back cleanly
+instead of leaving the learner with zero open memberships. `enroll`'s
+observable semantics are otherwise unchanged.
+
+### Debt 2 — zero-length membership policy: **strict**
+
+**Decision: membership intervals are half-open `[starts_on, ends_on)`
+and `starts_on` must be strictly earlier than `ends_on` when `ends_on`
+exists.** `starts_on == ends_on` is invalid. `transfer_membership` /
+`end_membership` now return a typed `ZeroLengthInterval` when
+`effective_on == starts_on` (Wave 2P allowed it as a "legal empty
+interval"). No historical row is ever deleted to make an operation fit.
+
+Repository-evidence challenge (per the brief): Wave 2P's permissive
+behavior was recorded in `VERIFICATION-DEBT.md` as *"an open product
+question,"* not as an evidence-backed choice, so the brief's escape
+hatch ("strong repository evidence requires another policy") does not
+apply — the strict rule is adopted. Three previously-passing tests were
+renamed and rewritten to assert the new behavior (a flipped assertion
+under an old name is a defect this project's reviews have caught twice
+before):
+`end_membership_rejects_a_same_day_end_as_a_zero_length_interval`,
+`transfer_membership_rejects_a_same_day_transfer_as_a_zero_length_interval`,
+`a_same_day_transfer_is_refused_so_no_zero_length_membership_is_ever_created`.
+
+**Exemption, stated:** `enroll`'s same-day cross-section re-placement
+still closes the source with `ends_on = starts_on`, i.e. it can still
+mint `[D, D)`. It is exempt because it is the create-and-place
+primitive, always called inside a caller-owned transaction from
+`import::commit`, and SF1 import never enrolls one learner into two
+sections on the same day. Recorded as residual debt with a closure
+gate (apply the strict rule to `enroll` when the SF1 importer is next
+reworked).
+
+**Mistake entered today:** under the strict rule, a placement whose
+`starts_on` is today cannot be transferred or ended effective-today
+(both return `ZeroLengthInterval`), and the row cannot be deleted. The
+recovery path is: wait until tomorrow, or (once built) an
+enrollment-history editor / undo. There is no same-day undo in Wave 2Q;
+closure gate is a dedicated "correct a placement entered in error"
+affordance, recorded in `VERIFICATION-DEBT.md`.
+
+### Debt 3 — backdating vs. dependent records
+
+`dependent_records_stranded(...)` is a private, **bounded** helper (not
+a dependency framework): given the resulting `[interval_start,
+interval_end)` for a `(learner, section)`, it returns
+`Some(DependentRecordKind)` when a record would fall outside it **and**
+outside every *other* retained membership the learner holds for that
+section:
+
+- **Attendance** — an `attendance_records` row for `(learner,
+  section)` whose `attendance_date` no resulting interval covers.
+  `ar.section_id = ?` excludes the migration-12 legacy `NULL`-section
+  rows automatically (a NULL-section row predates section scoping and
+  is not attributable to a membership) — pinned by a test.
+- **Grades** — a *scored* `learner_scores` row whose grading period
+  lies **wholly** outside the resulting coverage (entirely before the
+  new start, or entirely on/after the new end). Scores are
+  grading-period granular, so a period that merely *straddles* the
+  boundary is allowed; only a period with no possible enrolled day is
+  a conflict. This deliberately does **not** block ending an enrollment
+  mid-term.
+
+Wired into `enroll_membership`, `end_membership`, and
+`transfer_membership` (the source side). Returns a typed
+`DependentRecordConflict { record }` — the UI names the *category*
+("attendance records" / "grades"), never the records. Nothing is
+cascade-deleted, rewritten, or reassigned.
+
+For `enroll_membership` this is genuine defense-in-depth but rarely
+bites: if `OverlappingMembership` passes, every retained span ends at
+or before the new `starts_on`, and attendance before that date was
+written while a prior membership covered it (`is_active_member` gates
+attendance creation), so it is not stranded. The check still catches a
+true orphan (e.g. one left by an earlier backdated end that this same
+guard now prevents) — honest asymmetry, stated rather than papered
+over with fake symmetry.
+
+### Debt 4 — real two-connection concurrency
+
+`src-tauri/tests/enrollment_concurrency.rs` (new) opens a real
+SQLCipher **file** with two independent `db::open` connections sharing
+one key — the `tests/bootstrap.rs` pattern, not `:memory:` (private per
+connection). It pins:
+
+- **Exactly one commits.** Two connections from the same eligible
+  state both attempt an incompatible write; the loser gets a typed
+  conflict (`AlreadyEnrolled` / `NotCurrent`) from its own fresh
+  transaction's `SELECT`, never a duplicate membership.
+- **Stale-snapshot writes fail cleanly.** A connection that pinned a
+  read snapshot before the winner committed then tries to write: WAL
+  returns `SQLITE_BUSY_SNAPSHOT` — a whole-transaction rollback, no
+  partial row — and a **retry from a refreshed connection is
+  deterministic** (`AlreadyEnrolled`), not a "database busy" error
+  surfaced to the teacher.
+- **The guarded close writes nothing once the row is closed**
+  (`UPDATE ... WHERE ends_on IS NULL` → 0 rows → `NotCurrent`).
+- `TransactionBehavior::Immediate` surfaces contention as an immediate
+  error, never a silent partial write — the bounded, non-retrying tool
+  if write-write serialisation stronger than the app's
+  `Mutex<Connection>` is ever needed.
+
+Concurrency strategy of record: in the shipping app **all in-process
+writes are serialised by `Mutex<Connection>`** (`commands::lock_db`),
+so the stale-snapshot path is not reachable there. The layered
+guarantees are: `Mutex<Connection>` (serialisation) → WAL snapshot
+isolation (`SQLITE_BUSY_SNAPSHOT` on a stale writer) → the guarded
+`UPDATE` + affected-row check (`NotCurrent`) → the
+`idx_one_active_membership_per_learner` partial unique index
+(structural backstop). No retry loop was added; there is no "database
+busy" leaking as a logical outcome.
+
+### UI
+
+The Section Roster gains **one** "Enroll learner" button above the
+table (both populated and empty ready states). It opens a single inline
+panel — the same house pattern as the Wave 2P row panels, no modal —
+with: a name/LRN search filter, a native `<select>` of candidates
+annotated with their current state, a destination summary (this
+section's name/grade/year), a start-date input defaulting to today and
+**capped at today** (`max={asOfDate}` — a future `starts_on` would
+enrol the learner off the current roster and read as failure), a single
+Confirm, and a pending "Enrolling…" state that blocks double-submit.
+Confirm is disabled for a candidate already in this section or enrolled
+elsewhere, with inline guidance (transfer is required; it is not
+performed here). Outcomes: `enrolled` → success banner + roster refresh
++ focus to the page heading; `alreadyEnrolled` / `overlappingMembership`
+/ `dependentRecordConflict` / `invalidStartDate` → inline correctable
+field errors, panel kept open, entry preserved; `learnerNotFound` /
+`sectionNotFound` → "the list was out of date" recovery that refetches
+candidates; a thrown error → generic retry. Focus moves to the panel
+heading on open and on every error; back to the "Enroll learner" button
+on cancel. Efficient / Comfortable / Guided run the identical workflow
+(Guided adds explanatory copy only). `npm run check:architecture`
+passes; `knip` reports no new findings (the domain → port → adapter →
+service → UI chain is fully wired in one commit).
+
+### Verification (run this session)
+
+`npm run quality` green — typecheck, eslint, `prettier --check`,
+`check:architecture`, **534 vitest** (58 files; +51 in
+`SectionRosterScreen.test.tsx`, +service/adapter tests). `cargo test`
+— **528 lib** + every integration binary, incl. `enrollment` 31 (+7
+Wave 2Q command-boundary) and `enrollment_concurrency` 5 (new).
+`cargo nextest` on `section_membership` — 55 (+19 Wave 2Q).
+`cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+clean. `check:dev-preview-isolation` pass; `knip` no new findings;
+`cargo deny check` ok (no dependency change). `gitleaks` / OSV not on
+this machine's PATH — CI Security Gate authoritative.
+
+### Independent review + retained debt
+
+Five fresh reviewers (security/isolation, SQLite concurrency,
+domain/architecture, teacher-UX/mode parity, accessibility/focus) run
+against the feature commit; results, fixes, and any deferred findings
+recorded in the Wave 2Q entry of `docs/VERIFICATION-DEBT.md`. Retained
+debt after this wave: the native NVDA/Narrator pass (now covering
+Enroll + Transfer + End), `enroll`'s same-day `[D, D)` exemption, and
+the "correct a placement entered today" affordance. This addendum is
+the durable record; no separate ADR.

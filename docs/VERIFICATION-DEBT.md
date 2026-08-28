@@ -1,5 +1,88 @@
 # Verification Debt
 
+## Wave 2Q — safe learner enrollment + membership-integrity closure (2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/ACTIVE-PLAN.md` Wave 2Q entry.
+
+**Closed from the Wave 2P list below:**
+
+- **Two-connection concurrent-membership race — CLOSED.** New
+  `src-tauri/tests/enrollment_concurrency.rs` (5 tests) drives two real
+  `db::open` connections against one SQLCipher file (the
+  `tests/bootstrap.rs` pattern). Proves: exactly one of two incompatible
+  writes commits; the loser gets a typed conflict from its own fresh
+  transaction, or a clean `SQLITE_BUSY_SNAPSHOT` rollback (no partial
+  row) if its snapshot went stale; the guarded `UPDATE ... WHERE ends_on
+  IS NULL` writes 0 rows once the row is closed; retry from a refreshed
+  connection is deterministic; `TransactionBehavior::Immediate` errors
+  immediately rather than half-writing. Strategy of record: in-process
+  writes are `Mutex<Connection>`-serialised, so the stale-snapshot path
+  is unreachable in the shipping app; no retry loop was added.
+- **`enroll` date-shape + non-transactional-close gaps — CLOSED.**
+  `section_membership::enroll` now `is_iso_date`-guards `starts_on`
+  (returns `Ok(None)`) and wraps close-old + open-new in a `SAVEPOINT`
+  (nests inside `import::commit`'s `Transaction`; `Connection::transaction`
+  would not).
+- **Backdating vs. dependent records — CLOSED for enroll/transfer/end.**
+  `dependent_records_stranded()` blocks a backdated `starts_on` /
+  `effective_on` that would leave an `attendance_records` row or a
+  scored `learner_scores` row outside every resulting membership
+  interval for that `(learner, section)`, as a typed
+  `DependentRecordConflict { record }`. Bounded (two record types,
+  conservative), NULL-section legacy attendance excluded, grades checked
+  only when the grading period lies *wholly* outside coverage.
+- **Zero-length `[D, D)` membership — CLOSED (product decision made).**
+  Strict half-open policy adopted: `starts_on` strictly `<` `ends_on`.
+  `transfer_membership` / `end_membership` return typed
+  `ZeroLengthInterval` for a same-day change. Three pinned tests
+  renamed + rewritten to assert the new behavior.
+
+**Retained / newly recorded debt:**
+
+1. **Native NVDA / Narrator pass — still owed, scope widened.** The
+   compiled-binary screen-reader pass now covers the full Enroll +
+   Transfer + End lifecycle. `SectionRosterScreen.test.tsx` runs `axe`
+   on the open enroll panel plus all Wave 2P panel states — necessary,
+   not sufficient. Concrete owed checks: (a) focus landing on the enroll
+   panel heading on open and on every error outcome, and on the "Enroll
+   learner" button on cancel; (b) the `role="alert"` enroll error and
+   the visually-hidden roster-count `role="status"` announcing without
+   clobbering each other after a successful enroll + refresh; (c) the
+   `<select size>` candidate list operable and its per-option state
+   suffix ("— already in this section" / "— in <name>") read; (d) the
+   `max`-capped date input; (e) 200% zoom / 400% reflow of the panel;
+   (f) Android-width touch layout. Earliest closure gate: a session with
+   a Windows screen reader on the packaged Tauri binary. jsdom does not
+   evaluate `@media`, so no automated test exercises the narrow layout.
+
+2. **`enroll`'s same-day `[D, D)` exemption.** `section_membership::enroll`
+   (the create-and-place primitive) can still close a source with
+   `ends_on = starts_on` on a same-day cross-section re-placement — it
+   is not held to the strict zero-length rule that `enroll_membership` /
+   `transfer_membership` / `end_membership` now enforce. Reason: it is
+   always called inside a caller-owned transaction from `import::commit`,
+   and SF1 import never enrolls one learner into two sections on the
+   same day. Closure gate: apply the strict rule to `enroll` when the
+   SF1 importer is next reworked.
+
+3. **No same-day "correct a placement entered in error" path.** Under
+   the strict zero-length rule, a placement whose `starts_on` is today
+   cannot be transferred or ended effective-today (both →
+   `ZeroLengthInterval`) and the row cannot be deleted. Recovery today:
+   wait until tomorrow. Closure gate: a dedicated undo / enrollment-history
+   editor affordance (out of Wave 2Q scope — no learner deletion, no
+   history editor).
+
+4. **`roster_for_section` / `roster_for_section_over_range` still lack
+   the `l.school_id` JOIN predicate** that `current_roster` /
+   `enrollable_learners` have (carried from Wave 2O item 3). Pre-existing,
+   `formgen::sf1`-shared; apply next time that area is touched.
+
+5. **Local `gitleaks` / `osv-scanner` unavailable on this machine**
+   (standing per-machine gap). `cargo deny check` ran clean locally (no
+   dependency change); CI Security Gate is authoritative.
+
 ## Wave 2P — transfer learner + end enrollment (2026-08-27)
 
 Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/CURRENT-HANDOFF.md`

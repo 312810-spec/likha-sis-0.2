@@ -1864,6 +1864,74 @@ Fidelity` preserved and now enforced inside `resolve`).
   persistence/migration was built. Next work is an unrelated
   teacher-facing production slice (see `CURRENT-HANDOFF.md`).
 
+## Wave 2Q — safe learner enrollment + membership-integrity closure (added 2026-08-28)
+
+Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/VERIFICATION-DEBT.md`
+Wave 2Q entry. Third teacher-visible increment: place an existing eligible
+learner into a section from the Section Roster, plus closure of four
+Wave 2P membership-correctness debts.
+
+- **`section_membership::enroll_membership(&mut Connection, school_id,
+  learner_id, section_id, starts_on) -> EnrollOutcome`** is the typed,
+  transactional, stale-safe placement verb. `enroll` stays the bulk
+  create-and-place primitive. `EnrollOutcome` (serde `tag="kind"`; TS
+  `EnrollMembershipResult`) variants: `Enrolled` / `LearnerNotFound` /
+  `SectionNotFound` / `AlreadyEnrolled {currentMembershipId,
+  currentSectionId}` (**never moved implicitly — caller must choose
+  transfer**) / `OverlappingMembership` (a retained span ends after the
+  proposed start) / `InvalidStartDate` / `DependentRecordConflict
+  {record}`. Command `enroll_learner_membership`, gated `ManageLearners`,
+  `school_id` session-derived, forged-row `learner::find_by_id_in_school`
+  check.
+- **`enrollable_learners(conn, school_id) -> Vec<EnrollmentCandidate>`**
+  — one `LEFT JOIN` learners→open membership→sections, `school_id`
+  constrained on all three, ordered in SQL. Command
+  `list_enrollable_learners`, gated `ManageLearners` (school-wide learner
+  lookup, same class as `find_candidates` — **not** the open-read
+  convention). Returns every school learner + current state; UI renders
+  eligible / already-here / enrolled-elsewhere; domain re-checks.
+- **Zero-length membership policy = STRICT.** `starts_on` must be
+  strictly `<` `ends_on`. `transfer_membership` / `end_membership` return
+  typed `ZeroLengthInterval` for a same-day change (Wave 2P allowed it).
+  No historical row is ever deleted. `enroll` (the primitive) keeps a
+  documented same-day `[D,D)` exemption (always inside a caller-owned
+  import transaction). Decision + evidence in the ADR-0042 Wave 2Q
+  addendum.
+- **Backdating vs. dependent records.** `dependent_records_stranded()` —
+  bounded helper — blocks a backdated `starts_on` / `effective_on` that
+  would leave an `attendance_records` row or a scored `learner_scores`
+  row outside every resulting membership interval for that
+  `(learner, section)`, as typed `DependentRecordConflict {record}`.
+  Legacy NULL-section attendance excluded; grades block only when the
+  grading period lies *wholly* outside coverage (mid-term end is fine).
+  Wired into enroll / transfer / end. Nothing is cascade-deleted.
+- **`enroll` hardened in place:** `is_iso_date` guard on `starts_on`
+  (→ `Ok(None)`) + close-old/open-new wrapped in a `SAVEPOINT` (nests
+  inside `import::commit`'s `Transaction`; `Connection::transaction`
+  would not).
+- **Real two-connection concurrency test** —
+  `src-tauri/tests/enrollment_concurrency.rs` (5): two `db::open`
+  connections on one SQLCipher file. Exactly one write commits; loser
+  gets a typed conflict or a clean `SQLITE_BUSY_SNAPSHOT` rollback;
+  guarded `UPDATE` writes 0 rows on a closed row; refreshed-connection
+  retry is deterministic. Strategy of record: `Mutex<Connection>`
+  serialises in-process writes → WAL snapshot isolation → guarded
+  `UPDATE` → partial unique index. No retry loop added.
+- **UI:** Section Roster gains one "Enroll learner" button + inline
+  panel (house pattern, no modal): name/LRN filter, candidate `<select>`
+  annotated with state, start-date input capped at today, one Confirm,
+  double-submit block. Confirm disabled for already-here / enrolled-
+  elsewhere with inline transfer guidance. Typed outcomes → inline
+  correctable errors / stale-list refetch / success-refresh; focus to
+  panel heading on open + error, to the trigger on cancel. 3-mode
+  parity. `knip` clean (full domain→port→adapter→service→UI wiring).
+- **Verification:** `npm run quality` green (534 vitest); `cargo test`
+  528 lib + all integration (`enrollment` 31, `enrollment_concurrency`
+  5); `cargo fmt --check` / `clippy -D warnings` clean;
+  `check:dev-preview-isolation` pass; `knip` no new; `cargo deny` ok.
+- **Checkpoint / CI:** [feature commit + gates recorded at commit time in
+  `CURRENT-HANDOFF.md`]. `main` `d9ab036` untouched.
+
 ## Wave 2P — transfer learner + end enrollment (added 2026-08-27)
 
 Full record: `docs/adr/0042-*` Wave 2P addendum;

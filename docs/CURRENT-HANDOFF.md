@@ -1,5 +1,86 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-28 — Wave 2Q: safe learner enrollment + membership-integrity closure, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2Q addendum; `docs/PROJECT-MEMORY.md`
+Wave 2Q entry; `docs/ACTIVE-PLAN.md` Wave 2Q entry; `docs/VERIFICATION-DEBT.md`
+Wave 2Q entry. Same branch (`claude/likha-sis-wave2a-learner-core`).
+Frozen harness not reopened.
+
+**Repository/CI truth verified first**: HEAD `7807e5e` = origin, 0/0;
+`main` `d9ab036` untouched; tree clean; untracked paths all gitignored.
+Wave 2P CI re-confirmed `completed/success` for `7807e5e` — Quality Gate
+`33049989425` + Security Gate `33049989470`.
+
+**What was built** (feature commit `<FEATURE_SHA>`):
+
+- **`section_membership::enroll_membership` (NEW)** — typed,
+  transactional, stale-safe verb to place an existing eligible learner
+  into a section. `EnrollOutcome` (`Enrolled` / `LearnerNotFound` /
+  `SectionNotFound` / `AlreadyEnrolled{currentMembershipId,
+  currentSectionId}` — never moved implicitly / `OverlappingMembership`
+  / `InvalidStartDate` / `DependentRecordConflict{record}`). Command
+  `enroll_learner_membership`, gated `ManageLearners`, `school_id`
+  session-derived, forged-row `learner::find_by_id_in_school` check.
+- **`section_membership::enrollable_learners` (NEW)** — one `LEFT JOIN`
+  learners→open membership→sections, `school_id` on all three, ordered
+  in SQL. Command `list_enrollable_learners`, gated `ManageLearners`.
+- **Zero-length policy = STRICT** — `ZeroLengthInterval` added to
+  `TransferOutcome` / `EndMembershipOutcome`; same-day change rejected.
+  3 pinned tests renamed/rewritten. `enroll` primitive keeps a
+  documented `[D,D)` exemption.
+- **Dependent-record guard** — `dependent_records_stranded()` blocks a
+  backdated `starts_on`/`effective_on` that would strand an
+  `attendance_records` or scored `learner_scores` row, typed
+  `DependentRecordConflict{record}`. Wired into enroll/transfer/end.
+- **`enroll` hardened** — `is_iso_date` guard + `SAVEPOINT` around
+  close-old/open-new.
+- **`tests/enrollment_concurrency.rs` (NEW, 5)** — two `db::open`
+  connections on one SQLCipher file; exactly one write commits; loser
+  gets a typed conflict or clean `SQLITE_BUSY_SNAPSHOT` rollback;
+  guarded `UPDATE` writes 0 on a closed row; refreshed retry
+  deterministic.
+- **TS** — `EnrollMembershipResult` / `DependentRecordKind` /
+  `EnrollmentCandidate` in `domain/section.ts`; `ZeroLengthInterval` +
+  `dependentRecordConflict` added to `TransferResult` /
+  `EndEnrollmentResult`; `SectionRepository` gained `enrollMembership` /
+  `listEnrollableLearners`; adapter + `SectionApplicationService`
+  methods; 8 other `SectionRepository` stubs updated.
+- **UI** (`SectionRosterScreen.tsx`) — one "Enroll learner" button +
+  inline panel: name/LRN filter, candidate `<select>` annotated with
+  state, start-date capped at today, one Confirm, double-submit block,
+  transfer-required guidance, typed-outcome handling, focus management,
+  3-mode parity.
+
+**Verification** (all run this session): `npm run quality` green — 534
+vitest, typecheck, eslint, `prettier --check .`, `check:architecture`.
+`cargo test` — 528 lib + every integration binary (`enrollment` 31,
+`enrollment_concurrency` 5). `cargo nextest` `section_membership` 55.
+`cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+clean. `check:dev-preview-isolation` pass; `knip` no new findings;
+`cargo deny check` ok (no dependency change); gitleaks/OSV not on this
+machine's PATH — CI authoritative.
+
+**Independent review**: five fresh reviewers (security/isolation,
+SQLite concurrency, domain/architecture, teacher-UX/mode parity,
+accessibility) — [outcome + fixes recorded at review-fix commit].
+
+**Checkpoint**: [feature commit `<FEATURE_SHA>` — Quality Gate
+`<Q1>` + Security Gate `<S1>`; review-fix+docs commit `<DOCS_SHA>` —
+Quality Gate `<Q2>` + Security Gate `<S2>`, all `completed/success`].
+`main` `d9ab036` untouched.
+
+**Exact next task**: no milestone pre-selected. Candidates by LIKHA
+priority order — (a) a "correct a placement entered in error" affordance
+(closes the Wave 2Q retained debt: no same-day undo under the strict
+zero-length rule); (b) a learner enrollment-history view (read-only,
+reuses `list_learner_enrollment_history`); (c) apply the `l.school_id`
+JOIN predicate + strict zero-length rule to `enroll` /
+`roster_for_section*` when the SF1 importer is next reworked. Pick using
+current evidence per `.claude/rules/autonomous-development.md`.
+
+---
+
 ## Active Task (2026-08-27 — Wave 2P: transfer learner + end enrollment, COMPLETE)
 
 Full record: `docs/adr/0042-*` Wave 2P addendum; `docs/PROJECT-MEMORY.md`
