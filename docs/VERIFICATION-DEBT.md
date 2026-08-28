@@ -14,7 +14,7 @@ top entry; `docs/ACTIVE-PLAN.md` Wave 2Q entry.
   writes commits; the loser gets a typed conflict from its own fresh
   transaction, or a clean `SQLITE_BUSY_SNAPSHOT` rollback (no partial
   row) if its snapshot went stale; the guarded `UPDATE ... WHERE ends_on
-  IS NULL` writes 0 rows once the row is closed; retry from a refreshed
+IS NULL` writes 0 rows once the row is closed; retry from a refreshed
   connection is deterministic; `TransactionBehavior::Immediate` errors
   immediately rather than half-writing. Strategy of record: in-process
   writes are `Mutex<Connection>`-serialised, so the stale-snapshot path
@@ -31,7 +31,7 @@ top entry; `docs/ACTIVE-PLAN.md` Wave 2Q entry.
   interval for that `(learner, section)`, as a typed
   `DependentRecordConflict { record }`. Bounded (two record types,
   conservative), NULL-section legacy attendance excluded, grades checked
-  only when the grading period lies *wholly* outside coverage.
+  only when the grading period lies _wholly_ outside coverage.
 - **Zero-length `[D, D)` membership — CLOSED (product decision made).**
   Strict half-open policy adopted: `starts_on` strictly `<` `ends_on`.
   `transfer_membership` / `end_membership` return typed

@@ -18,7 +18,7 @@ Wave 2P CI re-confirmed `completed/success` for `7807e5e` — Quality Gate
   transactional, stale-safe verb to place an existing eligible learner
   into a section. `EnrollOutcome` (`Enrolled` / `LearnerNotFound` /
   `SectionNotFound` / `AlreadyEnrolled{currentMembershipId,
-  currentSectionId}` — never moved implicitly / `OverlappingMembership`
+currentSectionId}` — never moved implicitly / `OverlappingMembership`
   / `InvalidStartDate` / `DependentRecordConflict{record}`). Command
   `enroll_learner_membership`, gated `ManageLearners`, `school_id`
   session-derived, forged-row `learner::find_by_id_in_school` check.

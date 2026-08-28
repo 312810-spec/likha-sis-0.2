@@ -611,8 +611,8 @@ exists.** `starts_on == ends_on` is invalid. `transfer_membership` /
 interval"). No historical row is ever deleted to make an operation fit.
 
 Repository-evidence challenge (per the brief): Wave 2P's permissive
-behavior was recorded in `VERIFICATION-DEBT.md` as *"an open product
-question,"* not as an evidence-backed choice, so the brief's escape
+behavior was recorded in `VERIFICATION-DEBT.md` as _"an open product
+question,"_ not as an evidence-backed choice, so the brief's escape
 hatch ("strong repository evidence requires another policy") does not
 apply — the strict rule is adopted. Three previously-passing tests were
 renamed and rewritten to assert the new behavior (a flipped assertion
@@ -645,25 +645,25 @@ affordance, recorded in `VERIFICATION-DEBT.md`.
 a dependency framework): given the resulting `[interval_start,
 interval_end)` for a `(learner, section)`, it returns
 `Some(DependentRecordKind)` when a record would fall outside it **and**
-outside every *other* retained membership the learner holds for that
+outside every _other_ retained membership the learner holds for that
 section:
 
 - **Attendance** — an `attendance_records` row for `(learner,
-  section)` whose `attendance_date` no resulting interval covers.
+section)` whose `attendance_date` no resulting interval covers.
   `ar.section_id = ?` excludes the migration-12 legacy `NULL`-section
   rows automatically (a NULL-section row predates section scoping and
   is not attributable to a membership) — pinned by a test.
-- **Grades** — a *scored* `learner_scores` row whose grading period
+- **Grades** — a _scored_ `learner_scores` row whose grading period
   lies **wholly** outside the resulting coverage (entirely before the
   new start, or entirely on/after the new end). Scores are
-  grading-period granular, so a period that merely *straddles* the
+  grading-period granular, so a period that merely _straddles_ the
   boundary is allowed; only a period with no possible enrolled day is
   a conflict. This deliberately does **not** block ending an enrollment
   mid-term.
 
 Wired into `enroll_membership`, `end_membership`, and
 `transfer_membership` (the source side). Returns a typed
-`DependentRecordConflict { record }` — the UI names the *category*
+`DependentRecordConflict { record }` — the UI names the _category_
 ("attendance records" / "grades"), never the records. Nothing is
 cascade-deleted, rewritten, or reassigned.
 
@@ -724,16 +724,17 @@ Confirm, and a pending "Enrolling…" state that blocks double-submit.
 Confirm is disabled for a candidate already in this section or enrolled
 elsewhere, with inline guidance (transfer is required; it is not
 performed here). Outcomes: `enrolled` → success banner + roster refresh
-+ focus to the page heading; `alreadyEnrolled` / `overlappingMembership`
-/ `dependentRecordConflict` / `invalidStartDate` → inline correctable
-field errors, panel kept open, entry preserved; `learnerNotFound` /
-`sectionNotFound` → "the list was out of date" recovery that refetches
-candidates; a thrown error → generic retry. Focus moves to the panel
-heading on open and on every error; back to the "Enroll learner" button
-on cancel. Efficient / Comfortable / Guided run the identical workflow
-(Guided adds explanatory copy only). `npm run check:architecture`
-passes; `knip` reports no new findings (the domain → port → adapter →
-service → UI chain is fully wired in one commit).
+
+- focus to the page heading; `alreadyEnrolled` / `overlappingMembership`
+  / `dependentRecordConflict` / `invalidStartDate` → inline correctable
+  field errors, panel kept open, entry preserved; `learnerNotFound` /
+  `sectionNotFound` → "the list was out of date" recovery that refetches
+  candidates; a thrown error → generic retry. Focus moves to the panel
+  heading on open and on every error; back to the "Enroll learner" button
+  on cancel. Efficient / Comfortable / Guided run the identical workflow
+  (Guided adds explanatory copy only). `npm run check:architecture`
+  passes; `knip` reports no new findings (the domain → port → adapter →
+  service → UI chain is fully wired in one commit).
 
 ### Verification (run this session)
 

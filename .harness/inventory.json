@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-08-28",
+  "reviewIntervalDays": 14,
+  "policy": "Keep the smallest non-overlapping set; weak, stale, missing, or overlapping entries fail certification.",
+  "components": {
+    "agents": [
+      "accessibility-reviewer",
+      "architecture-reviewer",
+      "deped-researcher",
+      "dependency-researcher",
+      "evaluator",
+      "reliability-reviewer",
+      "security-reviewer",
+      "teacher-ux-reviewer"
+    ],
+    "skills": [
+      "accessibility",
+      "architecture-boundaries",
+      "auth-authorization",
+      "codex-delegation",
+      "commit-archaeology",
+      "completion-verification",
+      "context7-docs",
+      "deped-compliance",
+      "failure-recovery",
+      "impeccable",
+      "local-database",
+      "memory-health",
+      "official-forms",
+      "offline-sync",
+      "planning-with-files",
+      "playwright-cli",
+      "premium-teacher-ui",
+      "project-memory",
+      "scope-drift-review",
+      "security-privacy",
+      "tauri-windows"
+    ],
+    "hooks": ["check-bash.cjs", "check-write-edit.cjs", "format-write-edit.cjs"],
+    "plugins": [
+      "claude-code-setup@claude-plugins-official",
+      "claude-security@claude-plugins-official",
+      "rust-analyzer-lsp@claude-plugins-official",
+      "typescript-lsp@claude-plugins-official"
+    ],
+    "projectMcps": [],
+    "deterministicGates": [
+      "check:architecture",
+      "harness:verify",
+      "quality",
+      "quality:full",
+      "quality:security",
+      "quality:ui"
+    ],
+    "workflows": ["harness-health.yml", "quality.yml", "security.yml"]
+  }
+}

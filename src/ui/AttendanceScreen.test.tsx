@@ -25,6 +25,8 @@ const SECTION: Section = {
   createdAt: "now",
 };
 
+const FIXED_NOW = () => new Date(2026, 7, 24, 12);
+
 class FakeAttendanceRepository implements AttendanceRepository {
   recordCalls: Array<{
     sectionId: string;
@@ -111,7 +113,7 @@ class FakeSectionRepository implements SectionRepository {
 
 function renderScreen(roster: AttendanceRosterEntry[] = [], sections: Section[] = [SECTION]) {
   const repo = new FakeAttendanceRepository(roster);
-  const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+  const service = new AttendanceApplicationService(repo, FIXED_NOW);
   const sectionService = new SectionApplicationService(new FakeSectionRepository(sections));
   const result = render(
     <ModeProvider>
@@ -177,7 +179,7 @@ beforeEach(() => {
   // `Date`, not timers/setTimeout, so userEvent's own internals are
   // unaffected. See docs/learning/ERROR-PATTERNS.md.
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
+  vi.setSystemTime(FIXED_NOW());
 });
 
 afterEach(() => {
@@ -373,7 +375,7 @@ describe("AttendanceScreen", () => {
       ],
       "sec-b": "reject",
     });
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
     const sectionService = new SectionApplicationService(
       new FakeSectionRepository([SECTION_A, SECTION_B]),
     );
@@ -472,7 +474,7 @@ describe("AttendanceScreen", () => {
     }
 
     const repo = new OrderControlledAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
     const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
     render(
       <ModeProvider>
@@ -548,7 +550,7 @@ describe("AttendanceScreen", () => {
     }
 
     const repo = new SlowBulkRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
     const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
     render(
       <ModeProvider>
@@ -636,7 +638,7 @@ describe("AttendanceScreen", () => {
     const repo = new FakeAttendanceRepository([
       { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
     ]);
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
     const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
     render(
       <ModeProvider>

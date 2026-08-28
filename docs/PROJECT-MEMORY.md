@@ -1872,15 +1872,15 @@ learner into a section from the Section Roster, plus closure of four
 Wave 2P membership-correctness debts.
 
 - **`section_membership::enroll_membership(&mut Connection, school_id,
-  learner_id, section_id, starts_on) -> EnrollOutcome`** is the typed,
+learner_id, section_id, starts_on) -> EnrollOutcome`** is the typed,
   transactional, stale-safe placement verb. `enroll` stays the bulk
   create-and-place primitive. `EnrollOutcome` (serde `tag="kind"`; TS
   `EnrollMembershipResult`) variants: `Enrolled` / `LearnerNotFound` /
   `SectionNotFound` / `AlreadyEnrolled {currentMembershipId,
-  currentSectionId}` (**never moved implicitly — caller must choose
+currentSectionId}` (**never moved implicitly — caller must choose
   transfer**) / `OverlappingMembership` (a retained span ends after the
   proposed start) / `InvalidStartDate` / `DependentRecordConflict
-  {record}`. Command `enroll_learner_membership`, gated `ManageLearners`,
+{record}`. Command `enroll_learner_membership`, gated `ManageLearners`,
   `school_id` session-derived, forged-row `learner::find_by_id_in_school`
   check.
 - **`enrollable_learners(conn, school_id) -> Vec<EnrollmentCandidate>`**
@@ -1903,7 +1903,7 @@ Wave 2P membership-correctness debts.
   row outside every resulting membership interval for that
   `(learner, section)`, as typed `DependentRecordConflict {record}`.
   Legacy NULL-section attendance excluded; grades block only when the
-  grading period lies *wholly* outside coverage (mid-term end is fine).
+  grading period lies _wholly_ outside coverage (mid-term end is fine).
   Wired into enroll / transfer / end. Nothing is cascade-deleted.
 - **`enroll` hardened in place:** `is_iso_date` guard on `starts_on`
   (→ `Ok(None)`) + close-old/open-new wrapped in a `SAVEPOINT` (nests

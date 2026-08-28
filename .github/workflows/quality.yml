@@ -50,8 +50,14 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Install Chromium for deterministic UI verification
+        run: npx playwright install --with-deps chromium
+
       - name: Run canonical quality gate (npm run quality:full)
         run: npm run quality:full
+
+      - name: Run UI workflow and accessibility smoke gate
+        run: npm run quality:ui
 
   quality-windows:
     name: Quality (Windows)
@@ -78,3 +84,6 @@ jobs:
 
       - name: Run canonical quality gate (npm run quality:full)
         run: npm run quality:full
+
+      - name: Build the Windows-native Tauri application
+        run: npm run tauri build -- --debug

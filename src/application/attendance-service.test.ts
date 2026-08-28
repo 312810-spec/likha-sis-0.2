@@ -73,13 +73,18 @@ class FakeAttendanceRepository implements AttendanceRepository {
 }
 
 function serviceWithToday(today: string): AttendanceApplicationService {
-  return new AttendanceApplicationService(new FakeAttendanceRepository(), () => new Date(today));
+  return new AttendanceApplicationService(
+    new FakeAttendanceRepository(),
+    () => new Date(`${today}T12:00:00`),
+  );
 }
+
+const FIXED_NOW = () => new Date(2026, 7, 24, 12);
 
 describe("AttendanceApplicationService", () => {
   it("records attendance for a well-formed present-or-past date", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     const record = await service.recordAttendance("sec-1", "learner-1", "2026-08-24", "present");
 
@@ -96,7 +101,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects an empty section id without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(
       service.recordAttendance("  ", "learner-1", "2026-08-24", "present"),
@@ -106,7 +111,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects an empty learner id without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(
       service.recordAttendance("sec-1", "  ", "2026-08-24", "present"),
@@ -116,7 +121,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects a malformed date without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(
       service.recordAttendance("sec-1", "learner-1", "08/24/2026", "present"),
@@ -134,7 +139,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects an unrecognized status without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(
       service.recordAttendance(
@@ -158,7 +163,7 @@ describe("AttendanceApplicationService", () => {
         recordedAt: "now",
       },
     ];
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     const roster = await service.rosterForDate("sec-1", "2026-08-24");
 
@@ -168,7 +173,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rosterForDate rejects an empty section id without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.rosterForDate(" ", "2026-08-24")).rejects.toBeInstanceOf(ValidationError);
     expect(repo.rosterForDateCalls).toEqual([]);
@@ -185,7 +190,7 @@ describe("AttendanceApplicationService", () => {
         recordedAt: "now",
       },
     ];
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     const roster = await service.bulkMarkPresent("sec-1", "2026-08-24");
 
@@ -197,7 +202,7 @@ describe("AttendanceApplicationService", () => {
 
   it("bulkMarkPresent rejects an empty section id without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.bulkMarkPresent(" ", "2026-08-24")).rejects.toBeInstanceOf(
       ValidationError,
@@ -207,7 +212,7 @@ describe("AttendanceApplicationService", () => {
 
   it("bulkMarkPresent rejects a malformed date without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.bulkMarkPresent("sec-1", "08/24/2026")).rejects.toBeInstanceOf(
       ValidationError,
@@ -217,7 +222,7 @@ describe("AttendanceApplicationService", () => {
 
   it("bulkMarkPresent rejects a future date without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.bulkMarkPresent("sec-1", "2026-08-25")).rejects.toBeInstanceOf(
       ValidationError,
@@ -227,7 +232,7 @@ describe("AttendanceApplicationService", () => {
 
   it("monthlySummary delegates to the repository for a past-or-current month", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     const report = await service.monthlySummary("sec-1", 2026, 8);
 
@@ -237,7 +242,7 @@ describe("AttendanceApplicationService", () => {
 
   it("allows the current in-progress month", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-01"));
+    const service = new AttendanceApplicationService(repo, () => new Date(2026, 7, 1, 12));
 
     await expect(service.monthlySummary("sec-1", 2026, 8)).resolves.toBe(
       repo.monthlySummaryToReturn,
@@ -246,7 +251,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects a future month without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.monthlySummary("sec-1", 2026, 9)).rejects.toBeInstanceOf(ValidationError);
     expect(repo.monthlySummaryCalls).toEqual([]);
@@ -254,7 +259,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects a future year without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.monthlySummary("sec-1", 2027, 1)).rejects.toBeInstanceOf(ValidationError);
     expect(repo.monthlySummaryCalls).toEqual([]);
@@ -262,7 +267,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects a month outside 1-12 without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.monthlySummary("sec-1", 2026, 13)).rejects.toBeInstanceOf(ValidationError);
     await expect(service.monthlySummary("sec-1", 2026, 0)).rejects.toBeInstanceOf(ValidationError);
@@ -271,7 +276,7 @@ describe("AttendanceApplicationService", () => {
 
   it("rejects an empty section id for monthlySummary without calling the repository", async () => {
     const repo = new FakeAttendanceRepository();
-    const service = new AttendanceApplicationService(repo, () => new Date("2026-08-24"));
+    const service = new AttendanceApplicationService(repo, FIXED_NOW);
 
     await expect(service.monthlySummary("  ", 2026, 8)).rejects.toBeInstanceOf(ValidationError);
     expect(repo.monthlySummaryCalls).toEqual([]);

@@ -1,0 +1,28 @@
+name: Harness Metadata Health
+
+on:
+  schedule:
+    # GitHub cron cannot express an exact 14-day interval. The 1st/15th
+    # cadence is the closest stable calendar schedule; the verifier uses
+    # the authoritative 14-day maximum age from .harness/inventory.json.
+    - cron: "17 6 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metadata-health:
+    name: Inventory, weakness, and staleness check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Verify harness metadata and score evidence
+        run: node scripts/harness/verify.mjs

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "LIKHA Production Harness",
+  "version": "2.0.0-candidate",
+  "state": "unlocked",
+  "ownerAuthorization": "Owner-authorized final update in active session on 2026-08-28",
+  "unlockedOn": "2026-08-28",
+  "lockReason": null,
+  "certification": "pending-ci",
+  "score": null,
+  "fatalOverrides": [],
+  "rubric": "docs/adr/0052-wave2l-production-harness-v1.md",
+  "reviewedOn": "2026-08-28",
+  "reviewIntervalDays": 14,
+  "nextReviewOn": "2026-09-11"
+}
