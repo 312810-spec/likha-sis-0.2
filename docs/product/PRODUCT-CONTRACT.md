@@ -227,12 +227,18 @@ exists (ADR-0024) showing sections/attendance status; a full "My Day"
 using schedule + Class Record readiness + advisory + relief + deadlines
 needs Teacher Load/Schedule (§6) first — sequenced accordingly.
 
-## 11. Teacher Tools & Teacher Creation Studio — RESEARCHED (2026-08-29), nothing built yet
+## 11. Teacher Tools & Teacher Creation Studio — READY SPEC (2026-08-29), nothing built yet
 
-**Research/classification complete** — full record:
-`docs/adr/0042-ilawcraft-research-and-classification.md`. Nothing in
-this area has been implemented; this section records the researched
-direction, not a completed build.
+**Research/classification complete, full catalog and integration
+architecture complete** — full records:
+`docs/adr/0042-ilawcraft-research-and-classification.md` (ilawcraft
+classification) and `docs/adr/0043-teacher-tools-catalog-and-integration-architecture.md`
+(the full tool catalog, evidence tiers, architecture-impact tiers, and
+build order — a ready-to-execute Wave 6 spec, deliberately produced
+ahead of Wave 6 itself so no further research blocks it once Waves 1-5
+complete). Nothing in this area has been implemented; this section
+stays the concise durable-facts summary — read ADR-0043 for the full
+per-tool detail.
 
 **ilawcraft (`alotski15-png/ilaw-app-2`) classification — split by
 asset, not one label**: the DepEd Annex E-1 COT (Classroom Observation
@@ -271,14 +277,32 @@ analysis first — ties to DepEd's live ARAL remediation policy, DepEd
 Order 18 s.2025) and **6b — Teacher Creation Studio** (the AI generator
 adapter, gated on the BYOK-vs-LIKHA-funded decision above).
 
-**Candidate low-risk classroom tools** (seating plan, random picker,
-group generator, quick class list, advisory checklist, parent contact
-log, intervention tracker, certificate generator): must reuse existing
-learner/class data, never create parallel datasets. Validated as a
-known-useful pattern by generic/international edtech products, not by
-Filipino-teacher-specific demand evidence the way item analysis is —
-weaker-evidence but reasonable to build. No learner PII should ever be
-required by a generation tool.
+**Full catalog (ADR-0043), summarized by tier**: Tier A — Item Analysis,
+Phil-IRI reading-level digitization (strongest evidence, cheapest
+architecture). Tier B — LAC session minutes/attendance, an RPMS/IPCRF
+**evidence tracker** (explicitly not a replacement for DepEd's own
+official `eipcrf.deped.gov.ph` submission — an input aid reusing the
+already-adopted COT rubric), Learner Support/Intervention Tracker. Tier
+C — low-risk classroom utilities (seating plan, random picker/group
+generator, timer, certificate generator, quick formative check): must
+reuse existing learner/class data, never create parallel datasets;
+validated by generic/international edtech patterns, weaker
+Filipino-teacher-specific evidence than Tier A/B. Tier D — the AI
+generation studio itself (lesson plan, slide deck, worksheet, quiz+TOS,
+rubric), Wave 6b, gated as above. **Tier E — explicitly blocked/
+deprioritized, not silently dropped**: a SPED/IEP tool is **blocked**
+(Republic Act 11650 requires one, but DepEd's own detailed IEP framework
+remains unissued — do not guess a format); GAD Plan/DRRM Sitrep
+generators are **deprioritized** (official DepEd tooling already exists
+for both, role-specific rather than universal-teacher need); a
+sub/relief-teacher plan generator was **dropped** (no evidence of real
+demand found). No learner PII should ever be required by a generation
+tool.
+
+**Recommended build order within Wave 6** (full reasoning in ADR-0043):
+6a-i Item Analysis → 6a-ii Phil-IRI → 6a-iii low-risk utilities batch →
+6a-iv LAC + Portfolio/Evidence tracker → 6a-v Intervention Tracker →
+6b Teacher Creation Studio (gated).
 
 ## 12. Cloud / sync / web access — HYPOTHESIS, no ADR yet
 

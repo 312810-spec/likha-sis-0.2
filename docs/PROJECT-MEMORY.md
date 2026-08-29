@@ -443,6 +443,45 @@ the parent session). For a public GitHub repo, direct `WebFetch` against
 reliable inspection path in this environment — prefer it over spawning a
 CCR session for repo inspection going forward.
 
+## Teacher Tools Catalog and Integration Architecture (added 2026-08-29)
+
+Full record: `docs/adr/0043-teacher-tools-catalog-and-integration-architecture.md`.
+Extends the ILAWCraft classification (above) into a full, tightly-sourced
+Teacher Tools catalog and integration architecture, produced ahead of
+Wave 6 per explicit user instruction so Wave 6 needs no further research
+once Waves 1-5 complete. Catalog tiered by evidence strength — Tier A
+(Item Analysis, Phil-IRI reading-level digitization: strongest evidence,
+cheapest architecture); Tier B (LAC session records per DepEd Order 35
+s.2016, an RPMS/IPCRF **evidence-tracker input aid** — not a replacement
+for DepEd's own official `eipcrf.deped.gov.ph` tool — reusing the
+already-adopted COT rubric; a Learner Support/Intervention Tracker);
+Tier C (low-risk classroom utilities: seating chart, group maker, timer,
+certificate generator — weaker Filipino-specific evidence); Tier D (the
+AI generation studio: lesson plan, slide deck, worksheet, quiz+TOS,
+rubric — Wave 6b, still gated on the BYOK-vs-LIKHA-funded decision);
+**Tier E recorded as blocked/deprioritized, not dropped silently** — a
+SPED/IEP tool is blocked (Republic Act 11650 mandates one, DepEd's own
+detailed framework remains unissued); GAD/DRRM generators deprioritized
+(official DepEd tooling already exists); a sub/relief-teacher plan
+generator dropped (no demand evidence found).
+
+Integration architecture: a new "Teacher Tools" nav group (fifth,
+alongside UX-01's four), independent architecture-impact tiers (pure
+computation/no-new-Rust; new small tables over existing entities via
+the established session-scoped repository pattern; the AI provider
+port matching `SyncProvider`'s placeholder shape). **One genuine
+security improvement over ilawcraft's own design identified**: BYOK API
+keys should be DPAPI-protected via the same trusted mechanism already
+built for the SQLCipher key (ADR-0003), never transmitted anywhere
+except directly to Google's API — LIKHA has no remote server in this
+path the way ilawcraft's own reference implementation does.
+
+Recommended build order: 6a-i Item Analysis → 6a-ii Phil-IRI → 6a-iii
+low-risk utilities batch → 6a-iv LAC + Portfolio/Evidence tracker →
+6a-v Intervention Tracker → 6b Teacher Creation Studio (gated). No wave
+reordering — Waves 1-5's foundational work still correctly precedes
+this per LIKHA's priority order.
+
 ## UX-01: Design Tokens, Shared Components, and App Shell (added 2026-08-25)
 
 Second UI-First Program milestone (ADR-0031). The Calm Civic Classroom

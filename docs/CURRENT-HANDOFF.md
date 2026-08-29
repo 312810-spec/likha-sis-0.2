@@ -1,5 +1,69 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — Teacher Tools Catalog and Integration Architecture, complete)
+
+**Research/planning only — no product code changed.** Full record:
+`docs/adr/0043-teacher-tools-catalog-and-integration-architecture.md`.
+Extends the ILAWCraft classification below (same session, immediately
+following) per explicit user instruction: research as comprehensive a
+Teacher Tools catalog as can be tightly evidenced, design exactly how
+each tool integrates into LIKHA's architecture, and do it now so **Wave
+6 can start implementation immediately once Wave 5 completes**, with no
+further research blocking it.
+
+**Full catalog produced, tiered by evidence strength**: Tier A (Item
+Analysis, Phil-IRI reading-level digitization — strongest DepEd-specific
+evidence, cheapest architecture, reuse existing data, no paid API); Tier
+B (LAC session minutes/attendance per DepEd Order 35 s.2016, an
+RPMS/IPCRF **evidence tracker** explicitly scoped as an input aid, not
+a replacement for DepEd's own official `eipcrf.deped.gov.ph` submission
+tool, reusing the already-adopted COT rubric; a Learner Support/
+Intervention Tracker); Tier C (low-risk classroom utilities — seating
+chart, group maker, timer, certificate generator — weaker
+Filipino-specific evidence, cheapest to build); Tier D (the AI
+generation studio itself: lesson plan, slide deck, worksheet, quiz+TOS,
+rubric — Wave 6b, still gated on ADR-0042's BYOK-vs-LIKHA-funded
+decision); **Tier E explicitly recorded as blocked/deprioritized, not
+silently dropped** — a SPED/IEP tool is blocked (Republic Act 11650
+mandates one, but DepEd's own detailed IEP framework remains unissued;
+do not guess a format); GAD Plan/DRRM Sitrep generators deprioritized
+(official DepEd tooling already exists for both); a sub/relief-teacher
+plan generator dropped (no evidence of demand found).
+
+**Integration architecture defined**: a new "Teacher Tools" nav group
+(fifth, alongside UX-01's four), one screen + `*ApplicationService` per
+tool. Three architecture-impact tiers, independent of evidence
+strength: Impact Tier 1 (pure computation/ephemeral, no new Rust code —
+item analysis, seating chart, group maker, timer); Impact Tier 2 (new
+small tables over existing entities, following the established
+`school_id`-session-scoped repository/command pattern exactly — Phil-IRI
+results, LAC sessions, portfolio evidence, intervention log); Impact
+Tier 3 (the AI provider port, matching `SyncProvider`'s existing
+architectural placeholder shape) — **one genuine security improvement
+over ilawcraft's own reference design identified**: since LIKHA has no
+remote server in this path, the teacher's BYOK API key should be
+DPAPI-protected using the same trusted key-store mechanism already built
+for the SQLCipher database key (ADR-0003), never transmitted anywhere
+except directly to Google's API — strictly better than ilawcraft's own
+client-to-remote-server header pattern.
+
+**Recommended build order recorded** (full reasoning in ADR-0043): 6a-i
+Item Analysis → 6a-ii Phil-IRI → 6a-iii low-risk utilities batch → 6a-iv
+LAC + Portfolio/Evidence tracker → 6a-v Intervention Tracker → 6b
+Teacher Creation Studio (gated). No wave reordering relative to
+ADR-0042 — this only fills Wave 6's internal sequence in, using LIKHA's
+own priority order (foundational privacy/security/DepEd-compliance work
+in Waves 1-5 still correctly precedes this usability tooling).
+
+**Per Autonomous Continuous Development Mode: this is a completed
+research checkpoint, not a stopping point.** Exact next action:
+unchanged from the entry below — Wave 1 (RBAC foundation) remains the
+highest-leverage next implementation milestone, since Waves 1-5 are not
+yet started. Wave 6 itself is now fully spec'd and requires no further
+research when it is eventually reached; the one still-open item is the
+human BYOK-vs-LIKHA-funded decision for Wave 6b specifically, which
+remains for the user to decide whenever Wave 6b is reached, not now.
+
 ## Active Task (2026-08-29, this session — ILAWCraft Research and Classification, complete)
 
 **Research/planning only — no product code changed.** Full record:
