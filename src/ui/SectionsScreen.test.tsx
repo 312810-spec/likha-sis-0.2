@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LearnerApplicationService } from "../application/learner-service";
 import { SectionApplicationService } from "../application/section-service";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
@@ -29,6 +29,10 @@ class FakeLearnerRepository implements LearnerRepository {
   }
 
   async create(): Promise<Learner> {
+    throw new Error("not used in this test");
+  }
+
+  async createWithDuplicateCheck(): Promise<CreateLearnerResult> {
     throw new Error("not used in this test");
   }
 

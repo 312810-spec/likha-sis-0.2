@@ -85,6 +85,38 @@ pub fn find_learner_candidates(
     learner::find_candidates(&conn, &school_id, &given_name, &family_name, lrn.as_deref())
 }
 
+/// Manual Create Learner's duplicate-aware entry point (Wave 2U) --
+/// reuses `learner::find_candidates` (already relied on by SF1 import)
+/// through `learner::create_with_duplicate_check` rather than a second
+/// detection engine. `create_learner` above is left unchanged as the
+/// low-level primitive SF1 import's own commit path still calls
+/// directly; this command is the one the manual Create Learner UI calls.
+/// Same `ManageLearners` gate as `create_learner`, since this performs
+/// the same action with an added review step.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn create_learner_with_duplicate_check(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    given_name: String,
+    family_name: String,
+    lrn: Option<String>,
+    sex: Option<String>,
+    confirmed: bool,
+) -> AppResult<learner::CreateLearnerOutcome> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    learner::create_with_duplicate_check(
+        &conn,
+        &school_id,
+        &given_name,
+        &family_name,
+        lrn.as_deref(),
+        sex.as_deref(),
+        confirmed,
+    )
+}
+
 /// Same Registrar/School Head gate as `create_learner` — editing a
 /// learner's identity/records is the same "manage learners" capability,
 /// not a separate one.

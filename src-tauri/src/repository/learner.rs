@@ -164,6 +164,89 @@ pub fn find_candidates(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Typed result of `create_with_duplicate_check` — see that function's doc
+/// comment. Mirrors the house pattern used by other write commands with
+/// more than one legitimate outcome (e.g. `CorrectPlacementOutcome`,
+/// `EnrollOutcome`) rather than surfacing a raw DB error for the
+/// conflict case.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CreateLearnerOutcome {
+    Created {
+        learner: Learner,
+    },
+    /// The entered LRN exactly matches a different learner already in
+    /// this school. Never overridable by `confirmed` -- an LRN is
+    /// DepEd's own stable per-learner identifier (see ADR-0017) and the
+    /// `learners` table's own unique index already treats this as a hard
+    /// rule; this variant exists so the conflict surfaces as a typed
+    /// result instead of a raw constraint-violation error.
+    LrnConflict {
+        existing: Learner,
+    },
+    /// One or more learners already in this school share this name (or,
+    /// with no exact-LRN hit, this LRN) closely enough to warrant a
+    /// human look before creating a new record -- never auto-blocked.
+    /// Call again with `confirmed: true` to create anyway.
+    DuplicateCandidates {
+        candidates: Vec<Learner>,
+    },
+}
+
+/// Wraps `create` with the same deterministic, school-scoped candidate
+/// check `find_candidates` already provides to SF1 import (Wave 2C) --
+/// reused here rather than re-implemented, per
+/// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`'s
+/// "Deferred" section, which left exactly this manual-creation warning
+/// for a later milestone. Deliberately does not reuse
+/// `import::matching::classify_row`: that function's `MatchKind::ExactLrn`
+/// is *soft* there (SF1 import auto-resolves it to "use existing"), while
+/// a manual duplicate LRN must be a *hard*, non-overridable conflict here
+/// -- the two callers need different policy on the same underlying
+/// query, not a shared enum whose meaning would have to change per
+/// caller. Reusing `find_candidates` (the actual matching engine) while
+/// keeping the two policies separate avoids a second competing
+/// detection engine without blurring either call site's guarantees.
+///
+/// `confirmed` distinguishes an initial submission (`false`) from a
+/// teacher's explicit "create separate learner anyway" (`true`) after
+/// reviewing `DuplicateCandidates`. Candidates are always re-fetched
+/// fresh on every call (never trusting a caller-supplied list from an
+/// earlier response), so a `confirmed: true` call still atomically
+/// re-checks the hard LRN-conflict rule against the database's current
+/// state -- catching a conflict that appeared after the first check --
+/// while a soft `DuplicateCandidates` warning, once explicitly
+/// confirmed, does not re-block on a shifted candidate set.
+pub fn create_with_duplicate_check(
+    conn: &Connection,
+    school_id: &str,
+    given_name: &str,
+    family_name: &str,
+    lrn: Option<&str>,
+    sex: Option<&str>,
+    confirmed: bool,
+) -> AppResult<CreateLearnerOutcome> {
+    let candidates = find_candidates(conn, school_id, given_name, family_name, lrn)?;
+
+    if let Some(lrn_value) = lrn {
+        if let Some(exact) = candidates
+            .iter()
+            .find(|c| c.lrn.as_deref() == Some(lrn_value))
+        {
+            return Ok(CreateLearnerOutcome::LrnConflict {
+                existing: exact.clone(),
+            });
+        }
+    }
+
+    if !candidates.is_empty() && !confirmed {
+        return Ok(CreateLearnerOutcome::DuplicateCandidates { candidates });
+    }
+
+    let learner = create(conn, school_id, given_name, family_name, lrn, sex)?;
+    Ok(CreateLearnerOutcome::Created { learner })
+}
+
 fn row_to_learner(row: &rusqlite::Row) -> rusqlite::Result<Learner> {
     Ok(Learner {
         id: row.get(0)?,
@@ -388,6 +471,179 @@ mod tests {
         // The original learner, in its real school, is untouched.
         let unchanged = find_by_id_in_school(&conn, &school_a.id, &learner.id).unwrap();
         assert_eq!(unchanged, Some(learner));
+    }
+
+    #[test]
+    fn create_with_duplicate_check_creates_immediately_when_there_is_no_overlap() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+
+        let outcome =
+            create_with_duplicate_check(&conn, &s.id, "Juan", "Dela Cruz", None, None, false)
+                .unwrap();
+
+        match outcome {
+            CreateLearnerOutcome::Created { learner } => {
+                assert_eq!(learner.given_name, "Juan");
+            }
+            other => panic!("expected Created, got {other:?}"),
+        }
+        assert_eq!(list_by_school(&conn, &s.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn create_with_duplicate_check_warns_without_creating_when_the_name_matches() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let existing = create(&conn, &s.id, "Grace", "Torres", None, None).unwrap();
+
+        let outcome =
+            create_with_duplicate_check(&conn, &s.id, "Grace", "Torres", None, None, false)
+                .unwrap();
+
+        assert_eq!(
+            outcome,
+            CreateLearnerOutcome::DuplicateCandidates {
+                candidates: vec![existing]
+            }
+        );
+        assert_eq!(
+            list_by_school(&conn, &s.id).unwrap().len(),
+            1,
+            "must not create a second record while the warning is unresolved"
+        );
+    }
+
+    #[test]
+    fn create_with_duplicate_check_creates_when_confirmed_despite_a_name_match() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        create(&conn, &s.id, "Grace", "Torres", None, None).unwrap();
+
+        let outcome =
+            create_with_duplicate_check(&conn, &s.id, "Grace", "Torres", None, None, true).unwrap();
+
+        assert!(matches!(outcome, CreateLearnerOutcome::Created { .. }));
+        assert_eq!(
+            list_by_school(&conn, &s.id).unwrap().len(),
+            2,
+            "an explicitly confirmed separate learner must be created"
+        );
+    }
+
+    #[test]
+    fn create_with_duplicate_check_blocks_an_exact_lrn_conflict_even_when_confirmed() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let existing = create(&conn, &s.id, "Grace", "Torres", Some("123456789012"), None).unwrap();
+
+        let outcome = create_with_duplicate_check(
+            &conn,
+            &s.id,
+            "Different",
+            "Person",
+            Some("123456789012"),
+            None,
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CreateLearnerOutcome::LrnConflict { existing });
+        assert_eq!(
+            list_by_school(&conn, &s.id).unwrap().len(),
+            1,
+            "an exact LRN conflict must never be overridable, even when confirmed"
+        );
+    }
+
+    #[test]
+    fn create_with_duplicate_check_blocks_an_exact_lrn_conflict_when_unconfirmed() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let existing = create(&conn, &s.id, "Grace", "Torres", Some("123456789012"), None).unwrap();
+
+        let outcome = create_with_duplicate_check(
+            &conn,
+            &s.id,
+            "Different",
+            "Person",
+            Some("123456789012"),
+            None,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(outcome, CreateLearnerOutcome::LrnConflict { existing });
+    }
+
+    #[test]
+    fn create_with_duplicate_check_never_flags_a_different_schools_learner() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let other = school::create(&conn, "Other School").unwrap();
+        create(
+            &conn,
+            &other.id,
+            "Grace",
+            "Torres",
+            Some("123456789012"),
+            None,
+        )
+        .unwrap();
+
+        let outcome = create_with_duplicate_check(
+            &conn,
+            &s.id,
+            "Grace",
+            "Torres",
+            Some("123456789012"),
+            None,
+            false,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, CreateLearnerOutcome::Created { .. }));
+    }
+
+    #[test]
+    fn create_with_duplicate_check_rechecks_state_and_catches_a_conflict_that_appeared_after_the_first_check(
+    ) {
+        // Simulates the "stale candidate" scenario: a first call surfaces
+        // no conflict, then a different LRN write lands before the
+        // teacher's confirmed retry -- the confirmed call must still
+        // re-run the check against current state, not trust the earlier
+        // result.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+
+        let first = create_with_duplicate_check(
+            &conn,
+            &s.id,
+            "Juan",
+            "Dela Cruz",
+            Some("123456789012"),
+            None,
+            false,
+        )
+        .unwrap();
+        assert!(matches!(first, CreateLearnerOutcome::Created { .. }));
+
+        // A second, unrelated submission for the same LRN arrives before
+        // any "confirmed" retry of a *different* duplicate warning would
+        // occur -- re-using the same LRN must still be caught.
+        let second = create_with_duplicate_check(
+            &conn,
+            &s.id,
+            "Maria",
+            "Santos",
+            Some("123456789012"),
+            None,
+            true,
+        )
+        .unwrap();
+
+        assert!(matches!(second, CreateLearnerOutcome::LrnConflict { .. }));
+        assert_eq!(list_by_school(&conn, &s.id).unwrap().len(), 1);
     }
 
     #[test]

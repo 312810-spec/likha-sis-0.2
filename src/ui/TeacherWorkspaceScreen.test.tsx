@@ -18,7 +18,7 @@ import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
 import type { AuditLogEntry, CurrentSession } from "../domain/session";
 import { expectNoAccessibilityViolations } from "../test/a11y";
@@ -33,6 +33,10 @@ class FakeLearnerRepository implements LearnerRepository {
   }
 
   async create(): Promise<Learner> {
+    throw new Error("not used in this test");
+  }
+
+  async createWithDuplicateCheck(): Promise<CreateLearnerResult> {
     throw new Error("not used in this test");
   }
 

@@ -5,7 +5,7 @@ import type { LearnerApplicationService } from "../application/learner-service";
 import type { EnrollmentHistoryEntry } from "../domain/enrollment-history";
 import { ValidationError } from "../domain/errors";
 import type { LearnerRosterExportResult } from "../domain/export";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
@@ -58,6 +58,7 @@ export function LearnerListScreen({
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editFirstFieldRef = useRef<HTMLInputElement>(null);
+  const duplicateWarningRef = useRef<HTMLDivElement>(null);
   const [learners, setLearners] = useState<Learner[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [givenName, setGivenName] = useState("");
@@ -66,6 +67,8 @@ export function LearnerListScreen({
   const [sex, setSex] = useState<"" | "M" | "F">("");
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Learner[] | null>(null);
+  const [lrnConflict, setLrnConflict] = useState<Learner | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -96,6 +99,15 @@ export function LearnerListScreen({
       editFirstFieldRef.current?.focus();
     }
   }, [editingId]);
+
+  useEffect(() => {
+    // Moves focus to the duplicate/conflict warning as soon as it
+    // appears, so keyboard and screen-reader users land directly on it
+    // instead of it silently appearing below an unmoved focus point.
+    if (duplicateCandidates || lrnConflict) {
+      duplicateWarningRef.current?.focus();
+    }
+  }, [duplicateCandidates, lrnConflict]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,29 +178,79 @@ export function LearnerListScreen({
     void loadHistory(learner);
   }
 
+  /** Applies a `CreateLearnerResult` shared by both the initial submit
+   * and the confirmed "create separate learner anyway" retry -- keeping
+   * the three-way branch (created / conflict / candidates) in one
+   * place. Never clears form values except on `created`, so a teacher
+   * reviewing a warning never loses what they typed. */
+  function applyCreateLearnerResult(result: CreateLearnerResult) {
+    if (result.kind === "created") {
+      setLearners((current) => [...current, result.learner]);
+      setConfirmation(`${result.learner.givenName} ${result.learner.familyName} was enrolled.`);
+      setDuplicateCandidates(null);
+      setLrnConflict(null);
+      setGivenName("");
+      setFamilyName("");
+      setLrn("");
+      setSex("");
+    } else if (result.kind === "lrnConflict") {
+      setDuplicateCandidates(null);
+      setLrnConflict(result.existing);
+    } else {
+      setLrnConflict(null);
+      setDuplicateCandidates(result.candidates);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setConfirmation(null);
     setSubmitting(true);
     try {
-      const learner = await learnerService.enrollLearner(
+      const result = await learnerService.createLearnerWithDuplicateCheck(
         givenName,
         familyName,
         lrn.trim() === "" ? undefined : lrn,
         sex === "" ? undefined : sex,
       );
-      setLearners((current) => [...current, learner]);
-      setConfirmation(`${learner.givenName} ${learner.familyName} was enrolled.`);
-      setGivenName("");
-      setFamilyName("");
-      setLrn("");
-      setSex("");
+      applyCreateLearnerResult(result);
     } catch (err) {
       setError(err instanceof ValidationError ? err.message : "Could not enroll this learner.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** A teacher's explicit "create separate learner anyway" after
+   * reviewing `duplicateCandidates` -- re-checks the school's current
+   * records rather than trusting the earlier response, so a real LRN
+   * conflict that appeared meanwhile is still caught (see
+   * `learner::create_with_duplicate_check`'s doc comment). Never used to
+   * override an `lrnConflict`, which is not overridable at all. */
+  async function handleConfirmCreateSeparate() {
+    setError(null);
+    setConfirmation(null);
+    setSubmitting(true);
+    try {
+      const result = await learnerService.createLearnerWithDuplicateCheck(
+        givenName,
+        familyName,
+        lrn.trim() === "" ? undefined : lrn,
+        sex === "" ? undefined : sex,
+        true,
+      );
+      applyCreateLearnerResult(result);
+    } catch (err) {
+      setError(err instanceof ValidationError ? err.message : "Could not enroll this learner.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleCancelDuplicateReview() {
+    setDuplicateCandidates(null);
+    setLrnConflict(null);
   }
 
   function handleStartEdit(learner: Learner) {
@@ -521,9 +583,86 @@ export function LearnerListScreen({
             </select>
           </div>
         </div>
-        <button type="submit" className="button-primary" disabled={submitting}>
-          {submitting ? "Enrolling…" : "Enroll learner"}
-        </button>
+        {lrnConflict && (
+          <div
+            ref={duplicateWarningRef}
+            className="learner-duplicate-warning"
+            role="alert"
+            tabIndex={-1}
+            aria-label="LRN already in use"
+          >
+            <p>
+              LRN <strong>{lrn.trim()}</strong> already belongs to{" "}
+              <strong>
+                {lrnConflict.givenName} {lrnConflict.familyName}
+              </strong>{" "}
+              in this school.
+            </p>
+            <p className="field-hint">
+              Each Learner Reference Number can only belong to one learner. Correct the LRN above,
+              or edit {lrnConflict.givenName}&rsquo;s existing record instead of creating a new one.
+            </p>
+            <button type="button" onClick={handleCancelDuplicateReview}>
+              Edit the form
+            </button>
+          </div>
+        )}
+
+        {duplicateCandidates && (
+          <div
+            ref={duplicateWarningRef}
+            className="learner-duplicate-warning"
+            role="alert"
+            tabIndex={-1}
+            aria-label="Possible duplicate learner"
+          >
+            <p>
+              LIKHA found{" "}
+              {duplicateCandidates.length === 1
+                ? "a learner"
+                : `${duplicateCandidates.length} learners`}{" "}
+              already in this school with a matching name{lrn.trim() !== "" ? " or LRN" : ""}:
+            </p>
+            <ul>
+              {duplicateCandidates.map((candidate) => (
+                <li key={candidate.id}>
+                  {candidate.givenName} {candidate.familyName}
+                  {candidate.lrn && ` — LRN ${candidate.lrn}`}
+                </li>
+              ))}
+            </ul>
+            {mode === "guided" ? (
+              <p className="field-hint">
+                If this is the same learner, cancel and use their existing record instead of
+                creating a new one. If this is a different learner, you can safely continue — LIKHA
+                never merges or changes any existing record.
+              </p>
+            ) : (
+              <p className="field-hint">
+                LIKHA never merges or changes an existing record automatically.
+              </p>
+            )}
+            <div className="form-row">
+              <button
+                type="button"
+                className="button-primary"
+                onClick={handleConfirmCreateSeparate}
+                disabled={submitting}
+              >
+                {submitting ? "Creating…" : "Create separate learner"}
+              </button>
+              <button type="button" onClick={handleCancelDuplicateReview} disabled={submitting}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!duplicateCandidates && !lrnConflict && (
+          <button type="submit" className="button-primary" disabled={submitting}>
+            {submitting ? "Enrolling…" : "Enroll learner"}
+          </button>
+        )}
       </form>
     </section>
   );

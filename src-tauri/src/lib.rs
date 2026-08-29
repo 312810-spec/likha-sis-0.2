@@ -39,6 +39,7 @@ pub fn run() {
             commands::school::create_school,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
+            commands::learner::create_learner_with_duplicate_check,
             commands::learner::get_learner,
             commands::learner::update_learner,
             commands::learner::find_learner_candidates,

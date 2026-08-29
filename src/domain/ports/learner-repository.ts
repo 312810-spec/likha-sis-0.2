@@ -1,4 +1,4 @@
-import type { Learner } from "../learner";
+import type { CreateLearnerResult, Learner } from "../learner";
 
 /**
  * Repository port for learners. Every method here is implicitly scoped to
@@ -11,6 +11,20 @@ import type { Learner } from "../learner";
 export interface LearnerRepository {
   list(): Promise<Learner[]>;
   create(givenName: string, familyName: string, lrn?: string, sex?: "M" | "F"): Promise<Learner>;
+  /**
+   * Manual Create Learner's duplicate-aware entry point (Wave 2U) — see
+   * `CreateLearnerResult`. `confirmed` distinguishes an initial
+   * submission (`false`, the default) from an explicit "create separate
+   * learner anyway" after a teacher has reviewed a
+   * `duplicateCandidates` result; it never overrides an `lrnConflict`.
+   */
+  createWithDuplicateCheck(
+    givenName: string,
+    familyName: string,
+    lrn: string | undefined,
+    sex: "M" | "F" | undefined,
+    confirmed: boolean,
+  ): Promise<CreateLearnerResult>;
   updateProfile(
     learnerId: string,
     givenName: string,

@@ -1,5 +1,5 @@
 import { invoke } from "./invoke";
-import type { Learner } from "../../domain/learner";
+import type { CreateLearnerResult, Learner } from "../../domain/learner";
 import type { LearnerRepository } from "../../domain/ports/learner-repository";
 
 /** Tauri/SQLite implementation of {@link LearnerRepository}. */
@@ -14,6 +14,22 @@ export class TauriLearnerRepository implements LearnerRepository {
       familyName,
       lrn: lrn ?? null,
       sex: sex ?? null,
+    });
+  }
+
+  createWithDuplicateCheck(
+    givenName: string,
+    familyName: string,
+    lrn: string | undefined,
+    sex: "M" | "F" | undefined,
+    confirmed: boolean,
+  ): Promise<CreateLearnerResult> {
+    return invoke<CreateLearnerResult>("create_learner_with_duplicate_check", {
+      givenName,
+      familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
+      confirmed,
     });
   }
 

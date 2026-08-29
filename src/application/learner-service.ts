@@ -1,5 +1,5 @@
 import { ValidationError } from "../domain/errors";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 
 const MAX_NAME_LENGTH = 100;
@@ -34,6 +34,42 @@ export class LearnerApplicationService {
     const trimmedLrn = normalizeLrn(lrn);
 
     return this.learners.create(trimmedGiven, trimmedFamily, trimmedLrn, sex);
+  }
+
+  /**
+   * Manual Create Learner's duplicate-aware entry point (Wave 2U). Same
+   * validation as `enrollLearner`; the caller re-submits with
+   * `confirmed: true` after a teacher explicitly reviews a
+   * `duplicateCandidates` result and chooses to create a separate
+   * learner. Never bypasses `lrnConflict` -- see `CreateLearnerResult`.
+   */
+  async createLearnerWithDuplicateCheck(
+    givenName: string,
+    familyName: string,
+    lrn?: string,
+    sex?: "M" | "F",
+    confirmed = false,
+  ): Promise<CreateLearnerResult> {
+    const trimmedGiven = givenName.trim();
+    const trimmedFamily = familyName.trim();
+    if (trimmedGiven.length === 0) {
+      throw new ValidationError("Given name must not be empty.");
+    }
+    if (trimmedFamily.length === 0) {
+      throw new ValidationError("Family name must not be empty.");
+    }
+    if (trimmedGiven.length > MAX_NAME_LENGTH || trimmedFamily.length > MAX_NAME_LENGTH) {
+      throw new ValidationError(`Names must be at most ${MAX_NAME_LENGTH} characters.`);
+    }
+    const trimmedLrn = normalizeLrn(lrn);
+
+    return this.learners.createWithDuplicateCheck(
+      trimmedGiven,
+      trimmedFamily,
+      trimmedLrn,
+      sex,
+      confirmed,
+    );
   }
 
   async updateLearnerProfile(

@@ -5,7 +5,7 @@ import { ExportApplicationService } from "../application/export-service";
 import { EnrollmentHistoryApplicationService } from "../application/enrollment-history-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import type { LearnerRosterExportResult } from "../domain/export";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { EnrollmentHistoryRepository } from "../domain/ports/enrollment-history-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
@@ -14,8 +14,21 @@ import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { LearnerListScreen } from "./LearnerListScreen";
 
+/** Mirrors `learner::create_with_duplicate_check`'s real semantics
+ * (exact LRN match -> hard, non-overridable conflict; any other
+ * name/LRN overlap -> a review-required warning, overridable via
+ * `confirmed`) against this fake's own in-memory `learners`, so UI
+ * tests exercise the same three-way branch the real backend produces
+ * rather than a repository double that always succeeds. */
 class FakeLearnerRepository implements LearnerRepository {
   createCalls: Array<{ givenName: string; familyName: string; lrn?: string; sex?: "M" | "F" }> = [];
+  createWithDuplicateCheckCalls: Array<{
+    givenName: string;
+    familyName: string;
+    lrn?: string;
+    sex?: "M" | "F";
+    confirmed: boolean;
+  }> = [];
 
   constructor(public learners: Learner[] = []) {}
 
@@ -41,6 +54,35 @@ class FakeLearnerRepository implements LearnerRepository {
     };
     this.learners.push(learner);
     return learner;
+  }
+
+  async createWithDuplicateCheck(
+    givenName: string,
+    familyName: string,
+    lrn: string | undefined,
+    sex: "M" | "F" | undefined,
+    confirmed = false,
+  ): Promise<CreateLearnerResult> {
+    this.createWithDuplicateCheckCalls.push({ givenName, familyName, lrn, sex, confirmed });
+    const trimmedGiven = givenName.trim().toLowerCase();
+    const trimmedFamily = familyName.trim().toLowerCase();
+    const candidates = this.learners.filter(
+      (candidate) =>
+        (lrn !== undefined && candidate.lrn === lrn) ||
+        (candidate.givenName.trim().toLowerCase() === trimmedGiven &&
+          candidate.familyName.trim().toLowerCase() === trimmedFamily),
+    );
+    if (lrn !== undefined) {
+      const exact = candidates.find((candidate) => candidate.lrn === lrn);
+      if (exact) {
+        return { kind: "lrnConflict", existing: exact };
+      }
+    }
+    if (candidates.length > 0 && !confirmed) {
+      return { kind: "duplicateCandidates", candidates };
+    }
+    const learner = await this.create(givenName, familyName, lrn, sex);
+    return { kind: "created", learner };
   }
 
   async updateProfile(
@@ -608,6 +650,177 @@ describe("LearnerListScreen", () => {
     expect(repo.createCalls).toEqual([]);
   });
 
+  it("warns about a duplicate candidate instead of creating immediately, and lets the teacher confirm creating a separate learner", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Grace");
+    await user.type(screen.getByLabelText("Family name"), "Torres");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    const warning = await screen.findByRole("alert", { name: "Possible duplicate learner" });
+    expect(warning).toHaveTextContent("Grace Torres");
+    expect(warning).toHaveFocus();
+    // Nothing was created yet, and the typed values are preserved.
+    expect(repo.learners).toHaveLength(1);
+    expect(screen.getByLabelText("Given name")).toHaveValue("Grace");
+    expect(screen.getByLabelText("Family name")).toHaveValue("Torres");
+    expect(screen.queryByRole("button", { name: "Enroll learner" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create separate learner" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Grace Torres was enrolled.");
+    expect(repo.learners).toHaveLength(2);
+    expect(
+      screen.queryByRole("alert", { name: "Possible duplicate learner" }),
+    ).not.toBeInTheDocument();
+    // The form is cleared again after a successful confirmed create.
+    expect(screen.getByLabelText("Given name")).toHaveValue("");
+  });
+
+  it("lets the teacher cancel a duplicate warning and keeps the form values to edit", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Grace");
+    await user.type(screen.getByLabelText("Family name"), "Torres");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await screen.findByRole("alert", { name: "Possible duplicate learner" });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.queryByRole("alert", { name: "Possible duplicate learner" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Given name")).toHaveValue("Grace");
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeInTheDocument();
+    expect(repo.learners).toHaveLength(1);
+  });
+
+  it("blocks an exact LRN conflict even after the teacher tries to confirm, and never creates a second record", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: "123456789012",
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Different");
+    await user.type(screen.getByLabelText("Family name"), "Person");
+    await user.type(screen.getByLabelText("LRN (optional)"), "123456789012");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    const conflict = await screen.findByRole("alert", { name: "LRN already in use" });
+    expect(conflict).toHaveTextContent("Grace Torres");
+    expect(conflict).toHaveFocus();
+    // There is no "confirm anyway" affordance for a hard conflict.
+    expect(
+      screen.queryByRole("button", { name: "Create separate learner" }),
+    ).not.toBeInTheDocument();
+    expect(repo.learners).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "Edit the form" }));
+
+    expect(screen.queryByRole("alert", { name: "LRN already in use" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("LRN (optional)")).toHaveValue("123456789012");
+  });
+
+  it("re-checks at confirm time and still blocks a conflict that appeared after the warning was shown", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Grace");
+    await user.type(screen.getByLabelText("Family name"), "Torres");
+    await user.type(screen.getByLabelText("LRN (optional)"), "999999999999");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await screen.findByRole("alert", { name: "Possible duplicate learner" });
+
+    // Simulates another write landing between the warning and the
+    // teacher's confirmation -- someone else just claimed this LRN.
+    repo.learners.push({
+      id: "l2",
+      schoolId: "s1",
+      givenName: "Someone",
+      familyName: "Else",
+      lrn: "999999999999",
+      sex: null,
+      createdAt: "now",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Create separate learner" }));
+
+    expect(await screen.findByRole("alert", { name: "LRN already in use" })).toBeInTheDocument();
+    // the stale duplicate warning must not create a learner
+    expect(repo.learners).toHaveLength(2);
+  });
+
+  it("preserves the entered values and allows a clear retry when the duplicate check itself fails", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([]);
+    await screen.findByText("No learners enrolled yet.");
+    const originalCheck = repo.createWithDuplicateCheck.bind(repo);
+    let calls = 0;
+    repo.createWithDuplicateCheck = (...args) => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error("network error"));
+      return originalCheck(...args);
+    };
+
+    await user.type(screen.getByLabelText("Given name"), "Ben");
+    await user.type(screen.getByLabelText("Family name"), "Reyes");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not enroll this learner.");
+    expect(repo.learners).toHaveLength(0);
+    expect(screen.getByLabelText("Given name")).toHaveValue("Ben");
+    expect(screen.getByLabelText("Family name")).toHaveValue("Reyes");
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Ben Reyes was enrolled.");
+    expect(repo.learners).toHaveLength(1);
+  });
+
   it("moves focus to the heading on mount", async () => {
     renderScreen([]);
 
@@ -699,6 +912,53 @@ describe("LearnerListScreen", () => {
       screen.getByRole("button", { name: "View enrollment history for Ana Santos" }),
     );
     await screen.findByText("Started 2 Jun 2025 · Current placement");
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with a duplicate-candidate warning open", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Grace");
+    await user.type(screen.getByLabelText("Family name"), "Torres");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await screen.findByRole("alert", { name: "Possible duplicate learner" });
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with an LRN conflict warning open", async () => {
+    const user = userEvent.setup();
+    const { container } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Grace",
+        familyName: "Torres",
+        lrn: "123456789012",
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Grace Torres");
+
+    await user.type(screen.getByLabelText("Given name"), "Different");
+    await user.type(screen.getByLabelText("Family name"), "Person");
+    await user.type(screen.getByLabelText("LRN (optional)"), "123456789012");
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await screen.findByRole("alert", { name: "LRN already in use" });
 
     await expectNoAccessibilityViolations(container);
   });

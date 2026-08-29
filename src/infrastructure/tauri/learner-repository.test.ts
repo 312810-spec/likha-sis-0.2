@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
-import type { Learner } from "../../domain/learner";
+import type { CreateLearnerResult, Learner } from "../../domain/learner";
 import { TauriLearnerRepository } from "./learner-repository";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -72,6 +72,63 @@ describe("TauriLearnerRepository", () => {
       familyName: "Santos",
       lrn: "123456789012",
       sex: "F",
+    });
+  });
+
+  it("createWithDuplicateCheck invokes create_learner_with_duplicate_check with confirmed and null lrn/sex when omitted", async () => {
+    const result: CreateLearnerResult = {
+      kind: "created",
+      learner: {
+        id: "1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const returned = await new TauriLearnerRepository().createWithDuplicateCheck(
+      "Ana",
+      "Santos",
+      undefined,
+      undefined,
+      false,
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("create_learner_with_duplicate_check", {
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: null,
+      sex: null,
+      confirmed: false,
+    });
+    expect(returned).toEqual(result);
+  });
+
+  it("createWithDuplicateCheck passes lrn/sex/confirmed through when provided", async () => {
+    const result: CreateLearnerResult = {
+      kind: "duplicateCandidates",
+      candidates: [],
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    await new TauriLearnerRepository().createWithDuplicateCheck(
+      "Ana",
+      "Santos",
+      "123456789012",
+      "F",
+      true,
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("create_learner_with_duplicate_check", {
+      givenName: "Ana",
+      familyName: "Santos",
+      lrn: "123456789012",
+      sex: "F",
+      confirmed: true,
     });
   });
 

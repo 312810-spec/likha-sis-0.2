@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import { LearnerApplicationService } from "./learner-service";
 
 class FakeLearnerRepository implements LearnerRepository {
   private learners: Learner[] = [];
   createCalls: Array<{ givenName: string; familyName: string; lrn?: string; sex?: "M" | "F" }> = [];
+  createWithDuplicateCheckCalls: Array<{
+    givenName: string;
+    familyName: string;
+    lrn?: string;
+    sex?: "M" | "F";
+    confirmed: boolean;
+  }> = [];
+  nextCreateWithDuplicateCheckResult: CreateLearnerResult | null = null;
   updateProfileCalls: Array<{
     learnerId: string;
     givenName: string;
@@ -37,6 +45,30 @@ class FakeLearnerRepository implements LearnerRepository {
     };
     this.learners.push(learner);
     return learner;
+  }
+
+  async createWithDuplicateCheck(
+    givenName: string,
+    familyName: string,
+    lrn: string | undefined,
+    sex: "M" | "F" | undefined,
+    confirmed: boolean,
+  ): Promise<CreateLearnerResult> {
+    this.createWithDuplicateCheckCalls.push({ givenName, familyName, lrn, sex, confirmed });
+    if (this.nextCreateWithDuplicateCheckResult) {
+      return this.nextCreateWithDuplicateCheckResult;
+    }
+    const learner: Learner = {
+      id: `learner-${this.learners.length + 1}`,
+      schoolId: "current-session-school",
+      givenName,
+      familyName,
+      lrn: lrn ?? null,
+      sex: sex ?? null,
+      createdAt: "now",
+    };
+    this.learners.push(learner);
+    return { kind: "created", learner };
   }
 
   async updateProfile(
@@ -123,6 +155,78 @@ describe("LearnerApplicationService", () => {
     const learner = await service.enrollLearner("Ana", "Santos", "   ");
 
     expect(learner.lrn).toBeNull();
+  });
+
+  it("createLearnerWithDuplicateCheck creates with trimmed names when there is no overlap", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    const result = await service.createLearnerWithDuplicateCheck("  Ana  ", "  Santos  ");
+
+    expect(result).toMatchObject({ kind: "created" });
+    expect(repo.createWithDuplicateCheckCalls).toEqual([
+      { givenName: "Ana", familyName: "Santos", lrn: undefined, sex: undefined, confirmed: false },
+    ]);
+  });
+
+  it("createLearnerWithDuplicateCheck passes confirmed through to the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    await service.createLearnerWithDuplicateCheck("Ana", "Santos", undefined, undefined, true);
+
+    expect(repo.createWithDuplicateCheckCalls).toEqual([
+      { givenName: "Ana", familyName: "Santos", lrn: undefined, sex: undefined, confirmed: true },
+    ]);
+  });
+
+  it("createLearnerWithDuplicateCheck rejects an empty given name without calling the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    await expect(service.createLearnerWithDuplicateCheck("  ", "Santos")).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.createWithDuplicateCheckCalls).toEqual([]);
+  });
+
+  it("createLearnerWithDuplicateCheck rejects a malformed LRN without calling the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const service = new LearnerApplicationService(repo);
+
+    await expect(
+      service.createLearnerWithDuplicateCheck("Ana", "Santos", "not-an-lrn"),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.createWithDuplicateCheckCalls).toEqual([]);
+  });
+
+  it("createLearnerWithDuplicateCheck returns duplicateCandidates as-is from the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const existing = await repo.create("Grace", "Torres");
+    repo.nextCreateWithDuplicateCheckResult = {
+      kind: "duplicateCandidates",
+      candidates: [existing],
+    };
+    const service = new LearnerApplicationService(repo);
+
+    const result = await service.createLearnerWithDuplicateCheck("Grace", "Torres");
+
+    expect(result).toEqual({ kind: "duplicateCandidates", candidates: [existing] });
+  });
+
+  it("createLearnerWithDuplicateCheck returns lrnConflict as-is from the repository", async () => {
+    const repo = new FakeLearnerRepository();
+    const existing = await repo.create("Grace", "Torres", "123456789012");
+    repo.nextCreateWithDuplicateCheckResult = { kind: "lrnConflict", existing };
+    const service = new LearnerApplicationService(repo);
+
+    const result = await service.createLearnerWithDuplicateCheck(
+      "Different",
+      "Person",
+      "123456789012",
+    );
+
+    expect(result).toEqual({ kind: "lrnConflict", existing });
   });
 
   it("listLearners delegates to the repository", async () => {

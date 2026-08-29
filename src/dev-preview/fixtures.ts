@@ -49,7 +49,7 @@ import type {
   Sf2ExportResult,
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
-import type { Learner } from "../domain/learner";
+import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type {
   ComputedTermGrade,
   LearnerScore,
@@ -215,6 +215,11 @@ export class FixtureLearnerRepository implements LearnerRepository {
   }
   async create(): Promise<Learner> {
     throw new Error("dev-preview fixture: create() is not wired -- read-only fixture");
+  }
+  async createWithDuplicateCheck(): Promise<CreateLearnerResult> {
+    throw new Error(
+      "dev-preview fixture: createWithDuplicateCheck() is not wired -- read-only fixture",
+    );
   }
   async updateProfile(): Promise<Learner | null> {
     throw new Error("dev-preview fixture: updateProfile() is not wired -- read-only fixture");

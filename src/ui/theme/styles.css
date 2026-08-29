@@ -766,6 +766,21 @@ label {
   background: var(--color-surface);
 }
 
+/* Wave 2U: calm inline warning shown above the Create Learner form when
+   a possible duplicate or an exact LRN conflict is found -- same panel
+   treatment as .section-roster-action-panel, not a modal. */
+.learner-duplicate-warning {
+  padding: var(--spacing-unit);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium, 8px);
+  background: var(--color-surface);
+  margin-bottom: var(--spacing-unit);
+}
+
+.learner-duplicate-warning ul {
+  margin: calc(var(--spacing-unit) * 0.5) 0;
+}
+
 /* "Generate SF1": a section-level action alongside "Enroll learner",
    not a membership change -- no confirmation panel, just a button and
    its own result/error banner below. */
