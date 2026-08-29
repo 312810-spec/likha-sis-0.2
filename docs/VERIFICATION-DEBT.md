@@ -1,5 +1,36 @@
 # Verification Debt
 
+## Wave 2Z — Class Schedule (2026-08-29)
+
+Full record: `docs/adr/0039-*` Wave 2Z addendum; `docs/PROJECT-MEMORY.md`
+Wave 2Z entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **`ScheduleMeetingsScreen` has no browser-rendered (Playwright/axe)
+   screenshot coverage.** Not wired into `src/dev-preview/fixtures.ts`
+   this wave — the same disclosed gap Waves 2U/2W/2X/2Y's own new UI
+   left open. Coverage is jsdom + axe-core
+   (`expectNoAccessibilityViolations`) only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as Waves 2V/2W/2X/2Y, not a new gap class.
+3. **No `get_teacher_load` view.** The three independent load numbers
+   ADR-0039 already computes (assignment count, distinct-subject
+   count, weekly instructional minutes) have no screen — carried as
+   the natural next candidate.
+4. **No one-off exceptional-date schedule overrides.** A holiday,
+   suspension, or substitute for one specific date still requires
+   removing and later re-adding the whole weekly meeting — ADR-0039's
+   own long-standing, deliberate non-goal, unchanged, not new debt.
+
+**Debt closed this wave**: the Wave 2X addendum's open item — the
+weekday convention (0=Sunday..6=Saturday) "not yet verified against
+any pre-existing schedule-creation UI, because none exists yet" — is
+now closed. `ScheduleMeetingsScreen`'s `WEEKDAY_LABELS`-driven picker
+is the first code to _write_ a `weekday` value, and its own tests
+(`lists an existing meeting with its weekday label`, matching Monday
+against index 1) prove the write and read sides agree.
+
 ## Wave 2Y — Teaching Assignments (2026-08-29)
 
 Full record: `docs/adr/0039-*` Wave 2Y addendum; `docs/PROJECT-MEMORY.md`

@@ -1,5 +1,51 @@
 # ACTIVE PLAN
 
+## Wave 2Z: Class Schedule (added 2026-08-29) — complete
+
+Full record: `docs/adr/0039-*` Wave 2Z addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2Z entry;
+`docs/VERIFICATION-DEBT.md` Wave 2Z entry. **New branch**
+`claude/likha-sis-wave2z-class-schedule`, created from `cbc3f74`
+(Wave 2Y's own final, CI-confirmed checkpoint).
+
+**Scope**: one new screen, `ScheduleMeetingsScreen.tsx` — a School
+Head schedules/unschedules a class's weekly meeting times, reached
+from `TeachingAssignmentsScreen`'s new "Manage schedule" action. Wires
+`create_schedule_meeting`/`list_schedule_meetings_by_assignment`
+(existed since ADR-0039, never reachable from any screen, never proven
+at the command boundary). New backend surface:
+`remove_schedule_meeting` + `repository::schedule_meeting::remove` —
+no removal function existed for schedule meetings at all before this
+wave. Also completes the Wave 2X weekday convention's write-side
+verification (0=Sunday..6=Saturday via the new `WEEKDAY_LABELS`
+constant).
+
+**Architecture**: `TeachingAssignmentRepository` gained
+`createMeeting`/`removeMeeting`; `TeachingAssignmentApplicationService`
+gained validated passthroughs (weekday range, HH:MM time-format
+checks). New TS `CreateMeetingOutcome` discriminated union mirrors
+Rust's eight-variant enum exactly, letting the screen show a distinct
+message per conflict type (teacher/section/room double-booking,
+duplicate, invalid weekday/time).
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X/2Y); no `get_teacher_load` view; no
+one-off exceptional-date schedule overrides (ADR-0039's own
+long-standing non-goal).
+
+**Verification, all actually run this session**: `npm run quality`
+678/678 vitest (+20); typecheck/eslint/format/architecture clean.
+`cargo test` 571 lib tests (+3) plus new
+`tests/schedule_meeting_management.rs` (9/9, closing a second
+pre-existing command-boundary test gap); `cargo fmt --check` / `cargo
+clippy --all-targets -- -D warnings` clean, as part of `npm run
+quality:full`. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.
+
+**Next**: `get_teacher_load`; Subject Monitor / Adviser View; or the
+native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 2Y: Teaching Assignments (added 2026-08-29) — complete
 
 Full record: `docs/adr/0039-*` Wave 2Y addendum; `docs/CURRENT-HANDOFF.md`

@@ -257,3 +257,93 @@ reassignment shape, not a gap); no schedule-meeting create/edit UI; no
 teacher-load view; no independent (non-self) review dispatched for this
 bounded slice — retained as debt, consistent with the same pattern
 Waves 2V/2W/2X already established.
+
+## Addendum (Wave 2Z, 2026-08-29): Class Schedule — the weekday convention's first write path
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-2Z-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Why this slice**: Wave 2Y let a School Head create teaching
+assignments, but a real school still had no way to schedule _when_
+those classes meet — `create_schedule_meeting` and
+`list_schedule_meetings_by_assignment` existed since this ADR's
+original milestone, but no screen ever called them, and (like Wave 2Y's
+own commands before it) they had **zero test coverage at the command
+boundary**. Building this closes the loop this ADR always intended
+("assign, then eventually schedule, then eventually grade") and, not
+incidentally, is the first place in this codebase that _writes_ a
+`schedule_meetings.weekday` value — completing the round trip the Wave
+2X addendum's weekday convention (0 = Sunday … 6 = Saturday, matching
+`Date.getDay()`) always needed to be verified against, closing that
+wave's own recorded verification debt.
+
+**Scope**: one new screen, `ScheduleMeetingsScreen.tsx` — a School Head
+schedules and unschedules one class's weekly meeting times (weekday,
+start/end time, optional room). Reached from
+`TeachingAssignmentsScreen`'s new per-row "Manage schedule" action,
+the same handoff pattern as every prior contextual sub-screen in this
+app. The weekday picker's options come from a single new exported
+constant, `WEEKDAY_LABELS` (`src/domain/schedule-meeting.ts`), so the
+0=Sunday convention is never hand-duplicated at a second call site.
+Deliberately **not** the full Teacher Load/Class Schedule UI:
+`get_teacher_load` (the derived-load view) remains unwired, carried
+forward.
+
+**New backend surface: `remove_schedule_meeting`.** Unlike
+`create_schedule_meeting`, no `remove` function existed anywhere for
+`schedule_meetings` before this wave — only `create`/`find`/`list`/
+`total_weekly_minutes_for_teacher`. Added
+`repository::schedule_meeting::remove` (mirroring
+`teaching_assignment::remove`'s exact shape: a scoped delete, `true`
+iff a row existed) with 3 new unit tests, plus the
+`remove_schedule_meeting` command, gated the same School-Head-only
+`ManageTeachingAssignments` capability `create_schedule_meeting`
+already uses.
+
+**Typed conflict outcomes reach the UI unchanged.** `CreateMeetingOutcome`'s
+eight variants (`Created`/`UnknownAssignment`/`InvalidWeekday`/
+`InvalidTime`/`TeacherConflict`/`SectionConflict`/`RoomConflict`/
+`Duplicate`) were designed at this ADR's original milestone specifically
+so a caller could show a specific message — but nothing before this
+wave ever consumed them past the repository layer. The new TS
+`CreateMeetingOutcome` discriminated union
+(`src/domain/schedule-meeting.ts`) mirrors the Rust
+`#[serde(tag = "outcome", content = "meeting")]` shape exactly, and
+`ScheduleMeetingsScreen` shows a distinct, specific message per
+conflict type (a `CONFLICT_MESSAGES` lookup), proving the outcome type
+was designed correctly and not merely theoretically complete.
+
+**Closed a second pre-existing test gap**: like Wave 2Y's discovery
+about the teaching-assignment commands, `create_schedule_meeting`/
+`list_schedule_meetings_by_assignment` had never been proven at the
+command boundary. New `tests/schedule_meeting_management.rs` (9 tests)
+proves: a School Head can create/list/remove; a Teacher is denied on
+create and remove; no session is rejected; a duplicate meeting returns
+the typed `Duplicate` outcome at the command boundary (not just the
+repository layer); and — the narrower rule
+`list_schedule_meetings_by_assignment` actually uses, distinct from
+Wave 2Y's open reference-data rule — a teacher can list their own
+schedule, cannot list a colleague's, and a School Head can list any
+teacher's.
+
+**Verification**: `npm run quality` 678/678 vitest (+20: 3 more
+`TeachingAssignmentRepository` adapter tests, 8
+`TeachingAssignmentApplicationService` tests for
+`listMeetings`/`createMeeting`/`removeMeeting` incl. weekday/time
+validation, 8 `ScheduleMeetingsScreen` tests incl. 2 axe passes, 1 more
+`TeachingAssignmentsScreen` test for the new "Manage schedule" action).
+`npx tsc -b --noEmit` / `eslint` / `prettier --check` /
+`check:architecture` all clean. `cargo test`: **571 lib tests** (+3:
+`schedule_meeting::remove`'s own unit tests) plus the new
+`tests/schedule_meeting_management.rs` (9/9) — zero regression to any
+existing suite. `cargo fmt --check` / `cargo clippy --all-targets -- -D
+warnings` clean. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X/2Y); no `get_teacher_load` view; no
+one-off exceptional-date schedule overrides (this ADR's own long-
+standing non-goal, unchanged); no independent (non-self) review
+dispatched for this bounded slice — retained as debt, consistent with
+the pattern Waves 2V/2W/2X/2Y already established.

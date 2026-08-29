@@ -2442,6 +2442,44 @@ quality:security` clean, no new dependency; `npm run harness:verify`
   end-to-end); `get_teacher_load`; Subject Monitor / Adviser View; or
   the native NVDA/Narrator pass. No candidate pre-selected.
 
+## Wave 2Z — Class Schedule (added 2026-08-29)
+
+Full record: `docs/adr/0039-*` Wave 2Z addendum;
+`docs/VERIFICATION-DEBT.md` Wave 2Z entry. **New branch**
+`claude/likha-sis-wave2z-class-schedule`, created from `cbc3f74`
+(Wave 2Y's own final, CI-confirmed checkpoint).
+
+- **Built**: `ScheduleMeetingsScreen.tsx` — a School Head
+  schedules/unschedules a class's weekly meeting times (weekday,
+  start/end time, optional room), reached from
+  `TeachingAssignmentsScreen`'s new "Manage schedule" action. Wires
+  `create_schedule_meeting`/`list_schedule_meetings_by_assignment`
+  (existed since ADR-0039, never reachable from any screen, never
+  proven at the command boundary). New backend surface:
+  `remove_schedule_meeting` + `repository::schedule_meeting::remove` —
+  no removal function existed for schedule meetings at all. Completes
+  the Wave 2X weekday convention's write-side verification via a new
+  `WEEKDAY_LABELS` constant (0=Sunday..6=Saturday). `CreateMeetingOutcome`'s
+  eight typed variants (designed at ADR-0039's original milestone,
+  never consumed past the repository layer) now reach the UI via a
+  mirrored TS discriminated union, showing a distinct message per
+  conflict type.
+- **Deliberately not built**: no dev-preview-fixture wiring (same
+  disclosed gap as Waves 2U/2W/2X/2Y); no `get_teacher_load` view; no
+  one-off exceptional-date schedule overrides (ADR-0039's own
+  long-standing non-goal).
+- **Verification/checkpoint**: `npm run quality` 678/678 vitest (+20);
+  typecheck/eslint/format/architecture clean; `cargo test` 571 lib
+  tests (+3) plus new `tests/schedule_meeting_management.rs` (9/9,
+  closing a second pre-existing command-boundary test gap); `cargo fmt
+--check` / `cargo clippy --all-targets -- -D warnings` clean; `npm
+run build` + `check:dev-preview-isolation` pass; `npm run
+quality:security` clean, no new dependency; `npm run harness:verify`
+  still exactly 100/100, unchanged.
+- **Next**: `get_teacher_load` (the derived-load view); Subject
+  Monitor / Adviser View; or the native NVDA/Narrator pass. No
+  candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

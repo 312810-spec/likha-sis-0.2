@@ -1,6 +1,104 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2Y: Teaching Assignments, COMPLETE)
+## Active Task (2026-08-29 — Wave 2Z: Class Schedule, COMPLETE)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+Wave 2Z addendum; `docs/PROJECT-MEMORY.md` Wave 2Z entry;
+`docs/VERIFICATION-DEBT.md` Wave 2Z entry. **New dedicated branch**
+`claude/likha-sis-wave2z-class-schedule`, created from exactly
+`cbc3f746a9ece8541d259dfbd565b52f22a9df9b` (Wave 2Y's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2Y's own final Security
+Gate `33265788114` and Quality Gate `33265788109` reconfirmed
+`completed/success` for the exact HEAD commit `cbc3f74` before any Wave
+2Z work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 2Z work began.
+
+**Scope chosen**: the top recorded candidate at the end of Wave 2Y —
+Class Schedule, per the owner's own standing instruction to continue
+directly into the next wave with a notification at each boundary.
+Assignments could be created (Wave 2Y) but not scheduled; this also
+lets the Wave 2X weekday convention finally be verified end-to-end
+against a real write path, closing that wave's own recorded
+verification debt.
+
+**What shipped**: one new screen, `ScheduleMeetingsScreen.tsx` — a
+School Head schedules/unschedules one class's weekly meeting times
+(weekday, start/end time, optional room), reached from
+`TeachingAssignmentsScreen`'s new "Manage schedule" per-row action.
+Wires `create_schedule_meeting`/`list_schedule_meetings_by_assignment`
+(existed since ADR-0039, never reachable from any screen, and — like
+Wave 2Y's own commands — had **zero test coverage at the command
+boundary** before this wave). New backend surface:
+`remove_schedule_meeting` + `repository::schedule_meeting::remove`,
+since no removal function existed for schedule meetings at all. The
+weekday picker's options come from one new exported constant,
+`WEEKDAY_LABELS`, so the 0=Sunday convention is never hand-duplicated.
+`CreateMeetingOutcome`'s eight typed variants (designed at ADR-0039's
+original milestone but never consumed past the repository layer) now
+reach the UI unchanged via a mirrored TS discriminated union, and
+`ScheduleMeetingsScreen` shows a distinct message per conflict type
+(teacher/section/room double-booking, an exact duplicate, an invalid
+weekday/time).
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **678/678 vitest** (72 files; +20: 3 more
+`TeachingAssignmentRepository` adapter tests, 8
+`TeachingAssignmentApplicationService` tests for
+`listMeetings`/`createMeeting`/`removeMeeting` incl. weekday/time
+validation, 8 `ScheduleMeetingsScreen` tests incl. 2 axe accessibility
+passes, 1 more `TeachingAssignmentsScreen` test). `cargo test`: **571
+lib tests** (+3: `schedule_meeting::remove`'s own unit tests) plus a new
+`tests/schedule_meeting_management.rs` (9/9 — closing the second
+pre-existing command-boundary test gap this program has found) — zero
+regression to any existing suite. `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged — not reopened. `npm run quality:full` green end to end,
+exit code 0.
+
+**Scope guard held**: no dev-preview-fixture wiring (same disclosed,
+consistent gap as Waves 2U/2W/2X/2Y); no `get_teacher_load` view; no
+one-off exceptional-date schedule overrides (ADR-0039's own long-
+standing non-goal); zero change to any prior wave's backend or UI code
+beyond the new `remove_schedule_meeting` surface and the
+`TeachingAssignmentsScreen` handoff addition; `main` not touched; no
+unrelated refactor.
+
+**Review**: a bounded self-review confirmed `remove_schedule_meeting`
+never deletes a different school's meeting (proven), that a Teacher is
+denied on both create and remove while a teacher can list their own
+schedule but not a colleague's and a School Head can list any teacher's
+(all proven at the command boundary — the narrower rule
+`list_schedule_meetings_by_assignment` actually uses, distinct from
+Wave 2Y's open reference-data rule for assignments), that a duplicate
+meeting returns the typed `Duplicate` outcome at the command boundary
+(not just the repository layer, proven), and that
+`ScheduleMeetingsScreen`'s conflict-message mapping actually covers all
+eight `CreateMeetingOutcome` variants. No independent (non-self) review
+was dispatched for this bounded UI slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with the same retained-debt
+pattern Waves 2V/2W/2X/2Y already established.
+
+**Exact next slice** (recorded, not started): `get_teacher_load` (the
+derived-load view — the three independent numbers ADR-0039 already
+computes but no screen shows); Subject Monitor / Adviser View (Subject
+Attendance's own later spec steps); or the native NVDA/Narrator pass.
+No candidate pre-selected. Per the owner's own standing instruction
+this session, work continues directly into the next wave without a
+separate stop-and-wait — a notification is sent at each wave boundary
+instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply —
+unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-29 — Wave 2Y: Teaching Assignments, COMPLETE, superseded above)
 
 Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
 Wave 2Y addendum; `docs/PROJECT-MEMORY.md` Wave 2Y entry;
