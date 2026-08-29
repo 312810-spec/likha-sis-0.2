@@ -154,6 +154,22 @@ pub fn create_schedule_meeting(
 /// teacher-keyed views. An assignment id foreign to the caller's school
 /// resolves to an empty list, matching this codebase's established
 /// `find_by_id_in_school` convention (e.g. `commands::export`).
+/// School-Head-only, mirroring `remove_teaching_assignment`'s exact
+/// shape -- deleting a meeting is a scheduling-authority decision, the
+/// same `ManageTeachingAssignments` gate `create_schedule_meeting`
+/// already uses.
+#[tauri::command]
+pub fn remove_schedule_meeting(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
+    schedule_meeting::remove(&conn, &school_id, &id)
+}
+
 #[tauri::command]
 pub fn list_schedule_meetings_by_assignment(
     db: State<'_, Mutex<Connection>>,

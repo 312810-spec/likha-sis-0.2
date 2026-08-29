@@ -31,6 +31,7 @@ import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
+import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
@@ -83,6 +84,13 @@ function App() {
   const [teachingAssignmentsSection, setTeachingAssignmentsSection] = useState<{
     sectionId: string;
     sectionName: string;
+  } | null>(null);
+  // Set only by TeachingAssignmentsScreen's "Manage schedule" action, so
+  // ScheduleMeetingsScreen opens for that assignment -- same
+  // narrowly-typed handoff pattern as above, not a router/global store.
+  const [scheduleMeetingsAssignment, setScheduleMeetingsAssignment] = useState<{
+    teachingAssignmentId: string;
+    subjectName: string;
   } | null>(null);
 
   function handleSessionExpired() {
@@ -223,9 +231,39 @@ function App() {
                   sectionId={teachingAssignmentsSection.sectionId}
                   sectionName={teachingAssignmentsSection.sectionName}
                   onBack={() => setActiveTab("sections")}
+                  onManageSchedule={(teachingAssignmentId, subjectName) => {
+                    setScheduleMeetingsAssignment({ teachingAssignmentId, subjectName });
+                    setActiveTab("schedule-meetings");
+                  }}
                 />
               ) : (
                 // Reached only if this tab is active with no section
+                // context (e.g. a stale state after a reload) -- fall back
+                // to Sections rather than render a blank or wrong screen.
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                />
+              )
+            ) : activeTab === "schedule-meetings" ? (
+              scheduleMeetingsAssignment && teachingAssignmentsSection ? (
+                <ScheduleMeetingsScreen
+                  teachingAssignmentService={teachingAssignmentService}
+                  teachingAssignmentId={scheduleMeetingsAssignment.teachingAssignmentId}
+                  subjectName={scheduleMeetingsAssignment.subjectName}
+                  sectionName={teachingAssignmentsSection.sectionName}
+                  onBack={() => setActiveTab("teaching-assignments")}
+                />
+              ) : (
+                // Reached only if this tab is active with no assignment
                 // context (e.g. a stale state after a reload) -- fall back
                 // to Sections rather than render a blank or wrong screen.
                 <SectionsScreen

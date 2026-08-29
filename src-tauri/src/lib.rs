@@ -97,6 +97,7 @@ pub fn run() {
             commands::teaching_assignment::list_teacher_assignments,
             commands::teaching_assignment::get_teacher_load,
             commands::teaching_assignment::create_schedule_meeting,
+            commands::teaching_assignment::remove_schedule_meeting,
             commands::teaching_assignment::list_schedule_meetings_by_assignment,
             commands::subject_attendance::open_subject_attendance_session,
             commands::subject_attendance::mark_subject_attendance_no_class,

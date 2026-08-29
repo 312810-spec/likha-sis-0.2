@@ -1,4 +1,4 @@
-import type { ScheduleMeeting } from "../../domain/schedule-meeting";
+import type { CreateMeetingOutcome, ScheduleMeeting } from "../../domain/schedule-meeting";
 import type { TeachingAssignmentSummary } from "../../domain/subject-attendance";
 import type {
   TeachingAssignment,
@@ -66,5 +66,25 @@ export class TauriTeachingAssignmentRepository implements TeachingAssignmentRepo
 
   remove(id: string): Promise<boolean> {
     return invoke<boolean>("remove_teaching_assignment", { id });
+  }
+
+  createMeeting(
+    teachingAssignmentId: string,
+    weekday: number,
+    startsAt: string,
+    endsAt: string,
+    room: string | null,
+  ): Promise<CreateMeetingOutcome> {
+    return invoke<CreateMeetingOutcome>("create_schedule_meeting", {
+      teachingAssignmentId,
+      weekday,
+      startsAt,
+      endsAt,
+      room,
+    });
+  }
+
+  removeMeeting(id: string): Promise<boolean> {
+    return invoke<boolean>("remove_schedule_meeting", { id });
   }
 }

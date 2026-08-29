@@ -154,4 +154,72 @@ describe("TauriTeachingAssignmentRepository", () => {
     expect(mockInvoke).toHaveBeenCalledWith("remove_teaching_assignment", { id: "ta-1" });
     expect(result).toBe(true);
   });
+
+  it("creates a schedule meeting via create_schedule_meeting", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      outcome: "created",
+      meeting: {
+        id: "meeting-1",
+        schoolId: "school-1",
+        teachingAssignmentId: "ta-1",
+        weekday: 1,
+        startsAt: "08:00",
+        endsAt: "08:50",
+        room: "Room 3",
+        createdAt: "now",
+      },
+    });
+
+    const result = await new TauriTeachingAssignmentRepository().createMeeting(
+      "ta-1",
+      1,
+      "08:00",
+      "08:50",
+      "Room 3",
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("create_schedule_meeting", {
+      teachingAssignmentId: "ta-1",
+      weekday: 1,
+      startsAt: "08:00",
+      endsAt: "08:50",
+      room: "Room 3",
+    });
+    expect(result).toEqual({
+      outcome: "created",
+      meeting: {
+        id: "meeting-1",
+        schoolId: "school-1",
+        teachingAssignmentId: "ta-1",
+        weekday: 1,
+        startsAt: "08:00",
+        endsAt: "08:50",
+        room: "Room 3",
+        createdAt: "now",
+      },
+    });
+  });
+
+  it("passes through a declined create_schedule_meeting outcome unchanged", async () => {
+    mockInvoke.mockResolvedValueOnce({ outcome: "teacherConflict" });
+
+    const result = await new TauriTeachingAssignmentRepository().createMeeting(
+      "ta-1",
+      1,
+      "08:00",
+      "08:50",
+      null,
+    );
+
+    expect(result).toEqual({ outcome: "teacherConflict" });
+  });
+
+  it("removes a schedule meeting via remove_schedule_meeting", async () => {
+    mockInvoke.mockResolvedValueOnce(true);
+
+    const result = await new TauriTeachingAssignmentRepository().removeMeeting("meeting-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("remove_schedule_meeting", { id: "meeting-1" });
+    expect(result).toBe(true);
+  });
 });

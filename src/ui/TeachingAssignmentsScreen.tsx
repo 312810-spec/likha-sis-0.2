@@ -25,6 +25,10 @@ interface TeachingAssignmentsScreenProps {
   sectionId: string;
   sectionName: string;
   onBack: () => void;
+  /** Open Class Schedule for one assignment (Wave 2Z). Same handoff
+   * pattern as `onBack`; `subjectName` is passed along too since this
+   * screen already has each assignment's name in hand. */
+  onManageSchedule: (teachingAssignmentId: string, subjectName: string) => void;
 }
 
 /** Wave 2Y: a School Head assigns and unassigns which teacher teaches a
@@ -46,6 +50,7 @@ export function TeachingAssignmentsScreen({
   sectionId,
   sectionName,
   onBack,
+  onManageSchedule,
 }: TeachingAssignmentsScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -206,6 +211,13 @@ export function TeachingAssignmentsScreen({
                     <th scope="row">{assignment.subjectName}</th>
                     <td>{teacherName(assignment.teacherUserId)}</td>
                     <td>
+                      <button
+                        type="button"
+                        onClick={() => onManageSchedule(assignment.id, assignment.subjectName)}
+                        aria-label={`Manage schedule for ${assignment.subjectName}`}
+                      >
+                        Manage schedule
+                      </button>{" "}
                       <button
                         type="button"
                         disabled={removingId === assignment.id}

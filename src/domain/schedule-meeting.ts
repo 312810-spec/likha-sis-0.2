@@ -8,8 +8,10 @@
  * wave ever read it outside its own table. Established here, not
  * assumed: **0 = Sunday … 6 = Saturday**, matching JavaScript's
  * `Date.prototype.getDay()` exactly, so `TodaysClassesScreen` needs no
- * conversion table. Any future schedule-creation UI must follow this
- * same convention.
+ * conversion table. Wave 2Z's `ScheduleMeetingsScreen` is the first
+ * screen to *write* a `weekday` value (via `WEEKDAY_LABELS` below),
+ * completing the round trip this convention always needed to be
+ * verified against.
  */
 export interface ScheduleMeeting {
   id: string;
@@ -19,3 +21,31 @@ export interface ScheduleMeeting {
   endsAt: string;
   room: string | null;
 }
+
+/** Index-aligned with the `weekday` convention above -- `WEEKDAY_LABELS[0]`
+ * is Sunday. The single place any weekday picker in this codebase
+ * should read its options from, so the convention is never
+ * hand-duplicated at a second call site. */
+export const WEEKDAY_LABELS: readonly string[] = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+/** Mirrors Rust's `CreateMeetingOutcome`
+ * (`#[serde(tag = "outcome", content = "meeting", rename_all = "camelCase")]`)
+ * exactly -- distinct enough that `ScheduleMeetingsScreen` can show a
+ * specific message per conflict type, not a generic failure. */
+export type CreateMeetingOutcome =
+  | { outcome: "created"; meeting: ScheduleMeeting }
+  | { outcome: "unknownAssignment" }
+  | { outcome: "invalidWeekday" }
+  | { outcome: "invalidTime" }
+  | { outcome: "teacherConflict" }
+  | { outcome: "sectionConflict" }
+  | { outcome: "roomConflict" }
+  | { outcome: "duplicate" };

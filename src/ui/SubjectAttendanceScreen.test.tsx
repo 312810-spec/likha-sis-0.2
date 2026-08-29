@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type { CreateMeetingOutcome } from "../domain/schedule-meeting";
 import type {
   EntryStatus,
   RecordEntryOutcome,
@@ -147,6 +148,12 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     return null;
   }
   async remove() {
+    return false;
+  }
+  async createMeeting(): Promise<CreateMeetingOutcome> {
+    return { outcome: "unknownAssignment" };
+  }
+  async removeMeeting() {
     return false;
   }
 }

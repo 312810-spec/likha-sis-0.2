@@ -265,6 +265,16 @@ fn has_room_conflict(
     .map_err(Into::into)
 }
 
+/// Mirrors `teaching_assignment::remove`'s exact shape -- a plain
+/// scoped delete, `true` iff a row actually existed to remove.
+pub fn remove(conn: &Connection, school_id: &str, id: &str) -> AppResult<bool> {
+    let affected = conn.execute(
+        "DELETE FROM schedule_meetings WHERE id = ?1 AND school_id = ?2",
+        (id, school_id),
+    )?;
+    Ok(affected > 0)
+}
+
 pub fn find_by_id_in_school(
     conn: &Connection,
     school_id: &str,
@@ -599,6 +609,55 @@ mod tests {
         let outcome = create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap();
 
         assert_eq!(outcome, CreateMeetingOutcome::Duplicate);
+    }
+
+    #[test]
+    fn remove_deletes_the_meeting_and_returns_true() {
+        let conn = open_test_db();
+        let (school_id, _teacher_id, assignment_id) = setup(&conn);
+        let CreateMeetingOutcome::Created(meeting) =
+            create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap()
+        else {
+            panic!("expected Created");
+        };
+
+        let removed = remove(&conn, &school_id, &meeting.id).unwrap();
+
+        assert!(removed);
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &meeting.id).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn remove_returns_false_for_an_unknown_id() {
+        let conn = open_test_db();
+        let (school_id, ..) = setup(&conn);
+
+        let removed = remove(&conn, &school_id, "does-not-exist").unwrap();
+
+        assert!(!removed);
+    }
+
+    #[test]
+    fn remove_never_deletes_a_different_schools_meeting() {
+        let conn = open_test_db();
+        let (school_id, _teacher_id, assignment_id) = setup(&conn);
+        let CreateMeetingOutcome::Created(meeting) =
+            create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap()
+        else {
+            panic!("expected Created");
+        };
+        let other_school = school::create(&conn, "Other School").unwrap();
+
+        let removed = remove(&conn, &other_school.id, &meeting.id).unwrap();
+
+        assert!(!removed);
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &meeting.id).unwrap(),
+            Some(meeting)
+        );
     }
 
     #[test]

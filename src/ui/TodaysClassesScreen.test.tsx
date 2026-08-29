@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { ScheduleMeeting } from "../domain/schedule-meeting";
+import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type {
@@ -76,6 +76,12 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     return null;
   }
   async remove() {
+    return false;
+  }
+  async createMeeting(): Promise<CreateMeetingOutcome> {
+    return { outcome: "unknownAssignment" };
+  }
+  async removeMeeting() {
     return false;
   }
 }

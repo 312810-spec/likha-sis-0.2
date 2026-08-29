@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
 import type { TeachingAssignmentDetail } from "../domain/teaching-assignment";
 import { TeachingAssignmentApplicationService } from "./teaching-assignment-service";
 
@@ -14,13 +15,23 @@ const DETAIL: TeachingAssignmentDetail = {
   subjectName: "Mathematics",
 };
 
+const MEETING: ScheduleMeeting = {
+  id: "meeting-1",
+  teachingAssignmentId: "ta-1",
+  weekday: 1,
+  startsAt: "08:00",
+  endsAt: "08:50",
+  room: "Room 3",
+};
+
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   calls: unknown[] = [];
   async listMine() {
     return [];
   }
-  async listMeetings() {
-    return [];
+  async listMeetings(teachingAssignmentId: string) {
+    this.calls.push(["listMeetings", teachingAssignmentId]);
+    return [MEETING];
   }
   async listBySection(sectionId: string) {
     this.calls.push(["listBySection", sectionId]);
@@ -37,6 +48,20 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   }
   async remove(id: string) {
     this.calls.push(["remove", id]);
+    return true;
+  }
+  async createMeeting(
+    teachingAssignmentId: string,
+    weekday: number,
+    startsAt: string,
+    endsAt: string,
+    room: string | null,
+  ): Promise<CreateMeetingOutcome> {
+    this.calls.push(["createMeeting", teachingAssignmentId, weekday, startsAt, endsAt, room]);
+    return { outcome: "created", meeting: { ...MEETING, teachingAssignmentId } };
+  }
+  async removeMeeting(id: string) {
+    this.calls.push(["removeMeeting", id]);
     return true;
   }
 }
@@ -98,6 +123,75 @@ describe("TeachingAssignmentApplicationService", () => {
     const { service, repo } = makeService();
 
     await expect(service.remove(" ")).rejects.toThrow(ValidationError);
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("lists an assignment's schedule meetings", async () => {
+    const { service, repo } = makeService();
+
+    const result = await service.listMeetings("ta-1");
+
+    expect(repo.calls).toEqual([["listMeetings", "ta-1"]]);
+    expect(result).toEqual([MEETING]);
+  });
+
+  it("creates a schedule meeting with a trimmed room, or null when blank", async () => {
+    const { service, repo } = makeService();
+
+    const result = await service.createMeeting("ta-1", 1, "08:00", "08:50", "  Room 3  ");
+
+    expect(repo.calls).toEqual([["createMeeting", "ta-1", 1, "08:00", "08:50", "Room 3"]]);
+    expect(result.outcome).toBe("created");
+  });
+
+  it("passes a blank room through as null", async () => {
+    const { service, repo } = makeService();
+
+    await service.createMeeting("ta-1", 1, "08:00", "08:50", "   ");
+
+    expect(repo.calls).toEqual([["createMeeting", "ta-1", 1, "08:00", "08:50", null]]);
+  });
+
+  it("rejects a weekday outside 0-6 before calling the repository", async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.createMeeting("ta-1", 7, "08:00", "08:50", null)).rejects.toThrow(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("rejects a malformed start time before calling the repository", async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.createMeeting("ta-1", 1, "8:00", "08:50", null)).rejects.toThrow(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("rejects an empty class id before calling the repository for createMeeting", async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.createMeeting("  ", 1, "08:00", "08:50", null)).rejects.toThrow(
+      ValidationError,
+    );
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("removes a schedule meeting", async () => {
+    const { service, repo } = makeService();
+
+    const result = await service.removeMeeting("meeting-1");
+
+    expect(repo.calls).toEqual([["removeMeeting", "meeting-1"]]);
+    expect(result).toBe(true);
+  });
+
+  it("rejects an empty id before calling the repository for removeMeeting", async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.removeMeeting(" ")).rejects.toThrow(ValidationError);
     expect(repo.calls).toEqual([]);
   });
 });

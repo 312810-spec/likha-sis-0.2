@@ -7,6 +7,7 @@ import { TeachingAssignmentApplicationService } from "../application/teaching-as
 import type { SchoolMemberRepository } from "../domain/ports/school-member-repository";
 import type { SubjectRepository } from "../domain/ports/subject-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type { CreateMeetingOutcome } from "../domain/schedule-meeting";
 import type { SchoolMember } from "../domain/school-member";
 import type { Subject } from "../domain/subject";
 import type { TeachingAssignment, TeachingAssignmentDetail } from "../domain/teaching-assignment";
@@ -88,6 +89,12 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     this.assignments = this.assignments.filter((a) => a.id !== id);
     return this.removeResult;
   }
+  async createMeeting(): Promise<CreateMeetingOutcome> {
+    return { outcome: "unknownAssignment" };
+  }
+  async removeMeeting() {
+    return false;
+  }
 }
 
 function renderScreen(
@@ -95,6 +102,7 @@ function renderScreen(
     assignments?: TeachingAssignmentDetail[];
     members?: SchoolMember[];
     onBack?: () => void;
+    onManageSchedule?: (teachingAssignmentId: string, subjectName: string) => void;
   } = {},
 ) {
   const teachingAssignmentRepo = new FakeTeachingAssignmentRepository(options.assignments ?? []);
@@ -115,6 +123,7 @@ function renderScreen(
         sectionId="sec-1"
         sectionName="Mabini"
         onBack={options.onBack ?? (() => {})}
+        onManageSchedule={options.onManageSchedule ?? (() => {})}
       />
     </ModeProvider>,
   );
@@ -156,6 +165,17 @@ describe("TeachingAssignmentsScreen", () => {
 
     expect(await screen.findByText("Teacher assigned.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("cell", { name: "Ana Cruz" })).toBeInTheDocument());
+  });
+
+  it("calls onManageSchedule with the assignment id and subject name", async () => {
+    const user = userEvent.setup();
+    const onManageSchedule = vi.fn();
+    renderScreen({ assignments: [ASSIGNMENT], onManageSchedule });
+    await screen.findByRole("rowheader", { name: "Mathematics" });
+
+    await user.click(screen.getByRole("button", { name: "Manage schedule for Mathematics" }));
+
+    expect(onManageSchedule).toHaveBeenCalledWith("ta-1", "Mathematics");
   });
 
   it("removes an assignment", async () => {
