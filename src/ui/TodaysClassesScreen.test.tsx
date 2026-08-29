@@ -69,6 +69,15 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]> {
     return this.meetingsByAssignment[teachingAssignmentId] ?? [];
   }
+  async listBySection() {
+    return [];
+  }
+  async create() {
+    return null;
+  }
+  async remove() {
+    return false;
+  }
 }
 
 function meeting(overrides: Partial<ScheduleMeeting> = {}): ScheduleMeeting {

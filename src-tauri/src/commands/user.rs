@@ -8,7 +8,7 @@ use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::role;
-use crate::repository::user::{self, User};
+use crate::repository::user::{self, SchoolMember, User};
 
 /// Always requires an active session — this is no longer a bootstrap
 /// path (see ADR-0006; `auth::bootstrap_installation` is the sole way to
@@ -52,4 +52,20 @@ pub fn add_user_to_school(
     auth::authorize_school_membership_grant(&conn, &sessions, &school_id)?;
     user::add_school_membership(&conn, &user_id, &school_id)?;
     role::grant(&conn, &user_id, &school_id, role::TEACHER)
+}
+
+/// Reference data any authenticated school member may read -- matching
+/// `list_teaching_assignments_by_section`'s established convention.
+/// Wave 2Y (Teaching Assignments UI): a School Head needs to see who
+/// their colleagues are, with roles, to pick a teacher when creating an
+/// assignment; usernames/display names/roles carry no more sensitivity
+/// than what `AuditLogScreen` already shows within the same school.
+#[tauri::command]
+pub fn list_school_members(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Vec<SchoolMember>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    user::list_members_in_school(&conn, &school_id)
 }

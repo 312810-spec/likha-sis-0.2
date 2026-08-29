@@ -1,16 +1,23 @@
 import type { ScheduleMeeting } from "../schedule-meeting";
+import type { TeachingAssignment, TeachingAssignmentDetail } from "../teaching-assignment";
 import type { TeachingAssignmentSummary } from "../subject-attendance";
 
 /**
- * Deliberately narrow -- two read methods, only what Subject
- * Attendance's assignment picker and Today's Classes need. The full
- * Teaching Assignment/Class Schedule UI (create/reassign/remove
- * assignments, create/edit schedule meetings) remains out of scope,
- * carried as a separate future candidate (see Wave 2T/2U's own
- * evaluation) -- this is not that UI, only enough for a teacher to see
- * "which of my own classes, and when."
+ * `listMine`/`listMeetings` are Subject Attendance's and Today's
+ * Classes' own narrow reads (Waves 2W/2X). `listBySection`/`create`/
+ * `remove` are Wave 2Y's Teaching Assignments management screen --
+ * still not the full Teacher Load/Class Schedule UI (no reassign, no
+ * schedule-meeting create/edit, no load view), just enough for a
+ * School Head to assign and unassign a teacher for a section+subject.
  */
 export interface TeachingAssignmentRepository {
   listMine(teacherUserId: string): Promise<TeachingAssignmentSummary[]>;
   listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]>;
+  listBySection(sectionId: string): Promise<TeachingAssignmentDetail[]>;
+  create(
+    teacherUserId: string,
+    sectionId: string,
+    subjectId: string,
+  ): Promise<TeachingAssignment | null>;
+  remove(id: string): Promise<boolean>;
 }

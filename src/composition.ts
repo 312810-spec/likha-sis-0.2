@@ -9,11 +9,13 @@ import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
 import { SchoolApplicationService } from "./application/school-service";
+import { SchoolMemberApplicationService } from "./application/school-member-service";
 import { SectionApplicationService } from "./application/section-service";
 import { SetupApplicationService } from "./application/setup-service";
 import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
 import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
+import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
@@ -27,6 +29,7 @@ import { TauriGradingRepository } from "./infrastructure/tauri/grading-repositor
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
+import { TauriSchoolMemberRepository } from "./infrastructure/tauri/school-member-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
 import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
 import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repository";
@@ -71,7 +74,14 @@ export const sf1ImportService = new Sf1ImportApplicationService(
   new TauriSf1ImportRepository(),
   new TauriFilePicker(),
 );
+const teachingAssignmentRepository = new TauriTeachingAssignmentRepository();
 export const subjectAttendanceService = new SubjectAttendanceApplicationService(
   new TauriSubjectAttendanceRepository(),
-  new TauriTeachingAssignmentRepository(),
+  teachingAssignmentRepository,
+);
+export const teachingAssignmentService = new TeachingAssignmentApplicationService(
+  teachingAssignmentRepository,
+);
+export const schoolMemberService = new SchoolMemberApplicationService(
+  new TauriSchoolMemberRepository(),
 );

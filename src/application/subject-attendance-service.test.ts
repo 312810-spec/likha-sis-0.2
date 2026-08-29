@@ -114,6 +114,15 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     this.meetingsRequestedFor.push(teachingAssignmentId);
     return MEETINGS;
   }
+  async listBySection() {
+    return [];
+  }
+  async create() {
+    return null;
+  }
+  async remove() {
+    return false;
+  }
 }
 
 function makeService() {

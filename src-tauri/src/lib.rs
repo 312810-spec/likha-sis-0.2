@@ -45,6 +45,7 @@ pub fn run() {
             commands::learner::find_learner_candidates,
             commands::user::register_user,
             commands::user::add_user_to_school,
+            commands::user::list_school_members,
             commands::setup::installation_status,
             commands::setup::bootstrap_installation,
             commands::auth::login,

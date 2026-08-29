@@ -1,9 +1,18 @@
 import type { ScheduleMeeting } from "../../domain/schedule-meeting";
 import type { TeachingAssignmentSummary } from "../../domain/subject-attendance";
+import type {
+  TeachingAssignment,
+  TeachingAssignmentDetail,
+} from "../../domain/teaching-assignment";
 import type { TeachingAssignmentRepository } from "../../domain/ports/teaching-assignment-repository";
 import { invoke } from "./invoke";
 
-interface TeachingAssignmentDetail {
+/** The raw `list_teacher_assignments` wire shape -- narrower than the
+ * domain `TeachingAssignmentDetail` (no `teacherUserId`), since
+ * `listMine` only ever projects it down to `TeachingAssignmentSummary`
+ * below and never needs the teacher id (the caller already knows it,
+ * it's their own). */
+interface TeacherAssignmentsWireDetail {
   id: string;
   sectionId: string;
   sectionName: string;
@@ -18,7 +27,7 @@ interface TeachingAssignmentDetail {
  * picker needs. */
 export class TauriTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async listMine(teacherUserId: string): Promise<TeachingAssignmentSummary[]> {
-    const details = await invoke<TeachingAssignmentDetail[]>("list_teacher_assignments", {
+    const details = await invoke<TeacherAssignmentsWireDetail[]>("list_teacher_assignments", {
       teacherUserId,
     });
     return details.map((detail) => ({
@@ -35,5 +44,27 @@ export class TauriTeachingAssignmentRepository implements TeachingAssignmentRepo
     return invoke<ScheduleMeeting[]>("list_schedule_meetings_by_assignment", {
       teachingAssignmentId,
     });
+  }
+
+  listBySection(sectionId: string): Promise<TeachingAssignmentDetail[]> {
+    return invoke<TeachingAssignmentDetail[]>("list_teaching_assignments_by_section", {
+      sectionId,
+    });
+  }
+
+  create(
+    teacherUserId: string,
+    sectionId: string,
+    subjectId: string,
+  ): Promise<TeachingAssignment | null> {
+    return invoke<TeachingAssignment | null>("create_teaching_assignment", {
+      teacherUserId,
+      sectionId,
+      subjectId,
+    });
+  }
+
+  remove(id: string): Promise<boolean> {
+    return invoke<boolean>("remove_teaching_assignment", { id });
   }
 }

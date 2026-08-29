@@ -11,12 +11,14 @@ import {
   learnerScoreService,
   learnerService,
   onSessionExpired,
+  schoolMemberService,
   schoolService,
   sectionService,
   setupService,
   sf1ImportService,
   subjectAttendanceService,
   subjectService,
+  teachingAssignmentService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
 import { AppShell } from "./ui/AppShell";
@@ -34,6 +36,7 @@ import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
+import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
 import { WorkbenchNav } from "./ui/components/WorkbenchNav";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
@@ -72,6 +75,15 @@ function App() {
   const [subjectAttendanceAssignmentId, setSubjectAttendanceAssignmentId] = useState<string | null>(
     null,
   );
+  // Set only by SectionsScreen's "Manage assignments" action, so
+  // TeachingAssignmentsScreen opens for that section -- same
+  // narrowly-typed handoff pattern as rosterSectionId above, not a
+  // router/global store. sectionName travels alongside it since
+  // SectionsScreen already has the full Section in hand.
+  const [teachingAssignmentsSection, setTeachingAssignmentsSection] = useState<{
+    sectionId: string;
+    sectionName: string;
+  } | null>(null);
 
   function handleSessionExpired() {
     setSession(null);
@@ -172,6 +184,10 @@ function App() {
                   setRosterSectionId(sectionId);
                   setActiveTab("section-roster");
                 }}
+                onManageAssignments={(sectionId, sectionName) => {
+                  setTeachingAssignmentsSection({ sectionId, sectionName });
+                  setActiveTab("teaching-assignments");
+                }}
               />
             ) : activeTab === "section-roster" ? (
               rosterSectionId ? (
@@ -191,6 +207,37 @@ function App() {
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                />
+              )
+            ) : activeTab === "teaching-assignments" ? (
+              teachingAssignmentsSection ? (
+                <TeachingAssignmentsScreen
+                  teachingAssignmentService={teachingAssignmentService}
+                  subjectService={subjectService}
+                  schoolMemberService={schoolMemberService}
+                  sectionId={teachingAssignmentsSection.sectionId}
+                  sectionName={teachingAssignmentsSection.sectionName}
+                  onBack={() => setActiveTab("sections")}
+                />
+              ) : (
+                // Reached only if this tab is active with no section
+                // context (e.g. a stale state after a reload) -- fall back
+                // to Sections rather than render a blank or wrong screen.
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
                   }}
                 />
               )

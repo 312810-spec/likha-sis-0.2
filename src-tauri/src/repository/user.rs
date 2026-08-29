@@ -227,6 +227,62 @@ pub fn school_has_any_members(conn: &Connection, school_id: &str) -> AppResult<b
     Ok(count > 0)
 }
 
+/// A colleague within the caller's own school -- just enough for a
+/// School Head to pick a teacher when creating a Teaching Assignment
+/// (Wave 2Y). `roles` may be empty (a member with no role grant yet);
+/// never carries the password hash, matching `User`.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SchoolMember {
+    pub id: String,
+    pub username: String,
+    pub display_name: String,
+    pub roles: Vec<String>,
+}
+
+/// Every member of `school_id`, each with the full set of roles they
+/// hold there -- one query per member for the role set (never more than
+/// a handful of members per school; simpler to verify correct by
+/// inspection than a single aggregating join, the same tradeoff
+/// `role::has_any_role` already made). Ordered by display name so the
+/// UI never has to sort client-side.
+pub fn list_members_in_school(conn: &Connection, school_id: &str) -> AppResult<Vec<SchoolMember>> {
+    let mut stmt = conn.prepare(
+        "SELECT u.id, u.username, u.display_name \
+         FROM users u \
+         JOIN user_school_memberships m ON m.user_id = u.id \
+         WHERE m.school_id = ?1 \
+         ORDER BY u.display_name COLLATE NOCASE",
+    )?;
+    let members = stmt
+        .query_map([school_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut role_stmt = conn.prepare(
+        "SELECT role FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2 ORDER BY role",
+    )?;
+    members
+        .into_iter()
+        .map(|(id, username, display_name)| {
+            let roles = role_stmt
+                .query_map((&id, school_id), |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(SchoolMember {
+                id,
+                username,
+                display_name,
+                roles,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,6 +557,70 @@ mod tests {
     /// what the threshold predicts" -- a property, not a handful of
     /// examples, and exactly proptest's stated strength over
     /// example-based unit tests.
+    #[test]
+    fn list_members_in_school_is_empty_for_a_school_with_no_members() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+
+        let members = list_members_in_school(&conn, &s.id).unwrap();
+
+        assert!(members.is_empty());
+    }
+
+    #[test]
+    fn list_members_in_school_returns_each_members_roles() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+        add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        crate::repository::role::grant(&conn, &teacher.id, &s.id, crate::repository::role::TEACHER)
+            .unwrap();
+        let head = create_user(&conn, "bo.reyes", "password12345", "Bo Reyes").unwrap();
+        add_school_membership(&conn, &head.id, &s.id).unwrap();
+        crate::repository::role::grant(
+            &conn,
+            &head.id,
+            &s.id,
+            crate::repository::role::SCHOOL_HEAD,
+        )
+        .unwrap();
+
+        let members = list_members_in_school(&conn, &s.id).unwrap();
+
+        assert_eq!(members.len(), 2);
+        // Ordered by display name -- "Ana Cruz" before "Bo Reyes".
+        assert_eq!(members[0].display_name, "Ana Cruz");
+        assert_eq!(members[0].roles, vec!["teacher".to_string()]);
+        assert_eq!(members[1].display_name, "Bo Reyes");
+        assert_eq!(members[1].roles, vec!["school_head".to_string()]);
+    }
+
+    #[test]
+    fn list_members_in_school_never_includes_a_different_schools_members() {
+        let conn = open_test_db();
+        let s1 = school::create(&conn, "Rizal Elementary").unwrap();
+        let s2 = school::create(&conn, "Mabini Elementary").unwrap();
+        let teacher = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+        add_school_membership(&conn, &teacher.id, &s2.id).unwrap();
+
+        let members = list_members_in_school(&conn, &s1.id).unwrap();
+
+        assert!(members.is_empty());
+    }
+
+    #[test]
+    fn list_members_in_school_includes_a_member_with_no_role_grant_yet() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let user = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+        add_school_membership(&conn, &user.id, &s.id).unwrap();
+
+        let members = list_members_in_school(&conn, &s.id).unwrap();
+
+        assert_eq!(members.len(), 1);
+        assert!(members[0].roles.is_empty());
+    }
+
     mod lockout_properties {
         use super::*;
         use proptest::prelude::*;

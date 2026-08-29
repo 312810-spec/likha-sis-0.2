@@ -140,6 +140,15 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async listMeetings() {
     return [];
   }
+  async listBySection() {
+    return [];
+  }
+  async create() {
+    return null;
+  }
+  async remove() {
+    return false;
+  }
 }
 
 function renderScreen(

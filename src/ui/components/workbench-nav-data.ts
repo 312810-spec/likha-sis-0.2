@@ -3,6 +3,7 @@ export type SignedInTab =
   | "learners"
   | "sections"
   | "section-roster"
+  | "teaching-assignments"
   | "sf1-import"
   | "today-classes"
   | "attendance"
@@ -24,6 +25,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   learners: "Learners",
   sections: "Sections",
   "section-roster": "Section Roster",
+  "teaching-assignments": "Teaching Assignments",
   "sf1-import": "SF1: Enrollment",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
@@ -45,11 +47,11 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 
 /** Groups every navigable destination into a teacher's actual daily
  * rhythm instead of one flat button row -- see
- * docs/adr/0031-design-system-and-app-shell.md. `section-roster` is
- * deliberately absent: it is only ever reached from the "Sections" screen
- * with a section already chosen. Kept in its own data-only module (not
- * `WorkbenchNav.tsx`) so that component file can stay component-only for
- * React Fast Refresh. */
+ * docs/adr/0031-design-system-and-app-shell.md. `section-roster` and
+ * `teaching-assignments` are deliberately absent: both are only ever
+ * reached from the "Sections" screen with a section already chosen.
+ * Kept in its own data-only module (not `WorkbenchNav.tsx`) so that
+ * component file can stay component-only for React Fast Refresh. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",

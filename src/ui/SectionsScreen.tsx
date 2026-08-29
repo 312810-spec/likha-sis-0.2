@@ -16,6 +16,11 @@ interface SectionsScreenProps {
    * parent state handoff, not a route -- the same pattern
    * TeacherWorkspaceScreen uses for "open attendance for this section". */
   onOpenRoster: (sectionId: string) => void;
+  /** Open Teaching Assignments for one section (Wave 2Y). Same handoff
+   * pattern as `onOpenRoster`; `sectionName` is passed along too since
+   * this screen already has the full `Section` in hand and
+   * `TeachingAssignmentsScreen` needs it only for display. */
+  onManageAssignments: (sectionId: string, sectionName: string) => void;
 }
 
 function todayAsIsoDate(): string {
@@ -30,6 +35,7 @@ export function SectionsScreen({
   sectionService,
   learnerService,
   onOpenRoster,
+  onManageAssignments,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -146,6 +152,13 @@ export function SectionsScreen({
                 aria-label={`Open roster for ${section.name}`}
               >
                 Open roster
+              </button>{" "}
+              <button
+                type="button"
+                onClick={() => onManageAssignments(section.id, section.name)}
+                aria-label={`Manage teaching assignments for ${section.name}`}
+              >
+                Manage assignments
               </button>
             </li>
           ))}
