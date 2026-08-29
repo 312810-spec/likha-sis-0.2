@@ -1,5 +1,58 @@
 # ACTIVE PLAN
 
+## Wave 2X: Today's Classes (added 2026-08-29) — complete
+
+Full record: `docs/adr/0055-*` Wave 2X addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2X entry;
+`docs/VERIFICATION-DEBT.md` Wave 2X entry. **New branch**
+`claude/likha-sis-wave2x-todays-classes`, created from `bde802f`
+(Wave 2W's own final, CI-confirmed checkpoint).
+
+**Scope**: one new screen, `TodaysClassesScreen.tsx` — the spec's
+"Today's Classes" main screen. Lists every class the teacher meets
+today in schedule order, with each one's Subject Attendance status, and
+hands off to `SubjectAttendanceScreen` with the class preselected on
+"Check attendance". No new backend command — reuses
+`list_schedule_meetings_by_assignment` and
+`list_subject_attendance_sessions` unchanged.
+
+**Weekday convention established, not assumed**:
+`schedule_meetings.weekday` had no documented calendar meaning anywhere
+in this codebase before this wave (confirmed by exhaustive search — no
+Rust code, test, or ADR ever assigned it one). Documented at its single
+point of use, `src/domain/schedule-meeting.ts`: **0 = Sunday … 6 =
+Saturday**, matching JavaScript's `Date.getDay()` exactly. Recorded as
+a durable decision in the ADR-0055 Wave 2X addendum, binding for any
+future schedule-creation UI.
+
+**Architecture**: `TeachingAssignmentRepository` gained one more read
+method, `listMeetings`, reusing the existing
+`list_schedule_meetings_by_assignment` command. `SubjectAttendanceApplicationService`
+gained a thin validated passthrough. `SubjectAttendanceScreen` gained
+one optional prop, `initialAssignmentId` (verified against the loaded
+assignment list, mount-time-only default — same shape as
+`AttendanceScreen`'s `initialSectionId`). `App.tsx` gained one more
+narrowly-typed handoff variable, `subjectAttendanceAssignmentId`.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W); no `TeacherWorkspaceScreen` entry point
+into Today's Classes; no Subject Monitor/Adviser View.
+
+**Verification, all actually run this session**: `npm run quality`
+637/637 vitest (+12: 2 `listMeetings` service tests, 1 `listMeetings`
+adapter test, 1 `initialAssignmentId` screen test, 8
+`TodaysClassesScreen` tests incl. 2 axe passes);
+typecheck/eslint/format/architecture clean. Zero Rust files touched;
+`cargo test` reconfirmed 564/564 unchanged, `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean, as part of `npm run
+quality:full`. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.
+
+**Next**: the carried Teaching Assignment/Class Schedule UI; Subject
+Monitor / Adviser View; or the native NVDA/Narrator pass. No candidate
+pre-selected.
+
 ## Wave 2W: Subject Attendance first UI increment (added 2026-08-29) — complete
 
 Full record: `docs/adr/0055-*` Wave 2W addendum; `docs/CURRENT-HANDOFF.md`

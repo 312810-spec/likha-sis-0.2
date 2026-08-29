@@ -2366,6 +2366,42 @@ Full record: `docs/adr/0055-*` Wave 2W addendum;
   carried Teaching Assignment/Class Schedule UI; or the native
   NVDA/Narrator pass. No candidate pre-selected.
 
+## Wave 2X — Today's Classes (added 2026-08-29)
+
+Full record: `docs/adr/0055-*` Wave 2X addendum;
+`docs/VERIFICATION-DEBT.md` Wave 2X entry. **New branch**
+`claude/likha-sis-wave2x-todays-classes`, created from `bde802f`
+(Wave 2W's own final, CI-confirmed checkpoint).
+
+- **Built**: `TodaysClassesScreen.tsx` — lists every class the
+  signed-in teacher meets today (schedule order), each with its Subject
+  Attendance status (Not checked / Checked / No class) and a "Check
+  attendance" action that hands off to `SubjectAttendanceScreen` with
+  that class preselected. Reuses `list_schedule_meetings_by_assignment`
+  and `list_subject_attendance_sessions` unchanged — zero new backend
+  surface. **Established the `schedule_meetings.weekday` convention**
+  (0 = Sunday … 6 = Saturday, matching `Date.getDay()`) — the column
+  had no documented calendar meaning anywhere in this codebase before
+  this wave; now documented at `src/domain/schedule-meeting.ts` and in
+  the ADR-0055 Wave 2X addendum, binding for future schedule-creation
+  UI. `TeachingAssignmentRepository` gained `listMeetings`;
+  `SubjectAttendanceScreen` gained an `initialAssignmentId` handoff
+  prop (mount-time default, verified against the loaded list — same
+  shape as `AttendanceScreen`'s `initialSectionId`).
+- **Deliberately not built**: no dev-preview-fixture wiring (same
+  disclosed gap as Waves 2U/2W); no `TeacherWorkspaceScreen` entry
+  point into Today's Classes; no Subject Monitor/Adviser View.
+- **Verification/checkpoint**: `npm run quality` 637/637 vitest (+12);
+  typecheck/eslint/format/architecture clean; zero Rust files touched
+  (`cargo test` reconfirmed 564/564 unchanged, `cargo fmt --check` /
+  `cargo clippy --all-targets -- -D warnings` clean); `npm run build` +
+  `check:dev-preview-isolation` pass; `npm run quality:security` clean,
+  no new dependency; `npm run harness:verify` still exactly 100/100,
+  unchanged.
+- **Next**: the carried Teaching Assignment/Class Schedule UI; Subject
+  Monitor / Adviser View; or the native NVDA/Narrator pass. No
+  candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

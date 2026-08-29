@@ -1,6 +1,104 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2W: Subject Attendance first UI increment, COMPLETE)
+## Active Task (2026-08-29 — Wave 2X: Today's Classes, COMPLETE)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 2X
+addendum; `docs/PROJECT-MEMORY.md` Wave 2X entry;
+`docs/VERIFICATION-DEBT.md` Wave 2X entry. **New dedicated branch**
+`claude/likha-sis-wave2x-todays-classes`, created from exactly
+`bde802f6abf25aaaae41c3df0cee211e9460b5d6` (Wave 2W's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2W's own final Security
+Gate `33252525215` and Quality Gate `33252525239` reconfirmed
+`completed/success` for the exact HEAD commit `bde802f` before any Wave
+2X work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 2X work began.
+
+**Scope chosen**: the natural next slice recorded at the end of Wave
+2W — Today's Classes, which gives the "not checked" state Subject
+Attendance already relies on its first real UI purpose, per the
+owner's own standing instruction to continue directly into the next
+wave with a notification at each boundary rather than a stop-and-wait.
+
+**What shipped**: one new screen, `TodaysClassesScreen.tsx` — the
+spec's own "Today's Classes" main screen — listing every class the
+signed-in teacher meets today, in schedule order, with each one's
+Subject Attendance status (Not checked / Checked / No class) and a
+"Check attendance" action that hands off to `SubjectAttendanceScreen`
+with that class preselected (today's date is already
+`SubjectAttendanceScreen`'s own default). No new backend command: the
+screen reuses the existing `list_schedule_meetings_by_assignment` and
+`list_subject_attendance_sessions` commands, computing "does this class
+meet today, and has it been checked" entirely client-side.
+
+**A real correctness question surfaced and was resolved before writing
+any UI code**: `schedule_meetings.weekday` has never had a documented
+calendar meaning anywhere in this codebase (confirmed by an exhaustive
+search of the Rust source, its migration tests, and ADR-0039, none of
+which assign a specific day to any of its six values). This screen is
+the first code to read the column outside its own table, and needed a
+real interpretation to compare against JavaScript's `Date.getDay()`.
+Established, not assumed, and documented at its single point of use
+(`src/domain/schedule-meeting.ts`) and in the ADR-0055 Wave 2X
+addendum: **0 = Sunday … 6 = Saturday**, matching `Date.getDay()`
+exactly — binding for any future schedule-creation UI.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **637/637 vitest** (+12: 2 new
+`SubjectAttendanceApplicationService.listMeetings` tests, 1 new
+`TauriTeachingAssignmentRepository.listMeetings` adapter test, 1 new
+`SubjectAttendanceScreen` `initialAssignmentId` test, 8
+`TodaysClassesScreen` tests including 2 axe accessibility passes).
+**Zero Rust files touched this wave** — confirmed by `git status`;
+`cargo test` reconfirmed 564/564 unchanged, `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean, all as part of `npm
+run quality:full`. `npm run build` + `check:dev-preview-isolation`
+pass. `npm run quality:security` clean (gitleaks + `cargo deny check` +
+OSV-Scanner), no new dependency. `npm run harness:verify` still exactly
+100/100, unchanged — not reopened. `npm run quality:full` green end to
+end, exit code 0.
+
+**Scope guard held**: no dev-preview-fixture wiring (same disclosed,
+consistent gap as Waves 2U and 2W); no change to
+`TeacherWorkspaceScreen` to add a Today's Classes entry point (left for
+a future wave once the daily-teaching entry-point flow is reconsidered
+together, not as an ad hoc add); no Subject Monitor/Adviser View; zero
+change to any Wave 2V/2W backend or UI code beyond the two new,
+narrowly-typed reuse points (`listMeetings`, `initialAssignmentId`);
+`main` not touched; no unrelated refactor.
+
+**Review**: a bounded self-review confirmed the weekday-convention
+decision is documented at its point of use and in the ADR (not merely
+assumed), that `listMeetings` reuses an existing, already-authorized
+command rather than adding new authorization surface, that the
+today's-occurrence computation correctly excludes meetings on other
+weekdays (proven by a dedicated test using two different assignments
+and a meeting deliberately on a different day), and that the
+`initialAssignmentId` handoff is verified against the loaded assignment
+list before use, mirroring `AttendanceScreen`'s own established
+pattern. No independent (non-self) review was dispatched for this
+bounded UI slice — retained as debt in `docs/VERIFICATION-DEBT.md`,
+consistent with several recent waves' own retained-debt pattern.
+
+**Exact next slice** (recorded, not started): the carried Teaching
+Assignment/Class Schedule UI (the remaining unwired commands for
+creating/editing assignments and schedule meetings themselves); Subject
+Monitor / Adviser View (the spec's own later steps); or the native
+NVDA/Narrator pass. No candidate pre-selected. Per the owner's own
+standing instruction this session, work continues directly into the
+next wave without a separate stop-and-wait — a notification is sent at
+each wave boundary instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply
+(confirming an organization-managed Microsoft 365 tenant, who can grant
+Graph/site consent) — unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-29 — Wave 2W: Subject Attendance first UI increment, COMPLETE, superseded above)
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 2W
 addendum; `docs/PROJECT-MEMORY.md` Wave 2W entry;

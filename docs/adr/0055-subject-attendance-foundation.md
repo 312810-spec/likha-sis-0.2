@@ -210,3 +210,85 @@ populated roster). `npx tsc -b --noEmit` / `eslint` / `prettier --check`
 `npm run quality:full`. `npm run build` + `check:dev-preview-isolation`
 pass. `npm run quality:security` clean, no new dependency. `npm run
 harness:verify` still exactly 100/100, unchanged.
+
+## Addendum (Wave 2X, 2026-08-29): Today's Classes and the weekday convention
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-2X-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Scope**: a single new screen, `TodaysClassesScreen.tsx` — the spec's
+own "Today's Classes" main screen — listing every class the signed-in
+teacher meets today, in schedule order, each with its Subject Attendance
+status (Not checked / Checked / No class) and a "Check attendance"
+action that hands off to `SubjectAttendanceScreen` with the class (and
+today's date, already `SubjectAttendanceScreen`'s own default)
+preselected. Subject Monitor and Adviser View remain deferred, matching
+the spec's own later steps.
+
+**A real correctness question, not a design preference, surfaced and
+was resolved before writing any UI code**: `schedule_meetings.weekday`
+(`i64`, `CHECK BETWEEN 0 AND 6`, added by Teacher Load/Class Schedule
+Foundation, ADR-0039) has never had a documented calendar meaning
+anywhere in this codebase — confirmed by an exhaustive search of
+`src-tauri/src/`, its migration tests, and ADR-0039 itself, none of
+which assign a specific day to any of the six integers, and nothing
+before this wave ever read the column outside its own table. This
+screen is the first code to give it real-world meaning, and needed one
+to compare against JavaScript's `Date.getDay()`. Rather than guess or
+silently pick one, the convention is now established and documented at
+its single point of use, `src/domain/schedule-meeting.ts`: **0 = Sunday
+… 6 = Saturday**, chosen because it matches `Date.prototype.getDay()`
+exactly (no conversion table needed in the screen). This binds any
+future schedule-creation UI to the same numbering — recorded here as
+the durable decision, not merely as a code comment, per `CLAUDE.md`'s
+ADR requirement.
+
+**Architecture**: `TeachingAssignmentRepository` gained one more read
+method, `listMeetings(teachingAssignmentId)`, reusing the existing,
+already-tested `list_schedule_meetings_by_assignment` command
+(Teacher Load/Class Schedule Foundation) — zero new backend surface.
+`SubjectAttendanceApplicationService` gained a thin validated
+passthrough, `listMeetings`. The screen itself computes today's
+occurrences client-side: for each of the teacher's assignments, fetch
+its meetings, keep only those on today's weekday, and for any that
+match, fetch that assignment's sessions and look up today's date the
+same "no row = not checked" way `SubjectAttendanceScreen` already does
+— no new backend query, no new "today's classes" command.
+
+**Handoff pattern**: `SubjectAttendanceScreen` gained one new optional
+prop, `initialAssignmentId`, verified against the loaded assignment list
+before use and applied only as a mount-time default — the same shape as
+`AttendanceScreen`'s existing `initialSectionId` and
+`MonthlySummaryScreen`'s `initialSectionId`/`initialYearMonth`, not a
+new pattern. `App.tsx` gained one more narrowly-typed handoff variable,
+`subjectAttendanceAssignmentId`, set only by
+`TodaysClassesScreen`'s `onCheckAttendance` callback.
+
+**A lint rule caught a real (if minor) issue**: the project's `eslint`
+config includes `react-hooks/set-state-in-effect`, which flagged the
+screen's mount effect for calling `load()` (itself calling `setLoading`
+synchronously) directly in the effect body. Suppressed with the same
+`// eslint-disable-next-line react-hooks/set-state-in-effect` pattern
+already used in `SectionRosterScreen.tsx` and `MonthlySummaryScreen.tsx`
+for the identical load-on-mount-or-service-change shape — a deliberate,
+already-precedented pattern, not a bug.
+
+**Deliberately not done**: no new dev-preview fixture wiring (same
+disclosed, consistent tradeoff as Waves 2U and 2W); no change to
+`TeacherWorkspaceScreen` to link into Today's Classes — left for a
+future wave once the whole daily-teaching entry-point flow is
+reconsidered together, rather than adding an ad hoc link now.
+
+**Verification**: `npm run quality` 637/637 vitest (+12: 2 new
+`SubjectAttendanceApplicationService.listMeetings` tests, 1 new
+`TauriTeachingAssignmentRepository.listMeetings` adapter test, 1 new
+`SubjectAttendanceScreen` `initialAssignmentId` test, 8
+`TodaysClassesScreen` tests including 2 axe accessibility passes).
+`npx tsc -b --noEmit` / `eslint` / `prettier --check` /
+`check:architecture` all clean. Zero Rust files touched — confirmed by
+`git status`; `cargo test` reconfirmed 564/564 unchanged, `cargo fmt
+--check` / `cargo clippy --all-targets -- -D warnings` clean, all as
+part of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean
+(gitleaks + `cargo deny check` + OSV-Scanner), no new dependency. `npm
+run harness:verify` still exactly 100/100, unchanged.

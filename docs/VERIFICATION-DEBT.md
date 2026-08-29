@@ -1,5 +1,33 @@
 # Verification Debt
 
+## Wave 2X — Today's Classes (2026-08-29)
+
+Full record: `docs/adr/0055-*` Wave 2X addendum; `docs/PROJECT-MEMORY.md`
+Wave 2X entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **`TodaysClassesScreen` has no browser-rendered (Playwright/axe)
+   screenshot coverage.** Not wired into `src/dev-preview/fixtures.ts`
+   this wave — the same disclosed gap Waves 2U and 2W's own new UI left
+   open. Coverage is jsdom + axe-core
+   (`expectNoAccessibilityViolations`) only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as Waves 2V/2W, not a new gap class.
+3. **No `TeacherWorkspaceScreen` entry point into Today's Classes.** A
+   teacher reaches the new screen only via the nav tab, not from the
+   existing workspace dashboard's own "mark/continue/review attendance"
+   actions — left for a future wave that reconsiders the whole
+   daily-teaching entry-point flow together, rather than an ad hoc
+   addition now.
+4. **The weekday convention (0 = Sunday … 6 = Saturday) is established
+   by this wave, not verified against any pre-existing schedule-creation
+   UI**, because none exists yet — there is no code anywhere in this
+   codebase yet that writes a `schedule_meetings.weekday` value from a
+   real calendar date to confirm the convention round-trips correctly
+   end to end. Must be honored by whichever future wave finally builds
+   schedule-meeting creation.
+
 ## Wave 2W — Subject Attendance first UI increment (2026-08-29)
 
 Full record: `docs/adr/0055-*` Wave 2W addendum; `docs/PROJECT-MEMORY.md`
