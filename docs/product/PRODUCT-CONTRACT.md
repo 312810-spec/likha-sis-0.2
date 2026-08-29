@@ -51,27 +51,33 @@ future explicit "authorized organization switch" for legitimate
 multi-school membership is **HYPOTHESIS** — not needed until a real
 multi-school user is a confirmed requirement.
 
-## 3. Roles/permissions (RBAC) — DIRECTION SET, not yet implemented
+## 3. Roles/permissions (RBAC) — BUILT (foundation), stale status corrected 2026-08-29
 
-No role concept exists anywhere in the code today (`user_school_memberships`
-has no role column; `auth`/`session.ts` have no role checks). This was a
-deliberate, explicit deferral (`docs/product/M8-DECISION.md`, stop
-condition #8: changing access expectations without a documented
-requirement needs the user, not autonomous choice).
+**This section was stale** — it previously said "not yet implemented,"
+written before Wave 1A actually built it the same day (2026-08-25,
+`docs/adr/0036-rbac-foundation.md`) and never updated after. Verified
+directly against source this session: `user_school_roles` (migration,
+`CHECK (role IN ('teacher', 'registrar', 'school_head'))`) and
+`auth::Capability` (`src-tauri/src/auth/mod.rs`) both exist and are real.
 
-**Starting role model, already confirmed with the user** (M8-DECISION.md
-follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
+**Three-role model, as confirmed with the user** (M8-DECISION.md
+follow-up, 2026-08-24): **Teacher, Registrar, School Head** — one person
+can hold more than one role in the same school (separate join table, not
+a single role column).
 
-- School Head: sees/manages all teachers' data within the school.
-- Registrar: focused on official-form exports and learner records,
-  separate from grading/attendance.
-- Teacher: scoped to their own classes/sections, as today.
-
-**Not yet decided**: the exact authority boundaries between these three
-(e.g., can a Registrar edit a grade? can a School Head impersonate a
-teacher's session?) — do not implement from assumption; this needs its
-own short scoping pass when RBAC is actually built, using the confirmed
-three-role starting point as the anchor, not a blank slate.
+**Capabilities gated today** (`authorize_capability`, session-derived
+role lookup, never cached): `ManageLearners` (create/edit enrollment —
+Registrar or School Head), `ManageSchoolMembership` (grant a new member
+— School Head only, deliberately excludes Registrar), and
+`ManageTeachingAssignments`/`authorize_view_teacher_load` (Teacher Load
+— School Head manages, self-or-School-Head views). This is a
+**representative proof set, not the full authority boundary** —
+`PRODUCT-CONTRACT.md`'s original caution stands: **still not decided**
+whether a Registrar can edit a grade, whether a School Head can
+impersonate a teacher's session, or any authority question beyond what
+the three capabilities above already gate. Extend via new `Capability`
+variants through the existing gate, never a new authorization mechanism
+or a redesign of `user_school_roles`.
 
 ## 4. Curriculum / Key Stage versioning — BUILT (foundation), narrower than the full cohort model
 
