@@ -1,4 +1,5 @@
 import { ValidationError } from "../domain/errors";
+import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type {
@@ -40,6 +41,11 @@ export class SubjectAttendanceApplicationService {
   async listMyAssignments(teacherUserId: string): Promise<TeachingAssignmentSummary[]> {
     const trimmed = requireNonEmpty(teacherUserId, "Teacher");
     return this.teachingAssignments.listMine(trimmed);
+  }
+
+  async listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]> {
+    const assignment = requireNonEmpty(teachingAssignmentId, "Class");
+    return this.teachingAssignments.listMeetings(assignment);
   }
 
   async openSession(

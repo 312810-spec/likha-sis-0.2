@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import type {
   EntryStatus,
   RecordEntryOutcome,
@@ -10,6 +11,17 @@ import type {
   TeachingAssignmentSummary,
 } from "../domain/subject-attendance";
 import { SubjectAttendanceApplicationService } from "./subject-attendance-service";
+
+const MEETINGS: ScheduleMeeting[] = [
+  {
+    id: "meeting-1",
+    teachingAssignmentId: "ta-1",
+    weekday: 1,
+    startsAt: "08:00",
+    endsAt: "09:00",
+    room: "Room 3",
+  },
+];
 
 const SESSION: SubjectAttendanceSession = {
   id: "session-1",
@@ -93,9 +105,14 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   teacherUserIds: string[] = [];
+  meetingsRequestedFor: string[] = [];
   async listMine(teacherUserId: string) {
     this.teacherUserIds.push(teacherUserId);
     return ASSIGNMENTS;
+  }
+  async listMeetings(teachingAssignmentId: string) {
+    this.meetingsRequestedFor.push(teachingAssignmentId);
+    return MEETINGS;
   }
 }
 
@@ -121,6 +138,22 @@ describe("SubjectAttendanceApplicationService", () => {
 
     await expect(service.listMyAssignments("  ")).rejects.toThrow(ValidationError);
     expect(teachingAssignments.teacherUserIds).toEqual([]);
+  });
+
+  it("lists an assignment's schedule meetings", async () => {
+    const { service, teachingAssignments } = makeService();
+
+    const result = await service.listMeetings("ta-1");
+
+    expect(teachingAssignments.meetingsRequestedFor).toEqual(["ta-1"]);
+    expect(result).toEqual(MEETINGS);
+  });
+
+  it("rejects an empty class id before calling the repository for listMeetings", async () => {
+    const { service, teachingAssignments } = makeService();
+
+    await expect(service.listMeetings("  ")).rejects.toThrow(ValidationError);
+    expect(teachingAssignments.meetingsRequestedFor).toEqual([]);
   });
 
   it("opens a session with a validated date", async () => {

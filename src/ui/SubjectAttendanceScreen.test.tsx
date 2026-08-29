@@ -137,6 +137,9 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async listMine(): Promise<TeachingAssignmentSummary[]> {
     return this.assignments;
   }
+  async listMeetings() {
+    return [];
+  }
 }
 
 function renderScreen(
@@ -336,5 +339,32 @@ describe("SubjectAttendanceScreen", () => {
     await screen.findByRole("button", { name: "Check attendance" });
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("preselects the class passed as initialAssignmentId when it exists", async () => {
+    const other: TeachingAssignmentSummary = {
+      id: "ta-2",
+      sectionId: "sec-2",
+      sectionName: "Rizal",
+      schoolYear: "2026-2027",
+      subjectId: "sub-2",
+      subjectName: "Science",
+    };
+    const subjectAttendance = new FakeSubjectAttendanceRepository();
+    const teachingAssignments = new FakeTeachingAssignmentRepository([ASSIGNMENT, other]);
+    const service = new SubjectAttendanceApplicationService(subjectAttendance, teachingAssignments);
+    render(
+      <ModeProvider>
+        <SubjectAttendanceScreen
+          subjectAttendanceService={service}
+          teacherUserId="teacher-1"
+          initialAssignmentId="ta-2"
+        />
+      </ModeProvider>,
+    );
+
+    await screen.findByRole("button", { name: "Check attendance" });
+
+    expect(screen.getByRole("combobox", { name: "Class" })).toHaveValue("ta-2");
   });
 });

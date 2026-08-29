@@ -21,6 +21,11 @@ interface SubjectAttendanceScreenProps {
    * `subject_attendance::authorize_own_assignment`); there is no
    * "view a colleague's class" mode in this screen. */
   teacherUserId: string;
+  /** Wave 2X: preselect a class when arriving from Today's Classes'
+   * "Check attendance" action. Verified against the loaded assignment
+   * list before use, same as `AttendanceScreen`'s `initialSectionId` --
+   * a mount-time-only default, never re-applied on a later prop change. */
+  initialAssignmentId?: string;
 }
 
 const STATUS_LABELS: Record<EntryStatus, string> = {
@@ -45,6 +50,7 @@ function buttonKey(learnerId: string, status: EntryStatus): string {
 export function SubjectAttendanceScreen({
   subjectAttendanceService,
   teacherUserId,
+  initialAssignmentId,
 }: SubjectAttendanceScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -94,8 +100,15 @@ export function SubjectAttendanceScreen({
       .then((result) => {
         if (assignmentsRequestRef.current !== requestId) return;
         setAssignments(result);
-        const first = result[0];
-        if (first) setAssignmentId((current) => current || first.id);
+        const preselected =
+          initialAssignmentId && result.some((a) => a.id === initialAssignmentId)
+            ? initialAssignmentId
+            : result[0]?.id;
+        // initialAssignmentId is intentionally a mount-time-only default,
+        // not a synced prop -- read it here (deliberately omitted from
+        // this effect's own dependency list below) rather than reacting
+        // to a later change to initialAssignmentId from a parent re-render.
+        if (preselected) setAssignmentId((current) => current || preselected);
       })
       .catch(() => {
         if (assignmentsRequestRef.current !== requestId) return;

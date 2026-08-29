@@ -34,6 +34,7 @@ import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
+import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
 import { WorkbenchNav } from "./ui/components/WorkbenchNav";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
@@ -64,6 +65,13 @@ function App() {
     year: number;
     month: number;
   } | null>(null);
+  // Set only by TodaysClassesScreen's "Check attendance" action, so
+  // SubjectAttendanceScreen opens with that class already selected --
+  // same narrowly-typed handoff pattern as above, not a router/global
+  // store.
+  const [subjectAttendanceAssignmentId, setSubjectAttendanceAssignmentId] = useState<string | null>(
+    null,
+  );
 
   function handleSessionExpired() {
     setSession(null);
@@ -201,10 +209,20 @@ function App() {
                   setActiveTab("monthly-summary");
                 }}
               />
+            ) : activeTab === "today-classes" ? (
+              <TodaysClassesScreen
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
+                onCheckAttendance={(teachingAssignmentId) => {
+                  setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                  setActiveTab("subject-attendance");
+                }}
+              />
             ) : activeTab === "subject-attendance" ? (
               <SubjectAttendanceScreen
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
+                initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
               />
             ) : activeTab === "monthly-summary" ? (
               <MonthlySummaryScreen

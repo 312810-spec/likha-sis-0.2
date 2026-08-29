@@ -38,4 +38,33 @@ describe("TauriTeachingAssignmentRepository", () => {
       },
     ]);
   });
+
+  it("passes through the existing list_schedule_meetings_by_assignment command unchanged", async () => {
+    mockInvoke.mockResolvedValueOnce([
+      {
+        id: "meeting-1",
+        teachingAssignmentId: "ta-1",
+        weekday: 1,
+        startsAt: "08:00",
+        endsAt: "09:00",
+        room: "Room 3",
+      },
+    ]);
+
+    const result = await new TauriTeachingAssignmentRepository().listMeetings("ta-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_schedule_meetings_by_assignment", {
+      teachingAssignmentId: "ta-1",
+    });
+    expect(result).toEqual([
+      {
+        id: "meeting-1",
+        teachingAssignmentId: "ta-1",
+        weekday: 1,
+        startsAt: "08:00",
+        endsAt: "09:00",
+        room: "Room 3",
+      },
+    ]);
+  });
 });

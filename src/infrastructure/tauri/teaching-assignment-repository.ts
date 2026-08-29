@@ -1,3 +1,4 @@
+import type { ScheduleMeeting } from "../../domain/schedule-meeting";
 import type { TeachingAssignmentSummary } from "../../domain/subject-attendance";
 import type { TeachingAssignmentRepository } from "../../domain/ports/teaching-assignment-repository";
 import { invoke } from "./invoke";
@@ -28,5 +29,11 @@ export class TauriTeachingAssignmentRepository implements TeachingAssignmentRepo
       subjectId: detail.subjectId,
       subjectName: detail.subjectName,
     }));
+  }
+
+  listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]> {
+    return invoke<ScheduleMeeting[]>("list_schedule_meetings_by_assignment", {
+      teachingAssignmentId,
+    });
   }
 }
