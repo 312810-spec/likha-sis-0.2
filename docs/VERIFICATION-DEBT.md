@@ -1,5 +1,46 @@
 # Verification Debt
 
+## Wave 2U — Create Learner duplicate-candidate warning (2026-08-29)
+
+Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/ACTIVE-PLAN.md` Wave 2U entry.
+
+**Closed:**
+
+- **The Next Best candidate named in the Wave 2T entry (item 3 below) is
+  now built** — `find_learner_candidates`'s underlying detection is
+  wired into manual Create Learner via `create_with_duplicate_check`/
+  `create_learner_with_duplicate_check`, with a calm inline warning on
+  `LearnerListScreen`. See the ADR-0042 Wave 2U addendum for the full
+  design record.
+
+**Newly recorded debt:**
+
+1. **The new duplicate-candidate/LRN-conflict warning UI has no
+   browser-rendered (Playwright/axe) screenshot coverage this session.**
+   `npm run quality:ui`'s browser launch hit the pre-existing, already-
+   documented `chromium-1237`-vs-installed-`chromium-1194` mismatch (see
+   "`playwright-cli` browser mismatch in this environment" below); the
+   documented workaround (`executablePath:
+"/opt/pw-browsers/chromium"`) was re-run against the _existing,
+   unmodified_ smoke script and passed with zero axe violations,
+   confirming no regression to `LearnerListScreen`'s already-covered
+   flows (list, search, edit, enrollment history) from this wave's
+   changes to that file — but the smoke script does not exercise Create
+   Learner submission at all (the dev-preview fixture's write methods,
+   including the new `createWithDuplicateCheck`, deliberately throw "not
+   wired," matching every other write method on that read-only fixture,
+   pre-existing since before this wave). Coverage of the new warning
+   states is jsdom + axe-core (`expectNoAccessibilityViolations`) only,
+   pending either a real browser-driven Create Learner smoke test in a
+   future wave or the CI Ubuntu Quality job's own correctly-versioned
+   Playwright install.
+2. **No independent (non-self) review was dispatched for this bounded,
+   narrowly-scoped slice** — a self-review covered school isolation, the
+   non-overridability of `LrnConflict`, and the stale-candidate re-check
+   (see the ADR-0042 Wave 2U addendum's "Verification" section).
+   Consistent with several recent waves' own retained-debt pattern.
+
 ## Wave 2T — SF1/SF9 official-form generation UI (2026-08-28)
 
 Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/CURRENT-HANDOFF.md`
@@ -25,10 +66,10 @@ top entry; `docs/ACTIVE-PLAN.md` Wave 2T entry.
 2. **Official SF1/SF9 fidelity remains `NOT_VERIFIED`** — unchanged
    from Wave 3/2I; this wave changes who can reach the generator, not
    its evidence state. The on-screen disclosure states this plainly.
-3. **The Next Best candidate (duplicate-learner-candidate warning on
-   Create Learner) remains unbuilt** — evaluated, scored, recorded with
-   its own switch condition, not implemented this wave (exactly one
-   bounded slice was in scope).
+3. ~~The Next Best candidate (duplicate-learner-candidate warning on
+   Create Learner) remains unbuilt~~ — **CLOSED in Wave 2U**: evaluated,
+   scored, recorded with its own switch condition here; not implemented
+   this wave (exactly one bounded slice was in scope), but built next.
 4. **Teaching Assignment / Class Schedule UI (7 commands) and a
    PSGC/address-entry UI remain unbuilt** — evaluated and explicitly
    not selected this wave (too large / no evidenced need), not silently

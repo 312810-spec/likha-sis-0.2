@@ -1,6 +1,128 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-28 — Wave 2T: SF1/SF9 official-form generation UI, COMPLETE)
+## Active Task (2026-08-29 — Wave 2U: Create Learner duplicate-candidate warning, COMPLETE)
+
+Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/PROJECT-MEMORY.md`
+Wave 2U entry; `docs/ACTIVE-PLAN.md` Wave 2U entry;
+`docs/VERIFICATION-DEBT.md` Wave 2U entry. **New dedicated branch**
+`claude/likha-sis-wave2u-duplicate-warning`, created from exactly
+`c51b46c209fbbf561a7b6915328e7159d06297fc` (Wave 2T's own final,
+independently-verified checkpoint on
+`claude/likha-sis-wave2t-teacher-slice`) — that branch itself was not
+modified or force-updated. Harness v2 stayed locked and still computes
+**100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Before any Wave 2U work
+began, `c51b46c`'s own 5-point pre-push checklist was independently
+re-verified (clean tree; HEAD exactly `c51b46c`; ancestry contains both
+`820d1b2` and `54dc8fc`; `main` untouched at the exact SHA above; the
+`c51b46c` diff contains only the reported delivery/documentation
+changes) and pushed unmodified — not amended, squashed, or recreated.
+
+**No candidate was pre-selected for implementation** — Wave 2T's own
+candidate table (ADR-0049 addendum) had already scored "a duplicate-
+learner-candidate warning on Create Learner" as **Next Best**, and this
+wave picked up exactly that named candidate rather than re-running the
+scoring process.
+
+**Required reconnaissance before design** (this wave's own explicit
+instruction): read `repository::learner::find_candidates` (Wave 2A,
+already school-scoped and deterministic — exact LRN or exact
+case-insensitive trimmed name), `import::matching::classify_row`
+(Wave 2C, wraps `find_candidates` into `MatchKind::ExactLrn`/
+`SuspectedDuplicate`/`New` for SF1 import), and `learner::create`
+(no pre-check at all — a duplicate LRN surfaced as a raw, untyped DB
+constraint error). Confirmed `find_learner_candidates`
+(`commands::learner.rs`) was already registered but had zero frontend
+caller — the exact gap this wave closes.
+
+**What shipped**: `repository::learner::create_with_duplicate_check`
+reuses `find_candidates` (no new SQL, no second detection engine) and
+returns a typed `CreateLearnerOutcome` (`Created`/`LrnConflict`/
+`DuplicateCandidates`, mirroring the `CorrectPlacementOutcome`/
+`TransferOutcome` convention) instead of a raw DB error. An exact LRN
+match is always `LrnConflict` — hard, never overridable, even by the
+teacher's explicit "confirm" retry; any other name/LRN overlap is
+`DuplicateCandidates`, blocking creation until a `confirmed: true` retry.
+Candidates are re-fetched fresh on every call, so a confirmed retry
+still atomically re-catches a conflict that appeared after the warning
+was shown. New Tauri command `create_learner_with_duplicate_check`
+(same `ManageLearners` gate as `create_learner`) is what
+`LearnerListScreen`'s Create Learner form now calls; `create_learner`
+itself, and every SF1-import code path
+(`import::matching::classify_row`, `import::commit`'s direct calls to
+`learner::create`), are unchanged. `LearnerListScreen` gained an inline
+`role="alert"` warning panel (not a modal, matching the house
+Transfer/End/Correct confirmation-panel convention) that receives
+focus, lists the candidate(s), and offers "Create separate learner" /
+"Cancel" for `duplicateCandidates`, or shows the conflicting learner's
+name with no override affordance at all for `lrnConflict`. Three-mode
+parity is presentation-only (an extra Guided-mode hint sentence); the
+underlying detection/authorization/outcome never varies by mode.
+
+**Verification** (all run this session): 7 new `repository::learner`
+unit tests + 6 new `learner_management.rs` integration tests (546 lib +
+every integration binary green, up from 539 lib; `learner_management.rs`
+13/13, up from 7); `cargo fmt --check`/`cargo clippy --all-targets -- -D
+warnings`/`cargo test` all clean. `npm run quality` — **600/600 vitest**
+(62 files; +2 `TauriLearnerRepository` adapter, +6
+`LearnerApplicationService`, +8 `LearnerListScreen` including 2 new axe
+passes for the duplicate-candidate and LRN-conflict warning states),
+typecheck/eslint/format/architecture clean. `npm run quality:security`
+(gitleaks/cargo-deny/OSV) green — no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged — not reopened. `npm
+run quality:full` (harness + quality + `cargo fmt --check` + `cargo
+test` + clippy) green end to end, exit code 0. `npm run quality:ui`'s
+Playwright browser launch hit the same pre-existing
+`chromium-1237`-vs-installed-`chromium-1194` mismatch already recorded
+in `docs/VERIFICATION-DEBT.md`; the documented workaround
+(`executablePath: "/opt/pw-browsers/chromium"`) was re-run against the
+existing, unmodified smoke script and passed with zero axe violations,
+confirming no regression to `LearnerListScreen`'s already-covered flows.
+The new duplicate-warning UI itself has no local browser-rendered
+screenshot this session — the dev-preview fixture's
+`createWithDuplicateCheck` deliberately throws "not wired" (same as
+every other write method on that read-only fixture) — so it is covered
+by jsdom + axe-core only pending a CI/native pass.
+
+**Scope guard held**: no learner-merging capability was added (there is
+still no merge/delete for learners in this codebase); no probabilistic/
+fuzzy/AI matching was introduced (`find_candidates`'s existing exact-
+match rule is unchanged); SF1/SF9/SF10 fidelity, UI, and matching
+(`MatchKind`, `LearnerMatchResult`, `classify_row`) were not touched;
+no schema/migration change was needed (`create_with_duplicate_check`
+is a pure read-then-write over the existing `learners` table and its
+existing unique index); `main` was not touched; no unrelated refactor
+landed — `git status` shows exactly the 15 files this feature required
+across Rust and TypeScript, all four layers (domain → application →
+repository/adapter → UI), following the existing `LearnerRepository`
+port shape.
+
+**Review**: a bounded self-review covered school isolation (
+`create_with_duplicate_check_never_flags_a_different_schools_learner`/
+`create_learner_with_duplicate_check_never_flags_a_different_schools_learner_as_a_conflict`
+prove a shared name/LRN in a different school is never surfaced as a
+false duplicate), the non-overridability of `LrnConflict` under both
+`confirmed: true` and `confirmed: false`, the stale-candidate re-check
+(a new conflict introduced between the warning and the confirmed retry
+is still caught, proven with a real two-step test rather than asserted),
+and that no existing SF1-import test regressed (`tests/sf1_import.rs`
+stayed 12/12, unchanged). No independent (non-self) review was
+dispatched for this bounded, narrowly-scoped slice — retained as debt
+in `docs/VERIFICATION-DEBT.md`, consistent with several recent waves'
+own retained-debt pattern under the documented reviewer-harness-failure
+rule.
+
+**Exact next slice** (recorded, not started — see `docs/ACTIVE-PLAN.md`):
+Wave 2T's own candidate table names the Teaching Assignment/Class
+Schedule UI (7 unwired commands) as the next-largest evidenced gap,
+still assessed as too large for one bounded slice; a scoped first cut
+of it (e.g. read-only class schedule display before any assignment-
+editing UI) is the leading candidate for Wave 2V, pending the next
+autonomous-wave instruction.
+
+## Note — Active Task (2026-08-28 — Wave 2T: SF1/SF9 official-form generation UI, COMPLETE, superseded above)
 
 Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/PROJECT-MEMORY.md`
 Wave 2T entry; `docs/ACTIVE-PLAN.md` Wave 2T entry;

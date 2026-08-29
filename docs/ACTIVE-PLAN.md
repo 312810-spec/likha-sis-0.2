@@ -1,5 +1,82 @@
 # ACTIVE PLAN
 
+## Wave 2U: Create Learner duplicate-candidate warning (added 2026-08-29) — complete
+
+Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2U entry;
+`docs/VERIFICATION-DEBT.md` Wave 2U entry. **New branch**
+`claude/likha-sis-wave2u-duplicate-warning`, created from
+`c51b46c209fbbf561a7b6915328e7159d06297fc` (Wave 2T's own final,
+independently-verified checkpoint) — Wave 2T's branch was not modified.
+
+**Repository truth verified first**: `main` untouched at `d9ab0368`;
+`c51b46c`'s own 5-point pre-push checklist re-verified before use
+(clean tree, HEAD exactly `c51b46c`, ancestry contains `820d1b2` and
+`54dc8fc`, `main` untouched, diff docs-only) and pushed unmodified.
+
+**No candidate pre-selected** — Wave 2T's own scoring table had already
+named this exact candidate as **Next Best**; this wave implements it
+rather than re-scoring.
+
+**Required reconnaissance before design**: confirmed
+`repository::learner::find_candidates` (Wave 2A) is already a
+deterministic, school-scoped, exact-match-only query; confirmed
+`import::matching::classify_row` (Wave 2C) already wraps it for SF1
+import with `MatchKind::ExactLrn`/`SuspectedDuplicate`/`New`; confirmed
+manual `learner::create` has no duplicate pre-check at all (a duplicate
+LRN would surface as a raw DB constraint error); confirmed
+`find_learner_candidates` (already-registered Tauri command) has zero
+frontend caller — this wave's exact gap.
+
+**Scope delivered**: `repository::learner::create_with_duplicate_check`
+reuses `find_candidates` (no second query engine) and returns a typed
+`CreateLearnerOutcome` (`Created`/`LrnConflict`/`DuplicateCandidates`).
+`LrnConflict` (exact LRN match) is hard and never overridable by
+`confirmed`; `DuplicateCandidates` (any other name/LRN overlap) blocks
+creation until an explicit confirmed retry, which re-fetches candidates
+fresh so a conflict introduced meanwhile is still caught. New command
+`create_learner_with_duplicate_check` (same `ManageLearners` gate) is
+what `LearnerListScreen`'s Create Learner form now calls;
+`create_learner`, `import::matching::classify_row`, and `import::commit`
+are unchanged. `LearnerListScreen` gained an inline `role="alert"`
+warning panel (not a modal, matching the existing Transfer/End/Correct
+convention) with focus management, "Create separate learner"/"Cancel"
+for the soft case, and no override affordance at all for the hard case.
+
+**Architecture**: no new port — `createWithDuplicateCheck` added to the
+existing `LearnerRepository` port (list/create/updateProfile already
+lived there), matching the one-port-per-concern convention without
+introducing a needless second port for the same entity.
+
+**Verification**: `cargo test` 546 lib (+7, up from 539) + all
+integration binaries incl. `learner_management.rs` 13/13 (+6) — zero
+regression, `tests/sf1_import.rs` unchanged at 12/12. `cargo fmt
+--check`/`cargo clippy --all-targets -- -D warnings` clean. `npm run
+quality` 600/600 vitest (+15: 2 adapter, 6 service, 8 UI incl. 2 new axe
+passes), typecheck/eslint/format/architecture clean. `npm run
+quality:security` (gitleaks/cargo-deny/OSV) clean, no new dependency.
+`npm run harness:verify` still exactly 100/100, unchanged. `npm run
+quality:full` green end to end, exit code 0. `npm run quality:ui`'s
+Playwright browser launch hit the pre-existing, already-documented
+`chromium-1237`-vs-`chromium-1194` mismatch; the documented workaround
+was re-run against the existing smoke script and passed with zero axe
+violations (confirms no regression to `LearnerListScreen`'s covered
+flows); the new warning UI itself is unreachable through the read-only
+dev-preview fixture, so it has jsdom+axe coverage only this session.
+
+**Checkpoint**: implementation + tests in one feature commit, docs in a
+following commit — see `docs/CURRENT-HANDOFF.md` for exact SHAs and CI
+run ids once confirmed post-push.
+
+**Next planned wave (not started)**: a scoped first cut of the Teaching
+Assignment/Class Schedule UI (7 unwired commands) — e.g. read-only
+schedule display before any assignment-editing UI, since the full
+surface was already judged too large for one bounded slice. Alternatives
+carried forward: the native NVDA/Narrator pass; the SF1-importer debt,
+once evidence justifies it.
+
+---
+
 ## Wave 2T: SF1/SF9 official-form generation UI (added 2026-08-28) — complete
 
 Full record: `docs/adr/0049-*` Wave 2T addendum; `docs/CURRENT-HANDOFF.md`

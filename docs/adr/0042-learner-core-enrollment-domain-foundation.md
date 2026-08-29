@@ -1066,3 +1066,134 @@ Transfer/End exactly rather than diverging. Retained debt, recorded in
 covering the correction panel and its dependent-record-conflict state);
 no independent (non-self) review was dispatched for this bounded,
 narrowly-scoped slice.
+
+## Addendum (Wave 2U, 2026-08-29): manual Create Learner duplicate-candidate warning — reuse `find_candidates`, split the policy by caller
+
+Wave 2A's own "Deferred" section (above) named exactly this gap: manual
+Create Learner had no duplicate warning, and `find_candidates` existed
+only to eventually support one. Wave 2C (`import::matching::classify_row`,
+ADR-0043) used `find_candidates` to classify SF1 import rows into
+`ExactLrn`/`SuspectedDuplicate`/`New`, but manual Create Learner
+(`commands::learner::create_learner`) still had no equivalent — a
+duplicate LRN there surfaced as a raw, untyped database constraint error,
+and a duplicate name created a second, unwarned record outright.
+
+### Options evaluated
+
+1. **Do nothing / leave the DB unique index as the only guard** —
+   rejected: this is the status quo gap the wave brief names; a duplicate
+   name is silently created with no warning at all.
+2. **Reuse `import::matching::classify_row` directly from the manual
+   Create Learner command**, constructing a throwaway `Sf1ImportRow` to
+   call it — rejected. `MatchKind::ExactLrn` means something different in
+   each context: in SF1 import it is a _soft_, auto-resolvable "use this
+   existing learner" (a human still reviews it via `DuplicateResolution`,
+   but the row commits either way once resolved); in manual creation, an
+   exact LRN match must be a _hard_, non-overridable conflict — DepEd's
+   own per-learner identifier cannot legitimately collide, so there is no
+   legitimate "use existing" resolution to offer, only "fix the LRN or
+   edit the existing record." Forcing one enum to carry two different
+   policies is more fragile than reusing the actual matching engine and
+   letting each caller decide its own policy on the result.
+3. **A brand-new, independent SQL query for manual creation's duplicate
+   check** — rejected outright: this is precisely the "second competing
+   duplicate-detection engine" the wave brief warns against, and would
+   let the two call sites' notion of "duplicate" silently drift apart
+   over time.
+4. **Reuse `find_candidates` (the actual matching engine), with each
+   caller applying its own policy to the result** (RECOMMENDED) — see
+   below.
+
+### Decision: `learner::create_with_duplicate_check`, layered over `find_candidates` and `create`
+
+Added `repository::learner::create_with_duplicate_check(conn, school_id,
+given_name, family_name, lrn, sex, confirmed) -> AppResult<CreateLearnerOutcome>`,
+where `CreateLearnerOutcome` is a `#[serde(tag = "kind")]` enum ---
+`Created { learner }` / `LrnConflict { existing }` /
+`DuplicateCandidates { candidates }` --- mirroring the typed-outcome
+convention already used by `CorrectPlacementOutcome` (Wave 2S) and
+`TransferOutcome`/`EndMembershipOutcome` (Wave 2P) rather than surfacing
+a raw DB error.
+
+The function calls `find_candidates` once (unchanged, no new SQL), then:
+an exact LRN hit among the results is always `LrnConflict`, regardless of
+`confirmed` -- non-overridable, matching `idx_learners_school_lrn`'s own
+hard uniqueness rule, just surfaced as a typed result instead of a
+constraint-violation error; any other overlap with `confirmed: false` is
+`DuplicateCandidates` and creates nothing; with `confirmed: true` (the
+teacher's explicit "create separate learner anyway" after reviewing the
+warning) it proceeds to `create`. Candidates are always fetched fresh on
+every call -- a `confirmed: true` retry re-runs the same LRN-conflict
+check against the database's current state, so a conflict that appeared
+between the warning and the confirmation is still caught atomically (the
+whole check-then-write sequence runs under the single `Mutex<Connection>`
+guard every Tauri command already holds, so there is no separate
+transaction to add). `import::matching::classify_row`, `MatchKind`,
+`LearnerMatchResult`, and `import::commit`'s direct calls to `learner::create`
+are untouched -- SF1 import's own duplicate-resolution flow was
+out of this wave's scope and carries zero risk of regression from this
+change.
+
+New command `create_learner_with_duplicate_check` (same `ManageLearners`
+gate as `create_learner`) is the one `LearnerListScreen`'s Create Learner
+form now calls; `create_learner` itself is kept unchanged as the
+low-level primitive `import::commit` still calls directly.
+
+### Why Recommended won
+
+Every alternative either re-implements `find_candidates`'s query (a
+second detection engine, explicitly ruled out) or forces SF1 import's
+soft `ExactLrn` semantics onto manual creation's hard-conflict
+requirement (or vice versa), silently weakening one of the two
+call sites' actual guarantees. Reusing the query while keeping each
+caller's policy separate gets the reuse the brief asks for without
+blurring either guarantee -- SF1 import keeps treating `ExactLrn` as
+"use existing," manual creation keeps treating it as "cannot create."
+
+### UI
+
+`LearnerListScreen`'s Create Learner form calls the new command instead
+of `enrollLearner`/`create`. On `duplicateCandidates`, an inline
+`role="alert"` panel (not a modal, matching the house
+inline-confirmation-panel convention used by `SectionRosterScreen`'s
+Transfer/End/Correct actions) lists the matching learner(s), receives
+focus, and offers "Create separate learner" (confirmed retry) or
+"Cancel" (dismiss, form values preserved, nothing created). On
+`lrnConflict`, the same panel shape shows the conflicting learner's name
+with no "confirm anyway" affordance at all -- there is no override path
+in the UI because there is none in the domain. A duplicate-check network/
+storage failure (any thrown error) falls through to the form's existing
+generic error handling, which already preserves typed field values and
+allows an immediate retry -- no new failure-path code was needed for
+that scenario.
+
+### Verification
+
+New: 7 `repository::learner` unit tests, 6 `learner_management.rs`
+integration tests (including one proving the confirmed retry still
+re-checks and blocks a conflict introduced between the warning and the
+confirmation), 2 `TauriLearnerRepository` adapter tests, 6
+`LearnerApplicationService` tests, and 8 `LearnerListScreen.test.tsx`
+tests (duplicate warning shown without creating; confirmed creation;
+cancel preserves values; hard LRN conflict never offers an override;
+stale-candidate re-check; check-failure preserves values and allows
+retry; axe coverage of both new warning states). `cargo fmt --check`,
+`cargo clippy --all-targets -- -D warnings`, and `cargo test` all pass
+with zero new warnings. `npm run quality` (typecheck, eslint, `prettier
+--check`, `check:architecture`, vitest) and `npm run quality:security`
+(gitleaks/cargo-deny/OSV) both green. `npm run harness:verify` still
+exactly 100/100, unchanged. `npm run quality:ui`'s Playwright browser
+launch failed in this session on the same pre-existing
+`chromium-1237`-vs-installed-`chromium-1194` binary mismatch already
+recorded in `docs/VERIFICATION-DEBT.md` ("`playwright-cli` browser
+mismatch in this environment"); the documented workaround
+(`chromium.launch({ executablePath: "/opt/pw-browsers/chromium" })`) was
+re-run against the existing (unmodified) smoke script and passed with
+zero axe violations, confirming no regression to `LearnerListScreen`'s
+already-covered flows from this wave's changes to that file. The new
+duplicate-warning UI itself is not reachable through the dev-preview
+fixture (`FixtureLearnerRepository.createWithDuplicateCheck` throws "not
+wired," matching every other write method on that read-only fixture), so
+it has no local browser-rendered screenshot coverage this session --
+coverage of it is the jsdom + axe-core tests above, plus whatever the CI
+Ubuntu Quality job's own correctly-versioned Playwright install proves.
