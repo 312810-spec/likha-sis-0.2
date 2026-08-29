@@ -1,5 +1,94 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — ILAWCraft Research and Classification, complete)
+
+**Research/planning only — no product code changed.** Full record:
+`docs/adr/0042-ilawcraft-research-and-classification.md`,
+`docs/product/PRODUCT-CONTRACT.md` §11 (updated), this ADR's Wave 6 row
+update in `docs/adr/0035-roadmap-reconciliation-and-execution-waves.md`.
+
+**User-directed**: researched what DepEd teachers want in a SIS (general
+pass), then the user pointed this session at their own repository,
+`github.com/alotski15-png/ilaw-app-2` ("ilawcraft"), made it public
+mid-session, and asked for its classification plus a broader Teacher
+Tools segment research pass, per Wave 6's own long-standing prerequisite
+("research and classify ILAWCraft before any adapter code" —
+`PRODUCT-CONTRACT.md` §11, ADR-0035).
+
+**Two harness failures hit and worked around this session, both
+recorded for future sessions**: (1) the dispatched `deped-researcher`
+subagent hit this project's known agent-resume/retrieval failure on
+both its run and one retry — direct `WebSearch`/`WebFetch` substituted
+per the established fallback rule; (2) a spawned Claude Code Remote
+cloud session (used to inspect `ilaw-app-2` after `add_repo` failed with
+a cross-tier-owner restriction) completed its inspection but proved
+unretrievable — cross-session messaging to a cloud session is
+one-directional (no reply channel, not listed by `ListAgents`, no
+session-transcript-read tool available to the parent session). Worked
+around by inspecting the now-public repo directly via `WebFetch` against
+`raw.githubusercontent.com`/`api.github.com` instead — this is the
+reliable path for a public repo in this environment, recorded in
+ADR-0042 for reuse.
+
+**Classification (split by asset, not one label)**: ilawcraft's DepEd
+Annex E-1 COT (Classroom Observation Tool) 21-indicator rubric —
+**ADOPT** as seeded reference data. Its AI-generation architecture
+(ILAW-format-aware prompt, schema-validated output, PPTX generation
+already cleanly separated as its own step reading the lesson plan's
+stored data — exactly the shape the user wanted) — **REFERENCE**, a
+design blueprint, not portable code (Next.js/JS vs. LIKHA's Rust/Tauri).
+Its GCash payment/token-monetization layer — **REJECT**, excluded
+entirely. Overall: **PILOT** (one representative generator adapter, not
+the full studio, per Wave 6's original scope). No hardcoded secrets or
+real PII found in the repo. A genuine differentiator confirmed: no
+competitor product researched this session ties lesson planning to
+DepEd's official COT/RPMS teacher-appraisal indicators the way ilawcraft
+does.
+
+**A genuine human-approval gate surfaced, not resolved autonomously**:
+funding the AI-generation calls — BYOK (teacher's own Gemini key, zero
+LIKHA billing) vs. LIKHA-hosted (a real financial commitment) — is a
+paid-infrastructure product-policy choice
+(`.claude/rules/autonomous-development.md` gate #3). Recorded as open,
+to be decided by the user before Wave 6b's adapter code is written; BYOK
+is the recommended lower-risk default.
+
+**Wave 6 internal ordering refined (no wave reordering)**: split into
+6a — item analysis + low-risk classroom utilities (no paid API, reuses
+existing `learner_scores`/sections/learners data; item analysis first,
+tied to DepEd's live ARAL remediation policy, DepEd Order 18 s.2025) —
+and 6b — Teacher Creation Studio (gated on the funding decision above).
+Confirmed via LIKHA's own priority order that Waves 1-5's foundational
+privacy/security/DepEd-compliance work correctly stays ahead of this
+usability tooling — this research confirms Wave 6's existing placement,
+it does not move it earlier.
+
+**Supplementary DepEd-teacher research (durable, well-sourced)**: the
+IDinsight/EDCOM2 study (2,000+ schools, 15,000+ teachers) confirms
+Filipino teachers average 52 hrs/week (mandated 40), ~18 hrs/week on
+ancillary duties — direct, official validation of LIKHA's core thesis.
+Item analysis tied to DepEd's ARAL program is the strongest new Wave-6
+candidate surfaced (zero new PII, no paid API, extends existing
+`learner_scores` data, tied to current policy). SF9/SF10 remain
+manually prepared today, reinforcing but not changing Wave 3's existing
+priority.
+
+**No verification commands were relevant** — no code, schema, or
+config changed this session. `docs/adr/0042-...md` is the full citation
+trail for every claim above.
+
+**Per Autonomous Continuous Development Mode: this is a completed
+research checkpoint, not a stopping point.** Exact next action: the
+open human-approval gate (BYOK vs. LIKHA-hosted AI funding) means Wave
+6b's adapter code cannot start autonomously — but Wave 6a (item
+analysis + low-risk classroom utilities) carries no such gate and is
+available to start whenever Wave 6 itself is reached in sequence.
+Today's repository state is otherwise unchanged from the entry below
+(`main` at `3951c3d`); Wave 1 (RBAC foundation) remains the
+highest-leverage next implementation milestone per that entry, since
+Waves 1-5 are not yet started and still precede Wave 6 in the
+established sequence.
+
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 
 **`main` is now the verified integration baseline at `3951c3d`.**

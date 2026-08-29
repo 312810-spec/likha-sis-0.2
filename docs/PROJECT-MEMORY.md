@@ -404,6 +404,45 @@ Greenfield repository. No old implementation is authoritative.
   `git status` before assuming any particular commit reflects current
   state.
 
+## ILAWCraft Research and Classification (added 2026-08-29)
+
+Full record: `docs/adr/0042-ilawcraft-research-and-classification.md`,
+`docs/product/PRODUCT-CONTRACT.md` §11. Wave 6's own long-standing
+prerequisite ("research and classify ILAWCraft before any adapter
+code") is now complete. Classification split by asset: ilawcraft's
+DepEd Annex E-1 COT (Classroom Observation Tool) 21-indicator rubric is
+**ADOPT** (seeded reference data); its AI-generation/PPTX-separation
+architecture is **REFERENCE** (design blueprint only — different stack,
+Next.js/JS vs. LIKHA's Rust/Tauri, nothing is directly portable code);
+its GCash payment/token layer is **REJECT** (excluded entirely, zero-
+billing conflict). Overall: **PILOT** — one representative generator
+adapter, not the full studio, matching Wave 6's original scope. No
+secrets or real PII found in the repository.
+
+**Open human-approval gate, not resolved autonomously**: funding the AI
+calls — BYOK (teacher's own Gemini key, zero LIKHA billing) vs.
+LIKHA-hosted (a real financial commitment) — is a paid-infrastructure
+product-policy choice (autonomous-development.md gate #3), left for the
+user to decide before Wave 6b's adapter code begins; BYOK is the
+recommended default. Wave 6 is internally split into 6a (item analysis +
+low-risk classroom utilities — no paid API, no gate, reuses existing
+`learner_scores` data, tied to DepEd's live ARAL remediation policy) and
+6b (Teacher Creation Studio, gated). **No wave reordering** — Waves 1-5's
+foundational privacy/security/DepEd-compliance work correctly still
+precedes this usability tooling per LIKHA's own priority order.
+
+**Two harness limitations discovered and worked around, worth
+remembering**: the `deped-researcher` subagent hit the already-known
+agent-resume/retrieval failure (worked around with direct `WebSearch`);
+and, newly documented, a spawned Claude Code Remote **cloud** session's
+completed work proved unretrievable (cross-session messaging to a cloud
+session is one-directional — it can receive a message but not reply,
+isn't listed by `ListAgents`, and no transcript-read tool is exposed to
+the parent session). For a public GitHub repo, direct `WebFetch` against
+`raw.githubusercontent.com`/`api.github.com`'s tree endpoint is the
+reliable inspection path in this environment — prefer it over spawning a
+CCR session for repo inspection going forward.
+
 ## UX-01: Design Tokens, Shared Components, and App Shell (added 2026-08-25)
 
 Second UI-First Program milestone (ADR-0031). The Calm Civic Classroom

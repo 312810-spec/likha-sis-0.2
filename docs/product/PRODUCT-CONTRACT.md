@@ -227,21 +227,58 @@ exists (ADR-0024) showing sections/attendance status; a full "My Day"
 using schedule + Class Record readiness + advisory + relief + deadlines
 needs Teacher Load/Schedule (§6) first — sequenced accordingly.
 
-## 11. Teacher Tools & Teacher Creation Studio — HYPOTHESIS, nothing built
+## 11. Teacher Tools & Teacher Creation Studio — RESEARCHED (2026-08-29), nothing built yet
 
-Candidate low-risk classroom tools (seating plan, random picker, group
-generator, quick class list, advisory checklist, parent contact log,
-intervention tracker, certificate generator): must reuse existing
-learner/class data, never create parallel datasets.
+**Research/classification complete** — full record:
+`docs/adr/0042-ilawcraft-research-and-classification.md`. Nothing in
+this area has been implemented; this section records the researched
+direction, not a completed build.
 
-Teacher Creation Studio (lesson-plan → presentation/assessment/
-answer-key/TOS generation, integrating the user's separate ILAWCraft
-project): **research required before any implementation** — inspect the
-ILAWCraft repository and classify it ADOPT/PILOT/REFERENCE/REJECT (the
-`dependency-researcher` agent pattern already used for third-party
-adoption decisions) before writing any adapter code. No learner PII
-should ever be required by a generation tool. Nothing in this area has
-been started.
+**ilawcraft (`alotski15-png/ilaw-app-2`) classification — split by
+asset, not one label**: the DepEd Annex E-1 COT (Classroom Observation
+Tool) 21-indicator rubric it encodes is **ADOPT** as seeded reference
+data (the single most reusable asset — pure DepEd reference data,
+independent of ilawcraft's own code); its AI-generation architecture
+(ILAW-format-aware prompt, schema-validated output, PPTX generation
+already cleanly separated into its own step consuming the lesson plan's
+stored data) is **REFERENCE** — a sound design blueprint, not portable
+code (different stack: Next.js/JS vs. LIKHA's Rust/Tauri); its GCash
+payment/token-monetization layer is **REJECT**, excluded entirely
+(conflicts with LIKHA's zero-billing-by-default rule). Overall: **PILOT**
+— build one representative Lesson Plan → Slide Deck generator adapter
+natively in LIKHA's architecture (not by embedding or reusing
+ilawcraft's own running app), per Wave 6's original scope.
+
+**A genuine differentiator confirmed**: no competitor product researched
+this session (AnongKlase, Ecrah, DCOFF 2.0, the free ilawlessonplan.com/
+.net generators) ties lesson planning to DepEd's official COT/RPMS
+teacher-appraisal indicators the way ilawcraft does — this is worth
+building around, not just a nice-to-have.
+
+**A genuine human-approval gate, not an autonomous decision**: whether
+AI-generation calls are funded BYOK (teacher supplies their own Gemini
+key — zero LIKHA billing, matching ilawcraft's own model) or LIKHA-hosted
+(a real financial commitment) is an irreducible product-policy choice
+(`.claude/rules/autonomous-development.md` gate #3) — must be decided by
+the user before any adapter code is written when Wave 6 begins. BYOK is
+the lower-risk default to propose.
+
+**Wave 6 internal ordering refined** (no wave reordering — Wave 6 stays
+Wave 6, per ADR-0042's reasoning): split into **6a — item analysis +
+low-risk classroom utilities** (no paid API, reuses existing
+`learner_scores`/sections/learners data, no new architecture; item
+analysis first — ties to DepEd's live ARAL remediation policy, DepEd
+Order 18 s.2025) and **6b — Teacher Creation Studio** (the AI generator
+adapter, gated on the BYOK-vs-LIKHA-funded decision above).
+
+**Candidate low-risk classroom tools** (seating plan, random picker,
+group generator, quick class list, advisory checklist, parent contact
+log, intervention tracker, certificate generator): must reuse existing
+learner/class data, never create parallel datasets. Validated as a
+known-useful pattern by generic/international edtech products, not by
+Filipino-teacher-specific demand evidence the way item analysis is —
+weaker-evidence but reasonable to build. No learner PII should ever be
+required by a generation tool.
 
 ## 12. Cloud / sync / web access — HYPOTHESIS, no ADR yet
 
