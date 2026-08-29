@@ -144,3 +144,69 @@ refused (both proven with dedicated tests, not merely reasoned about). No
 independent (non-self) review was dispatched for this bounded foundation
 slice — retained as debt in `docs/VERIFICATION-DEBT.md`, consistent with
 several recent waves' own pattern.
+
+## Addendum (Wave 2W, 2026-08-29): first UI increment
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-2W-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Scope**: a single new screen, `SubjectAttendanceScreen.tsx`, covering
+the spec's own recommended-order steps 3-4 (local/offline session
+creation + the Attendance Check screen) in one slice, since they're
+inseparable in practice — a session must exist before there's a roster
+to check. Today's Classes (a full schedule-driven list of a teacher's
+classes) and Subject Monitor/Adviser View remain deferred, matching the
+spec's own later steps.
+
+**A real design question surfaced and was resolved before writing any
+UI code**: should selecting a class+date eagerly call
+`open_or_get_session` (creating a `Held` row) just from browsing? No —
+that would silently convert every visited date into "checked" and
+destroy the "not checked" (no row) signal a future Today's Classes list
+needs to be meaningful. Resolved by calling the existing, already-tested
+`list_subject_attendance_sessions` command first (no session-creating
+side effect) and only showing the roster once a session already exists
+for that date; two explicit teacher-initiated actions, "Check
+attendance" (opens a `Held` session) and "No class today" (marks
+`NoClass`), are shown instead when none exists yet — matching the
+spec's own "Session-level controls" section literally. **Zero backend
+change was needed** for this — `list_subject_attendance_sessions`
+already existed from Wave 2V.
+
+**Architecture**: a new narrow port, `TeachingAssignmentRepository`
+(one method, `listMine(teacherUserId)`), deliberately reuses the
+already-built, already-tested `list_teacher_assignments` command
+(Teacher Load/Class Schedule Foundation) rather than building any part
+of the still-deferred Teaching Assignment/Class Schedule UI — this is
+not that UI, only enough for a teacher to pick which of their own
+classes they're checking. `SubjectAttendanceRepository` (six methods)
+mirrors the six Wave 2V commands directly. Both flow through a new
+`SubjectAttendanceApplicationService` (shape/non-empty/date-format
+validation only, matching every other `*ApplicationService`'s
+convention) wired in `composition.ts`, and a new `subject-attendance`
+tab under the existing "Daily Teaching" nav group.
+
+**UI pattern reuse**: the screen's roster/mark/mark-all-present
+structure directly mirrors `AttendanceScreen.tsx` (per-learner write-
+generation guard against out-of-order responses, `role="group"`
+status-button clusters, the same "Mark all present never overwrites"
+copy and disabled-state logic) — no new interaction pattern was
+invented for this screen.
+
+**Deliberately not done**: the new screen was **not** wired into the
+dev-preview fixture (`src/dev-preview/fixtures.ts`), so it has no real
+browser-rendered (Playwright/axe) screenshot coverage this wave, only
+jsdom + axe-core — the same disclosed gap Wave 2U's own new UI left
+open, judged an acceptable, consistent tradeoff rather than expanding
+this wave's scope further. Recorded as debt, not silently skipped.
+
+**Verification**: `npm run quality` 625/625 vitest (+25: 8 application-
+service tests, 6 `TauriSubjectAttendanceRepository` adapter tests, 1
+`TauriTeachingAssignmentRepository` adapter test, 9 screen tests
+including 2 axe accessibility passes — not-checked-yet state and a
+populated roster). `npx tsc -b --noEmit` / `eslint` / `prettier --check`
+/ `check:architecture` all clean. Zero Rust files touched — confirmed by
+`git status`; `cargo test` reconfirmed 564/564 unchanged as part of
+`npm run quality:full`. `npm run build` + `check:dev-preview-isolation`
+pass. `npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.

@@ -1,5 +1,55 @@
 # ACTIVE PLAN
 
+## Wave 2W: Subject Attendance first UI increment (added 2026-08-29) — complete
+
+Full record: `docs/adr/0055-*` Wave 2W addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2W entry;
+`docs/VERIFICATION-DEBT.md` Wave 2W entry. **New branch**
+`claude/likha-sis-wave2w-subject-attendance-ui`, created from `4a7629e`
+(Wave 2V's own final, CI-confirmed checkpoint).
+
+**Scope**: one new screen, `SubjectAttendanceScreen.tsx`, covering the
+spec's recommended-order steps 3-4 in one slice (a session must exist
+before there's a roster to check, so these two steps are inseparable in
+practice). Today's Classes, Subject Monitor, and Adviser View remain
+deferred.
+
+**Design resolution before writing UI code**: selecting a class+date
+does **not** eagerly call `open_or_get_session` (which would silently
+convert every browsed date into "checked" and destroy the "not checked"
+signal a future Today's Classes list needs). Instead, the existing,
+non-mutating `list_subject_attendance_sessions` command is called first;
+the roster only shows once a session already exists for that date, and
+two explicit teacher-initiated actions ("Check attendance" / "No class
+today") appear otherwise. Zero backend change was needed.
+
+**Architecture**: new narrow `TeachingAssignmentRepository` port
+(`listMine`) reuses the already-built `list_teacher_assignments`
+command — deliberately not the deferred full Teaching Assignment/Class
+Schedule UI. `SubjectAttendanceRepository` (six methods) mirrors the six
+Wave 2V commands. Both flow through a new
+`SubjectAttendanceApplicationService`, wired in `composition.ts`, with a
+new `subject-attendance` nav tab. Roster/mark/mark-all-present UI
+directly mirrors `AttendanceScreen.tsx`'s existing pattern — no new
+interaction pattern invented.
+
+**Deliberately not built**: no dev-preview-fixture wiring (jsdom+axe
+coverage only, same disclosed gap Wave 2U's new UI left open); no
+Today's Classes list; no Subject Monitor/Adviser View.
+
+**Verification, all actually run this session**: `npm run quality`
+625/625 vitest (+25: 8 application-service, 6 adapter, 1
+teaching-assignment-adapter, 9 screen incl. 2 axe passes);
+typecheck/eslint/format/architecture clean. Zero Rust files touched;
+`cargo test` reconfirmed 564/564 unchanged as part of `npm run
+quality:full`. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.
+
+**Next**: Today's Classes (closes the "not checked" state's real UI
+purpose); the carried Teaching Assignment/Class Schedule UI; or the
+native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 2V: Subject Attendance Foundation (added 2026-08-29) — complete
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md`;

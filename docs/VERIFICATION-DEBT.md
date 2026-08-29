@@ -1,5 +1,29 @@
 # Verification Debt
 
+## Wave 2W — Subject Attendance first UI increment (2026-08-29)
+
+Full record: `docs/adr/0055-*` Wave 2W addendum; `docs/PROJECT-MEMORY.md`
+Wave 2W entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **`SubjectAttendanceScreen` has no browser-rendered (Playwright/axe)
+   screenshot coverage.** It was deliberately not wired into
+   `src/dev-preview/fixtures.ts` this wave — the same disclosed gap
+   Wave 2U's own new duplicate-warning UI left open, judged an
+   acceptable, consistent tradeoff rather than expanding this wave's
+   scope. Coverage is jsdom + axe-core (`expectNoAccessibilityViolations`)
+   only, pending either dev-preview fixture wiring in a future wave or
+   the CI Ubuntu Quality job's own correctly-versioned Playwright
+   install.
+2. **No independent (non-self) review was dispatched** — same retained-
+   debt pattern as Wave 2V, not a new gap class.
+3. **No amendment/audit-trail UI** — Wave 2V's own recorded debt (basic
+   actor/timestamp columns only) is unchanged; this wave adds no
+   correction affordance for an already-recorded mark beyond re-clicking
+   a different status button (which the backend's upsert already
+   supports, just with no "why was this changed" prompt).
+
 ## Wave 2V — Subject Attendance Foundation (2026-08-29)
 
 Full record: `docs/adr/0055-*`; `docs/PROJECT-MEMORY.md` Wave 2V entry;

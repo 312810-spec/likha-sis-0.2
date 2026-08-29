@@ -1,6 +1,97 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2V: Subject Attendance Foundation, COMPLETE)
+## Active Task (2026-08-29 — Wave 2W: Subject Attendance first UI increment, COMPLETE)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 2W
+addendum; `docs/PROJECT-MEMORY.md` Wave 2W entry;
+`docs/VERIFICATION-DEBT.md` Wave 2W entry. **New dedicated branch**
+`claude/likha-sis-wave2w-subject-attendance-ui`, created from exactly
+`4a7629e38dff2bcc0feabf5a04d6c7b414032038` (Wave 2V's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2V's own final Security
+Gate `33244243900` and Quality Gate `33244243895` reconfirmed
+`completed/success` for the exact HEAD commit `4a7629e` before any Wave
+2W work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 2W work began.
+
+**Scope chosen**: the natural next slice recorded at the end of Wave
+2V — a scoped first UI increment for Subject Attendance, per the
+owner's own standing instruction to continue directly into the next
+wave with a notification at each boundary rather than a stop-and-wait.
+
+**What shipped**: one new screen, `SubjectAttendanceScreen.tsx`,
+covering the spec's own recommended-order steps 3-4 (local/offline
+session creation + the Attendance Check screen) in one slice, since a
+session must exist before there's a roster to check. A teacher picks
+one of their own teaching assignments and a date; the screen calls the
+existing, non-mutating `list_subject_attendance_sessions` command
+first — **never** eagerly opening a session just from browsing to a
+date, which would have silently converted every visited date into
+"checked" and destroyed the "not checked" (no row) signal a future
+Today's Classes list needs to stay meaningful. If no session exists yet
+for that date, two explicit teacher-initiated actions appear ("Check
+attendance" opens a `Held` session; "No class today" marks `NoClass`);
+if one already exists, the roster (or the no-class message) shows
+directly. Zero backend change was needed for this design — the session-
+existence check reuses a Wave 2V command unchanged. Roster/mark/mark-
+all-present interaction directly mirrors `AttendanceScreen.tsx`'s
+existing, already-proven pattern (per-learner write-generation guard
+against out-of-order responses, `role="group"` status-button clusters,
+the same "Mark all present never overwrites" copy/disabled-state logic)
+— no new interaction pattern was invented. A new narrow
+`TeachingAssignmentRepository` port (one method, `listMine`) reuses the
+already-built, already-tested `list_teacher_assignments` command from
+Teacher Load/Class Schedule Foundation — this is explicitly not the
+still-deferred full Teaching Assignment/Class Schedule UI, only enough
+for a teacher to pick which of their own classes they're checking.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **625/625 vitest** (66 files; +25: 8
+`SubjectAttendanceApplicationService`, 6
+`TauriSubjectAttendanceRepository` adapter, 1
+`TauriTeachingAssignmentRepository` adapter, 9
+`SubjectAttendanceScreen` including 2 new axe accessibility passes for
+the not-checked-yet state and a populated roster). **Zero Rust files
+touched this wave** — confirmed by `git status`; `cargo test`
+reconfirmed 564/564 unchanged as part of `npm run quality:full`. `npm
+run build` + `check:dev-preview-isolation` pass. `npm run
+quality:security` clean, no new dependency. `npm run harness:verify`
+still exactly 100/100, unchanged — not reopened. `npm run quality:full`
+green end to end, exit code 0.
+
+**Scope guard held**: no dev-preview-fixture wiring (no real browser-
+rendered screenshot coverage this wave — jsdom + axe-core only, the
+same disclosed gap Wave 2U's own new UI left open, judged an
+acceptable, consistent tradeoff rather than expanding this wave's scope
+further); no Today's Classes list; no Subject Monitor/Adviser View; no
+amendment/audit-trail UI beyond what the backend's existing upsert
+already supports; zero change to any Wave 2V backend code; `main` not
+touched; no unrelated refactor.
+
+**Review**: a bounded self-review confirmed the session-existence-check
+design (no eager session creation from browsing), that
+`TeachingAssignmentRepository` correctly reuses an existing, already-
+authorized command rather than adding new authorization surface, and
+that the mark/mark-all-present logic correctly mirrors
+`AttendanceScreen.tsx`'s proven guards. No independent (non-self) review
+was dispatched for this bounded UI slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with several recent waves' own
+retained-debt pattern.
+
+**Exact next slice** (recorded, not started): Today's Classes (a
+schedule-driven list of a teacher's own classes across dates, which
+would give the "not checked" state built into this wave its first real
+UI purpose); the carried Teaching Assignment/Class Schedule UI (7
+unwired commands); or the native NVDA/Narrator pass. No candidate
+pre-selected. Per the owner's own standing instruction this session,
+work continues directly into the next wave without a separate
+stop-and-wait — a notification is sent at each wave boundary instead.
+
+## Note — Active Task (2026-08-29 — Wave 2V: Subject Attendance Foundation, COMPLETE, superseded above)
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md`;
 `docs/product/SUBJECT-ATTENDANCE-SPEC.md`;
