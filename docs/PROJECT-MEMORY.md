@@ -443,6 +443,20 @@ the parent session). For a public GitHub repo, direct `WebFetch` against
 reliable inspection path in this environment — prefer it over spawning a
 CCR session for repo inspection going forward.
 
+## Wave 4 Personnel Data-Collection Decision (added 2026-08-29)
+
+Extends the entry below. The user directly decided (put to them as an
+explicit `AskUserQuestion` choice first, since it's a genuine exception
+to LIKHA's local-first/no-third-party-PII posture): Wave 4's missing
+personnel dataset (SF7 fields) is collected via a **real external
+Google Form**, exported as CSV, bulk-imported through Wave 2's SF1
+import/reconciliation architecture. No live Google integration — an
+out-of-band step outside LIKHA entirely. Two recommendations recorded
+for the actual build: use an institutional Google Workspace account,
+not personal Gmail; put an RA 10173 (Data Privacy Act) notice on the
+form itself. Full record: `docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`
+(Wave 4 section), `docs/product/PRODUCT-CONTRACT.md` §6.
+
 ## Pre-Wave Research: Waves 3, 4, 5, 7 (added 2026-08-29)
 
 Full record: `docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`. Extends

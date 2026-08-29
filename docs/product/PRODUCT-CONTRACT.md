@@ -177,6 +177,19 @@ against DepEd Order 005 s.2024's own text first. SF7's actual
 structure (three sections, per-person fields) is recorded in ADR-0044,
 ready to inform the personnel/designation schema.
 
+**Personnel data collection — DECIDED (2026-08-29)**: a real external
+Google Form (institutional `@deped.gov.ph`-style account recommended,
+not personal Gmail), exported as CSV, bulk-imported via Wave 2's
+already-planned SF1 import/reconciliation architecture pointed at a new
+personnel column set. **A deliberate, disclosed exception** to LIKHA's
+local-first/no-third-party-PII-processor posture — no live Google
+integration exists or is planned, only an out-of-band collection step;
+the CSV importer itself is ordinary LIKHA architecture. Needs a
+plain-language Data Privacy Act (RA 10173) notice on the form itself
+before Wave 4 ships this (DepEd's own DO 006 s.2025 already names Data
+Privacy Act compliance as a school-data-collection requirement). Full
+record and recommended CSV column set: ADR-0044.
+
 Automation goal for a schedule generator (**HYPOTHESIS** — a real
 constraint-solver is a substantial build, not assumed as this
 reconciliation's next step; ADR-0044 narrows _how_: build on the

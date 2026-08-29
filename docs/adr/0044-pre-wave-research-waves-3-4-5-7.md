@@ -157,6 +157,62 @@ designation, availability/constraints, schedule generator, SF7 export,
   _how_ to build it, it does not commit to building it in full within
   Wave 4's first pass.
 
+### Personnel data collection — decided (2026-08-29), a genuine disclosed exception
+
+Wave 4's "full chain" needs a real personnel/qualifications/position/
+designation dataset (SF7's own field set, §Wave-3 above) that does not
+exist anywhere in LIKHA today. **The user directly decided, with the
+tradeoff stated plainly beforehand**: collect it via a **real external
+Google Form** sent to school personnel, exported as a CSV, then
+**bulk-imported into LIKHA** reusing Wave 2's already-planned SF1
+import/reconciliation architecture (provenance-tracked, never a silent
+merge — same "adviser/authorized user compares and chooses" pattern,
+here the School Head or designated records person instead of a
+Registrar).
+
+**This is a genuine, deliberate exception to LIKHA's local-first/
+no-third-party-PII-processor posture, not an architecture change.**
+There is no live integration with Google — no API call, no stored
+credential, no runtime dependency — the form is purely an out-of-band
+collection step outside LIKHA entirely; the only thing that touches
+LIKHA's own architecture is the CSV importer, which is ordinary,
+already-planned Wave 2 machinery pointed at a new column set. Recorded
+here so this is not silently forgotten as "just an import" — the actual
+privacy exposure happens before the CSV ever reaches LIKHA, and is now
+the user's own informed choice, not a gap this project introduced or
+overlooked.
+
+**Two concrete, actionable recommendations for whoever builds this at
+Wave 4** (not yet acted on):
+
+1. **Use an institutional Google Workspace account for the form**, not
+   a personal Gmail — many DepEd schools already hold `@deped.gov.ph`
+   Google Workspace access, which keeps the data within an
+   institutional boundary rather than fully public consumer Google
+   infrastructure. A real, cheap risk-reduction step given the choice
+   already made.
+2. **A Data Privacy Act (RA 10173) notice belongs on the form itself.**
+   Routing personnel PII through a third-party processor is exactly the
+   kind of collection RA 10173 expects a data subject to be informed
+   about — a short, plain-language notice on the Google Form ("your
+   responses will be collected via Google Forms and imported into
+   LIKHA-SIS for school personnel records") is a real compliance step,
+   not decorative. DepEd's own DO 006, s.2025 data-management-framework
+   directive already names Data Privacy Act compliance as a requirement
+   for school data collection generally — this is the same obligation,
+   applied here specifically.
+
+**Recommended CSV column set for the importer** (derived from SF7's
+confirmed structure above, Wave-3 section): full name, position/
+designation (from the Teacher I-VII / Master Teacher I-V/VI ladder),
+sex, educational qualifications, appointment details (date, funding
+source — nationally-funded teaching / nationally-funded non-teaching /
+other), subjects taught, advisory/ancillary-duty flags, daily program/
+timetable. Exact column headers and validation rules should be finalized
+against the real SF7 template once obtained (same gate as Wave 3's own
+authoritative-template need) — this list is a ready starting point, not
+a locked schema.
+
 ## Wave 5 — Sync + cloud authorization + session hardening
 
 **Objective, unchanged**: run the actual 10-scenario cloud-target
@@ -288,3 +344,9 @@ new research needed there. **One genuinely new, real finding**:
   (already an existing open item, now with a narrower, current-fact
   option set) and Wave 7's license-for-free-signing-vs-paid-certificate
   choice (newly identified this session).
+- **One item decided, not open**: Wave 4's personnel data-collection
+  method (real Google Form → CSV → LIKHA bulk-import, with the
+  institutional-account and Data Privacy Act notice recommendations
+  above) — the user chose this directly, with the third-party-PII
+  tradeoff stated before the choice was made. Recorded as decided, ready
+  for Wave 4 to build against, not a pending question.

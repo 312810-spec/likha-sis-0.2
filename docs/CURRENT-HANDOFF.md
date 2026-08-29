@@ -1,5 +1,39 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — Wave 4 Personnel Data-Collection Decision, complete)
+
+**One user decision recorded, folded into ADR-0044 and `PRODUCT-CONTRACT.md`
+§6 — no product code changed.** The user directly decided how Wave 4's
+missing personnel/qualifications/position dataset (SF7's own field set)
+gets collected: a **real external Google Form**, exported as CSV, then
+**bulk-imported via Wave 2's already-planned SF1 import/reconciliation
+architecture**. This was put to the user as an explicit choice first
+(`AskUserQuestion`, three options: native LIKHA form, real Google Forms
+
+- CSV, offline spreadsheet template + CSV) precisely because it's a
+  genuine exception to LIKHA's local-first/no-third-party-PII-processor
+  posture and privacy/security is LIKHA's highest priority — not decided
+  autonomously. The user chose Google Forms knowingly, with the tradeoff
+  (teacher PII briefly leaving LIKHA's boundary before the CSV import)
+  stated up front.
+
+**Two concrete recommendations recorded for whoever builds this at Wave
+4**: use an institutional `@deped.gov.ph`-style Google Workspace
+account, not personal Gmail; and put a plain-language Data Privacy Act
+(RA 10173) notice on the form itself — DepEd's own DO 006 s.2025 already
+names Data Privacy Act compliance as a school-data-collection
+requirement, so this isn't a new obligation LIKHA is inventing. A
+starting CSV column set (name, position/designation, sex, qualifications,
+appointment details, subjects taught, advisory/ancillary flags, daily
+program) was drafted from SF7's already-researched structure, to be
+finalized against the real template once obtained (same gate as Wave
+3's own template need).
+
+**No live Google integration exists or is planned** — this is an
+out-of-band collection step outside LIKHA entirely; the only thing that
+touches LIKHA's own architecture is the CSV importer, ordinary Wave-2
+machinery pointed at a new column set, not a new architecture pattern.
+
 ## Active Task (2026-08-29, this session — Pre-Wave Research: Waves 3, 4, 5, 7, complete)
 
 **Research/planning only — no product code changed.** Full record:
