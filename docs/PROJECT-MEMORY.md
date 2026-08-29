@@ -443,6 +443,47 @@ the parent session). For a public GitHub repo, direct `WebFetch` against
 reliable inspection path in this environment — prefer it over spawning a
 CCR session for repo inspection going forward.
 
+## Pre-Wave Research: Waves 3, 4, 5, 7 (added 2026-08-29)
+
+Full record: `docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`. Extends
+the "research ahead of time" approach (already used for Wave 6) to
+every remaining wave, per explicit user instruction, so implementation
+can start immediately once each wave is reached.
+
+**Wave 3 (Form Engine)**: SF9/SF10/SF7 structures recorded (three-term
+columns, personal-info/academic-progress split, personnel-assignment
+sections); the exact cell layout still needs an authoritative source
+file (flagged gate, same shape as M8's `CONSO SF v2025.xlsx`
+precedent). **Architecture plan revised**: the previously-assumed Apache
+POI/HSSF-via-sidecar approach has no prior art for Tauri integration;
+recommend pure-Rust `umya-spreadsheet` instead (no JVM dependency,
+preserves template formatting).
+
+**Wave 4 (Teacher Load/Schedule)**: position ladder and RA 4670's
+primary-source-confirmed 6hr/day teaching cap recorded; one Master
+Teacher coaching-credit figure flagged unverified. `school-scheduling-rs`
+**rejected** as a dependency (license conflict, prototype); recommend
+the MIT-licensed `highs`/`good_lp` crates as the real foundation for the
+eventual schedule generator.
+
+**Wave 5 (Sync/Cloud) — not pre-decided**, the 10-scenario cloud-target
+decision remains real required work at Wave 5's start. Cloudflare
+Durable Objects/D1 pricing reconfirmed zero-billing-viable at 2026
+rates. No drop-in sync engine fits (PowerSync/ElectricSQL are
+Postgres-centric; the one CRDT-native SQLite engine found requires
+Supabase, already excluded) — two unscored candidates (full CRDT vs.
+field-scoped last-write-wins) recorded for that decision.
+
+**Wave 7 (Finish)**: one real gate found — Windows code signing is a
+paid-infrastructure item, but the SignPath Foundation offers free
+signing for qualifying open-source projects; this repo is public
+(ADR-0041) but has no `LICENSE` file yet, so doesn't currently qualify.
+Recorded as a choice for the user at Wave 7's start (license vs. paid
+certificate).
+
+`PRODUCT-CONTRACT.md` §5/§6/§12 updated with findings; new §17 added
+for the code-signing gate. `ADR-0035`'s Wave 3/4/5/7 rows point here.
+
 ## Teacher Tools Catalog and Integration Architecture (added 2026-08-29)
 
 Full record: `docs/adr/0043-teacher-tools-catalog-and-integration-architecture.md`.

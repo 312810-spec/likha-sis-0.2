@@ -108,10 +108,19 @@ adapter → official output. **BUILT (partial)**: a reusable, disclosed
 CSV export engine already exists and is proven three times over
 (`src-tauri/src/export/csv.rs` + the `FieldDisclosure`/`OmittedField`
 pattern in `export/mod.rs`, shared by `sf2.rs`, `report_card.rs`, and
-`learner_roster.rs` — ADR-0009/M10). **DIRECTION SET, not built**: the
-authoritative-_template_ half — Tauri → scoped local sidecar → Java →
-Apache POI/HSSF → an authoritative `.xls` template — does not exist for
-any form yet; every export today is a disclosed, non-authoritative CSV.
+`learner_roster.rs` — ADR-0009/M10). **DIRECTION SET, not built, plan
+revised**: the authoritative-_template_ half does not exist for any form
+yet — every export today is a disclosed, non-authoritative CSV. The
+previously-assumed "Tauri → scoped sidecar → Apache POI/HSSF → `.xls`"
+plan is **superseded by research** (`docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`):
+recommend pure-Rust `umya-spreadsheet` (reads/writes `.xlsx`, preserves
+an existing template's formatting) instead — no JVM sidecar, no
+unproven cross-language integration, better fit for LIKHA's
+maintainability/offline-reliability priorities. SF9/SF10/SF7 structural
+findings (three-term columns, personal-info/academic-progress split,
+personnel-assignment sections) and the still-open "obtain an
+authoritative template file" gate are recorded in ADR-0044 — ready for
+Wave 3 to act on directly, not yet acted on.
 Naming pattern in UI: `SF#: practical-use label` (e.g. "SF9: Report
 Card") — the label explains use, never renames the official form.
 
@@ -159,9 +168,22 @@ qualifications + position/designation + advisory + ancillary duties +
 availability/constraints → Teacher Load → Class Schedule → SF7 → teacher
 access → "My Day" (§9).
 
+Personnel/position research ready (ADR-0044): position ladder Teacher
+I-VII → Master Teacher I-V/VI, RA 4670 primary-source-confirmed 6hr/day
+classroom-teaching cap (125% pay for excess up to 8hrs), a candidate
+"1hr credit per Master Teacher coaching/mentoring hour" figure found but
+**not yet primary-source-verified** — do not hardcode without confirming
+against DepEd Order 005 s.2024's own text first. SF7's actual
+structure (three sections, per-person fields) is recorded in ADR-0044,
+ready to inform the personnel/designation schema.
+
 Automation goal for a schedule generator (**HYPOTHESIS** — a real
 constraint-solver is a substantial build, not assumed as this
-reconciliation's next step): cover every required subject/section,
+reconciliation's next step; ADR-0044 narrows _how_: build on the
+MIT-licensed, actively-maintained `highs`/`good_lp` Rust crates
+directly — an existing candidate repo, `school-scheduling-rs`, was
+**rejected** for a real license conflict and prototype status, not
+adopted): cover every required subject/section,
 preserve required weekly instructional time, avoid teacher/section
 conflicts, respect availability/qualifications/position, preserve
 protected leadership/mentoring time, balance load reasonably, minimize
@@ -317,7 +339,20 @@ ADR-0001's layering statement, never implemented. The "Cloudflare Worker
   this repository. **Before real sync implementation begins, run this
   project's own 10-scenario architecture-decision process** (per
   `.claude/rules/autonomous-development.md`) to actually decide the cloud
-  target, rather than treating this hypothesis as pre-approved. Cloud is
+  target, rather than treating this hypothesis as pre-approved. **Pricing
+  reconfirmed current and still zero-billing-viable** (ADR-0044, 2026
+  figures): Durable Objects' SQLite storage is free on the Workers Free
+  plan; D1's free tier is 5M reads/100K writes per day, 5GB storage. **No
+  drop-in sync engine fits this design** — PowerSync/ElectricSQL are
+  Postgres-backend-centric, and the one CRDT-based SQLite-native engine
+  found syncs only to Supabase/PostgreSQL/SQLite Cloud, and Supabase is
+  already excluded by this project's own prior decision; a bespoke
+  protocol on Cloudflare primitives is genuinely needed. Two unscored
+  candidate approaches recorded for the real 10-scenario pass to weigh:
+  full CRDT-based merge, or an operation-log/per-field last-write-wins
+  model with logical timestamps (explicit risk: naive whole-record LWW
+  silently discards data — any LWW design needs deliberate field-level
+  scoping). Cloud is
   never the teacher's working database; SQLite remains primary. Web/PWA
   access (for iOS/macOS/stakeholders) must respect the same school/role
   authorization boundaries as native — no separate, weaker web auth path.
@@ -376,3 +411,22 @@ exposure behavior, logout behavior, device-loss behavior, authorization,
 school isolation, recovery. Authorization must never rely on UI hiding
 a control alone — already this project's standing rule
 (`.claude/rules/security-privacy.md`), reconfirmed here, not new.
+
+## 17. Windows distribution / code signing — RESEARCHED (2026-08-29), gate identified
+
+**HYPOTHESIS, not built.** Full record:
+`docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`. Trustworthy Windows
+distribution needs a Code Signing certificate (Digicert/Sectigo/
+GoDaddy) or Windows SmartScreen shows "Unknown Publisher" — a real
+teacher-trust risk. **This is a genuine paid-infrastructure item**, same
+approval-gate class as the Wave 6b AI-funding decision. **A real
+zero-cost alternative exists**: the SignPath Foundation signs
+qualifying open-source projects for free — LIKHA-SIS is already public
+(ADR-0041) but **has no `LICENSE` file today**, so does not yet
+qualify. Adding an OSI-approved license is cheap and reversible, but
+choosing to genuinely open-source LIKHA is itself a product-policy
+decision for the user, not to be made autonomously. Mechanically
+straightforward otherwise (NSIS/WiX+MSI, `publisher` field in
+`tauri.conf.json`, an official Tauri GitHub Action for CI signing) and
+compatible with the existing CI foundation (ADR-0041). Decide at Wave
+7's start: license-for-free-signing vs. budget for a paid certificate.

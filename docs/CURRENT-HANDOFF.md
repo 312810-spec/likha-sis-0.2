@@ -1,5 +1,72 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — Pre-Wave Research: Waves 3, 4, 5, 7, complete)
+
+**Research/planning only — no product code changed.** Full record:
+`docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`. Per explicit user
+instruction, extends the same "research ahead so the builder can just
+fetch the output" approach already used for Wave 6 to every remaining
+wave except Wave 6 itself (already done). Goal: each wave should need
+no fresh research pass when actually reached.
+
+**Wave 3 (Form Engine)**: SF9 (three-term columns per DO 015 s.2026),
+SF10 (personal-info/academic-progress split), and SF7 (personnel
+assignment, 3 sections) structures recorded from secondary sources —
+exact cell-level layout still needs an authoritative file, flagged as
+the one open gate (obtain from the user, matching the M8 `CONSO SF
+v2025.xlsx` precedent, when Wave 3 begins). **A real architecture
+finding**: no prior art exists for the previously-assumed Apache
+POI/HSSF-via-Tauri-sidecar plan; recommend pure-Rust `umya-spreadsheet`
+instead (reads/writes `.xlsx`, preserves template formatting, no JVM
+dependency) — a genuine simplification, not yet a locked decision.
+
+**Wave 4 (Teacher Load/Schedule)**: position ladder (Teacher I-VII →
+Master Teacher I-V/VI) and RA 4670's actual statutory text (fetched
+directly — 6hr/day classroom-teaching cap, 125% pay for excess up to
+8hrs) recorded for the personnel model. One Master Teacher
+coaching-credit figure found but explicitly flagged as not yet
+primary-verified — do not hardcode without confirming DepEd Order 005
+s.2024's own text. **A dependency candidate rejected**: `school-scheduling-rs`
+(license conflict — README says MIT, repo footer says AGPL-3.0 — plus
+0 stars/2 commits/no deployment evidence); **recommend the MIT-licensed,
+actively-maintained `highs`/`good_lp` Rust crates** as the real
+foundation for the eventual schedule generator instead.
+
+**Wave 5 (Sync/Cloud)**: **not pre-decided** — the 10-scenario
+cloud-target decision (ADR-0035 Decision 5) remains genuine required
+work at Wave 5's start. What's pre-researched: Cloudflare Durable
+Objects/D1 pricing reconfirmed at current 2026 rates (both remain
+zero-billing-viable — DO SQLite storage free on Workers Free plan; D1
+5M reads/100K writes/day free); a real survey found **no drop-in sync
+engine fits** (PowerSync/ElectricSQL are Postgres-backend-centric; the
+one CRDT-native SQLite-sync engine found requires Supabase, already on
+this project's own exclusion list) — two unscored candidate approaches
+(full CRDT-based merge vs. field-scoped last-write-wins with logical
+timestamps) recorded for the real decision to weigh, not chosen here.
+
+**Wave 7 (Finish/hardening)**: accessibility/performance/regression
+methodology already established, no new research needed there. **One
+real, previously-unidentified gate found**: Windows code signing is a
+genuine paid-infrastructure item (same approval-gate class as Wave 6b's
+AI-funding decision) — but the SignPath Foundation offers free signing
+for qualifying open-source projects, and LIKHA-SIS is already public
+(ADR-0041) but **has no `LICENSE` file today**, so doesn't yet qualify.
+Recorded as a choice for the user at Wave 7's start: add an OSI-approved
+license to qualify for free signing, or budget for a paid certificate.
+
+**Docs updated**: `PRODUCT-CONTRACT.md` §5/§6/§12 (findings appended),
+new §17 (code-signing gate); `ADR-0035`'s Wave 3/4/5/7 rows now point to
+ADR-0044.
+
+**Per Autonomous Continuous Development Mode: this is a completed
+research checkpoint, not a stopping point.** Exact next action:
+unchanged — Wave 1 (RBAC foundation) remains the highest-leverage next
+implementation milestone; Waves 1-5 are not yet started. Every wave
+except Wave 1 itself now has a ready research spec waiting for it
+(Waves 2's own scope was already clear from ADR-0035 and didn't need
+this treatment — it extends already-built UX-05/SF1 patterns, not new
+external-fact territory the way 3/4/5/6/7 were).
+
 ## Active Task (2026-08-29, this session — Teacher Tools Catalog and Integration Architecture, complete)
 
 **Research/planning only — no product code changed.** Full record:
