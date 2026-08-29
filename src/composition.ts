@@ -13,6 +13,7 @@ import { SectionApplicationService } from "./application/section-service";
 import { SetupApplicationService } from "./application/setup-service";
 import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
+import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
@@ -30,6 +31,8 @@ import { TauriSectionRepository } from "./infrastructure/tauri/section-repositor
 import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
 import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repository";
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
+import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject-attendance-repository";
+import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
 export { onSessionExpired } from "./infrastructure/tauri/invoke";
@@ -67,4 +70,8 @@ export const learnerScoreService = new LearnerScoreApplicationService(
 export const sf1ImportService = new Sf1ImportApplicationService(
   new TauriSf1ImportRepository(),
   new TauriFilePicker(),
+);
+export const subjectAttendanceService = new SubjectAttendanceApplicationService(
+  new TauriSubjectAttendanceRepository(),
+  new TauriTeachingAssignmentRepository(),
 );

@@ -15,6 +15,7 @@ import {
   sectionService,
   setupService,
   sf1ImportService,
+  subjectAttendanceService,
   subjectService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
@@ -31,6 +32,7 @@ import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
+import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "./ui/components/WorkbenchNav";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
@@ -198,6 +200,11 @@ function App() {
                   setMonthlySummaryContext({ sectionId, year, month });
                   setActiveTab("monthly-summary");
                 }}
+              />
+            ) : activeTab === "subject-attendance" ? (
+              <SubjectAttendanceScreen
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
               />
             ) : activeTab === "monthly-summary" ? (
               <MonthlySummaryScreen
