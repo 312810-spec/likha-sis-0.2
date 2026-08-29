@@ -40,6 +40,16 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 Greenfield repository. No old implementation is authoritative.
 
+- **Wave 0/1 Review Checkpoint (2026-08-29)**: user-requested review of
+  everything through Wave 1 before Wave 2 began. Both dispatched
+  reviewers (`security-reviewer` retry, `architecture-reviewer`
+  cross-milestone check) hit the documented recurring agent-resume/
+  retrieval failure again — real work done, no findings text
+  retrievable even after one explicit follow-up each. Self-reviews
+  substituted; no BLOCKING/SHOULD-FIX findings in either. Real,
+  non-self review debt remains open for both — see
+  `docs/VERIFICATION-DEBT.md`'s top two entries. Does not block Wave 2.
+
 - **`main` verified baseline (2026-08-26): `3951c3d`.** Fast-forward
   integration of `claude/likha-sis-ux03-plan-plv80c` (30 commits: RBAC
   Foundation, Curriculum/Key-Stage Versioning, Teacher Load/Class

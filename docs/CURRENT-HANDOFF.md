@@ -1,5 +1,48 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — Wave 0/1 Review Checkpoint, complete)
+
+Per explicit user request ("review up to wave 2"): a review checkpoint
+of everything built through Wave 1 before Wave 2 begins. Dispatched two
+independent reviewers — `security-reviewer` (retrying the review owed
+from School Branding, which had failed on a rate limit) and
+`architecture-reviewer` (a cross-milestone check of RBAC, curriculum
+versioning, Teacher Load, and School Branding together). **Both hit
+this project's documented recurring agent-resume/retrieval failure**:
+real work done (38 and 50 tool uses respectively, ~100-110K tokens
+each), but no findings text retrievable from either the initial
+completion or one explicit follow-up asking each to restate its
+findings as plain text. Per the established rule, no further retries
+were attempted.
+
+**A rigorous self-review was substituted for the architecture check**
+(the security self-review was already done in the prior session, when
+the first `security-reviewer` dispatch failed on the rate limit — see
+`docs/adr/0045-school-branding.md`): `node scripts/check-architecture.mjs`
+run directly (passed — no restricted imports); `grep` confirmed zero
+infrastructure/`@tauri-apps` imports anywhere in the new School Branding
+domain/application/UI files; `TauriSchoolBrandingRepository` confirmed
+imported only from `composition.ts`; the migration chain confirmed a
+clean append (19th entry, nothing reordered); no conceptual overlap
+found across the four Wave 0/1 domains; `PRODUCT-CONTRACT.md`/`ADR-0035`
+Wave 1 status reconfirmed accurate (this session's own earlier
+correction holds). **No BLOCKING or SHOULD-FIX findings.**
+
+**Real, non-self independent review debt remains open for both**
+(security and architecture) — recorded in `docs/VERIFICATION-DEBT.md`'s
+top two entries, to retry in a future session once agent-resume
+behavior is confirmed reliably working again. This does not block
+Wave 2 — the self-reviews found nothing blocking, matching this
+project's established "reviewer harness failures are not automatic
+stops" rule.
+
+**Per Autonomous Continuous Development Mode: this is a completed
+review checkpoint, not a stopping point.** Exact next action: **Wave 2
+— Learner Core** (combined UX-05 + SF1: extend search/section-editing/
+roster-export, add bulk import with conservative, provenance-tracked
+duplicate reconciliation, learner photo, enrollment history), gated by
+Wave 1's now-confirmed-real, now-twice-reviewed-clean RBAC.
+
 ## Active Task (2026-08-29, this session — School Branding (Wave 1 complete), implemented)
 
 **Real product code shipped this session** — not research/planning like

@@ -65,13 +65,66 @@ given to the failed reviewer:
    used elsewhere in this codebase for a similar class of race — see
    `ClassRecordWorkspace.tsx`'s `handleRecord`) if this area is revisited.
 2. **A real, non-self security review remains owed** for this
-   milestone's auth/persistence surface — retry `security-reviewer` in a
-   later session once the rate limit has cleared, per this project's
-   established "periodically retry the owed independent reviews when the
-   harness appears healthy" rule.
+   milestone's auth/persistence surface. **A second dispatch was
+   attempted the same day** (rate limit had presumably cleared) — this
+   time the agent completed real work (38 tool uses, ~92-101K tokens
+   across the run and one follow-up) but hit this project's other,
+   separately-documented failure mode instead: no findings text was
+   retrievable from either the initial completion or one explicit
+   follow-up asking it to restate the findings as plain text (its
+   replies: "Holding — no new content since my last several replies.
+   Findings already delivered in full... Nothing further to add" — a
+   channel the orchestrating session cannot read). Per this project's
+   own rule (don't repeatedly spend context chasing a known-broken
+   reviewer result), no further retry was attempted this session. A
+   real, non-self review is **still owed** — retry in a future session.
 3. `npm run quality:security` (gitleaks/cargo-deny/osv-scanner) was not
    run — the three binaries remain not installed in this sandbox, the
    same known per-machine gap already recorded elsewhere in this file.
+
+## School Branding: cross-milestone `architecture-reviewer` also failed retrieval, self-review substituted (2026-08-29)
+
+Dispatched the same day as the security-review retry above, to check
+everything built through Wave 1 (RBAC, curriculum versioning, Teacher
+Load, and School Branding) before Wave 2 begins — the same recurring
+agent-resume/retrieval failure documented since M7: real work done (50
+tool uses, ~107-111K tokens across the run and one follow-up) but no
+retrievable findings text, on the initial completion or one explicit
+follow-up (its reply: just "."). No further retry attempted, per the
+same don't-chase-a-known-broken-result rule.
+
+A rigorous self-review was substituted, verified directly rather than
+asserted:
+
+- `node scripts/check-architecture.mjs`, run directly: **"Architecture
+  check passed: no restricted imports found."**
+- `grep` for `from ".*infrastructure"`/`from "@tauri-apps"` across
+  `src/domain/`, `src/application/`, and `src/ui/SchoolBrandingScreen.tsx`
+  directly: **zero matches** — no boundary violation in any of the new
+  School Branding TS files.
+- `TauriSchoolBrandingRepository` (the concrete Tauri adapter) is
+  imported in exactly one place outside its own file: `composition.ts`
+  — confirmed by direct `grep`, matching the "only composition.ts
+  imports concrete infrastructure classes" rule exactly.
+- Migration chain: `school_branding` is the 19th `M::up(...)` entry,
+  appended after the 18th (Teacher Load's `schedule_meetings`), with no
+  existing migration edited or reordered — confirmed by reading the
+  actual file, not assumed.
+- Conceptual overlap across the four Wave 0/1 domains (RBAC, curriculum
+  versioning, Teacher Load, School Branding): none found — each owns a
+  genuinely distinct concern (authorization roles, curriculum content
+  versioning, scheduling/load, visual theme) with no shared table, no
+  reinvented pattern, no accidental coupling.
+- `PRODUCT-CONTRACT.md`/`ADR-0035`'s Wave 1 status: verified accurate
+  as of this session's own earlier correction (RBAC's stale "not yet
+  implemented" claim was found and fixed before School Branding began,
+  and Wave 1's row now correctly reads "Complete").
+
+**No BLOCKING or SHOULD-FIX findings from this self-review.** Real,
+non-self independent-review debt for this specific cross-milestone
+question remains open — retry `architecture-reviewer` in a future
+session once agent-resume/retrieval behavior is confirmed reliably
+working again.
 
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
