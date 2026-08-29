@@ -1,5 +1,60 @@
 # ACTIVE PLAN
 
+## Wave 2Y: Teaching Assignments (added 2026-08-29) — complete
+
+Full record: `docs/adr/0039-*` Wave 2Y addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 2Y entry;
+`docs/VERIFICATION-DEBT.md` Wave 2Y entry. **New branch**
+`claude/likha-sis-wave2y-teaching-assignments`, created from `361a2ba`
+(Wave 2X's own final, CI-confirmed checkpoint).
+
+**Scope**: one new screen, `TeachingAssignmentsScreen.tsx` — a School
+Head assigns/unassigns which teacher teaches which subject for a
+section, reached from `SectionsScreen`'s new "Manage assignments"
+action. Wires `create_teaching_assignment`/`remove_teaching_assignment`/
+`list_teaching_assignments_by_section` (existed since ADR-0039, never
+reachable from any screen before this wave, and never proven at the
+command boundary — only unit-tested in the repository layer,
+bypassing the authorization gate). New backend surface:
+`list_school_members` + `repository::user::list_members_in_school`,
+needed so the teacher picker has something to pick from — no command
+anywhere previously enumerated a school's own members.
+
+**Architecture**: `TeachingAssignmentRepository` gained `listBySection`/
+`create`/`remove`; a new `TeachingAssignmentApplicationService` wraps
+them (validated passthroughs). New `SchoolMemberRepository` port +
+`SchoolMemberApplicationService`, wired in `composition.ts`. New
+`teaching-assignments` tab (nav-invisible, reached only via
+`SectionsScreen`'s handoff, mirroring `section-roster`).
+
+**Security must not rely on UI hiding, applied literally**: any
+authenticated school member can view this screen; only a School Head
+can write, enforced solely by the backend's existing
+`Capability::ManageTeachingAssignments` gate. The screen shows the same
+form to everyone and surfaces a generic error on backend refusal —
+`SectionsScreen`'s own established convention, not a new one.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X); no `replace_teacher_assignment`
+wiring (explicit remove-then-create is ADR-0039's own intended
+reassignment shape); no schedule-meeting create/edit UI; no
+teacher-load view.
+
+**Verification, all actually run this session**: `npm run quality`
+658/658 vitest (+21); typecheck/eslint/format/architecture clean.
+`cargo test` 568 lib tests (+4) plus new
+`tests/teaching_assignment_management.rs` (9/9, closing a pre-existing
+command-boundary test gap); `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean, all as part of `npm run
+quality:full`. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged.
+
+**Next**: `create_schedule_meeting` (the weekly schedule builder, which
+also lets the Wave 2X weekday convention be verified end-to-end);
+`get_teacher_load`; Subject Monitor / Adviser View; or the native
+NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 2X: Today's Classes (added 2026-08-29) — complete
 
 Full record: `docs/adr/0055-*` Wave 2X addendum; `docs/CURRENT-HANDOFF.md`

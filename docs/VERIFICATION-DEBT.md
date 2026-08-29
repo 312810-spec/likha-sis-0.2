@@ -1,5 +1,35 @@
 # Verification Debt
 
+## Wave 2Y — Teaching Assignments (2026-08-29)
+
+Full record: `docs/adr/0039-*` Wave 2Y addendum; `docs/PROJECT-MEMORY.md`
+Wave 2Y entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **`TeachingAssignmentsScreen` has no browser-rendered (Playwright/axe)
+   screenshot coverage.** Not wired into `src/dev-preview/fixtures.ts`
+   this wave — the same disclosed gap Waves 2U/2W/2X's own new UI left
+   open. Coverage is jsdom + axe-core
+   (`expectNoAccessibilityViolations`) only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as Waves 2V/2W/2X, not a new gap class.
+3. **No `replace_teacher_assignment` wiring.** ADR-0039's own intended
+   reassignment shape is explicit remove-then-create, so this is a
+   deliberate scope choice rather than a gap in the usual sense — noted
+   here so a future reviewer doesn't mistake the missing "replace"
+   button for an oversight.
+4. **No schedule-meeting create/edit UI and no teacher-load view.**
+   `create_schedule_meeting` and `get_teacher_load` remain unwired to
+   any screen — carried as the natural next candidates.
+5. **The teacher picker's client-side role filter is a usability
+   guard, not a security boundary.** The backend's `teaching_assignment::create`
+   remains intentionally not role-gated (an existing, unchanged
+   ADR-0039 decision) — a School Head could in principle target a
+   non-teacher member through a different client. This is documented
+   behavior, not a defect, but recorded here so it is never mistaken
+   for enforcement.
+
 ## Wave 2X — Today's Classes (2026-08-29)
 
 Full record: `docs/adr/0055-*` Wave 2X addendum; `docs/PROJECT-MEMORY.md`

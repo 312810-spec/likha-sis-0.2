@@ -161,3 +161,99 @@ for every other command in this codebase.
   UI; automatic overload enforcement (metric only, no policy decision);
   one-off exceptional-date schedule overrides (shape left open, not
   designed); any change to `class_records`.
+
+## Addendum (Wave 2Y, 2026-08-29): first UI increment — Teaching Assignments
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-2Y-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Why this slice, chosen autonomously**: with Subject Attendance (Wave
+2V) and Today's Classes (Wave 2X) both built on `teaching_assignments`,
+a real deployed school had no way to actually create one — the
+commands existed (`create_teaching_assignment`, `remove_teaching_assignment`,
+`list_teaching_assignments_by_section`) since this ADR's original
+milestone, but zero UI ever called them, and they had zero test
+coverage at the command boundary (only `repository::teaching_assignment`'s
+own unit tests exercised them directly, bypassing
+`auth::authorize_capability`'s gate entirely). Without this, every
+downstream Subject Attendance/Today's Classes screen was only usable
+against dev-fixture or test data, never a real school's own setup —
+a genuine, foundational teacher-usability gap, the highest-priority
+viable candidate recorded at the end of Wave 2X.
+
+**Scope**: one new screen, `TeachingAssignmentsScreen.tsx` — a School
+Head assigns and unassigns which teacher teaches which subject for one
+section. Reached from `SectionsScreen` via a new "Manage assignments"
+per-section action, mirroring the existing "Open roster" →
+`SectionRosterScreen` handoff exactly. Deliberately **not** the full
+Teacher Load/Class Schedule UI this ADR always envisioned:
+`replace_teacher_assignment` (an atomic reassignment convenience),
+`create_schedule_meeting` (the weekly schedule builder), and
+`get_teacher_load` (the derived-load view) all remain unwired,
+carried forward as the next candidates. Reassignment in this slice is
+the explicit remove-then-create this ADR's own Decision section already
+called out as the intended shape, not a new one invented for the UI.
+
+**New backend surface: `list_school_members`.** Assigning a teacher
+requires picking one from a list — this codebase had no command
+anywhere that enumerated a school's own members before this wave (only
+`user::is_member_of_school`, a boolean check). Added
+`repository::user::list_members_in_school` (school-scoped, ordered by
+display name, includes each member's role set) and the
+`list_school_members` command, gated the same "reference data any
+authenticated school member may read" way as
+`list_teaching_assignments_by_section` — usernames/display names/roles
+within one's own school carry no more sensitivity than what
+`AuditLogScreen` already shows. The teacher picker filters client-side
+to members holding the `teacher` role; the backend's own `create`
+remains intentionally not role-gated (an existing, unchanged decision
+from this ADR's original text), so a School Head could in principle
+target a non-teacher member through a different client — the UI-level
+filter is a usability guard, not a security boundary, consistent with
+"security must not rely on UI hiding."
+
+**Security must not rely on UI hiding, applied literally**: any
+authenticated school member can view this screen and its assignment
+list (matching `list_teaching_assignments_by_section`'s own reference-
+data convention), but only a School Head can actually assign or remove
+— enforced exclusively by the backend's existing
+`Capability::ManageTeachingAssignments` gate. The screen shows the same
+form to everyone and surfaces a generic error if the backend declines,
+the same convention `SectionsScreen`'s own "Create a section" form
+already established; `CurrentSession` still carries no role field, so
+there was no client-side way to hide the form even if that had been
+wanted.
+
+**Closed a real, pre-existing test gap**: `create_teaching_assignment`/
+`remove_teaching_assignment`/`list_teaching_assignments_by_section` had
+never been proven at the command boundary in the ~4 waves since this
+ADR's original milestone. New `tests/teaching_assignment_management.rs`
+(9 tests) proves: a School Head can create/list/remove; a Teacher is
+denied on both create and remove; no session is rejected; any school
+member can list (reference data); a duplicate `(section_id,
+subject_id)` is rejected by the schema's own `UNIQUE` constraint; and
+`list_school_members` requires a session and never leaks a different
+school's members.
+
+**Verification**: `npm run quality` 658/658 vitest (+21: `SchoolMemberRepository`
+adapter + `SchoolMemberApplicationService` tests, 4 more
+`TeachingAssignmentRepository` adapter tests, 6
+`TeachingAssignmentApplicationService` tests, 8 `TeachingAssignmentsScreen`
+tests incl. 2 axe passes, 1 more `SectionsScreen` test for the new
+"Manage assignments" action). `npx tsc -b --noEmit` / `eslint` /
+`prettier --check` / `check:architecture` all clean. `cargo test`:
+**568 lib tests** (+4: `list_members_in_school`'s own unit tests) plus
+the new `tests/teaching_assignment_management.rs` (9/9) — zero
+regression to any existing suite. `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X); no `replace_teacher_assignment`
+wiring (an explicit remove-then-create is this ADR's own intended
+reassignment shape, not a gap); no schedule-meeting create/edit UI; no
+teacher-load view; no independent (non-self) review dispatched for this
+bounded slice — retained as debt, consistent with the same pattern
+Waves 2V/2W/2X already established.

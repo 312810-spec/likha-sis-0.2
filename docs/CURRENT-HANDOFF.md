@@ -1,6 +1,105 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2X: Today's Classes, COMPLETE)
+## Active Task (2026-08-29 — Wave 2Y: Teaching Assignments, COMPLETE)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+Wave 2Y addendum; `docs/PROJECT-MEMORY.md` Wave 2Y entry;
+`docs/VERIFICATION-DEBT.md` Wave 2Y entry. **New dedicated branch**
+`claude/likha-sis-wave2y-teaching-assignments`, created from exactly
+`361a2ba4ebe45af51f94d9761721a8564c8e689b` (Wave 2X's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2X's own final Security
+Gate `33257720197` and Quality Gate `33257720189` reconfirmed
+`completed/success` for the exact HEAD commit `361a2ba` before any Wave
+2Y work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 2Y work began.
+
+**Scope chosen**: the highest-priority viable candidate recorded at the
+end of Wave 2X — Teaching Assignments management, per the owner's own
+standing instruction to continue directly into the next wave with a
+notification at each boundary. Without this, Subject Attendance (2V)
+and Today's Classes (2X) were only usable against dev-fixture/test
+data — no real school could create the `teaching_assignments` rows
+those screens depend on.
+
+**What shipped**: one new screen, `TeachingAssignmentsScreen.tsx` — a
+School Head assigns/unassigns which teacher teaches which subject for
+a section, reached from `SectionsScreen`'s new "Manage assignments"
+action (mirroring the existing "Open roster" handoff exactly). Wires
+three commands that existed since Teacher Load/Class Schedule
+Foundation (ADR-0039) but had never been reachable from any screen —
+`create_teaching_assignment`, `remove_teaching_assignment`,
+`list_teaching_assignments_by_section` — and had **zero test coverage
+at the command boundary** before this wave (only the underlying
+repository functions were unit-tested, bypassing the
+`ManageTeachingAssignments` authorization gate entirely). New backend
+surface: `list_school_members` (+ `repository::user::list_members_in_school`),
+since no command anywhere previously enumerated a school's own members
+— needed so the teacher picker has something to pick from. Gated the
+same "reference data any authenticated school member may read" way as
+`list_teaching_assignments_by_section`. The picker filters to members
+holding the `teacher` role client-side; the backend's own `create`
+stays intentionally not role-gated (an existing, unchanged ADR-0039
+decision) — the UI filter is a usability guard, not a security
+boundary. Reassignment is the explicit remove-then-create ADR-0039
+always intended, not a new "replace" flow.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **658/658 vitest** (71 files; +21: `SchoolMemberRepository`
+adapter + `SchoolMemberApplicationService` tests, 4 more
+`TeachingAssignmentRepository` adapter tests, 6
+`TeachingAssignmentApplicationService` tests, 8
+`TeachingAssignmentsScreen` tests incl. 2 axe passes, 1 more
+`SectionsScreen` test). `cargo test`: **568 lib tests** (+4:
+`list_members_in_school`'s own unit tests) plus a new
+`tests/teaching_assignment_management.rs` (9/9 — closing the pre-
+existing command-boundary test gap) — zero regression to any existing
+suite. `cargo fmt --check` / `cargo clippy --all-targets -- -D
+warnings` clean. `npm run build` + `check:dev-preview-isolation` pass.
+`npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged — not reopened. `npm
+run quality:full` green end to end, exit code 0.
+
+**Scope guard held**: no dev-preview-fixture wiring (same disclosed,
+consistent gap as Waves 2U/2W/2X); no `replace_teacher_assignment`
+wiring (explicit remove-then-create is ADR-0039's own intended shape,
+not a gap); no schedule-meeting create/edit UI; no teacher-load view;
+zero change to any prior wave's backend or UI code beyond the new,
+narrowly-typed `list_school_members` surface and the `SectionsScreen`
+handoff addition; `main` not touched; no unrelated refactor.
+
+**Review**: a bounded self-review confirmed `list_school_members` never
+leaks a different school's members (proven by dedicated test), that a
+Teacher session is denied on both create and remove while any school
+member can list (proven), that a duplicate `(section_id, subject_id)`
+assignment is rejected by the schema's own constraint (proven), and
+that the teacher picker's client-side role filter is correctly
+documented as a usability guard, not the security boundary (the
+backend gate is). No independent (non-self) review was dispatched for
+this bounded UI slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with the same retained-debt
+pattern Waves 2V/2W/2X already established.
+
+**Exact next slice** (recorded, not started): `create_schedule_meeting`
+(the weekly schedule builder — now that assignments can actually be
+created, a real school needs to schedule them next, and this also lets
+the Wave 2X weekday convention finally be verified end-to-end against a
+real schedule-creation UI); `get_teacher_load` (the derived-load view);
+Subject Monitor / Adviser View (Subject Attendance's own later steps);
+or the native NVDA/Narrator pass. No candidate pre-selected. Per the
+owner's own standing instruction this session, work continues directly
+into the next wave without a separate stop-and-wait — a notification is
+sent at each wave boundary instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply —
+unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-29 — Wave 2X: Today's Classes, COMPLETE, superseded above)
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 2X
 addendum; `docs/PROJECT-MEMORY.md` Wave 2X entry;
