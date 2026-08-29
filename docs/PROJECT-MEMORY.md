@@ -2266,6 +2266,69 @@ quality` green — 484 vitest tests. `cargo-deny` clean (no dependency
   membership editor. The transfer/end seam is documented in prose in
   the screen's doc comment; no dead buttons.
 
+## Wave 2V — Subject Attendance Foundation (added 2026-08-29)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md`;
+`docs/product/SUBJECT-ATTENDANCE-SPEC.md`;
+`docs/VERIFICATION-DEBT.md` Wave 2V entry. **New branch**
+`claude/likha-sis-wave2v-subject-attendance-foundation`, created from
+`647ba09` (Wave 2U's own final, CI-confirmed checkpoint); the Wave 2U
+branch itself was not modified. Owner-supplied product specification
+(not autonomously selected) — the owner sent two new specs mid-session
+(Subject Attendance, Official School Repository) and directed continued
+autonomous work with a notification at each wave boundary, since their
+own separate research assistant's usage was exhausted.
+
+- **Both specs recorded** at `docs/product/SUBJECT-ATTENDANCE-SPEC.md` /
+  `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`, with a status
+  pointer added to `docs/product/PRODUCT-CONTRACT.md` §16.5. Subject
+  Attendance was chosen as this wave's implementation target — it needs
+  no external administrative material and reuses foundations LIKHA
+  already has (roster, enrollment history, teaching assignments,
+  authorization). Official School Repository is recorded but not
+  started — it requires owner-supplied external material (confirming an
+  organization-managed Microsoft 365 tenant, who can grant Graph/site
+  consent) before any implementation is safe to begin, per
+  `.claude/rules/autonomous-development.md`'s "external material only
+  the user can provide" gate.
+- **Built**: a session-centered schema (migration 22:
+  `subject_attendance_sessions` + `subject_attendance_entries`,
+  deliberately NOT columns on `attendance_records` — Subject Attendance
+  must never be able to become SF2 by sharing storage) and
+  `repository::subject_attendance` (`open_or_get_session`/`mark_no_class`
+  — idempotent via `INSERT ... ON CONFLICT DO NOTHING`, never creates a
+  duplicate on retry; `record_entry` — typed `RecordEntryOutcome`,
+  refuses a `NoClass` session or a membership from a different section;
+  `mark_all_present` — reuses the `bulk_mark_present` "never overwrite"
+  idiom; `roster_for_session` — reuses `section_membership::current_roster`
+  unchanged). New `subject_attendance::authorize_own_assignment` gate —
+  deliberately not a `Capability` match arm, since authorization depends
+  on _which_ assignment is targeted, the same shape
+  `auth::authorize_view_teacher_load`'s "self" branch already uses.
+  Six new Tauri commands in `commands::subject_attendance`, all gated on
+  this same rule.
+- **Deliberately not built this wave**: no UI (matches this project's
+  established zero-UI-first precedent for a new domain — RBAC,
+  Curriculum, Teacher Load, Wave 2A all shipped this way); no
+  adviser/School-Head read access to another teacher's records (the
+  spec's own "Adviser View" is a later implementation-order step); no
+  amendment/audit-trail beyond basic actor/timestamp columns; no
+  sync/offline-conflict handling beyond existing SQLite serialization;
+  zero change to `attendance_records`/SF2/any existing attendance code
+  path.
+- **Verification/checkpoint**: `cargo test` 564 lib (+18, up from 546) +
+  all integration binaries incl. new `tests/subject_attendance.rs` 7/7 —
+  zero regression to any existing suite. `cargo fmt --check`/`cargo
+clippy --all-targets -- -D warnings` clean. `npm run quality` 600/600
+  vitest, unchanged (Rust-only wave, zero frontend files touched).
+  `npm run quality:security` clean, no new dependency. `npm run
+harness:verify` still exactly 100/100, unchanged — not reopened. `npm
+run build` + `check:dev-preview-isolation` pass.
+- **Next**: a scoped first UI increment (Today's Classes + Attendance
+  Check screens, per the spec's own recommended order steps 3-4); or
+  the Teaching Assignment/Class Schedule UI carried from Wave 2T/2U; or
+  the native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

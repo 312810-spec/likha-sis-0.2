@@ -305,6 +305,35 @@ integration pattern established (not fully built); durable docs/tests/
 skills/agents sufficient that a lower-capability continuation session
 can keep going without re-deriving architecture from chat history.
 
+## 16.5 Subject Attendance and Official School Repository (added 2026-08-29)
+
+Two new owner-supplied product specifications, recorded verbatim at
+`docs/product/SUBJECT-ATTENDANCE-SPEC.md` and
+`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`.
+
+- **Subject Attendance** — **DIRECTION SET, foundation BUILT (Wave
+  2V)**. A per-subject teacher attendance-monitoring tool, explicitly
+  and permanently separate from SF2 (never shares storage,
+  authorization, or workflow with it). Domain/repository/command layer
+  shipped this wave (`repository::subject_attendance`,
+  `commands::subject_attendance`, migration 22) — no UI yet. Full
+  decision record: ADR-0055.
+- **Official School Repository** — **DIRECTION SET, not started.** A
+  school-owned document repository (memoranda, templates, approved
+  forms, policies) surfaced through a school-owned Microsoft 365
+  SharePoint library via OneDrive — never an individual employee's
+  personal OneDrive. This is LIKHA's first proposed cloud-provider
+  integration and carries real prerequisites before any implementation
+  can begin: confirming the school has an organization-managed
+  Microsoft 365 tenant, who can grant Graph/site consent, and a
+  completed privacy review (see the spec's own "Privacy and safety
+  gates" section) — these are external material/decisions only the
+  school/owner can supply, not something this project can research or
+  assume its way past. Do not begin implementation until that material
+  is available; the spec's own "First implementation slice" describes a
+  safe, Windows-only local-folder pilot as the first concrete step once
+  it is.
+
 ## 16. Security gates — reconfirmed, unchanged
 
 No real learner PII in development/fixtures/screenshots/demos/tests/AI

@@ -1,6 +1,118 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2U: Create Learner duplicate-candidate warning, COMPLETE)
+## Active Task (2026-08-29 — Wave 2V: Subject Attendance Foundation, COMPLETE)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md`;
+`docs/product/SUBJECT-ATTENDANCE-SPEC.md`;
+`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`;
+`docs/PROJECT-MEMORY.md` Wave 2V entry; `docs/VERIFICATION-DEBT.md` Wave
+2V entry. **New dedicated branch**
+`claude/likha-sis-wave2v-subject-attendance-foundation`, created from
+exactly `647ba0932b2043757cd71e599fb000a7e8dfd2ec` (Wave 2U's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Owner-directed, not autonomously selected**: mid-session the owner
+supplied two full product specifications (Subject Attendance, Official
+School Repository) and explicitly directed continued autonomous work
+across waves, with a notification at the end of each wave boundary
+rather than a stop-and-wait, since their separate research assistant's
+own usage was exhausted. Both specs were recorded into
+`docs/product/` and pointed to from `docs/product/PRODUCT-CONTRACT.md`
+§16.5.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2U's own final Security
+Gate `33241731694` and Quality Gate `33241731693` reconfirmed
+`completed/success` for the exact HEAD commit `647ba09` before any Wave
+2V work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 2V work began.
+
+**Candidate chosen from the two owner-supplied specs**: Subject
+Attendance, not Official School Repository. Official School Repository
+requires external material only the school/owner can supply
+(confirming an organization-managed Microsoft 365 tenant, who can grant
+Graph/site consent) before any implementation is safe to begin, per
+`.claude/rules/autonomous-development.md`'s external-material approval
+gate — recorded, not started. Subject Attendance needs no such material
+and reuses foundations LIKHA already has (Section Roster, enrollment
+history, Teaching Assignments, the existing authorization patterns).
+
+**What shipped**: a session-centered schema (migration 22:
+`subject_attendance_sessions` + `subject_attendance_entries`,
+deliberately not columns on `attendance_records` — Subject Attendance
+must never be able to become SF2 by sharing storage) and
+`repository::subject_attendance`: `open_or_get_session`/`mark_no_class`
+(idempotent via `INSERT ... ON CONFLICT DO NOTHING`, a retry never
+creates a duplicate session), `record_entry` (a typed
+`RecordEntryOutcome` — `Recorded`/`SessionNotFound`/`SessionIsNoClass`/
+`MembershipNotInSession` — refuses a `NoClass` session or a membership
+belonging to a different section rather than silently accepting one),
+`mark_all_present` (reuses the `attendance::bulk_mark_present`
+"never overwrite an existing mark" idiom), and `roster_for_session`
+(reuses `section_membership::current_roster` unchanged — no second,
+competing roster query). New authorization gate
+`subject_attendance::authorize_own_assignment` — deliberately not a
+`Capability` match arm, since whether a write is authorized depends on
+_which_ teaching assignment is targeted, the same shape
+`auth::authorize_view_teacher_load`'s "self" branch already uses. Six
+new Tauri commands in `commands::subject_attendance`, every one gated
+on this same rule; where a command also takes a `session_id`, the
+resolved session's own `teaching_assignment_id` is cross-checked against
+the caller-supplied one so a caller cannot pair an assignment they own
+with a `session_id` belonging to a different one.
+
+**Verification** (all run this session): `cargo test` — **564 lib**
+(+18, up from 546: 14 new `repository::subject_attendance` unit tests +
+4 new migration tests) + all integration binaries green, including new
+`tests/subject_attendance.rs` **7/7** (own-assignment success; a
+different teacher denied; no session denied; cross-teacher entry-write
+denied; `mark_all_present` never overwrites an existing mark; a
+cross-school session listing denied; re-opening an existing session is
+idempotent, not a duplicate) — zero regression to any existing suite.
+`cargo fmt --check`/`cargo clippy --all-targets -- -D warnings` clean.
+`npm run quality` — **600/600 vitest**, unchanged (this wave is
+Rust-only; zero frontend files touched, confirmed by `git status`).
+`npm run quality:security` (gitleaks/cargo-deny/OSV) clean, no new
+dependency. `npm run harness:verify` still exactly 100/100,
+unchanged — not reopened. `npm run build` + `check:dev-preview-isolation`
+pass (unaffected, no frontend change).
+
+**Scope guard held**: no UI was built this wave (matches this project's
+established zero-UI-first precedent for a new domain — RBAC,
+Curriculum, Teacher Load, and Wave 2A all shipped their first increment
+this same way); no adviser/School-Head read access to another teacher's
+Subject Attendance records (the spec's own "Adviser View" is a later
+implementation-order step, not this wave's); no amendment/audit-trail
+beyond basic actor/timestamp columns; no sync/offline-conflict handling
+(no cloud sync exists anywhere in this codebase yet to test one
+against); zero change to `attendance_records`, `AttendanceStatus`, SF2
+export, or any existing attendance code path — confirmed by `git diff
+--stat` touching only new files plus three registration lines.
+
+**Review**: a bounded self-review covered the two schema-level
+uniqueness invariants (proven by migration tests: a second session for
+the same assignment+date is rejected; a second entry for the same
+learner in one session is rejected), own-assignment authorization
+denial for a different teacher (proven), school-scoping on every
+read/list function (proven — a different school never sees another
+school's sessions), the `NoClass`-session write refusal (proven), and
+the cross-section/not-yet-enrolled membership refusal (both proven with
+dedicated tests). No independent (non-self) review was dispatched for
+this bounded foundation slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with several recent waves' own
+retained-debt pattern.
+
+**Exact next slice** (recorded, not started): a scoped first UI
+increment (Today's Classes + Attendance Check screens, per the spec's
+own recommended implementation order steps 3-4); the Teaching
+Assignment/Class Schedule UI carried from Wave 2T/2U (7 unwired
+commands); or the native NVDA/Narrator pass. No candidate pre-selected.
+Per the owner's own standing instruction this session, work continues
+directly into the next wave without a separate stop-and-wait — a
+notification is sent at each wave boundary instead.
+
+## Note — Active Task (2026-08-29 — Wave 2U: Create Learner duplicate-candidate warning, COMPLETE, superseded above)
 
 Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/PROJECT-MEMORY.md`
 Wave 2U entry; `docs/ACTIVE-PLAN.md` Wave 2U entry;

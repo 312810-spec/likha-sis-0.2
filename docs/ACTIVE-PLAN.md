@@ -1,5 +1,71 @@
 # ACTIVE PLAN
 
+## Wave 2V: Subject Attendance Foundation (added 2026-08-29) — complete
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md`;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 2V
+entry; `docs/VERIFICATION-DEBT.md` Wave 2V entry. **New branch**
+`claude/likha-sis-wave2v-subject-attendance-foundation`, created from
+`647ba0932b2043757cd71e599fb000a7e8dfd2ec` (Wave 2U's own final,
+CI-confirmed checkpoint) — Wave 2U's branch was not modified.
+
+**Owner-directed**: mid-session the owner supplied two full product
+specifications (`docs/product/SUBJECT-ATTENDANCE-SPEC.md`,
+`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`) and directed
+continued autonomous wave-by-wave work with a notification at each wave
+boundary. Subject Attendance was selected over Official School
+Repository because the latter requires external material only the
+school/owner can supply (an organization-managed Microsoft 365 tenant,
+consent authority) before implementation can safely begin.
+
+**Schema (migration 22)**: `subject_attendance_sessions` +
+`subject_attendance_entries`, session-centered, deliberately not columns
+on `attendance_records`. `UNIQUE(teaching_assignment_id, session_date)`
+and `UNIQUE(session_id, membership_id)` are real database invariants.
+Session status is two-valued (`held`/`no_class`); "not checked" is the
+absence of a row, reusing `attendance_records`' own idiom.
+
+**Domain**: `repository::subject_attendance` — idempotent
+`open_or_get_session`/`mark_no_class`, typed `record_entry` (refuses a
+`NoClass` session or an out-of-section membership), `mark_all_present`
+(never overwrites), `roster_for_session` (reuses
+`section_membership::current_roster` unchanged). New
+`authorize_own_assignment` gate — the caller must be exactly the
+teacher on the targeted assignment, mirroring
+`auth::authorize_view_teacher_load`'s "self" shape rather than a
+school-wide `Capability`.
+
+**Commands**: six new Tauri commands in `commands::subject_attendance`,
+all gated on `authorize_own_assignment`; commands taking a `session_id`
+also cross-check its resolved `teaching_assignment_id` against the
+caller-supplied one.
+
+**Deliberately not built**: no UI (matches RBAC/Curriculum/Teacher
+Load/Wave 2A's zero-UI-first precedent for a new domain); no
+adviser/School-Head read access to another teacher's records; no
+amendment/audit-trail beyond actor/timestamp columns; no sync/offline-
+conflict handling; zero change to `attendance_records`/SF2/any existing
+attendance path.
+
+**Verification, all actually run this session**: `cargo test` 564 lib
+(+18: 14 repository unit tests + 4 migration tests) + all integration
+binaries green incl. new `tests/subject_attendance.rs` 7/7; `cargo fmt
+--check`/`cargo clippy --all-targets -- -D warnings` clean. `npm run
+quality` 600/600 vitest, unchanged (Rust-only wave). `npm run
+quality:security` clean, no new dependency. `npm run harness:verify`
+still exactly 100/100, unchanged. `npm run build` +
+`check:dev-preview-isolation` pass.
+
+**Review**: bounded self-review — both `UNIQUE` invariants, own-
+assignment denial for a different teacher, school-scoping on every
+read, the `NoClass`-refusal, and the cross-section-membership refusal
+all proven by dedicated tests. No independent review dispatched —
+retained as debt.
+
+**Next**: a scoped first UI increment (Today's Classes + Attendance
+Check screens); the carried Teaching Assignment/Class Schedule UI; or
+the native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 2U: Create Learner duplicate-candidate warning (added 2026-08-29) — complete
 
 Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/CURRENT-HANDOFF.md`

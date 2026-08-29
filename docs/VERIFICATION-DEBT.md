@@ -1,5 +1,38 @@
 # Verification Debt
 
+## Wave 2V — Subject Attendance Foundation (2026-08-29)
+
+Full record: `docs/adr/0055-*`; `docs/PROJECT-MEMORY.md` Wave 2V entry;
+`docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No independent (non-self) review was dispatched** for this bounded
+   foundation slice. A self-review covered the two schema-level
+   uniqueness invariants, own-assignment authorization denial for a
+   different teacher, school-scoping on every read/list function, the
+   `NoClass`-session refusal, and the cross-section-membership refusal —
+   all proven by dedicated tests, not merely reasoned about (full list
+   in ADR-0055's "Review" section). No non-self reviewer confirmed this
+   independently.
+2. **No UI exists for Subject Attendance yet** — this wave is
+   domain/repository/command foundation only, deliberately, matching
+   this project's established zero-UI-first precedent for a new domain.
+   `npm run quality:ui`'s browser gate has nothing new to exercise this
+   wave (zero frontend files touched).
+3. **No amendment/audit-trail beyond basic actor/timestamp columns.**
+   `record_entry`'s upsert-on-conflict shape means a correction silently
+   replaces the prior value in place (only `updated_by_user_id`/
+   `updated_at` survive) — the spec's fuller "actor, device, time, prior
+   value, new value, reason" audit trail is not built. Acceptable for a
+   foundation wave with no UI yet to generate corrections through; must
+   be addressed before a real amendment/correction UI ships.
+4. **No sync/offline-conflict handling beyond existing SQLite
+   serialization.** The schema is offline-write-ready (stable UUIDv7
+   ids, idempotent session creation via `ON CONFLICT DO NOTHING`), but
+   no cloud sync exists anywhere in this codebase yet to test a real
+   conflict against.
+
 ## Wave 2U — Create Learner duplicate-candidate warning (2026-08-29)
 
 Full record: `docs/adr/0042-*` Wave 2U addendum; `docs/CURRENT-HANDOFF.md`
