@@ -31,6 +31,11 @@ rand = "0.10.2"
 zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
 argon2 = { version = "0.5.3", features = ["zeroize"] }
 password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
+# Decodes an uploaded school logo (PNG/JPEG) to extract a dominant color
+# for branding (src/branding/logo.rs). MIT/Apache-2.0, the standard,
+# widely-used Rust image-decoding crate -- no lighter-weight alternative
+# covers both formats without adding an equivalent dependency anyway.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

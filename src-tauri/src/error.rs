@@ -35,6 +35,11 @@ pub enum AppError {
     /// permissions problem, the one-time setup capability is simply gone
     /// (see `auth::bootstrap_installation`).
     AlreadyInitialized,
+    /// An uploaded school logo could not be decoded (unsupported/corrupt
+    /// format) or exceeded the size limit — see `branding::logo`. The
+    /// message is a fixed, generic category-safe string, never the
+    /// underlying decoder's own error text.
+    InvalidImage(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -48,6 +53,7 @@ impl std::fmt::Display for AppError {
             AppError::AccountLocked => write!(f, "account locked"),
             AppError::Unauthorized => write!(f, "unauthorized"),
             AppError::AlreadyInitialized => write!(f, "already initialized"),
+            AppError::InvalidImage(msg) => write!(f, "invalid image: {msg}"),
         }
     }
 }
@@ -101,6 +107,7 @@ impl Serialize for AppError {
             AppError::AccountLocked => "account_locked",
             AppError::Unauthorized => "unauthorized",
             AppError::AlreadyInitialized => "already_initialized",
+            AppError::InvalidImage(_) => "invalid_image",
         };
         serializer.serialize_str(category)
     }

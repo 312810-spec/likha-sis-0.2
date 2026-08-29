@@ -48,6 +48,29 @@ Greenfield repository. No old implementation is authoritative.
   no squash. CI green on `main` itself (Ubuntu + Windows). Previous
   baseline: `f02bce5`. See `docs/adr/0035` through `0041` and
   `docs/CURRENT-HANDOFF.md`'s Integration Review entry for full detail.
+- **School Branding, Wave 1 complete (2026-08-29)**: full record
+  `docs/adr/0045-school-branding.md`. `PRODUCT-CONTRACT.md` §3 (RBAC)
+  was found stale (claimed "not yet implemented" despite ADR-0036
+  building it 2026-08-25) and corrected before this milestone began —
+  Wave 1 was already 2/3 done; School Branding was the one real gap.
+  Now built: `branding::theme` (WCAG-AA-contrast-guaranteed color
+  derivation from a logo's dominant color), `branding::logo` (PNG/JPEG
+  decode with both a byte-size cap and a decompression-bomb pixel-count
+  cap), a new `school_branding` BLOB table (inside the already-encrypted
+  database), `Capability::ManageSchoolBranding` (School Head only), and
+  the full TS/UI layer, applied as inline CSS custom-property overrides
+  reset on every session change (a real shared-school-computer
+  requirement, ADR-0004). `cargo test` 367/367, `npm run quality`
+  401/401, all real and actually run — this session also fixed two
+  purely local sandbox gaps (outdated Rust toolchain, missing Linux
+  webview system packages) that had blocked real compiler verification
+  in several recent sessions; not a durable repo change, a future fresh
+  sandbox will need to repeat both fixes. `security-reviewer` failed on
+  a session rate limit (not the usual retrieval failure); a rigorous
+  self-review substituted, found and fixed one real issue (the
+  decompression-bomb gap), disclosed one minor non-blocking race — full
+  detail in `docs/VERIFICATION-DEBT.md`. **Wave 1 is now fully
+  complete**; Wave 2 (Learner Core) is next.
 - **Minimal CI Foundation (2026-08-26)**: `.github/workflows/quality.yml`
   runs `npm run quality:full` on `ubuntu-latest` and `windows-latest`
   (GitHub-hosted standard runners) on push/PR/manual dispatch,

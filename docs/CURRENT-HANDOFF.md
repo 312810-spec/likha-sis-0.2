@@ -1,5 +1,75 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — School Branding (Wave 1 complete), implemented)
+
+**Real product code shipped this session** — not research/planning like
+the entries below. Full record: `docs/adr/0045-school-branding.md`.
+
+**Repository truth checked first, a real staleness gap found and
+fixed**: `PRODUCT-CONTRACT.md` §3 still said RBAC was "not yet
+implemented" — written before Wave 1A actually built it (2026-08-25,
+ADR-0036) and never updated. Verified directly against source
+(`user_school_roles` table, `auth::Capability` enum both real,
+`cargo check --lib` passing) before correcting it. This meant **Wave 1
+("Foundational primitives") was already 2/3 done** — RBAC and
+curriculum-versioning schema both built — with only **School branding**
+genuinely missing. Implemented it, closing Wave 1.
+
+**A major environment fix, worth remembering for future sessions**:
+`cargo check --lib` was blocked by two purely local, per-machine gaps —
+an outdated Rust toolchain (1.94.1, fixed via `rustup update stable` to
+1.98.0) and missing Linux GTK/glib system packages (fixed with the exact
+`apt-get install` list already recorded in `.github/workflows/quality.yml`).
+With both fixed, real `cargo check`/`cargo test`/`cargo clippy` all ran
+cleanly this session — genuine compiler verification several recent
+milestones lacked. **Not a durable repository change** — a fresh sandbox
+will need to repeat both fixes.
+
+**What was built**: `branding::theme` (pure, WCAG-AA-contrast-guaranteed
+color derivation — 11 tests), `branding::logo` (PNG/JPEG dominant-color
+extraction with a byte-size cap _and_ a decompression-bomb pixel-count
+cap — 9 tests), `repository::school_branding` (new BLOB-storing table,
+9 tests), a new `Capability::ManageSchoolBranding` (School Head only),
+4 new Tauri commands, and the full TS layer (domain/port/adapter/
+application-service/`SchoolBrandingScreen`/`applyBranding`, 11 more
+tests) — a new "School Settings" nav group. Applied as inline CSS
+custom-property overrides, explicitly reset on every session change (a
+real shared-school-computer requirement, ADR-0004 — a school's branding
+must never leak across a login to a different school's teacher).
+
+**Verification, all actually run this session**: `cargo test` 367/367
+(up from 338), `cargo clippy --all-targets -- -D warnings` clean,
+`cargo fmt --check` clean, `npm run quality` clean (401/401 tests, up
+from 390), `npx tsc -b --noEmit` (the stricter check — caught one real
+issue the plain typecheck missed), `npm run build` clean,
+`check:dev-preview-isolation` clean, `npx knip` zero new findings.
+`npm run quality:security` not run (gitleaks/cargo-deny/osv-scanner
+still not installed in this sandbox, a known per-machine gap).
+
+**Independent `security-reviewer` dispatched but failed on a session
+rate limit** (not the usual documented retrieval failure — a genuine
+usage-limit 429 that would recur on immediate retry). A rigorous
+self-review was substituted, covering the reviewer's full checklist —
+found and fixed one real issue (the decompression-bomb pixel-count gap
+above); disclosed one minor, non-blocking race (a narrow window between
+`App.tsx`'s session-change branding fetch and a manual upload/reset,
+self-corrects, no cross-school leak). **Real, non-self security review
+remains owed** — retry `security-reviewer` in a later session once the
+rate limit clears. Full detail: `docs/VERIFICATION-DEBT.md`'s top entry.
+
+**Docs updated**: `PRODUCT-CONTRACT.md` §8 (HYPOTHESIS → BUILT),
+`ADR-0035`'s Wave 1 row (now **complete**), `VERIFICATION-DEBT.md` (new
+top entry).
+
+**Per Autonomous Continuous Development Mode: this is a completed
+milestone checkpoint, not a stopping point.** Exact next action: **Wave
+2 (Learner Core — combined UX-05 + SF1)** is now the correct next
+milestone — Wave 1 is genuinely complete (RBAC, curriculum versioning,
+and now school branding all real and verified), and Wave 2 is explicitly
+gated by Wave 1's RBAC per `ADR-0035`. Wave 6's full research/spec
+(ADR-0042/0043/0044) remains ready and waiting, not yet actionable until
+Waves 2-5 complete in sequence.
+
 ## Active Task (2026-08-29, this session — Wave 4 Personnel Data-Collection Decision, complete)
 
 **One user decision recorded, folded into ADR-0044 and `PRODUCT-CONTRACT.md`

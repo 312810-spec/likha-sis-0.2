@@ -401,6 +401,12 @@ pub enum Capability {
     /// scheduling-authority decision, distinct from onboarding a school
     /// member, even though both currently resolve to the same role.
     ManageTeachingAssignments,
+    /// Upload/clear a school's logo and derived theme -- see
+    /// `docs/adr/0045-school-branding.md`. School Head only, matching
+    /// `ManageSchoolMembership`/`ManageTeachingAssignments`: branding is
+    /// a whole-school identity decision, not something every teacher
+    /// should be able to change for everyone.
+    ManageSchoolBranding,
 }
 
 impl Capability {
@@ -409,6 +415,7 @@ impl Capability {
             Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
         }
     }
 }

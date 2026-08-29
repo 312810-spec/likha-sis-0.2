@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod branding;
 mod commands;
 pub mod crypto;
 pub mod db;
@@ -31,6 +32,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::school::list_schools,
             commands::school::create_school,
+            commands::school_branding::set_school_branding,
+            commands::school_branding::get_school_branding,
+            commands::school_branding::get_school_logo,
+            commands::school_branding::clear_school_branding,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
             commands::learner::get_learner,

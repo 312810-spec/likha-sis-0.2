@@ -6,6 +6,7 @@ import { ExportApplicationService } from "./application/export-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
+import { SchoolBrandingApplicationService } from "./application/school-branding-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SectionApplicationService } from "./application/section-service";
 import { SetupApplicationService } from "./application/setup-service";
@@ -19,6 +20,7 @@ import { TauriExportRepository } from "./infrastructure/tauri/export-repository"
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
+import { TauriSchoolBrandingRepository } from "./infrastructure/tauri/school-branding-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
 import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
@@ -34,6 +36,9 @@ export { onSessionExpired } from "./infrastructure/tauri/invoke";
  */
 export const authService = new AuthApplicationService(new TauriAuthRepository());
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
+export const schoolBrandingService = new SchoolBrandingApplicationService(
+  new TauriSchoolBrandingRepository(),
+);
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
 export const userService = new UserApplicationService(new TauriUserRepository());
 export const setupService = new SetupApplicationService(new TauriSetupRepository());

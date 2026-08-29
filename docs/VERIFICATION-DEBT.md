@@ -1,5 +1,78 @@
 # Verification Debt
 
+## School Branding: `security-reviewer` failed on a rate limit, self-review substituted (2026-08-29)
+
+Full milestone record: `docs/adr/0045-school-branding.md`. Required per
+`.claude/rules/security-privacy.md` (this milestone touches auth — a new
+`Capability::ManageSchoolBranding` — and persistence — a new
+`school_branding` BLOB table). `security-reviewer` was dispatched with a
+detailed checklist (authorization, the shared-computer cross-session
+branding-leak scenario, image-decode safety, SQL/upsert correctness,
+PII, error-boundary leakage) but failed before returning any findings:
+`Agent terminated early due to an API error: You've hit your session
+limit · resets 5pm (UTC)` (HTTP 429, rate_limit) — **not** this
+project's usual documented agent-resume/retrieval failure, a genuine
+usage-limit exhaustion that would recur on immediate retry.
+
+A rigorous self-review was substituted, covering the exact checklist
+given to the failed reviewer:
+
+- **Authorization**: `set_school_branding`/`clear_school_branding` take
+  no `school_id` parameter at all — it comes only from
+  `auth::authorize_capability`'s return value, School-Head-gated.
+  `get_school_branding`/`get_school_logo` similarly derive `school_id`
+  only from `sessions.require_active_school_scope`. No client-supplied
+  school scope anywhere in this command set; no cross-school read/write
+  path found.
+- **Cross-session branding leak** (LIKHA runs on shared school
+  computers with independent per-teacher logins, ADR-0004): traced every
+  `setSession` call site in `App.tsx` (login, setup-complete, logout,
+  session-expiry) — all trigger the reset-then-refetch `useEffect`, none
+  bypass it.
+- **SQL**: parameterized throughout; `ON CONFLICT (school_id) DO UPDATE`
+  used, not `INSERT OR REPLACE`/`OR IGNORE` (this codebase's own
+  documented `repository::role::grant` lesson about the latter silently
+  swallowing `CHECK` violations or cascading unexpectedly).
+- **PII**: a school logo is institutional branding, not personal data —
+  no concern under this project's synthetic-data/PII rules.
+- **Error-boundary leakage**: `AppError::InvalidImage`'s `Serialize`
+  impl confirmed to emit only the fixed `"invalid_image"` category
+  string across the Tauri IPC boundary, matching every other variant's
+  pattern — the underlying message (never itself sensitive, but still)
+  never crosses.
+- **A real, non-theoretical finding, found and fixed before the
+  milestone was called done**: `branding::logo`'s 2MB limit checked
+  compressed upload size only, not decoded pixel count — a small,
+  well-compressed file (a solid color compresses extremely well) could
+  still claim an enormous width×height, forcing a large allocation the
+  moment `decode()` ran. Fixed with `ImageReader::into_dimensions()` (a
+  header-only read, no full decode) checked against a 50-megapixel cap
+  _before_ `decode()` is called. Proven with a real test: a 9000×9000
+  solid-color PNG, confirmed well under the 2MB byte cap, correctly
+  rejected on pixel count instead.
+
+**Remaining debt, disclosed not fixed**:
+
+1. A minor, low-severity race: `App.tsx`'s per-session branding fetch
+   and a near-simultaneous manual upload/reset on
+   `SchoolBrandingScreen.tsx` are not coordinated — a fast-enough upload
+   could theoretically have its freshly-applied theme overwritten by an
+   in-flight, now-stale fetch resolving after it. Self-corrects on the
+   next render/reload; never crosses a school boundary; affects only a
+   transient applied CSS value, not persisted data. Low enough severity
+   not to block this milestone; worth a coordinating guard (e.g. an
+   incrementing request-generation counter, the same pattern already
+   used elsewhere in this codebase for a similar class of race — see
+   `ClassRecordWorkspace.tsx`'s `handleRecord`) if this area is revisited.
+2. **A real, non-self security review remains owed** for this
+   milestone's auth/persistence surface — retry `security-reviewer` in a
+   later session once the rate limit has cleared, per this project's
+   established "periodically retry the owed independent reviews when the
+   harness appears healthy" rule.
+3. `npm run quality:security` (gitleaks/cargo-deny/osv-scanner) was not
+   run — the three binaries remain not installed in this sandbox, the
+   same known per-machine gap already recorded elsewhere in this file.
+
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone

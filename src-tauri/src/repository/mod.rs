@@ -12,6 +12,7 @@ pub mod learner_score;
 pub mod role;
 pub mod schedule_meeting;
 pub mod school;
+pub mod school_branding;
 pub mod section;
 pub mod section_membership;
 pub mod session;

@@ -234,17 +234,23 @@ section/subject/school aggregation → SMEA data. Exact formulas must come
 from the authoritative current E-Class Record/policy when this is
 actually built — not invented now.
 
-## 8. School branding — HYPOTHESIS, no code exists yet
+## 8. School branding — BUILT (2026-08-29)
 
-`School` today has only `id`/`name`/`createdAt` — no logo/theme fields
-(`src/domain/school.ts`, confirmed). Direction: each school can upload
-a logo; LIKHA derives an accessibility-safe theme (primary/secondary/
-accent/selected-state/restrained-surface colors) from it, deterministically
-and stored locally so branding works offline. System semantic colors
-(success/warning/error/critical) stay fixed regardless of branding — a
-school's palette must never be allowed to compromise a status color's
-meaning or contrast. This is additive to the existing design-token
-system (ADR-0031, UX-01) — extend, don't replace.
+Full record: `docs/adr/0045-school-branding.md`. A school can upload a
+logo (PNG/JPEG, 2MB cap); LIKHA derives an accessibility-safe theme
+(primary/secondary/accent/selected-surface/restrained-surface, each
+WCAG-AA-contrast-guaranteed by real, tested color math — not eyeballed)
+from its dominant color, deterministically, and stores both the logo
+(as a BLOB inside the already-SQLCipher-encrypted database) and the
+derived theme locally, so branding works fully offline. System semantic
+colors (success/warning/error/danger) are never touched. Gated by a new
+`Capability::ManageSchoolBranding` (School Head only); reads are
+session-scoped, open to any active session. Applied as inline CSS
+custom-property overrides, reset to defaults on every session change
+(a shared-school-computer requirement, ADR-0004 — a school's branding
+must never persist across a login to a different school). This closes
+the last of Wave 1's three foundational primitives — **Wave 1 is now
+complete.**
 
 ## 9. Adaptive teacher UX — BUILT, principle reconfirmed
 

@@ -6,6 +6,7 @@ export type SignedInTab =
   | "monthly-summary"
   | "grading-periods"
   | "class-records"
+  | "school-branding"
   | "audit-log";
 
 interface NavGroup {
@@ -40,6 +41,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { id: "grading-periods", label: "Grading Periods" },
       { id: "class-records", label: "Class Records" },
     ],
+  },
+  {
+    label: "School Settings",
+    tabs: [{ id: "school-branding", label: "Branding" }],
   },
   {
     label: "Security",

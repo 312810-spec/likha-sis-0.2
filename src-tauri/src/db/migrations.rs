@@ -954,6 +954,34 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_schedule_meetings_assignment_id ON schedule_meetings(teaching_assignment_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- School branding (Wave 1's remaining foundational primitive --
+        -- see docs/adr/0045-school-branding.md). One row per school: the
+        -- uploaded logo plus its fully-derived, already-computed theme
+        -- (never recomputed at read time -- see branding::theme). The
+        -- logo is stored as a BLOB inside this already-SQLCipher-
+        -- encrypted database rather than a plaintext file on disk, so it
+        -- gets the same encryption-at-rest guarantee as everything else
+        -- for free (ADR-0003). System semantic colors (success/warning/
+        -- error/danger) are never stored here -- they stay the fixed
+        -- defaults in src/ui/theme/styles.css regardless of branding.
+        CREATE TABLE school_branding (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            logo BLOB NOT NULL,
+            logo_mime TEXT NOT NULL CHECK (logo_mime IN ('image/png', 'image/jpeg')),
+            primary_color TEXT NOT NULL,
+            primary_text_color TEXT NOT NULL,
+            secondary_color TEXT NOT NULL,
+            secondary_text_color TEXT NOT NULL,
+            accent_color TEXT NOT NULL,
+            accent_text_color TEXT NOT NULL,
+            selected_surface_color TEXT NOT NULL,
+            restrained_surface_color TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
     ])
 }
 

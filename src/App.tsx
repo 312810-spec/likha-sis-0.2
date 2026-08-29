@@ -9,6 +9,7 @@ import {
   learnerScoreService,
   learnerService,
   onSessionExpired,
+  schoolBrandingService,
   schoolService,
   sectionService,
   setupService,
@@ -25,10 +26,12 @@ import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
+import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "./ui/components/WorkbenchNav";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
+import { applyBranding } from "./ui/theme/applyBranding";
 import { ModeProvider } from "./ui/theme/ModeContext";
 import "./ui/theme/styles.css";
 
@@ -74,6 +77,38 @@ function App() {
     // and read aloud by some screen readers on navigation.
     document.title = session ? `${TAB_LABELS[activeTab]} · LIKHA-SIS` : "LIKHA-SIS";
   }, [session, activeTab]);
+
+  useEffect(() => {
+    // LIKHA runs on shared school computers with independent per-teacher
+    // sessions (ADR-0004) -- a school's branding is applied as inline
+    // style overrides (src/ui/theme/applyBranding.ts) that otherwise
+    // persist across logins. Without this, School A's colors would keep
+    // showing after logout, including to a School B teacher signing in
+    // next on the same machine. Reset to the default theme immediately
+    // on every session change, then fetch and apply the *new* session's
+    // own branding (or nothing, reverting to defaults, if it has none)
+    // -- never assume the previous session's applied theme is still
+    // correct. SchoolBrandingScreen applies live updates after an
+    // upload/reset itself; this covers every other screen and the
+    // moment of sign-in itself.
+    if (!session) {
+      applyBranding(null, document.documentElement);
+      return;
+    }
+    let cancelled = false;
+    schoolBrandingService
+      .getCurrent()
+      .then((branding) => {
+        if (!cancelled) applyBranding(branding, document.documentElement);
+      })
+      .catch(() => {
+        // Non-fatal: the app still works with the default theme if
+        // branding fails to load.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +210,8 @@ function App() {
                 learnerScoreService={learnerScoreService}
                 exportService={exportService}
               />
+            ) : activeTab === "school-branding" ? (
+              <SchoolBrandingScreen schoolBrandingService={schoolBrandingService} />
             ) : (
               <AuditLogScreen authService={authService} />
             )}
