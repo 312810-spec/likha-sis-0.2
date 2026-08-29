@@ -1126,6 +1126,77 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE section_memberships ADD COLUMN corrected_at TEXT;
         "#,
         ),
+        M::up(
+            r#"
+        -- Wave 2V: Subject Attendance Foundation
+        -- (docs/product/SUBJECT-ATTENDANCE-SPEC.md). A session-centered
+        -- model, deliberately NOT columns on attendance_records --
+        -- Subject Attendance is an internal per-subject monitoring tool
+        -- for the assigned teacher, never an official School Form, and
+        -- must never be able to silently become SF2 by sharing its
+        -- storage. `teaching_assignment_id` (not a bare teacher/section
+        -- pair) is the authorization anchor, matching Teacher Load's own
+        -- "who teaches what" concept -- a caller must own the exact
+        -- assignment, not merely be *a* teacher in the school.
+        --
+        -- `UNIQUE(teaching_assignment_id, session_date)` makes "one
+        -- session per class per day" a database invariant, not an
+        -- application-level check-then-act -- the same lesson this
+        -- project's history (M4/M6, and Wave 2Q's guarded-UPDATE work)
+        -- keeps re-teaching. `status` is intentionally two-valued here
+        -- (`held`/`no_class`) -- the spec's third state, "not checked,"
+        -- is the absence of any row for that (assignment, date), the
+        -- same "no row = not yet recorded" idiom `attendance_records`
+        -- already established (see M12b's note in PROJECT-MEMORY.md) --
+        -- so there is nothing to store for it and no way for it to drift
+        -- from reality.
+        CREATE TABLE subject_attendance_sessions (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id),
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id),
+            section_id TEXT NOT NULL REFERENCES sections(id),
+            subject_id TEXT NOT NULL REFERENCES subjects(id),
+            session_date TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('held', 'no_class')),
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (teaching_assignment_id, session_date)
+        );
+
+        CREATE INDEX idx_subject_attendance_sessions_school_date
+            ON subject_attendance_sessions(school_id, session_date);
+
+        -- `membership_id` (not a bare `learner_id`) is the exact
+        -- enrollment span an entry belongs to -- referencing the exact
+        -- membership row, the same discipline
+        -- `section_membership::current_roster` already established for
+        -- Section Roster, is what prevents a stale-roster mistake if a
+        -- learner transfers out between when a session opened and when
+        -- it was marked. `UNIQUE(session_id, membership_id)` makes "one
+        -- entry per learner per session" a database invariant, mirroring
+        -- `attendance_records`' own `UNIQUE(learner_id, attendance_date)`.
+        -- `learner_id` is denormalized alongside `membership_id` so a
+        -- read never needs a second join through `section_memberships`
+        -- just to know who a row is about.
+        CREATE TABLE subject_attendance_entries (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES subject_attendance_sessions(id),
+            membership_id TEXT NOT NULL REFERENCES section_memberships(id),
+            learner_id TEXT NOT NULL REFERENCES learners(id),
+            status TEXT NOT NULL CHECK (status IN ('present', 'absent', 'late', 'excused')),
+            note TEXT,
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            updated_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (session_id, membership_id)
+        );
+
+        CREATE INDEX idx_subject_attendance_entries_session
+            ON subject_attendance_entries(session_id);
+        "#,
+        ),
     ])
 }
 
@@ -2785,6 +2856,153 @@ mod tests {
         assert!(
             result.is_err(),
             "the exact same meeting must not be insertable twice"
+        );
+    }
+
+    // ---- Subject Attendance Foundation ----
+
+    fn seed_school_assignment_and_membership(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('t1', 'teacher.a', 'hash', 'Teacher A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2026-2027', '7', 'Mabini')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO learners (id, school_id, given_name, family_name) \
+             VALUES ('l1', 's1', 'Ana', 'Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('sm1', 's1', 'sec1', 'l1', '2026-06-01')",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_22_rejects_an_unrecognized_session_status() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_assignment_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, status, created_by_user_id) \
+             VALUES ('sas1', 's1', 'ta1', 'sec1', 'sub1', '2026-08-29', 'excused', 't1')",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_22_rejects_a_second_session_for_the_same_assignment_and_date() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_assignment_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, status, created_by_user_id) \
+             VALUES ('sas1', 's1', 'ta1', 'sec1', 'sub1', '2026-08-29', 'held', 't1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, status, created_by_user_id) \
+             VALUES ('sas2', 's1', 'ta1', 'sec1', 'sub1', '2026-08-29', 'held', 't1')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "one class + one day must resolve to exactly one session"
+        );
+    }
+
+    #[test]
+    fn migration_22_rejects_an_unrecognized_entry_status() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_assignment_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, status, created_by_user_id) \
+             VALUES ('sas1', 's1', 'ta1', 'sec1', 'sub1', '2026-08-29', 'held', 't1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO subject_attendance_entries \
+             (id, session_id, membership_id, learner_id, status, created_by_user_id, updated_by_user_id) \
+             VALUES ('sae1', 'sas1', 'sm1', 'l1', 'tardy', 't1', 't1')",
+            [],
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn migration_22_rejects_a_second_entry_for_the_same_learner_in_one_session() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_assignment_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, status, created_by_user_id) \
+             VALUES ('sas1', 's1', 'ta1', 'sec1', 'sub1', '2026-08-29', 'held', 't1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subject_attendance_entries \
+             (id, session_id, membership_id, learner_id, status, created_by_user_id, updated_by_user_id) \
+             VALUES ('sae1', 'sas1', 'sm1', 'l1', 'present', 't1', 't1')",
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "INSERT INTO subject_attendance_entries \
+             (id, session_id, membership_id, learner_id, status, created_by_user_id, updated_by_user_id) \
+             VALUES ('sae2', 'sas1', 'sm1', 'l1', 'absent', 't1', 't1')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "one learner + one session must resolve to exactly one entry"
         );
     }
 }

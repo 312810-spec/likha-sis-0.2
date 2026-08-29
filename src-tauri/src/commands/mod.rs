@@ -14,6 +14,7 @@ pub mod school;
 pub mod section;
 pub mod setup;
 pub mod subject;
+pub mod subject_attendance;
 pub mod teaching_assignment;
 pub mod user;
 

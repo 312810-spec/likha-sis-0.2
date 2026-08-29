@@ -18,5 +18,6 @@ pub mod section_membership;
 pub mod session;
 pub mod sf1_import_history;
 pub mod subject;
+pub mod subject_attendance;
 pub mod teaching_assignment;
 pub mod user;
