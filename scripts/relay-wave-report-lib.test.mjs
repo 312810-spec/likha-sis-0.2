@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   MARKER,
+  REQUIRED_WORKFLOWS,
   buildCommentBody,
   buildHeader,
-  ciIsGreen,
   containsClaudeMention,
   isDuplicate,
+  isValidCommitSha,
+  latestRunByName,
+  requiredWorkflowsGreen,
   validateReport,
 } from "./relay-wave-report-lib.mjs";
 
@@ -68,34 +71,94 @@ describe("containsClaudeMention", () => {
   });
 });
 
-describe("ciIsGreen", () => {
-  it("is green when all check runs completed successfully", () => {
+describe("isValidCommitSha", () => {
+  it("accepts a full 40-character hex SHA", () => {
+    expect(isValidCommitSha("a".repeat(40))).toBe(true);
+    expect(isValidCommitSha("944b988ffcfc786747164cdc7fe553ae57b5f2a3")).toBe(true);
+  });
+
+  it("rejects a short SHA, non-hex characters, or non-strings", () => {
+    expect(isValidCommitSha("944b988")).toBe(false);
+    expect(isValidCommitSha("g".repeat(40))).toBe(false);
+    expect(isValidCommitSha("")).toBe(false);
+    expect(isValidCommitSha(undefined)).toBe(false);
+    expect(isValidCommitSha(123)).toBe(false);
+  });
+});
+
+describe("latestRunByName", () => {
+  it("returns the most recently started run matching the name", () => {
     const runs = [
-      { name: "build", status: "completed", conclusion: "success" },
-      { name: "test", status: "completed", conclusion: "skipped" },
+      { name: "Quality Gate", run_started_at: "2026-08-30T10:00:00Z", status: "completed" },
+      { name: "Quality Gate", run_started_at: "2026-08-30T12:00:00Z", status: "in_progress" },
+      { name: "Security Gate", run_started_at: "2026-08-30T11:00:00Z", status: "completed" },
     ];
-    expect(ciIsGreen(runs, null).green).toBe(true);
+    expect(latestRunByName(runs, "Quality Gate").status).toBe("in_progress");
   });
 
-  it("is not green when a check run is still in progress", () => {
-    const runs = [{ name: "build", status: "in_progress", conclusion: null }];
-    expect(ciIsGreen(runs, null).green).toBe(false);
+  it("returns null when no run matches the name", () => {
+    expect(latestRunByName([{ name: "Other" }], "Quality Gate")).toBeNull();
+  });
+});
+
+describe("requiredWorkflowsGreen", () => {
+  const passing = (name) => ({
+    name,
+    status: "completed",
+    conclusion: "success",
+    run_started_at: "2026-08-30T10:00:00Z",
   });
 
-  it("is not green when a check run failed", () => {
-    const runs = [{ name: "build", status: "completed", conclusion: "failure" }];
-    expect(ciIsGreen(runs, null).green).toBe(false);
+  it("is green when both required workflows completed successfully", () => {
+    const runs = REQUIRED_WORKFLOWS.map(passing);
+    const result = requiredWorkflowsGreen(runs);
+    expect(result.green).toBe(true);
+    expect(result.detail).toContain("Quality Gate=success");
+    expect(result.detail).toContain("Security Gate=success");
   });
 
-  it("falls back to combined status success when there are no check runs", () => {
-    expect(ciIsGreen([], { state: "success" }).green).toBe(true);
+  it("refuses when a required workflow has no run for the commit", () => {
+    const result = requiredWorkflowsGreen([passing("Quality Gate")]);
+    expect(result.green).toBe(false);
+    expect(result.detail).toContain('required workflow "Security Gate" has no run');
   });
 
-  it("falls back to combined status failure when there are no check runs", () => {
-    expect(ciIsGreen([], { state: "failure" }).green).toBe(false);
+  it("refuses when a required workflow is still pending", () => {
+    const runs = [
+      { ...passing("Quality Gate"), status: "in_progress", conclusion: null },
+      passing("Security Gate"),
+    ];
+    const result = requiredWorkflowsGreen(runs);
+    expect(result.green).toBe(false);
+    expect(result.detail).toContain("is not completed");
   });
 
-  it("is not green when there is no signal at all", () => {
-    expect(ciIsGreen([], null).green).toBe(false);
+  it.each(["cancelled", "neutral", "skipped", "failure"])(
+    "refuses when a required workflow's conclusion is %s",
+    (conclusion) => {
+      const runs = [{ ...passing("Quality Gate"), conclusion }, passing("Security Gate")];
+      const result = requiredWorkflowsGreen(runs);
+      expect(result.green).toBe(false);
+      expect(result.detail).toContain("did not succeed");
+    },
+  );
+
+  it("uses the latest run per workflow, not an earlier failing one", () => {
+    const runs = [
+      {
+        name: "Quality Gate",
+        status: "completed",
+        conclusion: "failure",
+        run_started_at: "2026-08-30T09:00:00Z",
+      },
+      {
+        name: "Quality Gate",
+        status: "completed",
+        conclusion: "success",
+        run_started_at: "2026-08-30T11:00:00Z",
+      },
+      passing("Security Gate"),
+    ];
+    expect(requiredWorkflowsGreen(runs).green).toBe(true);
   });
 });
