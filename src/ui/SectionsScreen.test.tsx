@@ -110,6 +110,7 @@ function renderScreen(sections: Section[] = []) {
   const learnerService = new LearnerApplicationService(new FakeLearnerRepository());
   const openRosterCalls: string[] = [];
   const manageAssignmentsCalls: Array<[string, string]> = [];
+  const manageAdviserCalls: Array<[string, string]> = [];
   const result = render(
     <ModeProvider>
       <SectionsScreen
@@ -119,10 +120,13 @@ function renderScreen(sections: Section[] = []) {
         onManageAssignments={(sectionId, sectionName) =>
           manageAssignmentsCalls.push([sectionId, sectionName])
         }
+        onManageAdviser={(sectionId, sectionName) =>
+          manageAdviserCalls.push([sectionId, sectionName])
+        }
       />
     </ModeProvider>,
   );
-  return { ...result, sectionRepo, openRosterCalls, manageAssignmentsCalls };
+  return { ...result, sectionRepo, openRosterCalls, manageAssignmentsCalls, manageAdviserCalls };
 }
 
 beforeEach(() => {
@@ -213,6 +217,24 @@ describe("SectionsScreen", () => {
     );
 
     expect(manageAssignmentsCalls).toEqual([["sec-1", "Mabini"]]);
+  });
+
+  it("opens the section adviser screen for a section via its Manage adviser button", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { manageAdviserCalls } = renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    await user.click(screen.getByRole("button", { name: "Manage adviser for Mabini" }));
+
+    expect(manageAdviserCalls).toEqual([["sec-1", "Mabini"]]);
   });
 
   it("moves focus to the heading on mount", async () => {

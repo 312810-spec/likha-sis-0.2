@@ -21,6 +21,9 @@ interface SectionsScreenProps {
    * this screen already has the full `Section` in hand and
    * `TeachingAssignmentsScreen` needs it only for display. */
   onManageAssignments: (sectionId: string, sectionName: string) => void;
+  /** Open Section Adviser Management for one section (Wave 3G). Same
+   * handoff pattern as `onManageAssignments`. */
+  onManageAdviser: (sectionId: string, sectionName: string) => void;
 }
 
 function todayAsIsoDate(): string {
@@ -36,6 +39,7 @@ export function SectionsScreen({
   learnerService,
   onOpenRoster,
   onManageAssignments,
+  onManageAdviser,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -159,6 +163,13 @@ export function SectionsScreen({
                 aria-label={`Manage teaching assignments for ${section.name}`}
               >
                 Manage assignments
+              </button>{" "}
+              <button
+                type="button"
+                onClick={() => onManageAdviser(section.id, section.name)}
+                aria-label={`Manage adviser for ${section.name}`}
+              >
+                Manage adviser
               </button>
             </li>
           ))}

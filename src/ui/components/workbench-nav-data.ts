@@ -4,6 +4,7 @@ export type SignedInTab =
   | "sections"
   | "section-roster"
   | "teaching-assignments"
+  | "section-adviser"
   | "schedule-meetings"
   | "sf1-import"
   | "today-classes"
@@ -30,6 +31,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   sections: "Sections",
   "section-roster": "Section Roster",
   "teaching-assignments": "Teaching Assignments",
+  "section-adviser": "Section Adviser",
   "schedule-meetings": "Class Schedule",
   "sf1-import": "SF1: Enrollment",
   "today-classes": "Today's Classes",

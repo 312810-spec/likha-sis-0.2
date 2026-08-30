@@ -13,6 +13,7 @@ import {
   onSessionExpired,
   schoolMemberService,
   schoolService,
+  sectionAdvisoryService,
   sectionService,
   setupService,
   sf1ImportService,
@@ -33,6 +34,7 @@ import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
+import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
@@ -85,6 +87,14 @@ function App() {
   // router/global store. sectionName travels alongside it since
   // SectionsScreen already has the full Section in hand.
   const [teachingAssignmentsSection, setTeachingAssignmentsSection] = useState<{
+    sectionId: string;
+    sectionName: string;
+  } | null>(null);
+  // Set only by SectionsScreen's "Manage adviser" action, so
+  // SectionAdviserScreen opens for that section -- same narrowly-typed
+  // handoff pattern as teachingAssignmentsSection above, not a
+  // router/global store.
+  const [sectionAdviserSection, setSectionAdviserSection] = useState<{
     sectionId: string;
     sectionName: string;
   } | null>(null);
@@ -199,6 +209,10 @@ function App() {
                   setTeachingAssignmentsSection({ sectionId, sectionName });
                   setActiveTab("teaching-assignments");
                 }}
+                onManageAdviser={(sectionId, sectionName) => {
+                  setSectionAdviserSection({ sectionId, sectionName });
+                  setActiveTab("section-adviser");
+                }}
               />
             ) : activeTab === "section-roster" ? (
               rosterSectionId ? (
@@ -222,6 +236,10 @@ function App() {
                   onManageAssignments={(sectionId, sectionName) => {
                     setTeachingAssignmentsSection({ sectionId, sectionName });
                     setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
                   }}
                 />
               )
@@ -254,6 +272,40 @@ function App() {
                     setTeachingAssignmentsSection({ sectionId, sectionName });
                     setActiveTab("teaching-assignments");
                   }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
+                />
+              )
+            ) : activeTab === "section-adviser" ? (
+              sectionAdviserSection ? (
+                <SectionAdviserScreen
+                  sectionAdvisoryService={sectionAdvisoryService}
+                  schoolMemberService={schoolMemberService}
+                  sectionId={sectionAdviserSection.sectionId}
+                  sectionName={sectionAdviserSection.sectionName}
+                  onBack={() => setActiveTab("sections")}
+                />
+              ) : (
+                // Reached only if this tab is active with no section
+                // context (e.g. a stale state after a reload) -- fall back
+                // to Sections rather than render a blank or wrong screen.
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
                 />
               )
             ) : activeTab === "schedule-meetings" ? (
@@ -279,6 +331,10 @@ function App() {
                   onManageAssignments={(sectionId, sectionName) => {
                     setTeachingAssignmentsSection({ sectionId, sectionName });
                     setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
                   }}
                 />
               )
