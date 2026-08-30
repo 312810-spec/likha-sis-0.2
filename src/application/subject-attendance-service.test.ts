@@ -123,6 +123,14 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
     this.calls.push(["monitor", teachingAssignmentId, asOfDate]);
     return MONITOR;
   }
+  async listAdviserViewSections(asOfDate: string) {
+    this.calls.push(["listAdviserViewSections", asOfDate]);
+    return [];
+  }
+  async adviserOverview(sectionId: string, asOfDate: string) {
+    this.calls.push(["adviserOverview", sectionId, asOfDate]);
+    return null;
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
@@ -272,6 +280,27 @@ describe("SubjectAttendanceApplicationService", () => {
     const { service, subjectAttendance } = makeService();
 
     await expect(service.monitor("ta-1", "08/29/2026")).rejects.toThrow(ValidationError);
+    expect(subjectAttendance.calls).toEqual([]);
+  });
+
+  it("loads Adviser View sections and overview with validated inputs", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    await service.listAdviserViewSections("2026-08-29");
+    await service.adviserOverview("sec-1", "2026-08-29");
+
+    expect(subjectAttendance.calls).toEqual([
+      ["listAdviserViewSections", "2026-08-29"],
+      ["adviserOverview", "sec-1", "2026-08-29"],
+    ]);
+  });
+
+  it("rejects malformed Adviser View input before calling the repository", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    await expect(service.listAdviserViewSections("08/29/2026")).rejects.toThrow(ValidationError);
+    await expect(service.adviserOverview(" ", "2026-08-29")).rejects.toThrow(ValidationError);
+
     expect(subjectAttendance.calls).toEqual([]);
   });
 });

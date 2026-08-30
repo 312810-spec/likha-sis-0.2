@@ -1,10 +1,12 @@
 import type {
+  AdviserAttendanceOverview,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
   SubjectAttendanceRosterRow,
   SubjectAttendanceSession,
 } from "../../domain/subject-attendance";
+import type { Section } from "../../domain/section";
 import type { SubjectAttendanceRepository } from "../../domain/ports/subject-attendance-repository";
 import { invoke } from "./invoke";
 
@@ -78,6 +80,17 @@ export class TauriSubjectAttendanceRepository implements SubjectAttendanceReposi
   ): Promise<SubjectAttendanceMonitor | null> {
     return invoke<SubjectAttendanceMonitor | null>("subject_attendance_monitor", {
       teachingAssignmentId,
+      asOfDate,
+    });
+  }
+
+  listAdviserViewSections(asOfDate: string): Promise<Section[]> {
+    return invoke<Section[]>("list_adviser_view_sections", { asOfDate });
+  }
+
+  adviserOverview(sectionId: string, asOfDate: string): Promise<AdviserAttendanceOverview | null> {
+    return invoke<AdviserAttendanceOverview | null>("adviser_subject_attendance_overview", {
+      sectionId,
       asOfDate,
     });
   }

@@ -66,6 +66,12 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
     this.monitorCalls.push([teachingAssignmentId, asOfDate]);
     return this.monitorResult;
   }
+  async listAdviserViewSections() {
+    return [];
+  }
+  async adviserOverview() {
+    return null;
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {

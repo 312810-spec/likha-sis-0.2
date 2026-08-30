@@ -101,3 +101,29 @@ export interface SubjectAttendanceMonitor {
   heldSessionCount: number;
   rows: SubjectAttendanceMonitorRow[];
 }
+
+/** Read-only, section-wide signals for an adviser. Counts are raw
+ * Subject Attendance data and never imply an SF2 correction, grade
+ * deduction, or disciplinary conclusion. */
+interface AdviserAttendanceRow {
+  membershipId: string;
+  learnerId: string;
+  givenName: string;
+  familyName: string;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  subjectsWithAbsences: string[];
+  highestCurrentSubjectAbsenceStreak: number;
+}
+
+export interface AdviserAttendanceOverview {
+  sectionId: string;
+  sectionName: string;
+  schoolYear: string;
+  asOfDate: string;
+  subjectCount: number;
+  heldSessionCount: number;
+  rows: AdviserAttendanceRow[];
+}

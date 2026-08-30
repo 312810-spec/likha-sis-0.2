@@ -78,6 +78,20 @@ fn current_adviser_as_current_session(
     section_advisory::current_adviser_for_section(conn, &school_id, section_id, as_of_date)
 }
 
+/// Standing in for `commands::section_advisory::list_adviser_view_sections`.
+fn adviser_view_sections_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    as_of_date: &str,
+) -> app_lib::error::AppResult<Vec<section::Section>> {
+    let (user_id, school_id, can_review_all) = auth::resolve_adviser_view_scope(conn, sessions)?;
+    if can_review_all {
+        section::list_by_school(conn, &school_id)
+    } else {
+        section_advisory::list_sections_for_adviser(conn, &school_id, &user_id, as_of_date)
+    }
+}
+
 struct Fixture {
     section_id: String,
     teacher_id: String,
@@ -247,6 +261,50 @@ fn a_teacher_can_read_a_sections_current_adviser_in_their_own_school() {
             .unwrap();
 
     assert!(current.is_some());
+}
+
+#[test]
+fn adviser_view_picker_returns_only_the_teachers_active_advisory_section() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let adviser_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let (adviser_id, _) = adviser_sessions.require_active_session(&conn).unwrap();
+    let advisory_section =
+        section::create(&conn, &school_a.id, "2026-2027", "7", "Mabini").unwrap();
+    section::create(&conn, &school_a.id, "2026-2027", "7", "Rizal").unwrap();
+    section_advisory::assign(
+        &conn,
+        &school_a.id,
+        &advisory_section.id,
+        &adviser_id,
+        "2026-06-01",
+    )
+    .unwrap();
+
+    let sections =
+        adviser_view_sections_as_current_session(&conn, &adviser_sessions, "2026-08-29").unwrap();
+
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].id, advisory_section.id);
+}
+
+#[test]
+fn adviser_view_picker_returns_every_own_school_section_to_a_school_head() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let head_sessions = login_as_a_school_head_at(&conn, &school_a.id, "head.a");
+    section::create(&conn, &school_a.id, "2026-2027", "7", "Mabini").unwrap();
+    section::create(&conn, &school_a.id, "2026-2027", "7", "Rizal").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    section::create(&conn, &school_b.id, "2026-2027", "7", "Bonifacio").unwrap();
+
+    let sections =
+        adviser_view_sections_as_current_session(&conn, &head_sessions, "2026-08-29").unwrap();
+
+    assert_eq!(sections.len(), 2);
+    assert!(sections
+        .iter()
+        .all(|section| section.school_id == school_a.id));
 }
 
 #[test]

@@ -3,6 +3,7 @@ import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type {
+  AdviserAttendanceOverview,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
@@ -10,6 +11,7 @@ import type {
   SubjectAttendanceSession,
   TeachingAssignmentSummary,
 } from "../domain/subject-attendance";
+import type { Section } from "../domain/section";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -110,5 +112,19 @@ export class SubjectAttendanceApplicationService {
     const assignment = requireNonEmpty(teachingAssignmentId, "Class");
     const date = requireIsoDate(asOfDate);
     return this.subjectAttendance.monitor(assignment, date);
+  }
+
+  async listAdviserViewSections(asOfDate: string): Promise<Section[]> {
+    const date = requireIsoDate(asOfDate);
+    return this.subjectAttendance.listAdviserViewSections(date);
+  }
+
+  async adviserOverview(
+    sectionId: string,
+    asOfDate: string,
+  ): Promise<AdviserAttendanceOverview | null> {
+    const section = requireNonEmpty(sectionId, "Section");
+    const date = requireIsoDate(asOfDate);
+    return this.subjectAttendance.adviserOverview(section, date);
   }
 }

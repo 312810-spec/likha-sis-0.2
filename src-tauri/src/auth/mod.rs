@@ -508,6 +508,25 @@ pub fn authorize_adviser_of_section(
     Err(AppError::Unauthorized)
 }
 
+/// Resolves the current Adviser View list scope. A School Head may
+/// choose any section in their school; everyone else receives only
+/// sections they actively advise. This is picker scoping, not the data
+/// boundary -- `authorize_adviser_of_section` is still required for the
+/// selected section when attendance signals are read.
+pub fn resolve_adviser_view_scope(
+    conn: &Connection,
+    sessions: &SessionManager,
+) -> AppResult<(String, String, bool)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let can_review_all = role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageSectionAdvisories.allowed_roles(),
+    )?;
+    Ok((user_id, school_id, can_review_all))
+}
+
 /// The trusted authorization boundary for a capability-gated command.
 /// Mirrors `require_active_school_scope`'s fail-closed shape exactly,
 /// with one addition: the session's user must also hold one of

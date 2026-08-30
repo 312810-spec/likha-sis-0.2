@@ -23,6 +23,7 @@ import {
 import type { CurrentSession } from "./domain/session";
 import { AppShell } from "./ui/AppShell";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
+import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
@@ -316,6 +317,8 @@ function App() {
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
               />
+            ) : activeTab === "adviser-view" ? (
+              <AdviserViewScreen subjectAttendanceService={subjectAttendanceService} />
             ) : activeTab === "teacher-load" ? (
               <TeacherLoadScreen
                 teachingAssignmentService={teachingAssignmentService}

@@ -8,11 +8,12 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::repository::subject_attendance::{
-    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor, SubjectAttendanceRosterRow,
-    SubjectAttendanceSession,
+    self, AdviserAttendanceOverview, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor,
+    SubjectAttendanceRosterRow, SubjectAttendanceSession,
 };
 use app_lib::repository::{
-    learner, school, section, section_membership, subject, teaching_assignment, user,
+    learner, role, school, section, section_advisory, section_membership, subject,
+    teaching_assignment, user,
 };
 
 fn open_test_db() -> rusqlite::Connection {
@@ -26,6 +27,19 @@ fn login_as_a_teacher_at(
 ) -> SessionManager {
     let teacher = user::create_user(conn, username, "password", "A Teacher").unwrap();
     user::add_school_membership(conn, &teacher.id, school_id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(conn, &sessions, username, "password", school_id).unwrap();
+    sessions
+}
+
+fn login_as_a_school_head_at(
+    conn: &rusqlite::Connection,
+    school_id: &str,
+    username: &str,
+) -> SessionManager {
+    let head = user::create_user(conn, username, "password", "A School Head").unwrap();
+    user::add_school_membership(conn, &head.id, school_id).unwrap();
+    role::grant(conn, &head.id, school_id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(conn, &sessions, username, "password", school_id).unwrap();
     sessions
@@ -131,9 +145,23 @@ fn monitor_as_current_session(
     subject_attendance::monitor_for_assignment(conn, &school_id, teaching_assignment_id, as_of_date)
 }
 
+/// Standing in for
+/// `commands::subject_attendance::adviser_subject_attendance_overview`.
+fn adviser_overview_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> app_lib::error::AppResult<Option<AdviserAttendanceOverview>> {
+    let (_, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, as_of_date)?;
+    subject_attendance::adviser_overview_for_section(conn, &school_id, section_id, as_of_date)
+}
+
 struct Fixture {
     assignment_id: String,
     membership_id: String,
+    section_id: String,
 }
 
 fn seed(conn: &rusqlite::Connection, sessions: &SessionManager) -> Fixture {
@@ -151,6 +179,7 @@ fn seed(conn: &rusqlite::Connection, sessions: &SessionManager) -> Fixture {
     Fixture {
         assignment_id: assignment.id,
         membership_id: membership.id,
+        section_id: sec.id,
     }
 }
 
@@ -337,6 +366,97 @@ fn a_teacher_cannot_view_the_monitor_for_an_assignment_they_do_not_own() {
     let other_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.b");
 
     let result = monitor_as_current_session(&conn, &other_sessions, &f.assignment_id, "2026-08-29");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn an_adviser_can_read_signals_from_another_subject_teachers_assignment() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let subject_teacher_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &subject_teacher_sessions);
+    let session = open_session_as_current_session(
+        &conn,
+        &subject_teacher_sessions,
+        &f.assignment_id,
+        "2026-08-29",
+    )
+    .unwrap()
+    .unwrap();
+    record_entry_as_current_session(
+        &conn,
+        &subject_teacher_sessions,
+        &f.assignment_id,
+        &session.id,
+        &f.membership_id,
+        EntryStatus::Absent,
+    )
+    .unwrap();
+    let adviser_sessions = login_as_a_teacher_at(&conn, &school_a.id, "adviser.a");
+    let (adviser_id, _) = adviser_sessions.require_active_session(&conn).unwrap();
+    section_advisory::assign(
+        &conn,
+        &school_a.id,
+        &f.section_id,
+        &adviser_id,
+        "2026-06-01",
+    )
+    .unwrap();
+
+    let overview =
+        adviser_overview_as_current_session(&conn, &adviser_sessions, &f.section_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+    assert_eq!(overview.rows[0].absent_count, 1);
+    assert_eq!(overview.rows[0].subjects_with_absences, vec!["Mathematics"]);
+}
+
+#[test]
+fn an_unrelated_teacher_cannot_read_a_sections_adviser_view() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let unrelated_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.b");
+
+    let result = adviser_overview_as_current_session(
+        &conn,
+        &unrelated_sessions,
+        &f.section_id,
+        "2026-08-29",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_school_head_can_read_any_adviser_view_in_their_own_school() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let head_sessions = login_as_a_school_head_at(&conn, &school_a.id, "head.a");
+
+    let overview =
+        adviser_overview_as_current_session(&conn, &head_sessions, &f.section_id, "2026-08-29")
+            .unwrap();
+
+    assert!(overview.is_some());
+}
+
+#[test]
+fn a_school_head_cannot_read_another_schools_adviser_view() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let school_b = school::create(&conn, "School B").unwrap();
+    let head_sessions = login_as_a_school_head_at(&conn, &school_b.id, "head.b");
+
+    let result =
+        adviser_overview_as_current_session(&conn, &head_sessions, &f.section_id, "2026-08-29");
 
     assert!(matches!(result, Err(AppError::Unauthorized)));
 }

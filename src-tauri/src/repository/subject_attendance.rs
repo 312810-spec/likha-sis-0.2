@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::repository::{section_membership, teaching_assignment};
+use crate::repository::{section, section_membership, teaching_assignment};
 
 /// A scheduled class meeting either happened (`Held`, and attendance can
 /// be recorded/edited) or didn't (`NoClass` — suspension, holiday,
@@ -498,6 +498,42 @@ pub struct SubjectAttendanceMonitor {
     pub rows: Vec<SubjectAttendanceMonitorRow>,
 }
 
+/// One learner's read-only Subject Attendance signals across every
+/// teaching assignment attached to their section. Counts stay raw and
+/// separate -- Adviser View never turns these records into SF2 or an
+/// automatic disciplinary/grade conclusion.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AdviserAttendanceRow {
+    pub membership_id: String,
+    pub learner_id: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub present_count: i64,
+    pub absent_count: i64,
+    pub late_count: i64,
+    pub excused_count: i64,
+    /// Subject names for which at least one absence has been recorded,
+    /// sorted by the section's assignment order. This gives the adviser
+    /// a follow-up clue without exposing notes or edit controls.
+    pub subjects_with_absences: Vec<String>,
+    /// The largest current consecutive-absence streak in any one
+    /// subject. Streaks are never combined across unrelated subjects.
+    pub highest_current_subject_absence_streak: i64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AdviserAttendanceOverview {
+    pub section_id: String,
+    pub section_name: String,
+    pub school_year: String,
+    pub as_of_date: String,
+    pub subject_count: i64,
+    pub held_session_count: i64,
+    pub rows: Vec<AdviserAttendanceRow>,
+}
+
 /// Learner-by-learner attendance counts across every `Held` session
 /// recorded so far for one teaching assignment -- the spec's own
 /// "Subject Monitor" (recommended-order step 6). Scoped to the exact
@@ -542,20 +578,24 @@ pub fn monitor_for_assignment(
     let mut session_stmt = conn.prepare(
         "SELECT id FROM subject_attendance_sessions \
          WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND status = 'held' \
+           AND session_date <= ?3 \
          ORDER BY session_date DESC",
     )?;
     let held_session_ids: Vec<String> = session_stmt
-        .query_map((school_id, teaching_assignment_id), |row| row.get(0))?
+        .query_map((school_id, teaching_assignment_id, as_of_date), |row| {
+            row.get(0)
+        })?
         .collect::<Result<_, _>>()?;
 
     let mut entry_stmt = conn.prepare(
         "SELECT e.session_id, e.membership_id, e.status \
          FROM subject_attendance_entries e \
          JOIN subject_attendance_sessions s ON s.id = e.session_id \
-         WHERE s.school_id = ?1 AND s.teaching_assignment_id = ?2 AND s.status = 'held'",
+         WHERE s.school_id = ?1 AND s.teaching_assignment_id = ?2 AND s.status = 'held' \
+           AND s.session_date <= ?3",
     )?;
     let entries: Vec<(String, String, EntryStatus)> = entry_stmt
-        .query_map((school_id, teaching_assignment_id), |row| {
+        .query_map((school_id, teaching_assignment_id, as_of_date), |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -617,6 +657,85 @@ pub fn monitor_for_assignment(
 
     Ok(Some(SubjectAttendanceMonitor {
         held_session_count: held_session_ids.len() as i64,
+        rows,
+    }))
+}
+
+/// Read-only Subject Attendance signals across every subject taught to
+/// `section_id`, as of one date. Authorization is deliberately not
+/// inferred here: the command layer must first call
+/// `auth::authorize_adviser_of_section`, while this repository function
+/// independently keeps every lookup school-scoped.
+pub fn adviser_overview_for_section(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<Option<AdviserAttendanceOverview>> {
+    if !is_iso_date(as_of_date) {
+        return Ok(None);
+    }
+    let section = match section::find_by_id_in_school(conn, school_id, section_id)? {
+        Some(section) => section,
+        None => return Ok(None),
+    };
+    let assignments = teaching_assignment::list_by_section_in_school(conn, school_id, section_id)?;
+    let roster = section_membership::current_roster(conn, school_id, section_id, as_of_date)?;
+
+    let mut rows: Vec<AdviserAttendanceRow> = roster
+        .into_iter()
+        .map(|member| AdviserAttendanceRow {
+            membership_id: member.membership_id,
+            learner_id: member.learner_id,
+            given_name: member.given_name,
+            family_name: member.family_name,
+            present_count: 0,
+            absent_count: 0,
+            late_count: 0,
+            excused_count: 0,
+            subjects_with_absences: Vec::new(),
+            highest_current_subject_absence_streak: 0,
+        })
+        .collect();
+    let row_index: std::collections::HashMap<String, usize> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| (row.membership_id.clone(), index))
+        .collect();
+
+    let mut held_session_count = 0i64;
+    for assignment in &assignments {
+        let Some(monitor) = monitor_for_assignment(conn, school_id, &assignment.id, as_of_date)?
+        else {
+            continue;
+        };
+        held_session_count += monitor.held_session_count;
+        for signal in monitor.rows {
+            let Some(index) = row_index.get(&signal.membership_id) else {
+                continue;
+            };
+            let row = &mut rows[*index];
+            row.present_count += signal.present_count;
+            row.absent_count += signal.absent_count;
+            row.late_count += signal.late_count;
+            row.excused_count += signal.excused_count;
+            if signal.absent_count > 0 {
+                row.subjects_with_absences
+                    .push(assignment.subject_name.clone());
+            }
+            row.highest_current_subject_absence_streak = row
+                .highest_current_subject_absence_streak
+                .max(signal.current_consecutive_absences);
+        }
+    }
+
+    Ok(Some(AdviserAttendanceOverview {
+        section_id: section.id,
+        section_name: section.name,
+        school_year: section.school_year,
+        as_of_date: as_of_date.to_owned(),
+        subject_count: assignments.len() as i64,
+        held_session_count,
         rows,
     }))
 }
@@ -1265,5 +1384,99 @@ mod tests {
                 .unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn monitor_for_assignment_excludes_sessions_after_the_as_of_date() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Present);
+        open_and_mark(&conn, &f, "2026-09-01", EntryStatus::Absent);
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(monitor.held_session_count, 1);
+        assert_eq!(monitor.rows[0].present_count, 1);
+        assert_eq!(monitor.rows[0].absent_count, 0);
+        assert_eq!(monitor.rows[0].current_consecutive_absences, 0);
+    }
+
+    #[test]
+    fn adviser_overview_aggregates_subjects_without_combining_their_streaks() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+        open_and_mark(&conn, &f, "2026-08-26", EntryStatus::Absent);
+
+        let science = subject::create(&conn, &f.school_id, "Science").unwrap();
+        let science_assignment = teaching_assignment::create(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap()
+                .section_id,
+            &science.id,
+        )
+        .unwrap()
+        .unwrap();
+        let science_session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &science_assignment.id,
+            "2026-08-26",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        record_entry(
+            &conn,
+            &f.school_id,
+            &science_session.id,
+            &f.membership_id,
+            EntryStatus::Late,
+            None,
+            &f.teacher_id,
+        )
+        .unwrap();
+        let section_id =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap()
+                .section_id;
+
+        let overview = adviser_overview_for_section(&conn, &f.school_id, &section_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(overview.subject_count, 2);
+        assert_eq!(overview.held_session_count, 3);
+        assert_eq!(overview.rows.len(), 1);
+        let row = &overview.rows[0];
+        assert_eq!(row.absent_count, 2);
+        assert_eq!(row.late_count, 1);
+        assert_eq!(row.subjects_with_absences, vec!["Mathematics"]);
+        assert_eq!(row.highest_current_subject_absence_streak, 2);
+    }
+
+    #[test]
+    fn adviser_overview_never_resolves_a_section_from_another_school() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let other_school = school::create(&conn, "Another School").unwrap();
+        let section_id =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap()
+                .section_id;
+
+        let overview =
+            adviser_overview_for_section(&conn, &other_school.id, &section_id, "2026-08-29")
+                .unwrap();
+
+        assert!(overview.is_none());
     }
 }

@@ -108,4 +108,25 @@ describe("TauriSubjectAttendanceRepository", () => {
     });
     expect(result).toEqual(monitor);
   });
+
+  it("lists only sections available to Adviser View", async () => {
+    mockInvoke.mockResolvedValueOnce([]);
+
+    await new TauriSubjectAttendanceRepository().listAdviserViewSections("2026-08-29");
+
+    expect(mockInvoke).toHaveBeenCalledWith("list_adviser_view_sections", {
+      asOfDate: "2026-08-29",
+    });
+  });
+
+  it("loads a section's authorized Adviser View overview", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    await new TauriSubjectAttendanceRepository().adviserOverview("sec-1", "2026-08-29");
+
+    expect(mockInvoke).toHaveBeenCalledWith("adviser_subject_attendance_overview", {
+      sectionId: "sec-1",
+      asOfDate: "2026-08-29",
+    });
+  });
 });

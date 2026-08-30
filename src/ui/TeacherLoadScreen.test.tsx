@@ -65,6 +65,12 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   async monitor() {
     return null;
   }
+  async listAdviserViewSections() {
+    return [];
+  }
+  async adviserOverview() {
+    return null;
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {

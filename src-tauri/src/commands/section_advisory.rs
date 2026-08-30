@@ -6,6 +6,7 @@ use tauri::State;
 use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
+use crate::repository::section::Section;
 use crate::repository::section_advisory::{
     self, AssignAdviserOutcome, EndAdvisoryOutcome, SectionAdvisory,
 };
@@ -59,4 +60,22 @@ pub fn current_section_adviser(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &as_of_date)
+}
+
+/// Only sections the current caller may legitimately open in Adviser
+/// View. School Heads receive all sections in their own school; a
+/// teacher receives only their active advisory section(s).
+#[tauri::command]
+pub fn list_adviser_view_sections(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    as_of_date: String,
+) -> AppResult<Vec<Section>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id, can_review_all) = auth::resolve_adviser_view_scope(&conn, &sessions)?;
+    if can_review_all {
+        crate::repository::section::list_by_school(&conn, &school_id)
+    } else {
+        section_advisory::list_sections_for_adviser(&conn, &school_id, &user_id, &as_of_date)
+    }
 }

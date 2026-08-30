@@ -59,6 +59,12 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   async monitor(): Promise<null> {
     throw new Error("not used by TodaysClassesScreen");
   }
+  async listAdviserViewSections() {
+    return [];
+  }
+  async adviserOverview() {
+    return null;
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {

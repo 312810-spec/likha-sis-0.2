@@ -25,13 +25,15 @@ export function onSessionExpired(listener: SessionExpiredListener): () => void {
 /**
  * Every Rust command that additionally gates on a `Capability`, on
  * `authorize_view_teacher_load` (self-or-School-Head), or on
- * `subject_attendance::authorize_own_assignment` -- see
+ * `subject_attendance::authorize_own_assignment`, or on
+ * `authorize_adviser_of_section` -- see
  * `src-tauri/src/auth/mod.rs`'s `authorize_*` functions and
  * `repository::subject_attendance::authorize_own_assignment`. Each of
  * these can reject `Unauthorized` for a session that is completely
  * valid, just not permitted for this one specific action (a Teacher
  * without `ManageTeachingAssignments`, a Teacher viewing a colleague's
- * load, a caller targeting an assignment they don't own) -- a
+ * load, a caller targeting an assignment they don't own, an unrelated
+ * teacher targeting an advisory section) -- a
  * fundamentally different situation from `require_active_session`/
  * `require_active_school_scope`'s own `Unauthorized`, which really
  * does mean "no valid session at all."
@@ -80,6 +82,7 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "subject_attendance_roster_for_session",
   "list_subject_attendance_sessions",
   "subject_attendance_monitor",
+  "adviser_subject_attendance_overview",
   "assign_section_adviser",
   "end_section_adviser",
   "create_teaching_assignment",

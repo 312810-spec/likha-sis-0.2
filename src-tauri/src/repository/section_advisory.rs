@@ -173,6 +173,37 @@ pub fn is_current_adviser(
     Ok(count > 0)
 }
 
+/// Sections actively advised by `teacher_user_id` on `as_of_date`,
+/// always constrained to `school_id`. Used only to populate Adviser
+/// View's picker; the overview command still re-authorizes the selected
+/// section independently before returning attendance signals.
+pub fn list_sections_for_adviser(
+    conn: &Connection,
+    school_id: &str,
+    teacher_user_id: &str,
+    as_of_date: &str,
+) -> AppResult<Vec<section::Section>> {
+    let mut stmt = conn.prepare(
+        "SELECT sec.id, sec.school_id, sec.school_year, sec.grade_level, sec.name, sec.created_at \
+         FROM section_advisories sa \
+         JOIN sections sec ON sec.id = sa.section_id AND sec.school_id = sa.school_id \
+         WHERE sa.school_id = ?1 AND sa.teacher_user_id = ?2 \
+           AND sa.starts_on <= ?3 AND (sa.ends_on IS NULL OR ?3 < sa.ends_on) \
+         ORDER BY sec.school_year DESC, sec.grade_level, sec.name",
+    )?;
+    let rows = stmt.query_map((school_id, teacher_user_id, as_of_date), |row| {
+        Ok(section::Section {
+            id: row.get(0)?,
+            school_id: row.get(1)?,
+            school_year: row.get(2)?,
+            grade_level: row.get(3)?,
+            name: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 fn row_to_advisory(row: &rusqlite::Row) -> rusqlite::Result<SectionAdvisory> {
     Ok(SectionAdvisory {
         id: row.get(0)?,
@@ -432,5 +463,37 @@ mod tests {
             current_adviser_for_section(&conn, &school_b.id, &f.section_id, "2026-08-29").unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn list_sections_for_adviser_returns_only_active_advisories_in_that_school() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        assign(
+            &conn,
+            &f.school_id,
+            &f.section_id,
+            &f.teacher_id,
+            "2026-06-01",
+        )
+        .unwrap();
+        let other_section =
+            section::create(&conn, &f.school_id, "2026-2027", "7", "Rizal").unwrap();
+        let other_teacher = user::create_user(&conn, "teacher.c", "password", "C Teacher").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &f.school_id).unwrap();
+        assign(
+            &conn,
+            &f.school_id,
+            &other_section.id,
+            &other_teacher.id,
+            "2026-06-01",
+        )
+        .unwrap();
+
+        let sections =
+            list_sections_for_adviser(&conn, &f.school_id, &f.teacher_id, "2026-08-29").unwrap();
+
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].id, f.section_id);
     }
 }

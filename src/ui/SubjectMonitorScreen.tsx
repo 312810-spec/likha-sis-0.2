@@ -36,9 +36,8 @@ function todayAsIsoDate(): string {
  * type's own comment -- configurable school thresholds are a later,
  * separately-designed enhancement.
  *
- * Adviser View (a colleague/adviser viewing *someone else's* Subject
- * Attendance data) is deliberately not built here -- see
- * `docs/adr/0055-subject-attendance-foundation.md`. */
+ * Adviser View remains a separate screen and authorization path -- this
+ * screen never broadens its own-assignment boundary. */
 export function SubjectMonitorScreen({
   subjectAttendanceService,
   teacherUserId,
