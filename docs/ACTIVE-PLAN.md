@@ -1,5 +1,51 @@
 # ACTIVE PLAN
 
+## Wave 3F: Adviser View (added 2026-08-30) — complete
+
+Full record: `docs/adr/0055-*` Wave 3F addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3F entry;
+`docs/VERIFICATION-DEBT.md` Wave 3F entry. **New branch**
+`claude/likha-sis-wave3f-adviser-view`, created from `4de3973` (Wave
+3E's own final, CI-confirmed checkpoint).
+
+**Scope**: `subject_attendance::adviser_monitor_for_section` — reuses
+`monitor_for_assignment` per teaching assignment in a section, gathered
+under a new `adviser_section_monitor` command gated by
+`auth::authorize_adviser_of_section` (built by Wave 3E, first wired to
+a real command by this wave). New `AdviserViewScreen`, reachable
+directly from the Daily Teaching nav group, with a section picker
+showing every section (security enforced server-side, not by hiding
+options) and a date field.
+
+**Independent review dispatched and completed, zero issues found** —
+the priority item Wave 3E's own debt record flagged for this exact
+moment (the gate's first real caller). Confirmed: gate-only `school_id`
+provenance, double-scoped repository aggregation, no client-side
+caching/allow-list bypass in the picker, parameterized SQL throughout,
+and a correct `invoke.ts` exemption addition. Corroborates (without
+fully substituting for) Wave 3E's own self-reviewed gate logic.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap recent waves' new UI left open); no "which sections do I
+advise" convenience query for the picker (deliberately shows every
+section, backend gate decides).
+
+**Verification, all actually run this session**: `npm run quality`
+715/715 vitest (+10 net from Wave 3D's 705/705);
+typecheck/eslint/format/architecture clean. `cargo test`: 598 lib tests
+(+4) and all integration binaries green, including 4 new
+command-boundary tests. `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Next**: Subject Attendance's own screen backlog (Today's Classes /
+Attendance Check / Subject Monitor / Adviser View) is now fully
+delivered. Candidates: the native NVDA/Narrator pass (infeasible here);
+or a fresh survey of the roadmap for the next highest-priority gap
+(SF5, an authoritative-template SF9). No candidate pre-selected.
+
 ## Wave 3E: Section Advisory Foundation (added 2026-08-30) — complete
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;

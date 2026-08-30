@@ -1,6 +1,100 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-30 — Wave 3E: Section Advisory Foundation, COMPLETE)
+## Active Task (2026-08-30 — Wave 3F: Adviser View, COMPLETE)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 3F
+addendum; `docs/PROJECT-MEMORY.md` Wave 3F entry;
+`docs/VERIFICATION-DEBT.md` Wave 3F entry. **New dedicated branch**
+`claude/likha-sis-wave3f-adviser-view`, created from Wave 3E's own
+final, CI-confirmed checkpoint (`4de3973950387abbb68c37210412c5eabfcd8739`)
+— that branch itself was not modified. Harness v2 stayed locked and
+still computes **100/100**.
+
+**Scope chosen**: the exact next slice Wave 3E's report recorded —
+Adviser View, now a well-bounded slice since Wave 3E already built and
+tested `auth::authorize_adviser_of_section` as pure foundation. This
+wave is the first to actually wire that gate to real functionality.
+
+**What shipped**: `subject_attendance::adviser_monitor_for_section` —
+for every teaching assignment in a section, reuses the existing,
+already-TDD-proven `monitor_for_assignment` and collects the results
+with subject/teacher identity attached. New `adviser_section_monitor`
+command, gated by `auth::authorize_adviser_of_section` and using only
+the `school_id` that gate returns. New frontend: `AdviserAssignmentMonitor`
+domain type, a port/adapter/service method, and a new `AdviserViewScreen`
+with a section picker (showing every section in the school — security
+enforced entirely server-side, not by hiding options) and a date field,
+rendering each subject's own Subject Monitor table under a heading.
+Reachable directly from the Daily Teaching nav group.
+
+**Independent security review dispatched and completed, zero issues
+found.** Wave 3E's own retained debt flagged this exact moment — the
+first command to call `authorize_adviser_of_section` — as the priority
+point to get that outstanding review. A `security-reviewer` agent was
+dispatched (one retry needed to get a full restatement of its findings,
+same as Wave 3E's attempt, but this time successfully retrieved in
+full). It confirmed: the new command's `school_id` comes only from the
+gate, never client-supplied; the gate itself rejects a cross-school
+`section_id` before returning; the new repository aggregation function
+is independently double-scoped by `school_id` AND `section_id`; the
+frontend's "show every section" picker has no caching or client-side
+allow-list that could leak a prior section's data after switching
+selections; all new SQL is parameterized; and the `invoke.ts` exemption
+addition is pure post-decision UX routing with no effect on any real
+check. Full detail in the ADR-0055 Wave 3F addendum. This also
+corroborates (though doesn't fully substitute for a dedicated
+re-review of) Wave 3E's own self-reviewed gate logic.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **715/715 vitest** (75 files; +10 net from Wave 3D's
+705/705 — this wave's own new-UI additions are net new on top of Wave
+3E's backend-only 705, unchanged count). `cargo test`: **598 lib
+tests** (+4, the `adviser_monitor_for_section` repository tests) and
+all integration binaries green, including 4 new command-boundary tests.
+`cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
+clean. `npm run build` + `check:dev-preview-isolation` pass. `npm run
+quality:security` clean, no new dependency. `npm run harness:verify`
+still exactly 100/100, unchanged.
+
+**Scope guard held**: no change to Subject Monitor or any
+`authorize_own_assignment`-gated command (confirmed by `git diff
+--stat`); no dev-preview-fixture wiring (same disclosed, consistent
+gap recent waves' new UI left open); no "which sections do I advise"
+convenience query for the picker — deliberately shows every section
+and lets the backend gate decide, avoiding a second query whose own
+correctness would need separate verification; `main` not touched; no
+unrelated refactor.
+
+**Exact next slice** (recorded, not started): Subject Attendance's
+"Adviser View" and "Subject Monitor" screens (spec's recommended-order
+steps 5-6) are now both built, closing out the Subject Attendance
+domain's originally-scoped screen set (ADR-0055's own Wave 2V "Today's
+Classes / Attendance Check / Subject Monitor / Adviser View" deferral
+list is now fully delivered). Remaining candidates: the native
+**NVDA/Narrator accessibility pass**, still genuinely infeasible in
+this remote Linux-container session (no Windows machine, no screen
+reader available); or a fresh survey of `docs/PROGRESS-MAP.md`/
+`docs/product/PRODUCT-CONTRACT.md` for the next highest-priority gap
+now that this domain's own backlog is empty (SF5 Promotion & Learning
+Progress and an authoritative-template SF9 are both listed "not
+built," and both are candidates that could now reuse the Section
+Advisory Foundation's adviser relationship). No candidate has been
+pre-selected — the next session should re-run this evaluation with
+current evidence per `.claude/rules/autonomous-development.md` rather
+than defaulting to whichever is listed first here.
+
+**Genuinely deferred, not a candidate for any near-term wave**:
+**Official School Repository** remains blocked on external material
+only the owner can supply (Microsoft 365 tenant/consent confirmation),
+a genuine human-approval gate per
+`.claude/rules/autonomous-development.md`. Unchanged from prior waves'
+evaluation.
+
+Note — Wave 3E (Section Advisory Foundation) is superseded above; its
+own record remains at `docs/adr/0056-section-advisory-foundation.md`.
+
+## Note (2026-08-30 — Wave 3E: Section Advisory Foundation, COMPLETE, superseded above)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;
 `docs/PROJECT-MEMORY.md` Wave 3E entry; `docs/VERIFICATION-DEBT.md`

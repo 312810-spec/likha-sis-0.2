@@ -1,5 +1,40 @@
 # Verification Debt
 
+## Wave 3F — Adviser View (2026-08-30)
+
+Full record: `docs/adr/0055-*` Wave 3F addendum; `docs/PROJECT-MEMORY.md`
+Wave 3F entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/axe) screenshot coverage for the
+   new screen.** `AdviserViewScreen` isn't wired into
+   `src/dev-preview/fixtures.ts` — the same disclosed gap recent waves'
+   new UI left open. Coverage is jsdom + axe-core only.
+
+**Debt closed/downgraded this wave**: Wave 3E's item #1 (independent
+review dispatched but unretrievable) is **downgraded, not closed**. A
+`security-reviewer` agent dispatched this wave — scoped to this wave's
+new command, its use of the gate-returned `school_id`, the new
+repository aggregation function, and the frontend picker pattern —
+**succeeded** (after one retry for a full restatement, same protocol
+as Wave 3E's attempt) and found zero issues. Its findings directly
+re-traced and re-confirmed `authorize_adviser_of_section`'s core
+cross-school-rejection behavior (the exact gate Wave 3E's own
+self-review examined) as part of verifying its new caller, and found
+it sound. This is real, independently-obtained corroborating evidence,
+not a repeat of the self-review — but it was scoped to this wave's
+consumer, not a dedicated line-by-line re-review of every
+`authorize_adviser_of_section` branch and every `section_advisory`
+repository function Wave 3E's own self-review covered (e.g., the
+`assign`/`end` write-path cross-school rejection tests were not
+re-examined here, since this wave's command only reads). **Recorded as
+substantially corroborated, still not a full independent review of
+Wave 3E's own change** — if a future wave touches `section_advisory`'s
+write paths (`assign`/`end`) or adds another `authorize_adviser_of_section`
+caller, treat Wave 3E's original item as still fully open for that
+work; for the read path this wave added, it is resolved.
+
 ## Wave 3E — Section Advisory Foundation (2026-08-30)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;

@@ -2668,6 +2668,46 @@ Full record: `docs/adr/0056-section-advisory-foundation.md`;
   command + UI screen), reusing `authorize_adviser_of_section`; or the
   native NVDA/Narrator pass. No candidate pre-selected.
 
+## Wave 3F — Adviser View (added 2026-08-30)
+
+Full record: `docs/adr/0055-*` Wave 3F addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3F entry. **New branch**
+`claude/likha-sis-wave3f-adviser-view`, created from `4de3973` (Wave
+3E's own final, CI-confirmed checkpoint).
+
+- **Built**: `subject_attendance::adviser_monitor_for_section` — for
+  every teaching assignment in a section, reuses the existing
+  `monitor_for_assignment` and collects results with subject/teacher
+  identity. New `adviser_section_monitor` command, gated by
+  `auth::authorize_adviser_of_section` (Wave 3E's foundation, first
+  wired to a real command by this wave), using only the gate-returned
+  `school_id`. New `AdviserViewScreen`, reachable directly from the
+  Daily Teaching nav group, section picker shows every section
+  (security enforced server-side, not by hiding options).
+- **Independent review dispatched and completed, zero issues found** —
+  the priority item Wave 3E's own debt record flagged for this exact
+  moment. Confirmed gate-only `school_id` provenance, double-scoped
+  repository aggregation, no picker caching/allow-list bypass,
+  parameterized SQL, correct `invoke.ts` exemption. Corroborates (not a
+  full substitute for) Wave 3E's own self-reviewed gate logic.
+- **Deliberately not built**: no dev-preview-fixture wiring (same
+  disclosed gap recent waves' new UI left open); no "which sections do
+  I advise" convenience query (picker deliberately shows every
+  section, backend decides).
+- **Verification/checkpoint**: `npm run quality` 715/715 vitest (+10
+  net from Wave 3D's 705/705); typecheck/eslint/format/architecture
+  clean. `cargo test` 598 lib tests (+4) and all integration binaries
+  green, including 4 new command-boundary tests. `cargo fmt --check` /
+  `cargo clippy --all-targets -- -D warnings` clean. `npm run build` +
+  `check:dev-preview-isolation` pass. `npm run quality:security`
+  clean, no new dependency. `npm run harness:verify` still exactly
+  100/100, unchanged.
+- **Next**: Subject Attendance's own screen backlog (Today's Classes /
+  Attendance Check / Subject Monitor / Adviser View) is now fully
+  delivered. The native NVDA/Narrator pass (infeasible here); or a
+  fresh roadmap survey (SF5, authoritative-template SF9). No candidate
+  pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

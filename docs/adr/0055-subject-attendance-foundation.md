@@ -391,3 +391,107 @@ clean, all as part of `npm run quality:full` (exit 0). `npm run build`
 - `check:dev-preview-isolation` pass. `npm run quality:security` clean
   (gitleaks + `cargo deny check` + OSV-Scanner), no new dependency. `npm
 run harness:verify` still exactly 100/100, unchanged.
+
+## Addendum (Wave 3F, 2026-08-30): Adviser View
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-3F-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Scope**: the spec's own "Adviser View" (recommended-order step 6,
+the other half of "Subject Monitor / Adviser View" split apart back in
+the Wave 3D addendum above) — read-only Subject Attendance signals
+across every subject taught in one section, for that section's
+adviser. This wave was unblocked entirely by Wave 3E's Section Advisory
+Foundation (`docs/adr/0056-section-advisory-foundation.md`), which
+built and fully tested `auth::authorize_adviser_of_section` but
+deliberately left it uncalled by any command. This wave is the first
+to actually wire that gate to real functionality.
+
+**Backend**: one new function,
+`subject_attendance::adviser_monitor_for_section(conn, school_id,
+section_id, as_of_date) -> AppResult<Vec<AdviserAssignmentMonitor>>`,
+placed directly after `monitor_for_assignment` since it's a thin
+aggregation over it — for every teaching assignment in the section
+(`teaching_assignment::list_by_section_in_school`), it calls the
+existing, already-TDD-proven `monitor_for_assignment` and collects the
+results with enough identity (`subjectName`, `teacherUserId`) for an
+adviser to tell which subject and colleague each row belongs to. This
+function does no authorization of its own — matching this codebase's
+established layering, it trusts `school_id`/`section_id` as already
+verified by its caller. One new command,
+`adviser_section_monitor`, gated by
+`auth::authorize_adviser_of_section` and using only the `school_id`
+that gate returns (never a client-supplied one) to call the repository
+function — the same "authorize first, then use only the
+gate-returned, session-derived school_id" shape every other
+authorization-gated command in this codebase already follows.
+
+**Frontend**: `AdviserAssignmentMonitor` domain type mirroring the
+Rust struct; one new port/adapter/service method
+(`adviserSectionMonitor`); a new screen, `AdviserViewScreen.tsx`, with
+a section picker and an "as of" date field, rendering each subject's
+own Subject Monitor table grouped under a heading. The picker lists
+**every** section in the school (reusing the existing, already-reviewed
+`list_sections_by_school` command — session-scoped reference data, no
+capability), the same "security must not rely on UI hiding" pattern
+`TeachingAssignmentsScreen`'s teacher picker and `TeacherLoadScreen`'s
+colleague picker already established: picking a section the caller
+doesn't advise (and isn't School Head for) surfaces the backend's own
+denial as a local permission message, never a client-side guess about
+who is allowed to see what.
+
+**Independent review, dispatched and completed this wave, zero issues
+found**: Wave 3E's own retained debt explicitly flagged this exact
+moment — the first command to actually call
+`authorize_adviser_of_section` — as the priority point to get the
+outstanding independent review. A `security-reviewer` agent was
+dispatched, scoped to the new command's use of the gate-returned
+`school_id`, the new repository aggregation function's own scoping, the
+"show every section" picker pattern, and the frontend passthrough
+layer. Unlike the Wave 3E review attempt, this one's findings were
+successfully retrieved in full (after one retry requesting a complete
+restatement, per this project's established reviewer-failure protocol
+— the first response summarized as empty). The review traced
+`adviser_section_monitor`'s `school_id` provenance directly to
+`authorize_adviser_of_section`'s own `section_repo::find_by_id_in_school`
+check (confirming a cross-school `section_id` is rejected before
+`school_id` is ever available to misuse), confirmed
+`adviser_monitor_for_section`'s assignment list is independently
+double-scoped by `school_id` AND `section_id` before its per-assignment
+loop runs, confirmed the frontend's "show every section" picker has no
+caching or client-side allow-list that could serve a stale or
+wrong-section response after switching sections (a fresh request always
+clears prior results before the new one resolves), confirmed all new
+SQL is parameterized, and confirmed the `invoke.ts` exemption addition
+is pure post-decision UX routing with no effect on any real check. **No
+issues of any severity were found.** This corroborates (though does not
+by itself fully substitute for a dedicated re-review of) Wave 3E's own
+self-reviewed gate logic — Wave 3E's independent-review debt is
+therefore downgraded from "review attempted, unretrieved" to
+"substantially corroborated by a successful review of its first real
+consumer," recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Deliberately not built this wave**: any change to Subject Monitor
+itself or the existing `authorize_own_assignment`-gated commands —
+confirmed by `git diff --stat` touching only the expected new/aggregate
+files; no dev-preview-fixture wiring (same disclosed, consistent
+tradeoff recent waves' new UI left open); no configurable
+absence-streak threshold (unchanged spec deferral); no "which sections
+do I advise" convenience query for the picker to auto-select — the
+picker deliberately shows every section and lets the backend gate
+decide, rather than adding a second query whose own correctness would
+then need separate verification.
+
+**Verification**: `npm run quality` 715/715 vitest, up from Wave 3D's
+705/705 (+10: 1 adapter test, 2 application-service tests, 6
+`AdviserViewScreen` tests including 1 axe accessibility pass, 1 new
+`invoke.test.ts` representative-gate-shape case for
+`adviser_section_monitor`). `npx tsc -b --noEmit` / `eslint` /
+`prettier --check` / `check:architecture` all clean. `cargo test`: 598
+lib tests (+4: the `adviser_monitor_for_section` repository tests) and
+all integration binaries green, including 4 new command-boundary tests
+in `tests/subject_attendance.rs`. `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean
+(gitleaks + `cargo deny check` + OSV-Scanner), no new dependency. `npm
+run harness:verify` still exactly 100/100, unchanged.
