@@ -1,6 +1,7 @@
 export type SignedInTab =
   | "workspace"
   | "learners"
+  | "learner-import"
   | "sections"
   | "attendance"
   | "monthly-summary"
@@ -32,6 +33,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: "Learner Records",
     tabs: [
       { id: "learners", label: "Learners" },
+      { id: "learner-import", label: "Bulk Import" },
       { id: "sections", label: "Sections" },
     ],
   },

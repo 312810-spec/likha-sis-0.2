@@ -40,6 +40,37 @@ UI → Application Services → Domain → Repository Ports → Infrastructure/P
 
 Greenfield repository. No old implementation is authoritative.
 
+- **Wave 2: Learner Core, complete (2026-08-30)**: full record
+  `docs/adr/0046-learner-core-bulk-import.md`. Three features built:
+  (1) **bulk learner CSV import** with conservative, provenance-tracked
+  duplicate reconciliation (`import/csv.rs`, `import/learner.rs`,
+  `repository/learner_import.rs`) — LRN-first then exact-name duplicate
+  detection, atomic all-or-nothing `commit_batch` proven by a real
+  rollback test, every decision logged to `learner_import_log`
+  including `Skip`, the product contract's four reconciliation UX
+  choices collapsing onto three backend actions
+  (Create/Update/Skip) since the frontend always computes final field
+  values; (2) **learner photo**, reusing Wave 1 School Branding's
+  BLOB-in-encrypted-SQLite pattern (`repository/learner_photo.rs`) —
+  **a real serialization bug caught and fixed before shipping**: `set`
+  was originally `AppResult<Option<()>>`, but serde serializes both
+  `Some(())` and `None` as JSON `null`, making success and not-found
+  indistinguishable across Tauri IPC; fixed to return plain `bool`
+  (worth remembering as a general pattern: never use `Option<()>` as a
+  Tauri command return type — use `bool` or a real enum instead); (3)
+  **enrollment history**, a new `history_for_learner` query in
+  `repository/section_membership.rs`, the inverse of the existing
+  `roster_for_section*` queries, over already-existing storage (no new
+  table). Two scope decisions recorded: transfer foundation deferred to
+  Wave 5 (needs the cloud/sync layer); ID-generator data foundation
+  already satisfied by the existing nullable `Learner.lrn` field (no
+  new code needed). `cargo test --lib` 415/415 (48 new), `npm run
+quality` 439/439, all real and actually run. `security-reviewer`
+  dispatched — outcome in `docs/VERIFICATION-DEBT.md` once retrieved.
+  **Wave 2 is now fully complete.** Per explicit user instruction, this
+  session stops here rather than auto-continuing into Wave 3 (Form
+  Engine, pre-researched and ready per ADR-0044).
+
 - **Wave 0/1 Review Checkpoint (2026-08-29)**: user-requested review of
   everything through Wave 1 before Wave 2 began. Both dispatched
   reviewers (`security-reviewer` retry, `architecture-reviewer`

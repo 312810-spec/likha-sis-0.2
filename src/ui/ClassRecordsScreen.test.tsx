@@ -33,7 +33,12 @@ import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { SubjectRepository } from "../domain/ports/subject-repository";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import type { Subject } from "../domain/subject";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ClassRecordsScreen } from "./ClassRecordsScreen";
@@ -120,6 +125,10 @@ class FakeSectionRepository implements SectionRepository {
   async enroll(): Promise<SectionMembership | null> {
     throw new Error("not used in this test");
   }
+  async learnerEnrollmentHistory(): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    return [];
+  }
+
   async roster(): Promise<SectionRosterMember[]> {
     return [];
   }

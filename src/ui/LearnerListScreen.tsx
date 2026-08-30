@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerApplicationService } from "../application/learner-service";
+import type { LearnerPhotoApplicationService } from "../application/learner-photo-service";
+import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
 import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
+import type { LearnerEnrollmentHistoryEntry } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { useTeacherMode } from "./theme/useTeacherMode";
@@ -11,6 +14,13 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface LearnerListScreenProps {
   learnerService: LearnerApplicationService;
   exportService: ExportApplicationService;
+  learnerPhotoService: LearnerPhotoApplicationService;
+  sectionService: SectionApplicationService;
+}
+
+async function fileToBytes(file: File): Promise<Uint8Array> {
+  const buffer = await file.arrayBuffer();
+  return new Uint8Array(buffer);
 }
 
 /** Case-insensitive substring match against given name, family name, or
@@ -28,7 +38,12 @@ function matchesSearch(learner: Learner, query: string): boolean {
   );
 }
 
-export function LearnerListScreen({ learnerService, exportService }: LearnerListScreenProps) {
+export function LearnerListScreen({
+  learnerService,
+  exportService,
+  learnerPhotoService,
+  sectionService,
+}: LearnerListScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editFirstFieldRef = useRef<HTMLInputElement>(null);
@@ -50,6 +65,13 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
   const [savingEdit, setSavingEdit] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<LearnerRosterExportResult | null>(null);
+  const [editPhotoUrl, setEditPhotoUrl] = useState<string | null>(null);
+  const [editPhotoBusy, setEditPhotoBusy] = useState(false);
+  const [historyLearnerId, setHistoryLearnerId] = useState<string | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<LearnerEnrollmentHistoryEntry[] | null>(
+    null,
+  );
+  const [historyLoading, setHistoryLoading] = useState(false);
   const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
 
   useEffect(() => {
@@ -120,10 +142,87 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
     setEditFamilyName(learner.familyName);
     setEditLrn(learner.lrn ?? "");
     setEditSex(learner.sex ?? "");
+    setEditPhotoUrl(null);
+    learnerPhotoService
+      .getPhoto(learner.id)
+      .then((photo) => {
+        if (photo) {
+          const blob = new Blob([photo.bytes.slice()], { type: photo.mimeType });
+          setEditPhotoUrl((current) => current ?? URL.createObjectURL(blob));
+        }
+      })
+      .catch(() => {
+        // Non-fatal: the edit form still works without a photo preview.
+      });
   }
 
   function handleCancelEdit() {
     setEditingId(null);
+    setEditPhotoUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return null;
+    });
+  }
+
+  async function handleEditPhotoChange(learnerId: string, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setError(null);
+    setEditPhotoBusy(true);
+    try {
+      const bytes = await fileToBytes(file);
+      const found = await learnerPhotoService.setPhoto(learnerId, bytes, file.type);
+      if (!found) {
+        setError("Could not find this learner to attach a photo to.");
+        return;
+      }
+      setEditPhotoUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return URL.createObjectURL(file);
+      });
+    } catch (err) {
+      setError(err instanceof ValidationError ? err.message : "Could not upload this photo.");
+    } finally {
+      setEditPhotoBusy(false);
+    }
+  }
+
+  async function handleRemoveEditPhoto(learnerId: string) {
+    setError(null);
+    setEditPhotoBusy(true);
+    try {
+      await learnerPhotoService.clearPhoto(learnerId);
+      setEditPhotoUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return null;
+      });
+    } catch {
+      setError("Could not remove this photo.");
+    } finally {
+      setEditPhotoBusy(false);
+    }
+  }
+
+  async function handleToggleHistory(learnerId: string) {
+    if (historyLearnerId === learnerId) {
+      setHistoryLearnerId(null);
+      setHistoryEntries(null);
+      return;
+    }
+    setError(null);
+    setHistoryLearnerId(learnerId);
+    setHistoryEntries(null);
+    setHistoryLoading(true);
+    try {
+      const entries = await sectionService.learnerEnrollmentHistory(learnerId);
+      setHistoryEntries(entries ?? []);
+    } catch {
+      setError("Could not load this learner's enrollment history.");
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function handleExportRoster() {
@@ -163,6 +262,10 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
         setLearners((current) => current.map((l) => (l.id === updated.id ? updated : l)));
         setConfirmation(`${updated.givenName} ${updated.familyName}'s profile was updated.`);
         setEditingId(null);
+        setEditPhotoUrl((previous) => {
+          if (previous) URL.revokeObjectURL(previous);
+          return null;
+        });
       } else {
         setError("Could not find this learner to update.");
       }
@@ -258,6 +361,34 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
                       />
                     </div>
                   </div>
+                  <div className="field">
+                    <label htmlFor={`edit-photo-${learner.id}`}>Photo (optional)</label>
+                    {editPhotoUrl && (
+                      <p>
+                        <img
+                          src={editPhotoUrl}
+                          alt={`${learner.givenName} ${learner.familyName}`}
+                          style={{ maxWidth: "96px", maxHeight: "96px" }}
+                        />
+                      </p>
+                    )}
+                    <input
+                      id={`edit-photo-${learner.id}`}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      disabled={editPhotoBusy}
+                      onChange={(event) => handleEditPhotoChange(learner.id, event)}
+                    />
+                    {editPhotoUrl && (
+                      <button
+                        type="button"
+                        disabled={editPhotoBusy}
+                        onClick={() => handleRemoveEditPhoto(learner.id)}
+                      >
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
                   <div className="form-row">
                     <div className="field">
                       <label htmlFor={`edit-lrn-${learner.id}`}>LRN (optional)</label>
@@ -303,6 +434,36 @@ export function LearnerListScreen({ learnerService, exportService }: LearnerList
                 >
                   Edit
                 </button>
+                <button
+                  type="button"
+                  disabled={editingId !== null}
+                  onClick={() => handleToggleHistory(learner.id)}
+                  aria-expanded={historyLearnerId === learner.id}
+                  aria-label={
+                    historyLearnerId === learner.id
+                      ? `Hide enrollment history for ${learner.givenName} ${learner.familyName}`
+                      : `Show enrollment history for ${learner.givenName} ${learner.familyName}`
+                  }
+                >
+                  {historyLearnerId === learner.id ? "Hide history" : "Enrollment history"}
+                </button>
+                {historyLearnerId === learner.id &&
+                  (historyLoading ? (
+                    <Loading label="Loading enrollment history…" />
+                  ) : historyEntries && historyEntries.length === 0 ? (
+                    <p>No enrollment history yet.</p>
+                  ) : (
+                    historyEntries && (
+                      <ul aria-label={`Enrollment history entries for ${learner.givenName}`}>
+                        {historyEntries.map((entry) => (
+                          <li key={entry.membershipId}>
+                            {entry.sectionName} (Grade {entry.gradeLevel}, {entry.schoolYear}) —{" "}
+                            {entry.startsOn} to {entry.endsOn ?? "present"}
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  ))}
               </li>
             ),
           )}

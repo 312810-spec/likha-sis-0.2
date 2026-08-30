@@ -6,6 +6,8 @@ import {
   classRecordService,
   exportService,
   gradingService,
+  learnerImportService,
+  learnerPhotoService,
   learnerScoreService,
   learnerService,
   onSessionExpired,
@@ -21,6 +23,7 @@ import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
+import { LearnerImportScreen } from "./ui/LearnerImportScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
@@ -172,7 +175,14 @@ function App() {
                 onViewAuditLog={() => setActiveTab("audit-log")}
               />
             ) : activeTab === "learners" ? (
-              <LearnerListScreen learnerService={learnerService} exportService={exportService} />
+              <LearnerListScreen
+                learnerService={learnerService}
+                exportService={exportService}
+                learnerPhotoService={learnerPhotoService}
+                sectionService={sectionService}
+              />
+            ) : activeTab === "learner-import" ? (
+              <LearnerImportScreen learnerImportService={learnerImportService} />
             ) : activeTab === "sections" ? (
               <SectionsScreen sectionService={sectionService} learnerService={learnerService} />
             ) : activeTab === "attendance" ? (

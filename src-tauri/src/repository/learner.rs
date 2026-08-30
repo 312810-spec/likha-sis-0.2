@@ -127,7 +127,10 @@ pub fn update(
     find_by_id_in_school(conn, school_id, learner_id)
 }
 
-fn row_to_learner(row: &rusqlite::Row) -> rusqlite::Result<Learner> {
+/// `pub(crate)` so `repository::learner_import` can build the same
+/// `Learner` shape from its own duplicate-detection queries without
+/// duplicating this mapping — never exposed outside this crate.
+pub(crate) fn row_to_learner(row: &rusqlite::Row) -> rusqlite::Result<Learner> {
     Ok(Learner {
         id: row.get(0)?,
         school_id: row.get(1)?,

@@ -40,6 +40,13 @@ pub enum AppError {
     /// message is a fixed, generic category-safe string, never the
     /// underlying decoder's own error text.
     InvalidImage(String),
+    /// A bulk-import request was structurally invalid (bad CSV header, or
+    /// a commit decision referencing a row/learner that doesn't resolve)
+    /// — see `import::learner`/`repository::learner_import`. Deliberately
+    /// carries no message: every case here is a caller/programming error
+    /// on an already-Rust-validated preview step, not something to
+    /// explain to a teacher.
+    InvalidImport,
 }
 
 impl std::fmt::Display for AppError {
@@ -54,6 +61,7 @@ impl std::fmt::Display for AppError {
             AppError::Unauthorized => write!(f, "unauthorized"),
             AppError::AlreadyInitialized => write!(f, "already initialized"),
             AppError::InvalidImage(msg) => write!(f, "invalid image: {msg}"),
+            AppError::InvalidImport => write!(f, "invalid import request"),
         }
     }
 }
@@ -108,6 +116,7 @@ impl Serialize for AppError {
             AppError::Unauthorized => "unauthorized",
             AppError::AlreadyInitialized => "already_initialized",
             AppError::InvalidImage(_) => "invalid_image",
+            AppError::InvalidImport => "invalid_import",
         };
         serializer.serialize_str(category)
     }

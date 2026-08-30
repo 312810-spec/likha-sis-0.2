@@ -1,5 +1,10 @@
 import { invoke } from "./invoke";
-import type { Section, SectionMembership, SectionRosterMember } from "../../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../../domain/section";
 import type { SectionRepository } from "../../domain/ports/section-repository";
 
 /** Tauri/SQLite implementation of {@link SectionRepository}. */
@@ -26,5 +31,11 @@ export class TauriSectionRepository implements SectionRepository {
 
   roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
     return invoke<SectionRosterMember[]>("section_roster", { sectionId, asOfDate });
+  }
+
+  learnerEnrollmentHistory(learnerId: string): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    return invoke<LearnerEnrollmentHistoryEntry[] | null>("learner_enrollment_history", {
+      learnerId,
+    });
   }
 }

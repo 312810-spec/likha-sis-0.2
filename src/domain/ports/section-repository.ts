@@ -1,4 +1,9 @@
-import type { Section, SectionMembership, SectionRosterMember } from "../section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../section";
 
 /**
  * Repository port for sections and section memberships. Every method is
@@ -11,4 +16,6 @@ export interface SectionRepository {
   create(schoolYear: string, gradeLevel: string, name: string): Promise<Section>;
   enroll(sectionId: string, learnerId: string, startsOn: string): Promise<SectionMembership | null>;
   roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]>;
+  /** `null` when `learnerId` doesn't resolve in the caller's own school. */
+  learnerEnrollmentHistory(learnerId: string): Promise<LearnerEnrollmentHistoryEntry[] | null>;
 }

@@ -6,7 +6,12 @@ import { SectionApplicationService } from "../application/section-service";
 import type { Learner } from "../domain/learner";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { SectionsScreen } from "./SectionsScreen";
@@ -79,6 +84,10 @@ class FakeSectionRepository implements SectionRepository {
   }
 
   async roster(): Promise<SectionRosterMember[]> {
+    return [];
+  }
+
+  async learnerEnrollmentHistory(): Promise<LearnerEnrollmentHistoryEntry[] | null> {
     return [];
   }
 }

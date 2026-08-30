@@ -472,11 +472,25 @@ pub fn authorize_capability(
     sessions: &SessionManager,
     capability: Capability,
 ) -> AppResult<String> {
+    authorize_capability_with_user(conn, sessions, capability)
+        .map(|(_user_id, school_id)| school_id)
+}
+
+/// Same gate as `authorize_capability`, also returning the acting
+/// session's own `user_id` -- for a command that needs to attribute a
+/// write to *who* did it (e.g. `learner_import`'s provenance log), not
+/// just confirm they were allowed to. Never call this and then trust a
+/// caller-supplied user id instead of the one returned here.
+pub fn authorize_capability_with_user(
+    conn: &Connection,
+    sessions: &SessionManager,
+    capability: Capability,
+) -> AppResult<(String, String)> {
     let (user_id, school_id) = sessions.require_active_session(conn)?;
     if !role_repo::has_any_role(conn, &user_id, &school_id, capability.allowed_roles())? {
         return Err(AppError::Unauthorized);
     }
-    Ok(school_id)
+    Ok((user_id, school_id))
 }
 
 #[cfg(test)]

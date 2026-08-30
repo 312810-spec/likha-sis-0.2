@@ -1,5 +1,83 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — Wave 2 Learner Core, complete)
+
+**Wave 2 ("Learner Core," combined UX-05 + SF1) is complete.** Full
+record: `docs/adr/0046-learner-core-bulk-import.md`. Per explicit user
+instruction ("continue wave 2 but stop at wave 2w"), this session
+implements Wave 2 to completion and then **stops before Wave 3** —
+this is a deliberate pause point, not an approval-gate stop.
+
+**Three features built, Rust + full TS layer + UI, all TDD-verified**:
+
+1. **Bulk learner CSV import** with conservative, provenance-tracked
+   duplicate reconciliation. Dependency-free RFC4180 CSV
+   reader (`import/csv.rs`, mirrors the existing `export/csv.rs`
+   writer); duplicate detection is LRN-first then exact
+   case-insensitive name match, school-scoped, deliberately no fuzzy
+   matching (`repository/learner_import.rs`). The product contract's
+   four UX reconciliation choices (keep-existing/use-imported/
+   field-by-field/confirmed-different) collapse onto three backend
+   actions (Create/Update/Skip) since the frontend always computes
+   final field values. `commit_batch` is one atomic transaction,
+   proven all-or-nothing by a real test with a deliberately bad second
+   decision; every row's outcome is logged to `learner_import_log` for
+   provenance, including `Skip`. `LearnerImportScreen.tsx` is a new
+   screen under "Learner Records."
+2. **Learner photo**, reusing Wave 1 School Branding's BLOB-in-
+   encrypted-SQLite pattern (`repository/learner_photo.rs`) — same
+   mime whitelist, byte cap, and decompression-bomb pixel-count guard.
+   **A real serialization bug caught before shipping**: `set` was
+   initially typed `AppResult<Option<()>>`, but serde serializes both
+   `Some(())` and `None` as JSON `null` — success and not-found would
+   have been indistinguishable across the IPC boundary. Fixed to
+   return plain `bool`. Added to `LearnerListScreen.tsx`'s edit form.
+3. **Enrollment history** — a new `history_for_learner` query in
+   `repository/section_membership.rs`, the inverse of the existing
+   `roster_for_section*` queries, over the same already-existing
+   `[starts_on, ends_on)` membership model (no new storage). Added as
+   a toggleable per-learner panel on `LearnerListScreen.tsx`.
+
+**Two scope decisions recorded, not built this milestone** (full
+reasoning in the ADR): transfer foundation deferred to Wave 5 (needs
+the not-yet-built cloud/sync layer for a real cross-school receiving
+entity); ID-generator data foundation already satisfied by the
+existing nullable `Learner.lrn` field (DepEd's own LRN is the
+identifier here, not a locally-generated one).
+
+**Verification, all actually run this session**: `cargo test --lib`
+415/415 (48 new tests across `import::csv::`, `import::learner::`,
+`repository::learner_import::`, `repository::learner_photo::`, and 5
+new `section_membership::history_for_learner` tests); `cargo clippy
+--all-targets -- -D warnings` clean (one real finding fixed —
+`clippy::bool_assert_comparison`); `cargo fmt --check` clean; `npm run
+quality` clean, 439/439 tests; `npx tsc -b --noEmit` clean; `npm run
+build` clean; `npm run check:dev-preview-isolation` clean; `npx knip`
+zero new findings (same 4 pre-existing, unrelated). `npm run
+quality:security` not run (gitleaks/cargo-deny/osv-scanner still not
+installed in this sandbox, a known per-machine gap).
+
+**Independent `security-reviewer` dispatched** for this milestone
+(touches auth/persistence per `.claude/rules/security-privacy.md`) —
+see `docs/adr/0046-learner-core-bulk-import.md`/
+`docs/VERIFICATION-DEBT.md` for the outcome once retrieved.
+
+**Docs updated**: `PRODUCT-CONTRACT.md` §5 (SF1 row: not built →
+partially built, with the two deferred items named), `ADR-0035`'s
+Wave 2 row (now **complete**).
+
+**Per Autonomous Continuous Development Mode, and per this session's
+explicit user instruction**: this is a completed milestone checkpoint,
+and the session stops here rather than auto-continuing into Wave 3 —
+an explicit, disclosed exception to the default "keep going" behavior,
+not a claim that Wave 3 lacks a ready next action. Exact next action
+when resumed: **Wave 3 (Authoritative-template Form Engine)** —
+pre-researched and ready (`docs/adr/0044-pre-wave-research-waves-3-4-5-7.md`),
+SF9 (report card) recommended first since it extends UX-04's existing
+grade computation directly; one gate remains (obtain the current
+authoritative DepEd template file before implementation, per the M8
+`CONSO SF v2025.xlsx` precedent).
+
 ## Active Task (2026-08-29, this session — Wave 0/1 Review Checkpoint, complete)
 
 Per explicit user request ("review up to wave 2"): a review checkpoint

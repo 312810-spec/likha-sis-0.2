@@ -8,6 +8,8 @@ pub mod grading;
 pub mod grading_computation;
 pub mod installation;
 pub mod learner;
+pub mod learner_import;
+pub mod learner_photo;
 pub mod learner_score;
 pub mod role;
 pub mod schedule_meeting;

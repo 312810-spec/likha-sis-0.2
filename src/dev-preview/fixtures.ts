@@ -55,7 +55,12 @@ import type {
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import type { AuditLogEntry, CurrentSession } from "../domain/session";
 import type { Subject } from "../domain/subject";
 
@@ -231,6 +236,9 @@ export class FixtureSectionRepository implements SectionRepository {
     throw new Error("dev-preview fixture: enroll() is not wired -- read-only fixture");
   }
   async roster(): Promise<SectionRosterMember[]> {
+    return [];
+  }
+  async learnerEnrollmentHistory(): Promise<LearnerEnrollmentHistoryEntry[] | null> {
     return [];
   }
 }

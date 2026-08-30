@@ -7,7 +7,9 @@ use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::section::{self, Section};
-use crate::repository::section_membership::{self, SectionMembership, SectionRosterMember};
+use crate::repository::section_membership::{
+    self, LearnerEnrollmentHistoryEntry, SectionMembership, SectionRosterMember,
+};
 
 /// `school_id` is derived from the session, never a parameter — same
 /// convention as `commands::learner::list_learners_by_school`.
@@ -66,4 +68,19 @@ pub fn section_roster(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     section_membership::roster_for_section(&conn, &school_id, &section_id, &as_of_date)
+}
+
+/// The inverse of `section_roster`: every section this learner has ever
+/// belonged to, most recent first. `Ok(None)` when `learner_id` doesn't
+/// resolve in the caller's own school -- same convention as
+/// `enroll_learner_in_section`.
+#[tauri::command]
+pub fn learner_enrollment_history(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+) -> AppResult<Option<Vec<LearnerEnrollmentHistoryEntry>>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    section_membership::history_for_learner(&conn, &school_id, &learner_id)
 }

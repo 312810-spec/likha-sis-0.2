@@ -171,6 +171,57 @@ pub fn roster_for_section_over_range(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerEnrollmentHistoryEntry {
+    pub membership_id: String,
+    pub section_id: String,
+    pub section_name: String,
+    pub school_year: String,
+    pub grade_level: String,
+    pub starts_on: String,
+    pub ends_on: Option<String>,
+}
+
+/// The full section-membership history for one learner, across every
+/// section and school year, most recent first. `roster_for_section*`
+/// answers "who is/was on this section's roster"; this answers the
+/// inverse -- "where has this learner been enrolled" -- for a learner
+/// detail view. Returns `Ok(None)` if `learner_id` does not resolve in
+/// `school_id`, matching `learner::find_by_id_in_school`'s convention,
+/// so an unknown/wrong-school learner is distinguishable from a real
+/// learner who simply has no membership history yet (`Some(vec![])`).
+pub fn history_for_learner(
+    conn: &Connection,
+    school_id: &str,
+    learner_id: &str,
+) -> AppResult<Option<Vec<LearnerEnrollmentHistoryEntry>>> {
+    if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
+        return Ok(None);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT sm.id, sm.section_id, s.name, s.school_year, s.grade_level, \
+                sm.starts_on, sm.ends_on \
+         FROM section_memberships sm \
+         JOIN sections s ON s.id = sm.section_id \
+         WHERE sm.learner_id = ?1 AND sm.school_id = ?2 \
+         ORDER BY sm.starts_on DESC",
+    )?;
+    let rows = stmt.query_map((learner_id, school_id), |row| {
+        Ok(LearnerEnrollmentHistoryEntry {
+            membership_id: row.get(0)?,
+            section_id: row.get(1)?,
+            section_name: row.get(2)?,
+            school_year: row.get(3)?,
+            grade_level: row.get(4)?,
+            starts_on: row.get(5)?,
+            ends_on: row.get(6)?,
+        })
+    })?;
+    Ok(Some(rows.collect::<Result<Vec<_>, _>>()?))
+}
+
 /// True if `learner_id` has an active membership in `section_id` on
 /// `as_of_date`, scoped by `school_id`. Used to reject attendance for a
 /// learner who is not (or is no longer) on that section's roster for that
@@ -338,5 +389,67 @@ mod tests {
 
         assert!(is_active_member(&conn, &school_id, &section_id, &l.id, "2025-08-15").unwrap());
         assert!(!is_active_member(&conn, &school_id, &section_id, &l.id, "2025-07-01").unwrap());
+    }
+
+    #[test]
+    fn history_for_learner_returns_none_for_a_learner_not_in_this_school() {
+        let conn = open_test_db();
+        let (school_id, _section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+
+        let result = history_for_learner(&conn, &other_school.id, &l.id).unwrap();
+
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn history_for_learner_returns_an_empty_list_for_a_learner_with_no_memberships_yet() {
+        let conn = open_test_db();
+        let (school_id, _section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+
+        let result = history_for_learner(&conn, &school_id, &l.id).unwrap();
+
+        assert_eq!(result, Some(vec![]));
+    }
+
+    #[test]
+    fn history_for_learner_lists_every_membership_most_recent_first() {
+        let conn = open_test_db();
+        let (school_id, section_a) = setup(&conn);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01").unwrap();
+        enroll(&conn, &school_id, &section_b.id, &l.id, "2025-10-01").unwrap();
+
+        let history = history_for_learner(&conn, &school_id, &l.id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].section_id, section_b.id);
+        assert_eq!(history[0].starts_on, "2025-10-01");
+        assert_eq!(history[0].ends_on, None);
+        assert_eq!(history[1].section_id, section_a);
+        assert_eq!(history[1].starts_on, "2025-08-01");
+        assert_eq!(history[1].ends_on, Some("2025-10-01".to_string()));
+    }
+
+    #[test]
+    fn history_for_learner_never_includes_another_learners_memberships() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l1 = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let l2 = learner::create(&conn, &school_id, "Bea", "Reyes", None, None).unwrap();
+        enroll(&conn, &school_id, &section_id, &l1.id, "2025-08-01").unwrap();
+        enroll(&conn, &school_id, &section_id, &l2.id, "2025-08-01").unwrap();
+
+        let history = history_for_learner(&conn, &school_id, &l1.id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].section_id, section_id);
     }
 }

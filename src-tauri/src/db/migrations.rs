@@ -982,6 +982,63 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- Learner Core / Wave 2 bulk import (docs/adr/0046-learner-core-bulk-import.md).
+        -- One batch row per import run, purely for provenance (who, when,
+        -- how many rows) -- never referenced for authorization, which
+        -- stays session-derived as always.
+        CREATE TABLE learner_import_batches (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            imported_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            row_count INTEGER NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_learner_import_batches_school_id ON learner_import_batches(school_id);
+
+        -- One row per imported CSV row, whatever the outcome -- this is
+        -- the "never silently merge, always provenance-tracked" record:
+        -- what was actually in the file, whether a potential duplicate
+        -- was flagged at decision time, and what the authorized user
+        -- actually chose (create / update / skip). `resulting_learner_id`
+        -- and `potential_duplicate_learner_id` both use ON DELETE SET
+        -- NULL, not CASCADE: deleting a learner later must never silently
+        -- delete the historical record that an import touched them.
+        CREATE TABLE learner_import_log (
+            id TEXT PRIMARY KEY,
+            batch_id TEXT NOT NULL REFERENCES learner_import_batches(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            row_number INTEGER NOT NULL,
+            decision TEXT NOT NULL CHECK (decision IN ('created', 'updated', 'skipped')),
+            resulting_learner_id TEXT REFERENCES learners(id) ON DELETE SET NULL,
+            potential_duplicate_learner_id TEXT REFERENCES learners(id) ON DELETE SET NULL,
+            imported_given_name TEXT NOT NULL,
+            imported_family_name TEXT NOT NULL,
+            imported_lrn TEXT,
+            imported_sex TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_learner_import_log_batch_id ON learner_import_log(batch_id);
+        CREATE INDEX idx_learner_import_log_learner_id ON learner_import_log(resulting_learner_id);
+
+        -- Learner photo -- same BLOB-inside-the-encrypted-database pattern
+        -- as school_branding's logo (ADR-0045), reused here deliberately.
+        -- A learner's photo is meaningfully more sensitive than an
+        -- institutional logo (real personal data of a minor, not
+        -- branding) -- the encryption-at-rest guarantee (ADR-0003) is the
+        -- same either way, and access is gated the same as every other
+        -- learner-record write (Capability::ManageLearners).
+        CREATE TABLE learner_photos (
+            learner_id TEXT PRIMARY KEY REFERENCES learners(id) ON DELETE CASCADE,
+            photo BLOB NOT NULL,
+            photo_mime TEXT NOT NULL CHECK (photo_mime IN ('image/png', 'image/jpeg')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
     ])
 }
 

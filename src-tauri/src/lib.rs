@@ -5,6 +5,7 @@ pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod export;
+pub mod import;
 pub mod repository;
 
 use std::sync::Mutex;
@@ -37,6 +38,12 @@ pub fn run() {
             commands::school_branding::get_school_logo,
             commands::school_branding::clear_school_branding,
             commands::learner::list_learners_by_school,
+            commands::learner_import::preview_learner_import,
+            commands::learner_import::commit_learner_import,
+            commands::learner_import::get_learner_import_log,
+            commands::learner_photo::set_learner_photo,
+            commands::learner_photo::get_learner_photo,
+            commands::learner_photo::clear_learner_photo,
             commands::learner::create_learner,
             commands::learner::get_learner,
             commands::learner::update_learner,
@@ -57,6 +64,7 @@ pub fn run() {
             commands::section::create_section,
             commands::section::enroll_learner_in_section,
             commands::section::section_roster,
+            commands::section::learner_enrollment_history,
             commands::export::export_section_monthly_sf2,
             commands::export::export_class_record_report_card,
             commands::export::export_learner_roster,

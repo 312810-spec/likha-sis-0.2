@@ -18,7 +18,12 @@ import type {
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { MonthlySummaryScreen } from "./MonthlySummaryScreen";
@@ -72,6 +77,10 @@ class FakeSectionRepository implements SectionRepository {
 
   async enroll(): Promise<SectionMembership | null> {
     throw new Error("not used in this test");
+  }
+
+  async learnerEnrollmentHistory(): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    return [];
   }
 
   async roster(): Promise<SectionRosterMember[]> {

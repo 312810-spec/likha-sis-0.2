@@ -3,10 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ExportApplicationService } from "../application/export-service";
 import { LearnerApplicationService } from "../application/learner-service";
+import { LearnerPhotoApplicationService } from "../application/learner-photo-service";
+import { SectionApplicationService } from "../application/section-service";
 import type { LearnerRosterExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
+import type { LearnerPhoto } from "../domain/learner-photo";
 import type { ExportRepository } from "../domain/ports/export-repository";
+import type { LearnerPhotoRepository } from "../domain/ports/learner-photo-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
+import type { SectionRepository } from "../domain/ports/section-repository";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { LearnerListScreen } from "./LearnerListScreen";
@@ -81,18 +92,58 @@ class FakeExportRepository implements ExportRepository {
   }
 }
 
+class FakeLearnerPhotoRepository implements LearnerPhotoRepository {
+  photo: LearnerPhoto | null = null;
+
+  async get(): Promise<LearnerPhoto | null> {
+    return this.photo;
+  }
+
+  async set(): Promise<boolean> {
+    return true;
+  }
+
+  async clear(): Promise<boolean> {
+    return true;
+  }
+}
+
+class FakeSectionRepository implements SectionRepository {
+  historyToReturn: LearnerEnrollmentHistoryEntry[] | null = [];
+
+  async list(): Promise<Section[]> {
+    return [];
+  }
+  async create(): Promise<Section> {
+    throw new Error("not used in this test");
+  }
+  async enroll(): Promise<SectionMembership | null> {
+    throw new Error("not used in this test");
+  }
+  async roster(): Promise<SectionRosterMember[]> {
+    return [];
+  }
+  async learnerEnrollmentHistory(): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    return this.historyToReturn;
+  }
+}
+
 function renderScreen(learners: Learner[] = []) {
   const repo = new FakeLearnerRepository(learners);
   const exportRepo = new FakeExportRepository();
+  const photoRepo = new FakeLearnerPhotoRepository();
+  const sectionRepo = new FakeSectionRepository();
   const result = render(
     <ModeProvider>
       <LearnerListScreen
         learnerService={new LearnerApplicationService(repo)}
         exportService={new ExportApplicationService(exportRepo)}
+        learnerPhotoService={new LearnerPhotoApplicationService(photoRepo)}
+        sectionService={new SectionApplicationService(sectionRepo)}
       />
     </ModeProvider>,
   );
-  return { ...result, repo, exportRepo };
+  return { ...result, repo, exportRepo, photoRepo, sectionRepo };
 }
 
 beforeEach(() => {
@@ -493,5 +544,101 @@ describe("LearnerListScreen", () => {
     await screen.findByRole("form", { name: "Edit Ana Santos" });
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with enrollment history expanded", async () => {
+    const user = userEvent.setup();
+    const { container, sectionRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    sectionRepo.historyToReturn = [
+      {
+        membershipId: "mem-1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        schoolYear: "2025-2026",
+        gradeLevel: "7",
+        startsOn: "2025-08-01",
+        endsOn: null,
+      },
+    ];
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "Show enrollment history for Ana Santos" }),
+    );
+    await screen.findByText(/Mabini \(Grade 7, 2025-2026\)/);
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("shows a learner's enrollment history when toggled", async () => {
+    const user = userEvent.setup();
+    const { sectionRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    sectionRepo.historyToReturn = [
+      {
+        membershipId: "mem-1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        schoolYear: "2025-2026",
+        gradeLevel: "7",
+        startsOn: "2025-08-01",
+        endsOn: null,
+      },
+    ];
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "Show enrollment history for Ana Santos" }),
+    );
+
+    expect(await screen.findByText(/Mabini \(Grade 7, 2025-2026\)/)).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Hide enrollment history for Ana Santos" }),
+    );
+
+    expect(screen.queryByText(/Mabini \(Grade 7, 2025-2026\)/)).not.toBeInTheDocument();
+  });
+
+  it("shows a no-history message for a learner with no enrollment history yet", async () => {
+    const user = userEvent.setup();
+    const { sectionRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    sectionRepo.historyToReturn = [];
+    await screen.findByText("Ana Santos");
+
+    await user.click(
+      screen.getByRole("button", { name: "Show enrollment history for Ana Santos" }),
+    );
+
+    expect(await screen.findByText("No enrollment history yet.")).toBeInTheDocument();
   });
 });

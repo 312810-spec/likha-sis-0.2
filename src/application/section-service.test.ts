@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import { SectionApplicationService } from "./section-service";
 
 class FakeSectionRepository implements SectionRepository {
   createCalls: Array<{ schoolYear: string; gradeLevel: string; name: string }> = [];
   enrollCalls: Array<{ sectionId: string; learnerId: string; startsOn: string }> = [];
+  historyCalls: string[] = [];
   sectionsToReturn: Section[] = [];
   rosterToReturn: SectionRosterMember[] = [];
+  historyToReturn: LearnerEnrollmentHistoryEntry[] | null = [];
 
   async list(): Promise<Section[]> {
     return this.sectionsToReturn;
@@ -45,6 +52,13 @@ class FakeSectionRepository implements SectionRepository {
 
   async roster(): Promise<SectionRosterMember[]> {
     return this.rosterToReturn;
+  }
+
+  async learnerEnrollmentHistory(
+    learnerId: string,
+  ): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    this.historyCalls.push(learnerId);
+    return this.historyToReturn;
   }
 }
 
@@ -160,5 +174,33 @@ describe("SectionApplicationService", () => {
       ValidationError,
     );
     expect(repo.enrollCalls).toEqual([]);
+  });
+
+  it("learnerEnrollmentHistory delegates to the repository", async () => {
+    const repo = new FakeSectionRepository();
+    const entry: LearnerEnrollmentHistoryEntry = {
+      membershipId: "mem-1",
+      sectionId: "sec-1",
+      sectionName: "Mabini",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      startsOn: "2025-08-01",
+      endsOn: null,
+    };
+    repo.historyToReturn = [entry];
+    const service = new SectionApplicationService(repo);
+
+    const result = await service.learnerEnrollmentHistory("learner-1");
+
+    expect(result).toEqual([entry]);
+    expect(repo.historyCalls).toEqual(["learner-1"]);
+  });
+
+  it("learnerEnrollmentHistory passes through null for a learner not in this school", async () => {
+    const repo = new FakeSectionRepository();
+    repo.historyToReturn = null;
+    const service = new SectionApplicationService(repo);
+
+    await expect(service.learnerEnrollmentHistory("unknown")).resolves.toBeNull();
   });
 });

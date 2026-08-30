@@ -6,6 +6,8 @@ pub mod class_record;
 pub mod export;
 pub mod grading;
 pub mod learner;
+pub mod learner_import;
+pub mod learner_photo;
 pub mod learner_score;
 pub mod school;
 pub mod school_branding;

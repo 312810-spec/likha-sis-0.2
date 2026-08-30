@@ -1,5 +1,10 @@
 import { ValidationError } from "../domain/errors";
-import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../domain/section";
 import type { SectionRepository } from "../domain/ports/section-repository";
 
 const MAX_FIELD_LENGTH = 100;
@@ -65,5 +70,9 @@ export class SectionApplicationService {
 
   roster(sectionId: string, asOfDate: string): Promise<SectionRosterMember[]> {
     return this.sections.roster(sectionId, asOfDate);
+  }
+
+  learnerEnrollmentHistory(learnerId: string): Promise<LearnerEnrollmentHistoryEntry[] | null> {
+    return this.sections.learnerEnrollmentHistory(learnerId);
   }
 }

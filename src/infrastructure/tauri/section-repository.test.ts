@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
-import type { Section, SectionMembership, SectionRosterMember } from "../../domain/section";
+import type {
+  LearnerEnrollmentHistoryEntry,
+  Section,
+  SectionMembership,
+  SectionRosterMember,
+} from "../../domain/section";
 import { TauriSectionRepository } from "./section-repository";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -93,5 +98,33 @@ describe("TauriSectionRepository", () => {
       asOfDate: "2026-08-24",
     });
     expect(result).toEqual(roster);
+  });
+
+  it("learnerEnrollmentHistory invokes learner_enrollment_history with learnerId", async () => {
+    const history: LearnerEnrollmentHistoryEntry[] = [
+      {
+        membershipId: "mem-1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        schoolYear: "2025-2026",
+        gradeLevel: "7",
+        startsOn: "2025-08-01",
+        endsOn: null,
+      },
+    ];
+    mockInvoke.mockResolvedValueOnce(history);
+
+    const result = await new TauriSectionRepository().learnerEnrollmentHistory("l1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("learner_enrollment_history", { learnerId: "l1" });
+    expect(result).toEqual(history);
+  });
+
+  it("learnerEnrollmentHistory returns null when the learner does not resolve within the caller's school", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    const result = await new TauriSectionRepository().learnerEnrollmentHistory("unknown");
+
+    expect(result).toBeNull();
   });
 });

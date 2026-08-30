@@ -5,6 +5,8 @@ import { ClassRecordApplicationService } from "./application/class-record-servic
 import { ExportApplicationService } from "./application/export-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
+import { LearnerImportApplicationService } from "./application/learner-import-service";
+import { LearnerPhotoApplicationService } from "./application/learner-photo-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
 import { SchoolBrandingApplicationService } from "./application/school-branding-service";
 import { SchoolApplicationService } from "./application/school-service";
@@ -18,6 +20,8 @@ import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
+import { TauriLearnerImportRepository } from "./infrastructure/tauri/learner-import-repository";
+import { TauriLearnerPhotoRepository } from "./infrastructure/tauri/learner-photo-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriSchoolBrandingRepository } from "./infrastructure/tauri/school-branding-repository";
@@ -40,6 +44,12 @@ export const schoolBrandingService = new SchoolBrandingApplicationService(
   new TauriSchoolBrandingRepository(),
 );
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
+export const learnerImportService = new LearnerImportApplicationService(
+  new TauriLearnerImportRepository(),
+);
+export const learnerPhotoService = new LearnerPhotoApplicationService(
+  new TauriLearnerPhotoRepository(),
+);
 export const userService = new UserApplicationService(new TauriUserRepository());
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());
