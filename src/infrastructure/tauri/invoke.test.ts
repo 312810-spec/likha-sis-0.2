@@ -56,6 +56,43 @@ describe("invoke", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  // Wave 3B: every command gated by a Capability, `authorize_view_teacher_load`,
+  // or `authorize_own_assignment` can reject `unauthorized` for a
+  // perfectly valid session that simply isn't permitted for this one
+  // action -- see invoke.ts's own doc comment for the full discovery.
+  // One representative command per gate shape, not all 31, since the
+  // exemption logic itself is identical for each -- the coverage that
+  // actually matters is proving the mechanism works, and that it does
+  // not accidentally cover every command (the next test below).
+  it.each([
+    "create_teaching_assignment",
+    "get_teacher_load",
+    "open_subject_attendance_session",
+    "create_section",
+    "create_learner",
+  ])(
+    "does not notify the listener for %s's own unauthorized rejection (a permission denial, not session expiry)",
+    async (command) => {
+      mockTauriInvoke.mockRejectedValueOnce("unauthorized");
+      const listener = vi.fn();
+      onSessionExpired(listener);
+
+      await expect(invoke(command, {})).rejects.toBe("unauthorized");
+
+      expect(listener).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still notifies the listener for a session-only-gated command's unauthorized rejection", async () => {
+    mockTauriInvoke.mockRejectedValueOnce("unauthorized");
+    const listener = vi.fn();
+    onSessionExpired(listener);
+
+    await expect(invoke("list_teaching_assignments_by_section", {})).rejects.toBe("unauthorized");
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   it("does not notify the listener for an unrelated error", async () => {
     mockTauriInvoke.mockRejectedValueOnce("authentication_failed");
     const listener = vi.fn();

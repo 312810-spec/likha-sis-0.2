@@ -23,14 +23,71 @@ export function onSessionExpired(listener: SessionExpiredListener): () => void {
 }
 
 /**
- * Commands whose own `Unauthorized` rejection means something other
- * than "the session expired" and must not trigger the global handler:
- * `login` itself rejects with `Unauthorized` for "this account isn't a
- * member of the selected school," a normal login-time validation
- * outcome `LoginScreen` already surfaces on its own, not a session that
- * was ever valid and then expired.
+ * Every Rust command that additionally gates on a `Capability`, on
+ * `authorize_view_teacher_load` (self-or-School-Head), or on
+ * `subject_attendance::authorize_own_assignment` -- see
+ * `src-tauri/src/auth/mod.rs`'s `authorize_*` functions and
+ * `repository::subject_attendance::authorize_own_assignment`. Each of
+ * these can reject `Unauthorized` for a session that is completely
+ * valid, just not permitted for this one specific action (a Teacher
+ * without `ManageTeachingAssignments`, a Teacher viewing a colleague's
+ * load, a caller targeting an assignment they don't own) -- a
+ * fundamentally different situation from `require_active_session`/
+ * `require_active_school_scope`'s own `Unauthorized`, which really
+ * does mean "no valid session at all."
+ *
+ * Wave 3B discovery: this codebase's own `AppError::Unauthorized`
+ * serializes identically ("unauthorized") for both situations, so the
+ * frontend could not tell them apart -- every one of these commands
+ * was silently forcing a global "session expired, please sign in
+ * again" logout on an ordinary permission denial, discarding whatever
+ * friendlier local message the calling screen intended to show (see
+ * `Sf1ImportScreen.test.tsx`'s own "generic, safe message" test, which
+ * only ever exercised this in isolation, never through the real
+ * `App.tsx` session-listener wiring that made the bug invisible to
+ * that test). `login` was the only command ever added to this
+ * exemption list, because it was the only one anyone had reason to
+ * test end-to-end. Fixing this only changes frontend UX
+ * classification of an already-correct backend decision -- no
+ * `authorize_*` gate itself changed, so this is not a security
+ * loosening. A session that is genuinely expired is still caught
+ * promptly: virtually every screen also calls at least one
+ * non-exempted, session-only-gated read.
  */
-const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set(["login"]);
+const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
+  "login",
+  "register_user",
+  "add_user_to_school",
+  "create_learner",
+  "find_learner_candidates",
+  "create_learner_with_duplicate_check",
+  "update_learner",
+  "preview_sf1_import",
+  "commit_sf1_import",
+  "list_sf1_import_history",
+  "import_psgc_snapshot",
+  "create_section",
+  "enroll_learner_in_section",
+  "transfer_learner_membership",
+  "end_learner_membership",
+  "list_enrollable_learners",
+  "enroll_learner_membership",
+  "correct_same_day_placement",
+  "open_subject_attendance_session",
+  "mark_subject_attendance_no_class",
+  "record_subject_attendance_entry",
+  "mark_subject_attendance_all_present",
+  "subject_attendance_roster_for_session",
+  "list_subject_attendance_sessions",
+  "create_teaching_assignment",
+  "replace_teacher_assignment",
+  "remove_teaching_assignment",
+  "list_teacher_assignments",
+  "get_teacher_load",
+  "create_schedule_meeting",
+  "remove_schedule_meeting",
+  "list_schedule_meetings_by_assignment",
+]);
 
 /**
  * Every `TauriXRepository` calls this instead of importing `invoke`
