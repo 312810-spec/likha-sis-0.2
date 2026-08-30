@@ -11,7 +11,8 @@ use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
     audit_log as audit_log_repo, installation as installation_repo, role as role_repo,
-    school as school_repo, session as session_repo, user as user_repo,
+    school as school_repo, section as section_repo, section_advisory as section_advisory_repo,
+    session as session_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -401,6 +402,16 @@ pub enum Capability {
     /// scheduling-authority decision, distinct from onboarding a school
     /// member, even though both currently resolve to the same role.
     ManageTeachingAssignments,
+    /// Assign or end a section's adviser (`section_advisories`) -- see
+    /// `docs/adr/0056-section-advisory-foundation.md`. School Head only,
+    /// deliberately its own variant rather than reusing
+    /// `ManageTeachingAssignments`: who advises a section is a distinct
+    /// scheduling-authority decision from who teaches which subject to
+    /// it, matching this codebase's own established precedent
+    /// (`ManageTeachingAssignments`'s doc comment reasons the same way
+    /// about not reusing `ManageSchoolMembership`), even though today
+    /// both capabilities resolve to the same role.
+    ManageSectionAdvisories,
 }
 
 impl Capability {
@@ -409,6 +420,7 @@ impl Capability {
             Capability::ManageLearners => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -444,6 +456,54 @@ pub fn authorize_view_teacher_load(
     )? && user_repo::is_member_of_school(conn, target_teacher_user_id, &school_id)?
     {
         return Ok(school_id);
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// A teacher who currently advises `section_id` (as of `as_of_date`) may
+/// view its adviser-facing signals, and so may anyone holding
+/// `ManageSectionAdvisories` (a School Head, matching every other
+/// School-Head-oversight gate in this module). Mirrors
+/// `authorize_view_teacher_load`'s self-or-School-Head shape exactly.
+///
+/// Not yet called by any command -- this is Section Advisory
+/// Foundation (Wave 3E), the authorization boundary a future Subject
+/// Attendance "Adviser View" read will be built on, matching this
+/// project's own established zero-UI-first precedent for a new domain
+/// (RBAC, Curriculum, Teacher Load, Subject Attendance Foundation all
+/// shipped their first increment with full test coverage and no
+/// caller). See `docs/adr/0056-section-advisory-foundation.md`.
+pub fn authorize_adviser_of_section(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    // A School Head's role holds only within their own school, but role
+    // membership alone says nothing about which school `section_id`
+    // belongs to -- without this check, a School Head would incorrectly
+    // authorize a same-shaped `section_id` belonging to a *different*
+    // school, the same class of bug
+    // `authorize_view_teacher_load_denies_a_school_head_from_a_different_school`
+    // proved this module must guard against (caught here by
+    // `authorize_adviser_of_section_denies_a_school_head_for_a_different_schools_section`
+    // during this function's own TDD pass, not shipped and fixed later).
+    if section_repo::find_by_id_in_school(conn, &school_id, section_id)?.is_none() {
+        return Err(AppError::Unauthorized);
+    }
+    if section_advisory_repo::is_current_adviser(
+        conn, &school_id, section_id, &user_id, as_of_date,
+    )? {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageSectionAdvisories.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
     }
     Err(AppError::Unauthorized)
 }
@@ -495,7 +555,7 @@ mod tests {
     use super::*;
     use crate::{
         db,
-        repository::{learner, school, user},
+        repository::{learner, school, section, user},
     };
     use std::path::Path;
 
@@ -1524,6 +1584,86 @@ mod tests {
         assert!(
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority does not extend to a teacher outside their own school"
+        );
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_allows_the_sections_current_adviser() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &u.id, "2026-06-01").unwrap();
+
+        assert!(authorize_adviser_of_section(&conn, &sessions, &sec.id, "2026-08-29").is_ok());
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_denies_a_teacher_who_does_not_advise_it() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = user::create_user(&conn, "adviser", "password", "The Adviser").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &s.id).unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &adviser.id, "2026-06-01").unwrap();
+
+        let result = authorize_adviser_of_section(&conn, &sessions, &sec.id, "2026-08-29");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_allows_a_school_head_even_without_advising_it() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = user::create_user(&conn, "adviser", "password", "The Adviser").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &s.id).unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &adviser.id, "2026-06-01").unwrap();
+
+        assert!(authorize_adviser_of_section(&conn, &sessions, &sec.id, "2026-08-29").is_ok());
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_denies_a_section_with_no_adviser_assigned_yet() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+
+        let result = authorize_adviser_of_section(&conn, &sessions, &sec.id, "2026-08-29");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_adviser_of_section(&conn, &sessions, "some-section", "2026-08-29");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_adviser_of_section_denies_a_school_head_for_a_different_schools_section() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_sec =
+            section::create(&conn, &other_school.id, "2026-2027", "7", "Rizal").unwrap();
+
+        let result = authorize_adviser_of_section(&conn, &sessions, &other_sec.id, "2026-08-29");
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a School Head's authority in their own school must not extend to a different school's section"
         );
     }
 }

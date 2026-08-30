@@ -1197,6 +1197,51 @@ pub fn migrations() -> Migrations<'static> {
             ON subject_attendance_entries(session_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- Section Advisory Foundation (Wave 3E). See
+        -- docs/adr/0056-section-advisory-foundation.md for the full
+        -- 10-scenario evaluation and decision record.
+        --
+        -- Models "who is the adviser of this section" as its own
+        -- half-open temporal interval, mirroring `section_memberships`
+        -- exactly (`starts_on`/`ends_on` nullable, "at most one open
+        -- row" enforced as a real unique partial index rather than
+        -- application check-then-act -- this codebase has shipped that
+        -- exact race twice before). Deliberately NOT a bare
+        -- `sections.adviser_user_id` column: DepEd schools reassign
+        -- advisers by school year (sometimes mid-year), and a mutable
+        -- column would silently lose who advised a section in a prior
+        -- year the moment it's overwritten -- exactly the loss ADR-0008
+        -- already reasoned `section_memberships` itself must avoid.
+        -- Deliberately NOT folded into `teaching_assignments` (e.g. a
+        -- reserved "Advisory" pseudo-subject): advisory oversight and
+        -- subject-teaching are two different relationships that happen
+        -- to often be held by the same person, not one relationship --
+        -- conflating them would pollute `subjects` with a fake row and
+        -- make "list a teacher's real subjects" no longer a clean query.
+        CREATE TABLE section_advisories (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            starts_on TEXT NOT NULL,
+            ends_on TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_section_advisories_school_id ON section_advisories(school_id);
+        CREATE INDEX idx_section_advisories_section_id ON section_advisories(section_id);
+        CREATE INDEX idx_section_advisories_teacher_id ON section_advisories(teacher_user_id);
+
+        -- "At most one active adviser per section" -- the same
+        -- structural-invariant reasoning as
+        -- `idx_one_active_membership_per_learner` (migration 5), applied
+        -- per section instead of per learner.
+        CREATE UNIQUE INDEX idx_one_active_adviser_per_section
+            ON section_advisories(section_id) WHERE ends_on IS NULL;
+        "#,
+        ),
     ])
 }
 

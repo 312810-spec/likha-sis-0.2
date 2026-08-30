@@ -80,6 +80,8 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "subject_attendance_roster_for_session",
   "list_subject_attendance_sessions",
   "subject_attendance_monitor",
+  "assign_section_adviser",
+  "end_section_adviser",
   "create_teaching_assignment",
   "replace_teacher_assignment",
   "remove_teaching_assignment",

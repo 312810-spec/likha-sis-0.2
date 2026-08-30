@@ -14,6 +14,7 @@ pub mod role;
 pub mod schedule_meeting;
 pub mod school;
 pub mod section;
+pub mod section_advisory;
 pub mod section_membership;
 pub mod session;
 pub mod sf1_import_history;
