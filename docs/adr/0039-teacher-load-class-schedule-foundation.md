@@ -415,3 +415,66 @@ question, unchanged from this ADR's original text); no independent
 (non-self) review dispatched for this bounded slice -- retained as
 debt, consistent with the pattern Waves 2V/2W/2X/2Y/2Z already
 established.
+
+## Addendum (Wave 3C, 2026-08-30): School Head views a colleague's load
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-3C-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Why now, not sooner**: Wave 3A deliberately deferred this exact
+extension, since `get_teacher_load`'s `auth::authorize_view_teacher_load`
+gate rejects a Teacher session viewing a colleague, and — until Wave
+3B — that rejection was silently forcing a global "session expired"
+logout instead of a local error message, which would have made this
+feature confusing and broken for exactly the sessions it needs to
+reject gracefully (a Teacher who tries it, or a genuine mis-click).
+With that false positive closed, this extension is now safe to build.
+
+**Scope**: `TeacherLoadScreen` gained a "View" picker, populated from
+`list_school_members` (reused unchanged from Wave 2Y's Teaching
+Assignments picker), filtered to members holding the `teacher` role
+-- the same client-side usability filter Wave 2Y's own teacher picker
+already established, not a new pattern. Selecting a colleague re-runs
+`get_teacher_load`/`listMyAssignments` for that colleague's id instead
+of the signed-in session's own; the heading updates to "`<Name>`'s
+Teaching Load". The picker itself is hidden only when there is no
+other teacher to view (a school with exactly one teacher) -- a
+usability nicety, not a security boundary, since the backend gate is
+what actually decides who may view whom regardless of what the UI
+offers.
+
+**Security must not rely on UI hiding, applied identically to Wave
+2Y's own precedent**: every authenticated school member sees the same
+picker, including every other teacher's name. A Teacher session that
+selects a colleague still gets denied by
+`auth::authorize_view_teacher_load` exactly as before -- unchanged,
+since this wave touches zero Rust code -- and now (thanks to Wave 3B)
+sees this screen's own specific message ("Could not load this
+teacher's load — you may not have permission to view it.") instead of
+being logged out of the whole app.
+
+**Zero new backend surface.** `get_teacher_load` and
+`list_teacher_assignments` already supported viewing any id the caller
+is authorized for -- Wave 3A's own "self-view only" framing described
+the wave's _scope_, not a backend limitation. This wave is a pure UI
+extension: no Rust file touched, no new command, no port method beyond
+what Waves 2Y/3A already added.
+
+**Verification**: `npm run quality` 696/696 vitest (+4 net: the
+existing 5 `TeacherLoadScreen` tests were extended to 9, covering the
+picker's presence when colleagues exist, its absence when the signed-
+in teacher is the school's only teacher, switching to a colleague and
+the heading updating, and the permission-denial message on a refused
+view). `npx tsc -b --noEmit` / `eslint` / `prettier --check` /
+`check:architecture` all clean. **Zero Rust files touched** --
+confirmed by `git status`; `cargo test` reconfirmed 571/571 unchanged
+as part of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
+warning/enforcement (unchanged non-goal); no independent (non-self)
+review dispatched for this bounded UI slice -- retained as debt,
+consistent with the pattern recent waves have established.

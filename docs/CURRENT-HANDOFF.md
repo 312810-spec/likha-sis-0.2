@@ -1,6 +1,97 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-30 — Wave 3B: Session-Expiry False-Positive Fix, COMPLETE)
+## Active Task (2026-08-30 — Wave 3C: School Head views a colleague's Teacher Load, COMPLETE)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+Wave 3C addendum; `docs/PROJECT-MEMORY.md` Wave 3C entry;
+`docs/VERIFICATION-DEBT.md` Wave 3C entry. **New dedicated branch**
+`claude/likha-sis-wave3c-teacher-load-colleague-view`, created from
+exactly `72fc3cceb14c25662b87b011e68ed9a6de3a725d` (Wave 3B's own
+final, CI-confirmed checkpoint) — that branch itself was not modified.
+Harness v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 3B's own final Security
+Gate `33295817717` and Quality Gate `33295817715` reconfirmed
+`completed/success` for the exact HEAD commit `72fc3cc` before any Wave
+3C work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 3C work began.
+
+**Scope chosen**: the original Wave 3B candidate, now safe to build —
+per the owner's own standing instruction to continue directly into the
+next wave with a notification at each boundary. `get_teacher_load`
+already supported a School Head viewing a colleague's load
+server-side; Wave 3B's fix (closing the false-positive global-logout
+bug this exact path would otherwise have hit constantly) was the
+blocker, not any missing backend capability.
+
+**What shipped**: `TeacherLoadScreen` gained a "View" picker
+(`list_school_members`, reused unchanged from Wave 2Y's Teaching
+Assignments picker, filtered to the `teacher` role — the same
+usability filter, not a new pattern). Selecting a colleague re-runs
+`get_teacher_load`/`listMyAssignments` for that colleague's id; the
+heading updates to "`<Name>`'s Teaching Load". The picker is hidden
+only when there is no other teacher to view — a usability nicety, not
+a security boundary. **Zero new backend surface**: `get_teacher_load`
+and `list_teacher_assignments` already supported any authorized target
+id; this wave is a pure UI extension, no Rust file touched. Security
+must not rely on UI hiding, applied identically to Wave 2Y's own
+precedent: every school member sees the same picker, and a Teacher
+session that selects a colleague is still denied by
+`auth::authorize_view_teacher_load` exactly as before — now surfaced
+as this screen's own specific message ("Could not load this teacher's
+load — you may not have permission to view it.") instead of Wave 3B's
+now-fixed false-positive logout.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **696/696 vitest** (73 files; +4 net: the existing 5
+`TeacherLoadScreen` tests extended to 9, covering the picker's
+presence/absence, switching to a colleague with the heading updating,
+and the permission-denial message on a refused view). **Zero Rust
+files touched this wave** — confirmed by `git status`; `cargo test`
+reconfirmed 571/571 unchanged as part of `npm run quality:full`. `npm
+run build` + `check:dev-preview-isolation` pass. `npm run
+quality:security` clean, no new dependency. `npm run harness:verify`
+still exactly 100/100, unchanged — not reopened. `npm run
+quality:full` green end to end, exit code 0.
+
+**Scope guard held**: no dev-preview-fixture wiring (same disclosed,
+consistent gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
+warning/enforcement (ADR-0039's own long-standing non-goal); zero
+change to any prior wave's backend code, and the only UI change beyond
+`TeacherLoadScreen` itself is threading the already-composed
+`schoolMemberService` through as one more prop; `main` not touched; no
+unrelated refactor.
+
+**Review**: a bounded self-review confirmed the picker filters to the
+`teacher` role only (a School Head or Registrar in the member list is
+never offered as a load target, proven by a dedicated test), that the
+picker correctly hides itself when the signed-in teacher is the
+school's only teacher (proven), that switching the selection actually
+re-fetches both the load and the assignment list for the new target
+id rather than only one of them (proven), and that a refused colleague
+view shows the screen's own specific denial message rather than any
+generic fallback (proven). No independent (non-self) review was
+dispatched for this bounded UI slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with the pattern recent waves
+have established.
+
+**Exact next slice** (recorded, not started): Subject Monitor /
+Adviser View (Subject Attendance's own later spec steps — the last
+major deferred piece of that domain; note ADR-0055's own Wave 2V
+addendum flagged this as needing a genuinely new authorization shape,
+real design work rather than a thin wiring wave); or the native
+NVDA/Narrator pass. No candidate pre-selected. Per the owner's own
+standing instruction this session, work continues directly into the
+next wave without a separate stop-and-wait — a notification is sent at
+each wave boundary instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply —
+unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-30 — Wave 3B: Session-Expiry False-Positive Fix, COMPLETE, superseded above)
 
 Full record: `docs/adr/0022-global-session-expiry-handling.md` Wave 3B
 addendum; `docs/PROJECT-MEMORY.md` Wave 3B entry;

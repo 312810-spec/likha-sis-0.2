@@ -1,5 +1,37 @@
 # ACTIVE PLAN
 
+## Wave 3C: School Head views a colleague's Teacher Load (added 2026-08-30) — complete
+
+Full record: `docs/adr/0039-*` Wave 3C addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3C entry;
+`docs/VERIFICATION-DEBT.md` Wave 3C entry. **New branch**
+`claude/likha-sis-wave3c-teacher-load-colleague-view`, created from
+`72fc3cc` (Wave 3B's own final, CI-confirmed checkpoint).
+
+**Scope**: `TeacherLoadScreen` gained a "View" picker
+(`list_school_members`, filtered to the `teacher` role) letting a
+School Head view a colleague's derived load. Zero new backend
+surface — `get_teacher_load` already supported any authorized target
+id; this is a pure UI extension, safe now that Wave 3B closed the
+false-positive-logout bug this exact path would otherwise have
+triggered.
+
+**Deliberately not built**: no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
+warning/enforcement (ADR-0039's own long-standing non-goal).
+
+**Verification, all actually run this session**: `npm run quality`
+696/696 vitest (+4 net); typecheck/eslint/format/architecture clean.
+Zero Rust files touched; `cargo test` reconfirmed 571/571 unchanged as
+part of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Next**: Subject Monitor / Adviser View (needs real new
+authorization-shape design work, per ADR-0055's own Wave 2V addendum);
+or the native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 3B: Session-Expiry False-Positive Fix (added 2026-08-30) — complete
 
 Full record: `docs/adr/0022-*` Wave 3B addendum; `docs/CURRENT-HANDOFF.md`

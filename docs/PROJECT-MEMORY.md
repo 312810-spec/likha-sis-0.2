@@ -2543,6 +2543,36 @@ authorize_*` in `auth/mod.rs`. Not a security change — no Rust
   safe to build); Subject Monitor / Adviser View; or the native
   NVDA/Narrator pass. No candidate pre-selected.
 
+## Wave 3C — School Head views a colleague's Teacher Load (added 2026-08-30)
+
+Full record: `docs/adr/0039-*` Wave 3C addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3C entry. **New branch**
+`claude/likha-sis-wave3c-teacher-load-colleague-view`, created from
+`72fc3cc` (Wave 3B's own final, CI-confirmed checkpoint).
+
+- **Built**: `TeacherLoadScreen` gained a "View" picker
+  (`list_school_members`, filtered to the `teacher` role) letting a
+  School Head view a colleague's derived load; the heading updates to
+  "`<Name>`'s Teaching Load". Zero new backend surface —
+  `get_teacher_load` already supported any authorized target id.
+  Security must not rely on UI hiding: every school member sees the
+  same picker, and a Teacher who selects a colleague is denied
+  server-side exactly as before, now surfaced as a local message
+  (safe since Wave 3B closed the false-positive-logout bug this path
+  would otherwise trigger).
+- **Deliberately not built**: no dev-preview-fixture wiring (same
+  disclosed gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
+  warning/enforcement (ADR-0039's own long-standing non-goal).
+- **Verification/checkpoint**: `npm run quality` 696/696 vitest (+4
+  net); typecheck/eslint/format/architecture clean; zero Rust files
+  touched (`cargo test` reconfirmed 571/571 unchanged); `npm run
+build` + `check:dev-preview-isolation` pass; `npm run
+quality:security` clean, no new dependency; `npm run harness:verify`
+  still exactly 100/100, unchanged.
+- **Next**: Subject Monitor / Adviser View (needs real new
+  authorization-shape design work); or the native NVDA/Narrator pass.
+  No candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

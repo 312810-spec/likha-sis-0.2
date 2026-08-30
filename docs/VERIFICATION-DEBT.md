@@ -1,5 +1,23 @@
 # Verification Debt
 
+## Wave 3C — School Head views a colleague's Teacher Load (2026-08-30)
+
+Full record: `docs/adr/0039-*` Wave 3C addendum; `docs/PROJECT-MEMORY.md`
+Wave 3C entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/axe) screenshot coverage for the
+   picker.** `TeacherLoadScreen` still isn't wired into
+   `src/dev-preview/fixtures.ts` — the same disclosed gap Waves
+   2U/2W/2X/2Y/2Z's own new UI left open. Coverage is jsdom + axe-core
+   only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as recent waves, not a new gap class.
+
+**Debt closed this wave**: Wave 3A's own recorded gap — "no
+School-Head-views-a-colleague's-load UI" — is now closed.
+
 ## Wave 3B — Session-Expiry False-Positive Fix (2026-08-30)
 
 Full record: `docs/adr/0022-*` Wave 3B addendum; `docs/PROJECT-MEMORY.md`
