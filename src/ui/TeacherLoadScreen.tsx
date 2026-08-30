@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { SchoolMemberApplicationService } from "../application/school-member-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
+import type { SchoolMember } from "../domain/school-member";
 import type { TeacherLoad } from "../domain/teacher-load";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
@@ -10,6 +12,11 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface TeacherLoadScreenProps {
   teachingAssignmentService: TeachingAssignmentApplicationService;
   subjectAttendanceService: SubjectAttendanceApplicationService;
+  schoolMemberService: SchoolMemberApplicationService;
+  /** The signed-in teacher's own user id -- always the default view,
+   * and the only id a Teacher session may actually view (enforced
+   * server-side by `auth::authorize_view_teacher_load`, not by this
+   * picker being hidden). */
   teacherUserId: string;
 }
 
@@ -26,18 +33,27 @@ function formatMinutes(totalMinutes: number): string {
  * independent numbers -- computed since Teacher Load/Class Schedule
  * Foundation (ADR-0039), but with nothing to show until Teaching
  * Assignments (Wave 2Y) and Class Schedule (Wave 2Z) gave real schools
- * a way to create the data these numbers are derived from. Always a
- * self-view this wave -- see the port's own doc comment for the
- * self-or-School-Head rule `get_teacher_load` actually enforces; a
- * School Head viewing a colleague's load is a deferred candidate. */
+ * a way to create the data these numbers are derived from.
+ *
+ * Wave 3C: a School Head may also view a colleague's load, matching
+ * `auth::authorize_view_teacher_load`'s own self-or-School-Head rule.
+ * Every authenticated school member sees the same "View" picker
+ * (`list_school_members`, reused from Wave 2Y's Teaching Assignments
+ * picker) -- security must not rely on UI hiding, so a Teacher session
+ * that picks a colleague simply gets the backend's own denial surfaced
+ * as a local message (safe now that Wave 3B closed the false-positive
+ * global-logout bug this exact path would otherwise have hit). */
 export function TeacherLoadScreen({
   teachingAssignmentService,
   subjectAttendanceService,
+  schoolMemberService,
   teacherUserId,
 }: TeacherLoadScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
+  const [members, setMembers] = useState<SchoolMember[]>([]);
+  const [viewedTeacherId, setViewedTeacherId] = useState(teacherUserId);
   const [teacherLoad, setTeacherLoad] = useState<TeacherLoad | null>(null);
   const [assignments, setAssignments] = useState<TeachingAssignmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,17 +70,23 @@ export function TeacherLoadScreen({
     setLoading(true);
     setError(null);
     Promise.all([
-      teachingAssignmentService.getLoad(teacherUserId),
-      subjectAttendanceService.listMyAssignments(teacherUserId),
+      teachingAssignmentService.getLoad(viewedTeacherId),
+      subjectAttendanceService.listMyAssignments(viewedTeacherId),
+      schoolMemberService.listMembers(),
     ])
-      .then(([loadResult, assignmentResult]) => {
+      .then(([loadResult, assignmentResult, memberResult]) => {
         if (requestRef.current !== requestId) return;
         setTeacherLoad(loadResult);
         setAssignments(assignmentResult);
+        setMembers(memberResult);
       })
       .catch(() => {
         if (requestRef.current !== requestId) return;
-        setError("Could not load your teaching load.");
+        setError(
+          viewedTeacherId === teacherUserId
+            ? "Could not load your teaching load."
+            : "Could not load this teacher's load — you may not have permission to view it.",
+        );
       })
       .finally(() => {
         if (requestRef.current !== requestId) return;
@@ -76,19 +98,42 @@ export function TeacherLoadScreen({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teachingAssignmentService, subjectAttendanceService, teacherUserId]);
+  }, [teachingAssignmentService, subjectAttendanceService, schoolMemberService, viewedTeacherId]);
+
+  const teachers = members.filter((member) => member.roles.includes("teacher"));
+  const otherTeachers = teachers.filter((member) => member.id !== teacherUserId);
+  const viewingSelf = viewedTeacherId === teacherUserId;
+  const viewedName = members.find((member) => member.id === viewedTeacherId)?.displayName;
 
   return (
     <section aria-label="Teacher Load">
       <h2 ref={headingRef} tabIndex={-1}>
-        My Teaching Load
+        {viewingSelf ? "My Teaching Load" : `${viewedName ?? "Teacher"}'s Teaching Load`}
       </h2>
       {mode === "guided" && (
         <p className="field-hint">
           These three numbers are tracked separately on purpose — a full class list doesn&rsquo;t
           say how much time each class takes, and total minutes alone doesn&rsquo;t say how many
-          different subjects you&rsquo;re preparing for.
+          different subjects a teacher is preparing for.
         </p>
+      )}
+
+      {otherTeachers.length > 0 && (
+        <div className="field">
+          <label htmlFor="teacher-load-viewed">View</label>
+          <select
+            id="teacher-load-viewed"
+            value={viewedTeacherId}
+            onChange={(event) => setViewedTeacherId(event.target.value)}
+          >
+            <option value={teacherUserId}>Myself</option>
+            {otherTeachers.map((teacher) => (
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {error && (
@@ -101,7 +146,7 @@ export function TeacherLoadScreen({
       )}
 
       {loading ? (
-        <Loading label="Loading your teaching load…" />
+        <Loading label="Loading teaching load…" />
       ) : error || !teacherLoad ? null : (
         <>
           <dl className="attendance-count">

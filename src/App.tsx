@@ -314,6 +314,7 @@ function App() {
               <TeacherLoadScreen
                 teachingAssignmentService={teachingAssignmentService}
                 subjectAttendanceService={subjectAttendanceService}
+                schoolMemberService={schoolMemberService}
                 teacherUserId={session.userId}
               />
             ) : activeTab === "monthly-summary" ? (
