@@ -1,0 +1,68 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'e:\\LIKHA-SIS 0.2\\.codex\\hooks\\check-write-edit.cjs'",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'e:\\LIKHA-SIS 0.2\\.codex\\hooks\\check-bash.cjs'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node 'e:\\LIKHA-SIS 0.2\\.codex\\hooks\\format-write-edit.cjs'",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreCompact\",\"additionalContext\":\"Before this compaction completes: persist the current task, key findings, what verification has actually run, and the exact next step - to .planning/<task>/progress.md if one is active, otherwise to docs/CURRENT-HANDOFF.md. Keep it short; do not write a full transcript summary.\"}}'"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"LIKHA-SIS harness: read docs/CURRENT-HANDOFF.md and docs/ACTIVE-PLAN.md before starting work - they hold the current task and the exact next action. Do not restart work already recorded as complete there.\"}}'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStop\",\"additionalContext\":\"Reminder: when relaying this subagent'\"'\"'s findings, keep the shape - severity, file/location, evidence, recommendation. Do not treat its summary as verified until you have checked the evidence yourself.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
