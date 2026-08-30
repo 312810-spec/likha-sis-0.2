@@ -105,6 +105,7 @@ pub fn run() {
             commands::subject_attendance::mark_subject_attendance_all_present,
             commands::subject_attendance::subject_attendance_roster_for_session,
             commands::subject_attendance::list_subject_attendance_sessions,
+            commands::subject_attendance::subject_attendance_monitor,
             commands::import::preview_sf1_import,
             commands::import::commit_sf1_import,
             commands::import::list_sf1_import_history,

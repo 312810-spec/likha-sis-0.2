@@ -7,7 +7,8 @@ use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::subject_attendance::{
-    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceRosterRow, SubjectAttendanceSession,
+    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor, SubjectAttendanceRosterRow,
+    SubjectAttendanceSession,
 };
 
 /// Every command in this file gates on
@@ -181,4 +182,33 @@ pub fn list_subject_attendance_sessions(
         &teaching_assignment_id,
     )?;
     subject_attendance::list_sessions_for_assignment(&conn, &school_id, &teaching_assignment_id)
+}
+
+/// Subject Monitor -- `docs/product/SUBJECT-ATTENDANCE-SPEC.md`'s
+/// per-learner attendance report for one teaching assignment. Reuses
+/// `authorize_own_assignment` unchanged: this is a reporting view over
+/// data the caller already owns, not a new authorization shape. Adviser
+/// View (a colleague/adviser viewing *someone else's* Subject Attendance
+/// data) is deliberately deferred -- see `docs/adr/0055-subject-attendance-foundation.md`.
+#[tauri::command]
+pub fn subject_attendance_monitor(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    teaching_assignment_id: String,
+    as_of_date: String,
+) -> AppResult<Option<SubjectAttendanceMonitor>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    subject_attendance::authorize_own_assignment(
+        &conn,
+        &user_id,
+        &school_id,
+        &teaching_assignment_id,
+    )?;
+    subject_attendance::monitor_for_assignment(
+        &conn,
+        &school_id,
+        &teaching_assignment_id,
+        &as_of_date,
+    )
 }

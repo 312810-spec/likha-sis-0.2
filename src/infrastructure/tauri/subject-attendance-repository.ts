@@ -1,6 +1,7 @@
 import type {
   EntryStatus,
   RecordEntryOutcome,
+  SubjectAttendanceMonitor,
   SubjectAttendanceRosterRow,
   SubjectAttendanceSession,
 } from "../../domain/subject-attendance";
@@ -68,6 +69,16 @@ export class TauriSubjectAttendanceRepository implements SubjectAttendanceReposi
   listSessions(teachingAssignmentId: string): Promise<SubjectAttendanceSession[]> {
     return invoke<SubjectAttendanceSession[]>("list_subject_attendance_sessions", {
       teachingAssignmentId,
+    });
+  }
+
+  monitor(
+    teachingAssignmentId: string,
+    asOfDate: string,
+  ): Promise<SubjectAttendanceMonitor | null> {
+    return invoke<SubjectAttendanceMonitor | null>("subject_attendance_monitor", {
+      teachingAssignmentId,
+      asOfDate,
     });
   }
 }

@@ -1,6 +1,7 @@
 import type {
   EntryStatus,
   RecordEntryOutcome,
+  SubjectAttendanceMonitor,
   SubjectAttendanceRosterRow,
   SubjectAttendanceSession,
 } from "../subject-attendance";
@@ -44,4 +45,6 @@ export interface SubjectAttendanceRepository {
   ): Promise<SubjectAttendanceRosterRow[] | null>;
 
   listSessions(teachingAssignmentId: string): Promise<SubjectAttendanceSession[]>;
+
+  monitor(teachingAssignmentId: string, asOfDate: string): Promise<SubjectAttendanceMonitor | null>;
 }

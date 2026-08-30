@@ -465,6 +465,162 @@ pub fn list_sessions_for_assignment(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// One learner's raw attendance counts and current standing for the
+/// Subject Monitor screen -- deliberately no automatic flag or
+/// threshold beyond the raw streak number: `docs/product/SUBJECT-ATTENDANCE-SPEC.md`
+/// explicitly defers "configurable school thresholds for follow-up" as
+/// a later, separately-designed enhancement, not something to guess at
+/// here.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectAttendanceMonitorRow {
+    pub membership_id: String,
+    pub learner_id: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub present_count: i64,
+    pub absent_count: i64,
+    pub late_count: i64,
+    pub excused_count: i64,
+    /// Consecutive `Absent` marks counting back from the most recent
+    /// `Held` session with an entry, stopping at the first non-`Absent`
+    /// mark or the first session this learner was never marked for --
+    /// an unmarked ("no row = not yet recorded") session never
+    /// contributes to or silently breaks a streak the wrong way, it
+    /// simply stops the count where certainty ends.
+    pub current_consecutive_absences: i64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectAttendanceMonitor {
+    pub held_session_count: i64,
+    pub rows: Vec<SubjectAttendanceMonitorRow>,
+}
+
+/// Learner-by-learner attendance counts across every `Held` session
+/// recorded so far for one teaching assignment -- the spec's own
+/// "Subject Monitor" (recommended-order step 6). Scoped to the exact
+/// same authorization anchor every other Subject Attendance function
+/// already uses (`authorize_own_assignment`, called by the command
+/// layer before this) -- a reporting view over data the caller already
+/// owns, not a new authorization shape.
+///
+/// Rows are scoped to the roster as of `as_of_date` (reusing
+/// `section_membership::current_roster`, the same "current roster"
+/// every other Subject Attendance screen already uses) -- a learner who
+/// has since transferred out no longer appears here, even if they have
+/// historical entries. Showing a monitor row for a learner no longer in
+/// the class is a deliberately deferred enhancement, not attempted in
+/// this first slice. Returns `Ok(None)` for an invalid date or an
+/// assignment that doesn't resolve in `school_id`, matching this
+/// module's other functions' convention.
+pub fn monitor_for_assignment(
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    as_of_date: &str,
+) -> AppResult<Option<SubjectAttendanceMonitor>> {
+    if !is_iso_date(as_of_date) {
+        return Ok(None);
+    }
+    let assignment =
+        match teaching_assignment::find_by_id_in_school(conn, school_id, teaching_assignment_id)? {
+            Some(a) => a,
+            None => return Ok(None),
+        };
+
+    let roster =
+        section_membership::current_roster(conn, school_id, &assignment.section_id, as_of_date)?;
+
+    // Every `Held` session's id, most-recent-first -- walked per learner
+    // below so an unmarked session (no entry row) is a real, visible gap
+    // in the sequence, not silently skipped the way iterating only over
+    // existing entries would (an absence three sessions ago and one from
+    // yesterday are not "consecutive" just because nothing was recorded
+    // in between).
+    let mut session_stmt = conn.prepare(
+        "SELECT id FROM subject_attendance_sessions \
+         WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND status = 'held' \
+         ORDER BY session_date DESC",
+    )?;
+    let held_session_ids: Vec<String> = session_stmt
+        .query_map((school_id, teaching_assignment_id), |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+
+    let mut entry_stmt = conn.prepare(
+        "SELECT e.session_id, e.membership_id, e.status \
+         FROM subject_attendance_entries e \
+         JOIN subject_attendance_sessions s ON s.id = e.session_id \
+         WHERE s.school_id = ?1 AND s.teaching_assignment_id = ?2 AND s.status = 'held'",
+    )?;
+    let entries: Vec<(String, String, EntryStatus)> = entry_stmt
+        .query_map((school_id, teaching_assignment_id), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                EntryStatus::from_db_str(&row.get::<_, String>(2)?)?,
+            ))
+        })?
+        .collect::<Result<_, _>>()?;
+
+    let mut status_by_session_and_membership: std::collections::HashMap<
+        (String, String),
+        EntryStatus,
+    > = std::collections::HashMap::new();
+    for (session_id, membership_id, status) in entries {
+        status_by_session_and_membership.insert((session_id, membership_id), status);
+    }
+
+    let rows = roster
+        .into_iter()
+        .map(|m| {
+            let mut present_count = 0i64;
+            let mut absent_count = 0i64;
+            let mut late_count = 0i64;
+            let mut excused_count = 0i64;
+            let mut current_consecutive_absences = 0i64;
+            let mut streak_still_counting = true;
+
+            for session_id in &held_session_ids {
+                let status = status_by_session_and_membership
+                    .get(&(session_id.clone(), m.membership_id.clone()));
+                match status {
+                    Some(EntryStatus::Present) => present_count += 1,
+                    Some(EntryStatus::Absent) => absent_count += 1,
+                    Some(EntryStatus::Late) => late_count += 1,
+                    Some(EntryStatus::Excused) => excused_count += 1,
+                    None => {}
+                }
+                if streak_still_counting {
+                    if status == Some(&EntryStatus::Absent) {
+                        current_consecutive_absences += 1;
+                    } else {
+                        streak_still_counting = false;
+                    }
+                }
+            }
+
+            SubjectAttendanceMonitorRow {
+                membership_id: m.membership_id,
+                learner_id: m.learner_id,
+                given_name: m.given_name,
+                family_name: m.family_name,
+                present_count,
+                absent_count,
+                late_count,
+                excused_count,
+                current_consecutive_absences,
+            }
+        })
+        .collect();
+
+    Ok(Some(SubjectAttendanceMonitor {
+        held_session_count: held_session_ids.len() as i64,
+        rows,
+    }))
+}
+
 /// Returns `Err(AppError::Unauthorized)` unless `session`'s active user
 /// is exactly the teacher on `teaching_assignment_id` within their own
 /// school — the "own assignment only" rule
@@ -505,6 +661,7 @@ mod tests {
     struct Fixture {
         school_id: String,
         teacher_id: String,
+        learner_id: String,
         assignment_id: String,
         membership_id: String,
     }
@@ -531,6 +688,7 @@ mod tests {
         Fixture {
             school_id: s.id,
             teacher_id: t.id,
+            learner_id: l.id,
             assignment_id: assignment.id,
             membership_id: membership.unwrap().id,
         }
@@ -939,5 +1097,173 @@ mod tests {
             list_sessions_for_assignment(&conn, &other_school.id, &f.assignment_id).unwrap();
 
         assert!(sessions.is_empty());
+    }
+
+    fn open_and_mark(conn: &Connection, f: &Fixture, session_date: &str, status: EntryStatus) {
+        let session = open_or_get_session(
+            conn,
+            &f.school_id,
+            &f.assignment_id,
+            session_date,
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        record_entry(
+            conn,
+            &f.school_id,
+            &session.id,
+            &f.membership_id,
+            status,
+            None,
+            &f.teacher_id,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn monitor_for_assignment_returns_none_for_an_unknown_assignment() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let result =
+            monitor_for_assignment(&conn, &f.school_id, "does-not-exist", "2026-08-29").unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn monitor_for_assignment_returns_none_for_an_invalid_date() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let result =
+            monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "08/29/2026").unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn monitor_for_assignment_counts_each_status_and_the_held_session_count() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-24", EntryStatus::Present);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Late);
+        open_and_mark(&conn, &f, "2026-08-26", EntryStatus::Excused);
+        open_and_mark(&conn, &f, "2026-08-27", EntryStatus::Present);
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(monitor.held_session_count, 4);
+        assert_eq!(monitor.rows.len(), 1);
+        let row = &monitor.rows[0];
+        assert_eq!(row.membership_id, f.membership_id);
+        assert_eq!(row.present_count, 2);
+        assert_eq!(row.late_count, 1);
+        assert_eq!(row.excused_count, 1);
+        assert_eq!(row.absent_count, 0);
+    }
+
+    #[test]
+    fn monitor_for_assignment_computes_the_current_consecutive_absence_streak() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-24", EntryStatus::Present);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+        open_and_mark(&conn, &f, "2026-08-26", EntryStatus::Absent);
+        open_and_mark(&conn, &f, "2026-08-27", EntryStatus::Absent);
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(monitor.rows[0].current_consecutive_absences, 3);
+        assert_eq!(monitor.rows[0].absent_count, 3);
+    }
+
+    #[test]
+    fn monitor_for_assignment_streak_stops_at_the_first_non_absent_mark() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-24", EntryStatus::Absent);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Present);
+        open_and_mark(&conn, &f, "2026-08-26", EntryStatus::Absent);
+        open_and_mark(&conn, &f, "2026-08-27", EntryStatus::Absent);
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        // Most recent two (08-26, 08-27) are Absent; 08-25 (Present) stops
+        // the streak from reaching further back to 08-24's own Absent.
+        assert_eq!(monitor.rows[0].current_consecutive_absences, 2);
+        assert_eq!(monitor.rows[0].absent_count, 3);
+    }
+
+    #[test]
+    fn monitor_for_assignment_streak_stops_at_an_unmarked_session_never_counting_it() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+        // 2026-08-27 is opened (Held) but never marked for this learner --
+        // an unmarked session must never be silently treated as Absent.
+        open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-27",
+            &f.teacher_id,
+        )
+        .unwrap();
+        open_and_mark(&conn, &f, "2026-08-28", EntryStatus::Absent);
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(monitor.held_session_count, 3);
+        assert_eq!(monitor.rows[0].current_consecutive_absences, 1);
+        assert_eq!(monitor.rows[0].absent_count, 2);
+    }
+
+    #[test]
+    fn monitor_for_assignment_excludes_a_learner_who_has_since_transferred_out() {
+        let mut conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+
+        section_membership::end_membership(
+            &mut conn,
+            &f.school_id,
+            &f.learner_id,
+            &f.membership_id,
+            "2026-08-26",
+        )
+        .unwrap();
+
+        let monitor = monitor_for_assignment(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+
+        assert!(monitor.rows.is_empty());
+        // The session/entry data itself is untouched -- only today's
+        // roster-scoped view excludes the now-transferred learner.
+        assert_eq!(monitor.held_session_count, 1);
+    }
+
+    #[test]
+    fn monitor_for_assignment_never_leaks_a_different_schools_data() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+        let other_school = school::create(&conn, "Another School").unwrap();
+
+        let result =
+            monitor_for_assignment(&conn, &other_school.id, &f.assignment_id, "2026-08-29")
+                .unwrap();
+
+        assert!(result.is_none());
     }
 }

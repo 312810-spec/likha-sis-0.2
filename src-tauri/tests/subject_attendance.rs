@@ -8,7 +8,8 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::repository::subject_attendance::{
-    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceRosterRow, SubjectAttendanceSession,
+    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor, SubjectAttendanceRosterRow,
+    SubjectAttendanceSession,
 };
 use app_lib::repository::{
     learner, school, section, section_membership, subject, teaching_assignment, user,
@@ -111,6 +112,23 @@ fn list_sessions_as_current_session(
         teaching_assignment_id,
     )?;
     subject_attendance::list_sessions_for_assignment(conn, &school_id, teaching_assignment_id)
+}
+
+/// Standing in for `commands::subject_attendance::subject_attendance_monitor`.
+fn monitor_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    teaching_assignment_id: &str,
+    as_of_date: &str,
+) -> app_lib::error::AppResult<Option<SubjectAttendanceMonitor>> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    subject_attendance::authorize_own_assignment(
+        conn,
+        &user_id,
+        &school_id,
+        teaching_assignment_id,
+    )?;
+    subject_attendance::monitor_for_assignment(conn, &school_id, teaching_assignment_id, as_of_date)
 }
 
 struct Fixture {
@@ -278,4 +296,47 @@ fn re_opening_a_session_that_already_exists_returns_the_same_session_not_a_dupli
     assert_eq!(first.id, second.id);
     let all = list_sessions_as_current_session(&conn, &sessions, &f.assignment_id).unwrap();
     assert_eq!(all.len(), 1);
+}
+
+#[test]
+fn a_teacher_can_view_the_monitor_for_their_own_assignment() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &sessions);
+    let session = open_session_as_current_session(&conn, &sessions, &f.assignment_id, "2026-08-29")
+        .unwrap()
+        .unwrap();
+    record_entry_as_current_session(
+        &conn,
+        &sessions,
+        &f.assignment_id,
+        &session.id,
+        &f.membership_id,
+        EntryStatus::Absent,
+    )
+    .unwrap();
+
+    let monitor = monitor_as_current_session(&conn, &sessions, &f.assignment_id, "2026-08-29")
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(monitor.held_session_count, 1);
+    assert_eq!(monitor.rows.len(), 1);
+    assert_eq!(monitor.rows[0].membership_id, f.membership_id);
+    assert_eq!(monitor.rows[0].absent_count, 1);
+    assert_eq!(monitor.rows[0].current_consecutive_absences, 1);
+}
+
+#[test]
+fn a_teacher_cannot_view_the_monitor_for_an_assignment_they_do_not_own() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let other_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.b");
+
+    let result = monitor_as_current_session(&conn, &other_sessions, &f.assignment_id, "2026-08-29");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }

@@ -5,6 +5,7 @@ import type { SubjectAttendanceRepository } from "../domain/ports/subject-attend
 import type {
   EntryStatus,
   RecordEntryOutcome,
+  SubjectAttendanceMonitor,
   SubjectAttendanceRosterRow,
   SubjectAttendanceSession,
   TeachingAssignmentSummary,
@@ -100,5 +101,14 @@ export class SubjectAttendanceApplicationService {
   async listSessions(teachingAssignmentId: string): Promise<SubjectAttendanceSession[]> {
     const assignment = requireNonEmpty(teachingAssignmentId, "Class");
     return this.subjectAttendance.listSessions(assignment);
+  }
+
+  async monitor(
+    teachingAssignmentId: string,
+    asOfDate: string,
+  ): Promise<SubjectAttendanceMonitor | null> {
+    const assignment = requireNonEmpty(teachingAssignmentId, "Class");
+    const date = requireIsoDate(asOfDate);
+    return this.subjectAttendance.monitor(assignment, date);
   }
 }

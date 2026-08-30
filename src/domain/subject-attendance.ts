@@ -71,3 +71,33 @@ export interface TeachingAssignmentSummary {
   subjectId: string;
   subjectName: string;
 }
+
+/** One learner's raw attendance counts and current standing for the
+ * Subject Monitor screen -- mirrors Rust's `SubjectAttendanceMonitorRow`
+ * exactly. Deliberately no automatic flag/threshold beyond the raw
+ * streak number: `docs/product/SUBJECT-ATTENDANCE-SPEC.md` defers
+ * configurable school thresholds as a later, separately-designed
+ * enhancement. */
+export interface SubjectAttendanceMonitorRow {
+  membershipId: string;
+  learnerId: string;
+  givenName: string;
+  familyName: string;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  /** Consecutive `absent` marks counting back from the most recent
+   * `held` session, stopping at the first non-absent mark or the first
+   * session this learner has no entry for -- an unmarked session never
+   * counts as absent and always breaks the streak. */
+  currentConsecutiveAbsences: number;
+}
+
+/** Mirrors Rust's `SubjectAttendanceMonitor`. Rows are scoped to the
+ * roster as of the requested date -- a learner who has since
+ * transferred out no longer appears here. */
+export interface SubjectAttendanceMonitor {
+  heldSessionCount: number;
+  rows: SubjectAttendanceMonitorRow[];
+}

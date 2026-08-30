@@ -6,6 +6,7 @@ import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-m
 import type {
   EntryStatus,
   RecordEntryOutcome,
+  SubjectAttendanceMonitor,
   SubjectAttendanceRosterRow,
   SubjectAttendanceSession,
   TeachingAssignmentSummary,
@@ -45,6 +46,23 @@ const ROSTER: SubjectAttendanceRosterRow[] = [
     entryStatus: null,
   },
 ];
+
+const MONITOR: SubjectAttendanceMonitor = {
+  heldSessionCount: 3,
+  rows: [
+    {
+      membershipId: "mem-1",
+      learnerId: "l-1",
+      givenName: "Ana",
+      familyName: "Cruz",
+      presentCount: 2,
+      absentCount: 1,
+      lateCount: 0,
+      excusedCount: 0,
+      currentConsecutiveAbsences: 1,
+    },
+  ],
+};
 
 const ASSIGNMENTS: TeachingAssignmentSummary[] = [
   {
@@ -100,6 +118,10 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   async listSessions(teachingAssignmentId: string) {
     this.calls.push(["listSessions", teachingAssignmentId]);
     return [SESSION];
+  }
+  async monitor(teachingAssignmentId: string, asOfDate: string) {
+    this.calls.push(["monitor", teachingAssignmentId, asOfDate]);
+    return MONITOR;
   }
 }
 
@@ -235,5 +257,21 @@ describe("SubjectAttendanceApplicationService", () => {
 
     expect(subjectAttendance.calls).toEqual([["listSessions", "ta-1"]]);
     expect(result).toEqual([SESSION]);
+  });
+
+  it("loads the monitor with a validated date", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    const result = await service.monitor("ta-1", "2026-08-29");
+
+    expect(subjectAttendance.calls).toEqual([["monitor", "ta-1", "2026-08-29"]]);
+    expect(result).toEqual(MONITOR);
+  });
+
+  it("rejects a malformed date before calling the repository for monitor", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    await expect(service.monitor("ta-1", "08/29/2026")).rejects.toThrow(ValidationError);
+    expect(subjectAttendance.calls).toEqual([]);
   });
 });

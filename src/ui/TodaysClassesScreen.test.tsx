@@ -56,6 +56,9 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   async listSessions(teachingAssignmentId: string) {
     return this.sessions.filter((s) => s.teachingAssignmentId === teachingAssignmentId);
   }
+  async monitor(): Promise<null> {
+    throw new Error("not used by TodaysClassesScreen");
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
