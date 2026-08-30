@@ -1,5 +1,68 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Wave 3E/3F/3G Individual Review Debt Closure, complete)
+
+Continued directly after the Integration Review below, on `main` at
+`c34fef0`. Full record: `docs/VERIFICATION-DEBT.md`'s new top entry.
+
+Dispatched a `security-reviewer` specifically for the three still-open
+individual-wave review debts the Integration Review's own composition
+check did not close: Wave 3E's owed independent review (its first
+dispatch had hit the known agent-retrieval problem, self-review
+substituted at the time), Wave 3F's owed independent review (same
+situation), and Wave 3G (never had a dedicated review requested at
+all, since it was assessed as UI-only reusing existing gates). Scoped
+to `auth::authorize_adviser_of_section`, `repository::section_advisory`,
+the section-advisory commands, `resolve_adviser_view_scope`/the
+Adviser View overview command, and `src/ui/SectionAdviserScreen.tsx`.
+
+**Result: no BLOCKING findings, no SHOULD-FIX findings.** The reviewer
+confirmed by direct source reading: the cross-school isolation fix in
+`authorize_adviser_of_section` (caught by TDD during Wave 3E) is real
+and intact; `section_advisory::assign`'s "one active adviser per
+section" guarantee is backed by the real unique index under this app's
+single `Mutex<Connection>` serialization, not merely an app-level
+pre-check racing a write; no `INSERT OR IGNORE` masking a constraint
+violation; the Adviser View overview command independently
+re-authorizes the selected section rather than trusting an
+already-filtered picker as the boundary; and `SectionAdviserScreen.tsx`
+enforces nothing client-side, showing the same form to every school
+member and surfacing only a generic error on backend rejection.
+
+This closes all review debt opened by the section-adviser feature line
+(Waves 3E-3G) and the separate cross-wave composition question the
+Integration Review closed below. No code changes this session — review
+only.
+
+**Gate decision: SECTION ADVISER FEATURE LINE FULLY REVIEWED.** No
+outstanding review debt remains for Waves 2Z-3G. This is a wave
+boundary per `.claude/rules/autonomous-development.md` (checkpoint
+recorded, review debt closed, CI green on `main`) — recording the
+exact next slice and stopping here rather than starting a new
+open-ended macro wave without it being named first.
+
+**Recommended next slice, not started**: close
+`docs/VERIFICATION-DEBT.md`'s Wave 3F item 2 — real browser-rendered
+Playwright verification of Adviser View and the new Section Adviser
+Management screen (light/dark, all three teacher modes), which every
+prior session recorded as blocked by Chromium being unavailable in
+that environment. This session's environment has Chromium pre-installed
+(confirmed via the system prompt's tooling description, not yet
+verified live), so this may now be genuinely closeable rather than
+still blocked — worth checking fresh before assuming the old blocker
+still applies. Scope: extend `src/dev-preview/` with Adviser View and
+Section Adviser fixture states (neither currently has one), then
+capture/verify via Playwright the same way UX-02 through UX-04
+established. Alternative candidates evaluated and set aside for now:
+Wave 5 (Sync) requires its own 10-scenario cloud-target decision before
+any code — a large, separate undertaking, not a quick next slice; Wave
+3's macro "Authoritative-template Form Engine" scope is largely already
+covered by the already-shipped Wave 2T (SF1/SF9 official-form
+generation UI); Key Stage 1 descriptive grading and Grade 12 DO 8
+carryover both need a fresh DepEd research pass before they're
+actionable; password reset is blocked on a real product/security policy
+decision (no out-of-band recovery channel exists yet).
+
 ## Active Task (2026-08-31, this session — Integration Review + Main Fast-Forward, complete)
 
 **`main` is now the verified integration baseline at `9c1514c`**,

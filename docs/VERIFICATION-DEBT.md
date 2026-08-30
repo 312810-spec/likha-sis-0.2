@@ -1,5 +1,28 @@
 # Verification Debt
 
+## Wave 3E/3F/3G individual review debt — closed (2026-08-31)
+
+A `security-reviewer` was dispatched specifically for the three
+still-open individual-wave review debts below (Wave 3E's item 1, Wave
+3F's item 1, and Wave 3G — which had never had a dedicated review
+requested) — scoped to `auth::authorize_adviser_of_section`,
+`repository::section_advisory`, the section-advisory commands,
+`resolve_adviser_view_scope`/the Adviser View overview command, and
+`src/ui/SectionAdviserScreen.tsx`. It completed and reported **no
+BLOCKING findings, no SHOULD-FIX findings** — specifically confirming:
+the cross-school isolation fix in `authorize_adviser_of_section` is
+real and intact; `section_advisory::assign`'s "one active adviser"
+guarantee is backed by the real unique index under this app's single
+`Mutex<Connection>` serialization, not just an app-level pre-check; no
+`INSERT OR IGNORE` masking a constraint violation; the Adviser View
+overview command independently re-authorizes rather than trusting the
+picker; and `SectionAdviserScreen.tsx` enforces nothing client-side,
+surfacing only a generic error on backend rejection. Full record:
+`docs/CURRENT-HANDOFF.md`'s Integration Review entry. Wave 3E's item 1
+and Wave 3F's item 1 below are superseded by this entry, not deleted
+(kept for the historical record of the agent-retrieval issue and the
+self-review that stood in for it at the time).
+
 ## Integration Review (Waves 2Z-3G) — closed (2026-08-31)
 
 The cross-milestone question "does every `authorize_*` gate/capability
