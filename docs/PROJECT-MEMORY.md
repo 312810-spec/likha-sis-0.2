@@ -903,6 +903,50 @@ motion without a teacher decision; no real learner PII until
 production-readiness gates permit it; no new post-UX milestone numbers
 until the UX-08 reassessment itself determines the correct sequence.
 
+## Wave 5 Offline-Session/Re-Authentication Security Review (added 2026-08-29)
+
+Closes the other Wave 5 objective (`PRODUCT-CONTRACT.md` §13): a real
+`security-reviewer` pass on the offline-session/re-authentication
+policy (previously a stated candidate, not security-reviewed).
+Numeric policy reconfirmed unchanged (8h absolute / 30m idle / 15m
+lockout — see `docs/adr/0020-idle-timeout-session-hardening.md`'s
+addendum for the justification). One real defect found and fixed via
+TDD: `login()` didn't revoke/audit-log a previous still-active session
+when a second user logged in over it on a shared computer (a school
+threat model this app explicitly targets) — now mirrors `logout()`'s
+own revoke+audit logic. One real hardening gap recorded as debt, not
+fixed: session-lifetime checks trust OS wall-clock (`SystemTime`), not
+a monotonic clock — mitigated by Windows' default
+`SeSystemtimePrivilege` restriction on standard accounts, not
+eliminated; see `docs/VERIFICATION-DEBT.md`. **Durable environment fix
+made along the way**: this Linux sandbox's Rust toolchain (1.94.1, the
+crate needs 1.95) and missing Tauri GTK/webkit2gtk system packages were
+both blocking `cargo check` entirely — fixed (`rustup update stable`;
+installed the same package list `.github/workflows/quality.yml` already
+uses) — real Rust compiler/test/clippy/fmt verification now works in
+this kind of sandbox, not just on Windows/CI; don't assume a future
+session in a similar environment is still blocked without checking.
+
+## Multiple Unmerged Parallel Development Branches Discovered (added 2026-08-29)
+
+While starting Wave 5 work on `claude/phase-5-zero-cost-scenarios-6owlfm`
+(forked from the Integration Review checkpoint `d9ab036`), found that
+several other branches also fork from that same checkpoint with
+substantial, real, tested work that has never been merged into `main`
+or reconciled with each other: `claude/likha-sis-wave2z-class-schedule`
+(109 commits — Learner Core, Subject Attendance, Today's Classes,
+Teaching Assignments, Class Schedule UI, its own separate lettered
+"Wave 2S-2Z" sequence) and `claude/deped-teacher-likha-features-j7zfv6`
+(54 commits — RBAC, School Branding closing the literal ADR-0035 Wave
+1, pre-research for Waves 3/4/5/7, from which this session's ADR-0042
+reused the Wave 5 Cloudflare-pricing/sync-engine research directly
+rather than re-deriving it). **This is a real, durable fact worth
+recording, not something this session resolved**: `main` remains at
+`d9ab036`, unaware of either branch's work. Reconciling which branch's
+work becomes canonical, and in what order, is a genuine integration
+decision only the user can make — flagged to them directly in this
+session's report, not decided autonomously here.
+
 ## Wave 5 Cloud Sync Target Decision (added 2026-08-29)
 
 The required 10-scenario cloud-target architecture decision

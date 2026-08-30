@@ -54,12 +54,69 @@ changed — decision/documentation only, matching this project's own
 confirms this session's doc edits didn't break anything already
 passing).
 
-**Gate decision: WAVE 5 CLOUD-TARGET DECISION MADE — SYNC
-IMPLEMENTATION BLOCKED ON EXTERNAL CREDENTIALS.** Per autonomous-
-development mode, continuing directly to the other, non-blocked half of
-Wave 5's objective next: an actual `security-reviewer` pass on the
-offline-session/re-authentication window (`PRODUCT-CONTRACT.md` §13),
-which needs no cloud credentials at all.
+**Continued in this same session — offline-session/re-authentication
+security pass, complete.** Full record:
+`docs/adr/0020-idle-timeout-session-hardening.md`'s new addendum,
+`docs/VERIFICATION-DEBT.md`. A `security-reviewer` agent was
+dispatched; it completed real work but hit this project's recurring
+agent-resume/retrieval failure (documented since M7) on both the
+initial dispatch and the one permitted retry — the retry claimed its
+findings were "already delivered in plain text," but none were ever
+received. A rigorous self-review was substituted, reading
+`src-tauri/src/auth/mod.rs` end to end.
+
+**Numeric policy reconfirmed, not changed**: 8-hour absolute cap /
+30-minute idle timeout / 15-minute lockout all justified as still
+correct for this threat model (shortening the absolute cap would
+conflict with offline reliability), not defaulted.
+
+**One real defect found and fixed, TDD**: `login()` overwrote
+`SessionManager`'s one in-memory slot without revoking or audit-logging
+whatever session was already held — on a shared computer, a second
+teacher logging in without the first signing out first left the first
+teacher's session row silently active/un-revoked and lost their actual
+sign-off time from the audit log. A failing regression test
+(`logging_in_as_a_second_user_revokes_and_audits_the_first_users_still_active_session`)
+reproduced it first; fixed by mirroring `logout()`'s own revoke+audit
+logic inside `login()`, only after the new login's own credentials
+succeed.
+
+**One real hardening gap found, recorded as debt, not fixed this
+session**: all session-lifetime checks trust `SystemTime::now()`
+(OS wall-clock, not monotonic) — see `docs/VERIFICATION-DEBT.md`'s new
+entry for the full mitigation/severity analysis and the `Instant`-based
+fix recorded for a dedicated future pass.
+
+**A real environment fix, incidental to this pass but durable**: this
+Linux sandbox's Rust toolchain was 1.94.1 (the crate requires 1.95) and
+was missing the Tauri GTK/webkit2gtk system packages `cargo check`
+needs — both fixed this session (`rustup update stable` → 1.98.0; the
+same `apt-get install` package list `.github/workflows/quality.yml`
+already uses for its Ubuntu job). **`cargo check`/`test`/`clippy`/`fmt`
+now genuinely run in this environment**, not merely on Windows/CI — a
+real, durable capability improvement future sessions in this same kind
+of sandbox should rely on rather than assuming Rust verification is
+still blocked here.
+
+**Verification, all actually run this session**: `cargo check --lib`
+clean; `cargo test --lib auth::` 58/58 (was 57, +1 new regression
+test); full `cargo test` all green, 0 failed; `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean; `npm run
+quality:full` full end-to-end pass, exit code 0.
+
+**Gate decision: WAVE 5'S TWO NON-CLOUD-CREDENTIAL DELIVERABLES ARE
+BOTH DONE** (cloud-target decision, session-hardening review). The
+remaining Wave 5 work — the actual live sync round trip — is genuinely
+blocked on external Cloudflare account credentials only the user can
+provide (approval gate #2); recorded in `docs/VERIFICATION-DEBT.md`,
+not silently dropped. Also still open, unrelated to credentials: the
+`std::time::Instant` session-hardening follow-up above, and this
+session's own discovery that the repository currently has several
+parallel, unmerged development branches (all forked from this same
+`d9ab036` checkpoint) with substantial, non-overlapping completed work
+never reconciled with `main` or each other — a real integration
+decision only the user can make, flagged to them directly, not acted on
+here.
 
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 

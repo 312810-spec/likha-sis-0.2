@@ -98,3 +98,85 @@ run build` succeeds.
   ADR-0019's fixed lockout threshold), a client-side idle warning
   ("you'll be logged out in 2 minutes") — this app has no background
   polling loop today to drive one.
+
+## Addendum (2026-08-29) — Wave 5 security-reviewer pass on the offline-session/re-authentication policy
+
+`docs/product/PRODUCT-CONTRACT.md` §13 named this exact question as
+still open: "an offline-capable session with periodic
+re-authentication, roughly an 8-hour protection window is a
+product-requirement candidate, not a locked policy — any concrete
+numeric threshold needs a security-focused decision pass." A
+`security-reviewer` agent was dispatched for that pass; it completed
+real work but — the same recurring agent-resume/retrieval failure
+documented since M7 — returned no retrievable findings on the initial
+dispatch or the one permitted retry (the second attempt claimed its
+findings had "already [been] delivered in plain text earlier in this
+thread," but the orchestrating session never received any such text;
+it declined to restate a third time without new input). A rigorous
+self-review was substituted, reading `src-tauri/src/auth/mod.rs`
+directly end to end.
+
+**Conclusion on the numeric policy: keep 8-hour absolute cap / 30-minute
+idle timeout / 15-minute lockout unchanged.** No evidence surfaced that
+any of the three thresholds is wrong for this threat model — shortening
+the 8-hour cap would conflict with offline reliability (a teacher
+working a full school day with no network connectivity to re-
+authenticate against a cloud service must not be forcibly logged out
+mid-lesson), and the 30-minute idle window is already inside standard
+guidance with a 2-minute warning banner (ADR-0026) as the mitigating
+control for the "stepped away" case. Changing a number without new
+evidence would repeat the exact mistake `PRODUCT-CONTRACT.md` already
+warns against.
+
+**One real defect found and fixed** (`Confirmed`, TDD, not merely
+theorized): `login()` unconditionally overwrote `SessionManager`'s one
+in-memory slot with the new session, but never revoked or logged out
+whatever session was already held. On a shared school computer, if
+Teacher B logged in without Teacher A explicitly signing out first,
+Teacher A's persisted session row stayed **active or un-revoked**
+indefinitely (until its own 8-hour expiry) and no `Logout` audit event
+was ever recorded for Teacher A — silently losing exactly the
+"who was using this account and when" fact ADR-0021's audit log exists
+to preserve. A failing regression test
+(`logging_in_as_a_second_user_revokes_and_audits_the_first_users_still_active_session`)
+reproduced it before the fix; `login()` now revokes the previous
+session and records its `Logout` audit event (mirroring `logout()`'s
+own logic exactly) immediately after the new login's own credentials
+are verified — never before, so a failed second-login attempt cannot
+sign the first teacher out.
+
+**One real hardening gap identified, not fixed this session (recorded,
+not silently dropped)**: every session-lifetime comparison
+(`Session::is_active`, `expires_at`, `last_activity_at`) is computed
+from `SystemTime::now()` — ordinary OS wall-clock time, not a monotonic
+clock. On a shared computer, anyone able to roll the system clock
+backward could keep a live in-memory session (and thus a stolen or
+unattended one) alive indefinitely past both the 30-minute idle window
+and the 8-hour absolute cap, since both bounds are themselves points on
+the same manipulable clock. **Real-world severity is mitigated, not
+eliminated**: changing the system clock on Windows requires the
+`SeSystemtimePrivilege` right, which a correctly-configured shared
+school deployment (standard teacher accounts, no local admin) does not
+grant by default — this is a defense-in-depth gap for a properly locked
+down device, not an actively exploitable one under the assumed
+deployment model. Given the size of the change (switching `Session`'s
+internal time fields to `std::time::Instant` for the enforcement
+comparisons touches the struct, `new_session`, `is_active`,
+`require_active_session`'s slide-forward logic, and a large share of
+this module's existing `SystemTime`-constructing tests) versus its
+conditional severity, this is recorded as **SHOULD-FIX debt** in
+`docs/VERIFICATION-DEBT.md` for a dedicated small follow-up, not
+bundled into this pass as an unrelated large refactor.
+
+**Verification, all actually run this session**: Rust toolchain updated
+(`rustup update stable`, 1.94.1 → 1.98.0 — the crate requires 1.95) and
+this session's Linux sandbox's missing Tauri GTK/webkit2gtk system
+packages installed (the same package list `.github/workflows/quality.yml`
+already uses for the Ubuntu CI job) — both were blocking `cargo
+check`/`test` entirely before this session; a real native Rust
+toolchain now works in this environment, not merely on Windows/CI.
+`cargo check --lib` clean. `cargo test --lib auth::` — 58/58, including
+the new regression test. Full `cargo test` — all lib and integration
+suites green, 0 failed. `cargo fmt --check` / `cargo clippy
+--all-targets -- -D warnings` clean. `npm run quality:full` — full
+end-to-end pass, exit code 0.

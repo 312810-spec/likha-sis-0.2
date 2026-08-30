@@ -17,11 +17,45 @@ zero-cost. **Resolution**: the next session with real Cloudflare
 account access should deploy a minimal Worker + one Durable Object,
 implement the `SyncProvider` port's TS/Rust halves per ADR-0042's
 field-scoped audited-LWW design, and prove one real record's round
-trip end to end. Also still owed from the same Wave 5 objective:
-`PRODUCT-CONTRACT.md` §13's offline-session/re-authentication window
-needs an actual `security-reviewer` pass, not a default number — not
-blocked on credentials, genuinely still open, separate from the sync
-round trip.
+trip end to end.
+
+**Update (same day)**: the other Wave 5 objective named above — an
+actual `security-reviewer` pass on `PRODUCT-CONTRACT.md` §13's
+offline-session/re-authentication window — is now **done**. Full
+record: `docs/adr/0020-idle-timeout-session-hardening.md`'s new
+addendum. Numeric policy (8h absolute / 30m idle / 15m lockout)
+reconfirmed unchanged, justified rather than defaulted. One real defect
+found and fixed (TDD): `login()` didn't revoke/audit-log a previous
+teacher's still-active session when a second teacher logged in over it
+on a shared computer. One real hardening gap identified but not fixed
+this session (see the new entry directly below): session-lifetime
+checks trust OS wall-clock time, not a monotonic clock.
+
+## Session hardening uses wall-clock time, not a monotonic clock — SHOULD-FIX, mitigated by Windows default privileges (2026-08-29)
+
+`src-tauri/src/auth/mod.rs`'s `Session::is_active`/`expires_at`/
+`last_activity_at` are all computed from `SystemTime::now()`. On a
+shared computer, rolling the OS clock backward could keep a live
+session (including a stolen or unattended one) alive past both the
+30-minute idle window and the 8-hour absolute cap indefinitely, since
+both bounds are points on the same manipulable clock. **Mitigated, not
+eliminated**: changing the Windows system clock requires
+`SeSystemtimePrivilege`, which a correctly-configured shared-school
+deployment (standard teacher accounts, no local admin) does not grant
+by default — this is defense-in-depth debt for a properly locked-down
+device, not an actively exploitable gap under the assumed deployment
+model. **Resolution when picked up**: switch `Session`'s internal
+`created_at`/`last_activity_at` fields (and the comparisons in
+`is_active`/`require_active_session`) to `std::time::Instant`, which
+cannot go backward and ignores OS clock changes; keep `SystemTime`
+only where a wall-clock value must actually be persisted or displayed
+(audit-log timestamps, the frontend's idle-warning countdown display).
+Not done this session because of its size relative to its conditional
+severity — it touches the `Session` struct, every constructor, both
+enforcement functions, and a large share of this module's existing
+`SystemTime`-constructing tests; a dedicated small TDD pass is the
+right shape for it, not a bundle-in with an unrelated review. Full
+context: `docs/adr/0020-idle-timeout-session-hardening.md`'s addendum.
 
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 

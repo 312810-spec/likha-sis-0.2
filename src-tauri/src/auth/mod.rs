@@ -199,6 +199,28 @@ pub fn login(
         return Err(AppError::Unauthorized);
     }
 
+    // A shared-school-computer scenario: another teacher may still be
+    // holding this process's one in-memory session slot. Revoke and audit
+    // their session as an implicit sign-off now, rather than silently
+    // overwriting it -- otherwise their persisted session row stays
+    // "active" indefinitely (a stale row an accountability view could
+    // later mistake for a still-live session) and the audit log loses
+    // their actual sign-off time. Mirrors `logout`'s own revoke+audit
+    // logic exactly. Only done after the new login has already succeeded
+    // above, so a failed login attempt never signs anyone out.
+    if let Some(previous) = sessions.current() {
+        session_repo::revoke(conn, &previous.id)?;
+        if let Some(previous_user) = user_repo::find_by_id(conn, &previous.user_id)? {
+            audit_log_repo::record(
+                conn,
+                &previous.school_id,
+                Some(&previous_user.id),
+                &previous_user.username,
+                AuditEventType::Logout,
+            )?;
+        }
+    }
+
     let duration_modifier = format!("+{} seconds", SESSION_DURATION.as_secs());
     let session_id = session_repo::insert(conn, &user.id, school_id, &duration_modifier)?;
 
@@ -630,6 +652,71 @@ mod tests {
         let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries[0].event_type, AuditEventType::Logout);
         assert_eq!(entries[0].username, "ana.cruz");
+    }
+
+    /// A shared-school-computer scenario: a second teacher logs in without
+    /// the first one explicitly signing out first. `SessionManager` can
+    /// only ever hold one in-memory session, so the first teacher's
+    /// session is about to become unusable either way -- but the first
+    /// teacher's persisted session row must not be left silently "active"
+    /// in the database (a stale non-revoked row an accountability/audit
+    /// view could later mistake for a still-live session), and the audit
+    /// log (ADR-0021's whole purpose is "who was using this account and
+    /// when") must not lose the first teacher's actual sign-off time.
+    #[test]
+    fn logging_in_as_a_second_user_revokes_and_audits_the_first_users_still_active_session() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        let teacher_b =
+            user::create_user(&conn, "ben.reyes", "another strong passphrase", "Ben Reyes")
+                .unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+
+        let session_a = login(
+            &conn,
+            &sessions,
+            "ana.cruz",
+            "correct horse battery staple",
+            &s.id,
+        )
+        .unwrap();
+
+        login(
+            &conn,
+            &sessions,
+            "ben.reyes",
+            "another strong passphrase",
+            &s.id,
+        )
+        .unwrap();
+
+        assert!(
+            session_repo::is_revoked(&conn, &session_a.id).unwrap(),
+            "teacher A's session row must be revoked once teacher B logs in over it, not left active"
+        );
+        assert_eq!(
+            sessions.current().unwrap().user_id,
+            teacher_b.id,
+            "the in-memory session must reflect the new login"
+        );
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let a_logout = entries
+            .iter()
+            .find(|e| e.username == "ana.cruz" && e.event_type == AuditEventType::Logout);
+        assert!(
+            a_logout.is_some(),
+            "teacher A's implicit sign-off must be recorded, exactly like an explicit logout"
+        );
     }
 
     #[test]
