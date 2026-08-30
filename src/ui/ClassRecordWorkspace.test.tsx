@@ -146,6 +146,9 @@ class FakeAssessmentRepository implements AssessmentRepository {
   deleteResult = true;
   async deleteItem(id: string): Promise<boolean> {
     this.deleteCalls.push(id);
+    if (this.deleteResult) {
+      this.items = this.items.filter((item) => item.id !== id);
+    }
     return this.deleteResult;
   }
 }
@@ -367,6 +370,54 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Confirm delete" }));
 
     await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
+  });
+
+  it("moves focus into the delete confirmation, then to the heading once the item is actually gone", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Confirm delete" })).toHaveFocus(),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
+
+    // The item's own controls (including the button that was just
+    // focused) are now gone -- focus must land somewhere real, not <body>.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Class Record Workspace" })).toHaveFocus(),
+    );
+  });
+
+  it("returns focus to the item's own Delete button after cancelling the confirmation", async () => {
+    const user = userEvent.setup();
+    renderScreen({ assessmentRepo: new FakeAssessmentRepository([ITEM]) });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete" })).toHaveFocus());
+  });
+
+  it("moves focus into the edit form, then back to the item's select button after Cancel", async () => {
+    const user = userEvent.setup();
+    renderScreen({ assessmentRepo: new FakeAssessmentRepository([ITEM]) });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const nameField = screen.getAllByLabelText("Item name")[1]!;
+    await waitFor(() => expect(nameField).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Quiz 1 \(max 20\)/ })).toHaveFocus(),
+    );
   });
 
   it("does not offer to delete an item that already has recorded scores", async () => {

@@ -589,7 +589,8 @@ label {
   flex-wrap: wrap;
 }
 
-.attendance-roster button[aria-pressed="true"] {
+.attendance-roster button[aria-pressed="true"],
+.assessment-item-list button[aria-pressed="true"] {
   background: var(--color-primary);
   color: var(--color-primary-text);
   border-color: var(--color-primary);
@@ -597,7 +598,8 @@ label {
 }
 
 /* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
-.attendance-roster button[aria-pressed="true"]::before {
+.attendance-roster button[aria-pressed="true"]::before,
+.assessment-item-list button[aria-pressed="true"]::before {
   content: "✓ ";
 }
 

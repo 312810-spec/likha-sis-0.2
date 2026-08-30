@@ -405,6 +405,43 @@ describe("ClassRecordsScreen", () => {
     expect(classRecordRepo.listCallCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("restores focus to the list heading after returning from a workspace, not just on first mount", async () => {
+    const user = userEvent.setup();
+    const classRecordRepo = new FakeClassRecordRepository([
+      {
+        id: "cr-1",
+        schoolId: "s1",
+        sectionId: "sec-1",
+        sectionName: "Mabini",
+        subjectId: "sub-1",
+        subjectName: "Mathematics",
+        gradingPeriodId: "gp-1",
+        gradingPeriodLabel: "1st Term",
+        schoolYear: "2026-2027",
+        weightPolicyId: "wp-1",
+        weightPolicyName: WEIGHT_POLICY.name,
+        createdAt: "now",
+        itemCount: 0,
+        recordedCount: 0,
+        totalEligible: 30,
+      },
+    ]);
+    renderScreen({ classRecordRepo });
+
+    expect(await screen.findByText("No assessment items yet")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open workspace" }));
+    await screen.findByRole("heading", { name: "Class Record Workspace" });
+
+    await user.click(screen.getByRole("button", { name: "Back to Class Records" }));
+
+    // The "Back to Class Records" button that was focused when clicked is
+    // removed from the DOM on this transition -- focus must land on the
+    // list heading, not silently revert to <body>.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Class Records" })).toHaveFocus(),
+    );
+  });
+
   it("moves focus to the heading on mount", async () => {
     renderScreen();
 

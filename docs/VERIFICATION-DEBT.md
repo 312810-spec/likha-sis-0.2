@@ -1,6 +1,38 @@
 # Verification Debt
 
-## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
+## Agent-dispatch retrieval fix: cross-milestone `architecture-reviewer` debt CLOSED, UX-04 `accessibility-reviewer` debt CLOSED (2026-08-30)
+
+This session's own directed task was researching and fixing the
+recurring reviewer-agent retrieval failure referenced throughout this
+file since M7 — not ordinary product feature work. Full decision
+record: `docs/adr/0042-agent-dispatch-recovery.md`,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`. Confirmed root cause
+with a controlled same-session test (four consecutive chat-text-only
+retrieval attempts all failed, two scratch-file-based attempts both
+succeeded, one of those surviving a mid-run API failure because the file
+write had already completed) and used the fix to actually close two
+pieces of real, previously-open review debt as proof, not just a
+meta-exercise:
+
+- The **Integration Review + Main Fast-Forward cross-milestone
+  `architecture-reviewer` debt** (immediately below this entry) is
+  **CLOSED**: re-dispatched with the scratch-file protocol, retrieved a
+  complete, real 190-line independent review. No BLOCKING/SHOULD-FIX
+  findings — three NON-BLOCKING-FUTURE observations, all pre-existing
+  and already documented elsewhere in this file (limited `Capability`
+  variant coverage per ADR-0036/ADR-0039's own explicit non-goals; the
+  already-reviewed `create_school`/`list_schools`/`register_user`
+  no-gate cases). The original entry's text is left intact below per
+  this file's "mark superseded in place, don't delete" convention.
+- The **UX-04 `accessibility-reviewer` half** of the "UX-04 teacher-ux-
+  reviewer / accessibility-reviewer independent review not retrievable"
+  entry (further below) is **CLOSED** with real findings retrieved,
+  fixed, and tested — see that entry for the full detail (1 BLOCKING CSS
+  fix, 4 SHOULD-FIX fixes, 1 SHOULD-FIX deferred as its own new debt
+  entry). The `teacher-ux-reviewer` half of that same entry remains
+  genuinely open — not attempted this session.
+
+## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure — CLOSED above, original text preserved (2026-08-26)
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone
 question (does every command RBAC should gate, added after RBAC
@@ -43,10 +75,11 @@ since M7. A rigorous self-review was substituted:
   ADR-0037/ADR-0039's own explicit "deliberately not linked" reasoning,
   re-confirmed by direct schema read, not just cited.
 
-**No BLOCKING or SHOULD-FIX findings.** Real, non-self independent-review
-debt for this specific cross-milestone integration-delta question
-remains open — re-run `architecture-reviewer` once agent-resume
-behavior is confirmed reliably working in a future session.
+**No BLOCKING or SHOULD-FIX findings** from this self-review pass.
+**CLOSED 2026-08-30** — see the entry at the top of this file: a real,
+non-self `architecture-reviewer` re-run using the scratch-file dispatch
+protocol confirmed the same conclusion (no BLOCKING/SHOULD-FIX findings)
+independently.
 
 ## Minimal CI Foundation: no CI configuration debt closed (2026-08-26)
 
@@ -572,7 +605,56 @@ NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
    `security-reviewer` dispatched for an adversarial pass. Still not
    reachable from any UI (unchanged).
 
-## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+## UX-04 accessibility-reviewer independent review: RETRIEVED AND CLOSED 2026-08-30; teacher-ux-reviewer remains open
+
+**`accessibility-reviewer` half closed, real findings retrieved and
+fixed.** Re-dispatched 2026-08-30 using the new scratch-file report
+protocol (`docs/adr/0042-agent-dispatch-recovery.md`,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`) rather than relying on
+its chat response — the same recurring agent-resume/retrieval failure
+this entry originally described (see the superseded text below) is what
+that protocol exists to work around. This time a complete, genuinely
+independent 242-line review was retrieved, covering
+`ClassRecordsScreen.tsx`/`ClassRecordWorkspace.tsx` and their shared
+components. **1 BLOCKING finding, fixed**: the selected-assessment-item
+button's pressed state (`aria-pressed`) had zero visual indication — not
+even color — because the only pressed-state CSS rule in the codebase was
+scoped to `.attendance-roster button[aria-pressed="true"]`, which never
+matched `.assessment-item-list`'s markup; fixed by extending that
+selector to also cover `.assessment-item-list`
+(`src/ui/theme/styles.css`). **4 of 5 SHOULD-FIX findings fixed**: focus
+dropped to `<body>` on the two-step-delete and edit transitions (fixed
+with id-based focus-restoration `useEffect`s in `ClassRecordWorkspace.tsx`,
+covering both the confirm-delete-then-removed and cancel-and-restore
+cases); "Back to Class Records" never restored focus to the list heading
+because its mount effect had an empty dependency array (fixed by keying
+it on `selectedClassRecordId` in `ClassRecordsScreen.tsx`); the
+scored-item edit hint wasn't linked via `aria-describedby` (fixed); this
+file's own dedicated screen-reader-debt section (below) was stale,
+naming only 4 pre-UX-02 screens (fixed, see that entry). **1 SHOULD-FIX
+deferred as its own debt** (item-scoped error placement in a long
+assessment-item list — a real UX design question, not a quick fix; see
+below). **4 NON-BLOCKING-FUTURE observations recorded, not acted on**
+(mobile touch-target inconsistency — still passes the 24px floor;
+unannounced score-save success; the same focus-loss pattern on a rare
+roster-retry-button path; unverified placeholder-text contrast). 4 new
+regression tests added (`ClassRecordWorkspace.test.tsx`,
+`ClassRecordsScreen.test.tsx`); `npm run quality` 394/394 (up from 390).
+Full findings preserved as the reviewer wrote them, not just this
+summary: see this session's commit for the original scratch-file
+content, or re-derive from the fixes' own code comments, which quote the
+same reasoning.
+
+**`teacher-ux-reviewer`'s own dedicated pass on this same UX-04 scope
+remains genuinely open** — not attempted this session (this session's
+scope was proving/using the accessibility-reviewer retrieval fix, not a
+full independent-review sweep of every reviewer type). Retry it with the
+same scratch-file protocol in a future session.
+
+---
+
+Original text describing the original failure, preserved per this
+project's "mark superseded in place, don't delete" convention:
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
 against UX-04's `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx`
@@ -594,6 +676,22 @@ themselves are still open debt. Retry both in a future session once
 there's reason to believe the agent-resume harness issue is fixed;
 remove this entry once real (non-self) reviews actually complete and
 their findings are recorded.
+
+## Deferred: assessment-item-list error placement is far from the item that caused it (open, non-blocking)
+
+`accessibility-reviewer`'s 2026-08-30 UX-04 pass (above) found
+`itemActionError` (`ClassRecordWorkspace.tsx`) renders once, directly
+under the "Add item" button, above the entire assessment-item list — a
+sighted keyboard user acting on, say, item #10's Edit/Delete controls
+sees an error appear off-screen above with nothing tying it visually to
+the item that failed (it is still `role="alert"`, so a screen reader
+does get the announcement regardless of scroll position — not a total
+failure, just an inline-placement gap). Not fixed this session: the
+right fix (a per-item error slot vs. scrolling/focusing the existing
+banner into view) is a real UX decision, not a mechanical one, and out
+of scope for a session whose primary purpose was validating the
+agent-dispatch-recovery protocol. Pick this up alongside any future
+`ClassRecordWorkspace.tsx` work.
 
 ## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (RESOLVED 2026-08-25 — Native Rust Verification Recovery)
 
@@ -824,8 +922,20 @@ Testing Library + `axe-core` (see `src/test/a11y.ts`) and computed WCAG
 contrast ratios from actual hex values — not by looking at the rendered
 UI. A human visual pass (does it look premium/comfortable, not just
 structurally valid?) and a real screen-reader pass (NVDA/Narrator) on the
-compiled app are still owed for every screen shipped so far
-(`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+compiled app are still owed for every screen shipped so far, not only the
+original four this section named. **Corrected 2026-08-30** (flagged as
+stale by an independent `accessibility-reviewer` pass on UX-04 — see
+that milestone's entry below): this list previously named only
+`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`
+and had not been updated since M0–M6, even though every later UX
+milestone's own ADR (UX-02 through UX-04) separately and correctly
+disclosed the identical unclosed gap for its own screens. The debt is
+the same for all of them — a human/NVDA/Narrator pass on the compiled
+Windows app — so rather than re-enumerate a list that will keep going
+stale, the authoritative record is: **every screen in `src/ui/*.tsx`
+still owes this pass**, cross-reference each UX milestone's own ADR
+Verification section for what browser-rendered (not native) inspection
+it did complete.
 
 ## Browser-pane dev-server port was misconfigured — fixed 2026-08-25 (closed)
 

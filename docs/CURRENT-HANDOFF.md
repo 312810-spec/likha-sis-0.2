@@ -1,5 +1,92 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — Agent-Dispatch Retrieval Fix, complete)
+
+**This session's directed task: research and fix the recurring
+reviewer-subagent retrieval failure documented since M7** (see the many
+"self-review substituted, real independent-review debt remains open"
+entries throughout `docs/VERIFICATION-DEBT.md`), not ordinary product
+milestone work. Branch: `claude/research-agent-retry-recovery-zbbyp6`
+(no PR/issue existed describing the task in more detail — the branch
+name plus this project's own extensively documented recurring problem
+was the actionable signal, per Autonomous Continuous Development Mode's
+instruction to select the next highest-value work from evidence).
+
+**Root cause isolated with a controlled, same-session test** (full
+detail: `docs/adr/0042-agent-dispatch-recovery.md`): the dispatched
+agent's own chat-text final response is not a reliable report channel —
+four consecutive retrieval attempts (fresh background dispatch, a
+resume explicitly asking for plain text, a fresh synchronous
+`run_in_background: false` dispatch, a resume told to skip tools and
+just answer) all returned only a terse generic placeholder ("Complete.",
+"(No further action.)", "No new content to act on.", "No new
+instruction.") despite real, substantial tool activity (0-42 tool calls,
+49K-148K tokens) every time. Switching the delivery mechanism — instruct
+the agent to write its findings to a scratch-directory file via `Bash`,
+then `Read` that file directly from the orchestrating session — succeeded
+twice in a row (`architecture-reviewer`, then `accessibility-reviewer`),
+the second time even surviving the dispatched agent's run ending in a
+session API rate-limit `failed` status, because the file write had
+already completed before the failure.
+
+**Documented as a durable, reusable fix, not just a one-off workaround**:
+`.claude/skills/agent-dispatch-recovery/SKILL.md` (triggered whenever
+dispatching any reviewer/researcher subagent), referenced from
+`.claude/rules/autonomous-development.md`'s existing "Reviewer harness
+failures are not automatic stops" section as the new default dispatch
+method — not a fallback tried only after a first attempt already failed.
+
+**Used immediately to close real, previously-open independent-review
+debt as proof, not left as a meta-exercise**:
+
+- The Integration Review's cross-milestone `architecture-reviewer`
+  question (RBAC-gate coverage on `teaching_assignment.rs`, migration
+  additivity, `check:architecture`, leftover debug artifacts) —
+  re-dispatched with the new protocol, retrieved a complete, real
+  190-line review. No BLOCKING/SHOULD-FIX findings, confirming the
+  earlier self-review's conclusion independently rather than merely
+  re-asserting it.
+- UX-04's `accessibility-reviewer` pass on `ClassRecordsScreen.tsx`/
+  `ClassRecordWorkspace.tsx` — never successfully completed in any prior
+  session. Retrieved a complete 242-line review: **1 BLOCKING finding,
+  fixed** (the selected assessment item had zero visual pressed-state
+  indication — not even color — because the only matching CSS rule in
+  the codebase was scoped to `.attendance-roster`, which never matches
+  `.assessment-item-list`'s markup; fixed by extending that selector in
+  `src/ui/theme/styles.css`). **4 of 5 SHOULD-FIX findings fixed**: focus
+  dropped to `<body>` on the two-step-delete and edit transitions (fixed
+  with id-based focus-restoration `useEffect`s in
+  `ClassRecordWorkspace.tsx`); "Back to Class Records" never restored
+  focus to the list heading (fixed by keying its effect on
+  `selectedClassRecordId` instead of an empty deps array in
+  `ClassRecordsScreen.tsx`); a scored-item edit hint wasn't linked via
+  `aria-describedby` (fixed); this file's own dedicated screen-reader
+  debt section was stale, naming only 4 pre-UX-02 screens (fixed — see
+  that entry). **1 SHOULD-FIX deferred as its own new, disclosed debt
+  entry** (item-scoped error placement in a long assessment-item list —
+  a real UX design decision, not a mechanical fix). `teacher-ux-reviewer`'s
+  own UX-04 pass remains genuinely open, not attempted this session.
+
+**Verification, all actually run this session**: `npm install` (fresh
+container, no `node_modules` present at session start), 4 new regression
+tests added covering the focus-management and delete-visibility fixes,
+`npm run quality` PASS 394/394 (up from 390, zero regressions), `git
+status --short` clean apart from this session's own changes before
+commit. `cargo`/Rust checks not run — this session touched no Rust code.
+
+**Gate decision: AGENT-DISPATCH RETRIEVAL FIX COMPLETE, VALIDATED, AND
+IN USE.** Per Autonomous Continuous Development Mode, continuing
+autonomously is the default; this session's practical scope (proving and
+documenting the fix, using it once per agent type to confirm
+generalization, closing the debt that proof touched) is a reasonable
+stopping point for this specific research task. Recommended next
+action for a future session: use the now-documented protocol to close
+the remaining open independent-review debt entries in
+`docs/VERIFICATION-DEBT.md` (UX-04's `teacher-ux-reviewer`, UX-02/UX-03's
+`teacher-ux-reviewer`/`accessibility-reviewer` entries below, Teacher
+Load's still-cited-as-open items) rather than re-deriving the retrieval
+fix from scratch each time.
+
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 
 **`main` is now the verified integration baseline at `3951c3d`.**

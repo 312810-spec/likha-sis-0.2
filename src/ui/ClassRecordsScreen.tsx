@@ -72,9 +72,16 @@ export function ClassRecordsScreen({
   const [newSubjectName, setNewSubjectName] = useState("");
   const [addingSubject, setAddingSubject] = useState(false);
 
+  // Re-runs (not mount-only) so returning from the workspace via
+  // `handleBackToList` also restores focus to the list heading -- the
+  // "Back to Class Records" button that was focused when clicked is
+  // removed from the DOM on that transition, dropping focus to <body>
+  // otherwise. `selectedClassRecordId` truthy means the workspace branch
+  // is rendered instead and this heading doesn't exist, so `headingRef.
+  // current` is null and this is a safe no-op in that case.
   useEffect(() => {
     headingRef.current?.focus();
-  }, []);
+  }, [selectedClassRecordId]);
 
   useEffect(() => {
     let cancelled = false;

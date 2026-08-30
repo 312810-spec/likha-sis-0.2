@@ -107,9 +107,17 @@ rules:
 
 ## Reviewer harness failures are not automatic stops
 
-Follow the project's established agent/reviewer failure rule. If an
-independent reviewer performs work but findings can't be retrieved, hits
-the known resume/retrieval problem, or fails after the permitted retry:
+**Read `.claude/skills/agent-dispatch-recovery/SKILL.md` before dispatching
+any reviewer/researcher subagent** — it documents a confirmed, working
+fix (route the report through a scratch file, not the agent's chat
+response) that closes the retrieval failure described below far more
+often than the old retry-then-self-review fallback did. Use it as the
+default dispatch method, not something reached for only after a first
+attempt already failed.
+
+If a dispatch still returns nothing usable even with that protocol —
+findings can't be retrieved, the known resume/retrieval problem recurs, or
+it fails after the permitted retry:
 
 1. Record the failed review attempt honestly.
 2. Perform a rigorous self-review.
@@ -119,7 +127,7 @@ the known resume/retrieval problem, or fails after the permitted retry:
 
 Do not repeatedly spend large amounts of context trying to recover a
 known-broken reviewer result. Periodically retry the owed independent
-reviews in later sessions when the harness appears healthy.
+reviews in later sessions using the scratch-file protocol.
 
 ## Verification still matters
 

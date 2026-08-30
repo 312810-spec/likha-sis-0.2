@@ -130,6 +130,44 @@ export function ClassRecordWorkspace({
     headingRef.current?.focus();
   }, []);
 
+  // Opening the edit form for an item moves focus into it; closing it
+  // (Cancel or a successful Save, neither of which removes the item)
+  // returns focus to that same item's select button, so a keyboard/
+  // screen-reader user never loses their place in the list — the item's
+  // own controls unmount and remount around this transition, so nothing
+  // is left to hold focus on its own.
+  const previousEditingItemId = useRef<string | null>(null);
+  useEffect(() => {
+    if (editingItemId !== null) {
+      document.getElementById(`edit-name-${editingItemId}`)?.focus();
+    } else if (previousEditingItemId.current !== null) {
+      document.getElementById(`select-item-${previousEditingItemId.current}`)?.focus();
+    }
+    previousEditingItemId.current = editingItemId;
+  }, [editingItemId]);
+
+  // Same reasoning for the two-step delete confirmation, with one extra
+  // case: a successful delete removes the item's own controls entirely,
+  // so there is nothing to return focus to — fall back to the workspace
+  // heading (the same stable anchor the initial mount-focus effect above
+  // already uses) rather than silently dropping to <body>.
+  const previousConfirmingDeleteItemId = useRef<string | null>(null);
+  useEffect(() => {
+    if (confirmingDeleteItemId !== null) {
+      document.getElementById(`confirm-delete-${confirmingDeleteItemId}`)?.focus();
+    } else if (previousConfirmingDeleteItemId.current !== null) {
+      const restoreTarget = document.getElementById(
+        `delete-item-${previousConfirmingDeleteItemId.current}`,
+      );
+      if (restoreTarget) {
+        restoreTarget.focus();
+      } else {
+        headingRef.current?.focus();
+      }
+    }
+    previousConfirmingDeleteItemId.current = confirmingDeleteItemId;
+  }, [confirmingDeleteItemId]);
+
   useEffect(() => {
     return () => {
       if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
@@ -586,7 +624,7 @@ export function ClassRecordWorkspace({
                 {isEditing ? (
                   <div className="item-edit-form">
                     {isScored && (
-                      <p className="field-hint">
+                      <p className="field-hint" id={`edit-scored-hint-${item.id}`}>
                         This activity already contains learner scores. Its maximum score and
                         category can&rsquo;t be changed here because doing so could change
                         previously calculated grades. Its name can still be corrected.
@@ -600,6 +638,7 @@ export function ClassRecordWorkspace({
                           type="text"
                           value={editName}
                           onChange={(event) => setEditName(event.target.value)}
+                          aria-describedby={isScored ? `edit-scored-hint-${item.id}` : undefined}
                         />
                       </div>
                       {!isScored && (
@@ -649,6 +688,7 @@ export function ClassRecordWorkspace({
                   <>
                     <button
                       type="button"
+                      id={`select-item-${item.id}`}
                       aria-pressed={selectedItemId === item.id}
                       onClick={() => {
                         setError(null);
@@ -674,6 +714,7 @@ export function ClassRecordWorkspace({
                           </span>
                           <button
                             type="button"
+                            id={`confirm-delete-${item.id}`}
                             disabled={deletingItemId === item.id}
                             onClick={() => void handleDeleteItem(item)}
                           >
@@ -684,7 +725,11 @@ export function ClassRecordWorkspace({
                           </button>
                         </>
                       ) : (
-                        <button type="button" onClick={() => setConfirmingDeleteItemId(item.id)}>
+                        <button
+                          type="button"
+                          id={`delete-item-${item.id}`}
+                          onClick={() => setConfirmingDeleteItemId(item.id)}
+                        >
                           Delete
                         </button>
                       )}

@@ -1198,6 +1198,40 @@ was the actual reason formatting drift accumulated unnoticed:
 `quality:full` ran `cargo test`/`clippy` but never `cargo fmt --check`.
 Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
 
+## Agent-Dispatch Retrieval Fix (added 2026-08-30)
+
+This session's directed task: research and fix the recurring reviewer-
+subagent retrieval failure documented since M7 (many entries above and
+throughout `docs/VERIFICATION-DEBT.md`), not ordinary product work. A
+controlled test isolated the actual failure: the agent's own chat-text
+response is unreliable as a report channel (four consecutive attempts —
+fresh/resumed, foreground/background — all returned only a terse
+placeholder despite real, substantial tool activity each time), while
+having the agent write its findings to a scratch file via `Bash` and
+reading that file directly succeeded twice in a row, once even surviving
+a mid-run API rate-limit failure because the file write had already
+completed. Documented as `.claude/skills/agent-dispatch-recovery/SKILL.md`
+and `docs/adr/0042-agent-dispatch-recovery.md`; referenced from
+`.claude/rules/autonomous-development.md` as the new default dispatch
+method, not a fallback tried only after a first attempt fails. Used
+immediately to close two pieces of real, previously-open independent-
+review debt as proof: the Integration Review's cross-milestone
+`architecture-reviewer` question (no BLOCKING/SHOULD-FIX findings,
+confirming the earlier self-review's conclusion independently), and
+UX-04's `accessibility-reviewer` pass (1 BLOCKING CSS fix — the selected
+assessment item had zero visual pressed-state indication, since the only
+matching CSS rule was scoped to a different list's class name — plus 4
+SHOULD-FIX fixes: focus management on the two-step-delete/edit
+transitions, focus restoration on "Back to Class Records," an
+`aria-describedby` hint linkage, and a stale `VERIFICATION-DEBT.md`
+section that under-scoped which screens still owe a human screen-reader
+pass). One SHOULD-FIX (item-scoped error placement) deferred as its own
+new, disclosed debt entry — a real UX design question, not a mechanical
+fix. `teacher-ux-reviewer`'s own UX-04 pass remains open, not attempted
+this session. 4 new regression tests; `npm run quality` 394/394 (up from
+390). Full record: `docs/adr/0042-agent-dispatch-recovery.md`,
+`docs/VERIFICATION-DEBT.md`'s top two entries.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.
