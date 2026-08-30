@@ -235,3 +235,79 @@ self-review** — recorded as higher-priority debt in
 `docs/VERIFICATION-DEBT.md`, to be retried in a later session once the
 reviewer harness appears healthy, per this project's own periodic-retry
 rule.
+
+## Wave 3F Addendum — Adviser View
+
+### Scope and design
+
+Wave 3F implements the exact next slice Wave 3E recorded: the first
+read-only Subject Attendance caller of `authorize_adviser_of_section`,
+plus its UI. It introduces no new schema or authorization policy.
+
+The screen uses two independently protected reads:
+
+1. `list_adviser_view_sections(as_of_date)` resolves the active session
+   and returns only active advisory sections for an ordinary teacher; a
+   caller holding `ManageSectionAdvisories` receives every section in
+   their own school. This is a usability-scoped picker.
+2. `adviser_subject_attendance_overview(section_id, as_of_date)` ignores
+   client assumptions and re-runs `authorize_adviser_of_section` for the
+   selected resource before calling the school-scoped projection. This
+   is the trusted boundary.
+
+The projection aggregates each currently enrolled learner's raw
+Present/Absent/Late/Excused counts across every teaching assignment for
+the section, lists subject names containing one or more absences, and
+reports the highest current consecutive-absence streak within any
+single subject. It deliberately does not combine streaks across
+unrelated subjects. It returns no attendance notes and exposes no write
+operation. The screen labels the data **Subject attendance — not SF2**
+and contains no edit or conversion control.
+
+### Correctness correction discovered during implementation
+
+`monitor_for_assignment(as_of_date)` previously date-scoped its roster
+but not its held-session/entry queries. A future-dated held session could
+therefore inflate a monitor for an earlier date. Both queries now
+require `session_date <= as_of_date`.
+`monitor_for_assignment_excludes_sessions_after_the_as_of_date` proves
+the future absence is excluded from count and streak; Adviser View
+inherits the correction by reusing the monitor projection per subject.
+
+### Security and failure review
+
+- The picker joins `section_advisories` to `sections` on section and
+  school identity and constrains user id plus half-open advisory dates.
+- School Heads list only `section::list_by_school`; a cross-school id is
+  still rejected by `authorize_adviser_of_section`.
+- An unrelated Teacher cannot read a valid same-school section by
+  forging its id.
+- Every added query is parameterized; no note, actor, or write surface
+  is returned.
+- `adviser_subject_attendance_overview` is in
+  `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`, with a regression test,
+  because its legitimate resource denial serializes as the same
+  `Unauthorized` value as session expiry (ADR-0022 Wave 3B).
+- A stale UI request is invalidated when a date leaves no authorized
+  section, so a late rejection cannot replace the correct empty state.
+
+No blocker remained after self-review. A fresh independent security
+review is still owed and recorded in `VERIFICATION-DEBT.md`.
+
+### Verification and consequence
+
+Local: `npm run quality` (**714/714** Vitest), production build,
+dev-preview isolation, architecture, typecheck, ESLint, Prettier,
+`cargo fmt --check`, and harness **100/100** pass. Local Rust test/
+clippy could not link because the container lacks Tauri Linux system
+libraries and cannot install them; local security binaries were absent;
+local Playwright Chromium download timed out. GitHub Security Gate
+`33317574476` passed gitleaks, cargo-deny, and OSV. GitHub Quality Gate
+`33317574392` completed successfully: Ubuntu passed 598 Rust lib tests,
+all integration binaries, clippy, and Playwright/axe; Windows passed 602
+Rust lib tests, all integration binaries, clippy, and the native Tauri
+application build.
+
+The next slice is Wave 3G, **Section Adviser Management UI**: wire Wave
+3E's tested assign/end commands into the School Head's Sections workflow
+so Adviser View can be configured without seeded data.

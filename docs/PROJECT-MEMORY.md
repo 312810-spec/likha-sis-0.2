@@ -2668,6 +2668,39 @@ Full record: `docs/adr/0056-section-advisory-foundation.md`;
   command + UI screen), reusing `authorize_adviser_of_section`; or the
   native NVDA/Narrator pass. No candidate pre-selected.
 
+## Wave 3F — Adviser View (added 2026-08-30)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3F
+addendum; `docs/VERIFICATION-DEBT.md` Wave 3F entry. Branch
+`codex/likha-sis-wave3f-adviser-view`, based exactly on Wave 3E
+checkpoint `4de3973`; remote feature checkpoint `874a630`.
+
+- **Built**: read-only section-wide Subject Attendance projection;
+  authorized Adviser View section listing; Tauri commands; TypeScript
+  domain/port/application/adapter wiring; and a Daily Teaching Adviser
+  View screen in all three comfort modes.
+- **Authorization**: an adviser lists only active advisory section(s); a
+  School Head lists their own school's sections. The selected section is
+  re-authorized by `authorize_adviser_of_section` on every overview read.
+  Cross-school and unrelated-teacher reads fail closed; the picker is
+  never the boundary.
+- **Signals**: per current learner, raw Present/Absent/Late/Excused
+  totals across assigned subjects; subject names containing absences;
+  highest current absence streak within any one subject. Streaks are not
+  combined across subjects. No notes or write controls. Screen states
+  **Subject attendance — not SF2**.
+- **Correctness fix**: Subject Monitor's “as of” date now filters future
+  sessions/entries (`session_date <= as_of_date`), not only the roster.
+  Adviser View reuses the corrected projection.
+- **Verification**: local `npm run quality` 714/714, build/architecture/
+  format/type/lint green, `cargo fmt --check` green, harness 100/100;
+  GitHub Security Gate `33317574476` and Quality Gate `33317574392`
+  completed/success (Ubuntu 598 Rust lib tests + UI gate; Windows 602
+  Rust lib tests + native Tauri build; all integration/clippy green).
+- **Next**: Wave 3G, Section Adviser Management UI — wire assign/end
+  advisory commands into the School Head's Sections workflow so the
+  new view is configurable without seeded data.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

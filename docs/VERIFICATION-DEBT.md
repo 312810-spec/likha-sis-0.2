@@ -1,5 +1,32 @@
 # Verification Debt
 
+## Wave 3F — Adviser View (2026-08-30)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3F
+addendum; `docs/PROJECT-MEMORY.md` Wave 3F entry;
+`docs/CURRENT-HANDOFF.md` top entry.
+
+1. **Independent security review remains owed.** This is the first
+   production caller of Wave 3E's `authorize_adviser_of_section`. A
+   rigorous self-review found no surviving blocker: picker and overview
+   queries are school-scoped/parameterized; the overview re-runs the
+   trusted gate; unrelated teachers and cross-school School Heads are
+   denied by command-boundary tests; no notes/write path are exposed;
+   and the resource-gated command is classified correctly by
+   `invoke.ts`. This does not replace the fresh independent review
+   required by `.claude/rules/security-privacy.md`.
+2. **No browser-rendered screenshot fixture for Adviser View.** The
+   screen has jsdom + axe-core coverage, including its read-only/SF2
+   boundary and empty state. Local `quality:ui` could not launch because
+   Playwright Chromium was unavailable and its download timed out; the
+   GitHub Ubuntu quality job remains authoritative.
+3. **No School Head UI to assign/end an adviser yet.** Backend commands
+   and invariants shipped in Wave 3E, but Adviser View is empty until an
+   advisory exists. This is the exact Wave 3G slice.
+
+**Correctness debt closed**: Subject Monitor no longer counts future-
+dated held sessions after its requested `as_of_date`.
+
 ## Wave 3E — Section Advisory Foundation (2026-08-30)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;

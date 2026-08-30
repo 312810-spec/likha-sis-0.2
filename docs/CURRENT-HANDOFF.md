@@ -1,5 +1,59 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30 — Wave 3F: Adviser View, COMPLETE)
+
+Wave 3F continued from Wave 3E's exact pushed checkpoint `4de3973` on
+`codex/likha-sis-wave3f-adviser-view`. `main` remains untouched at
+`d9ab036`. GitHub feature checkpoint:
+`874a630b82bec22611584f10aa8c3a56eeebd765` (equivalent local commit
+`d5ff4f3`; hashes differ because the GitHub connector created the remote
+commit object).
+
+**Delivered**: Adviser View is now a first-class Daily Teaching screen.
+`list_adviser_view_sections` gives an adviser only their active advisory
+section(s), while a School Head receives only their own school's
+sections. `adviser_subject_attendance_overview` independently reuses
+Wave 3E's `authorize_adviser_of_section` gate before returning raw
+Present/Absent/Late/Excused totals across all subjects, subject names
+with recorded absences, and the highest current single-subject absence
+streak for each currently enrolled learner.
+
+**Boundaries held**: no write path was broadened; no notes are disclosed;
+no SF2, grade, conduct, or enrollment record is changed; picker filtering
+is usability only; every trusted read is school-scoped; unrelated
+teachers and cross-school School Heads fail closed. The resource-gated
+command joined the Wave 3B session-expiry exemption list.
+
+**Correctness fix**: `monitor_for_assignment` now excludes sessions and
+entries after `as_of_date`. Previously the roster was date-scoped but a
+future held session could still inflate counts/streaks. A dedicated
+regression test proves it cannot.
+
+**Verification**: local `npm run quality` green at **714/714** tests;
+TypeScript, ESLint, Prettier, architecture, production build,
+dev-preview isolation, `cargo fmt --check`, and harness **100/100** pass.
+Local native compilation was blocked by missing container system
+packages; local security tools were unavailable; local Playwright
+browser download timed out. GitHub Security Gate `33317574476` passed
+gitleaks, cargo-deny, and OSV. GitHub Quality Gate `33317574392` is
+completed/success: Ubuntu ran 598 Rust lib tests plus all integration
+binaries, clippy, and Playwright/axe; Windows ran 602 Rust lib tests plus
+all integration binaries, clippy, and the native Tauri build. All green.
+
+**Review**: self-review covered forged/cross-school section ids, stale
+advisory dates, School-Head scope, parameterized SQL, absence of notes/
+writes, session-expiry classification, and a stale UI-request race
+(fixed by invalidating an in-flight overview when a date leaves no
+authorized section). No blocker remained. A fresh independent security
+review remains owed in `docs/VERIFICATION-DEBT.md`.
+
+**Exact next slice (recorded, not started)**: Wave 3G — **Section Adviser
+Management UI**. Wire the already-tested assign/end commands into the
+School Head's Sections workflow using the existing school-member teacher
+picker, effective dates, explicit end-before-reassign behavior, and all
+three comfort modes. This closes the setup gap: Adviser View works once
+advisories exist, but no production UI creates them yet.
+
 ## Active Task (2026-08-30 — Wave 3E: Section Advisory Foundation, COMPLETE)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;

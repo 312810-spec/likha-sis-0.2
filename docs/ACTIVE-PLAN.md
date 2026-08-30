@@ -1,5 +1,55 @@
 # ACTIVE PLAN
 
+## Wave 3F: Adviser View (added 2026-08-30) — complete
+
+Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3F
+addendum; `docs/CURRENT-HANDOFF.md` top entry;
+`docs/PROJECT-MEMORY.md` Wave 3F entry; `docs/VERIFICATION-DEBT.md`
+Wave 3F entry. Branch `codex/likha-sis-wave3f-adviser-view` was created
+from Wave 3E's final checkpoint `4de3973` without modifying Wave 3E or
+`main`.
+
+**Scope**: the actual read-only Adviser View recorded by Wave 3E. New
+section-wide repository projection, two commands, TypeScript contracts/
+service/adapter, and a dedicated Daily Teaching screen. The picker
+returns only the caller's active advisory section(s), while a School
+Head may choose any section in their own school. The overview command
+independently re-runs `authorize_adviser_of_section`; picker filtering
+is never treated as the security boundary.
+
+**What teachers can now finish**: an adviser can review raw Present,
+Absent, Late, and Excused totals across every subject in their advisory
+class, see which subjects contain absences, and see the highest current
+subject-specific absence streak. The screen is explicitly labeled
+**Subject attendance — not SF2**, contains no edit/conversion control,
+and never changes another teacher's entry, SF2, a grade, or conduct/
+discipline record. School Heads retain the same read-only review path.
+
+**Correctness fix included**: Subject Monitor previously interpreted
+"as of" only for the roster; future-dated held sessions were still
+counted. Both session and entry queries now enforce
+`session_date <= as_of_date`, with a dedicated regression test.
+
+**Security review**: rigorous self-review confirmed the selected section
+is re-authorized on every read; cross-school School Heads and unrelated
+teachers fail closed; queries remain school-scoped and parameterized;
+no notes/write path are exposed; and the new resource-gated command is
+exempt from the known false session-expiry classification. No blocker
+found. A fresh independent review remains owed.
+
+**Verification**: `npm run quality` 714/714 Vitest; TypeScript, ESLint,
+Prettier, architecture, production build, `cargo fmt --check`, and
+harness 100/100 green. GitHub Security Gate `33317574476` and Quality
+Gate `33317574392` are both completed/success. Ubuntu: 598 Rust lib
+tests, all integration binaries, clippy, and Playwright/axe green.
+Windows: 602 Rust lib tests, all integration binaries, clippy, and the
+native Tauri application build green.
+
+**Next**: Wave 3G — Section Adviser Management UI. Wire the already-
+shipped assign/end commands into the School Head's Sections workflow
+with a teacher picker, effective dates, explicit history-preserving
+reassignment, three-mode parity, and trusted-boundary tests.
+
 ## Wave 3E: Section Advisory Foundation (added 2026-08-30) — complete
 
 Full record: `docs/adr/0056-section-advisory-foundation.md`;
