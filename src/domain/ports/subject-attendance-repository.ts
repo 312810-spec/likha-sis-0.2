@@ -1,4 +1,5 @@
 import type {
+  AdviserAssignmentMonitor,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
@@ -47,4 +48,6 @@ export interface SubjectAttendanceRepository {
   listSessions(teachingAssignmentId: string): Promise<SubjectAttendanceSession[]>;
 
   monitor(teachingAssignmentId: string, asOfDate: string): Promise<SubjectAttendanceMonitor | null>;
+
+  adviserSectionMonitor(sectionId: string, asOfDate: string): Promise<AdviserAssignmentMonitor[]>;
 }

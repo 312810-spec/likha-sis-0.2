@@ -621,6 +621,66 @@ pub fn monitor_for_assignment(
     }))
 }
 
+/// One subject's Subject Monitor data for the Adviser View screen --
+/// the same [`SubjectAttendanceMonitor`] any subject teacher already
+/// sees on their own Subject Monitor screen, plus enough identity
+/// (`subjectName`, `teacherUserId`) for an adviser to tell which
+/// subject and colleague each row belongs to when viewing every
+/// subject taught in their advisory section at once.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AdviserAssignmentMonitor {
+    pub teaching_assignment_id: String,
+    pub subject_id: String,
+    pub subject_name: String,
+    pub teacher_user_id: String,
+    pub monitor: SubjectAttendanceMonitor,
+}
+
+/// The spec's own "Adviser View" (`docs/product/SUBJECT-ATTENDANCE-SPEC.md`)
+/// -- read-only Subject Attendance signals across every subject taught
+/// in one section, for that section's adviser. Deliberately reuses
+/// [`monitor_for_assignment`] per teaching assignment rather than a
+/// second aggregation query: this is the exact same per-learner
+/// counts/streak computation a subject teacher already sees, just
+/// gathered across every subject in the section instead of scoped to
+/// one teacher's own assignment. Authorization
+/// (`auth::authorize_adviser_of_section`) is the caller's
+/// responsibility, exactly like `monitor_for_assignment`'s own callers
+/// authorize via `authorize_own_assignment` first -- this function
+/// trusts `school_id`/`section_id` as already-verified.
+///
+/// An unknown or cross-school `section_id`, or an invalid `as_of_date`,
+/// resolves to an empty list -- matching
+/// `teaching_assignment::list_by_section_in_school`'s own established
+/// "no row = nothing to show" convention for section-scoped reference
+/// data, rather than a distinct error a caller would have to unwrap.
+pub fn adviser_monitor_for_section(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<Vec<AdviserAssignmentMonitor>> {
+    if !is_iso_date(as_of_date) {
+        return Ok(Vec::new());
+    }
+    let assignments = teaching_assignment::list_by_section_in_school(conn, school_id, section_id)?;
+    let mut rows = Vec::with_capacity(assignments.len());
+    for assignment in assignments {
+        if let Some(monitor) = monitor_for_assignment(conn, school_id, &assignment.id, as_of_date)?
+        {
+            rows.push(AdviserAssignmentMonitor {
+                teaching_assignment_id: assignment.id,
+                subject_id: assignment.subject_id,
+                subject_name: assignment.subject_name,
+                teacher_user_id: assignment.teacher_user_id,
+                monitor,
+            });
+        }
+    }
+    Ok(rows)
+}
+
 /// Returns `Err(AppError::Unauthorized)` unless `session`'s active user
 /// is exactly the teacher on `teaching_assignment_id` within their own
 /// school — the "own assignment only" rule
@@ -660,6 +720,7 @@ mod tests {
 
     struct Fixture {
         school_id: String,
+        section_id: String,
         teacher_id: String,
         learner_id: String,
         assignment_id: String,
@@ -687,6 +748,7 @@ mod tests {
 
         Fixture {
             school_id: s.id,
+            section_id: sec.id,
             teacher_id: t.id,
             learner_id: l.id,
             assignment_id: assignment.id,
@@ -1265,5 +1327,102 @@ mod tests {
                 .unwrap();
 
         assert!(result.is_none());
+    }
+
+    fn add_second_subject_assignment(
+        conn: &Connection,
+        f: &Fixture,
+        teacher_id: &str,
+        subject_name: &str,
+    ) -> teaching_assignment::TeachingAssignment {
+        let sub = subject::create(conn, &f.school_id, subject_name).unwrap();
+        teaching_assignment::create(conn, &f.school_id, teacher_id, &f.section_id, &sub.id)
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn adviser_monitor_for_section_covers_every_subject_taught_in_the_section() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Present);
+        let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &f.school_id).unwrap();
+        let second =
+            add_second_subject_assignment(&conn, &f, &other_teacher.id, "Araling Panlipunan");
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &second.id,
+            "2026-08-25",
+            &other_teacher.id,
+        )
+        .unwrap()
+        .unwrap();
+        record_entry(
+            &conn,
+            &f.school_id,
+            &session.id,
+            &f.membership_id,
+            EntryStatus::Absent,
+            None,
+            &other_teacher.id,
+        )
+        .unwrap();
+
+        let rows =
+            adviser_monitor_for_section(&conn, &f.school_id, &f.section_id, "2026-08-29").unwrap();
+
+        assert_eq!(rows.len(), 2);
+        let math = rows
+            .iter()
+            .find(|r| r.teaching_assignment_id == f.assignment_id)
+            .unwrap();
+        assert_eq!(math.subject_name, "Mathematics");
+        assert_eq!(math.teacher_user_id, f.teacher_id);
+        assert_eq!(math.monitor.rows[0].present_count, 1);
+        let ap = rows
+            .iter()
+            .find(|r| r.teaching_assignment_id == second.id)
+            .unwrap();
+        assert_eq!(ap.subject_name, "Araling Panlipunan");
+        assert_eq!(ap.teacher_user_id, other_teacher.id);
+        assert_eq!(ap.monitor.rows[0].absent_count, 1);
+    }
+
+    #[test]
+    fn adviser_monitor_for_section_returns_empty_for_a_section_with_no_assignments() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let sec = section::create(&conn, &s.id, "2026-2027", "8", "Bonifacio").unwrap();
+
+        let rows = adviser_monitor_for_section(&conn, &s.id, &sec.id, "2026-08-29").unwrap();
+
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn adviser_monitor_for_section_returns_empty_for_an_invalid_date() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let rows =
+            adviser_monitor_for_section(&conn, &f.school_id, &f.section_id, "not-a-date").unwrap();
+
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn adviser_monitor_for_section_never_leaks_a_different_schools_data() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
+        let other_school = school::create(&conn, "Another School").unwrap();
+
+        let rows =
+            adviser_monitor_for_section(&conn, &other_school.id, &f.section_id, "2026-08-29")
+                .unwrap();
+
+        assert!(rows.is_empty());
     }
 }

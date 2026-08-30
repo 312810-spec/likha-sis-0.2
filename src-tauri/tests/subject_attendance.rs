@@ -8,11 +8,12 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::repository::subject_attendance::{
-    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor, SubjectAttendanceRosterRow,
-    SubjectAttendanceSession,
+    self, AdviserAssignmentMonitor, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor,
+    SubjectAttendanceRosterRow, SubjectAttendanceSession,
 };
 use app_lib::repository::{
-    learner, school, section, section_membership, subject, teaching_assignment, user,
+    learner, role, school, section, section_advisory, section_membership, subject,
+    teaching_assignment, user,
 };
 
 fn open_test_db() -> rusqlite::Connection {
@@ -26,6 +27,19 @@ fn login_as_a_teacher_at(
 ) -> SessionManager {
     let teacher = user::create_user(conn, username, "password", "A Teacher").unwrap();
     user::add_school_membership(conn, &teacher.id, school_id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(conn, &sessions, username, "password", school_id).unwrap();
+    sessions
+}
+
+fn login_as_a_school_head_at(
+    conn: &rusqlite::Connection,
+    school_id: &str,
+    username: &str,
+) -> SessionManager {
+    let head = user::create_user(conn, username, "password", "A School Head").unwrap();
+    user::add_school_membership(conn, &head.id, school_id).unwrap();
+    role::grant(conn, &head.id, school_id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(conn, &sessions, username, "password", school_id).unwrap();
     sessions
@@ -131,7 +145,20 @@ fn monitor_as_current_session(
     subject_attendance::monitor_for_assignment(conn, &school_id, teaching_assignment_id, as_of_date)
 }
 
+/// Standing in for `commands::subject_attendance::adviser_section_monitor`.
+fn adviser_section_monitor_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> app_lib::error::AppResult<Vec<AdviserAssignmentMonitor>> {
+    let (_user_id, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, as_of_date)?;
+    subject_attendance::adviser_monitor_for_section(conn, &school_id, section_id, as_of_date)
+}
+
 struct Fixture {
+    section_id: String,
     assignment_id: String,
     membership_id: String,
 }
@@ -149,6 +176,7 @@ fn seed(conn: &rusqlite::Connection, sessions: &SessionManager) -> Fixture {
         .unwrap();
 
     Fixture {
+        section_id: sec.id,
         assignment_id: assignment.id,
         membership_id: membership.id,
     }
@@ -337,6 +365,101 @@ fn a_teacher_cannot_view_the_monitor_for_an_assignment_they_do_not_own() {
     let other_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.b");
 
     let result = monitor_as_current_session(&conn, &other_sessions, &f.assignment_id, "2026-08-29");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_sections_adviser_can_view_the_adviser_monitor_for_that_section() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let session =
+        open_session_as_current_session(&conn, &owner_sessions, &f.assignment_id, "2026-08-29")
+            .unwrap()
+            .unwrap();
+    record_entry_as_current_session(
+        &conn,
+        &owner_sessions,
+        &f.assignment_id,
+        &session.id,
+        &f.membership_id,
+        EntryStatus::Absent,
+    )
+    .unwrap();
+    let adviser_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.adviser");
+    let (adviser_id, _) = adviser_sessions.require_active_session(&conn).unwrap();
+    section_advisory::assign(
+        &conn,
+        &school_a.id,
+        &f.section_id,
+        &adviser_id,
+        "2026-06-01",
+    )
+    .unwrap();
+
+    let rows = adviser_section_monitor_as_current_session(
+        &conn,
+        &adviser_sessions,
+        &f.section_id,
+        "2026-08-29",
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].teaching_assignment_id, f.assignment_id);
+    assert_eq!(rows[0].monitor.rows[0].absent_count, 1);
+}
+
+#[test]
+fn a_teacher_who_does_not_advise_the_section_cannot_view_the_adviser_monitor() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let other_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.b");
+
+    let result = adviser_section_monitor_as_current_session(
+        &conn,
+        &other_sessions,
+        &f.section_id,
+        "2026-08-29",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn a_school_head_can_view_the_adviser_monitor_without_advising_the_section() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let head_sessions = login_as_a_school_head_at(&conn, &school_a.id, "head.a");
+
+    let rows = adviser_section_monitor_as_current_session(
+        &conn,
+        &head_sessions,
+        &f.section_id,
+        "2026-08-29",
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].teaching_assignment_id, f.assignment_id);
+}
+
+#[test]
+fn viewing_the_adviser_monitor_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let owner_sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
+    let f = seed(&conn, &owner_sessions);
+    let no_session = SessionManager::new();
+
+    let result =
+        adviser_section_monitor_as_current_session(&conn, &no_session, &f.section_id, "2026-08-29");
 
     assert!(matches!(result, Err(AppError::Unauthorized)));
 }

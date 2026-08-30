@@ -4,6 +4,7 @@ import type { SubjectAttendanceRepository } from "../domain/ports/subject-attend
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
 import type {
+  AdviserAssignmentMonitor,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
@@ -64,6 +65,16 @@ const MONITOR: SubjectAttendanceMonitor = {
   ],
 };
 
+const ADVISER_MONITOR: AdviserAssignmentMonitor[] = [
+  {
+    teachingAssignmentId: "ta-1",
+    subjectId: "sub-1",
+    subjectName: "Mathematics",
+    teacherUserId: "teacher-1",
+    monitor: MONITOR,
+  },
+];
+
 const ASSIGNMENTS: TeachingAssignmentSummary[] = [
   {
     id: "ta-1",
@@ -122,6 +133,10 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   async monitor(teachingAssignmentId: string, asOfDate: string) {
     this.calls.push(["monitor", teachingAssignmentId, asOfDate]);
     return MONITOR;
+  }
+  async adviserSectionMonitor(sectionId: string, asOfDate: string) {
+    this.calls.push(["adviserSectionMonitor", sectionId, asOfDate]);
+    return ADVISER_MONITOR;
   }
 }
 
@@ -272,6 +287,24 @@ describe("SubjectAttendanceApplicationService", () => {
     const { service, subjectAttendance } = makeService();
 
     await expect(service.monitor("ta-1", "08/29/2026")).rejects.toThrow(ValidationError);
+    expect(subjectAttendance.calls).toEqual([]);
+  });
+
+  it("loads the adviser section monitor with a validated date", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    const result = await service.adviserSectionMonitor("sec-1", "2026-08-29");
+
+    expect(subjectAttendance.calls).toEqual([["adviserSectionMonitor", "sec-1", "2026-08-29"]]);
+    expect(result).toEqual(ADVISER_MONITOR);
+  });
+
+  it("rejects a malformed date before calling the repository for adviserSectionMonitor", async () => {
+    const { service, subjectAttendance } = makeService();
+
+    await expect(service.adviserSectionMonitor("sec-1", "08/29/2026")).rejects.toThrow(
+      ValidationError,
+    );
     expect(subjectAttendance.calls).toEqual([]);
   });
 });

@@ -108,4 +108,20 @@ describe("TauriSubjectAttendanceRepository", () => {
     });
     expect(result).toEqual(monitor);
   });
+
+  it("loads the adviser section monitor for a section as of a date", async () => {
+    const rows = [{ teachingAssignmentId: "ta-1" }];
+    mockInvoke.mockResolvedValueOnce(rows);
+
+    const result = await new TauriSubjectAttendanceRepository().adviserSectionMonitor(
+      "sec-1",
+      "2026-08-29",
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("adviser_section_monitor", {
+      sectionId: "sec-1",
+      asOfDate: "2026-08-29",
+    });
+    expect(result).toEqual(rows);
+  });
 });

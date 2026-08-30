@@ -3,6 +3,7 @@ import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type {
+  AdviserAssignmentMonitor,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
@@ -110,5 +111,14 @@ export class SubjectAttendanceApplicationService {
     const assignment = requireNonEmpty(teachingAssignmentId, "Class");
     const date = requireIsoDate(asOfDate);
     return this.subjectAttendance.monitor(assignment, date);
+  }
+
+  async adviserSectionMonitor(
+    sectionId: string,
+    asOfDate: string,
+  ): Promise<AdviserAssignmentMonitor[]> {
+    const section = requireNonEmpty(sectionId, "Section");
+    const date = requireIsoDate(asOfDate);
+    return this.subjectAttendance.adviserSectionMonitor(section, date);
   }
 }

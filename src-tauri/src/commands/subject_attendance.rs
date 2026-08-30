@@ -3,12 +3,12 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::subject_attendance::{
-    self, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor, SubjectAttendanceRosterRow,
-    SubjectAttendanceSession,
+    self, AdviserAssignmentMonitor, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor,
+    SubjectAttendanceRosterRow, SubjectAttendanceSession,
 };
 
 /// Every command in this file gates on
@@ -211,4 +211,25 @@ pub fn subject_attendance_monitor(
         &teaching_assignment_id,
         &as_of_date,
     )
+}
+
+/// Adviser View -- `docs/product/SUBJECT-ATTENDANCE-SPEC.md`'s
+/// read-only Subject Attendance signals across every subject taught in
+/// one section, for that section's adviser. Gated by
+/// `auth::authorize_adviser_of_section` (Section Advisory Foundation,
+/// Wave 3E) -- the section's current adviser, or a School Head, per
+/// that gate's own self-or-School-Head shape. Deliberately not gated by
+/// `authorize_own_assignment`: an adviser reading this may not teach
+/// any subject in their own advisory section at all.
+#[tauri::command]
+pub fn adviser_section_monitor(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    as_of_date: String,
+) -> AppResult<Vec<AdviserAssignmentMonitor>> {
+    let conn = lock_db(&db);
+    let (_user_id, school_id) =
+        auth::authorize_adviser_of_section(&conn, &sessions, &section_id, &as_of_date)?;
+    subject_attendance::adviser_monitor_for_section(&conn, &school_id, &section_id, &as_of_date)
 }

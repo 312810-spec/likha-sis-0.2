@@ -101,3 +101,18 @@ export interface SubjectAttendanceMonitor {
   heldSessionCount: number;
   rows: SubjectAttendanceMonitorRow[];
 }
+
+/** One subject's Subject Monitor data for the Adviser View screen --
+ * mirrors Rust's `AdviserAssignmentMonitor` exactly. The same
+ * `SubjectAttendanceMonitor` a subject teacher already sees on their
+ * own Subject Monitor screen, plus enough identity (`subjectName`,
+ * `teacherUserId`) for an adviser to tell which subject and colleague
+ * each row belongs to when viewing every subject in their advisory
+ * section at once. */
+export interface AdviserAssignmentMonitor {
+  teachingAssignmentId: string;
+  subjectId: string;
+  subjectName: string;
+  teacherUserId: string;
+  monitor: SubjectAttendanceMonitor;
+}

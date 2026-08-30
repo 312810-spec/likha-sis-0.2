@@ -106,6 +106,7 @@ pub fn run() {
             commands::subject_attendance::subject_attendance_roster_for_session,
             commands::subject_attendance::list_subject_attendance_sessions,
             commands::subject_attendance::subject_attendance_monitor,
+            commands::subject_attendance::adviser_section_monitor,
             commands::section_advisory::assign_section_adviser,
             commands::section_advisory::end_section_adviser,
             commands::section_advisory::current_section_adviser,

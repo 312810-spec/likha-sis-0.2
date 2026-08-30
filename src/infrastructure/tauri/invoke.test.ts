@@ -57,17 +57,19 @@ describe("invoke", () => {
   });
 
   // Wave 3B: every command gated by a Capability, `authorize_view_teacher_load`,
-  // or `authorize_own_assignment` can reject `unauthorized` for a
-  // perfectly valid session that simply isn't permitted for this one
-  // action -- see invoke.ts's own doc comment for the full discovery.
-  // One representative command per gate shape, not all 32, since the
-  // exemption logic itself is identical for each -- the coverage that
-  // actually matters is proving the mechanism works, and that it does
-  // not accidentally cover every command (the next test below).
+  // `authorize_own_assignment`, or (Wave 3E/3F) `authorize_adviser_of_section`
+  // can reject `unauthorized` for a perfectly valid session that simply
+  // isn't permitted for this one action -- see invoke.ts's own doc
+  // comment for the full discovery. One representative command per gate
+  // shape, not all 36, since the exemption logic itself is identical for
+  // each -- the coverage that actually matters is proving the mechanism
+  // works, and that it does not accidentally cover every command (the
+  // next test below).
   it.each([
     "create_teaching_assignment",
     "get_teacher_load",
     "open_subject_attendance_session",
+    "adviser_section_monitor",
     "create_section",
     "create_learner",
   ])(

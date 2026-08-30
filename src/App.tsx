@@ -21,6 +21,7 @@ import {
   teachingAssignmentService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
+import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AppShell } from "./ui/AppShell";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
@@ -315,6 +316,11 @@ function App() {
               <SubjectMonitorScreen
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
+              />
+            ) : activeTab === "adviser-view" ? (
+              <AdviserViewScreen
+                subjectAttendanceService={subjectAttendanceService}
+                sectionService={sectionService}
               />
             ) : activeTab === "teacher-load" ? (
               <TeacherLoadScreen

@@ -1,4 +1,5 @@
 import type {
+  AdviserAssignmentMonitor,
   EntryStatus,
   RecordEntryOutcome,
   SubjectAttendanceMonitor,
@@ -78,6 +79,13 @@ export class TauriSubjectAttendanceRepository implements SubjectAttendanceReposi
   ): Promise<SubjectAttendanceMonitor | null> {
     return invoke<SubjectAttendanceMonitor | null>("subject_attendance_monitor", {
       teachingAssignmentId,
+      asOfDate,
+    });
+  }
+
+  adviserSectionMonitor(sectionId: string, asOfDate: string): Promise<AdviserAssignmentMonitor[]> {
+    return invoke<AdviserAssignmentMonitor[]>("adviser_section_monitor", {
+      sectionId,
       asOfDate,
     });
   }
