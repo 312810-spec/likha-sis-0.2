@@ -1,5 +1,47 @@
 # ACTIVE PLAN
 
+## Wave 3G: Section Adviser Management UI (added 2026-08-31) — complete
+
+Full record: `docs/PROJECT-MEMORY.md` Wave 3G entry;
+`docs/CURRENT-HANDOFF.md` top entry. Continued on this session's
+designated branch `claude/continue-working-v7xzb3`, reset onto Wave 3F's
+exact checkpoint `0c62884` (the most-advanced, CI-verified line of
+development — see the memory entry for why).
+
+**Scope**: the exact next slice Wave 3F's own report named — wire the
+already-shipped `assign_section_adviser`/`end_section_adviser`/
+`current_section_adviser` commands (Wave 3E) into the School Head's
+Sections workflow. Zero Rust changes; UI-only, reusing every existing
+authorization gate unchanged.
+
+**What shipped**: `src/domain/section-advisory.ts`,
+`src/domain/ports/section-advisory-repository.ts`,
+`src/application/section-advisory-service.ts`,
+`src/infrastructure/tauri/section-advisory-repository.ts` (mirroring
+Wave 2Y's Teaching Assignments pattern exactly); a new
+`SectionAdviserScreen` reached from `SectionsScreen`'s new "Manage
+adviser" button; a new contextual `section-adviser` tab in `App.tsx`
+(same pattern as `teaching-assignments`). Reassignment is explicit
+end-then-assign, not a one-step replace — the assign form only appears
+once the current adviser has been ended, preserving advisory history.
+
+**Verification, all actually run this session**: `npm run quality`
+735/735 (up from 714 — 21 new tests across application/infrastructure/UI
+layers); typecheck/lint/format/architecture all clean; `npm run build`
+clean; `npm run check:dev-preview-isolation` clean; `npx knip` unchanged
+from the pre-existing baseline; `cargo fmt --check` clean (no Rust
+touched). GitHub Actions CI not yet re-run on this push at the time this
+was recorded.
+
+**Not done this milestone**: a fresh independent security review — not
+required by this slice's own risk (no new authorization logic added,
+every command reused unchanged from Wave 3E), but the project's general
+independent-review debt is not closed by that alone; still tracked in
+`docs/VERIFICATION-DEBT.md`.
+
+**Next**: no candidate pre-selected — evaluate fresh once this
+checkpoint's CI is confirmed green.
+
 ## Wave 3F: Adviser View (added 2026-08-30) — complete
 
 Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3F

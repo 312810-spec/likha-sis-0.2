@@ -1,5 +1,66 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Wave 3G: Section Adviser Management UI, complete)
+
+**Branch-line note, read first**: this session's designated harness
+branch (`claude/continue-working-v7xzb3`) started from an old
+integration checkpoint (`d9ab036` + a trivial `.skills` commit), far
+behind the project's actual front line — a separate, more advanced
+development line (`codex/likha-sis-wave3f-adviser-view`, Waves 2Z
+through 3F) had progressed with its own CI-verified checkpoints but was
+never fast-forwarded into `main`. Verified via `git log`/`git fetch`
+before touching anything: `main`/`origin/main` are both still at
+`d9ab036`, unaware of any wave past 3F. This session reset its own
+branch onto `codex/likha-sis-wave3f-adviser-view`'s tip (`0c62884`) and
+continued from there — the `.skills` commit was not reapplied (trivial,
+Codex-only tooling compatibility, not product code). `main` was not
+touched. **A real integration decision (fast-forwarding `main` to catch
+up through Wave 3G) remains open and is not made here** — flagging it
+explicitly for the next session/human decision, since it spans several
+waves of work never reviewed together as one integration delta (the
+same kind of review the Integration Review entry further below performed
+for the prior gap).
+
+Full record: `docs/PROJECT-MEMORY.md` Wave 3G entry;
+`docs/ACTIVE-PLAN.md`'s new top section.
+
+**Delivered**: the exact next slice Wave 3F's own report named — Section
+Adviser Management UI. New TS domain/port/application/Tauri-adapter
+layers for `SectionAdvisory`/`AssignAdviserOutcome`/`EndAdvisoryOutcome`
+mirror Wave 2Y's Teaching Assignments pattern exactly. A new
+`SectionAdviserScreen`, reached from `SectionsScreen`'s new "Manage
+adviser" button, shows the current adviser with an "End advisory"
+action, or an assign form once none is active — reassignment is
+deliberately explicit end-then-assign, not a one-step replace,
+preserving advisory history the same way `TeachingAssignmentsScreen`'s
+remove-then-create already does. Wired into `App.tsx` as a new
+contextual `section-adviser` tab, same pattern as `teaching-assignments`.
+
+**Zero Rust changes, zero new authorization surface**: every command
+this screen calls (`assign_section_adviser`/`end_section_adviser`/
+`current_section_adviser`) already existed, already gated by
+`ManageSectionAdvisories`/session-only, and already tested from Wave 3E.
+This milestone is UI-only.
+
+**Verification, all actually run this session**: `npm run quality`
+**735/735** (up from 714 — 21 new tests), typecheck/lint/format/
+architecture all clean; `npm run build` clean; `npm run
+check:dev-preview-isolation` clean; `npx knip` unchanged from the
+pre-existing baseline (zero new findings); `cargo fmt --check` clean (no
+Rust files touched this session). GitHub Actions CI on this push had not
+yet reported by the time this was recorded — check before trusting it
+green.
+
+**Not done this milestone**: a fresh independent security review (this
+slice's own risk is low — no new authorization logic, every command
+reused unchanged — but the project's general independent-review debt in
+`docs/VERIFICATION-DEBT.md` is not closed by that alone).
+
+**Gate decision: WAVE 3G COMPLETE, LOCAL VERIFICATION GREEN.** No next
+milestone pre-selected — the open integration-decision flagged above
+(main fast-forward through Wave 3G) is real work worth evaluating first,
+per this project's own autonomous-development priority order.
+
 ## Active Task (2026-08-30 — Wave 3F: Adviser View, COMPLETE)
 
 Wave 3F continued from Wave 3E's exact pushed checkpoint `4de3973` on

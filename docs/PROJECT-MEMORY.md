@@ -2701,6 +2701,48 @@ checkpoint `4de3973`; remote feature checkpoint `874a630`.
   advisory commands into the School Head's Sections workflow so the
   new view is configurable without seeded data.
 
+## Wave 3G — Section Adviser Management UI (added 2026-08-31)
+
+Full record: `docs/CURRENT-HANDOFF.md` top entry;
+`docs/ACTIVE-PLAN.md`'s new top section. Continued on branch
+`claude/continue-working-v7xzb3` (this session's designated harness
+branch), reset onto Wave 3F's exact checkpoint `0c62884` — the
+`codex/likha-sis-wave3f-adviser-view` line was the actual most-advanced,
+CI-verified state of the project (Wave 2Z through 3F), not yet reflected
+on `main`; this session's own prior branch content (a single `.skills`
+compatibility commit) was trivial and not lost in substance. `main`
+remains untouched at `d9ab036`, unaware of Waves 2Z-3G.
+
+- **Built**: closes the setup gap Wave 3F's report explicitly named —
+  Adviser View worked once advisories existed, but no production UI
+  created them. New TS domain/port/application/Tauri-adapter layers for
+  `SectionAdvisory`/`AssignAdviserOutcome`/`EndAdvisoryOutcome`, mirroring
+  Wave 2Y's Teaching Assignments pattern exactly. New
+  `SectionAdviserScreen`, reached from `SectionsScreen`'s new "Manage
+  adviser" button, wired into `App.tsx` as a contextual tab
+  (`section-adviser`) the same way `teaching-assignments` already is.
+- **No new authorization surface** — every command wired here
+  (`assign_section_adviser`/`end_section_adviser`/
+  `current_section_adviser`) already existed and was already tested from
+  Wave 3E; this milestone is UI-only, zero Rust changes.
+- **Reassignment is deliberately explicit end-then-assign**, not a
+  one-step replace — the assign form only appears once the current
+  adviser has been ended, matching `TeachingAssignmentsScreen`'s own
+  remove-then-create convention and preserving advisory history.
+- **Verification, all actually run this session**: `npm run quality`
+  735/735 (up from 714 — 21 new tests), typecheck/lint/format/
+  architecture all clean; `npm run build` clean; `npm run
+check:dev-preview-isolation` clean; `npx knip` unchanged from the
+  pre-existing baseline (zero new findings); `cargo fmt --check` clean
+  (no Rust files touched). GitHub Actions CI not yet re-run on this
+  session's push.
+- **Not done this milestone**: a fresh independent security review
+  (still owed generally per `docs/VERIFICATION-DEBT.md`; this slice adds
+  no new authorization logic, so the risk is lower than Wave 3E/3F, but
+  the debt is not closed by that alone).
+- **Next**: no candidate pre-selected — see `docs/CURRENT-HANDOFF.md` for
+  the evaluation once this checkpoint's CI is confirmed.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
