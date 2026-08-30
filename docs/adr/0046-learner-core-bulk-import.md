@@ -161,8 +161,11 @@ it) already is the "ID-generator data foundation" this line describes.
 
 ## Verification, all actually run this session (not claimed)
 
-- `cargo test --lib` (whole crate): **415 passed, 0 failed** (48 new
-  tests added across this milestone's modules, itemized below).
+- `cargo test --lib` (whole crate): **416 passed, 0 failed** (49 new
+  tests added across this milestone's modules — 48 written alongside
+  the implementation, plus one regression test added during the
+  self-review below — itemized here for the 48; the 49th is described
+  in the self-review finding).
   - `import::csv::`: 8 tests.
   - `import::learner::`: 12 tests.
   - `repository::learner_import::`: 12 tests (duplicate detection,
@@ -196,10 +199,77 @@ comparison`).
   ones from before this milestone (`userService`,
   `LEARNER_SCORE_STATUSES`, `OmittedField`, `FieldDisclosure`),
   unrelated to this work.
-- Independent `security-reviewer` **dispatched** for this milestone
-  (touches auth/persistence per `.claude/rules/security-privacy.md`) —
-  see the addendum below for its outcome, appended once the dispatch
-  returns.
+- Independent `security-reviewer` **dispatched but findings
+  unretrievable**, matching this project's documented recurring
+  agent-resume/retrieval failure: the agent completed real work (65
+  tool uses, ~148K tokens) but its completion notification carried no
+  findings text, only a bare "Done."; one explicit follow-up asking it
+  to restate its findings as plain text (not via `ReportFindings`)
+  produced the identical bare-"Complete." result. Per the established
+  rule, no further retries were attempted; a rigorous self-review was
+  substituted, covering the exact checklist given to the reviewer:
+  - **Tenant/school isolation**: read every new command's signature
+    directly (`commands/learner_import.rs`, `commands/learner_photo.rs`,
+    the new `learner_enrollment_history` in `commands/section.rs`) —
+    `school_id` is derived only from
+    `auth::authorize_capability`/`authorize_capability_with_user`/
+    `sessions.require_active_school_scope`, never a caller-supplied
+    parameter, in all six new commands.
+  - **Authorization**: confirmed `Capability::ManageLearners` still
+    resolves to `[REGISTRAR, SCHOOL_HEAD]` (unchanged), correctly
+    gating every write path (`preview_learner_import`,
+    `commit_learner_import`, `set_learner_photo`,
+    `clear_learner_photo`); the three read-only commands
+    (`get_learner_import_log`, `get_learner_photo`,
+    `learner_enrollment_history`) are session-scoped-only, matching
+    `list_learners_by_school`/`get_learner`/`section_roster`'s
+    established read convention.
+  - **SQL construction**: every new query parameterized (`rusqlite`
+    tuple/`params!` binding throughout) — no string interpolation
+    found anywhere in the new repository modules.
+  - **Error-boundary leakage**: `AppError`'s `Serialize` impl
+    reconfirmed to emit only a fixed category string per variant —
+    `InvalidImport` (message-free) and `InvalidImage(_)` (message
+    discarded at serialization) both covered, matching every existing
+    variant's pattern; a direct test
+    (`serialization_never_leaks_underlying_error_detail`) already
+    proves this for the general case.
+  - **Image-handling safety**: `learner_photo.rs`'s mime whitelist,
+    2MB byte cap, and decompression-bomb pixel-count guard
+    (re-verified against a real 9000×9000 solid-color PNG, well under
+    the byte cap yet correctly rejected on pixel count) all hold; the
+    dependency-free CSV parser (`import/csv.rs`) walks `text.chars()`
+    with no indexing/slicing that could panic on malformed or
+    adversarial input — confirmed by reading the parser directly, not
+    just by its passing tests.
+  - **PII handling**: `learner_import_log`'s stored
+    name/LRN/sex fields are the intended provenance audit trail
+    (school-scoped, encrypted at rest via SQLCipher, ADR-0003) — an
+    appropriate, expected use, not an expansion of PII collection.
+  - **One real, non-theoretical finding, found and fixed before this
+    milestone was called done**: `commit_batch`'s `Skip` branch never
+    validated that `existing_learner_id` actually belonged to
+    `school_id` — unlike `Update`, which is implicitly protected by
+    `learner::update`'s own school-scoped `WHERE` clause, `Skip`
+    writes no row to piggyback that check on, so it had no validation
+    of its own. A malformed or malicious direct IPC call (never
+    reachable through the normal UI flow, which always sources
+    `existing_learner_id` from this school's own
+    `find_potential_duplicate`) could have logged a provenance entry
+    referencing another school's real learner id. Fixed by adding an
+    explicit `learner::find_by_id_in_school` check to the `Skip`
+    branch, erroring (and rolling back the whole batch, per the
+    existing atomicity guarantee) exactly like `Update` already does
+    for the same case. Proven with a new test
+    (`commit_batch_never_lets_one_school_log_a_skip_against_another_
+schools_learner`) — not just asserted in a comment — including
+    confirming zero provenance rows are left behind. `cargo test --lib`
+    reconfirmed **416 passed, 0 failed** after the fix.
+  - **No other BLOCKING or SHOULD-FIX findings.**
+    **Real, non-self independent security review remains owed** — retry
+    `security-reviewer` in a later session once agent-resume/retrieval
+    behavior is confirmed reliably working again; recorded in
+    `docs/VERIFICATION-DEBT.md`.
 - **Not run**: `npm run quality:security` (gitleaks/cargo-deny/
   osv-scanner binaries not installed in this sandbox, a known
   per-machine gap, not attempted-and-hidden); real browser-rendered

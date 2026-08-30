@@ -237,6 +237,23 @@ pub fn commit_batch(
                 ("updated", Some(updated.id))
             }
             ImportAction::Skip => {
+                // `Skip` writes no learner row, but still must not let a
+                // caller log a provenance entry pointing at another
+                // school's learner id -- `Update`'s own school-scoped
+                // `WHERE` clause already protects that action; `Skip` has
+                // no such write to piggyback on, so it needs this
+                // explicit check of its own. Under the normal UI flow
+                // `existing_learner_id` always comes from this school's
+                // own `find_potential_duplicate`, so this only ever
+                // fires for a malformed/malicious direct IPC call -- but
+                // school isolation must hold at this trusted boundary
+                // regardless of what the frontend is expected to send.
+                let existing_id = decision
+                    .existing_learner_id
+                    .as_deref()
+                    .ok_or(crate::error::AppError::InvalidImport)?;
+                learner::find_by_id_in_school(&tx, school_id, existing_id)?
+                    .ok_or(crate::error::AppError::InvalidImport)?;
                 skipped_count += 1;
                 ("skipped", decision.existing_learner_id.clone())
             }
@@ -545,6 +562,34 @@ mod tests {
         assert!(
             result.is_err(),
             "updating a different school's learner id must fail, not succeed silently"
+        );
+    }
+
+    #[test]
+    fn commit_batch_never_lets_one_school_log_a_skip_against_another_schools_learner() {
+        let mut conn = open_test_db();
+        let (school_id, user_id) = seed_school_and_user(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_learner =
+            learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        let mut decision = base_decision(1);
+        decision.action = ImportAction::Skip;
+        decision.existing_learner_id = Some(other_learner.id);
+
+        let result = commit_batch(&mut conn, &school_id, &user_id, &[decision]);
+
+        assert!(
+            result.is_err(),
+            "skipping with a different school's learner id must fail, not log it silently"
+        );
+        let log_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM learner_import_log", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            log_count, 0,
+            "the rejected decision must not have left a provenance row behind"
         );
     }
 }

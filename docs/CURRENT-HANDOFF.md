@@ -46,21 +46,33 @@ existing nullable `Learner.lrn` field (DepEd's own LRN is the
 identifier here, not a locally-generated one).
 
 **Verification, all actually run this session**: `cargo test --lib`
-415/415 (48 new tests across `import::csv::`, `import::learner::`,
-`repository::learner_import::`, `repository::learner_photo::`, and 5
-new `section_membership::history_for_learner` tests); `cargo clippy
---all-targets -- -D warnings` clean (one real finding fixed —
-`clippy::bool_assert_comparison`); `cargo fmt --check` clean; `npm run
-quality` clean, 439/439 tests; `npx tsc -b --noEmit` clean; `npm run
-build` clean; `npm run check:dev-preview-isolation` clean; `npx knip`
-zero new findings (same 4 pre-existing, unrelated). `npm run
-quality:security` not run (gitleaks/cargo-deny/osv-scanner still not
-installed in this sandbox, a known per-machine gap).
+416/416 (49 new tests, including one added during the self-review
+below); `cargo clippy --all-targets -- -D warnings` clean (one real
+finding fixed — `clippy::bool_assert_comparison`); `cargo fmt --check`
+clean; `npm run quality` clean, 439/439 tests; `npx tsc -b --noEmit`
+clean; `npm run build` clean; `npm run check:dev-preview-isolation`
+clean; `npx knip` zero new findings (same 4 pre-existing, unrelated).
+`npm run quality:security` not run (gitleaks/cargo-deny/osv-scanner
+still not installed in this sandbox, a known per-machine gap).
 
-**Independent `security-reviewer` dispatched** for this milestone
-(touches auth/persistence per `.claude/rules/security-privacy.md`) —
-see `docs/adr/0046-learner-core-bulk-import.md`/
-`docs/VERIFICATION-DEBT.md` for the outcome once retrieved.
+**Independent `security-reviewer` dispatched, findings unretrievable**
+— completed real work (65 tool uses, ~148K tokens) but returned no
+findings text, only a bare "Done."; one explicit follow-up asking for
+plain text produced the identical result. This project's documented
+recurring agent-resume/retrieval failure, third instance now (see
+`docs/VERIFICATION-DEBT.md`'s top entry) — worth investigating as a
+harness issue if it keeps recurring. A rigorous self-review was
+substituted, covering the reviewer's full checklist. **One real,
+non-theoretical finding, found and fixed before this milestone was
+called done**: `commit_batch`'s `Skip` decision path never validated
+`existing_learner_id` against the caller's `school_id` (unlike
+`Update`, which is implicitly protected by `learner::update`'s own
+scoped `WHERE` clause) — a malformed/malicious direct IPC call (never
+reachable through the normal UI flow) could have logged a provenance
+entry referencing another school's learner id. Fixed, proven with a
+new regression test, not just asserted. No other BLOCKING/SHOULD-FIX
+findings. Real, non-self review remains owed — full detail in
+`docs/VERIFICATION-DEBT.md`'s top entry.
 
 **Docs updated**: `PRODUCT-CONTRACT.md` §5 (SF1 row: not built →
 partially built, with the two deferred items named), `ADR-0035`'s

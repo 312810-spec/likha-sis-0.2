@@ -1,5 +1,54 @@
 # Verification Debt
 
+## Wave 2 (Learner Core): `security-reviewer` findings unretrievable, self-review substituted (2026-08-30)
+
+Full milestone record: `docs/adr/0046-learner-core-bulk-import.md`.
+Required per `.claude/rules/security-privacy.md` (this milestone
+touches auth — three new commands gated by `Capability::ManageLearners`
+— and persistence — three new tables). `security-reviewer` was
+dispatched with a detailed checklist (tenant/school isolation,
+authorization gating, bulk-import atomicity/provenance, image-handling
+safety, SQL construction, error-message leakage, PII handling). The
+agent completed real work (65 tool uses, ~148K tokens) but its
+completion notification carried no findings text, only a bare "Done."
+— this project's documented recurring agent-resume/retrieval failure,
+not a rate limit or other hard error this time. One explicit follow-up
+asking it to restate its findings as plain text (not via
+`ReportFindings`) produced the identical bare-"Complete." result (150K
+tokens, another 65 tool uses spent, no text returned). Per the
+established rule (ask once, then stop retrying rather than repeatedly
+spending context chasing a known-broken reviewer result), no further
+retries were attempted.
+
+A rigorous self-review was substituted, covering the exact checklist
+given to the failed reviewer — full detail in ADR-0046's Verification
+section. **One real, non-theoretical finding, found and fixed before
+this milestone was called done**: `learner_import::commit_batch`'s
+`Skip` branch never validated that `existing_learner_id` actually
+belonged to the caller's `school_id`. `Update` is implicitly protected
+by `learner::update`'s own school-scoped `WHERE` clause; `Skip` writes
+no learner row to piggyback that check on, so it had no validation of
+its own — a malformed or malicious direct IPC call (never reachable
+through the normal UI flow) could have logged a provenance entry
+referencing another school's real learner id. Fixed by adding an
+explicit `learner::find_by_id_in_school` check to the `Skip` branch,
+matching `Update`'s existing protection; proven with a new regression
+test (`commit_batch_never_lets_one_school_log_a_skip_against_another_
+schools_learner`), not just asserted. `cargo test --lib` reconfirmed
+416/416 after the fix. No other BLOCKING or SHOULD-FIX findings —
+tenant isolation, authorization gating, SQL parameterization,
+error-boundary leakage, image-handling safety, and PII handling all
+checked out clean.
+
+**Real, non-self security review remains owed** for this milestone —
+retry `security-reviewer` in a later session once agent-resume/
+retrieval behavior is confirmed reliably working again (this is now
+the third documented instance of this failure mode across recent
+milestones — see the School Branding entry below and the Foundation
+entries further down — worth investigating as a harness issue in its
+own right if it keeps recurring, per
+`.claude/rules/autonomous-development.md`'s reviewer-failure handling).
+
 ## School Branding: `security-reviewer` failed on a rate limit, self-review substituted (2026-08-29)
 
 Full milestone record: `docs/adr/0045-school-branding.md`. Required per

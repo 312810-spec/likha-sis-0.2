@@ -64,10 +64,17 @@ Greenfield repository. No old implementation is authoritative.
   table). Two scope decisions recorded: transfer foundation deferred to
   Wave 5 (needs the cloud/sync layer); ID-generator data foundation
   already satisfied by the existing nullable `Learner.lrn` field (no
-  new code needed). `cargo test --lib` 415/415 (48 new), `npm run
+  new code needed). `cargo test --lib` 416/416 (49 new), `npm run
 quality` 439/439, all real and actually run. `security-reviewer`
-  dispatched — outcome in `docs/VERIFICATION-DEBT.md` once retrieved.
-  **Wave 2 is now fully complete.** Per explicit user instruction, this
+  dispatched but findings unretrievable (this project's documented
+  recurring agent-resume/retrieval failure, third instance) — a
+  rigorous self-review was substituted and found one real issue,
+  fixed before shipping: `commit_batch`'s `Skip` path didn't validate
+  `existing_learner_id` against the caller's school (unlike `Update`,
+  protected by `learner::update`'s own scoped query), fixed with an
+  explicit check + a proven regression test. Real, non-self review
+  remains owed — full detail in `docs/VERIFICATION-DEBT.md`'s top
+  entry. **Wave 2 is now fully complete.** Per explicit user instruction, this
   session stops here rather than auto-continuing into Wave 3 (Form
   Engine, pre-researched and ready per ADR-0044).
 
