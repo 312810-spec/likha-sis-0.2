@@ -40,8 +40,9 @@ command-boundary tests; `cargo fmt --check` /
 100/100, unchanged.
 
 **Next**: the actual Adviser View read (repository function + command
-+ UI screen), reusing `authorize_adviser_of_section`; or the native
-NVDA/Narrator pass. No candidate pre-selected.
+
+- UI screen), reusing `authorize_adviser_of_section`; or the native
+  NVDA/Narrator pass. No candidate pre-selected.
 
 ## Wave 3D: Subject Monitor (added 2026-08-30) — complete
 
