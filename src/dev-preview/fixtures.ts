@@ -59,6 +59,14 @@ import type {
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
 import type { AuditLogEntry, CurrentSession } from "../domain/session";
 import type { Subject } from "../domain/subject";
+import type { SchoolMemberRepository } from "../domain/ports/school-member-repository";
+import type { SectionAdvisoryRepository } from "../domain/ports/section-advisory-repository";
+import type { SchoolMember } from "../domain/school-member";
+import type {
+  AssignAdviserOutcome,
+  EndAdvisoryOutcome,
+  SectionAdvisory,
+} from "../domain/section-advisory";
 
 /** A plain data object, not a real session -- see this file's own doc
  * comment. Rendered only as a prop to `AppShell`/`TeacherWorkspaceScreen`
@@ -1016,5 +1024,85 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
       wasTransmuted: false,
       wasFloored: termGrade === 60 && initialGrade < 60,
     };
+  }
+}
+
+const FIXTURE_SCHOOL_MEMBERS: SchoolMember[] = [
+  { id: "teacher-ana", username: "ana.cruz", displayName: "Ana Cruz", roles: ["teacher"] },
+  {
+    id: "teacher-bayani",
+    username: "bayani.reyes",
+    displayName: "Bayani Reyes",
+    roles: ["teacher"],
+  },
+  {
+    id: "head-corazon",
+    username: "corazon.santos",
+    displayName: "Corazon Santos",
+    roles: ["school_head"],
+  },
+];
+
+export class FixtureSchoolMemberRepository implements SchoolMemberRepository {
+  async listMembers(): Promise<SchoolMember[]> {
+    return FIXTURE_SCHOOL_MEMBERS;
+  }
+}
+
+/** In-memory-only advisory state for `sec-not-started` (Wave 3G's own
+ * screen), seeded with one already-active advisory so both the
+ * "current adviser / end advisory" state and, after ending it, the
+ * "no adviser / assign" state are both reachable in one fixture --
+ * mutated by `assign()`/`end()` so a School Head can genuinely walk
+ * the full end-then-reassign cycle, never persisted, never touches
+ * Tauri/SQLite. */
+export class FixtureSectionAdvisoryRepository implements SectionAdvisoryRepository {
+  private advisory: SectionAdvisory | null = {
+    id: "adv-1",
+    schoolId: "fixture-school",
+    sectionId: "sec-not-started",
+    teacherUserId: "teacher-ana",
+    startsOn: "2026-06-01",
+    endsOn: null,
+    createdAt: "2026-06-01T00:00:00.000Z",
+  };
+
+  async currentAdviser(sectionId: string): Promise<SectionAdvisory | null> {
+    if (this.advisory && this.advisory.sectionId === sectionId) return this.advisory;
+    return null;
+  }
+
+  async assign(
+    sectionId: string,
+    teacherUserId: string,
+    startsOn: string,
+  ): Promise<AssignAdviserOutcome> {
+    if (this.advisory && this.advisory.sectionId === sectionId) {
+      return { kind: "alreadyHasAnActiveAdviser" };
+    }
+    const advisory: SectionAdvisory = {
+      id: `adv-${Date.now()}`,
+      schoolId: "fixture-school",
+      sectionId,
+      teacherUserId,
+      startsOn,
+      endsOn: null,
+      createdAt: new Date().toISOString(),
+    };
+    this.advisory = advisory;
+    return { kind: "assigned", advisory };
+  }
+
+  async end(sectionId: string, advisoryId: string, endsOn: string): Promise<EndAdvisoryOutcome> {
+    if (
+      !this.advisory ||
+      this.advisory.id !== advisoryId ||
+      this.advisory.sectionId !== sectionId
+    ) {
+      return { kind: "notFound" };
+    }
+    const ended: SectionAdvisory = { ...this.advisory, endsOn };
+    this.advisory = null;
+    return { kind: "ended", advisory: ended };
   }
 }

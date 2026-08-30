@@ -8,6 +8,8 @@ import { EnrollmentHistoryApplicationService } from "../application/enrollment-h
 import { GradingApplicationService } from "../application/grading-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import { LearnerScoreApplicationService } from "../application/learner-score-service";
+import { SchoolMemberApplicationService } from "../application/school-member-service";
+import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
 import { AppShell } from "../ui/AppShell";
@@ -16,6 +18,8 @@ import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { LearnerListScreen } from "../ui/LearnerListScreen";
+import { SectionAdviserScreen } from "../ui/SectionAdviserScreen";
+import { SectionsScreen } from "../ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
 import { WorkbenchNav } from "../ui/components/WorkbenchNav";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
@@ -32,6 +36,8 @@ import {
   FixtureGradingRepository,
   FixtureLearnerRepository,
   FixtureLearnerScoreRepository,
+  FixtureSchoolMemberRepository,
+  FixtureSectionAdvisoryRepository,
   FixtureSectionRepository,
   FixtureSubjectRepository,
 } from "./fixtures";
@@ -49,11 +55,14 @@ import {
  *   authentication, a real session, Tauri, or SQLite.
  *
  * Renders the exact same `AppShell`, `WorkbenchNav`, and screen
- * components production uses (reused, not duplicated), only three
- * destinations wired (Workspace, Attendance, Sign-in Activity -- enough
- * to visually verify UX-02's own changes and the section-preselection
- * flow between them) so this stays a narrow verification tool, not a
- * second app shell to maintain.
+ * components production uses (reused, not duplicated). Wired
+ * destinations have grown with each milestone that needed real
+ * browser-rendered verification (see each screen's own git history for
+ * which wave added it) -- still a narrow verification tool, not a full
+ * second app shell: several `SignedInTab` destinations (e.g. Subject
+ * Attendance, Teacher Load, Adviser View) remain unwired and fall
+ * through to the catch-all message below, tracked as retained debt in
+ * `docs/VERIFICATION-DEBT.md` rather than assumed covered.
  */
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
@@ -70,6 +79,10 @@ const subjectService = new SubjectApplicationService(new FixtureSubjectRepositor
 const classRecordService = new ClassRecordApplicationService(new FixtureClassRecordRepository());
 const assessmentService = new AssessmentApplicationService(new FixtureAssessmentRepository());
 const learnerScoreService = new LearnerScoreApplicationService(new FixtureLearnerScoreRepository());
+const schoolMemberService = new SchoolMemberApplicationService(new FixtureSchoolMemberRepository());
+const sectionAdvisoryService = new SectionAdvisoryApplicationService(
+  new FixtureSectionAdvisoryRepository(),
+);
 
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
@@ -78,6 +91,10 @@ export function DevPreviewApp() {
     sectionId: string;
     year: number;
     month: number;
+  } | null>(null);
+  const [sectionAdviserSection, setSectionAdviserSection] = useState<{
+    sectionId: string;
+    sectionName: string;
   } | null>(null);
 
   return (
@@ -147,6 +164,25 @@ export function DevPreviewApp() {
           />
         ) : activeTab === "audit-log" ? (
           <AuditLogScreen authService={authService} />
+        ) : activeTab === "sections" ? (
+          <SectionsScreen
+            sectionService={sectionService}
+            learnerService={learnerService}
+            onOpenRoster={() => {}}
+            onManageAssignments={() => {}}
+            onManageAdviser={(sectionId, sectionName) => {
+              setSectionAdviserSection({ sectionId, sectionName });
+              setActiveTab("section-adviser");
+            }}
+          />
+        ) : activeTab === "section-adviser" ? (
+          <SectionAdviserScreen
+            sectionAdvisoryService={sectionAdvisoryService}
+            schoolMemberService={schoolMemberService}
+            sectionId={sectionAdviserSection?.sectionId ?? "sec-not-started"}
+            sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
+            onBack={() => setActiveTab("sections")}
+          />
         ) : (
           <div className="alert alert-info" role="status">
             <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>

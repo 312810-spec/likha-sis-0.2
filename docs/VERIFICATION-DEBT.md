@@ -1,5 +1,35 @@
 # Verification Debt
 
+## Section Adviser browser-rendered verification — partially closed (2026-08-31)
+
+Real browser-rendered Playwright verification of the Section Adviser
+screen (Wave 3G) is now done — this session's environment has Chromium
+pre-installed (unlike prior sessions, which recorded this as blocked),
+confirmed live. Extended `src/dev-preview/fixtures.ts` with
+`FixtureSchoolMemberRepository` and a genuinely stateful, in-memory
+`FixtureSectionAdvisoryRepository` (not read-only stubs — a School Head
+can walk the real end-then-reassign cycle in the fixture), and wired
+`src/dev-preview/DevPreviewApp.tsx`'s `sections` tab (previously
+unwired, despite `TeacherWorkspaceScreen`'s "Manage sections" button
+already pointing at it) through to a new `section-adviser` tab
+rendering the real `SectionAdviserScreen`. Verified via a full
+Playwright walk (1366-wide, light + dark, both Comfortable and Guided
+modes): Sections list → "Manage adviser" → current-adviser state → End
+advisory → confirmation + empty state → Assign adviser form → new
+assignment confirmed. No console errors, no accessibility regressions
+observed. This closes Wave 3F's item 2 **for the Section Adviser
+screen only**.
+
+**Not closed by this session**: Adviser View itself (`AdviserViewScreen`,
+Wave 3F) still has no dev-preview fixture wiring — it needs a
+`SubjectAttendanceApplicationService` fixture (present nowhere in
+`fixtures.ts` today), a materially larger addition than Section
+Adviser's two small repositories, deliberately deferred rather than
+scope-crept into this slice. Also still unwired in dev-preview: Subject
+Attendance, Subject Monitor, Teacher Load, Teaching Assignments,
+Schedule Meetings, SF1 Import — tracked here as retained debt, not
+assumed covered by this session's work.
+
 ## Wave 3E/3F/3G individual review debt — closed (2026-08-31)
 
 A `security-reviewer` was dispatched specifically for the three

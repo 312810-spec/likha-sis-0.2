@@ -1,5 +1,58 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)
+
+Continued directly after the Wave 3E/3F/3G review debt closure below,
+on `main` at `40170e7`. Full record: `docs/VERIFICATION-DEBT.md`'s new
+top entry.
+
+Closed the recommended next slice named at the end of the Integration
+Review entry below: real browser-rendered Playwright verification of
+the Section Adviser screen. This session's environment turned out to
+have Chromium pre-installed (confirmed live, not assumed), unlike prior
+sessions that recorded this as a hard blocker.
+
+**What shipped**: `src/dev-preview/fixtures.ts` gained
+`FixtureSchoolMemberRepository` and a genuinely stateful
+`FixtureSectionAdvisoryRepository` (in-memory, mutated by `assign()`/
+`end()` — not a read-only stub, so the full end-then-reassign cycle is
+actually interactive in the fixture). `src/dev-preview/DevPreviewApp.tsx`
+gained a `sections` tab (previously unwired, despite
+`TeacherWorkspaceScreen`'s existing "Manage sections" button already
+pointing at it — a real, if minor, pre-existing gap this closes as a
+side effect) wired through to a new `section-adviser` tab rendering
+the real `SectionAdviserScreen`, reached the same way production does
+(Sections → "Manage adviser" button), not an artificial always-on tab.
+
+**Verified live via Playwright** (1366×900, light + dark, Comfortable
+and Guided modes, driven against `vite`'s dev server on
+`dev-preview.html`): the full flow — Sections list → Manage adviser →
+current-adviser state → End advisory → confirmation + empty state →
+Assign adviser form → new adviser confirmed — renders correctly in
+every combination checked, no console errors, no visual defects.
+Screenshots sent to the user directly.
+
+**Re-verified after the fixture change**: `npm run quality` 735/735,
+typecheck/lint/format/architecture clean; `npm run build` clean;
+`npm run check:dev-preview-isolation` clean (the fixture additions do
+not leak into the production bundle).
+
+**Not done this slice, deliberately deferred**: `AdviserViewScreen`
+itself still has no dev-preview fixture — it needs a
+`SubjectAttendanceApplicationService` fixture that doesn't exist yet in
+`fixtures.ts`, a materially larger addition than Section Adviser's two
+small repositories. Recorded as retained debt, not scope-crept into
+this slice.
+
+**Gate decision: SECTION ADVISER FEATURE LINE FULLY BUILT, REVIEWED,
+AND VISUALLY VERIFIED.** No code-change work remains open on this
+feature line. Next candidate (not started): extend the dev-preview
+fixture for Adviser View itself (needs the Subject Attendance fixture
+first), or begin the next macro-wave candidate named in the Integration
+Review entry's evaluation (Wave 5 Sync's 10-scenario decision, Key
+Stage 1 descriptive grading research, etc.) — no single one clearly
+wins without a fresh evaluation pass, so none is pre-selected here.
+
 ## Active Task (2026-08-31, this session — Wave 3E/3F/3G Individual Review Debt Closure, complete)
 
 Continued directly after the Integration Review below, on `main` at
