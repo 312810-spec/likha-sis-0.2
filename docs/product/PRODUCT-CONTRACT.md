@@ -243,23 +243,35 @@ adoption decisions) before writing any adapter code. No learner PII
 should ever be required by a generation tool. Nothing in this area has
 been started.
 
-## 12. Cloud / sync / web access — HYPOTHESIS, no ADR yet
+## 12. Cloud / sync / web access — DIRECTION SET (target decided), not yet implemented
 
-**Repository-truth correction**: no cloud/sync ADR or code exists today
-— `SyncProvider` is only the architecture-diagram placeholder in
-ADR-0001's layering statement, never implemented. The "Cloudflare Worker
+**Updated 2026-08-29** (`docs/adr/0042-cloud-sync-target-decision.md`):
+the required 10-scenario cloud-target decision has now actually been
+run (it was previously only a stated hypothesis). **Decision: Cloudflare
+Workers + one SQLite-backed Durable Object per school**, with a
+field-scoped, explicitly audited last-write-wins operation log (never a
+silent whole-record overwrite) — scored 8.30/10 against a
+privacy/security-weighted rubric derived from `CLAUDE.md`'s priority
+order, ahead of the documented Next Best (Cloudflare Workers + one D1
+database per school, 7.90 — a pre-justified fallback if the Durable
+Object SQLite storage API proves awkward in practice) and five other
+scored, zero-cost-filtered scenarios (hand-rolled CRDT variants,
+PowerSync, Firebase/Firestore, a self-hosted free-tier PaaS server).
+Supabase and an always-on VPS remain excluded/disqualified, unchanged.
+CRDT is a real, evidenced future upgrade path if actual concurrent-edit
+conflicts justify it, not built now.
 
-- one SQLite-backed Durable Object per school (next-best: Worker + one
-  D1 database per school)" target stated in this reconciliation is
-  recorded here as the **current working hypothesis**, not a ratified
-  architecture decision — no prior ADR or scenario pass established it in
-  this repository. **Before real sync implementation begins, run this
-  project's own 10-scenario architecture-decision process** (per
-  `.claude/rules/autonomous-development.md`) to actually decide the cloud
-  target, rather than treating this hypothesis as pre-approved. Cloud is
-  never the teacher's working database; SQLite remains primary. Web/PWA
-  access (for iOS/macOS/stakeholders) must respect the same school/role
-  authorization boundaries as native — no separate, weaker web auth path.
+**Not yet implemented**: no product code, schema, or dependency exists
+for this yet — this is the architecture decision only. **The "one real
+end-to-end sync round trip" success bar from §15 is genuinely blocked**,
+not skipped: it requires an actual Cloudflare account and API
+credentials, which are external material only the user can provide
+(`.claude/rules/autonomous-development.md` gate #2) — confirmed
+unavailable in the deciding session (no credentials in environment, no
+prior Cloudflare config anywhere in this repository). Cloud is never the
+teacher's working database; SQLite remains primary. Web/PWA access (for
+iOS/macOS/stakeholders) must respect the same school/role authorization
+boundaries as native — no separate, weaker web auth path.
 
 ## 13. Local session / auth hardening — BUILT (current), HYPOTHESIS (extension)
 

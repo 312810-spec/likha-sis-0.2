@@ -1,5 +1,28 @@
 # Verification Debt
 
+## Wave 5 Cloud Sync Target: live round trip blocked on external Cloudflare credentials (2026-08-29)
+
+`docs/adr/0042-cloud-sync-target-decision.md` completed the required
+10-scenario cloud-target architecture decision (Cloudflare Workers +
+Durable Object per school). It did **not** attempt Wave 5's other
+stated deliverable, "one real end-to-end sync round trip"
+(`PRODUCT-CONTRACT.md` §15) — confirmed genuinely blocked, not merely
+deferred: `env | grep -i cloudflare` found no credentials in this
+session's environment, and no Cloudflare account/API token/`wrangler`
+config exists anywhere in this repository. Provisioning a live
+Cloudflare account under the user's identity is external material only
+the user can provide (`.claude/rules/autonomous-development.md`
+approval gate #2), even though the target architecture itself is
+zero-cost. **Resolution**: the next session with real Cloudflare
+account access should deploy a minimal Worker + one Durable Object,
+implement the `SyncProvider` port's TS/Rust halves per ADR-0042's
+field-scoped audited-LWW design, and prove one real record's round
+trip end to end. Also still owed from the same Wave 5 objective:
+`PRODUCT-CONTRACT.md` §13's offline-session/re-authentication window
+needs an actual `security-reviewer` pass, not a default number — not
+blocked on credentials, genuinely still open, separate from the sync
+round trip.
+
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone

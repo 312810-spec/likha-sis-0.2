@@ -903,6 +903,26 @@ motion without a teacher decision; no real learner PII until
 production-readiness gates permit it; no new post-UX milestone numbers
 until the UX-08 reassessment itself determines the correct sequence.
 
+## Wave 5 Cloud Sync Target Decision (added 2026-08-29)
+
+The required 10-scenario cloud-target architecture decision
+(`ADR-0035` Decision 5) is now actually made, not merely a stated
+hypothesis: **Cloudflare Workers + one SQLite-backed Durable Object per
+school**, field-scoped audited last-write-wins operation log (never a
+silent whole-record overwrite), Cloudflare Workers + one D1 database
+per school as the documented Next Best/fallback. See
+`docs/adr/0042-cloud-sync-target-decision.md` for the full scoring and
+`docs/product/PRODUCT-CONTRACT.md` §12 (now DIRECTION SET, was
+HYPOTHESIS). **Not implemented yet** — the "one real end-to-end sync
+round trip" deliverable is genuinely blocked on external Cloudflare
+account/API credentials only the user can provide, recorded in
+`docs/VERIFICATION-DEBT.md`, not silently dropped. Reused (cited, not
+re-derived) Cloudflare pricing/sync-engine-survey research already done
+the same day on a sibling, unmerged branch
+(`claude/deped-teacher-likha-features-j7zfv6`) rather than duplicating
+it, per this project's own "don't duplicate completed work" rule — the
+scenario set, rubric, and scoring in ADR-0042 are this session's own.
+
 ## Post-UX-04 Roadmap Reconciliation (added 2026-08-25)
 
 The product definition expanded substantially right after UX-04

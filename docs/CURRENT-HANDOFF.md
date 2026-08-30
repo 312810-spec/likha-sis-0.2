@@ -1,5 +1,66 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-29, this session — Wave 5 Cloud Sync Target Decision, complete)
+
+Full record: `docs/adr/0042-cloud-sync-target-decision.md`,
+`docs/VERIFICATION-DEBT.md`'s new top entry. Branch
+`claude/phase-5-zero-cost-scenarios-6owlfm`, created from the
+Integration Review checkpoint `d9ab036` (see the entry directly below —
+`main` confirmed still at `d9ab036`, untouched).
+
+**Repository truth verified first**: no `SyncProvider` implementation
+anywhere (`grep -ril SyncProvider src docs` finds only ADR-0001's
+layering statement and planning docs); no Cloudflare/Firebase/Supabase
+SDK in `package.json`/`Cargo.toml`; no Cloudflare credentials in this
+session's environment (`env | grep -i cloudflare` empty). Also found,
+and reused rather than duplicated: a sibling, unmerged development
+branch (`claude/deped-teacher-likha-features-j7zfv6`, both branches
+descend from the same `d9ab036` checkpoint but are not merged into each
+other) had already pre-researched Wave 5's cloud-target facts
+(Cloudflare Free-plan pricing, a sync-engine survey) without resolving
+the decision itself — its sourced facts were cited and reused directly
+per the project's own "don't duplicate completed work" rule; the
+scenario construction and scoring in ADR-0042 are new, not copied.
+
+**Decision made**: the required 10-scenario cloud-target
+architecture decision (`ADR-0035` Decision 5, `PRODUCT-CONTRACT.md`
+§12) — previously only a stated hypothesis, never actually run.
+**Recommended: Cloudflare Workers + one SQLite-backed Durable Object
+per school**, field-scoped audited last-write-wins operation log
+(8.30/10 on a privacy/security-weighted rubric derived from `CLAUDE.md`'s
+priority order). **Next Best, pre-justified fallback**: Cloudflare
+Workers + one D1 database per school (7.90/10). Five other zero-cost-
+filtered scenarios scored lower (hand-rolled CRDT variants, PowerSync,
+Firebase/Firestore, a self-hosted free-tier PaaS server); Supabase and
+an always-on VPS were disqualified before scoring (standing exclusion;
+no genuine free tier, respectively). CRDT is recorded as a real future
+upgrade path if actual concurrent-edit evidence later justifies it, not
+built now. Full scoring table and reasoning in ADR-0042.
+
+**Genuinely blocked, not skipped**: Wave 5's other stated deliverable
+("one real end-to-end sync round trip," `PRODUCT-CONTRACT.md` §15)
+needs an actual Cloudflare account and API credentials — external
+material only the user can provide
+(`.claude/rules/autonomous-development.md` approval gate #2). This is
+recorded as open work for the next session with those credentials, not
+silently dropped — see `docs/VERIFICATION-DEBT.md`'s new top entry.
+
+**Docs updated**: `PRODUCT-CONTRACT.md` §12 (HYPOTHESIS → DIRECTION
+SET), `ADR-0035`'s Wave 5 row, `docs/VERIFICATION-DEBT.md`,
+`docs/PROJECT-MEMORY.md`. No product code, schema, or dependency
+changed — decision/documentation only, matching this project's own
+"10-scenario process is a decision mechanism, run before code" pattern.
+`npm run quality:full` re-run clean (no application code touched;
+confirms this session's doc edits didn't break anything already
+passing).
+
+**Gate decision: WAVE 5 CLOUD-TARGET DECISION MADE — SYNC
+IMPLEMENTATION BLOCKED ON EXTERNAL CREDENTIALS.** Per autonomous-
+development mode, continuing directly to the other, non-blocked half of
+Wave 5's objective next: an actual `security-reviewer` pass on the
+offline-session/re-authentication window (`PRODUCT-CONTRACT.md` §13),
+which needs no cloud credentials at all.
+
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 
 **`main` is now the verified integration baseline at `3951c3d`.**
