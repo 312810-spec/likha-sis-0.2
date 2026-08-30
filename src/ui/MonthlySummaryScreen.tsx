@@ -94,6 +94,18 @@ export function MonthlySummaryScreen({
     headingRef.current?.focus();
   }, []);
 
+  // Every "Retry" button below sits inside an error Alert that its own
+  // retry function unmounts as its first synchronous step (the error
+  // state is cleared before the async retry even starts) -- so the
+  // button being clicked is removed from the document before its click
+  // handler finishes, and focus would otherwise drop to <body> per the
+  // HTML spec's remove-focused-element behavior. Moving focus to the
+  // heading first, synchronously, avoids that.
+  function retryWithHeadingFocus(retryFn: () => void) {
+    headingRef.current?.focus();
+    retryFn();
+  }
+
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
     setSectionsLoading(true);
@@ -245,7 +257,7 @@ export function MonthlySummaryScreen({
       {sectionsError && (
         <Alert tone="error">
           <p>{sectionsError}</p>
-          <button type="button" onClick={loadSections}>
+          <button type="button" onClick={() => retryWithHeadingFocus(loadSections)}>
             Retry
           </button>
         </Alert>
@@ -319,7 +331,7 @@ export function MonthlySummaryScreen({
           {reportError && (
             <Alert tone="error">
               <p>{reportError}</p>
-              <button type="button" onClick={loadReport}>
+              <button type="button" onClick={() => retryWithHeadingFocus(loadReport)}>
                 Retry
               </button>
             </Alert>

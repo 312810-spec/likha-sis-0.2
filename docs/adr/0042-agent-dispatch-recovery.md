@@ -117,6 +117,23 @@ no-`Bash` gap is real and not solved by retrying. The skill records both
 explicitly and asks future sessions to keep treating each further use as
 continued confirmation, not a settled fact, in either direction.
 
+**Both conclusions were independently reconfirmed the same session on a
+second milestone (UX-03).** A third `Bash`-agent dispatch
+(`accessibility-reviewer` on `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`)
+succeeded again via the scratch-file protocol, retrieving a genuinely
+useful ~300-line review that found a real, systemic BLOCKING bug
+(every "Retry" button in the codebase's `Alert`+retry pattern drops
+keyboard focus to `<body>`, including in 3 call sites this very session
+had just added to `ClassRecordWorkspace.tsx` — exactly the "broader
+pattern risk" the UX-04 review's own finding #8 had flagged but not
+verified). A second `teacher-ux-reviewer` dispatch, this time explicitly
+coached to lead with a one-line summary and keep findings short (testing
+whether response length was the actual driver of the failure), still
+returned only a terse placeholder on both the fresh attempt and the
+retry — ruling out "the response was too long" as the cause and
+reinforcing that this is a structural limitation of dispatching an
+agent with no `Bash` tool, not a fixable prompting problem.
+
 ## Consequences
 
 - Independent review debt is no longer expected to default to

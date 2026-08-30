@@ -136,6 +136,18 @@ export function ClassRecordWorkspace({
     headingRef.current?.focus();
   }, []);
 
+  // Every "Retry" button below sits inside an error Alert that its own
+  // retry function unmounts as its first synchronous step (the error
+  // state is cleared before the async retry even starts) -- so the
+  // button being clicked is removed from the document before its click
+  // handler finishes, and focus would otherwise drop to <body> per the
+  // HTML spec's remove-focused-element behavior. Moving focus to the
+  // heading first, synchronously, avoids that.
+  function retryWithHeadingFocus(retryFn: () => void) {
+    headingRef.current?.focus();
+    retryFn();
+  }
+
   // Opening the edit form for an item moves focus into it; closing it
   // (Cancel or a successful Save, neither of which removes the item)
   // returns focus to that same item's select button, so a keyboard/
@@ -582,7 +594,7 @@ export function ClassRecordWorkspace({
       {itemsLoadError && (
         <Alert tone="error">
           <p>{itemsLoadError}</p>
-          <button type="button" onClick={loadItemsAndCategorySets}>
+          <button type="button" onClick={() => retryWithHeadingFocus(loadItemsAndCategorySets)}>
             Retry
           </button>
         </Alert>
@@ -590,7 +602,7 @@ export function ClassRecordWorkspace({
       {categoriesLoadError && (
         <Alert tone="error">
           <p>{categoriesLoadError}</p>
-          <button type="button" onClick={loadCategoriesForSet}>
+          <button type="button" onClick={() => retryWithHeadingFocus(loadCategoriesForSet)}>
             Retry
           </button>
         </Alert>
@@ -801,7 +813,7 @@ export function ClassRecordWorkspace({
           {rosterError && (
             <Alert tone="error">
               <p>{rosterError}</p>
-              <button type="button" onClick={loadRoster}>
+              <button type="button" onClick={() => retryWithHeadingFocus(loadRoster)}>
                 Retry
               </button>
             </Alert>

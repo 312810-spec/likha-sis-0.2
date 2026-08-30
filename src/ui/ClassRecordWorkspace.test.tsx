@@ -179,9 +179,15 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     updatedAt: "now",
   };
 
+  failNextRosterForItemCall = false;
+
   constructor(private roster: LearnerScoreRosterEntry[] | null = [ROSTER_ENTRY]) {}
 
   async rosterForItem(): Promise<LearnerScoreRosterEntry[] | null> {
+    if (this.failNextRosterForItemCall) {
+      this.failNextRosterForItemCall = false;
+      throw new Error("simulated roster load failure");
+    }
     return this.roster;
   }
 
@@ -289,6 +295,40 @@ describe("ClassRecordWorkspace", () => {
     expect(
       screen.queryByText(/could not load this class record's assessment items/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("clicking Retry on a failed assessment-item load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.failNextListItemsCall = true;
+    renderScreen({ assessmentRepo });
+    await screen.findByText(/could not load this class record's assessment items/i);
+
+    // The Retry button's own retry function clears the error (unmounting
+    // the button being clicked) as its first synchronous step -- without
+    // a focus fix, the browser drops focus to <body> at that point.
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Class Record Workspace" })).toHaveFocus();
+  });
+
+  it("clicking Retry on a failed roster load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository();
+    scoreRepo.failNextRosterForItemCall = true;
+    renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    await user.click(itemButton);
+    await screen.findByText(/could not load the roster for this item/i);
+
+    // The Retry button's own retry function clears the error (unmounting
+    // the button being clicked) as its first synchronous step -- without
+    // a focus fix, the browser drops focus to <body> at that point.
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Class Record Workspace" })).toHaveFocus();
   });
 
   it("creates a new assessment item", async () => {

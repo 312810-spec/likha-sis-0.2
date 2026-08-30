@@ -71,6 +71,11 @@ export function AttendanceScreen({
     Record<string, { message: string; status: AttendanceStatus }>
   >({});
   const [bulkMarking, setBulkMarking] = useState(false);
+  // Dedicated (not `rosterError`) so its Retry action targets exactly
+  // what failed -- `rosterError`'s own Retry button calls `loadRoster`,
+  // which would silently just reload the roster instead of actually
+  // retrying "Mark all present" if the two shared one state.
+  const [bulkMarkError, setBulkMarkError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   // Per-learner write "generation": incremented every time a new write
@@ -89,6 +94,19 @@ export function AttendanceScreen({
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  // Every page-level "Retry" button below sits inside an error Alert that
+  // its own retry function unmounts as its first synchronous step (the
+  // error state is cleared before the async retry even starts) -- so the
+  // button being clicked is removed from the document before its own
+  // click handler finishes, and focus would otherwise drop to <body> per
+  // the HTML spec's remove-focused-element behavior. Moving focus to the
+  // heading first, synchronously, avoids that: by the time the button is
+  // actually removed, it's no longer the focused element.
+  function retryWithHeadingFocus(retryFn: () => void) {
+    headingRef.current?.focus();
+    retryFn();
+  }
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -221,7 +239,7 @@ export function AttendanceScreen({
   }
 
   async function handleMarkAllPresent() {
-    setRosterError(null);
+    setBulkMarkError(null);
     setConfirmation(null);
     setBulkMarking(true);
     try {
@@ -234,7 +252,7 @@ export function AttendanceScreen({
           : `Marked ${unmarkedCount} learner${unmarkedCount === 1 ? "" : "s"} Present. Existing marks were left as-is.`,
       );
     } catch (err) {
-      setRosterError(
+      setBulkMarkError(
         err instanceof ValidationError ? err.message : "Could not mark the roster present.",
       );
     } finally {
@@ -284,7 +302,7 @@ export function AttendanceScreen({
       {sectionsError && (
         <Alert tone="error">
           <p>{sectionsError}</p>
-          <button type="button" onClick={loadSections}>
+          <button type="button" onClick={() => retryWithHeadingFocus(loadSections)}>
             Retry
           </button>
         </Alert>
@@ -342,7 +360,7 @@ export function AttendanceScreen({
           {rosterError && (
             <Alert tone="error">
               <p>{rosterError}</p>
-              <button type="button" onClick={loadRoster}>
+              <button type="button" onClick={() => retryWithHeadingFocus(loadRoster)}>
                 Retry
               </button>
             </Alert>
@@ -372,10 +390,19 @@ export function AttendanceScreen({
                 className="button-primary"
                 disabled={bulkMarking || roster.every((entry) => entry.status !== null)}
                 onClick={handleMarkAllPresent}
+                aria-describedby="bulk-mark-hint"
               >
                 {bulkMarking ? "Marking…" : "Mark all present"}
               </button>
-              <p className="field-hint">
+              {bulkMarkError && (
+                <Alert tone="error">
+                  <p>{bulkMarkError}</p>
+                  <button type="button" onClick={() => retryWithHeadingFocus(handleMarkAllPresent)}>
+                    Retry
+                  </button>
+                </Alert>
+              )}
+              <p className="field-hint" id="bulk-mark-hint">
                 Only fills in learners with no mark yet — never changes a mark you've already made.
               </p>
               <p className="field-hint">
@@ -402,6 +429,7 @@ export function AttendanceScreen({
                           <div
                             role="group"
                             aria-label={`Attendance status for ${entry.givenName} ${entry.familyName}`}
+                            aria-describedby={rowError ? `row-error-${entry.learnerId}` : undefined}
                           >
                             {ATTENDANCE_STATUSES.map((status) => (
                               <button
@@ -433,11 +461,22 @@ export function AttendanceScreen({
                           )}
                           {rowError && (
                             <Alert tone="error" inline>
-                              <span>{rowError.message}</span>{" "}
+                              <span id={`row-error-${entry.learnerId}`}>{rowError.message}</span>{" "}
                               <button
                                 type="button"
-
-                                onClick={() => handleMark(entry.learnerId, rowError.status)}
+                                onClick={() => {
+                                  // handleMark clears this row's error (and
+                                  // this Retry button along with it) as its
+                                  // first synchronous step -- move focus to
+                                  // the still-mounted status button for
+                                  // this row/status *before* that happens,
+                                  // or focus drops to <body> per the HTML
+                                  // spec's remove-focused-element behavior.
+                                  buttonRefs.current
+                                    .get(buttonKey(entry.learnerId, rowError.status))
+                                    ?.focus();
+                                  void handleMark(entry.learnerId, rowError.status);
+                                }}
                               >
                                 Retry
                               </button>

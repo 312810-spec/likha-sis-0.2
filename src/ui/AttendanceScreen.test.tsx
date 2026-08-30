@@ -33,10 +33,14 @@ class FakeAttendanceRepository implements AttendanceRepository {
     status: AttendanceStatus;
   }> = [];
   bulkMarkPresentCalls: Array<{ sectionId: string; attendanceDate: string }> = [];
+  rosterForDateCallCount = 0;
+  failNextBulkMarkPresentCall = false;
+  failNextRecordCall = false;
 
   constructor(private roster: AttendanceRosterEntry[] = []) {}
 
   async rosterForDate(): Promise<AttendanceRosterEntry[]> {
+    this.rosterForDateCallCount += 1;
     return [...this.roster];
   }
 
@@ -51,6 +55,10 @@ class FakeAttendanceRepository implements AttendanceRepository {
     status: AttendanceStatus,
   ): Promise<AttendanceRecord | null> {
     this.recordCalls.push({ sectionId, learnerId, attendanceDate, status });
+    if (this.failNextRecordCall) {
+      this.failNextRecordCall = false;
+      throw new Error("simulated record failure");
+    }
     this.roster = this.roster.map((entry) =>
       entry.learnerId === learnerId ? { ...entry, status, recordedAt: "now" } : entry,
     );
@@ -70,6 +78,10 @@ class FakeAttendanceRepository implements AttendanceRepository {
     attendanceDate: string,
   ): Promise<AttendanceRosterEntry[]> {
     this.bulkMarkPresentCalls.push({ sectionId, attendanceDate });
+    if (this.failNextBulkMarkPresentCall) {
+      this.failNextBulkMarkPresentCall = false;
+      throw new Error("simulated bulk-mark failure");
+    }
     this.roster = this.roster.map((entry) =>
       entry.status === null ? { ...entry, status: "present", recordedAt: "now" } : entry,
     );
@@ -304,6 +316,96 @@ describe("AttendanceScreen", () => {
       { sectionId: "sec-1", attendanceDate: "2026-08-24" },
     ]);
     expect(await screen.findByRole("status")).toHaveTextContent(/marked 1 learner present/i);
+  });
+
+  it("Retry on a failed bulk-mark actually retries the bulk mark, not a roster reload", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+    repo.failNextBulkMarkPresentCall = true;
+
+    await user.click(screen.getByRole("button", { name: "Mark all present" }));
+
+    await screen.findByText(/could not mark the roster present/i);
+    const rosterCallsBeforeRetry = repo.rosterForDateCallCount;
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    const anaGroup = screen.getByRole("group", { name: /attendance status for ana santos/i });
+    await waitFor(() =>
+      expect(within(anaGroup).getByRole("button", { name: "Present" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    // The bug this pins: Retry must call bulkMarkPresent again, not just
+    // loadRoster (which would leave the learner unmarked and misleadingly
+    // imply the retry had done something).
+    expect(repo.bulkMarkPresentCalls).toEqual([
+      { sectionId: "sec-1", attendanceDate: "2026-08-24" },
+      { sectionId: "sec-1", attendanceDate: "2026-08-24" },
+    ]);
+    expect(repo.rosterForDateCallCount).toBe(rosterCallsBeforeRetry);
+    expect(screen.queryByText(/could not mark the roster present/i)).not.toBeInTheDocument();
+  });
+
+  it("clicking Retry on a failed bulk-mark does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+    repo.failNextBulkMarkPresentCall = true;
+    await user.click(screen.getByRole("button", { name: "Mark all present" }));
+    await screen.findByText(/could not mark the roster present/i);
+
+    // Retry's own retry function clears the error (unmounting the Retry
+    // button being clicked) as its first synchronous step -- without a
+    // focus fix, the browser drops focus to <body> at that point.
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Attendance" })).toHaveFocus();
+  });
+
+  it("clicking Retry on a failed roster load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const repo = new PerSectionAttendanceRepository({});
+    const sectionService = new SectionApplicationService(new FakeSectionRepository([SECTION]));
+    render(
+      <ModeProvider>
+        <AttendanceScreen
+          attendanceService={new AttendanceApplicationService(repo, () => new Date("2026-08-24"))}
+          sectionService={sectionService}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText(/could not load the attendance roster for this date/i);
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Attendance" })).toHaveFocus();
+  });
+
+  it("clicking a row's Retry after a failed mark keeps focus on that row's status button, not <body>", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+    repo.failNextRecordCall = true;
+
+    await user.click(screen.getByRole("button", { name: "Present" }));
+    await screen.findByText(/could not save this mark/i);
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    const anaGroup = screen.getByRole("group", { name: /attendance status for ana santos/i });
+    expect(within(anaGroup).getByRole("button", { name: "Present" })).toHaveFocus();
   });
 
   it("disables the bulk-mark button once every learner already has a mark", async () => {
@@ -653,6 +755,24 @@ describe("AttendanceScreen", () => {
       },
     ]);
     await waitFor(() => screen.getByText("Ana Santos"));
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with a row error and a failed bulk mark both showing", async () => {
+    const user = userEvent.setup();
+    const { container, repo } = renderScreen([
+      { learnerId: "l1", givenName: "Ana", familyName: "Santos", status: null, recordedAt: null },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    repo.failNextRecordCall = true;
+    await user.click(screen.getByRole("button", { name: "Present" }));
+    await screen.findByText(/could not save this mark/i);
+
+    repo.failNextBulkMarkPresentCall = true;
+    await user.click(screen.getByRole("button", { name: "Mark all present" }));
+    await screen.findByText(/could not mark the roster present/i);
 
     await expectNoAccessibilityViolations(container);
   });

@@ -1249,6 +1249,44 @@ quality` 396/396 (up from 390 at session start). Full record:
 `docs/adr/0042-agent-dispatch-recovery.md`, `docs/VERIFICATION-DEBT.md`'s
 top three entries.
 
+## UX-03 Independent Review Debt Closure (added 2026-08-30, same session)
+
+Continued using the agent-dispatch-recovery protocol on a second
+milestone, `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`. The
+`accessibility-reviewer` scratch-file dispatch succeeded on the first
+attempt (no retry needed this time) and found a real, systemic
+**BLOCKING** bug: every "Retry" button's own retry function cleared its
+error state as its first synchronous step, unmounting the just-clicked
+button before the async retry started — per the HTML spec, this drops
+keyboard focus to `<body>`. Affected 5 call sites across the two UX-03
+screens, plus 3 more in `ClassRecordWorkspace.tsx` that this same
+session had just added a few hours earlier (the UX-04 accessibility
+review's own "broader pattern risk" note had correctly flagged this as
+likely, unverified at the time). Fixed everywhere with a small
+`retryWithHeadingFocus` helper (page-level errors) or per-button-ref
+focus (row-level errors) in all three files. Both SHOULD-FIX findings
+(missing `aria-describedby` linkage; axe tests only covering the happy
+path) also fixed. All contrast/color/target-size/mount-focus findings
+confirmed already clean.
+
+The `teacher-ux-reviewer` dispatch was attempted a second time (after
+UX-04) with an explicit test of whether coaching it toward a short,
+one-line-first response would help — it did not: both the fresh dispatch
+and the retry still returned only a terse placeholder, ruling out
+response length as the failure's cause and reinforcing that the no-`Bash`
+gap is structural. The substituted self-review found and fixed one more
+real bug of the exact same class the accessibility review's BLOCKING
+finding was about, but for a different reason: `AttendanceScreen`'s
+bulk-mark failure reused the roster-load error's Retry button (hardcoded
+to `loadRoster`), so clicking Retry after a failed "Mark all present"
+silently reloaded the roster instead of retrying the bulk mark. Fixed
+with a dedicated `bulkMarkError` state, mirroring the identical fix
+already applied to `ClassRecordWorkspace.tsx` earlier the same session.
+
+11 new regression tests; `npm run quality` 407/407 (up from 396). Full
+record: `docs/adr/0042-agent-dispatch-recovery.md`'s addendum,
+`docs/VERIFICATION-DEBT.md`'s UX-03 entry.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

@@ -34,6 +34,7 @@ const SECTION: Section = {
 
 class FakeAttendanceRepository implements AttendanceRepository {
   monthlySummaryCalls: Array<{ sectionId: string; year: number; month: number }> = [];
+  failNextMonthlySummaryCall = false;
 
   constructor(private report: MonthlyAttendanceReport) {}
 
@@ -55,6 +56,10 @@ class FakeAttendanceRepository implements AttendanceRepository {
     month: number,
   ): Promise<MonthlyAttendanceReport> {
     this.monthlySummaryCalls.push({ sectionId, year, month });
+    if (this.failNextMonthlySummaryCall) {
+      this.failNextMonthlySummaryCall = false;
+      throw new Error("simulated monthly-summary load failure");
+    }
     return this.report;
   }
 }
@@ -228,6 +233,65 @@ describe("MonthlySummaryScreen", () => {
     );
   });
 
+  it("clicking Retry on a failed report load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+    repo.failNextMonthlySummaryCall = true;
+
+    // Any context change (here: switching the month) re-triggers the load
+    // and hits the simulated failure.
+    fireEvent.change(screen.getByLabelText("Month"), { target: { value: "2026-07" } });
+    await screen.findByText(/could not load the monthly summary/i);
+
+    // The Retry button's own retry function clears the error (unmounting
+    // the button being clicked) as its first synchronous step -- without
+    // a focus fix, the browser drops focus to <body> at that point.
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Monthly Attendance Summary" })).toHaveFocus();
+  });
+
+  it("clicking Retry on a failed sections load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    class FailingSectionRepository implements SectionRepository {
+      async list(): Promise<Section[]> {
+        throw new Error("simulated sections load failure");
+      }
+      async create(): Promise<Section> {
+        throw new Error("not used in this test");
+      }
+      async enroll(): Promise<SectionMembership | null> {
+        throw new Error("not used in this test");
+      }
+      async roster(): Promise<SectionRosterMember[]> {
+        return [];
+      }
+    }
+    render(
+      <ModeProvider>
+        <MonthlySummaryScreen
+          attendanceService={
+            new AttendanceApplicationService(
+              new FakeAttendanceRepository(EMPTY_REPORT),
+              () => new Date("2026-08-24"),
+            )
+          }
+          sectionService={new SectionApplicationService(new FailingSectionRepository())}
+          exportService={new ExportApplicationService(new FakeExportRepository())}
+          schoolName="Rizal Elementary"
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText(/could not load sections/i);
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Monthly Attendance Summary" })).toHaveFocus();
+  });
+
   it("shows a field hint only in guided mode", async () => {
     window.localStorage.setItem("likha-sis:teacher-mode", "guided");
     renderScreen();
@@ -239,6 +303,29 @@ describe("MonthlySummaryScreen", () => {
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen(reportWith("tardy"));
     await waitFor(() => screen.getByText("Ana Santos"));
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with an export result showing", async () => {
+    const user = userEvent.setup();
+    const { container, exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await screen.findByText(/saved to/i);
+
+    await expectNoAccessibilityViolations(container);
+    expect(exportRepo.calls).toHaveLength(1);
+  });
+
+  it("has no detectable accessibility violations with a report-load error showing", async () => {
+    const { container, repo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+
+    repo.failNextMonthlySummaryCall = true;
+    fireEvent.change(screen.getByLabelText("Month"), { target: { value: "2026-07" } });
+    await screen.findByText(/could not load the monthly summary/i);
 
     await expectNoAccessibilityViolations(container);
   });

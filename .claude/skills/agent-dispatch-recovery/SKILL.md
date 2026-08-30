@@ -131,9 +131,12 @@ in this environment. Until one is found:
 - It only fixes agents that have `Bash`. `teacher-ux-reviewer` — and any
   future reviewer/researcher agent defined without `Bash` — is not covered
   (see the gap above).
-- Data points so far: 2 successes (`architecture-reviewer`,
-  `accessibility-reviewer`, same session, both with `Bash`), 1 confirmed
-  non-applicable failure (`teacher-ux-reviewer`, no `Bash`, both the fresh
-  dispatch and the retry failed). Each future dispatch using this protocol
-  is further confirmation either way; record a failure here with the same
+- Data points so far: 3 successes (`architecture-reviewer` once,
+  `accessibility-reviewer` twice — UX-04 and UX-03 milestones — same
+  session, all with `Bash`), 2 confirmed non-applicable failures
+  (`teacher-ux-reviewer`, no `Bash`, UX-04 and UX-03 — fresh dispatch and
+  retry both failed each time, even when the second attempt was
+  explicitly coached to keep its response short, ruling out response
+  length as the cause). Each future dispatch using this protocol is
+  further confirmation either way; record a failure here with the same
   rigor as the original test, whether or not the agent has `Bash`.

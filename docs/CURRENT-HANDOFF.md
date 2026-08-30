@@ -1,5 +1,56 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — UX-03 Independent Review Debt Closure, complete)
+
+Continuation of the same session's Agent-Dispatch Retrieval Fix work
+(entry immediately below), applying the now-validated protocol to a
+second milestone rather than stopping after one. Full record:
+`docs/adr/0042-agent-dispatch-recovery.md`'s addendum,
+`docs/VERIFICATION-DEBT.md`'s UX-03 entry, `docs/PROJECT-MEMORY.md`'s
+"UX-03 Independent Review Debt Closure" entry.
+
+**`accessibility-reviewer` on `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`
+succeeded on the first scratch-file dispatch** (no retry needed) and
+found a real, systemic **BLOCKING** bug: every "Retry" button's own
+retry function cleared its error state as its first synchronous step,
+unmounting the just-clicked button before the async retry started —
+per the HTML spec, focus then drops to `<body>`. 5 call sites in these
+two screens, plus 3 more in `ClassRecordWorkspace.tsx` this same session
+had added a few hours earlier (predicted but unverified by the UX-04
+review's own "broader pattern risk" note). Fixed everywhere with a
+`retryWithHeadingFocus` helper (page-level) or per-button-ref focus
+(row-level, `AttendanceScreen`'s per-learner error). Both SHOULD-FIX
+findings (missing `aria-describedby` linkage; axe tests only covering
+the happy path) also fixed. Contrast/color/target-size/mount-focus all
+confirmed clean.
+
+**`teacher-ux-reviewer` reconfirmed the no-`Bash` gap a second time**,
+this attempt explicitly coached toward a short, lead-with-a-summary
+response to test whether length was the driver — it was not: both the
+fresh dispatch and the retry still returned only a terse placeholder.
+The substituted self-review found and fixed one more real bug of the
+same class as the BLOCKING finding above: `AttendanceScreen`'s bulk-mark
+failure reused the roster-load error's Retry button (hardcoded to
+`loadRoster`), so Retry after a failed "Mark all present" silently just
+reloaded the roster instead of retrying the bulk mark. Fixed with a
+dedicated `bulkMarkError` state, mirroring the identical fix already
+applied to `ClassRecordWorkspace.tsx` earlier this session.
+
+**Verification, all actually run this session**: 11 new regression
+tests (focus-preservation across 3 files, `aria-describedby` linkage,
+axe coverage of error states), `npm run quality` PASS 407/407 (up from
+396 at the start of this UX-03 pass, 396→407 = +11), zero regressions.
+
+**Gate decision: UX-03 INDEPENDENT REVIEW DEBT CLOSED.** Remaining open
+review debt in `docs/VERIFICATION-DEBT.md`: UX-02's `accessibility-reviewer`
+entry (no `teacher-ux-reviewer` was ever dispatched for UX-02, so nothing
+to reconcile there beyond the one entry), Teacher Load's items already
+marked STALE/CORRECTED. Recommended next action for a future session:
+apply the same protocol to UX-02's `accessibility-reviewer` entry, or
+pursue the still-unattempted investigation into an actual fix for the
+no-`Bash` gap itself (two confirmed data points now, never yet
+investigated as a fixable problem rather than worked around).
+
 ## Active Task (2026-08-30, this session — Agent-Dispatch Retrieval Fix, complete)
 
 **This session's directed task: research and fix the recurring

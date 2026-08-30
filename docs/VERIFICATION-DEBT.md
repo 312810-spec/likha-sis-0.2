@@ -40,6 +40,16 @@ meta-exercise:
   glossed over — see `docs/adr/0042-agent-dispatch-recovery.md`'s
   update and the skill's new "Known gap" section. The self-review found
   and fixed two real findings (see the UX-04 entry below for detail).
+- **UX-03's `accessibility-reviewer` and `teacher-ux-reviewer` halves are
+  also both CLOSED** (see that entry further below), extending this same
+  protocol to a second UX milestone: the `accessibility-reviewer` pass
+  found a real, systemic BLOCKING focus-loss bug affecting every "Retry"
+  button in both `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` (and,
+  per its own prediction, in `ClassRecordWorkspace.tsx` too — 3 of that
+  bug's 8 total call sites were ones this very session had just added),
+  now fixed everywhere; the `teacher-ux-reviewer` half reconfirmed the
+  no-`Bash` gap a second time (different coaching, same failure), further
+  evidence it is a real structural limit, not a fluke.
 
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure — CLOSED above, original text preserved (2026-08-26)
 
@@ -925,7 +935,68 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+## UX-03 accessibility-reviewer + teacher-ux-reviewer independent review: BOTH CLOSED 2026-08-30
+
+**`accessibility-reviewer` half closed, real findings retrieved and
+fixed.** Re-dispatched 2026-08-30 using the scratch-file report protocol
+(`docs/adr/0042-agent-dispatch-recovery.md`,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`) — the same recurring
+agent-resume/retrieval failure this entry originally described (see the
+superseded text below) is what that protocol exists to work around. This
+time a complete, genuinely independent ~300-line review was retrieved on
+the first attempt, covering `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`.
+**1 BLOCKING finding, fixed, systemic (5 call sites in these two screens,
+plus 3 more the reviewer's own "broader pattern risk" note correctly
+predicted existed in `ClassRecordWorkspace.tsx` from this session's own
+earlier work)**: every "Retry" button's own retry function cleared its
+error state as its first synchronous step, unmounting the just-clicked
+button before its async work even started — per the HTML Living
+Standard, removing the currently-focused element drops focus to
+`<body>`. Fixed by moving focus to a stable anchor (the screen's heading
+for page-level errors, or the specific status button being retried for
+`AttendanceScreen`'s per-row error) synchronously _before_ invoking the
+retry function, via a small `retryWithHeadingFocus` helper added to all
+three affected files. **Both SHOULD-FIX findings fixed**: `aria-describedby`
+now links `AttendanceScreen`'s always-visible "Only fills in learners
+with no mark yet" hint to the "Mark all present" button, and each row's
+error message to that row's status-button group (matching the
+established `FirstRunSetupScreen`/`LoginScreen`/`ClassRecordWorkspace`
+pattern the reviewer cited); both test files gained an axe pass that
+actually renders an error/bulk/export state, not just the happy path.
+**All NON-BLOCKING/FUTURE observations confirmed clean, no action
+needed**: contrast (independently recomputed from real hex values, all
+pass), color-only state (checkmark + `aria-pressed`, not color alone),
+target size (≥24px in every mode), mount-focus (correct, matches the
+app's convention). 11 new regression tests added across
+`AttendanceScreen.test.tsx`/`MonthlySummaryScreen.test.tsx`/
+`ClassRecordWorkspace.test.tsx`; `npm run quality` 407/407 (up from 396
+at the start of this UX-03 pass).
+
+**`teacher-ux-reviewer` half also attempted and closed, via self-review
+— dispatch confirmed genuinely undeliverable a second time (UX-04 was
+the first), not a fluke.** Same no-`Bash` gap as UX-04's entry above: a
+fresh dispatch (this time explicitly coached to lead with a one-line
+summary and keep each finding short, to test whether response length was
+the driver) still returned only a terse placeholder ("Done."), and the
+one permitted retry — again explicitly told nothing had reached the
+orchestrator — returned only "Complete." Confirms the gap is about the
+delivery channel itself, not response length or phrasing. The
+substituted self-review found and fixed one real bug (independently of,
+and before, the accessibility-reviewer's findings above): `handleMarkAllPresent`'s
+failure reused `rosterError`'s existing Retry button, which was
+hardcoded to call `loadRoster` — so clicking Retry after a failed "Mark
+all present" silently just reloaded the roster instead of retrying the
+bulk mark, the exact same "shared error state, wrong Retry target" bug
+class already found and fixed in `ClassRecordWorkspace.tsx` earlier this
+session. Fixed with a dedicated `bulkMarkError` state. Copy/jargon, mode
+parity (Guided hints are purely additive, no functional-parity
+violation), and error/confirmation consistency were all re-checked and
+found already correct — no other findings.
+
+---
+
+Original text describing the original failure, preserved per this
+project's "mark superseded in place, don't delete" convention:
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
 against UX-03's `AttendanceScreen`/`MonthlySummaryScreen` changes
