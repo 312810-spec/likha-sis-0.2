@@ -1213,24 +1213,41 @@ a mid-run API rate-limit failure because the file write had already
 completed. Documented as `.claude/skills/agent-dispatch-recovery/SKILL.md`
 and `docs/adr/0042-agent-dispatch-recovery.md`; referenced from
 `.claude/rules/autonomous-development.md` as the new default dispatch
-method, not a fallback tried only after a first attempt fails. Used
-immediately to close two pieces of real, previously-open independent-
-review debt as proof: the Integration Review's cross-milestone
-`architecture-reviewer` question (no BLOCKING/SHOULD-FIX findings,
-confirming the earlier self-review's conclusion independently), and
+method, not a fallback tried only after a first attempt fails.
+
+Used immediately to close three pieces of real, previously-open
+independent-review debt as proof: the Integration Review's
+cross-milestone `architecture-reviewer` question (no BLOCKING/SHOULD-FIX
+findings, confirming the earlier self-review's conclusion independently);
 UX-04's `accessibility-reviewer` pass (1 BLOCKING CSS fix — the selected
 assessment item had zero visual pressed-state indication, since the only
-matching CSS rule was scoped to a different list's class name — plus 4
-SHOULD-FIX fixes: focus management on the two-step-delete/edit
+matching CSS rule was scoped to a different list's class name — plus all
+5 SHOULD-FIX fixes: focus management on the two-step-delete/edit
 transitions, focus restoration on "Back to Class Records," an
-`aria-describedby` hint linkage, and a stale `VERIFICATION-DEBT.md`
-section that under-scoped which screens still owe a human screen-reader
-pass). One SHOULD-FIX (item-scoped error placement) deferred as its own
-new, disclosed debt entry — a real UX design question, not a mechanical
-fix. `teacher-ux-reviewer`'s own UX-04 pass remains open, not attempted
-this session. 4 new regression tests; `npm run quality` 394/394 (up from
-390). Full record: `docs/adr/0042-agent-dispatch-recovery.md`,
-`docs/VERIFICATION-DEBT.md`'s top two entries.
+`aria-describedby` hint linkage, a stale `VERIFICATION-DEBT.md` section
+that under-scoped which screens still owe a human screen-reader pass,
+and item-scoped error placement — briefly deferred as its own debt entry
+then closed the same session by moving focus to the existing error
+banner rather than needing a bigger redesign); and UX-04's
+`teacher-ux-reviewer` pass, closed by self-review after confirming the
+dispatch itself is genuinely undeliverable, not just untried — this
+agent's declared tools have no `Bash`, so the scratch-file fix cannot
+apply to it, and both a fresh dispatch and the one permitted retry
+independently confirmed this (same terse-placeholder failure signature).
+This is recorded as a real, currently-unsolved gap in the fix rather
+than glossed over, in `docs/adr/0042-agent-dispatch-recovery.md`'s
+addendum and the skill's "Known gap" section. The substituted self-review
+found and fixed two real teacher-UX gaps: an unexplained "unknown"
+fallback for a class record's grading-weighting name (now "not available
+— try reopening this class record"), and a missing Retry affordance on
+the assessment-item/category load failures, inconsistent with the
+roster-load failure right below them on the same screen (fixed with
+dedicated per-load error state, not the shared page-level banner several
+unrelated actions reuse, avoiding a Retry button that would retry the
+wrong thing). 6 new regression tests total across both rounds; `npm run
+quality` 396/396 (up from 390 at session start). Full record:
+`docs/adr/0042-agent-dispatch-recovery.md`, `docs/VERIFICATION-DEBT.md`'s
+top three entries.
 
 ## Current Milestone
 

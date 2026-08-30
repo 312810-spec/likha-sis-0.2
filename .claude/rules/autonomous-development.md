@@ -113,7 +113,11 @@ fix (route the report through a scratch file, not the agent's chat
 response) that closes the retrieval failure described below far more
 often than the old retry-then-self-review fallback did. Use it as the
 default dispatch method, not something reached for only after a first
-attempt already failed.
+attempt already failed. **Check the agent's declared tools first**
+(`.claude/agents/<name>.md` frontmatter) — the fix only works for agents
+with `Bash`; `teacher-ux-reviewer` has none and is a confirmed exception
+(both a fresh dispatch and the permitted retry failed) — don't spend a
+second dispatch expecting the file protocol to help there.
 
 If a dispatch still returns nothing usable even with that protocol —
 findings can't be retrieved, the known resume/retrieval problem recurs, or

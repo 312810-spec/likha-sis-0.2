@@ -1,6 +1,6 @@
 # Verification Debt
 
-## Agent-dispatch retrieval fix: cross-milestone `architecture-reviewer` debt CLOSED, UX-04 `accessibility-reviewer` debt CLOSED (2026-08-30)
+## Agent-dispatch retrieval fix: cross-milestone `architecture-reviewer` debt CLOSED, UX-04 `accessibility-reviewer` + `teacher-ux-reviewer` debt BOTH CLOSED (2026-08-30)
 
 This session's own directed task was researching and fixing the
 recurring reviewer-agent retrieval failure referenced throughout this
@@ -10,7 +10,7 @@ record: `docs/adr/0042-agent-dispatch-recovery.md`,
 with a controlled same-session test (four consecutive chat-text-only
 retrieval attempts all failed, two scratch-file-based attempts both
 succeeded, one of those surviving a mid-run API failure because the file
-write had already completed) and used the fix to actually close two
+write had already completed) and used the fix to actually close three
 pieces of real, previously-open review debt as proof, not just a
 meta-exercise:
 
@@ -27,10 +27,19 @@ meta-exercise:
 - The **UX-04 `accessibility-reviewer` half** of the "UX-04 teacher-ux-
   reviewer / accessibility-reviewer independent review not retrievable"
   entry (further below) is **CLOSED** with real findings retrieved,
-  fixed, and tested — see that entry for the full detail (1 BLOCKING CSS
-  fix, 4 SHOULD-FIX fixes, 1 SHOULD-FIX deferred as its own new debt
-  entry). The `teacher-ux-reviewer` half of that same entry remains
-  genuinely open — not attempted this session.
+  fixed, and tested — 1 BLOCKING CSS fix, all 5 SHOULD-FIX findings
+  fixed (the 5th, item-scoped error placement, was briefly deferred as
+  its own debt entry then closed the same session — see that entry).
+- The **`teacher-ux-reviewer` half of that same entry is also CLOSED**,
+  but by self-review, not by successful dispatch: this agent's declared
+  tools have no `Bash`, so the scratch-file protocol structurally cannot
+  apply to it — confirmed directly (a fresh dispatch and the one
+  permitted retry both returned only terse placeholders, the same
+  failure signature as the original four-attempt chat-text test). This
+  is recorded as a genuine, currently-unsolved gap in the fix, not
+  glossed over — see `docs/adr/0042-agent-dispatch-recovery.md`'s
+  update and the skill's new "Known gap" section. The self-review found
+  and fixed two real findings (see the UX-04 entry below for detail).
 
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure — CLOSED above, original text preserved (2026-08-26)
 
@@ -605,7 +614,7 @@ NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
    `security-reviewer` dispatched for an adversarial pass. Still not
    reachable from any UI (unchanged).
 
-## UX-04 accessibility-reviewer independent review: RETRIEVED AND CLOSED 2026-08-30; teacher-ux-reviewer remains open
+## UX-04 accessibility-reviewer + teacher-ux-reviewer independent review: BOTH CLOSED 2026-08-30
 
 **`accessibility-reviewer` half closed, real findings retrieved and
 fixed.** Re-dispatched 2026-08-30 using the new scratch-file report
@@ -631,25 +640,60 @@ because its mount effect had an empty dependency array (fixed by keying
 it on `selectedClassRecordId` in `ClassRecordsScreen.tsx`); the
 scored-item edit hint wasn't linked via `aria-describedby` (fixed); this
 file's own dedicated screen-reader-debt section (below) was stale,
-naming only 4 pre-UX-02 screens (fixed, see that entry). **1 SHOULD-FIX
-deferred as its own debt** (item-scoped error placement in a long
-assessment-item list — a real UX design question, not a quick fix; see
-below). **4 NON-BLOCKING-FUTURE observations recorded, not acted on**
-(mobile touch-target inconsistency — still passes the 24px floor;
-unannounced score-save success; the same focus-loss pattern on a rare
-roster-retry-button path; unverified placeholder-text contrast). 4 new
-regression tests added (`ClassRecordWorkspace.test.tsx`,
-`ClassRecordsScreen.test.tsx`); `npm run quality` 394/394 (up from 390).
-Full findings preserved as the reviewer wrote them, not just this
-summary: see this session's commit for the original scratch-file
-content, or re-derive from the fixes' own code comments, which quote the
-same reasoning.
+naming only 4 pre-UX-02 screens (fixed, see that entry). **The 5th
+SHOULD-FIX (item-scoped error placement) is also now fixed** — see below,
+was deferred within this same session and then closed a few hours later
+in the same milestone, not left open across sessions. **4
+NON-BLOCKING-FUTURE observations recorded, not acted on** (mobile
+touch-target inconsistency — still passes the 24px floor; unannounced
+score-save success; the same focus-loss pattern on a rare
+roster-retry-button path; unverified placeholder-text contrast). Full
+findings preserved as the reviewer wrote them, not just this summary: see
+this session's commits for the original scratch-file content, or
+re-derive from the fixes' own code comments, which quote the same
+reasoning.
 
-**`teacher-ux-reviewer`'s own dedicated pass on this same UX-04 scope
-remains genuinely open** — not attempted this session (this session's
-scope was proving/using the accessibility-reviewer retrieval fix, not a
-full independent-review sweep of every reviewer type). Retry it with the
-same scratch-file protocol in a future session.
+**`teacher-ux-reviewer` half also attempted and closed, via self-review
+— dispatch confirmed genuinely undeliverable, not just untried.**
+`teacher-ux-reviewer`'s declared tools (`Read, Grep, Glob`) don't include
+`Bash`, so the scratch-file protocol above can't apply to it at all. A
+fresh dispatch on this same UX-04 scope returned only
+`"No action needed — my review is complete and was fully delivered in
+prior turns."`; the one permitted resume, explicitly telling it nothing
+had reached the orchestrator and asking it to restate everything in that
+reply, returned only `"No further response required."` — confirming (not
+just repeating the M7 pattern) that no retrieval path exists today for a
+reviewer agent without `Bash`. Full detail and the durable "no known fix
+yet" gap: `docs/adr/0042-agent-dispatch-recovery.md`,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`.
+
+A rigorous self-review was substituted, applying `teacher-ux-reviewer`'s
+own checklist (jargon, mode parity, failure messages, confirmation/state,
+consistency) to `ClassRecordsScreen.tsx`/`ClassRecordWorkspace.tsx`. No
+jargon leaks found (no "database"/"tenant"/"repository"/"migration" in
+visible copy); Guided-only hints are purely explanatory, never gating a
+control, so Efficient/Comfortable retain full functional parity;
+destructive actions (delete) get two-step confirmation; in-flight actions
+consistently use a verb+ellipsis label ("Saving…", "Deleting…",
+"Opening…", "Exporting…", "Computing…"); the report-card export's
+omitted-fields disclosure is transparent, not alarming. **Two real,
+fixed findings**: (1) `weightPolicyName ?? "unknown"` (two call sites)
+gave a teacher no indication of what "unknown" meant or what to do about
+it — changed to "not available — try reopening this class record",
+matching this app's own "explain what to do next" convention; (2) the
+initial assessment-item/category-set load failure and the
+category-for-set load failure both showed a dead-end error message with
+no retry affordance, inconsistent with the roster-load failure right
+below them on the same screen, which already has one — fixed by giving
+each its own dedicated error state (not the shared page-level `error`,
+which several unrelated actions reuse — a shared Retry button would have
+retried the wrong thing) and a matching Retry button
+(`ClassRecordWorkspace.tsx`). 3 new regression tests added across both
+fixes.
+
+Combined for this whole entry: 6 new regression tests added
+(`ClassRecordWorkspace.test.tsx`, `ClassRecordsScreen.test.tsx`);
+`npm run quality` 396/396 (up from 390 at session start).
 
 ---
 
@@ -677,7 +721,7 @@ there's reason to believe the agent-resume harness issue is fixed;
 remove this entry once real (non-self) reviews actually complete and
 their findings are recorded.
 
-## Deferred: assessment-item-list error placement is far from the item that caused it (open, non-blocking)
+## Assessment-item-list error placement far from the item that caused it — CLOSED 2026-08-30 (same session)
 
 `accessibility-reviewer`'s 2026-08-30 UX-04 pass (above) found
 `itemActionError` (`ClassRecordWorkspace.tsx`) renders once, directly
@@ -686,12 +730,21 @@ sighted keyboard user acting on, say, item #10's Edit/Delete controls
 sees an error appear off-screen above with nothing tying it visually to
 the item that failed (it is still `role="alert"`, so a screen reader
 does get the announcement regardless of scroll position — not a total
-failure, just an inline-placement gap). Not fixed this session: the
-right fix (a per-item error slot vs. scrolling/focusing the existing
-banner into view) is a real UX decision, not a mechanical one, and out
-of scope for a session whose primary purpose was validating the
-agent-dispatch-recovery protocol. Pick this up alongside any future
-`ClassRecordWorkspace.tsx` work.
+failure, just an inline-placement gap). Briefly deferred within this
+session (the right fix looked like it might need a bigger per-item error
+slot redesign) then closed a few hours later in the same milestone, once
+a smaller, safer option became clear: rather than restructure error
+placement, move focus to the existing banner when it appears. Added an
+optional `id` prop to the shared `Alert` component (`tabIndex={-1}`
+unconditionally, matching this app's established programmatic-focus-
+target convention already used for headings), gave the item-action-error
+banner that id, and added a `useEffect` keyed on the error state that
+focuses it — which also scrolls it into view natively, for exactly the
+"error appeared off-screen" complaint. One new regression test
+(`ClassRecordWorkspace.test.tsx`). No redesign, no new UX decision
+needed — the reviewer's own two proposed fixes ("per-item error slot vs.
+scrolling/focusing the existing banner into view") already named this as
+an option, and it turned out sufficient.
 
 ## Rust toolchain cannot compile in this environment: `windows-future`/`windows-core` version conflict (RESOLVED 2026-08-25 — Native Rust Verification Recovery)
 

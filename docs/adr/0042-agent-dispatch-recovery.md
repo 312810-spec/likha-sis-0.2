@@ -77,23 +77,45 @@ itself became reliable; the file is still the deliverable actually
 trusted, and is what closed this milestone's real review debt (see
 below).
 
+A seventh and eighth dispatch (same session, immediately after the above
+was documented and used) tested the one case the scratch-file protocol
+cannot cover: `teacher-ux-reviewer`'s own declared tools are `Read, Grep,
+Glob` — no `Bash` — so it has no way to write a report file at all. A
+fresh dispatch on real, previously-never-completed scope (UX-04's own
+teacher-UX review) returned only `"No action needed — my review is
+complete and was fully delivered in prior turns."`; the one permitted
+resume, explicitly telling it its findings had **not** reached the
+orchestrator and asking it to restate everything in that reply, returned
+only `"No further response required."` — the identical terse-placeholder
+failure signature as the four chat-text-only tests above, confirming
+this is not fixable by asking harder, and that no `Bash` means no
+available workaround at all today. A rigorous self-review was substituted
+per the established fallback (see `docs/VERIFICATION-DEBT.md`'s
+corresponding entry) and found and fixed two real, if minor, teacher-UX
+gaps.
+
 ## Decision
 
 **Route reviewer/researcher subagent reports through a scratch file, not
 the agent's own chat response, as the default first dispatch method —
-not a fallback tried only after retrieval already failed once.**
-Documented as `.claude/skills/agent-dispatch-recovery/SKILL.md`, referenced
-from `.claude/rules/autonomous-development.md`'s existing "Reviewer
-harness failures are not automatic stops" section (kept as the
-last-resort fallback for the rare case even the file protocol fails, not
-replaced).
+not a fallback tried only after retrieval already failed once — for any
+agent whose declared tools include `Bash`.** Documented as
+`.claude/skills/agent-dispatch-recovery/SKILL.md`, referenced from
+`.claude/rules/autonomous-development.md`'s existing "Reviewer harness
+failures are not automatic stops" section (kept as the last-resort
+fallback for the rare case even the file protocol fails, not replaced).
+**For an agent without `Bash` (confirmed: `teacher-ux-reviewer`), no
+retrieval fix is known yet — go straight to the resume-retry-then-
+self-review fallback rather than expecting the file protocol to help.**
 
 This is a workaround for a harness limitation, not a fix to the
 underlying platform — nothing here changes agent/notification behavior
-itself, only how this project's own sessions retrieve results. Two
-data points back it so far (both confirmations from this one session);
-the skill records that explicitly and asks future sessions to keep
-treating each further use as continued confirmation, not a settled fact.
+itself, only how this project's own sessions retrieve results. Three
+data points back the `Bash`-agent conclusion so far (two successes, both
+from this session); one data point (also this session) confirms the
+no-`Bash` gap is real and not solved by retrying. The skill records both
+explicitly and asks future sessions to keep treating each further use as
+continued confirmation, not a settled fact, in either direction.
 
 ## Consequences
 

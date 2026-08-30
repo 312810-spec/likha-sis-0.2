@@ -53,7 +53,7 @@ debt as proof, not left as a meta-exercise**:
   indication — not even color — because the only matching CSS rule in
   the codebase was scoped to `.attendance-roster`, which never matches
   `.assessment-item-list`'s markup; fixed by extending that selector in
-  `src/ui/theme/styles.css`). **4 of 5 SHOULD-FIX findings fixed**: focus
+  `src/ui/theme/styles.css`). **All 5 SHOULD-FIX findings fixed**: focus
   dropped to `<body>` on the two-step-delete and edit transitions (fixed
   with id-based focus-restoration `useEffect`s in
   `ClassRecordWorkspace.tsx`); "Back to Class Records" never restored
@@ -62,30 +62,56 @@ debt as proof, not left as a meta-exercise**:
   `ClassRecordsScreen.tsx`); a scored-item edit hint wasn't linked via
   `aria-describedby` (fixed); this file's own dedicated screen-reader
   debt section was stale, naming only 4 pre-UX-02 screens (fixed — see
-  that entry). **1 SHOULD-FIX deferred as its own new, disclosed debt
-  entry** (item-scoped error placement in a long assessment-item list —
-  a real UX design decision, not a mechanical fix). `teacher-ux-reviewer`'s
-  own UX-04 pass remains genuinely open, not attempted this session.
+  that entry); item-scoped error placement in a long assessment-item
+  list — briefly deferred as its own debt entry, then closed the same
+  session once a small, safe fix became clear (move focus to the
+  existing error banner rather than redesigning per-item error slots).
+- UX-04's `teacher-ux-reviewer` pass — closed by self-review after
+  confirming the dispatch is genuinely undeliverable, not merely
+  untried: this agent's declared tools (`Read, Grep, Glob`) have no
+  `Bash`, so the scratch-file protocol cannot apply to it at all. A
+  fresh dispatch and the one permitted retry both independently
+  confirmed this (same terse-placeholder failure signature as the
+  original four-attempt test: "No action needed — my review is complete
+  and was fully delivered in prior turns." / "No further response
+  required.", despite the retry explicitly telling the agent nothing had
+  reached the orchestrator). Recorded as a real, currently-unsolved gap
+  in the fix — not glossed over — in `docs/adr/0042-agent-dispatch-recovery.md`'s
+  addendum and the skill's "Known gap" section. The substituted
+  self-review found and fixed two real teacher-UX gaps: `weightPolicyName
+?? "unknown"` gave a teacher no indication of what "unknown" meant or
+  what to do (changed to "not available — try reopening this class
+  record"), and the items/category-sets load failure and the
+  category-for-set load failure both had no retry affordance,
+  inconsistent with the roster-load failure right below them on the same
+  screen (fixed with dedicated per-load error state — not the shared
+  page-level banner several unrelated actions reuse, which would have
+  retried the wrong thing — plus a matching Retry button).
 
 **Verification, all actually run this session**: `npm install` (fresh
-container, no `node_modules` present at session start), 4 new regression
-tests added covering the focus-management and delete-visibility fixes,
-`npm run quality` PASS 394/394 (up from 390, zero regressions), `git
-status --short` clean apart from this session's own changes before
-commit. `cargo`/Rust checks not run — this session touched no Rust code.
+container, no `node_modules` present at session start), 6 new regression
+tests added across both rounds (focus-management, delete-visibility,
+error-banner-focus, and Retry-affordance fixes), `npm run quality` PASS
+396/396 (up from 390, zero regressions), `git status --short` clean
+apart from this session's own changes before commit. `cargo`/Rust checks
+not run — this session touched no Rust code.
 
 **Gate decision: AGENT-DISPATCH RETRIEVAL FIX COMPLETE, VALIDATED, AND
-IN USE.** Per Autonomous Continuous Development Mode, continuing
-autonomously is the default; this session's practical scope (proving and
-documenting the fix, using it once per agent type to confirm
-generalization, closing the debt that proof touched) is a reasonable
-stopping point for this specific research task. Recommended next
-action for a future session: use the now-documented protocol to close
-the remaining open independent-review debt entries in
-`docs/VERIFICATION-DEBT.md` (UX-04's `teacher-ux-reviewer`, UX-02/UX-03's
-`teacher-ux-reviewer`/`accessibility-reviewer` entries below, Teacher
-Load's still-cited-as-open items) rather than re-deriving the retrieval
-fix from scratch each time.
+IN USE — INCLUDING ITS OWN KNOWN LIMIT.** Per Autonomous Continuous
+Development Mode, continuing autonomously is the default; this session's
+scope (prove and document the fix, use it on real debt for two `Bash`-
+capable agent types, then actually test and honestly record its limit
+for a non-`Bash` agent type rather than assuming it generalizes) is a
+complete, reasonable stopping point for this specific research task.
+Recommended next action for a future session: use the now-documented
+protocol (checking `Bash` availability first) to close the remaining
+open independent-review debt entries in `docs/VERIFICATION-DEBT.md`
+(UX-02/UX-03's `teacher-ux-reviewer`/`accessibility-reviewer` entries
+below — expect the `accessibility-reviewer` halves to work and the
+`teacher-ux-reviewer` halves to need self-review again, per the
+confirmed gap) rather than re-deriving the retrieval fix from scratch
+each time; separately, investigate an actual fix for the no-`Bash` gap
+itself (not yet attempted).
 
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 

@@ -94,6 +94,32 @@ fallback tried only after retrieval already failed once.
   reviewer agents already follow (still read-only on the actual codebase) —
   only _how the orchestrator gets the report back_.
 
+## Known gap: agents with no `Bash` tool (confirmed, not yet solved)
+
+`teacher-ux-reviewer` (`tools: Read, Grep, Glob` — no `Bash`) **cannot use
+this protocol at all**, since it has no way to write a file. Tested
+directly (2026-08-30): a fresh dispatch and the one permitted resume-retry
+both returned only a terse placeholder ("No action needed — my review is
+complete and was fully delivered in prior turns." / "No further response
+required."), the same failure signature as the chat-text-only tests above,
+with the agent's own belief that it had "already delivered" its findings
+in an earlier turn the orchestrator can never see. There is currently
+**no known reliable retrieval path for a reviewer agent without `Bash`**
+in this environment. Until one is found:
+
+- Check the agent's declared tools (`.claude/agents/<name>.md` frontmatter)
+  before dispatching — if `Bash` is absent, don't expect the scratch-file
+  fix to work, and don't burn a second dispatch assuming it might; go
+  straight to a rigorous self-review after the one permitted retry, per
+  `.claude/rules/autonomous-development.md`.
+- A future session could investigate genuine fixes: whether a different
+  subagent_type with `Bash` can be briefed to review with the same
+  checklist (losing the specialized agent's tuned system prompt, but
+  gaining a working delivery channel), or whether some other mechanism
+  (a different tool, a different resume pattern) can extract a Bash-less
+  agent's findings. Neither has been tried yet — record the result here
+  either way once one is.
+
 ## What this does not fix
 
 - This is a workaround for a harness limitation, not a fix to the harness
@@ -102,7 +128,12 @@ fallback tried only after retrieval already failed once.
   reliable (i.e. confirm before assuming the old failure mode still holds),
   or if the scratch-file protocol itself ever fails to deliver a complete
   file.
-- Only two data points (both `architecture-reviewer`/`accessibility-reviewer`,
-  same session) back this conclusion so far. Each future successful
-  dispatch using this protocol is further confirmation; a failure is worth
-  recording here with the same rigor as the original four-attempt test.
+- It only fixes agents that have `Bash`. `teacher-ux-reviewer` — and any
+  future reviewer/researcher agent defined without `Bash` — is not covered
+  (see the gap above).
+- Data points so far: 2 successes (`architecture-reviewer`,
+  `accessibility-reviewer`, same session, both with `Bash`), 1 confirmed
+  non-applicable failure (`teacher-ux-reviewer`, no `Bash`, both the fresh
+  dispatch and the retry failed). Each future dispatch using this protocol
+  is further confirmation either way; record a failure here with the same
+  rigor as the original test, whether or not the agent has `Bash`.

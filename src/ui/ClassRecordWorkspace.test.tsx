@@ -92,7 +92,14 @@ class FakeAssessmentRepository implements AssessmentRepository {
     return [CATEGORY];
   }
 
+  listItemsCallCount = 0;
+  failNextListItemsCall = false;
   async listItemsByClassRecord(): Promise<AssessmentItemDetail[]> {
+    this.listItemsCallCount += 1;
+    if (this.failNextListItemsCall) {
+      this.failNextListItemsCall = false;
+      throw new Error("simulated items load failure");
+    }
     return this.items;
   }
 
@@ -264,6 +271,24 @@ describe("ClassRecordWorkspace", () => {
     expect(
       await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" }),
     ).toBeInTheDocument();
+  });
+
+  it("offers a Retry action when the initial assessment-item load fails, and it actually retries", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.failNextListItemsCall = true;
+    renderScreen({ assessmentRepo });
+
+    await screen.findByText(/could not load this class record's assessment items/i);
+    const listCallsBeforeRetry = assessmentRepo.listItemsCallCount;
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ })).toBeInTheDocument();
+    expect(assessmentRepo.listItemsCallCount).toBeGreaterThan(listCallsBeforeRetry);
+    expect(
+      screen.queryByText(/could not load this class record's assessment items/i),
+    ).not.toBeInTheDocument();
   });
 
   it("creates a new assessment item", async () => {

@@ -59,6 +59,12 @@ export function ClassRecordWorkspace({
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  // Dedicated (not the shared `error` banner below) so a Retry action can
+  // target exactly this load -- `error` is reused by several unrelated
+  // actions (create item, compute term grades, export report card), and a
+  // generic "Retry" on that shared banner would re-run the wrong thing.
+  const [itemsLoadError, setItemsLoadError] = useState<string | null>(null);
+  const [categoriesLoadError, setCategoriesLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
@@ -187,8 +193,10 @@ export function ClassRecordWorkspace({
     };
   }, []);
 
-  useEffect(() => {
+  function loadItemsAndCategorySets(): () => void {
     let cancelled = false;
+    setItemsLoading(true);
+    setItemsLoadError(null);
     Promise.all([
       assessmentService.listItemsByClassRecord(classRecordId),
       assessmentService.listCategorySets(),
@@ -201,7 +209,7 @@ export function ClassRecordWorkspace({
         if (defaultSet) setCategorySetId(defaultSet.id);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this class record's assessment items.");
+        if (!cancelled) setItemsLoadError("Could not load this class record's assessment items.");
       })
       .finally(() => {
         if (!cancelled) setItemsLoading(false);
@@ -209,11 +217,17 @@ export function ClassRecordWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [assessmentService, classRecordId]);
+  }
 
   useEffect(() => {
-    if (!categorySetId) return;
+    return loadItemsAndCategorySets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentService, classRecordId]);
+
+  function loadCategoriesForSet(): () => void {
+    if (!categorySetId) return () => {};
     let cancelled = false;
+    setCategoriesLoadError(null);
     assessmentService
       .listCategoriesForSet(categorySetId)
       .then((result) => {
@@ -222,11 +236,16 @@ export function ClassRecordWorkspace({
         if (result[0]) setCategoryId(result[0].id);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load categories for this set.");
+        if (!cancelled) setCategoriesLoadError("Could not load categories for this set.");
       });
     return () => {
       cancelled = true;
     };
+  }
+
+  useEffect(() => {
+    return loadCategoriesForSet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentService, categorySetId]);
 
   function loadRoster() {
@@ -560,6 +579,22 @@ export function ClassRecordWorkspace({
 
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+      {itemsLoadError && (
+        <Alert tone="error">
+          <p>{itemsLoadError}</p>
+          <button type="button" onClick={loadItemsAndCategorySets}>
+            Retry
+          </button>
+        </Alert>
+      )}
+      {categoriesLoadError && (
+        <Alert tone="error">
+          <p>{categoriesLoadError}</p>
+          <button type="button" onClick={loadCategoriesForSet}>
+            Retry
+          </button>
+        </Alert>
+      )}
 
       <div className="form-row">
         <div className="field">
@@ -919,7 +954,10 @@ export function ClassRecordWorkspace({
           {roster.length > 0 && (
             <div className="term-grades">
               <p className="field-hint">
-                Grading weighting: <strong>{weightPolicyName ?? "unknown"}</strong>
+                Grading weighting:{" "}
+                <strong>
+                  {weightPolicyName ?? "not available — try reopening this class record"}
+                </strong>
               </p>
               <button type="button" disabled={termGradesLoading} onClick={handleShowTermGrades}>
                 {termGradesLoading ? "Computing…" : "Show term grades"}
@@ -986,10 +1024,13 @@ export function ClassRecordWorkspace({
                 {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
               </button>
               <p className="field-hint">
-                This export uses the <strong>{weightPolicyName ?? "unknown"}</strong> weighting
-                chosen for this class record. Only two DepEd weighting groups are available so far —
-                if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is
-                DepEd-compliant for it yet.
+                This export uses the{" "}
+                <strong>
+                  {weightPolicyName ?? "not available — try reopening this class record"}
+                </strong>{" "}
+                weighting chosen for this class record. Only two DepEd weighting groups are
+                available so far — if this subject is Senior High School, Grade 12, or Key Stage 1,
+                neither option is DepEd-compliant for it yet.
               </p>
 
               {reportCardResult && (
