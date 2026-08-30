@@ -2508,6 +2508,41 @@ Full record: `docs/adr/0039-*` Wave 3A addendum;
   colleague's-load extension; or the native NVDA/Narrator pass. No
   candidate pre-selected.
 
+## Wave 3B — Session-Expiry False-Positive Fix (added 2026-08-30)
+
+Full record: `docs/adr/0022-*` Wave 3B addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3B entry. **New branch**
+`claude/likha-sis-wave3b-session-expiry-fix`, created from `e465a42`
+(Wave 3A's own final, CI-confirmed checkpoint).
+
+- **Discovered and fixed**: `AppError::Unauthorized` serializes
+  identically for "session genuinely invalid" and "session valid but
+  not permitted for this action" — the frontend's session-expiry
+  wrapper (ADR-0022) could not tell them apart, so every
+  `Capability`/`authorize_view_teacher_load`/`authorize_own_assignment`-gated
+  command (31 total, already shipped across Sections, Learners, SF1
+  Import, Teaching Assignments, Class Schedule, Subject Attendance)
+  was silently force-logging out a session that merely got a
+  legitimate permission denial. Found while planning the
+  School-Head-views-a-colleague's-load feature, which would have
+  exercised this path constantly. Fixed by extending `invoke.ts`'s
+  exemption set from `login` alone to all 31 gated commands,
+  enumerated explicitly and cross-checked against every `pub fn
+authorize_*` in `auth/mod.rs`. Not a security change — no Rust
+  `authorize_*` gate touched.
+- **Deliberately not built**: the deeper Rust-side `Forbidden`/
+  `Unauthorized` type split — properly needs independent security
+  review, out of proportion to this bounded fix.
+- **Verification/checkpoint**: `npm run quality` 692/692 vitest (+6);
+  typecheck/eslint/format/architecture clean; zero Rust files touched
+  (`cargo test` reconfirmed 571/571 unchanged); `npm run build` +
+  `check:dev-preview-isolation` pass; `npm run quality:security` clean,
+  no new dependency; `npm run harness:verify` still exactly 100/100,
+  unchanged.
+- **Next**: the School-Head-views-a-colleague's-load extension (now
+  safe to build); Subject Monitor / Adviser View; or the native
+  NVDA/Narrator pass. No candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

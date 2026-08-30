@@ -1,5 +1,40 @@
 # Verification Debt
 
+## Wave 3B — Session-Expiry False-Positive Fix (2026-08-30)
+
+Full record: `docs/adr/0022-*` Wave 3B addendum; `docs/PROJECT-MEMORY.md`
+Wave 3B entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No Rust-side `Forbidden`/`Unauthorized` type split.** The
+   architecturally cleaner fix — a distinct error variant for
+   "permission denied" vs. "session invalid," decided once at the type
+   level instead of an enumerated frontend list every future
+   `Capability`/`authorize_view_teacher_load`/`authorize_own_assignment`-gated
+   command must remember to join — was not attempted. It touches every
+   `authorize_*` call site and the error serialization contract, and
+   properly requires the independent security review
+   `.claude/rules/security-privacy.md` calls for on auth-touching
+   milestones. **Practical consequence**: any future command using one
+   of these three gate functions must be added to
+   `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` in `invoke.ts` by
+   hand, or it will silently reintroduce this exact false-positive
+   logout bug. Flag this explicitly in review whenever a new gated
+   command ships.
+2. **No independent (non-self) review was dispatched** for this fix,
+   despite it touching session-expiry handling — a frontend-only
+   reclassification, not an authorization change, but still adjacent
+   to security-relevant code. Retained as debt, distinct from (and not
+   a substitute for) the deferred Rust-side fix's own future
+   independent review noted above.
+
+**Debt closed this wave**: the false-positive global logout itself —
+a Teacher (or any session) denied permission for one specific action
+no longer gets silently signed out app-wide; they now see the
+screen's own local error message, as every screen's `.catch()` handler
+already intended.
+
 ## Wave 3A — Teacher Load (2026-08-30)
 
 Full record: `docs/adr/0039-*` Wave 3A addendum; `docs/PROJECT-MEMORY.md`

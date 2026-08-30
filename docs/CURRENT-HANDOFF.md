@@ -1,6 +1,114 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-30 — Wave 3A: Teacher Load, COMPLETE)
+## Active Task (2026-08-30 — Wave 3B: Session-Expiry False-Positive Fix, COMPLETE)
+
+Full record: `docs/adr/0022-global-session-expiry-handling.md` Wave 3B
+addendum; `docs/PROJECT-MEMORY.md` Wave 3B entry;
+`docs/VERIFICATION-DEBT.md` Wave 3B entry. **New dedicated branch**
+`claude/likha-sis-wave3b-session-expiry-fix`, created from exactly
+`e465a4282c4ff23f7498614c40793336fadeb570` (Wave 3A's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 3A's own final Security
+Gate `33284814035` and Quality Gate `33284814060` reconfirmed
+`completed/success` for the exact HEAD commit `e465a42` before any Wave
+3B work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 3B work began.
+
+**Scope chosen — a foundational defect discovered while designing the
+next feature, fixed before it, per this project's own standing
+instruction to prefer repairing the foundation over building on top of
+it.** While planning Wave 3B's original candidate (School Head views a
+colleague's teaching load), inspecting `authorize_view_teacher_load`
+and `src/infrastructure/tauri/invoke.ts` together surfaced a real,
+already-shipped bug: `AppError::Unauthorized` serializes identically
+whether a session is genuinely invalid or merely lacks permission for
+one specific action, and the frontend's session-expiry wrapper
+(ADR-0022) could not tell the two apart. Every `Capability`-gated
+write, every `authorize_view_teacher_load`-gated read, and every
+`authorize_own_assignment`-gated Subject Attendance command (31 in
+total) was silently forcing a global "session expired, please sign in
+again" logout on an ordinary permission denial — not just the
+about-to-be-built colleague's-load feature, but already-shipped
+Sections, Learners, SF1 Import, Teaching Assignments, and Class
+Schedule writes too.
+
+**What shipped**: `src/infrastructure/tauri/invoke.ts`'s
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` set, previously
+containing only `"login"`, extended to all 31 commands gated by
+`Capability`, `authorize_view_teacher_load`, or
+`authorize_own_assignment` — enumerated explicitly by grepping every
+`commands::*` file for these three gate functions, cross-checked
+against every `pub fn authorize_*` in `auth/mod.rs` to confirm
+completeness. A command gated only by `require_active_session`/
+`require_active_school_scope` (no additional permission check) is
+deliberately **not** exempted, since its `Unauthorized` really can
+only mean the session itself is invalid. **This is not a security
+loosening** — no `authorize_*` gate in Rust changed; every command
+still refuses exactly the same callers it always did. The fix only
+changes which frontend mechanism reports that refusal: a local,
+in-screen message instead of an unrelated global logout. A genuinely
+expired session is still caught promptly, since almost every screen
+also calls at least one non-exempted, session-only-gated read in the
+same load cycle.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **692/692 vitest** (73 files; +6: a parameterized test
+proving 5 representative newly-exempted commands across all three gate
+shapes no longer notify the global listener, plus one proving a
+session-only-gated command still does). **Zero Rust files touched** —
+confirmed by `git status`; no `authorize_*` function or any command's
+gate changed; `cargo test` reconfirmed 571/571 unchanged as part of
+`npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged — not reopened. `npm run quality:full` green end to end,
+exit code 0.
+
+**Scope guard held**: the deeper architectural fix (a Rust-side
+`Forbidden` error variant distinct from `Unauthorized`, letting this
+distinction be made once at the type level instead of an enumerated
+frontend list every future gated command must remember to join) was
+deliberately **not** attempted — it touches every `authorize_*` call
+site and the error serialization contract, properly requiring the
+independent security review `.claude/rules/security-privacy.md` calls
+for on auth-touching milestones, and is out of proportion to a
+bounded, foundation-repair wave. Recorded as debt, not silently
+dropped. Zero change to any prior wave's backend or UI code beyond
+`invoke.ts` and its own test file; `main` not touched; no unrelated
+refactor.
+
+**Review**: a bounded self-review confirmed the enumerated command
+list is complete (cross-checked two independent ways: grepping every
+`commands::*` file for the three gate-function names, and separately
+listing every `pub fn authorize_*` in `auth/mod.rs` to confirm no
+fourth gate shape was missed), that a representative command from each
+of the three gate shapes is covered by a test, and that the one
+session-only-gated command used as the negative-control test
+(`list_teaching_assignments_by_section`) genuinely has no capability
+or ownership gate (confirmed by re-reading its command body). No
+independent (non-self) review was dispatched — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with the pattern recent waves
+have established, and explicitly not a substitute for the deferred
+Rust-side fix's own future independent review.
+
+**Exact next slice** (recorded, not started): the School-Head-views-a-
+colleague's-load extension to Teacher Load — Wave 3B's own original
+candidate, now safe to build without inheriting this false-positive
+logout; Subject Monitor / Adviser View; or the native NVDA/Narrator
+pass. No candidate pre-selected. Per the owner's own standing
+instruction this session, work continues directly into the next wave
+without a separate stop-and-wait — a notification is sent at each wave
+boundary instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply —
+unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-30 — Wave 3A: Teacher Load, COMPLETE, superseded above)
 
 Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
 Wave 3A addendum; `docs/PROJECT-MEMORY.md` Wave 3A entry;
