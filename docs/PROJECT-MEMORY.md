@@ -2480,6 +2480,34 @@ quality:security` clean, no new dependency; `npm run harness:verify`
   Monitor / Adviser View; or the native NVDA/Narrator pass. No
   candidate pre-selected.
 
+## Wave 3A — Teacher Load (added 2026-08-30)
+
+Full record: `docs/adr/0039-*` Wave 3A addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3A entry. **New branch**
+`claude/likha-sis-wave3a-teacher-load`, created from `62c58e0`
+(Wave 2Z's own final, CI-confirmed checkpoint).
+
+- **Built**: `TeacherLoadScreen.tsx` — a teacher views their own
+  derived load (assignment count, distinct subjects, weekly
+  instructional time as "Xh Ym") plus the assignments counted toward
+  it, reusing the already-built `listMyAssignments`. Top-level "My
+  Teaching Load" nav tab, no contextual handoff needed. **Zero new
+  backend surface** — `get_teacher_load` already existed, gated, and
+  unit-tested since ADR-0039's original milestone.
+- **Deliberately not built**: School-Head-views-a-colleague's-load UI
+  (deferred); no dev-preview-fixture wiring (same disclosed gap as
+  Waves 2U/2W/2X/2Y/2Z); no overload-threshold warning/enforcement
+  (ADR-0039's own long-standing non-goal).
+- **Verification/checkpoint**: `npm run quality` 686/686 vitest (+8);
+  typecheck/eslint/format/architecture clean; zero Rust files touched
+  (`cargo test` reconfirmed 571/571 unchanged); `npm run build` +
+  `check:dev-preview-isolation` pass; `npm run quality:security` clean,
+  no new dependency; `npm run harness:verify` still exactly 100/100,
+  unchanged.
+- **Next**: Subject Monitor / Adviser View; the School-Head-views-a-
+  colleague's-load extension; or the native NVDA/Narrator pass. No
+  candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

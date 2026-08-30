@@ -1,5 +1,30 @@
 # Verification Debt
 
+## Wave 3A — Teacher Load (2026-08-30)
+
+Full record: `docs/adr/0039-*` Wave 3A addendum; `docs/PROJECT-MEMORY.md`
+Wave 3A entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **`TeacherLoadScreen` has no browser-rendered (Playwright/axe)
+   screenshot coverage.** Not wired into `src/dev-preview/fixtures.ts`
+   this wave — the same disclosed gap Waves 2U/2W/2X/2Y/2Z's own new
+   UI left open. Coverage is jsdom + axe-core
+   (`expectNoAccessibilityViolations`) only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as Waves 2V/2W/2X/2Y/2Z, not a new gap class.
+3. **No School-Head-views-a-colleague's-load UI.** `get_teacher_load`
+   supports it (`auth::authorize_view_teacher_load`'s School-Head
+   branch), but this wave wires only the self-view path — carried as
+   the natural next candidate for this specific screen.
+4. **No overload-threshold warning or enforcement.** The three
+   numbers this wave finally displays are exactly what a future
+   overload-flagging feature (RA 4670's 6-hour/day classroom-teaching
+   threshold) would need, but ADR-0039 itself never decided whether to
+   warn, block, or merely report an overload — a product-policy
+   question with no repository evidence yet, unchanged, not new debt.
+
 ## Wave 2Z — Class Schedule (2026-08-29)
 
 Full record: `docs/adr/0039-*` Wave 2Z addendum; `docs/PROJECT-MEMORY.md`

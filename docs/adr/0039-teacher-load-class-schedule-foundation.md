@@ -347,3 +347,71 @@ one-off exceptional-date schedule overrides (this ADR's own long-
 standing non-goal, unchanged); no independent (non-self) review
 dispatched for this bounded slice — retained as debt, consistent with
 the pattern Waves 2V/2W/2X/2Y already established.
+
+## Addendum (Wave 3A, 2026-08-30): Teacher Load — the derived numbers finally have data to show
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-3A-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Why this slice**: `get_teacher_load` and its three independent
+numbers (assignment count, distinct-subject/preparation count, weekly
+instructional minutes) were designed and implemented at this ADR's
+original milestone, but had nothing real to compute from until
+Teaching Assignments (Wave 2Y) and Class Schedule (Wave 2Z) gave real
+schools a way to create assignments and schedule them. This wave
+closes the Teacher Load/Class Schedule track's last remaining unbuilt
+read surface.
+
+**Scope**: one new screen, `TeacherLoadScreen.tsx` -- a teacher views
+their own derived load: assignment count, distinct subjects, and
+weekly instructional time (formatted as "Xh Ym", not raw minutes),
+plus the list of assignments counted toward it (reusing
+`SubjectAttendanceApplicationService.listMyAssignments`, already
+built and tested in Wave 2W, rather than inventing a second "my
+assignments" read). Reachable as a normal top-level "My Teaching Load"
+nav tab under Daily Teaching -- unlike every other Wave 2Y/2Z/3A
+screen, this one needs no contextual handoff, since a teacher always
+views their own load with no selection to make first.
+
+**Deliberately self-view only.** `get_teacher_load` is gated by
+`auth::authorize_view_teacher_load` (self, or a School Head viewing a
+colleague) -- this wave wires only the self path.
+`TeacherLoadScreen` is given the signed-in teacher's own
+`session.userId`, never a client-supplied target id, so there is no
+new surface for a Teacher to probe a colleague's load. A School Head
+viewing another teacher's load (the same picker problem Wave 2Y
+already solved once for assignment creation, via `list_school_members`)
+is a deferred candidate, not attempted here.
+
+**Zero new backend surface.** `get_teacher_load` already existed,
+already gated, already unit-tested at the repository level since this
+ADR's original milestone. This wave adds no Rust code at all --
+confirmed by `git status` touching only TypeScript files. The only new
+surface is a `getLoad` method threaded through the already-shared
+`TeachingAssignmentRepository` port (the same port Waves 2W/2X/2Y/2Z
+already extended) and its `TeachingAssignmentApplicationService`
+wrapper.
+
+**Verification**: `npm run quality` 686/686 vitest (+8: 1 more
+`TeachingAssignmentRepository` adapter test, 2
+`TeachingAssignmentApplicationService.getLoad` tests, 5
+`TeacherLoadScreen` tests incl. 1 axe accessibility pass and a
+retryable-error case). `npx tsc -b --noEmit` / `eslint` / `prettier
+--check` / `check:architecture` all clean. **Zero Rust files touched**
+-- confirmed by `git status`; `cargo test` reconfirmed 571/571
+unchanged as part of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Deliberately not built**: no School-Head-views-a-colleague's-load
+UI (deferred, see above); no dev-preview-fixture wiring (same
+disclosed gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
+warning/enforcement (this ADR's own long-standing, deliberate non-goal
+-- the metric this wave finally displays is exactly what a future
+overload-flagging feature would need, but whether to warn or block on
+RA 4670's 6-hour/day threshold remains an unanswered product-policy
+question, unchanged from this ADR's original text); no independent
+(non-self) review dispatched for this bounded slice -- retained as
+debt, consistent with the pattern Waves 2V/2W/2X/2Y/2Z already
+established.

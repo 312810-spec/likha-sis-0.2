@@ -1,6 +1,97 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-29 — Wave 2Z: Class Schedule, COMPLETE)
+## Active Task (2026-08-30 — Wave 3A: Teacher Load, COMPLETE)
+
+Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
+Wave 3A addendum; `docs/PROJECT-MEMORY.md` Wave 3A entry;
+`docs/VERIFICATION-DEBT.md` Wave 3A entry. **New dedicated branch**
+`claude/likha-sis-wave3a-teacher-load`, created from exactly
+`62c58e06a6a9467d5ea39a42f9595b733b2bba07` (Wave 2Z's own final,
+CI-confirmed checkpoint) — that branch itself was not modified. Harness
+v2 stayed locked and still computes **100/100**.
+
+**Repository truth verified first**: `main` confirmed untouched at
+`d9ab0368dbc9218186578c9617810f48fe7a41fc`. Wave 2Z's own final Security
+Gate `33267923807` and Quality Gate `33267923872` reconfirmed
+`completed/success` for the exact HEAD commit `62c58e0` before any Wave
+3A work began. `npm run harness:verify` reconfirmed exactly 100/100,
+certified, before any Wave 3A work began.
+
+**Scope chosen**: the top recorded candidate at the end of Wave 2Z —
+Teacher Load, per the owner's own standing instruction to continue
+directly into the next wave with a notification at each boundary.
+`get_teacher_load`'s three derived numbers were designed and
+implemented at ADR-0039's original milestone but had nothing real to
+compute from until Teaching Assignments (2Y) and Class Schedule (2Z)
+existed — this closes the Teacher Load/Class Schedule track's last
+remaining unbuilt read surface.
+
+**What shipped**: one new screen, `TeacherLoadScreen.tsx` — a teacher
+views their own derived load (assignment count, distinct subjects,
+weekly instructional time formatted as "Xh Ym") plus the list of
+assignments counted toward it, reusing the already-built
+`SubjectAttendanceApplicationService.listMyAssignments` rather than
+inventing a second "my assignments" read. Reachable as a normal
+top-level "My Teaching Load" nav tab — unlike every Wave 2Y/2Z screen,
+this one needs no contextual handoff, since a teacher always views
+their own load with nothing to select first. **Zero new backend
+surface**: `get_teacher_load` already existed, already gated
+(`auth::authorize_view_teacher_load`, self-or-School-Head), already
+unit-tested since ADR-0039's original milestone — this wave adds no
+Rust code at all. Deliberately **self-view only**: the screen is given
+the signed-in teacher's own `session.userId`, never a client-supplied
+target id, so there is no new surface for a Teacher to probe a
+colleague's load; a School Head viewing a colleague's load is a
+deferred candidate.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **686/686 vitest** (73 files; +8: 1 more
+`TeachingAssignmentRepository` adapter test, 2
+`TeachingAssignmentApplicationService.getLoad` tests, 5
+`TeacherLoadScreen` tests incl. 1 axe accessibility pass and a
+retryable-error case). **Zero Rust files touched this wave** —
+confirmed by `git status`; `cargo test` reconfirmed 571/571 unchanged
+as part of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged — not reopened. `npm run quality:full` green end to end,
+exit code 0.
+
+**Scope guard held**: no School-Head-views-a-colleague's-load UI
+(deferred); no dev-preview-fixture wiring (same disclosed, consistent
+gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold warning/
+enforcement (ADR-0039's own long-standing, deliberate non-goal —
+whether to warn or block on RA 4670's 6-hour/day threshold remains an
+unanswered product-policy question); zero change to any prior wave's
+backend or UI code beyond the new `TeacherLoadScreen` and its
+`getLoad` passthrough; `main` not touched; no unrelated refactor.
+
+**Review**: a bounded self-review confirmed the screen never accepts a
+client-supplied teacher id (always `session.userId`, matching every
+other self-scoped screen's convention), that the three numbers are
+displayed separately rather than combined into one score (matching
+PRODUCT-CONTRACT §6's explicit requirement, unchanged since ADR-0039),
+and that `formatMinutes`'s zero/hour-only/minute-only branches are
+each covered by a dedicated test. No independent (non-self) review was
+dispatched for this bounded UI slice — retained as debt in
+`docs/VERIFICATION-DEBT.md`, consistent with the same retained-debt
+pattern Waves 2V/2W/2X/2Y/2Z already established.
+
+**Exact next slice** (recorded, not started): Subject Monitor /
+Adviser View (Subject Attendance's own later spec steps — the last
+major deferred piece of that domain); the School-Head-views-a-
+colleague's-load extension to Teacher Load; or the native
+NVDA/Narrator pass. No candidate pre-selected. Per the owner's own
+standing instruction this session, work continues directly into the
+next wave without a separate stop-and-wait — a notification is sent at
+each wave boundary instead.
+
+**Genuinely deferred, not a candidate**: Official School Repository
+remains blocked on external material only the owner can supply —
+unchanged from Wave 2V's own evaluation.
+
+## Note — Active Task (2026-08-29 — Wave 2Z: Class Schedule, COMPLETE, superseded above)
 
 Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
 Wave 2Z addendum; `docs/PROJECT-MEMORY.md` Wave 2Z entry;

@@ -1,5 +1,37 @@
 # ACTIVE PLAN
 
+## Wave 3A: Teacher Load (added 2026-08-30) — complete
+
+Full record: `docs/adr/0039-*` Wave 3A addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3A entry;
+`docs/VERIFICATION-DEBT.md` Wave 3A entry. **New branch**
+`claude/likha-sis-wave3a-teacher-load`, created from `62c58e0`
+(Wave 2Z's own final, CI-confirmed checkpoint).
+
+**Scope**: one new screen, `TeacherLoadScreen.tsx` — a teacher views
+their own derived load (assignment count, distinct subjects, weekly
+instructional time as "Xh Ym") plus the assignments counted toward
+it, reusing the already-built `listMyAssignments`. Reachable as a
+normal top-level "My Teaching Load" nav tab, needing no contextual
+handoff. **Zero new backend surface**: `get_teacher_load` already
+existed, gated, and unit-tested since ADR-0039's original milestone.
+
+**Deliberately self-view only**: the screen is given the signed-in
+teacher's own `session.userId`, never a client-supplied target id. A
+School Head viewing a colleague's load is a deferred candidate.
+
+**Verification, all actually run this session**: `npm run quality`
+686/686 vitest (+8); typecheck/eslint/format/architecture clean. Zero
+Rust files touched; `cargo test` reconfirmed 571/571 unchanged as part
+of `npm run quality:full`. `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged.
+
+**Next**: Subject Monitor / Adviser View; the School-Head-views-a-
+colleague's-load extension; or the native NVDA/Narrator pass. No
+candidate pre-selected.
+
 ## Wave 2Z: Class Schedule (added 2026-08-29) — complete
 
 Full record: `docs/adr/0039-*` Wave 2Z addendum; `docs/CURRENT-HANDOFF.md`
