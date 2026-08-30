@@ -292,3 +292,102 @@ part of `npm run quality:full`. `npm run build` +
 `check:dev-preview-isolation` pass. `npm run quality:security` clean
 (gitleaks + `cargo deny check` + OSV-Scanner), no new dependency. `npm
 run harness:verify` still exactly 100/100, unchanged.
+
+## Addendum (Wave 3D, 2026-08-30): Subject Monitor, and splitting it from Adviser View
+
+Full delivery report: `../../../LIKHA-SIS-DELIVERY-REPORTS/WAVE-3D-FINAL-REPORT.md`
+(kept outside tracked source, per `CLAUDE.md`).
+
+**Scope**: the spec's own "Subject Monitor" (recommended-order step 6,
+half of what earlier addenda listed together as "Subject Monitor /
+Adviser View") — a per-learner attendance report for one teaching
+assignment: present/absent/late/excused counts across every `held`
+session recorded so far, plus the learner's current consecutive-absence
+streak. A new screen, `SubjectMonitorScreen.tsx`, reachable directly
+from the Daily Teaching nav group (`subject-monitor` tab), mirroring
+`SubjectAttendanceScreen`'s own class-picker/date-field shape.
+
+**Splitting Subject Monitor from Adviser View was a deliberate scoping
+decision, made before writing any code, not an oversight.** Every prior
+addendum bundled the two under one heading because the spec does, but
+they need fundamentally different authorization shapes:
+
+- **Subject Monitor** reads data the caller already owns — the exact
+  same `authorize_own_assignment` gate every other Subject Attendance
+  command already uses. Zero new authorization design.
+- **Adviser View** (a colleague or adviser viewing _someone else's_
+  Subject Attendance data) requires an "adviser of a section"
+  relationship that **does not exist anywhere in this codebase's
+  schema** — confirmed by an exhaustive grep across `src-tauri/src/`,
+  every migration, and every ADR: not a column on `sections`, not a
+  role, not enforced anywhere. Even SF2's own `commands/attendance.rs`
+  — informally called "adviser-facing" in `PRODUCT-CONTRACT.md` as a UX
+  label only — gates purely on `require_active_school_scope`, with no
+  adviser-specific check at all. Building Adviser View now would mean
+  inventing that relationship for the first time, cross-cutting SF2,
+  SF5, SF9, and general RBAC, with no existing pattern to extend —
+  exactly this project's own bar (`.claude/rules/autonomous-development.md`)
+  for a decision warranting the established 10-scenario evaluation
+  process, not a quick implementation piggybacked on this wave. It
+  remains deferred, recorded as a real next-slice candidate, not
+  quietly dropped.
+
+**A real correctness bug was caught by TDD before shipping, not found
+in review.** The first implementation of the consecutive-absence streak
+walked only the `subject_attendance_entries` rows that exist for a
+learner (an inner join against `subject_attendance_sessions`). A `held`
+session the teacher opened but never marked for one particular learner
+produces no entry row at all for that learner — so that gap session was
+invisible to the streak calculation instead of breaking it, silently
+bridging two non-adjacent absences into a false "consecutive" streak. A
+dedicated test,
+`monitor_for_assignment_streak_stops_at_an_unmarked_session_never_counting_it`,
+written before the fix, caught this (expected streak `1`, got `2`). The
+fix walks the complete ordered list of every `held` session id for the
+assignment (not merely ones with an entry), looking up
+`(session_id, membership_id)` in a map built from the actual entries —
+a session with no entry for that learner now explicitly breaks the
+streak, matching `SubjectAttendanceMonitorRow::currentConsecutiveAbsences`'s
+own documented contract ("an unmarked session never counts as absent
+and always breaks the streak").
+
+**Deliberately no automatic flag or threshold** beyond the raw streak
+number — the spec explicitly defers configurable school thresholds for
+follow-up as a later, separately-designed enhancement; guessing at one
+here would mean inventing a DepEd-adjacent policy this project has no
+authority to invent.
+
+**Architecture**: one new Rust function,
+`subject_attendance::monitor_for_assignment`, and one new command,
+`subject_attendance_monitor`, gated identically to every other command
+in `commands/subject_attendance.rs`. Rows are scoped to
+`section_membership::current_roster` as of the requested date — the
+same "current roster" convention every other Subject Attendance screen
+already uses — so a learner who has since transferred out no longer
+appears, confirmed by a dedicated test. Frontend gained
+`SubjectAttendanceMonitor`/`SubjectAttendanceMonitorRow` domain types
+mirroring the Rust types exactly, one new port/adapter/service method
+(`monitor`), and the new screen.
+
+**Deliberately not built this wave**: Adviser View (see above); no
+dev-preview-fixture wiring (same disclosed, consistent tradeoff recent
+waves' new UI left open); no configurable absence-streak threshold or
+automatic flag (see above).
+
+**Verification**: `npm run quality` 705/705 vitest, up from Wave 3C's
+696/696 (+9: 1 `TauriSubjectAttendanceRepository.monitor` adapter test,
+2 `SubjectAttendanceApplicationService.monitor` tests, 6
+`SubjectMonitorScreen` tests including 1 axe accessibility pass).
+`npx tsc -b --noEmit` / `eslint` / `prettier --check` /
+`check:architecture` all clean. `cargo test`: 579 lib tests (+8: the
+monitor repository tests, including the streak/gap-handling test
+above) and all existing integration binaries green, including 2 new
+`tests/subject_attendance.rs` command-boundary tests
+(`a_teacher_can_view_the_monitor_for_their_own_assignment`,
+`a_teacher_cannot_view_the_monitor_for_an_assignment_they_do_not_own`).
+`cargo fmt --check` / `cargo clippy --all-targets -- -D warnings`
+clean, all as part of `npm run quality:full` (exit 0). `npm run build`
+
+- `check:dev-preview-isolation` pass. `npm run quality:security` clean
+  (gitleaks + `cargo deny check` + OSV-Scanner), no new dependency. `npm
+run harness:verify` still exactly 100/100, unchanged.

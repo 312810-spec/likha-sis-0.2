@@ -1,5 +1,30 @@
 # Verification Debt
 
+## Wave 3D — Subject Monitor (2026-08-30)
+
+Full record: `docs/adr/0055-*` Wave 3D addendum; `docs/PROJECT-MEMORY.md`
+Wave 3D entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/axe) screenshot coverage for the
+   new screen.** `SubjectMonitorScreen` isn't wired into
+   `src/dev-preview/fixtures.ts` — the same disclosed gap Waves
+   2U/2W/2X/2Y/2Z/3C's own new UI left open. Coverage is jsdom +
+   axe-core only.
+2. **No independent (non-self) review was dispatched** — same
+   retained-debt pattern as recent waves, not a new gap class.
+
+**Debt avoided, not incurred**: the new `subject_attendance_monitor`
+command is gated by `authorize_own_assignment`, the exact shape Wave 3B
+found could false-positive-logout a caller on an ordinary permission
+denial. It was added to `invoke.ts`'s
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` set in this same wave —
+Wave 3B's own recorded debt item #1 (no Rust-side type split, so every
+future gated command must be added to this list by hand) is still open
+and still real, but this wave did not let it lapse into a live bug the
+way it would have if the new command shipped without the addition.
+
 ## Wave 3C — School Head views a colleague's Teacher Load (2026-08-30)
 
 Full record: `docs/adr/0039-*` Wave 3C addendum; `docs/PROJECT-MEMORY.md`

@@ -2573,6 +2573,55 @@ quality:security` clean, no new dependency; `npm run harness:verify`
   authorization-shape design work); or the native NVDA/Narrator pass.
   No candidate pre-selected.
 
+## Wave 3D — Subject Monitor (added 2026-08-30)
+
+Full record: `docs/adr/0055-*` Wave 3D addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3D entry. **New branch**
+`claude/likha-sis-wave3d-subject-monitor`, created from `f7d7029`
+(Wave 3C's own final, CI-confirmed checkpoint).
+
+- **Built**: `subject_attendance::monitor_for_assignment` (Rust) —
+  per-learner present/absent/late/excused counts and a current
+  consecutive-absence streak, scoped to one teaching assignment's
+  roster as of a requested date. New `subject_attendance_monitor`
+  command, gated identically to every other command in that file
+  (`authorize_own_assignment` — zero new authorization shape). New
+  `SubjectMonitorScreen`, reachable directly from the Daily Teaching
+  nav group.
+- **Deliberately split from Adviser View** (the other half of "Subject
+  Monitor / Adviser View" carried since Wave 2V): Adviser View needs an
+  "adviser of a section" relationship that does not exist anywhere in
+  this codebase's schema — confirmed by an exhaustive grep, including
+  SF2's own command file, which gates only on
+  `require_active_school_scope` despite being informally called
+  "adviser-facing" in `PRODUCT-CONTRACT.md`. Real, cross-cutting design
+  work (SF2, SF5, SF9, RBAC), deferred as its own wave rather than
+  rushed alongside this one.
+- **A real bug caught by TDD before shipping**: the first streak
+  implementation walked only entry rows that exist (an inner join), so
+  a `held` session opened but never marked for a learner was invisible
+  to the streak instead of breaking it — silently bridging two
+  non-adjacent absences into a false "consecutive" streak. A dedicated
+  test written before the fix caught it (expected `1`, got `2`). Fixed
+  by walking every `held` session id and looking up each learner's
+  entry by `(session_id, membership_id)`, so a missing entry now
+  explicitly breaks the streak.
+- **Deliberately not built**: Adviser View (see above); no
+  dev-preview-fixture wiring (same disclosed gap recent waves' new UI
+  left open); no configurable absence-streak threshold or automatic
+  flag (the spec explicitly defers this as a later enhancement).
+- **Verification/checkpoint**: `npm run quality` 705/705 vitest (+9
+  net from Wave 3C's 696/696); typecheck/eslint/format/architecture
+  clean; `cargo test` 579 lib tests (+8) and all integration binaries
+  green, including 2 new command-boundary tests; `cargo fmt --check` /
+  `cargo clippy --all-targets -- -D warnings` clean; `npm run build` +
+  `check:dev-preview-isolation` pass; `npm run quality:security` clean,
+  no new dependency; `npm run harness:verify` still exactly 100/100,
+  unchanged.
+- **Next**: Adviser View (needs the 10-scenario evaluation process for
+  its authorization-shape design); or the native NVDA/Narrator pass. No
+  candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

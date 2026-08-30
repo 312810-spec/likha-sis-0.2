@@ -1,6 +1,104 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-30 — Wave 3C: School Head views a colleague's Teacher Load, COMPLETE)
+## Active Task (2026-08-30 — Wave 3D: Subject Monitor, COMPLETE)
+
+Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 3D
+addendum; `docs/PROJECT-MEMORY.md` Wave 3D entry;
+`docs/VERIFICATION-DEBT.md` Wave 3D entry. **New dedicated branch**
+`claude/likha-sis-wave3d-subject-monitor`, created from Wave 3C's own
+final, CI-confirmed checkpoint (`f7d7029864b506cb468cbc76509b2dbc99cdc4c2`)
+— that branch itself was not modified. Harness v2 stayed locked and
+still computes **100/100**.
+
+**Scope chosen**: the spec's own "Subject Monitor" — deliberately split
+from "Adviser View", the other half of the candidate Wave 3C's report
+carried forward. Subject Monitor reuses `authorize_own_assignment`
+unchanged (a reporting view over data the caller already owns, zero new
+authorization design). Adviser View needs a genuinely new "adviser of a
+section" relationship that does not exist anywhere in this codebase's
+schema — confirmed by an exhaustive grep, including SF2's own command
+file, which gates only on `require_active_school_scope` despite being
+informally called "adviser-facing" in `PRODUCT-CONTRACT.md`. Adviser
+View remains deferred as its own, larger, cross-cutting design question
+(SF2, SF5, SF9, general RBAC) — recorded as the exact next-slice
+candidate below, not attempted here.
+
+**What shipped**: `subject_attendance::monitor_for_assignment` (Rust) —
+present/absent/late/excused counts and a current consecutive-absence
+streak per learner on the roster as of a requested date, scoped to one
+teaching assignment. New `subject_attendance_monitor` command, gated
+identically to every other command in that file. Frontend:
+`SubjectAttendanceMonitor`/`SubjectAttendanceMonitorRow` domain types,
+a `monitor` port/adapter/service method, and a new
+`SubjectMonitorScreen` reachable directly from the Daily Teaching nav
+group.
+
+**A real correctness bug was caught by TDD before shipping**: the first
+streak implementation only walked entry rows that exist for a learner
+(an inner join), so a `held` session the teacher opened but never
+marked for one learner was invisible to the streak instead of breaking
+it — silently bridging two non-adjacent absences into a false
+"consecutive" streak. A dedicated test written before the fix caught it
+(expected streak `1`, got `2`). Fixed by walking every `held` session
+id for the assignment and looking up each learner's entry by
+`(session_id, membership_id)` — a missing entry now explicitly breaks
+the streak. Full detail in the ADR-0055 Wave 3D addendum.
+
+**Verification** (all run this session): `npx tsc -b --noEmit`/`eslint
+.`/`prettier --check .`/`check:architecture` all clean. `npm run
+quality` — **705/705 vitest** (74 files; +9 net from Wave 3C's
+696/696). `cargo test`: **579 lib tests** (+8, the monitor repository
+tests including the streak/gap-handling case) and all integration
+binaries green, including 2 new command-boundary tests in
+`tests/subject_attendance.rs`. `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean, all as part of `npm
+run quality:full` (exit 0). `npm run build` +
+`check:dev-preview-isolation` pass. `npm run quality:security` clean,
+no new dependency. `npm run harness:verify` still exactly 100/100,
+unchanged — not reopened.
+
+**Scope guard held**: no dev-preview-fixture wiring (same disclosed,
+consistent gap recent waves' new UI left open); no configurable
+absence-streak threshold or automatic flag — the spec explicitly defers
+this as a later, separately-designed enhancement; Adviser View not
+attempted (see above); `main` not touched; no unrelated refactor.
+
+**Review**: a bounded self-review confirmed `monitor_for_assignment`'s
+gap-handling fix against the dedicated failing-then-passing test, that
+a transferred-out learner no longer appears (proven by a dedicated
+test), and that the new command's authorization gate matches every
+other Subject Attendance command exactly (`authorize_own_assignment`,
+proven by a dedicated command-boundary denial test). No independent
+(non-self) review was dispatched for this bounded slice — retained as
+debt in `docs/VERIFICATION-DEBT.md`, consistent with the pattern recent
+waves have established.
+
+**Exact next slice** (recorded, not started): **Adviser View** — a
+colleague/School Head viewing _someone else's_ Subject Attendance data.
+Requires first designing an "adviser of a section" authorization shape
+that has never existed in this codebase, cross-cutting SF2, SF5, SF9,
+and general RBAC — real design work warranting the project's own
+established 10-scenario evaluation process, not a quick implementation.
+The native **NVDA/Narrator accessibility pass** remains carried forward
+and genuinely infeasible in this remote Linux-container session (no
+Windows machine, no screen reader available). No candidate has been
+pre-selected between these two; Adviser View is real design work and
+will take the time that deserves rather than being rushed alongside a
+thin wiring wave.
+
+**Genuinely deferred, not a candidate for any near-term wave**:
+**Official School Repository** remains blocked on external material
+only the owner can supply (Microsoft 365 tenant/consent confirmation),
+a genuine human-approval gate per
+`.claude/rules/autonomous-development.md`. Unchanged from prior waves'
+evaluation.
+
+Note — Wave 3C (School Head views a colleague's Teacher Load) is
+superseded above; its own record remains at
+`docs/adr/0039-teacher-load-class-schedule-foundation.md` Wave 3C
+addendum.
+
+## Note (2026-08-30 — Wave 3C: School Head views a colleague's Teacher Load, COMPLETE, superseded above)
 
 Full record: `docs/adr/0039-teacher-load-class-schedule-foundation.md`
 Wave 3C addendum; `docs/PROJECT-MEMORY.md` Wave 3C entry;

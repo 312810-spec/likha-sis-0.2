@@ -1,5 +1,57 @@
 # ACTIVE PLAN
 
+## Wave 3D: Subject Monitor (added 2026-08-30) — complete
+
+Full record: `docs/adr/0055-*` Wave 3D addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3D entry;
+`docs/VERIFICATION-DEBT.md` Wave 3D entry. **New branch**
+`claude/likha-sis-wave3d-subject-monitor`, created from `f7d7029`
+(Wave 3C's own final, CI-confirmed checkpoint).
+
+**Scope**: `subject_attendance::monitor_for_assignment` (Rust) —
+per-learner present/absent/late/excused counts and a current
+consecutive-absence streak, scoped to one teaching assignment's roster
+as of a requested date. New `subject_attendance_monitor` command,
+gated identically to every other Subject Attendance command
+(`authorize_own_assignment` — zero new authorization shape). New
+frontend `SubjectMonitorScreen`, reachable directly from the Daily
+Teaching nav group.
+
+**Deliberately split from Adviser View** (the other half of the "Subject
+Monitor / Adviser View" candidate carried since Wave 2V): Adviser View
+needs an "adviser of a section" relationship that doesn't exist
+anywhere in this codebase's schema — real, cross-cutting design work
+(SF2, SF5, SF9, RBAC), properly warranting the project's own
+10-scenario evaluation process rather than a quick implementation
+piggybacked on this wave.
+
+**A real bug, caught by TDD before shipping**: the first streak
+implementation only walked entries that exist (inner join), so an
+unmarked `held` session was invisible to the streak instead of
+breaking it — a dedicated failing test caught it before the fix
+shipped. Fixed by walking every `held` session id and looking up each
+learner's entry by `(session_id, membership_id)`, so a missing entry
+explicitly breaks the streak.
+
+**Deliberately not built**: Adviser View (see above); no
+dev-preview-fixture wiring (same disclosed gap recent waves' new UI
+left open); no configurable absence-streak threshold or automatic flag
+(the spec explicitly defers this).
+
+**Verification, all actually run this session**: `npm run quality`
+705/705 vitest (+9 net from Wave 3C's 696/696);
+typecheck/eslint/format/architecture clean. `cargo test`: 579 lib tests
+(+8) and all integration binaries green, including 2 new command-
+boundary tests. `cargo fmt --check` / `cargo clippy --all-targets -- -D
+warnings` clean, all as part of `npm run quality:full` (exit 0). `npm
+run build` + `check:dev-preview-isolation` pass. `npm run
+quality:security` clean, no new dependency. `npm run harness:verify`
+still exactly 100/100, unchanged.
+
+**Next**: Adviser View (needs real new authorization-shape design
+work, per ADR-0055's own Wave 2V/3D addenda); or the native
+NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 3C: School Head views a colleague's Teacher Load (added 2026-08-30) — complete
 
 Full record: `docs/adr/0039-*` Wave 3C addendum; `docs/CURRENT-HANDOFF.md`
