@@ -1287,6 +1287,29 @@ already applied to `ClassRecordWorkspace.tsx` earlier the same session.
 record: `docs/adr/0042-agent-dispatch-recovery.md`'s addendum,
 `docs/VERIFICATION-DEBT.md`'s UX-03 entry.
 
+## UX-02 Independent Review Debt Closure (added 2026-08-30, same session)
+
+Third and last UX milestone reconciled this session. `accessibility-reviewer`
+on `TeacherWorkspaceScreen.tsx` succeeded on the first attempt (no retry
+needed — 4th `Bash`-agent dispatch in a row to succeed via the
+scratch-file protocol). Found the same systemic Retry-focus-loss bug a
+third time, missed here specifically because this screen uses the
+shared `PageHeader` component (its mount-only focus effect had no way
+to be re-invoked on a later retry) rather than an inline heading like
+the other three fixed screens — fixed by giving `PageHeader` an
+imperative `focus()` handle via `forwardRef`/`useImperativeHandle`. Also
+found and corrected a real overstated claim in
+`docs/adr/0032-teacher-workspace-polish.md`'s own self-review, which had
+asserted `expectNoAccessibilityViolations` covered "every screen state
+this test file renders" — checked directly and found only the happy
+path was ever axe-scanned; fixed with both the missing test coverage
+and a dated correction added to the ADR rather than a silent edit. 4 new
+regression tests; `npm run quality` 411/411 (up from 407). This closes
+all three UX milestones' (UX-02/UX-03/UX-04) previously-open independent
+review debt in one session. Full record:
+`docs/adr/0042-agent-dispatch-recovery.md`'s second addendum,
+`docs/VERIFICATION-DEBT.md`'s UX-02 entry.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`.

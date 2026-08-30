@@ -134,6 +134,20 @@ retry — ruling out "the response was too long" as the cause and
 reinforcing that this is a structural limitation of dispatching an
 agent with no `Bash` tool, not a fixable prompting problem.
 
+**A fourth `Bash`-agent dispatch on a third milestone (UX-02) succeeded
+on the first attempt, no retry needed** — `accessibility-reviewer` on
+`TeacherWorkspaceScreen.tsx` found the same systemic Retry-focus-loss
+bug a third time (this screen's variant went undetected longer because
+it uses the shared `PageHeader` component, whose mount-only focus effect
+had no way to be re-invoked on a later retry) and a real, distinct
+finding: this project's own `docs/adr/0032-teacher-workspace-polish.md`
+had claimed its self-review's `expectNoAccessibilityViolations` calls
+covered "every screen state," which the reviewer checked directly and
+found false (only the happy path was ever axe-scanned). Four consecutive
+`Bash`-agent dispatches have now succeeded via this protocol with zero
+failures; the `teacher-ux-reviewer` gap remains the only unresolved
+retrieval failure mode.
+
 ## Consequences
 
 - Independent review debt is no longer expected to default to

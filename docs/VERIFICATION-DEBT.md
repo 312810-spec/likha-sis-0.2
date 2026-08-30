@@ -50,6 +50,15 @@ meta-exercise:
   now fixed everywhere; the `teacher-ux-reviewer` half reconfirmed the
   no-`Bash` gap a second time (different coaching, same failure), further
   evidence it is a real structural limit, not a fluke.
+- **UX-02's `accessibility-reviewer` half is also CLOSED** (see that
+  entry further below) — a third milestone, and a third confirmation of
+  the exact same systemic Retry-focus-loss bug, this time in
+  `TeacherWorkspaceScreen.tsx`, missed there specifically because this
+  screen uses the shared `PageHeader` component rather than an inline
+  heading; fixed by giving `PageHeader` an imperative focus handle. Also
+  found and corrected (with a dated addendum, not a silent edit) a real
+  overstated claim in `docs/adr/0032-teacher-workspace-polish.md`'s own
+  self-review about axe-core test coverage.
 
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure — CLOSED above, original text preserved (2026-08-26)
 
@@ -1022,7 +1031,56 @@ or hardware. This is **not** a bug backlog; move an item here only when
 the underlying work is otherwise done and reviewed, and remove it once
 the missing verification actually happens (record what ran and when).
 
-## UX-02 accessibility-reviewer independent review not retrievable (open)
+## UX-02 accessibility-reviewer independent review: CLOSED 2026-08-30
+
+Re-dispatched using the scratch-file report protocol
+(`docs/adr/0042-agent-dispatch-recovery.md`,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`) — the same recurring
+agent-resume/retrieval failure this entry originally described (see the
+superseded text below) is what that protocol exists to work around.
+This time a complete, genuinely independent review was retrieved on the
+first attempt, covering `TeacherWorkspaceScreen.tsx`.
+
+**2 BLOCKING findings, both fixed.** (1) The exact same systemic
+Retry-focus-loss bug already found and fixed this session in
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`/`ClassRecordWorkspace.tsx`
+was present here too, on both of this screen's "Try again" buttons —
+never fixed here because this screen migrated to the shared `PageHeader`
+component (UX-01), whose own mount-focus effect had no way to be
+re-triggered on a later retry. Fixed by giving `PageHeader` an
+imperative `focus()` handle (`forwardRef`/`useImperativeHandle`,
+`src/ui/components/PageHeader.tsx` — the only other consumer,
+`AuditLogScreen.tsx`, is unaffected since the ref is optional) and
+routing both retry buttons through a `retryWithHeadingFocus` wrapper
+matching the established pattern. (2) `docs/adr/0032-teacher-workspace-polish.md`'s
+own self-review had claimed `expectNoAccessibilityViolations` "runs
+`axe-core` against every screen state this test file renders, including
+the new symmetric-failure state" — the reviewer checked directly and
+found this was wrong: the test file called it exactly once, against
+only the happy-path state, never the two error states, the loading
+state, or the empty-sections state. Fixed by adding axe coverage of the
+error states and the empty state, and by adding a dated correction to
+ADR-0032 itself rather than silently editing the original claim.
+
+**1 SHOULD-FIX**: no regression test asserted focus destination after a
+retry (now added — 4 new tests total: 2 for focus preservation, 2 for
+the new axe coverage). **1 more SHOULD-FIX, no action needed**: the
+`is-no-learners` accent-bar color sits closest to the contrast floor
+among the four priority-rail states, but independently recomputed at
+~3.7:1/4.1:1, clearing the WCAG 1.4.11 non-text 3:1 minimum — flagged
+for a human second look, not a violation. **All NON-BLOCKING/FUTURE
+observations confirmed clean**: contrast (independently recomputed from
+real hex values, all pass), color-only state (every state has a text
+`StatusChip` label, color is additive), target size (≥24px in every
+mode, no disabled buttons on this screen), labels/hints (not
+applicable — no form inputs on this screen). `docs/VERIFICATION-DEBT.md`'s
+own human/screen-reader-pass disclosure re-confirmed current and
+accurate. `npm run quality` 411/411 (up from 407).
+
+---
+
+Original text describing the original failure, preserved per this
+project's "mark superseded in place, don't delete" convention:
 
 `accessibility-reviewer` was dispatched against UX-02's rewritten
 `TeacherWorkspaceScreen.tsx` (2026-08-25) and hit the same recurring

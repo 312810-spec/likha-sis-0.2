@@ -630,6 +630,37 @@ describe("TeacherWorkspaceScreen", () => {
     expect(screen.queryByText("Could not load your workspace overview.")).not.toBeInTheDocument();
   });
 
+  it("clicking Try again on a failed overview load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const sectionRepo = new FakeSectionRepository([]);
+    sectionRepo.shouldFail = true;
+    render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(sectionRepo)}
+          attendanceService={new AttendanceApplicationService(new FakeAttendanceRepository({}))}
+          authService={new AuthApplicationService(new FakeAuthRepository([]))}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Could not load your workspace overview.");
+
+    // The "Try again" button's own retry-key update unmounts the error
+    // Alert (and this button along with it) as the effect re-runs --
+    // without a focus fix, the browser drops focus to <body> at that
+    // point.
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toHaveFocus();
+  });
+
   it("shows an error with retry when recent activity fails, without erasing a successfully loaded overview", async () => {
     const user = userEvent.setup();
     const section: Section = {
@@ -739,6 +770,33 @@ describe("TeacherWorkspaceScreen", () => {
     expect(await screen.findByText(/ana.cruz signed in/)).toBeInTheDocument();
   });
 
+  it("clicking Try again on a failed activity load does not drop keyboard focus to <body>", async () => {
+    const user = userEvent.setup();
+    const authRepo = new FakeAuthRepository([]);
+    authRepo.shouldFail = true;
+    render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(new FakeSectionRepository([]))}
+          attendanceService={new AttendanceApplicationService(new FakeAttendanceRepository({}))}
+          authService={new AuthApplicationService(authRepo)}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Could not load recent sign-in activity.");
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toHaveFocus();
+  });
+
   it("has no detectable accessibility violations", async () => {
     const section: Section = {
       id: "sec1",
@@ -753,6 +811,39 @@ describe("TeacherWorkspaceScreen", () => {
       rostersBySectionId: { sec1: [anEntry("present")] },
     });
     await waitFor(() => screen.getByText(/Mabini/));
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with both error states showing", async () => {
+    const sectionRepo = new FakeSectionRepository([]);
+    sectionRepo.shouldFail = true;
+    const authRepo = new FakeAuthRepository([]);
+    authRepo.shouldFail = true;
+    const { container } = render(
+      <ModeProvider>
+        <TeacherWorkspaceScreen
+          displayName="Ana Cruz"
+          learnerService={new LearnerApplicationService(new FakeLearnerRepository([]))}
+          sectionService={new SectionApplicationService(sectionRepo)}
+          attendanceService={new AttendanceApplicationService(new FakeAttendanceRepository({}))}
+          authService={new AuthApplicationService(authRepo)}
+          gradingService={new GradingApplicationService(new FakeGradingRepository({}))}
+          onOpenAttendance={vi.fn()}
+          onManageSections={vi.fn()}
+          onViewAuditLog={vi.fn()}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByText("Could not load your workspace overview.");
+    await screen.findByText("Could not load recent sign-in activity.");
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("has no detectable accessibility violations with the no-sections empty state showing", async () => {
+    const { container } = renderScreen({});
+    await screen.findByText("No sections created yet.");
 
     await expectNoAccessibilityViolations(container);
   });

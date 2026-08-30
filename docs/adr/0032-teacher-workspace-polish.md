@@ -331,3 +331,23 @@ a successfully loaded activity list"`) was added and passes,
   (recorded here and in `docs/VERIFICATION-DEBT.md`), not a blocker to
   completing this milestone; retry it in a future session once the
   agent-resume harness issue is confirmed fixed.
+
+  **Correction (2026-08-30)**: a real, successfully-retrieved
+  `accessibility-reviewer` pass (`docs/VERIFICATION-DEBT.md`'s UX-02
+  entry) found the "runs `axe-core` against every screen state this test
+  file renders" claim above was wrong — `TeacherWorkspaceScreen.test.tsx`
+  called `expectNoAccessibilityViolations` exactly once, against only
+  the happy-path state, never the overview-error, activity-error,
+  loading, or empty-sections states. It also found this milestone's own
+  `PageHeader` mount-focus fix, while correct on mount, never carried
+  forward to either "Try again" button — clicking one unmounted the
+  button being clicked (the error state clears synchronously before the
+  retry starts) and dropped keyboard focus to `<body>`, a real BLOCKING
+  bug this self-review's "focus management" bullet above did not catch
+  because it only checked mount focus, not retry focus. Both are now
+  fixed: `PageHeader` exposes an imperative `focus()` handle
+  (`src/ui/components/PageHeader.tsx`), both retry buttons route through
+  a `retryWithHeadingFocus` wrapper matching the pattern already used in
+  `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`/`ClassRecordWorkspace.tsx`,
+  and the test file gained axe coverage of the error and empty states.
+  See `docs/VERIFICATION-DEBT.md`'s UX-02 entry for full detail.

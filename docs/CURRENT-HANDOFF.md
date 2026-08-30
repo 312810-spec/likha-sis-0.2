@@ -1,5 +1,50 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — UX-02 Independent Review Debt Closure, complete)
+
+Continuation of the same session's UX-03 closure (entry immediately
+below) onto the third and final open UX-milestone review-debt entry.
+Full record: `docs/adr/0042-agent-dispatch-recovery.md`'s second
+addendum, `docs/VERIFICATION-DEBT.md`'s UX-02 entry,
+`docs/PROJECT-MEMORY.md`'s "UX-02 Independent Review Debt Closure" entry.
+
+**`accessibility-reviewer` on `TeacherWorkspaceScreen.tsx` succeeded on
+the first attempt** — the 4th consecutive `Bash`-agent dispatch to
+succeed via the scratch-file protocol, zero failures across
+`architecture-reviewer` (1) and `accessibility-reviewer` (3, one per UX
+milestone). Found the same systemic Retry-focus-loss bug a third time,
+missed here specifically because this screen uses the shared
+`PageHeader` component rather than an inline heading — fixed by giving
+`PageHeader` an imperative `focus()` handle
+(`forwardRef`/`useImperativeHandle`, `src/ui/components/PageHeader.tsx`;
+the only other consumer, `AuditLogScreen.tsx`, is unaffected since the
+ref is optional) and routing both "Try again" buttons through the same
+`retryWithHeadingFocus` pattern used elsewhere. Also found and corrected
+a real overstated claim in `docs/adr/0032-teacher-workspace-polish.md`'s
+own self-review — it had asserted axe-core coverage of "every screen
+state this test file renders," which the reviewer checked directly and
+found false (only the happy path was ever scanned) — fixed with both
+the missing test coverage and a dated correction added to the ADR.
+
+**Verification, all actually run this session**: 4 new regression tests
+(2 focus-preservation, 2 axe coverage), `npm run quality` PASS 411/411
+(up from 407), zero regressions.
+
+**Gate decision: ALL THREE OPEN UX-MILESTONE REVIEW-DEBT ENTRIES
+(UX-02/UX-03/UX-04) NOW CLOSED.** This closes the entire independent-review
+backlog this session's research task set out to eventually clear, not
+just prove the fix works once. Remaining genuinely open items in
+`docs/VERIFICATION-DEBT.md`: none from the UX-0x tranche; Teacher Load's
+entries are already marked STALE/CORRECTED (no action needed); the
+native visual/screen-reader-pass gap remains a real, disclosed,
+hardware-dependent limitation this protocol cannot close (it needs a
+human on the compiled Windows app, not another agent dispatch).
+Recommended next action for a future session: either investigate an
+actual fix for the `teacher-ux-reviewer` no-`Bash` gap (2 confirmed data
+points now, never yet investigated as fixable rather than worked
+around), or return to ordinary product-feature work per LIKHA's priority
+order — this session's specific research task is complete.
+
 ## Active Task (2026-08-30, this session — UX-03 Independent Review Debt Closure, complete)
 
 Continuation of the same session's Agent-Dispatch Retrieval Fix work

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AttendanceApplicationService } from "../application/attendance-service";
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
@@ -10,7 +10,7 @@ import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
-import { PageHeader } from "./components/PageHeader";
+import { PageHeader, type PageHeaderHandle } from "./components/PageHeader";
 import { StatusChip, type StatusChipTone } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -166,6 +166,7 @@ export function TeacherWorkspaceScreen({
   onViewAuditLog,
 }: TeacherWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
+  const pageHeaderRef = useRef<PageHeaderHandle>(null);
   const [learnerCount, setLearnerCount] = useState<number | null>(null);
   const [sectionSummaries, setSectionSummaries] = useState<SectionAttendanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,9 +252,22 @@ export function TeacherWorkspaceScreen({
     };
   }, [authService, activityRetryKey]);
 
+  // Every "Try again" button below sits inside an error Alert that its
+  // own retry-key state update unmounts as the effect re-runs (the error
+  // state is cleared before the async retry even starts) -- so the
+  // button being clicked is removed from the document before its click
+  // handler finishes, and focus would otherwise drop to <body> per the
+  // HTML spec's remove-focused-element behavior. Moving focus to the
+  // shared PageHeader's heading first, synchronously, avoids that.
+  function retryWithHeadingFocus(retryFn: () => void) {
+    pageHeaderRef.current?.focus();
+    retryFn();
+  }
+
   return (
     <section aria-label="Workspace">
       <PageHeader
+        ref={pageHeaderRef}
         title={`Welcome, ${displayName}`}
         hint={
           mode === "guided" && (
@@ -269,7 +283,10 @@ export function TeacherWorkspaceScreen({
       {error ? (
         <Alert tone="error">
           <p>{error}</p>
-          <button type="button" onClick={() => setOverviewRetryKey((key) => key + 1)}>
+          <button
+            type="button"
+            onClick={() => retryWithHeadingFocus(() => setOverviewRetryKey((key) => key + 1))}
+          >
             Try again
           </button>
         </Alert>
@@ -343,7 +360,10 @@ export function TeacherWorkspaceScreen({
       {activityError ? (
         <Alert tone="error">
           <p>{activityError}</p>
-          <button type="button" onClick={() => setActivityRetryKey((key) => key + 1)}>
+          <button
+            type="button"
+            onClick={() => retryWithHeadingFocus(() => setActivityRetryKey((key) => key + 1))}
+          >
             Try again
           </button>
         </Alert>
