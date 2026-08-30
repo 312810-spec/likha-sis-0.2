@@ -1,5 +1,18 @@
 # Verification Debt
 
+## Integration Review (Waves 2Z-3G) — closed (2026-08-31)
+
+The cross-milestone question "does every `authorize_*` gate/capability
+added since baseline `d9ab036` still compose correctly once every
+wave's commands are combined" is now closed — a `security-reviewer`
+was dispatched specifically for it during the Integration Review +
+Main Fast-Forward milestone and reported no BLOCKING/SHOULD-FIX
+findings (full record: `docs/CURRENT-HANDOFF.md`'s top entry). This
+does **not** close each wave's own individual review debt below (3E,
+3F, 3G each still owe a fresh reviewer dedicated to that wave's own
+diff) — it only closes the separate, narrower "do they compose"
+question.
+
 ## Wave 3F — Adviser View (2026-08-30)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3F

@@ -2743,6 +2743,26 @@ check:dev-preview-isolation` clean; `npx knip` unchanged from the
 - **Next**: no candidate pre-selected — see `docs/CURRENT-HANDOFF.md` for
   the evaluation once this checkpoint's CI is confirmed.
 
+## Integration Review + Main Fast-Forward (added 2026-08-31)
+
+**`main` is now the verified integration baseline at `9c1514c`**,
+fast-forwarded from `d9ab036` through Waves 2Z, 3A-3G (79 commits). Full
+record: `docs/CURRENT-HANDOFF.md` top entry; `docs/VERIFICATION-DEBT.md`'s
+new top entry.
+
+- A real, pre-existing CI failure on `main` itself was found and fixed
+  during this milestone: the `.skills` commit (`7365180`, landed by a
+  prior session without running `npm run quality`) was failing Quality
+  Gate CI on `main`. Fixed with a formatting-only pass confined to
+  `.agents/`.
+- A `security-reviewer` closed the specific cross-milestone question
+  this gate exists to answer (does authorization compose correctly
+  across every wave's commands combined) — no BLOCKING/SHOULD-FIX
+  findings. Each wave's own individual review debt (3E/3F/3G) remains
+  separately open.
+- Both Quality Gate and Security Gate confirmed green on `main`'s new
+  head (`9c1514c`) after the fast-forward, not assumed.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

@@ -1,5 +1,80 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Integration Review + Main Fast-Forward, complete)
+
+**`main` is now the verified integration baseline at `9c1514c`**,
+fast-forwarded from `d9ab036` (previous baseline) through Waves 2Z,
+3A-3G — 79 commits, no merge commit, no squash, no rebase, no force
+push (one small reconciliation merge was needed first, see below).
+
+**Repository truth verified first**: `main`/`origin/main` were at
+`7365180` (the `.skills` commit, one commit ahead of the prior
+recorded baseline `d9ab036`), while this session's branch
+(`claude/continue-working-v7xzb3`, reset onto the most-advanced
+CI-verified line per the entry below) had 78 commits including its own
+independent `.skills` cherry-pick, diverged from `main` at the same
+`d9ab036` point — not a clean ancestor relationship. Fixed by merging
+`origin/main` into the branch (`b2602fd`): since both sides' `.skills`
+content was byte-identical (confirmed via `git diff origin/main --
+.agents .codex AGENTS.md` returning empty), the merge produced zero
+conflicts and an unchanged tree, restoring `main` as a strict ancestor
+without discarding or duplicating anything.
+
+**A real, pre-existing CI failure was found and fixed, not assumed
+away**: `main`'s own `.skills` commit (`7365180`) had never been run
+through `npm run quality` before landing and was failing Quality Gate
+CI on `main` itself (run `33322328528`, conclusion `failure`) — 133
+files under `.agents/` violated `prettier --check`. Fixed with a
+formatting-only `prettier --write` pass confined entirely to
+`.agents/` (product source untouched), committed as `9c1514c`.
+
+**Cross-milestone integration delta reviewed**: automated checks
+(migration chain `src-tauri/src/db/migrations.rs` — pure appends only
+vs. `d9ab036`, zero lines removed; `Cargo.lock` diff is new
+dependencies only — `calamine`/`aes`/`cbc`/etc. for SF1 xlsx import and
+encryption, no removals/downgrades; no `LIKHA-SIS 2.0` stale naming
+beyond pre-existing historical confirmations; no stray junk files) all
+clean. A `security-reviewer` was dispatched for the specific
+cross-milestone question this gate exists to answer (does every
+`authorize_*` gate/capability added since `d9ab036` — RBAC composition
+across Teaching Assignments, Schedule Meetings, Teacher Load, the Wave
+3B session-expiry exemption list, Section Advisories, and Adviser
+View — still compose correctly and fail closed once every wave's
+commands are combined) — it completed and, after being asked to
+restate its findings as plain text (the project's known
+ReportFindings-retrieval issue recurred once, resolved the same way as
+prior sessions), reported **no BLOCKING findings, no SHOULD-FIX
+findings**.
+
+**Pre-integration CI, actually run on the exact commit integrated**:
+branch push `9c1514c` — Quality Gate (`33325361836`) and Security Gate
+(`33325361859`) both green. Local `npm run quality` 735/735,
+`npm run build`, `check:dev-preview-isolation`, `git diff --check` all
+PASS, all actually run this session.
+
+**Fast-forward performed** (`git checkout main && git pull --ff-only
+origin main && git merge --ff-only origin/claude/continue-working-v7xzb3`)
+— Git itself reported `Fast-forward`. Pushed; `origin/main` confirmed
+at `9c1514c`, matching local exactly.
+
+**`main` CI verified green on the new baseline, not assumed**: push
+event runs `33326788531` (Quality Gate) and `33326788538` (Security
+Gate), both `success` at `9c1514c` — this is also the run that proves
+the `.skills` formatting fix actually resolved the pre-existing `main`
+CI failure.
+
+**Feature branches** (`claude/likha-sis-wave3e-...` through
+`codex/likha-sis-wave3f-adviser-view`, and this session's own
+`claude/continue-working-v7xzb3`) are now fully integrated into `main`.
+Not deleted this milestone — retained until the user approves removal.
+
+**Gate decision: INTEGRATION PASSED — MAIN IS THE NEW VERIFIED
+BASELINE THROUGH WAVE 3G.** Independent-review debt narrows slightly
+(this integration-composition question is now closed) but per-wave
+review debt for 3E/3F/3G individually (a fresh reviewer dedicated to
+each wave's own diff) remains open in `docs/VERIFICATION-DEBT.md`.
+Recommended next milestone: see this session's evaluation below.
+
 ## Active Task (2026-08-31, this session — Wave 3G: Section Adviser Management UI, complete)
 
 **Branch-line note, read first**: this session's designated harness
