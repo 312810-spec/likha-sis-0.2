@@ -6,27 +6,37 @@
 // Guardrails (see .claude/rules/autonomous-development.md and the wave
 // completion report rule in CLAUDE.md):
 //   - Only runs after the caller has a real report file and a real SHA/branch.
-//   - Refuses to post unless GitHub confirms the checkpoint SHA's CI is green.
+//   - Refuses to post unless GitHub confirms BOTH required workflows
+//     (Quality Gate, Security Gate) completed successfully for the exact
+//     checkpoint SHA. No generic combined-status fallback.
 //   - Refuses to post a duplicate for a SHA already relayed to this PR.
 //   - Refuses to post a body that would mention/invoke @claude.
 //   - --dry-run performs no GitHub write; it only prints what would be sent.
+//
+// All `gh` invocations run with shell:false (argv arrays, no shell
+// interpretation) so report/branch/repo content can never reach a shell.
 //
 // Usage:
 //   node scripts/relay-wave-report.mjs --report <path> --sha <sha> --branch <branch> [--pr 1] [--repo owner/name] [--dry-run]
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, existsSync, statSync, writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, existsSync, statSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildCommentBody,
   containsClaudeMention,
   isDuplicate,
+  isValidCommitSha,
+  requiredWorkflowsGreen,
   validateReport,
-  ciIsGreen,
 } from "./relay-wave-report-lib.mjs";
 
+/** Thrown for expected, user-facing failures; caught once at the top level. */
+class RelayError extends Error {}
+
 function fail(message) {
-  console.error(`[relay-wave-report] FAILED: ${message}`);
-  process.exit(1);
+  throw new RelayError(message);
 }
 
 function parseArgs(argv) {
@@ -44,13 +54,13 @@ function parseArgs(argv) {
   return args;
 }
 
-function haveGh() {
-  const finder = process.platform === "win32" ? "where" : "which";
-  return spawnSync(finder, ["gh"], { stdio: "ignore", shell: true }).status === 0;
+/** Runs `gh <args>` with no shell interpretation. */
+function gh(args) {
+  return spawnSync("gh", args, { encoding: "utf8", shell: false });
 }
 
-function gh(args) {
-  return spawnSync("gh", args, { encoding: "utf8", shell: true });
+function haveGh() {
+  return gh(["--version"]).status === 0;
 }
 
 function ghJson(args, what) {
@@ -65,11 +75,14 @@ function ghJson(args, what) {
   }
 }
 
-function main() {
+function run() {
   const args = parseArgs(process.argv.slice(2));
 
   if (!args.report) fail("--report <path> is required");
   if (!args.sha) fail("--sha <commit-sha> is required");
+  if (!isValidCommitSha(args.sha)) {
+    fail(`--sha must be a full 40-character hexadecimal commit SHA, got: ${args.sha}`);
+  }
   if (!args.branch) fail("--branch <branch-name> is required");
 
   if (!haveGh()) {
@@ -98,36 +111,23 @@ function main() {
   }
 
   const repo =
-    args.repo ??
-    (() => {
-      const r = ghJson(["repo", "view", "--json", "nameWithOwner"], "repo name");
-      return r.nameWithOwner;
-    })();
+    args.repo ?? ghJson(["repo", "view", "--json", "nameWithOwner"], "repo name").nameWithOwner;
 
-  // 1. Confirm CI is green for the exact checkpoint SHA before doing anything else.
-  const checkRunsResp = gh([
-    "api",
-    `repos/${repo}/commits/${args.sha}/check-runs`,
-    "--jq",
-    ".check_runs",
-  ]);
-  const checkRuns = checkRunsResp.status === 0 ? JSON.parse(checkRunsResp.stdout || "[]") : [];
+  // 1. Confirm BOTH required workflows completed successfully for the exact
+  //    checkpoint SHA before doing anything else.
+  const runsResp = ghJson(
+    ["api", `repos/${repo}/actions/runs?head_sha=${args.sha}&per_page=100`],
+    "workflow runs",
+  );
+  const workflowRuns = Array.isArray(runsResp.workflow_runs) ? runsResp.workflow_runs : [];
 
-  let combinedStatus = null;
-  const statusResp = gh(["api", `repos/${repo}/commits/${args.sha}/status`]);
-  if (statusResp.status === 0) {
-    try {
-      combinedStatus = JSON.parse(statusResp.stdout);
-    } catch {
-      combinedStatus = null;
-    }
-  }
-
-  const ci = ciIsGreen(checkRuns, combinedStatus);
+  const ci = requiredWorkflowsGreen(workflowRuns);
   if (!ci.green) {
-    fail(`CI is not confirmed green for ${args.sha}: ${ci.detail}`);
+    fail(`required workflows not confirmed green for ${args.sha}: ${ci.detail}`);
   }
-  console.log(`[relay-wave-report] CI confirmed green for ${args.sha}: ${ci.detail}`);
+  console.log(
+    `[relay-wave-report] required workflows confirmed green for ${args.sha}: ${ci.detail}`,
+  );
 
   // 2. Check for an existing relay comment for this SHA (idempotency).
   const existingComments = ghJson(
@@ -138,7 +138,7 @@ function main() {
     console.log(
       `[relay-wave-report] a relay comment for SHA ${args.sha} already exists on PR #${args.pr} — skipping (idempotent no-op).`,
     );
-    process.exit(0);
+    return;
   }
 
   if (args.dryRun) {
@@ -146,25 +146,36 @@ function main() {
       `[relay-wave-report] DRY RUN — would post to ${repo}#${args.pr} (no GitHub write performed):\n`,
     );
     console.log(commentBody);
-    process.exit(0);
+    return;
   }
 
   // gh pr comment reads the body from a file to avoid Windows/POSIX shell
-  // quoting issues entirely.
-  const tmpFile = `${args.report}.relay-comment.tmp`;
-  writeFileSync(tmpFile, commentBody, "utf8");
+  // quoting issues entirely. The file lives in a fresh, unique OS temp
+  // directory (never beside the report) and is always removed.
+  const tmpDir = mkdtempSync(join(tmpdir(), "likha-relay-"));
+  const tmpFile = join(tmpDir, "comment.md");
   try {
+    writeFileSync(tmpFile, commentBody, "utf8");
     const post = gh(["pr", "comment", String(args.pr), "--repo", repo, "--body-file", tmpFile]);
     if (post.status !== 0) {
       fail(`GitHub rejected the comment: ${(post.stderr || post.stdout || "").trim()}`);
     }
     console.log(`[relay-wave-report] posted wave report for ${args.sha} to ${repo}#${args.pr}.`);
   } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      // best-effort cleanup
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+function main() {
+  try {
+    run();
+  } catch (err) {
+    if (err instanceof RelayError) {
+      console.error(`[relay-wave-report] FAILED: ${err.message}`);
+      process.exitCode = 1;
+      return;
     }
+    throw err;
   }
 }
 
