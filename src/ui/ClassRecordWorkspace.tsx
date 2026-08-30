@@ -168,6 +168,19 @@ export function ClassRecordWorkspace({
     previousConfirmingDeleteItemId.current = confirmingDeleteItemId;
   }, [confirmingDeleteItemId]);
 
+  // An item-action failure (edit/delete) renders as one banner above the
+  // whole list, not next to the item that caused it -- with a long list,
+  // a sighted keyboard user acting on a far-down item would otherwise see
+  // an error appear off-screen with nothing drawing their attention to
+  // it. `role="alert"` already announces it to a screen reader regardless
+  // of scroll position; this moves visible/keyboard focus to match,
+  // which also scrolls it into view natively.
+  useEffect(() => {
+    if (itemActionError !== null) {
+      document.getElementById("item-action-error")?.focus();
+    }
+  }, [itemActionError]);
+
   useEffect(() => {
     return () => {
       if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
@@ -607,7 +620,11 @@ export function ClassRecordWorkspace({
         {creatingItem ? "Adding…" : "Add item"}
       </button>
 
-      {itemActionError && <Alert tone="error">{itemActionError}</Alert>}
+      {itemActionError && (
+        <Alert tone="error" id="item-action-error">
+          {itemActionError}
+        </Alert>
+      )}
 
       {itemsLoading ? (
         <Loading label="Loading items…" />

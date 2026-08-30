@@ -372,6 +372,20 @@ describe("ClassRecordWorkspace", () => {
     await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
   });
 
+  it("moves focus to the item-action error banner when a delete fails, wherever the list scrolled to", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.deleteResult = false;
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await screen.findByText(/could not delete this item/i);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveFocus());
+  });
+
   it("moves focus into the delete confirmation, then to the heading once the item is actually gone", async () => {
     const user = userEvent.setup();
     const assessmentRepo = new FakeAssessmentRepository([ITEM]);

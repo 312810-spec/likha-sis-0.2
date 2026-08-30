@@ -10,6 +10,11 @@ interface AlertProps {
    * that genuinely needs a message sitting beside a single action button
    * (e.g. the idle-timeout warning's "message + Stay signed in"). */
   inline?: boolean;
+  /** Lets a caller move focus to this banner when it appears (e.g. an
+   * action taken far down a long list) via `document.getElementById`,
+   * the same pattern this app's other focus-restoration effects already
+   * use. Optional -- most call sites don't need it. */
+  id?: string;
   children: ReactNode;
 }
 
@@ -23,11 +28,11 @@ interface AlertProps {
  * exactly the roles every existing call site already used, not a new
  * choice made here.
  */
-export function Alert({ tone, inline = false, children }: AlertProps) {
+export function Alert({ tone, inline = false, id, children }: AlertProps) {
   const role = tone === "error" || tone === "warning" ? "alert" : "status";
   const className = `alert alert-${tone}${inline ? " alert-inline" : ""}`;
   return (
-    <div className={className} role={role}>
+    <div id={id} className={className} role={role} tabIndex={-1}>
       {children}
     </div>
   );
