@@ -1,5 +1,48 @@
 # ACTIVE PLAN
 
+## Wave 3E: Section Advisory Foundation (added 2026-08-30) — complete
+
+Full record: `docs/adr/0056-section-advisory-foundation.md`;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 3E
+entry; `docs/VERIFICATION-DEBT.md` Wave 3E entry. **New branch**
+`claude/likha-sis-wave3e-section-advisory-foundation`, created from
+`00b4040` (Wave 3D's own final, CI-confirmed checkpoint).
+
+**Scope**: the 10-scenario evaluation process applied to "how is the
+adviser of a section represented and authorized" — Adviser View's own
+missing foundation, deferred from Wave 3D. Decision: `section_advisories`,
+a half-open temporal interval table mirroring `section_memberships`,
+over a bare `sections.adviser_user_id` column (loses history on
+reassignment). New `Capability::ManageSectionAdvisories`, a new
+`auth::authorize_adviser_of_section` gate (not yet called by any
+command), and three commands (assign/end, capability-gated;
+current-adviser read, session-only-gated). Zero UI, zero change to any
+existing Subject Attendance code path — foundation only, matching this
+project's zero-UI-first precedent for a new domain.
+
+**A real cross-school isolation bug, caught by TDD before shipping**:
+the first `authorize_adviser_of_section` implementation never verified
+`section_id` actually belonged to the caller's own school before
+authorizing a School Head via the capability path. A dedicated test
+caught it on first run; fixed by resolving the section against the
+caller's school before either authorization path.
+
+**Deliberately not built**: the actual Adviser View read of Subject
+Attendance data (next slice); no UI (foundation-only, see above); no
+seed/migration path from prior data (correct — no history exists to
+migrate).
+
+**Verification, all actually run this session**: `cargo test` 594 lib
+tests (+15) and all integration binaries green, including 7 new
+command-boundary tests; `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean; `npm run quality`
+705/705 vitest, unchanged; `npm run harness:verify` still exactly
+100/100, unchanged.
+
+**Next**: the actual Adviser View read (repository function + command
++ UI screen), reusing `authorize_adviser_of_section`; or the native
+NVDA/Narrator pass. No candidate pre-selected.
+
 ## Wave 3D: Subject Monitor (added 2026-08-30) — complete
 
 Full record: `docs/adr/0055-*` Wave 3D addendum; `docs/CURRENT-HANDOFF.md`

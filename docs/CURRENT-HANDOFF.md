@@ -1,6 +1,133 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-08-30 — Wave 3D: Subject Monitor, COMPLETE)
+## Active Task (2026-08-30 — Wave 3E: Section Advisory Foundation, COMPLETE)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md`;
+`docs/PROJECT-MEMORY.md` Wave 3E entry; `docs/VERIFICATION-DEBT.md`
+Wave 3E entry. **New dedicated branch**
+`claude/likha-sis-wave3e-section-advisory-foundation`, created from
+Wave 3D's own final, CI-confirmed checkpoint
+(`00b4040d9fb856ac7621a3d848165144a64b7173`) — that branch itself was
+not modified. Harness v2 stayed locked and still computes **100/100**.
+
+**Scope chosen**: the exact next slice Wave 3D's report recorded —
+Adviser View, deferred because it needs a genuinely new "adviser of a
+section" authorization shape that has never existed in this codebase.
+Ran the project's own established 10-scenario evaluation process
+(`.claude/rules/autonomous-development.md`) to decide how to represent
+and authorize that relationship, before writing any code. **This wave
+is foundation only** — schema, repository, a new `Capability`, and a
+new authorization gate, with zero UI and zero change to any existing
+Subject Attendance code path — matching this project's own established
+zero-UI-first precedent for a new domain. The actual Adviser View read
+of Subject Attendance data is the next slice, not attempted here.
+
+**Decision**: `section_advisories`, a half-open temporal interval table
+mirroring `section_memberships` exactly (`starts_on`/`ends_on`
+nullable, "at most one active adviser per section" enforced as a real
+unique partial index). Chosen over a bare `sections.adviser_user_id`
+column (the Next Best candidate) because DepEd schools reassign
+advisers by school year, and a mutable column would silently lose
+prior years' history the moment it's overwritten — the same reasoning
+ADR-0008 already established for `section_memberships` over a bare
+column on `learners`. Full 10-scenario record in ADR-0056.
+
+**What shipped**: migration 23 (`section_advisories` table + indexes +
+unique partial index); `repository::section_advisory` (`assign`/`end`/
+`current_adviser_for_section`/`is_current_adviser`); a new
+`Capability::ManageSectionAdvisories` (School Head only, its own
+variant rather than reusing `ManageTeachingAssignments`, matching that
+variant's own established reasoning); a new
+`auth::authorize_adviser_of_section` gate (self-or-School-Head, mirrors
+`authorize_view_teacher_load` exactly) — not yet called by any command,
+ready for the next wave's Adviser View read; three new commands
+(`assign_section_adviser`/`end_section_adviser`, capability-gated;
+`current_section_adviser`, session-only-gated reference data, matching
+`list_teaching_assignments_by_section`'s convention).
+
+**A real cross-school isolation bug was caught by TDD before
+shipping**: the first `authorize_adviser_of_section` implementation
+checked the caller's role in their own school but never verified that
+the `section_id` argument actually belonged to that school — a School
+Head could have been incorrectly authorized against a same-shaped
+section id belonging to a _different_ school. A dedicated test,
+`authorize_adviser_of_section_denies_a_school_head_for_a_different_schools_section`,
+caught this on first run (the exact same bug class
+`authorize_view_teacher_load`'s own TDD pass caught during an earlier
+wave). Fixed by resolving `section_id` against the caller's school
+before authorizing via either path. Full detail in ADR-0056.
+
+**Verification** (all run this session): `cargo test`: **594 lib
+tests** (+15: 9 new `repository::section_advisory` tests, 6 new
+`auth::authorize_adviser_of_section` tests) and all integration
+binaries green, including 7 new command-boundary tests in
+`tests/section_advisory.rs`. `cargo fmt --check` /
+`cargo clippy --all-targets -- -D warnings` clean. `npm run quality` —
+705/705 vitest, unchanged (this wave is backend-only except the
+`invoke.ts` exemption-list addition below). `npm run harness:verify`
+still exactly 100/100, unchanged — not reopened.
+
+**A correctness check made mid-wave, not deferred to review**: the two
+new capability-gated write commands
+(`assign_section_adviser`/`end_section_adviser`) were added to
+`invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` set in the
+same wave — Wave 3B's own recorded debt item #1 (no Rust-side type
+split) staying open but not allowed to lapse into a live bug for these
+new commands. `current_section_adviser` (session-only-gated) was
+correctly left out, matching `list_teaching_assignments_by_section`'s
+own precedent.
+
+**Scope guard held**: no UI screen (deliberate, see above); no change
+to any existing Subject Attendance/Teaching Assignment code path
+(confirmed by `git diff --stat` on the feature commit); no seed/
+migration path from prior data (correct — no prior version of this
+codebase ever recorded who advised a section, so there is no history to
+lose); `main` not touched; no unrelated refactor.
+
+**Review**: an independent `security-reviewer` agent was dispatched,
+scoped to this wave's new gate, repository, commands, and the
+`invoke.ts` change. Its findings could not be retrieved after one
+retry — the known reviewer-harness resume/retrieval problem this
+project's own rules already anticipate
+(`.claude/rules/autonomous-development.md`). Per that protocol, a
+rigorous self-review was performed instead, confirming the cross-school
+isolation fix against the dedicated failing-then-passing test described
+above, the "at most one active adviser per section" invariant (proven
+by a dedicated test), that a future-dated advisory is not treated as
+current before it takes effect (proven), that
+`section_advisory::assign`/`end` correctly reject a cross-school
+`section_id`/`teacher_user_id` and scope `end` by `(id, school_id,
+section_id)` together, that `current_section_adviser` discloses nothing
+for an id it cannot resolve within the caller's school, and that the
+two write commands were correctly added to `invoke.ts`'s exemption set.
+The independent review itself remains owed — retained as
+higher-priority debt in `docs/VERIFICATION-DEBT.md` (not the usual
+recurring "no independent review" item; this wave actually attempted
+one and the harness failed to deliver it).
+
+**Exact next slice** (recorded, not started): the actual **Adviser
+View read** — a new repository function and command reusing
+`authorize_adviser_of_section` to return read-only Subject Attendance
+signals across an adviser's own advisory section, per
+`docs/product/SUBJECT-ATTENDANCE-SPEC.md`'s "Adviser View" screen, plus
+a UI screen. This wave deliberately stopped short of that read so the
+authorization foundation could be reviewed and tested as its own
+focused unit. The native **NVDA/Narrator accessibility pass** remains
+carried forward and genuinely infeasible in this remote Linux-container
+session.
+
+**Genuinely deferred, not a candidate for any near-term wave**:
+**Official School Repository** remains blocked on external material
+only the owner can supply (Microsoft 365 tenant/consent confirmation),
+a genuine human-approval gate per
+`.claude/rules/autonomous-development.md`. Unchanged from prior waves'
+evaluation.
+
+Note — Wave 3D (Subject Monitor) is superseded above; its own record
+remains at `docs/adr/0055-subject-attendance-foundation.md` Wave 3D
+addendum.
+
+## Note (2026-08-30 — Wave 3D: Subject Monitor, COMPLETE, superseded above)
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 3D
 addendum; `docs/PROJECT-MEMORY.md` Wave 3D entry;

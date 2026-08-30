@@ -1,5 +1,54 @@
 # Verification Debt
 
+## Wave 3E — Section Advisory Foundation (2026-08-30)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md`;
+`docs/PROJECT-MEMORY.md` Wave 3E entry; `docs/CURRENT-HANDOFF.md` top
+entry.
+
+**Newly recorded debt:**
+
+1. **An independent reviewer agent was dispatched but its findings
+   could not be retrieved** — the known agent resume/retrieval problem
+   this project's own rules already anticipate
+   (`.claude/rules/autonomous-development.md`'s "Reviewer harness
+   failures are not automatic stops"). Dispatched once
+   (`security-reviewer`, scoped to this wave's new
+   `authorize_adviser_of_section` gate, `section_advisory` repository/
+   commands, and the `invoke.ts` exemption-list change), asked once
+   more explicitly for its findings per the permitted retry, and both
+   attempts returned no usable content. Per the established protocol,
+   a rigorous self-review was performed instead (see the ADR-0056
+   implementation record): both `authorize_adviser_of_section` branches
+   traced against cross-school leakage, `is_current_adviser`'s
+   half-open date-range SQL checked for edge cases (exact-boundary
+   date, zero-length interval), `section_advisory::assign`/`end`
+   confirmed to reject a cross-school `section_id`/`teacher_user_id`
+   and to scope `end` by `(id, school_id, section_id)` together so a
+   mismatched pair cannot touch the wrong row, `current_section_adviser`
+   confirmed to disclose nothing more than "no current adviser" for any
+   id it cannot resolve within the caller's school, and the
+   `invoke.ts` change confirmed to be a pure frontend classification
+   change with no effect on any Rust-side check. No blocking issue
+   found by the self-review beyond the isolation bug TDD already caught
+   and fixed before this review was requested. **The independent review
+   itself remains owed, not satisfied by the self-review** — retry it
+   in a later session once the harness appears healthy, per the
+   project's own established periodic-retry rule, prioritizing it
+   before or alongside the next wave that calls
+   `authorize_adviser_of_section` for the first time (the Adviser View
+   read).
+2. No UI this wave — deliberate (foundation-only), not a gap: there is
+   nothing to screenshot or accessibility-test yet.
+
+**Debt avoided, not incurred**: the two new capability-gated commands
+(`assign_section_adviser`/`end_section_adviser`) were added to
+`invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` set in
+this same wave — Wave 3B's own recorded debt item #1 (no Rust-side type
+split, so every future gated command must be added to this list by
+hand) is still open and still real, but this wave did not let it lapse
+into a live bug for these two new commands.
+
 ## Wave 3D — Subject Monitor (2026-08-30)
 
 Full record: `docs/adr/0055-*` Wave 3D addendum; `docs/PROJECT-MEMORY.md`

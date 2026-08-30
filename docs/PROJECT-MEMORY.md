@@ -2622,6 +2622,52 @@ Full record: `docs/adr/0055-*` Wave 3D addendum;
   its authorization-shape design); or the native NVDA/Narrator pass. No
   candidate pre-selected.
 
+## Wave 3E — Section Advisory Foundation (added 2026-08-30)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md`;
+`docs/VERIFICATION-DEBT.md` Wave 3E entry. **New branch**
+`claude/likha-sis-wave3e-section-advisory-foundation`, created from
+`00b4040` (Wave 3D's own final, CI-confirmed checkpoint).
+
+- **Built**: ran the project's own 10-scenario evaluation process to
+  decide how "adviser of a section" is represented and authorized.
+  Recommended (chosen): `section_advisories`, a half-open temporal
+  interval table mirroring `section_memberships` exactly
+  (`starts_on`/`ends_on` nullable, "at most one active adviser per
+  section" as a real unique partial index) — chosen over a bare
+  `sections.adviser_user_id` column (Next Best) because DepEd schools
+  reassign advisers by school year and a mutable column would silently
+  lose prior years' history. New `Capability::ManageSectionAdvisories`
+  (School Head only); new `auth::authorize_adviser_of_section` gate
+  (self-or-School-Head, mirrors `authorize_view_teacher_load`) — not
+  yet called by any command, ready for the next wave's Adviser View
+  read; three new commands (assign/end, capability-gated;
+  current-adviser read, session-only-gated reference data).
+  **Foundation only**: zero UI, zero change to any existing Subject
+  Attendance code path, matching this project's zero-UI-first
+  precedent for a new domain.
+- **A real cross-school isolation bug caught by TDD before shipping**:
+  the first `authorize_adviser_of_section` implementation never
+  verified `section_id` actually belonged to the caller's own school
+  before authorizing a School Head via the capability path — a
+  dedicated test caught it on first run (the same bug class
+  `authorize_view_teacher_load`'s own TDD pass caught during an earlier
+  wave). Fixed by resolving the section against the caller's school
+  before either authorization path.
+- **Deliberately not built**: the actual Adviser View read of Subject
+  Attendance data (next slice); no UI; no seed/migration path from
+  prior data (correct — no history exists to migrate).
+- **Verification/checkpoint**: `cargo test` 594 lib tests (+15: 9
+  repository tests, 6 auth-gate tests) and all integration binaries
+  green, including 7 new command-boundary tests; `cargo fmt --check` /
+  `cargo clippy --all-targets -- -D warnings` clean; `npm run quality`
+  705/705 vitest, unchanged (backend-only wave except the `invoke.ts`
+  exemption-list addition for the two new capability-gated commands);
+  `npm run harness:verify` still exactly 100/100, unchanged.
+- **Next**: the actual Adviser View read (repository function +
+  command + UI screen), reusing `authorize_adviser_of_section`; or the
+  native NVDA/Narrator pass. No candidate pre-selected.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
