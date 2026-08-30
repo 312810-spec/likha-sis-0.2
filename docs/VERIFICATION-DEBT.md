@@ -1,5 +1,28 @@
 # Verification Debt
 
+## Cloud Sync Target Decision: `dependency-researcher` retrieval failure, direct research substituted (2026-08-30)
+
+`dependency-researcher` was dispatched to gather current (2026) facts on
+seven cloud sync backend candidates (Cloudflare Durable Objects/D1,
+Turso, Supabase, Firebase, PocketBase, Litestream) plus a Philippine
+Data Privacy Act residency check for ADR-0042. It completed real work
+(29 tool uses, ~80-83K tokens across two attempts — the initial
+dispatch and the one permitted `SendMessage` retry) but returned no
+retrievable findings text either time — the same recurring agent-resume/
+retrieval failure documented since M7 (see the entry below). Per
+`.claude/rules/autonomous-development.md`'s reviewer-failure rule, a
+third attempt was not made. The research was instead performed directly
+in this session via `WebSearch` against primary/current sources
+(Cloudflare's own docs/changelog, Turso's docs/blog, NPC advisory
+material), cited inline in ADR-0042. No blocking gap resulted — the
+decision in ADR-0042 rests on directly-verified facts, not on the failed
+agent's unretrievable output. Independent-review debt: none owed here
+specifically (this was research, not a security/architecture review of
+shipped code — ADR-0042 ships no code). The actual future implementation
+milestone (Worker/Durable Object round trip) will still need its own
+`security-reviewer` pass per `.claude/rules/security-privacy.md`, not
+satisfied by this entry.
+
 ## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone

@@ -1,5 +1,31 @@
 # ACTIVE PLAN
 
+## Cloud Sync Target Decision (added 2026-08-30) — complete, decision-only
+
+Full record: `docs/adr/0042-cloud-sync-target-decision.md`. Ran the
+10-scenario process for the cloud sync target that ADR-0035 had left as
+an unratified hypothesis. **No code changed** — there is nothing to
+build/test/lint for this milestone; "verification" here is the research
+and scoring itself, which was performed directly via `WebSearch` after
+a `dependency-researcher` agent dispatch hit the known agent-resume/
+retrieval failure on both attempts (logged in
+`docs/VERIFICATION-DEBT.md`'s top entry, not silently worked around).
+
+**Decision**: Recommended — Cloudflare Workers + Durable Objects
+(SQLite-backed storage), one Durable Object per school (7.95/10). Next
+Best — Turso/libSQL embedded replicas, one database per school
+(7.80/10). Full scoring table and rejected-alternative reasoning in the
+ADR. `docs/PROJECT-MEMORY.md` and `docs/CURRENT-HANDOFF.md` updated to
+reflect the ratified decision.
+
+**Still out of scope** (unchanged by this milestone — see "Out of Scope"
+below): `SyncProvider` implementation, any Worker/Durable Object code,
+cloud authentication/credential design, conflict-resolution policy. The
+next cloud-sync milestone, not started, is a minimal one-record
+proof-of-concept round trip per `docs/product/PRODUCT-CONTRACT.md` §15's
+"prove the protocol, not the feature set" criterion — see
+`docs/CURRENT-HANDOFF.md`'s exact next task.
+
 ## Minimal CI Foundation (added 2026-08-26) — complete, read this section first
 
 **Complete.** Full decision record: `docs/adr/0041-minimal-ci-foundation.md`.

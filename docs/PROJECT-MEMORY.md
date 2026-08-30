@@ -931,11 +931,16 @@ architecture/sequencing record: `docs/adr/0035-roadmap-reconciliation-and-execut
 - RBAC's starting role model (Teacher/Registrar/School Head) was
   already confirmed with the user during M8 — do not re-ask it; only
   the exact authority boundaries between the three roles remain open.
-- The Cloudflare Worker + Durable Object (next-best: Worker + D1) cloud
-  target is a **hypothesis**, not a ratified ADR decision — no prior
-  cloud-architecture ADR exists in this repo. Run the actual
-  10-scenario process before writing sync code, don't treat it as
-  pre-approved.
+- The cloud sync target is **ratified**: Cloudflare Workers + Durable
+  Objects (SQLite-backed storage), one Durable Object per school —
+  Recommended, scored 7.95/10 in the actual 10-scenario process (Next
+  Best: Turso/libSQL embedded replicas, 7.80/10, close enough to be the
+  first fallback). See `docs/adr/0042-cloud-sync-target-decision.md` for
+  full scoring and rejected alternatives. This is a **target decision
+  only** — no `SyncProvider` implementation, Worker, or schema change
+  exists yet; cloud sync remains listed in `docs/ACTIVE-PLAN.md`'s "Out
+  of Scope (current milestones)" until a follow-up implementation
+  milestone actually builds against it.
 - Curriculum must be modeled as versioned/cohort-aware (school year +
   grade + curriculum version + cohort + implementation status +
   applicable policy/subjects/form) from the start — reusing this
@@ -1197,6 +1202,33 @@ quality:full` (`8ee1187`) — the canonical milestone/release gate. This
 was the actual reason formatting drift accumulated unnoticed:
 `quality:full` ran `cargo test`/`clippy` but never `cargo fmt --check`.
 Full record: `docs/VERIFICATION-DEBT.md`'s top entry.
+
+## Cloud Sync Target Decision (added 2026-08-30)
+
+The 10-scenario architecture-decision process was run for the cloud
+sync target (previously only a recorded hypothesis). Full record:
+`docs/adr/0042-cloud-sync-target-decision.md`. Winner: Cloudflare
+Workers + Durable Objects (SQLite-backed), one DO per school —
+tenant isolation is structural (a separate storage object per school,
+addressed by `idFromName(school_id)`), matching this project's existing
+"trusted-boundary, never client-supplied scope" rule more closely than
+any shared-database alternative scored. Next Best: Turso/libSQL
+embedded replicas — closest technical fit to LIKHA's existing SQLite-
+first client architecture, but scored slightly lower on Dependency
+Readiness after this session's research surfaced Turso steering users
+away from libSQL's own sync mode toward a newer proprietary "Turso
+Sync," a live ecosystem-churn signal for a smaller vendor. Disqualified
+regardless of score: PocketBase (no route to zero-billing hosting) and
+Litestream (solves backup/DR, not multi-writer sync — the actual
+requirement). A `dependency-researcher` agent hit the same known
+agent-resume/retrieval failure documented since M7 on both the initial
+dispatch and the one permitted retry; research was completed directly
+via `WebSearch` instead — see `docs/VERIFICATION-DEBT.md`'s top entry.
+Decision-only: no code shipped. The next cloud-sync milestone (not
+started) is a minimal one-record, one-school proof-of-concept round
+trip behind a first-cut `SyncProvider` port, per
+`docs/product/PRODUCT-CONTRACT.md` §15's own "prove the protocol, not
+the feature set" success criterion.
 
 ## Current Milestone
 

@@ -1,5 +1,65 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — Cloud Sync Target Decision, complete)
+
+Ran this project's own 10-scenario architecture-decision process for
+the cloud sync target, per explicit user instruction and the standing
+requirement recorded in ADR-0035/`docs/product/PRODUCT-CONTRACT.md` §12
+that the Cloudflare hypothesis be actually scored before being treated
+as decided. Full record: `docs/adr/0042-cloud-sync-target-decision.md`.
+
+**Winner (Recommended): Cloudflare Workers + Durable Objects
+(SQLite-backed storage), one Durable Object per school** — 7.95/10.
+**Next Best: Turso/libSQL embedded replicas**, one database per school —
+7.80/10, close enough to be the first fallback if the Durable Object
+storage API proves awkward during real implementation. Disqualified
+independent of score: PocketBase (no zero-billing hosting route found —
+Railway ~US$5-10/mo, Fly.io no longer has a free always-on persistent-
+volume tier) and Litestream (solves single-writer backup/DR, not the
+actual multi-writer sync requirement). Rejected on merit: both
+shared-database/`school_id`-column variants (Turso and D1) — same
+weaker-isolation pattern ADR-0004 already rejected locally; Firebase/
+Firestore (NoSQL Reuse mismatch, no first-class Rust SDK, would either
+violate the UI-never-touches-infra rule or lose its own offline-SDK
+advantage); Supabase (7-day free-tier auto-pause is a real teacher-
+facing failure mode, plus `docs/PROJECT-MEMORY.md` already recorded "no
+Supabase migration" as a standing exclusion from an earlier session); a
+custom Worker+R2 changeset-log design (highest Architectural Fit of the
+rejected options, but lowest Implementation Risk score — building
+multi-writer conflict resolution from scratch is real distributed-
+systems risk a managed platform's tested primitives already solve).
+
+**Data-residency checked, not assumed**: the Philippine Data Privacy Act
+of 2012 / NPC guidance impose no data-localization requirement — only a
+lawful basis and comparable protection for cross-border transfer — so a
+global edge host (Cloudflare, Turso) is legally viable, removing what
+could otherwise have been a hard blocker.
+
+**Research method, disclosed**: a `dependency-researcher` agent hit the
+same known agent-resume/retrieval failure this project has recorded
+since M7, on both the initial dispatch and the one permitted
+`SendMessage` retry — real work happened (29 tool uses, ~80-83K tokens)
+but no findings text was retrievable either time. Per
+`.claude/rules/autonomous-development.md`, a third attempt was not made;
+the research was instead performed directly in this session via
+`WebSearch` against primary/current sources (Cloudflare's own docs/
+changelog, Turso's docs/blog, NPC advisory PDFs), cited inline in
+ADR-0042. Logged in `docs/VERIFICATION-DEBT.md`'s top entry.
+
+**This is a decision-only milestone — no code shipped.** No
+`SyncProvider` implementation, no Worker, no schema change. `cloud sync`
+correctly remains in `docs/ACTIVE-PLAN.md`'s "Out of Scope (current
+milestones)" list. **Exact next task, if cloud sync work continues**:
+per `docs/product/PRODUCT-CONTRACT.md` §15's own success criterion ("a
+sync protocol proven via one real round trip, not a full feature set"),
+scaffold a minimal proof-of-concept — one Worker, one Durable Object,
+one authenticated round trip of a single sync record for one school,
+behind a first-cut `SyncProvider` port in `src/domain/ports/` — not a
+general sync feature. That milestone still needs its own cloud-side
+authentication/credential design (not decided by ADR-0042) and a
+mandatory `security-reviewer` pass before being considered complete
+(`.claude/rules/security-privacy.md`).
+
 ## Active Task (2026-08-26, this session — Integration Review + Main Fast-Forward Decision, complete)
 
 **`main` is now the verified integration baseline at `3951c3d`.**
