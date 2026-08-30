@@ -222,4 +222,21 @@ describe("TauriTeachingAssignmentRepository", () => {
     expect(mockInvoke).toHaveBeenCalledWith("remove_schedule_meeting", { id: "meeting-1" });
     expect(result).toBe(true);
   });
+
+  it("gets a teacher's derived load via get_teacher_load", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      assignmentCount: 3,
+      distinctSubjectCount: 2,
+      weeklyInstructionalMinutes: 250,
+    });
+
+    const result = await new TauriTeachingAssignmentRepository().getLoad("teacher-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_teacher_load", { teacherUserId: "teacher-1" });
+    expect(result).toEqual({
+      assignmentCount: 3,
+      distinctSubjectCount: 2,
+      weeklyInstructionalMinutes: 250,
+    });
+  });
 });

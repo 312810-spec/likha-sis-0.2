@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
+import type { TeacherLoad } from "../domain/teacher-load";
 import type { TeachingAssignmentDetail } from "../domain/teaching-assignment";
 import { TeachingAssignmentApplicationService } from "./teaching-assignment-service";
+
+const LOAD: TeacherLoad = {
+  assignmentCount: 3,
+  distinctSubjectCount: 2,
+  weeklyInstructionalMinutes: 250,
+};
 
 const DETAIL: TeachingAssignmentDetail = {
   id: "ta-1",
@@ -63,6 +70,10 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async removeMeeting(id: string) {
     this.calls.push(["removeMeeting", id]);
     return true;
+  }
+  async getLoad(teacherUserId: string): Promise<TeacherLoad> {
+    this.calls.push(["getLoad", teacherUserId]);
+    return LOAD;
   }
 }
 
@@ -192,6 +203,22 @@ describe("TeachingAssignmentApplicationService", () => {
     const { service, repo } = makeService();
 
     await expect(service.removeMeeting(" ")).rejects.toThrow(ValidationError);
+    expect(repo.calls).toEqual([]);
+  });
+
+  it("gets a teacher's derived load", async () => {
+    const { service, repo } = makeService();
+
+    const result = await service.getLoad("teacher-1");
+
+    expect(repo.calls).toEqual([["getLoad", "teacher-1"]]);
+    expect(result).toEqual(LOAD);
+  });
+
+  it("rejects an empty teacher id before calling the repository for getLoad", async () => {
+    const { service, repo } = makeService();
+
+    await expect(service.getLoad(" ")).rejects.toThrow(ValidationError);
     expect(repo.calls).toEqual([]);
   });
 });

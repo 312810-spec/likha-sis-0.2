@@ -1,4 +1,5 @@
 import type { CreateMeetingOutcome, ScheduleMeeting } from "../../domain/schedule-meeting";
+import type { TeacherLoad } from "../../domain/teacher-load";
 import type { TeachingAssignmentSummary } from "../../domain/subject-attendance";
 import type {
   TeachingAssignment,
@@ -86,5 +87,9 @@ export class TauriTeachingAssignmentRepository implements TeachingAssignmentRepo
 
   removeMeeting(id: string): Promise<boolean> {
     return invoke<boolean>("remove_schedule_meeting", { id });
+  }
+
+  getLoad(teacherUserId: string): Promise<TeacherLoad> {
+    return invoke<TeacherLoad>("get_teacher_load", { teacherUserId });
   }
 }

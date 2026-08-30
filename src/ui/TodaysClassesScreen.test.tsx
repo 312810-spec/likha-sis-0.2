@@ -84,6 +84,9 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async removeMeeting() {
     return false;
   }
+  async getLoad() {
+    return { assignmentCount: 0, distinctSubjectCount: 0, weeklyInstructionalMinutes: 0 };
+  }
 }
 
 function meeting(overrides: Partial<ScheduleMeeting> = {}): ScheduleMeeting {

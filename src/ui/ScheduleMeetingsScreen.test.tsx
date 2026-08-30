@@ -65,6 +65,9 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     this.meetings = this.meetings.filter((m) => m.id !== id);
     return this.meetings.length < before;
   }
+  async getLoad() {
+    return { assignmentCount: 0, distinctSubjectCount: 0, weeklyInstructionalMinutes: 0 };
+  }
 }
 
 function renderScreen(options: { meetings?: ScheduleMeeting[]; onBack?: () => void } = {}) {

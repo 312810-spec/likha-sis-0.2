@@ -1,6 +1,7 @@
 import { ValidationError } from "../domain/errors";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { CreateMeetingOutcome } from "../domain/schedule-meeting";
+import type { TeacherLoad } from "../domain/teacher-load";
 import type { TeachingAssignment, TeachingAssignmentDetail } from "../domain/teaching-assignment";
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -29,14 +30,15 @@ function requireTime(value: string, label: string): string {
 
 /** Wave 2Y: assign/unassign which teacher teaches a section+subject.
  * Wave 2Z: schedule/unschedule that assignment's weekly meetings.
- * Validates shape/non-empty input only, matching every other
- * `*ApplicationService`'s convention -- the backend stays authoritative
- * on authorization (School-Head-only `ManageTeachingAssignments`) and
- * every domain rule (one teacher per section+subject, a teacher must be
- * a member of the school, teacher/section/room conflict detection).
- * Deliberately not the full Teacher Load/Class Schedule UI -- no
- * reassign-in-one-step, no load view; see `docs/adr/0039-*` Wave 2Y/2Z
- * addenda. */
+ * Wave 3A: read a teacher's derived load. Validates shape/non-empty
+ * input only, matching every other `*ApplicationService`'s convention
+ * -- the backend stays authoritative on authorization (School-Head-only
+ * `ManageTeachingAssignments` for writes; self-or-School-Head for
+ * `getLoad`, via `auth::authorize_view_teacher_load`) and every domain
+ * rule (one teacher per section+subject, a teacher must be a member of
+ * the school, teacher/section/room conflict detection). Deliberately
+ * not the full Teacher Load/Class Schedule UI -- no
+ * reassign-in-one-step; see `docs/adr/0039-*` Wave 2Y/2Z/3A addenda. */
 export class TeachingAssignmentApplicationService {
   constructor(private readonly teachingAssignments: TeachingAssignmentRepository) {}
 
@@ -90,5 +92,10 @@ export class TeachingAssignmentApplicationService {
   async removeMeeting(id: string): Promise<boolean> {
     const meetingId = requireNonEmpty(id, "Meeting");
     return this.teachingAssignments.removeMeeting(meetingId);
+  }
+
+  async getLoad(teacherUserId: string): Promise<TeacherLoad> {
+    const teacher = requireNonEmpty(teacherUserId, "Teacher");
+    return this.teachingAssignments.getLoad(teacher);
   }
 }

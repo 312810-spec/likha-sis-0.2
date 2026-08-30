@@ -36,6 +36,7 @@ import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
+import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
@@ -308,6 +309,12 @@ function App() {
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
                 initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
+              />
+            ) : activeTab === "teacher-load" ? (
+              <TeacherLoadScreen
+                teachingAssignmentService={teachingAssignmentService}
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
               />
             ) : activeTab === "monthly-summary" ? (
               <MonthlySummaryScreen

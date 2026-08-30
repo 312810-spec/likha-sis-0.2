@@ -9,6 +9,7 @@ export type SignedInTab =
   | "today-classes"
   | "attendance"
   | "subject-attendance"
+  | "teacher-load"
   | "monthly-summary"
   | "grading-periods"
   | "class-records"
@@ -32,6 +33,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
+  "teacher-load": "My Teaching Load",
   "monthly-summary": "Monthly Summary",
   "grading-periods": "Grading Periods",
   "class-records": "Class Records",
@@ -63,6 +65,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       tab("today-classes"),
       tab("attendance"),
       tab("subject-attendance"),
+      tab("teacher-load"),
       tab("monthly-summary"),
     ],
   },
