@@ -112,13 +112,42 @@ in this environment. Until one is found:
   fix to work, and don't burn a second dispatch assuming it might; go
   straight to a rigorous self-review after the one permitted retry, per
   `.claude/rules/autonomous-development.md`.
-- A future session could investigate genuine fixes: whether a different
-  subagent_type with `Bash` can be briefed to review with the same
-  checklist (losing the specialized agent's tuned system prompt, but
-  gaining a working delivery channel), or whether some other mechanism
-  (a different tool, a different resume pattern) can extract a Bash-less
-  agent's findings. Neither has been tried yet — record the result here
-  either way once one is.
+
+**Investigated as a fixable problem, 2026-08-30 — granting `Bash` alone
+does not fix it.** Temporarily added `Bash` to
+`.claude/agents/teacher-ux-reviewer.md`'s tool grant (with the same
+"scratch-file exception" wording that reliably works for
+`architecture-reviewer`/`accessibility-reviewer`) and dispatched it on
+genuinely new scope (`TeacherWorkspaceScreen.tsx`, never reviewed by
+this agent type before). Result: the scratch file was never created —
+not merely undelivered, actually never written. A full dispatch (23
+tool calls, 82K tokens) and a follow-up resume asking directly "did you
+attempt to use Bash, and if not why" (0 new tool calls, ~4K more
+tokens) both still returned only a terse chat placeholder, and neither
+turn's tool-use count shows a single `Bash` invocation across the whole
+exchange. This rules out "the tool is unavailable" as the actual root
+cause for this agent type specifically — the model running as
+`teacher-ux-reviewer` does not reliably invoke `Bash` for the
+scratch-file delivery mechanism even when it is available and
+explicitly instructed to use it, unlike the same instruction working
+cleanly for `architecture-reviewer`/`accessibility-reviewer`. Reverted
+the tool grant back to `Read, Grep, Glob` afterward — an unused
+capability added to a deliberately read-only agent for no gained
+benefit is scope drift, not a fix; the agent's `.md` is confirmed
+byte-identical to before this experiment.
+
+This means the real blocker is agent-specific behavior/tuning, not a
+simple tool-grant gap. Genuine next things to try, none attempted yet:
+whether a different `subagent_type` with `Bash` (e.g. a general-purpose
+agent briefed with `teacher-ux-reviewer`'s own checklist verbatim,
+trading its tuned persona for a working delivery channel) reviews
+comparably; whether restructuring the dispatch prompt to make a Bash
+call the very first instructed action (rather than the last step of a
+longer task) changes compliance; or whether this is specific to the
+`teacher-ux-reviewer` persona's own system-prompt framing rather than
+`Bash`-availability in general — none of these has been tested. Record
+the result here either way once one is, and don't re-run the identical
+"just add Bash" experiment again without a new variable to test.
 
 ## What this does not fix
 

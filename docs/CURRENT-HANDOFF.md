@@ -1,5 +1,54 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-30, this session — teacher-ux-reviewer No-Bash Gap Investigation, complete)
+
+Direct follow-up to the "Recommended next action" named in the UX-02
+closure entry immediately below: investigate the `teacher-ux-reviewer`
+no-`Bash` retrieval gap as a genuinely fixable problem rather than
+leaving it as an assumption. Full record:
+`docs/adr/0042-agent-dispatch-recovery.md`'s third addendum,
+`.claude/skills/agent-dispatch-recovery/SKILL.md`'s "Known gap" section,
+`docs/VERIFICATION-DEBT.md`'s new top entry.
+
+**Hypothesis tested and falsified**: granting `Bash` to
+`.claude/agents/teacher-ux-reviewer.md` (identical scratch-file-exception
+wording already proven for the other two working reviewer agent types)
+was expected to close the gap the same way it worked for
+`architecture-reviewer`/`accessibility-reviewer`. Dispatched on scope
+this agent type had never reviewed before (`TeacherWorkspaceScreen.tsx`)
+to avoid any risk of reusing stale results. **The scratch file was never
+created.** A full dispatch (23 tool calls, 82K tokens) and a resumed
+diagnostic question asking directly whether `Bash` was attempted (0
+further tool calls, still only a terse chat placeholder) both showed
+zero `Bash` invocations across the entire exchange, despite the tool
+being available and explicitly instructed. This is a materially
+different, more specific finding than "no `Bash` tool, structurally
+impossible" — the actual blocker is this agent type's own behavior when
+given the task, not tool availability. The tool grant was reverted
+(`git diff` confirmed byte-identical to the original file) since it
+added capability with no measured benefit.
+
+**Verification**: `git diff -- .claude/agents/teacher-ux-reviewer.md`
+showed no residual change before this session's commit; no product code
+touched, so no `npm run quality` re-run was needed for this specific
+investigation (no application code changed).
+
+**Gate decision: GAP GENUINELY INVESTIGATED, NOT SOLVED — HONESTLY
+RECORDED AS SUCH.** This is not a regression from the prior session's
+"remaining open item" framing — it's the difference between an untested
+assumption and a tested negative result, which is real progress even
+though the gap itself remains open. Recommended next action for a
+future session, if this thread is worth continuing: try a
+differently-briefed `general-purpose` (or other `Bash`-capable)
+dispatch using `teacher-ux-reviewer`'s own checklist verbatim in the
+prompt, trading the specialized persona for a working delivery channel;
+or restructure the dispatch prompt so a `Bash` write is the first
+instructed action rather than the last step of a longer review, to test
+whether task-ordering (not tool availability) is the actual variable.
+Otherwise, per Autonomous Continuous Development Mode, this specific
+research thread has reached a reasonable stopping point and the session
+should return to ordinary product-feature work.
+
 ## Active Task (2026-08-30, this session — UX-02 Independent Review Debt Closure, complete)
 
 Continuation of the same session's UX-03 closure (entry immediately

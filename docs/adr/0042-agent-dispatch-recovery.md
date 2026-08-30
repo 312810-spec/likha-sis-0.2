@@ -148,6 +148,26 @@ found false (only the happy path was ever axe-scanned). Four consecutive
 failures; the `teacher-ux-reviewer` gap remains the only unresolved
 retrieval failure mode.
 
+**The `teacher-ux-reviewer` gap was investigated as a fixable problem,
+not just documented, and the obvious fix does not work.** Hypothesis:
+the gap is really "no `Bash` tool," so granting `Bash` should close it
+the same way it closed the gap for the other two agent types.
+Temporarily added `Bash` to `.claude/agents/teacher-ux-reviewer.md` with
+the identical scratch-file-exception wording already proven to work
+elsewhere, then dispatched on genuinely new scope
+(`TeacherWorkspaceScreen.tsx`, never reviewed by this agent type
+before). Result: falsified. The scratch file was never created — across
+a full dispatch (23 tool calls) and a resumed diagnostic question asking
+directly whether `Bash` was attempted (0 further tool calls), the agent
+never once invoked `Bash`, despite the tool being available and
+explicitly instructed. The real blocker is therefore this agent type's
+own behavior when given this task, not tool availability — a materially
+different, more specific finding than "no `Bash`, structurally
+impossible." The tool grant was reverted (confirmed byte-identical to
+before) since it added capability with no measured benefit. Full record
+and untried next steps: `.claude/skills/agent-dispatch-recovery/SKILL.md`'s
+"Known gap" section.
+
 ## Consequences
 
 - Independent review debt is no longer expected to default to

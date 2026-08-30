@@ -1,5 +1,35 @@
 # Verification Debt
 
+## `teacher-ux-reviewer` no-`Bash` retrieval gap: investigated as fixable, obvious fix falsified (2026-08-30)
+
+Follow-up to the entry immediately below (and the UX-02/03/04 closures
+further down): rather than leave "no known reliable retrieval path for
+a reviewer agent without `Bash`" as an untested assumption, actually
+tried the obvious fix. Temporarily granted `Bash` to
+`.claude/agents/teacher-ux-reviewer.md` (same scratch-file-exception
+wording already proven for `architecture-reviewer`/`accessibility-reviewer`)
+and dispatched it on scope this agent type had never reviewed before
+(`TeacherWorkspaceScreen.tsx`). **Result: the hypothesis was wrong.**
+The scratch file was never created — across a full dispatch (23 tool
+calls, 82K tokens) and a resumed diagnostic question asking directly
+whether `Bash` was attempted (0 further tool calls), the agent never
+once invoked `Bash` despite it being available and explicitly
+instructed to use it for exactly this purpose. So the blocker isn't
+"the tool is missing" (which granting `Bash` would fix) — it's
+something about how this specific agent type behaves when given this
+task, a genuinely different and more specific problem. Reverted the
+tool grant afterward (confirmed byte-identical to the original) since
+it added capability with no measured benefit — an unused widening of a
+deliberately read-only agent's access is scope drift, not a fix.
+
+Full record and untried next steps (a differently-briefed general-purpose
+agent standing in for the persona; restructuring the prompt so a `Bash`
+call is the first instructed action rather than the last step of a
+longer task): `docs/adr/0042-agent-dispatch-recovery.md`'s third
+addendum, `.claude/skills/agent-dispatch-recovery/SKILL.md`'s "Known
+gap" section. Don't re-run the identical "just add `Bash`" experiment
+again without a new variable to test.
+
 ## Agent-dispatch retrieval fix: cross-milestone `architecture-reviewer` debt CLOSED, UX-04 `accessibility-reviewer` + `teacher-ux-reviewer` debt BOTH CLOSED (2026-08-30)
 
 This session's own directed task was researching and fixing the
