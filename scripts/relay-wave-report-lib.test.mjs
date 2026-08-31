@@ -50,7 +50,10 @@ describe("validateReport", () => {
 
   it("rejects a report larger than the configured limit", () => {
     const huge = "x".repeat(100);
-    expect(validateReport(huge, 50).ok).toBe(false);
+    const result = validateReport(huge, 50);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("complete and self-contained");
+    expect(result.error).not.toContain("link");
   });
 
   it("accepts a normal report", () => {

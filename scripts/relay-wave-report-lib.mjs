@@ -36,7 +36,7 @@ export function validateReport(reportBody, maxChars = MAX_COMMENT_CHARS) {
   if (reportBody.length > maxChars) {
     return {
       ok: false,
-      error: `report is ${reportBody.length} chars, exceeds the ${maxChars}-char relay limit (GitHub comment cap is 65536 chars) — split the report or link it instead of inlining`,
+      error: `report is ${reportBody.length} chars, exceeds the ${maxChars}-char relay limit (GitHub comment cap is 65536 chars) — shorten or condense the report while keeping it complete and self-contained`,
     };
   }
   return { ok: true, error: null };
