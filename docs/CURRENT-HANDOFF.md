@@ -1,5 +1,64 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Adviser View Browser-Rendered Verification, complete)
+
+Continued directly after the Section Adviser Browser-Rendered
+Verification entry below, on `main` at `edf6167`. Full record:
+`docs/VERIFICATION-DEBT.md`'s new top entry.
+
+Closed the recommended next candidate named at the end of the entry
+below: real browser-rendered Playwright verification of Adviser View
+itself (the screen from Wave 3F), which needed a
+`SubjectAttendanceApplicationService` fixture that did not exist in
+`src/dev-preview/fixtures.ts` before this session.
+
+**What shipped**: `src/dev-preview/fixtures.ts` gained
+`FixtureSubjectAttendanceRepository` (real data for
+`listAdviserViewSections`/`adviserOverview` only — the two methods
+Adviser View actually calls; every other method throws "not wired",
+matching this file's own established convention) and a stub
+`FixtureTeachingAssignmentRepository` (needed only to satisfy
+`SubjectAttendanceApplicationService`'s constructor — Adviser View never
+calls any of its methods). `src/dev-preview/DevPreviewApp.tsx` wired its
+`adviser-view` tab (a normal top-level `WorkbenchNav` destination, no
+contextual handoff, unlike Section Adviser's) through to the real
+`AdviserViewScreen`.
+
+**Verified live via Playwright** (1366×900, light + dark, Comfortable
+and Guided modes): section picker with two synthetic sections, the
+overview table (raw Present/Absent/Late/Excused counts, subjects with
+absences, absence streak), a long learner name wrapping correctly, and
+Guided mode's extra explanatory paragraph — all render correctly in
+every combination, zero blocking axe violations, zero console errors.
+Screenshots sent to the user directly. A test-script false alarm (not a
+product bug) is recorded in the VERIFICATION-DEBT.md entry so it isn't
+re-diagnosed from scratch next time: `WorkbenchNav`'s and the mode
+switcher's active-button accessible names are prefixed "✓ ", which
+breaks an `exact: true` Playwright match against the already-active
+button.
+
+**Re-verified after the fixture change**: `npm run quality` 735/735
+(unchanged — no new test file, matching this file's own no-dedicated-
+fixture-tests precedent), typecheck/lint/format/architecture clean;
+`npm run build` clean; `npm run check:dev-preview-isolation` clean;
+`npx knip` unchanged from the pre-existing baseline; `cargo fmt --check`
+clean (no Rust touched this session).
+
+**Gate decision: ADVISER VIEW BROWSER-RENDERED VERIFICATION CLOSED.**
+Combined with the prior entry, both screens the section-advisory feature
+line (Waves 3E-3G) shipped now have real browser-rendered, accessibility-
+checked visual verification, not just jsdom+axe coverage. **Not done
+this slice, deliberately deferred**: Subject Attendance, Subject
+Monitor, Teacher Load, Teaching Assignments, Schedule Meetings, and SF1
+Import still have no dev-preview fixture wiring at all (retained debt,
+`docs/VERIFICATION-DEBT.md`'s new top entry). **Recommended next
+candidate, not started**: no single one clearly wins without a fresh
+evaluation pass — options carried from the prior entry remain live
+(further dev-preview fixture wiring for one of the screens above; Wave 5
+Sync's 10-scenario cloud-target decision; Key Stage 1 descriptive
+grading research; Grade 12 DO 8 carryover research; password reset,
+still blocked on a real product/security policy decision).
+
 ## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)
 
 Continued directly after the Wave 3E/3F/3G review debt closure below,

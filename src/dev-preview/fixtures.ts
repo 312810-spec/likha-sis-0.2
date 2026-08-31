@@ -67,6 +67,9 @@ import type {
   EndAdvisoryOutcome,
   SectionAdvisory,
 } from "../domain/section-advisory";
+import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
+import type { AdviserAttendanceOverview } from "../domain/subject-attendance";
 
 /** A plain data object, not a real session -- see this file's own doc
  * comment. Rendered only as a prop to `AppShell`/`TeacherWorkspaceScreen`
@@ -1104,5 +1107,138 @@ export class FixtureSectionAdvisoryRepository implements SectionAdvisoryReposito
     const ended: SectionAdvisory = { ...this.advisory, endsOn };
     this.advisory = null;
     return { kind: "ended", advisory: ended };
+  }
+}
+
+/** Stub only -- `SubjectAttendanceApplicationService`'s constructor
+ * requires a `TeachingAssignmentRepository`, but Adviser View (the only
+ * screen this fixture wires so far) never calls any of its methods.
+ * Every method throws rather than returning invented data, matching
+ * this file's own "not wired -- read-only fixture" convention, so a
+ * future wave that wires Subject Attendance/Today's Classes/Teaching
+ * Assignments here fills these in for real rather than silently reusing
+ * a placeholder. */
+export class FixtureTeachingAssignmentRepository implements TeachingAssignmentRepository {
+  async listMine(): Promise<never> {
+    throw new Error("dev-preview fixture: listMine() is not wired -- read-only fixture");
+  }
+  async listMeetings(): Promise<never> {
+    throw new Error("dev-preview fixture: listMeetings() is not wired -- read-only fixture");
+  }
+  async listBySection(): Promise<never> {
+    throw new Error("dev-preview fixture: listBySection() is not wired -- read-only fixture");
+  }
+  async create(): Promise<never> {
+    throw new Error("dev-preview fixture: create() is not wired -- read-only fixture");
+  }
+  async remove(): Promise<never> {
+    throw new Error("dev-preview fixture: remove() is not wired -- read-only fixture");
+  }
+  async createMeeting(): Promise<never> {
+    throw new Error("dev-preview fixture: createMeeting() is not wired -- read-only fixture");
+  }
+  async removeMeeting(): Promise<never> {
+    throw new Error("dev-preview fixture: removeMeeting() is not wired -- read-only fixture");
+  }
+  async getLoad(): Promise<never> {
+    throw new Error("dev-preview fixture: getLoad() is not wired -- read-only fixture");
+  }
+}
+
+/** Adviser View's own two read-only sections (`sec-partial`/
+ * `sec-complete`, reusing the same section ids `FixtureSectionRepository`
+ * already defines, and the same learners `FIXTURE_LEARNERS` already
+ * defines -- not a second, disconnected set of synthetic ids), keyed by
+ * section id so the screen's section picker is genuinely interactive.
+ * Every other method throws -- see `FixtureTeachingAssignmentRepository`'s
+ * own doc comment for why that is deliberate, not an oversight. */
+const FIXTURE_ADVISER_OVERVIEWS: Record<string, AdviserAttendanceOverview> = {
+  "sec-partial": {
+    sectionId: "sec-partial",
+    sectionName: "Rizal",
+    schoolYear: "2026-2027",
+    asOfDate: TODAY,
+    subjectCount: 3,
+    heldSessionCount: 12,
+    rows: [
+      {
+        membershipId: "l1",
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Santos",
+        presentCount: 8,
+        absentCount: 2,
+        lateCount: 1,
+        excusedCount: 0,
+        subjectsWithAbsences: ["Mathematics", "Filipino"],
+        highestCurrentSubjectAbsenceStreak: 2,
+      },
+      {
+        membershipId: "l2",
+        learnerId: "l2",
+        givenName: "Bayani",
+        familyName: "Cruz",
+        presentCount: 10,
+        absentCount: 0,
+        lateCount: 0,
+        excusedCount: 1,
+        subjectsWithAbsences: [],
+        highestCurrentSubjectAbsenceStreak: 0,
+      },
+    ],
+  },
+  "sec-complete": {
+    sectionId: "sec-complete",
+    sectionName: "Bonifacio",
+    schoolYear: "2026-2027",
+    asOfDate: TODAY,
+    subjectCount: 1,
+    heldSessionCount: 5,
+    rows: [
+      {
+        membershipId: "l3",
+        learnerId: "l3",
+        givenName: "Maria Corazon",
+        familyName: "Dela Peña-Villanueva",
+        presentCount: 5,
+        absentCount: 0,
+        lateCount: 0,
+        excusedCount: 0,
+        subjectsWithAbsences: [],
+        highestCurrentSubjectAbsenceStreak: 0,
+      },
+    ],
+  },
+};
+
+export class FixtureSubjectAttendanceRepository implements SubjectAttendanceRepository {
+  async openSession(): Promise<never> {
+    throw new Error("dev-preview fixture: openSession() is not wired -- read-only fixture");
+  }
+  async markNoClass(): Promise<never> {
+    throw new Error("dev-preview fixture: markNoClass() is not wired -- read-only fixture");
+  }
+  async recordEntry(): Promise<never> {
+    throw new Error("dev-preview fixture: recordEntry() is not wired -- read-only fixture");
+  }
+  async markAllPresent(): Promise<never> {
+    throw new Error("dev-preview fixture: markAllPresent() is not wired -- read-only fixture");
+  }
+  async rosterForSession(): Promise<never> {
+    throw new Error("dev-preview fixture: rosterForSession() is not wired -- read-only fixture");
+  }
+  async listSessions(): Promise<never> {
+    throw new Error("dev-preview fixture: listSessions() is not wired -- read-only fixture");
+  }
+  async monitor(): Promise<never> {
+    throw new Error("dev-preview fixture: monitor() is not wired -- read-only fixture");
+  }
+
+  async listAdviserViewSections(): Promise<Section[]> {
+    return FIXTURE_SECTIONS.filter((section) => section.id in FIXTURE_ADVISER_OVERVIEWS);
+  }
+
+  async adviserOverview(sectionId: string): Promise<AdviserAttendanceOverview | null> {
+    return FIXTURE_ADVISER_OVERVIEWS[sectionId] ?? null;
   }
 }

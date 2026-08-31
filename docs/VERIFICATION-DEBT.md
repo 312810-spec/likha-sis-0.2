@@ -1,5 +1,63 @@
 # Verification Debt
 
+## Adviser View browser-rendered verification — closed (2026-08-31)
+
+Closes the remaining half of the entry below ("Not closed by this
+session": Adviser View itself) and Wave 3F's own item 2 ("No
+browser-rendered screenshot fixture for Adviser View"). Extended
+`src/dev-preview/fixtures.ts` with `FixtureSubjectAttendanceRepository`
+and `FixtureTeachingAssignmentRepository`, and wired
+`src/dev-preview/DevPreviewApp.tsx`'s existing `adviser-view` tab
+(`WorkbenchNav`'s normal top-level "Adviser View" destination, no
+contextual handoff needed — matches production exactly) through to the
+real `AdviserViewScreen`. Only `listAdviserViewSections`/
+`adviserOverview` are implemented with real synthetic data (two
+sections, `sec-partial`/`sec-complete`, reusing the same section/learner
+ids `FixtureSectionRepository`/`FIXTURE_LEARNERS` already define, not a
+disconnected second set); every other `SubjectAttendanceRepository`/
+`TeachingAssignmentRepository` method throws "not wired — read-only
+fixture", the same convention this file already uses for every other
+screen not yet reachable in dev-preview (Subject Attendance, Subject
+Monitor, Teacher Load, Teaching Assignments, Schedule Meetings, SF1
+Import remain unwired and retained as debt below, not assumed covered
+by this session's work).
+
+**Verified live via Playwright** (1366×900, light + dark, both
+Comfortable and Guided modes, driven against `vite`'s dev server on
+`dev-preview.html`, Chromium confirmed pre-installed this session same
+as the Section Adviser slice): the full read-only flow — Adviser View
+nav tab → default section (Rizal) overview table → section picker
+switch to a second section (Bonifacio) → long-name learner row wraps
+correctly → Guided mode's extra explanatory paragraph renders only in
+that mode → dark theme contrast — all render correctly in every
+combination checked, zero blocking axe (WCAG A/AA) violations, zero
+console errors. Screenshots sent to the user directly.
+
+**A test-script false alarm, not a product bug, worth recording so a
+future session doesn't re-diagnose it from scratch**: `WorkbenchNav`'s
+active-tab button and the Efficient/Comfortable/Guided mode switcher's
+active button both prepend "✓ " to their accessible name when active —
+a `getByRole("button", { name: ..., exact: true })` Playwright query
+against the _already-active_ button times out, which looks exactly like
+an environment/rendering hang (and this session initially chased a false
+lead of Chromium's blocked background-networking calls to Google hosts
+as the cause) but is purely a test-script matching bug. Match with a
+regex tolerating the optional prefix instead.
+
+**Re-verified after the fixture change**: `npm run quality` 735/735
+(unchanged — no test file added, matching this file's own existing
+fixture-file precedent of no dedicated fixture unit tests), typecheck/
+lint/format/architecture clean; `npm run build` clean; `npm run
+check:dev-preview-isolation` clean; `npx knip` unchanged from the
+pre-existing baseline; `cargo fmt --check` clean (no Rust touched).
+
+**Not done this slice, deliberately deferred**: Subject Attendance,
+Subject Monitor, Teacher Load, Teaching Assignments, Schedule Meetings,
+and SF1 Import still have no dev-preview fixture wiring — each would
+need its own new fixture repository (Subject Attendance's write/roster
+methods in particular are materially more involved than Adviser View's
+two read-only ones). Retained as debt, not scope-crept into this slice.
+
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
 Real browser-rendered Playwright verification of the Section Adviser

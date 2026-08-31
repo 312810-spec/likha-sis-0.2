@@ -12,6 +12,8 @@ import { SchoolMemberApplicationService } from "../application/school-member-ser
 import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
+import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { AdviserViewScreen } from "../ui/AdviserViewScreen";
 import { AppShell } from "../ui/AppShell";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
@@ -40,6 +42,8 @@ import {
   FixtureSectionAdvisoryRepository,
   FixtureSectionRepository,
   FixtureSubjectRepository,
+  FixtureSubjectAttendanceRepository,
+  FixtureTeachingAssignmentRepository,
 } from "./fixtures";
 
 /**
@@ -60,9 +64,14 @@ import {
  * browser-rendered verification (see each screen's own git history for
  * which wave added it) -- still a narrow verification tool, not a full
  * second app shell: several `SignedInTab` destinations (e.g. Subject
- * Attendance, Teacher Load, Adviser View) remain unwired and fall
- * through to the catch-all message below, tracked as retained debt in
- * `docs/VERIFICATION-DEBT.md` rather than assumed covered.
+ * Attendance, Subject Monitor, Teacher Load, Teaching Assignments,
+ * Schedule Meetings, SF1 Import) remain unwired and fall through to the
+ * catch-all message below, tracked as retained debt in
+ * `docs/VERIFICATION-DEBT.md` rather than assumed covered. Adviser
+ * View's own `SubjectAttendanceApplicationService`/`TeachingAssignmentRepository`
+ * fixture pair only implements the two read-only Adviser View methods
+ * (`listAdviserViewSections`/`adviserOverview`) for real -- every other
+ * method throws, since no other screen calling them is wired here yet.
  */
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
@@ -82,6 +91,10 @@ const learnerScoreService = new LearnerScoreApplicationService(new FixtureLearne
 const schoolMemberService = new SchoolMemberApplicationService(new FixtureSchoolMemberRepository());
 const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new FixtureSectionAdvisoryRepository(),
+);
+const subjectAttendanceService = new SubjectAttendanceApplicationService(
+  new FixtureSubjectAttendanceRepository(),
+  new FixtureTeachingAssignmentRepository(),
 );
 
 export function DevPreviewApp() {
@@ -183,6 +196,8 @@ export function DevPreviewApp() {
             sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
             onBack={() => setActiveTab("sections")}
           />
+        ) : activeTab === "adviser-view" ? (
+          <AdviserViewScreen subjectAttendanceService={subjectAttendanceService} />
         ) : (
           <div className="alert alert-info" role="status">
             <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
