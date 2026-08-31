@@ -83,6 +83,16 @@ exact next slice, and **stop**. Do not begin another wave until the user
 asks to continue. Genuine approval and safety gates can still stop a
 wave earlier.
 
+**Standing owner authorization for wave delivery:** do not ask for
+separate permission to commit, push/sync the action-managed feature
+branch, open its pull request, or squash-merge it. Perform those actions
+automatically after verification. Never commit directly to `main`, never
+force-push/rebase published work, and never use an admin/bypass merge.
+Merge only when both required Quality and Security workflows have
+completed successfully for the exact full checkpoint SHA. If either
+gate is missing, pending, cancelled, or failed, do not merge; fix or
+report the blocker and stop.
+
 ## Completion
 
 Before marking work complete:
