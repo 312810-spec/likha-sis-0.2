@@ -44,6 +44,13 @@ fixture-tests precedent), typecheck/lint/format/architecture clean;
 `npx knip` unchanged from the pre-existing baseline; `cargo fmt --check`
 clean (no Rust touched this session).
 
+**Checkpoint**: feature+docs commit `c19b251`, pushed to
+`claude/github-app-install-mdhpi0`. **Final Security Gate `33385986166`
+and Quality Gate `33385986180`, both `completed/success`** (Ubuntu
+canonical `quality:full` + Playwright/axe UI gate; Windows canonical
+`quality:full` + native Tauri build) — actually confirmed via the GitHub
+Actions API this session, not assumed.
+
 **Gate decision: ADVISER VIEW BROWSER-RENDERED VERIFICATION CLOSED.**
 Combined with the prior entry, both screens the section-advisory feature
 line (Waves 3E-3G) shipped now have real browser-rendered, accessibility-
