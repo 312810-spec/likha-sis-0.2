@@ -260,9 +260,14 @@ UX-04 ✓ ↺ complete (2026-08-25, baseline 0634421) — Class Records,
   (docs/adr/0041) now runs the full `npm run quality:full` contract on
   GitHub Actions (Ubuntu + Windows) on every push/PR.
 
-CURRENT ← Wave 1 + Wave 4 complete. `main` fast-forward integration in
-  progress (this milestone) — see docs/CURRENT-HANDOFF.md for the exact
-  next product milestone once integration closes.
+CURRENT ← Wave 1 + Wave 4 complete; `main` fast-forwarded through Waves
+  2Z-3G (Subject Attendance + Section Advisory, a full feature line
+  delivered outside this table, fully reviewed and verified). Wave 3H
+  (2026-08-31, planning-only, docs/product/WAVE-3H-DECISION.md) surveyed
+  the roadmap fresh and recommends Wave 3I: Admin-Assisted Password
+  Reset (newly unblocked now that Wave 1's RBAC exists — see the
+  decision record for why the old low score no longer applies) — see
+  docs/CURRENT-HANDOFF.md for exact next-action detail.
 
 Still available, not on the directed roadmap but not superseded: Key
   Stage 1 descriptive grading (structurally different computation) and
@@ -270,9 +275,10 @@ Still available, not on the directed roadmap but not superseded: Key
   known, but DO 8's own transmutation table differs from DO 015's and
   needs its own research pass plus an architecture decision, not a
   purely-additive change like the SHS groups — deps: M16); password
-  reset (scored 4.20 this pass — blocked on a real product/security
-  decision, not just effort, since this app has no out-of-band recovery
-  channel)
+  reset (scored 4.20 in this 2026-08-25 pass — blocked at the time on the
+  then-deferred Roles & Permissions decision. **Superseded 2026-08-31**:
+  RBAC has since shipped, that blocker is gone, and Wave 3H recommends
+  this as the next slice — see docs/product/WAVE-3H-DECISION.md)
 LearnerListScreen edit affordance for M17's disclosed LRN/Sex gap ✓
   (2026-08-24, same session as M18)
 ```

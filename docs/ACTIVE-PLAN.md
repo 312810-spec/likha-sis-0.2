@@ -1,5 +1,34 @@
 # ACTIVE PLAN
 
+## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
+
+Planning-only wave (GitHub issue #6), branch
+`claude/issue-6-20260831-1042`, `HEAD` `9ff7c09` (verified exactly the
+issue's expected checkpoint). No product/Rust/test/dependency/migration/
+workflow/harness-metadata file touched.
+
+**Full record**: `docs/product/WAVE-3H-DECISION.md` — 11 candidates
+evaluated against the live repository (not assumed from memory),
+scored against LIKHA's priority order, recommended slice + runner-up +
+exact Wave 3I scope/non-goals/risks/acceptance-checks, completion-
+percentage and mock-pilot-readiness estimates, and a copy-ready Wave 3I
+prompt.
+
+**Recommended next slice**: Admin-Assisted Password Reset (School Head
+resets a colleague's LIKHA password within their own school) — newly
+unblocked because RBAC (ADR-0036) has shipped since this candidate was
+last scored low for lacking exactly that. **Runner-up**: the Adviser
+View dev-preview/Playwright verification-debt closure already named as
+this project's own prior "recommended next slice."
+
+**Verification**: doc-only wave; `npm run harness:verify`, `npm run
+quality`, `git diff --check` run as this wave's gate (see
+`docs/CURRENT-HANDOFF.md`'s top entry and this session's final report
+for actual results).
+
+**Next**: Wave 3I (Admin-Assisted Password Reset), per the issue's
+explicit instruction, deliberately not started in this wave.
+
 ## Wave 3G: Section Adviser Management UI (added 2026-08-31) — complete
 
 Full record: `docs/PROJECT-MEMORY.md` Wave 3G entry;

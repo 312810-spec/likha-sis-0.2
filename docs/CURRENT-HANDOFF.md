@@ -1,5 +1,56 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
+
+Planning-only wave, run from GitHub issue #6, on branch
+`claude/issue-6-20260831-1042` at `HEAD` `9ff7c09` (confirmed exactly the
+issue's expected checkpoint — not merely an ancestor). No product source,
+Rust source, tests, dependencies, migrations, workflows, or harness
+metadata touched. `main` not fetched/switched/merged.
+
+Full record: `docs/product/WAVE-3H-DECISION.md`. Surveyed
+`CLAUDE.md`/`.claude/rules/`, `docs/CURRENT-HANDOFF.md`,
+`docs/ACTIVE-PLAN.md`, `docs/PROJECT-MEMORY.md`, `docs/PROGRESS-MAP.md`,
+`docs/product/PRODUCT-CONTRACT.md`, `docs/VERIFICATION-DEBT.md`, ADR-0035
+(the authoritative Wave 0-7 roadmap), and a direct source-code grep of
+`src-tauri/src` to confirm current state rather than trust doc summaries.
+Evaluated 11 candidates (the 10 the issue named plus one this survey
+surfaced).
+
+**Selected via LIKHA's priority order and the project's evidence-first
+discipline**: the "password reset" candidate was previously scored low
+(4.20, 2026-08-25) specifically because a safe admin-reset flow "needs
+the deferred Roles & Permissions decision" — RBAC has since shipped
+(ADR-0036), and a fresh grep confirms zero password-reset/change command
+exists anywhere in the codebase today. The original blocker no longer
+holds and the roadmap was never revisited to reflect it — exactly the
+"newly discovered evidence changes the best sequence" case
+`.claude/rules/autonomous-development.md` calls out.
+
+**Recommended next slice (Wave 3I, not started)**: Admin-Assisted
+Password Reset — a School Head resets a colleague's LIKHA login password
+within their own school, reusing the existing `Capability::ManageSchoolMembership`
+gate, Argon2id hashing, school-scoping, and audit-log patterns unchanged.
+**Runner-up**: close the Adviser View dev-preview/Playwright verification
+debt named in this file's prior entry below. Both Wave 5 Sync's
+10-scenario decision and the raw-database backup/recovery design question
+were evaluated and deliberately not selected — both are decision-shaped,
+not narrow-implementation-shaped, and each needs its own dedicated
+scenario-process wave first (same reasoning already applied to Sync).
+Full scope/non-goals/risks/acceptance-checks for Wave 3I, current
+completion-percentage and mock-pilot-readiness estimates, and the exact
+recommended Wave 3I prompt are all in `docs/product/WAVE-3H-DECISION.md`
+— not duplicated here.
+
+**Verification this wave**: doc-only change; `npm run harness:verify`,
+`npm run quality`, and `git diff --check` run as this wave's own gate
+(see the session's final report for actual results); a changed-path
+review confirms only planning/brain documents changed.
+
+**Gate decision: WAVE 3H COMPLETE.** Per the issue's explicit
+instruction, Wave 3I is not implemented here. Stopping and waiting for
+the next continuation instruction.
+
 ## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)
 
 Continued directly after the Wave 3E/3F/3G review debt closure below,
