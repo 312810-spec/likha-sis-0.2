@@ -35,7 +35,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code
         id: claude
@@ -47,10 +47,7 @@ jobs:
           additional_permissions: |
             actions: write
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Permit unattended local verification while keeping branch creation,
+          # commits, pushes, and destructive shell operations outside Claude's Bash access.
+          claude_args: |
+            --allowedTools "Edit,Read,Write,Bash(npm:*),Bash(npx:*),Bash(cargo:*),Bash(rg:*),Bash(git status:*),Bash(git diff:*),Bash(git rev-parse:*),Bash(git log:*),Bash(git show:*),Bash(git branch --show-current),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git diff-tree:*),Bash(git grep:*),Bash(gh run:*),Bash(gh workflow run:*)"
