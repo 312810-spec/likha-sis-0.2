@@ -232,6 +232,26 @@ pub fn is_member_of_school(conn: &Connection, user_id: &str, school_id: &str) ->
     Ok(count > 0)
 }
 
+/// True only when `school_id` is `user_id`'s sole school membership.
+/// The password hash is global to the user identity, so an admin reset
+/// must fail closed for a target that can authenticate in another
+/// school's scope as well.
+pub fn is_exclusively_member_of_school(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+) -> AppResult<bool> {
+    let eligible: i64 = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM user_school_memberships \
+                        WHERE user_id = ?1 AND school_id = ?2) \
+                AND NOT EXISTS (SELECT 1 FROM user_school_memberships \
+                                WHERE user_id = ?1 AND school_id <> ?2)",
+        (user_id, school_id),
+        |row| row.get(0),
+    )?;
+    Ok(eligible != 0)
+}
+
 /// True once at least one user account exists. Used to gate the
 /// unauthenticated bootstrap path: `register_user` may only skip
 /// authentication for the very first account ever created — see

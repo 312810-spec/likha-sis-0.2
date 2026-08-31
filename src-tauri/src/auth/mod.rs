@@ -609,6 +609,9 @@ pub fn admin_reset_teacher_password(
         Some(user) => user,
         None => return Ok(false),
     };
+    if !user_repo::is_exclusively_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
     let new_hash = hash_password(new_password)?;
     conn.execute_batch("SAVEPOINT admin_password_reset")?;
     let reset = (|| -> AppResult<bool> {

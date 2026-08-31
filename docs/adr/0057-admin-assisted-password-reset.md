@@ -243,6 +243,10 @@ to a user rather than scoped per school, a School Head may reset only a
 target whose memberships are confined to the Head's own school. A
 same-school target that also belongs to another school is rejected with
 the same non-enumerating `Ok(false)` result and no audit event.
+Eligibility is checked before Argon2 hashing so unknown, cross-school,
+and multi-school targets all reject without the expensive hash work;
+the exclusive-membership predicate is repeated in the conditional
+password `UPDATE` at the write boundary for defense in depth.
 
 A successful reset revokes every active persisted session for the target
 across all school scopes. Other running application instances therefore
