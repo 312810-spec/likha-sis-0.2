@@ -2809,6 +2809,49 @@ production use with real learner PII.
 migration/workflow/harness-metadata file touched — see
 `docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
 
+## Wave 3I — Admin-Assisted Password Reset (added 2026-08-31)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact). Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c`
+(confirmed exactly the issue's expected checkpoint). Full record:
+`docs/adr/0057-admin-assisted-password-reset.md`;
+`docs/CURRENT-HANDOFF.md`'s new top entry.
+
+Closes the gap Wave 3H's survey identified: a teacher who forgets their
+LIKHA password (distinct from the existing 15-minute lockout, which
+already self-clears) previously had no legitimate in-app recovery path
+at all. Ran the project's 10-scenario decision process; selected
+**School Head sets a new password directly, effective immediately**
+(reuses `Capability::ManageSchoolMembership`, the existing Argon2id
+path, and the existing `audit_log` table, widened not replaced).
+Recorded **Next Best, explicitly deferred not rejected**: a
+system-generated temporary password with forced change at next login —
+would need a new `users` schema flag and a new login-flow interception
+point this codebase doesn't have yet; the switch condition is a future
+finding that School-Head-durably-knows-the-password is unacceptable for
+this deployment model, not effort alone.
+
+**Durable facts for future sessions**: `admin_reset_teacher_password`
+is the first `audit_log` event type where the acting user
+(`actor_user_id`) genuinely differs from the event's subject
+(`user_id`/`username`) — migration 24 widened the table for this,
+preserving every pre-existing row losslessly with `actor_user_id =
+NULL`. A successful reset also clears the target account's lockout
+state as a deliberate, in-scope side effect (not a change to ADR-0019's
+lockout policy itself). An unknown target and a target in a different
+school are indistinguishable (`Ok(false)`, no audit write) —
+enumeration-safety by construction, not code-review vigilance.
+
+**Verification**: `npm run quality` 770/770; `npm run build`; `npm run
+harness:verify` 100/100; `cargo fmt --check`; `git diff --check`; all
+clean. `cargo test`/`cargo clippy` could not run in-session (missing
+Linux GTK/WebKit system libraries, `apt-get install` needs interactive
+approval unavailable here) — retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for that check.
+Independent security review dispatched — see this wave's own final
+report and `docs/VERIFICATION-DEBT.md` for the actual outcome.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

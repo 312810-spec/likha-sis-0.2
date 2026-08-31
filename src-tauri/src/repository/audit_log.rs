@@ -14,6 +14,12 @@ pub enum AuditEventType {
     LoginFailed,
     AccountLocked,
     Logout,
+    /// A School Head reset another member's password via
+    /// `auth::admin_reset_teacher_password` (Wave 3I). The only event
+    /// type so far where the acting user and the event's subject
+    /// (`user_id`/`username`) are genuinely different people — see
+    /// migration 24 and `AuditLogEntry::actor_user_id`.
+    PasswordResetByAdmin,
 }
 
 impl AuditEventType {
@@ -23,6 +29,7 @@ impl AuditEventType {
             AuditEventType::LoginFailed => "login_failed",
             AuditEventType::AccountLocked => "account_locked",
             AuditEventType::Logout => "logout",
+            AuditEventType::PasswordResetByAdmin => "password_reset_by_admin",
         }
     }
 
@@ -32,6 +39,7 @@ impl AuditEventType {
             "login_failed" => Ok(AuditEventType::LoginFailed),
             "account_locked" => Ok(AuditEventType::AccountLocked),
             "logout" => Ok(AuditEventType::Logout),
+            "password_reset_by_admin" => Ok(AuditEventType::PasswordResetByAdmin),
             other => Err(rusqlite::Error::FromSqlConversionFailure(
                 0,
                 rusqlite::types::Type::Text,
@@ -48,6 +56,17 @@ pub struct AuditLogEntry {
     pub school_id: String,
     pub user_id: Option<String>,
     pub username: String,
+    /// Who performed the action, when that differs from `user_id` (the
+    /// event's subject) — `None` for every event type except
+    /// `PasswordResetByAdmin` (migration 24, Wave 3I). Every event
+    /// before this one is self-caused, so backfilling this for old rows
+    /// would be fabricating attribution that was never recorded.
+    pub actor_user_id: Option<String>,
+    /// `actor_user_id`'s username, resolved via join at read time for
+    /// display -- never stored redundantly, matching how `username`
+    /// itself is always the value valid at the time of the event, not
+    /// a live lookup.
+    pub actor_username: Option<String>,
     pub event_type: AuditEventType,
     pub created_at: String,
 }
@@ -76,6 +95,39 @@ pub fn record(
     Ok(())
 }
 
+/// Records an event caused by someone OTHER than its subject -- so far
+/// only `admin_reset_teacher_password` (Wave 3I): `actor_user_id` is the
+/// School Head who performed the reset, `target_user_id`/
+/// `target_username` are the account whose password was reset. Kept as
+/// its own function rather than widening `record`'s signature: every
+/// existing caller (`login`, `logout`) is self-caused and would only
+/// ever pass `None` for an actor, so a separate, explicitly-named
+/// function is clearer than a rarely-used extra parameter on the one
+/// already-proven, heavily-called path.
+pub fn record_admin_action(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    target_user_id: &str,
+    target_username: &str,
+    event_type: AuditEventType,
+) -> AppResult<()> {
+    let id = Uuid::now_v7().to_string();
+    conn.execute(
+        "INSERT INTO audit_log (id, school_id, user_id, username, actor_user_id, event_type) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (
+            &id,
+            school_id,
+            target_user_id,
+            target_username,
+            actor_user_id,
+            event_type.as_db_str(),
+        ),
+    )?;
+    Ok(())
+}
+
 /// The most recent events for `school_id`, newest first, capped at
 /// `limit` — this is a review/troubleshooting screen, not an unbounded
 /// export; a teacher does not need the entire history rendered at once.
@@ -91,19 +143,24 @@ pub fn list_for_school(
     // deterministically in the same direction rather than leaving
     // same-millisecond rows in an arbitrary SQLite-chosen order.
     let mut stmt = conn.prepare(
-        "SELECT id, school_id, user_id, username, event_type, created_at \
-         FROM audit_log WHERE school_id = ?1 \
-         ORDER BY created_at DESC, id DESC LIMIT ?2",
+        "SELECT al.id, al.school_id, al.user_id, al.username, al.actor_user_id, \
+                actor.username, al.event_type, al.created_at \
+         FROM audit_log al \
+         LEFT JOIN users actor ON actor.id = al.actor_user_id \
+         WHERE al.school_id = ?1 \
+         ORDER BY al.created_at DESC, al.id DESC LIMIT ?2",
     )?;
     let rows = stmt.query_map((school_id, limit), |row| {
-        let event_type: String = row.get(4)?;
+        let event_type: String = row.get(6)?;
         Ok(AuditLogEntry {
             id: row.get(0)?,
             school_id: row.get(1)?,
             user_id: row.get(2)?,
             username: row.get(3)?,
+            actor_user_id: row.get(4)?,
+            actor_username: row.get(5)?,
             event_type: AuditEventType::from_db_str(&event_type)?,
-            created_at: row.get(5)?,
+            created_at: row.get(7)?,
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
@@ -228,5 +285,63 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].username, "ana.cruz");
+    }
+
+    #[test]
+    fn a_plain_login_event_has_no_actor_attribution() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+
+        record(
+            &conn,
+            &s.id,
+            Some(&u.id),
+            "ana.cruz",
+            AuditEventType::LoginSuccess,
+        )
+        .unwrap();
+
+        let entries = list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries[0].actor_user_id, None);
+        assert_eq!(entries[0].actor_username, None);
+    }
+
+    #[test]
+    fn record_admin_action_attributes_the_event_to_the_acting_user_distinct_from_its_subject() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(&conn, "corazon.santos", "password", "Corazon Santos").unwrap();
+        let teacher = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+
+        record_admin_action(
+            &conn,
+            &s.id,
+            &head.id,
+            &teacher.id,
+            "ana.cruz",
+            AuditEventType::PasswordResetByAdmin,
+        )
+        .unwrap();
+
+        let entries = list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].event_type, AuditEventType::PasswordResetByAdmin);
+        assert_eq!(
+            entries[0].user_id,
+            Some(teacher.id),
+            "user_id/username stay the event's subject -- the account whose password changed"
+        );
+        assert_eq!(entries[0].username, "ana.cruz");
+        assert_eq!(
+            entries[0].actor_user_id,
+            Some(head.id),
+            "actor_user_id is who performed the reset, not who it was done to"
+        );
+        assert_eq!(
+            entries[0].actor_username,
+            Some("corazon.santos".to_string())
+        );
     }
 }

@@ -54,6 +54,29 @@ pub fn add_user_to_school(
     role::grant(&conn, &user_id, &school_id, role::TEACHER)
 }
 
+/// Wave 3I (ADR-0057): a School Head sets a new password directly for a
+/// colleague in their own school. See `auth::admin_reset_teacher_password`
+/// for the full authorization/enumeration-safety contract -- this
+/// command only wires it up and zeroizes the raw password afterward,
+/// matching `register_user`'s established convention. Returns `false`
+/// (not an error) for a target that doesn't exist or belongs to a
+/// different school; the frontend shows the same generic message either
+/// way, matching this codebase's "security must not rely on UI hiding"
+/// convention.
+#[tauri::command]
+pub fn admin_reset_teacher_password(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    target_user_id: String,
+    mut new_password: String,
+) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let result =
+        auth::admin_reset_teacher_password(&conn, &sessions, &target_user_id, &new_password);
+    new_password.zeroize();
+    result
+}
+
 /// Reference data any authenticated school member may read -- matching
 /// `list_teaching_assignments_by_section`'s established convention.
 /// Wave 2Y (Teaching Assignments UI): a School Head needs to see who

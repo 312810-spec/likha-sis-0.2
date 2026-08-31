@@ -35,6 +35,9 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
   async listMembers() {
     return this.members;
   }
+  async resetPassword(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {

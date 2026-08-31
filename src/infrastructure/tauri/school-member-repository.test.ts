@@ -19,4 +19,19 @@ describe("TauriSchoolMemberRepository", () => {
       { id: "u-1", username: "ana.cruz", displayName: "Ana Cruz", roles: ["teacher"] },
     ]);
   });
+
+  it("resets a colleague's password via admin_reset_teacher_password", async () => {
+    mockInvoke.mockResolvedValueOnce(true);
+
+    const result = await new TauriSchoolMemberRepository().resetPassword(
+      "u-1",
+      "brand-new-password",
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("admin_reset_teacher_password", {
+      targetUserId: "u-1",
+      newPassword: "brand-new-password",
+    });
+    expect(result).toBe(true);
+  });
 });

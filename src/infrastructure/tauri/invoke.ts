@@ -60,6 +60,7 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "login",
   "register_user",
   "add_user_to_school",
+  "admin_reset_teacher_password",
   "create_learner",
   "find_learner_candidates",
   "create_learner_with_duplicate_check",

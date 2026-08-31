@@ -92,6 +92,39 @@ describe("AuditLogScreen", () => {
     expect(screen.getByText("unknown.user")).toBeInTheDocument();
   });
 
+  it("shows who performed a password reset -- the one event type where the actor differs from the subject", async () => {
+    renderScreen([
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        actorUserId: "u2",
+        actorUsername: "corazon.santos",
+        eventType: "password_reset_by_admin",
+        createdAt: "2026-08-31T08:00:00.000Z",
+      },
+    ]);
+
+    expect(await screen.findByText("Password reset by corazon.santos")).toBeInTheDocument();
+    expect(screen.getByText("ana.cruz")).toBeInTheDocument();
+  });
+
+  it("falls back to a generic label for a password reset with no resolvable actor username", async () => {
+    renderScreen([
+      {
+        id: "a1",
+        schoolId: "s1",
+        userId: "u1",
+        username: "ana.cruz",
+        eventType: "password_reset_by_admin",
+        createdAt: "2026-08-31T08:00:00.000Z",
+      },
+    ]);
+
+    expect(await screen.findByText("Password reset by an administrator")).toBeInTheDocument();
+  });
+
   it("shows a human-readable date/time, not the raw ISO storage timestamp", async () => {
     renderScreen([
       {
