@@ -1,4 +1,6 @@
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
 # Wave 3H — Fresh Roadmap Survey and Next-Slice Selection
 
 Decision record, added 2026-08-31. This is a **planning wave only** — no
