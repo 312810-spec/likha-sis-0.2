@@ -1,5 +1,32 @@
 # Verification Debt
 
+## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
+
+The user reported (not this session's own finding — no reproduction
+attempted) that a session sometimes does not wake back up after a
+long-running check (e.g. `npm run quality`/`cargo test`) even when a
+wakeup was explicitly scheduled for it. This is a distinct issue from
+the well-documented "agent-resume/retrieval failure" pattern tracked
+throughout this file (that one is about dispatched subagent findings
+not coming back); this one is about the session's own scheduled-wakeup
+mechanism (`ScheduleWakeup`/`send_later`-style timers) not reliably
+firing or resuming the session.
+
+**Working mitigation, not a fix**: prefer the Bash tool's
+`run_in_background: true` plus the harness's automatic
+completion-notification for anything gated on a specific process
+finishing (quality gates, `cargo test`, CI polling) — that path does
+not depend on a manually-scheduled timer. Reserve `ScheduleWakeup`/
+`send_later` for genuinely open-ended waits with no process to attach
+to, where an occasional missed wake is lower-stakes.
+
+**Not yet done**: no root-cause investigation, no reproduction, no fix
+— this is a platform/harness-level mechanism outside this repository's
+own code. Revisit if it recurs with enough detail (which command, how
+long it ran, whether `run_in_background` or a manual `ScheduleWakeup`
+was used) to file upstream, or if it starts blocking a wave's
+verification step.
+
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
 Real browser-rendered Playwright verification of the Section Adviser
