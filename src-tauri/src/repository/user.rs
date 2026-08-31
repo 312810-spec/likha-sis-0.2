@@ -200,14 +200,19 @@ fn reset_failed_login_attempts(conn: &Connection, user_id: &str) -> AppResult<()
 pub fn set_password_and_clear_lockout(
     conn: &Connection,
     user_id: &str,
+    school_id: &str,
     new_password_hash: &str,
-) -> AppResult<()> {
-    conn.execute(
+) -> AppResult<bool> {
+    let updated = conn.execute(
         "UPDATE users SET password_hash = ?2, failed_login_attempts = 0, locked_until = NULL \
-         WHERE id = ?1",
-        (user_id, new_password_hash),
+         WHERE id = ?1 \
+           AND EXISTS (SELECT 1 FROM user_school_memberships \
+                       WHERE user_id = ?1 AND school_id = ?3) \
+           AND NOT EXISTS (SELECT 1 FROM user_school_memberships \
+                           WHERE user_id = ?1 AND school_id <> ?3)",
+        (user_id, new_password_hash, school_id),
     )?;
-    Ok(())
+    Ok(updated == 1)
 }
 
 pub fn add_school_membership(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<()> {
@@ -221,24 +226,6 @@ pub fn add_school_membership(conn: &Connection, user_id: &str, school_id: &str) 
 pub fn is_member_of_school(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<bool> {
     let count: i64 = conn.query_row(
         "SELECT count(*) FROM user_school_memberships WHERE user_id = ?1 AND school_id = ?2",
-        (user_id, school_id),
-        |row| row.get(0),
-    )?;
-    Ok(count > 0)
-}
-
-/// True when `user_id` belongs to any school other than `school_id`.
-/// Password credentials are currently global to a user identity, so a
-/// School Head must not reset an identity that can also authenticate in
-/// another school's scope.
-pub fn has_memberships_outside_school(
-    conn: &Connection,
-    user_id: &str,
-    school_id: &str,
-) -> AppResult<bool> {
-    let count: i64 = conn.query_row(
-        "SELECT count(*) FROM user_school_memberships \
-         WHERE user_id = ?1 AND school_id <> ?2",
         (user_id, school_id),
         |row| row.get(0),
     )?;
@@ -526,10 +513,12 @@ mod tests {
     #[test]
     fn set_password_and_clear_lockout_replaces_the_hash_so_the_new_password_verifies() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let user = create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        add_school_membership(&conn, &user.id, &school.id).unwrap();
         let new_hash = auth::hash_password("new password").unwrap();
 
-        set_password_and_clear_lockout(&conn, &user_id_of(&conn, "ana.cruz"), &new_hash).unwrap();
+        assert!(set_password_and_clear_lockout(&conn, &user.id, &school.id, &new_hash).unwrap());
 
         assert!(matches!(
             verify_credentials(&conn, "ana.cruz", "old password"),
@@ -541,7 +530,9 @@ mod tests {
     #[test]
     fn set_password_and_clear_lockout_unlocks_an_account_that_was_locked_out() {
         let conn = open_test_db();
-        create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let user = create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        add_school_membership(&conn, &user.id, &school.id).unwrap();
         for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
             let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
         }
@@ -551,7 +542,7 @@ mod tests {
         ));
         let new_hash = auth::hash_password("new password").unwrap();
 
-        set_password_and_clear_lockout(&conn, &user_id_of(&conn, "ana.cruz"), &new_hash).unwrap();
+        assert!(set_password_and_clear_lockout(&conn, &user.id, &school.id, &new_hash).unwrap());
 
         assert!(
             verify_credentials(&conn, "ana.cruz", "new password").is_ok(),

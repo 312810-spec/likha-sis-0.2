@@ -609,16 +609,12 @@ pub fn admin_reset_teacher_password(
         Some(user) => user,
         None => return Ok(false),
     };
-    if !user_repo::is_member_of_school(conn, &target.id, &school_id)?
-        || user_repo::has_memberships_outside_school(conn, &target.id, &school_id)?
-    {
-        return Ok(false);
-    }
-
     let new_hash = hash_password(new_password)?;
     conn.execute_batch("SAVEPOINT admin_password_reset")?;
-    let reset = (|| -> AppResult<()> {
-        user_repo::set_password_and_clear_lockout(conn, &target.id, &new_hash)?;
+    let reset = (|| -> AppResult<bool> {
+        if !user_repo::set_password_and_clear_lockout(conn, &target.id, &school_id, &new_hash)? {
+            return Ok(false);
+        }
         session_repo::revoke_all_for_user(conn, &target.id)?;
         audit_log_repo::record_admin_action(
             conn,
@@ -628,12 +624,12 @@ pub fn admin_reset_teacher_password(
             &target.username,
             AuditEventType::PasswordResetByAdmin,
         )?;
-        Ok(())
+        Ok(true)
     })();
     match reset {
-        Ok(()) => {
+        Ok(succeeded) => {
             conn.execute_batch("RELEASE admin_password_reset")?;
-            Ok(true)
+            Ok(succeeded)
         }
         Err(error) => {
             let _ = conn
