@@ -235,6 +235,28 @@ read time for display, matching how `username` itself is already the
 value valid at the time of the event, not a live re-lookup of the
 subject.
 
+### Post-review hardening: global identity scope, revocation, and atomicity
+
+Codex review identified three blocking invariants that the initial
+implementation did not enforce. Because `users.password_hash` is global
+to a user rather than scoped per school, a School Head may reset only a
+target whose memberships are confined to the Head's own school. A
+same-school target that also belongs to another school is rejected with
+the same non-enumerating `Ok(false)` result and no audit event.
+
+A successful reset revokes every active persisted session for the target
+across all school scopes. Other running application instances therefore
+fail their next trusted-boundary authorization check even if their
+in-memory `SessionManager` still holds the old session.
+
+The password replacement and lockout clearing, target-session
+revocation, and attributable audit insertion execute inside one SQLite
+savepoint. Any failure rolls all three effects back together; callers
+cannot receive an error after a password changed without its required
+audit record. Regression tests cover multi-school rejection,
+cross-`SessionManager` revocation, and an injected audit failure that
+must preserve the old password and session.
+
 ## Consequences
 
 **In scope, shipped this wave:**

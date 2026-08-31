@@ -227,6 +227,24 @@ pub fn is_member_of_school(conn: &Connection, user_id: &str, school_id: &str) ->
     Ok(count > 0)
 }
 
+/// True when `user_id` belongs to any school other than `school_id`.
+/// Password credentials are currently global to a user identity, so a
+/// School Head must not reset an identity that can also authenticate in
+/// another school's scope.
+pub fn has_memberships_outside_school(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+) -> AppResult<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT count(*) FROM user_school_memberships \
+         WHERE user_id = ?1 AND school_id <> ?2",
+        (user_id, school_id),
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
 /// True once at least one user account exists. Used to gate the
 /// unauthenticated bootstrap path: `register_user` may only skip
 /// authentication for the very first account ever created — see

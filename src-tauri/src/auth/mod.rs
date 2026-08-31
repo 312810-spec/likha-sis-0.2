@@ -609,21 +609,38 @@ pub fn admin_reset_teacher_password(
         Some(user) => user,
         None => return Ok(false),
     };
-    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)?
+        || user_repo::has_memberships_outside_school(conn, &target.id, &school_id)?
+    {
         return Ok(false);
     }
 
     let new_hash = hash_password(new_password)?;
-    user_repo::set_password_and_clear_lockout(conn, &target.id, &new_hash)?;
-    audit_log_repo::record_admin_action(
-        conn,
-        &school_id,
-        &actor_user_id,
-        &target.id,
-        &target.username,
-        AuditEventType::PasswordResetByAdmin,
-    )?;
-    Ok(true)
+    conn.execute_batch("SAVEPOINT admin_password_reset")?;
+    let reset = (|| -> AppResult<()> {
+        user_repo::set_password_and_clear_lockout(conn, &target.id, &new_hash)?;
+        session_repo::revoke_all_for_user(conn, &target.id)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::PasswordResetByAdmin,
+        )?;
+        Ok(())
+    })();
+    match reset {
+        Ok(()) => {
+            conn.execute_batch("RELEASE admin_password_reset")?;
+            Ok(true)
+        }
+        Err(error) => {
+            let _ = conn
+                .execute_batch("ROLLBACK TO admin_password_reset; RELEASE admin_password_reset");
+            Err(error)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1906,5 +1923,68 @@ mod tests {
             user::verify_credentials(&conn, "outsider", "old-password").is_ok(),
             "a School Head's authority must not extend to a different school's member"
         );
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_rejects_a_target_with_memberships_outside_the_actors_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &other_school.id).unwrap();
+
+        let result =
+            admin_reset_teacher_password(&conn, &sessions, &teacher.id, "brand-new-password");
+
+        assert!(!result.unwrap());
+        assert!(user::verify_credentials(&conn, "ana.cruz", "old-password").is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_revokes_every_existing_target_session() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+
+        admin_reset_teacher_password(&conn, &head_sessions, &teacher.id, "brand-new-password")
+            .unwrap();
+
+        assert!(matches!(
+            teacher_sessions.require_active_session(&conn),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_rolls_back_password_sessions_and_audit_together() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_admin_reset_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'password_reset_by_admin' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result =
+            admin_reset_teacher_password(&conn, &head_sessions, &teacher.id, "brand-new-password");
+
+        assert!(result.is_err());
+        assert!(user::verify_credentials(&conn, "ana.cruz", "old-password").is_ok());
+        assert!(teacher_sessions.require_active_session(&conn).is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
     }
 }
