@@ -42,21 +42,15 @@ At session start read:
 3. `docs/ACTIVE-PLAN.md`
 4. only ADRs/docs relevant to the current task
 
-Detailed, topic-specific rules live in `.claude/rules/` (architecture,
-security-privacy, testing, project-state, autonomous-development) and
-narrowly-triggered procedures live in `.claude/skills/` — read the
-relevant one when the task matches it rather than expecting this file to
-contain everything.
+Detailed rules live in `.claude/rules/`; narrow procedures live in
+`.claude/skills/`. Read only those relevant to the current task.
 
 The Claude Code harness is **LIKHA Production Harness v2.0 — certified and locked**
-(`docs/adr/0054-final-harness-v2-certification.md`). Do not open a new
-tooling/MCP/plugin/agent/skill/hook optimization wave. Change it only
-for a production blocker, an important security/correctness defect, a
-genuinely missing capability, a retained component becoming
-insecure/obsolete/incompatible, or benchmarked evidence of substantial
-improvement — never for popularity or novelty. Reusable, non-LIKHA
-parts are extracted to `docs/harness/` and the separate ProjectForge
-repository; LIKHA does not depend on ProjectForge at runtime.
+(`docs/adr/0054-final-harness-v2-certification.md`). Change it only for
+a production blocker, important security/correctness defect, genuinely
+missing capability, obsolete component, or benchmarked substantial
+improvement. Reusable parts live in `docs/harness/` and ProjectForge;
+LIKHA does not depend on ProjectForge at runtime.
 
 Inspect code before changing it.
 
