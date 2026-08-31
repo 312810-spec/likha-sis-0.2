@@ -2763,6 +2763,52 @@ new top entry.
 - Both Quality Gate and Security Gate confirmed green on `main`'s new
   head (`9c1514c`) after the fast-forward, not assumed.
 
+## Wave 3H — Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31)
+
+Planning-only wave, run from GitHub issue #6 on branch
+`claude/issue-6-20260831-1042`, `HEAD` `9ff7c09` (confirmed exactly the
+issue's expected checkpoint, not merely an ancestor). Full record:
+`docs/product/WAVE-3H-DECISION.md`; `docs/CURRENT-HANDOFF.md` top entry;
+`docs/ACTIVE-PLAN.md`'s new top section.
+
+Surveyed every required authority doc plus ADR-0035's Wave 0-7 roadmap
+and evaluated 11 next-slice candidates (the 10 the issue named plus one
+this survey surfaced) directly against current repository state,
+including a source grep confirming no password-reset/change command
+exists anywhere in `src-tauri/src` today.
+
+**Durable finding**: "password reset/account recovery" was previously
+scored low (4.20, 2026-08-25 reassessment) specifically because a safe
+admin-reset flow needed the then-deferred Roles & Permissions decision.
+RBAC shipped since (ADR-0036, Wave 1) and this candidate was never
+re-scored — the original blocker is gone. Recorded here so a future
+session doesn't re-read the stale 4.20 score without this correction.
+
+**Recommended (Wave 3I, not started)**: Admin-Assisted Password Reset —
+a School Head resets a colleague's LIKHA password within their own
+school, reusing `Capability::ManageSchoolMembership`, existing Argon2id
+hashing, school-scoping, and the audit-log table unchanged. Deliberately
+unrelated to the separate, still-unresolved Windows-DPAPI/SQLCipher
+key-recovery question (ADR-0044) — LIKHA's own app-level credentials are
+independent of that. **Runner-up**: close the Adviser View dev-preview/
+Playwright verification debt already on record. Wave 5 Sync's
+10-scenario decision and the raw-database backup/recovery design
+question were both evaluated and deliberately not selected — each is
+decision-shaped, not implementation-shaped, and needs its own dedicated
+scenario-process wave first.
+
+**Completion estimates recorded** (both explicitly disclosed as coarse,
+evidence-derived, not precise): roughly 44% of the originally-planned
+ADR-0035 Wave 0-7 roadmap (Subject Attendance/Section Advisory, a full
+additional owner-supplied feature line, delivered outside that plan and
+not counted in the denominator); roughly 55-65% ready for a Windows-only
+synthetic-data facilitator-guided mock pilot, roughly 20-25% ready for
+production use with real learner PII.
+
+**Verification**: doc-only wave; no product/Rust/test/dependency/
+migration/workflow/harness-metadata file touched — see
+`docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
