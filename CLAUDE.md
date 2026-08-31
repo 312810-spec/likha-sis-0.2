@@ -114,3 +114,20 @@ before/after, list what shipped, the verification actually run, the
 independent reviews and their outcomes, the checkpoint commit + CI run
 ids, retained debt, and the exact next slice. Do not let writing it
 modify or invalidate the checkpoint it documents.
+
+After the report is written and the wave's final CI is confirmed green,
+relay it to the durable ChatGPT-to-Claude bridge (PR #1) by running:
+
+```
+npm run relay:wave-report -- --report <path-to-report> --sha <checkpoint-sha> --branch <branch>
+```
+
+(`scripts/relay-wave-report.mjs`; see `docs/adr/` if a relay ADR exists,
+otherwise the script's own header comment is authoritative.) The script
+independently re-confirms CI is green for that SHA, refuses to post a
+duplicate for a SHA already relayed, and never mentions `@claude`. If the
+relay fails for any reason (`gh` missing/unauthenticated, report
+missing/empty/too large, CI not confirmed, GitHub rejects the comment),
+record the relay failure in the handoff and stop — do not begin the next
+wave with an unrelayed report. Use `--dry-run` to preview a comment
+without posting.
