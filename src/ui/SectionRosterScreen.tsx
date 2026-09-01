@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import type { ExportApplicationService } from "../application/export-service";
 import type { FormGenerationApplicationService } from "../application/form-generation-service";
 import type { SectionApplicationService } from "../application/section-service";
 import { ValidationError } from "../domain/errors";
+import type { Sf5ExportResult } from "../domain/export";
 import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
 import type {
   CorrectPlacementResult,
@@ -27,6 +29,10 @@ interface SectionRosterScreenProps {
    * one-port-per-concern convention (e.g. `EnrollmentHistoryRepository`
    * staying separate from `SectionRepository`). */
   formGenerationService: FormGenerationApplicationService;
+  /** Generates the SF5 (Report on Promotion and Level of Proficiency)
+   * End-of-School-Year export. Optional for backwards compatibility with
+   * tests/callers that only test roster mutations. */
+  exportService?: ExportApplicationService;
   /** The section whose roster to show. Supplied by the Sections workflow
    * (App.tsx state handoff), never a URL/route param — the same
    * narrowly-typed pattern AttendanceScreen uses for `initialSectionId`.
@@ -138,6 +144,7 @@ type PanelErrorField = "destination" | "effectiveOn" | null;
 export function SectionRosterScreen({
   sectionService,
   formGenerationService,
+  exportService,
   sectionId,
   onBack,
 }: SectionRosterScreenProps) {
@@ -200,7 +207,8 @@ export function SectionRosterScreen({
   const enrollRequestRef = useRef(0);
 
   // --- Official-form generation: "Generate SF1" (section-level, above
-  // the table) and a per-row "Generate SF9" action. Neither mutates
+  // the table), "Export SF5" (EOSY promotion summary, above the table),
+  // and a per-row "Generate SF9" action. Neither mutates
   // membership state or needs confirmation -- both write a file and
   // report the result via the same top-of-screen banner area every
   // other action here already uses. Only one form generates at a time,
@@ -209,6 +217,9 @@ export function SectionRosterScreen({
   const [sf1Generating, setSf1Generating] = useState(false);
   const [sf1Result, setSf1Result] = useState<Sf1GenerationResult | null>(null);
   const [sf1Error, setSf1Error] = useState<string | null>(null);
+  const [sf5Exporting, setSf5Exporting] = useState(false);
+  const [sf5Result, setSf5Result] = useState<Sf5ExportResult | null>(null);
+  const [sf5Error, setSf5Error] = useState<string | null>(null);
   const [sf9GeneratingLearnerId, setSf9GeneratingLearnerId] = useState<string | null>(null);
   const [sf9Result, setSf9Result] = useState<{
     member: SectionRosterMember;
@@ -490,12 +501,18 @@ export function SectionRosterScreen({
   // is in flight, or a membership panel is open. Every action button
   // disables on this, so a teacher never has two writes racing.
   const anyActionInFlight =
-    activeAction !== null || sf1Generating || sf9GeneratingLearnerId !== null || enrollOpen;
+    activeAction !== null ||
+    sf1Generating ||
+    sf5Exporting ||
+    sf9GeneratingLearnerId !== null ||
+    enrollOpen;
 
   async function handleGenerateSf1() {
     if (!section) return;
     setSf1Error(null);
     setSf1Result(null);
+    setSf5Result(null);
+    setSf5Error(null);
     setSf9Result(null);
     setSf9Error(null);
     setSf1Generating(true);
@@ -519,11 +536,42 @@ export function SectionRosterScreen({
     }
   }
 
+  async function handleExportSf5() {
+    if (!section || !exportService) return;
+    setSf5Error(null);
+    setSf5Result(null);
+    setSf1Result(null);
+    setSf1Error(null);
+    setSf9Result(null);
+    setSf9Error(null);
+    setSf5Exporting(true);
+    try {
+      const result = await exportService.exportSectionEosySf5(section.id, section.schoolYear);
+      if (result) {
+        setSf5Result(result);
+      } else {
+        setSf5Error(
+          "This section could not be found. It may have been removed since you opened this roster — use “Back to sections” and try again.",
+        );
+      }
+    } catch (err) {
+      setSf5Error(
+        err instanceof ValidationError
+          ? err.message
+          : "Could not export SF5 — you may not have permission to export this section (only the assigned class adviser or School Head can export it), or learning records are incomplete.",
+      );
+    } finally {
+      setSf5Exporting(false);
+    }
+  }
+
   async function handleGenerateSf9(member: SectionRosterMember) {
     setSf9Error(null);
     setSf9Result(null);
     setSf1Result(null);
     setSf1Error(null);
+    setSf5Result(null);
+    setSf5Error(null);
     setSf9GeneratingLearnerId(member.learnerId);
     try {
       const result = await formGenerationService.generateSf9(sectionId, member.learnerId, asOfDate);
@@ -998,11 +1046,24 @@ export function SectionRosterScreen({
             <button type="button" disabled={anyActionInFlight} onClick={handleGenerateSf1}>
               {sf1Generating ? "Generating…" : "Generate SF1 (School Register)"}
             </button>
+            {exportService && (
+              <button type="button" disabled={anyActionInFlight} onClick={handleExportSf5}>
+                {sf5Exporting ? "Exporting SF5…" : "Export SF5 (Promotion & Level of Proficiency)"}
+              </button>
+            )}
             <p className="field-hint">
               SF1 and SF9 use a synthetic, DepEd-style template — neither has been verified against
               an official DepEd source. Confirm your school&rsquo;s actual SF1/SF9 requirements
               before treating a generated file as an official record.
             </p>
+            {mode === "guided" && (
+              <p className="field-hint">
+                SF5 (Report on Promotion and Level of Proficiency) computes final subject ratings,
+                general averages, and promotion decisions for this section&rsquo;s school year (
+                {section?.schoolYear ?? ""}). Only the designated class adviser or School Head can
+                export SF5.
+              </p>
+            )}
           </div>
 
           {sf1Error && <Alert tone="error">{sf1Error}</Alert>}
@@ -1012,6 +1073,25 @@ export function SectionRosterScreen({
                 Saved to <code>{sf1Result.outputPath}</code> ({sf1Result.learnerCount} learner
                 {sf1Result.learnerCount === 1 ? "" : "s"}).
               </p>
+            </Alert>
+          )}
+          {sf5Error && <Alert tone="error">{sf5Error}</Alert>}
+          {sf5Result && (
+            <Alert tone="success">
+              <p>
+                Saved to <code>{sf5Result.filePath}</code>.
+              </p>
+              <p>
+                This file is a DepEd SF5 End-of-School-Year promotion summary for school year{" "}
+                <strong>{section?.schoolYear}</strong>. It does <strong>not</strong> include:
+              </p>
+              <ul>
+                {sf5Result.disclosure.omittedFields.map((omitted) => (
+                  <li key={omitted.field}>
+                    <strong>{omitted.field}</strong> — {omitted.reason}
+                  </li>
+                ))}
+              </ul>
             </Alert>
           )}
           {sf9Error && (

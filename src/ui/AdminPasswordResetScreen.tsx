@@ -23,7 +23,7 @@ const GENERIC_FAILURE_MESSAGE =
   "Could not reset this password. Check that you selected a valid teacher and have permission to reset passwords.";
 
 /**
- * Wave 3I (ADR-0057): a School Head sets a new password directly for a
+ * Wave 3I (ADR-0061): a School Head sets a new password directly for a
  * colleague in their own school, effective immediately -- the
  * recommended mechanism from this wave's 10-scenario decision process.
  * Any authenticated school member sees the same form (matching

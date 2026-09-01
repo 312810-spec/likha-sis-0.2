@@ -47,7 +47,8 @@ jobs:
           additional_permissions: |
             actions: write
 
-          # Permit unattended local verification while keeping branch creation,
-          # commits, pushes, and destructive shell operations outside Claude's Bash access.
+          # Owner-authorized autonomous delivery: verify locally, commit and push only
+          # the action-managed branch, open a PR, inspect/dispatch CI, and merge only
+          # after the exact checkpoint's required Quality and Security gates are green.
           claude_args: |
-            --allowedTools "Edit,Read,Write,Bash(npm:*),Bash(npx:*),Bash(cargo:*),Bash(rg:*),Bash(git status:*),Bash(git diff:*),Bash(git rev-parse:*),Bash(git log:*),Bash(git show:*),Bash(git branch --show-current),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git diff-tree:*),Bash(git grep:*),Bash(gh run:*),Bash(gh workflow run:*)"
+            --allowedTools "Edit,Read,Write,Bash(npm:*),Bash(npx:*),Bash(cargo:*),Bash(rg:*),Bash(git status:*),Bash(git diff:*),Bash(git rev-parse:*),Bash(git log:*),Bash(git show:*),Bash(git branch --show-current),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git diff-tree:*),Bash(git grep:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git restore package-lock.json),Bash(gh run:*),Bash(gh workflow run:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh pr merge:*),Bash(gh issue comment:*)"

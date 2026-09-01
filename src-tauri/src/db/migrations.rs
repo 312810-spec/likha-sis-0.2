@@ -1258,7 +1258,7 @@ pub fn migrations() -> Migrations<'static> {
         -- so this is safe to do with foreign_keys enforcement on. Every
         -- pre-existing row is preserved losslessly with
         -- actor_user_id = NULL. See
-        -- docs/adr/0057-admin-assisted-password-reset.md.
+        -- docs/adr/0061-admin-assisted-password-reset.md.
         CREATE TABLE audit_log_new (
             id TEXT PRIMARY KEY,
             school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,

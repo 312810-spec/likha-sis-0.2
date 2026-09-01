@@ -2,7 +2,7 @@ import type { SchoolMember } from "../school-member";
 
 /**
  * `listMembers` is read-only reference data: every member of the
- * caller's own school. `resetPassword` (Wave 3I, ADR-0057) is this
+ * caller's own school. `resetPassword` (Wave 3I, ADR-0061) is this
  * port's one write: a School Head sets a new password directly for a
  * colleague in their own school. `school_id` is always session-derived
  * server-side, never a parameter here -- matching every other

@@ -1,8 +1,101 @@
 # Verification Debt
 
-## Wave 3I: native Rust compile/test/clippy — open (2026-08-31)
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure (2026-09-01)
 
-`cargo test`/`cargo clippy` could not run in this session's sandbox: no
+A `security-reviewer` was dispatched against the reconciliation diff
+(multi-tenant isolation of the three new export commands, CSV/formula-
+injection defense, filename sanitization, and the
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` categorization decision —
+see `docs/adr/0060-wave-3m-reconciliation.md`). It completed real work
+but its structured findings could not be retrieved from the tool
+result; a `SendMessage` resume of the same agent (the one permitted
+retry, per `.claude/rules/autonomous-development.md`'s established
+rule for this recurring harness issue) also returned no retrievable
+content. This is the same class of failure recorded repeatedly
+elsewhere in this project's history (see `docs/PROJECT-MEMORY.md`'s
+M7-M20-era entries).
+
+**Self-review performed instead, per the established fallback**: direct
+inspection confirmed (1) every teacher/school-entered field in
+`export/{sf4,sf5,sf6}.rs` is written through the shared `csv::row()`
+helper (`export/csv.rs`), which neutralizes a leading `=`/`+`/`-`/`@`/
+tab and RFC-4180-quotes commas/quotes/newlines per field — no `format!`
+bypasses it; (2) every filename built by the six export commands in
+`commands/export.rs` (including the three new ones) routes through
+`sanitize_filename_component`; (3) `export_school_monthly_attendance_sf4`
+and `export_school_eosy_sf6` take no client-supplied section/school id
+at all — `school_id` comes only from
+`sessions.require_active_school_scope(&conn)` — and
+`export_section_eosy_sf5` is gated by the existing, already-reviewed
+`auth::authorize_adviser_of_section` before any data access. No
+BLOCKING issue found by this self-review.
+
+**Retained as independent-review debt, not closed**: a real
+non-self-review of this diff is still owed. Retry in a future session
+once the agent-resume/retrieval mechanism is confirmed reliably
+working again, per the project's standing instruction not to keep
+spending large amounts of context chasing a known-broken retrieval
+path.
+
+## Wave 3m reconciliation — no local Rust build/test/clippy — CLOSED (2026-09-01)
+
+**Closed for real this session** (not the GitHub-CI-will-confirm-it
+deferral originally recorded below): after merging PR #18 and #11, this
+session's sandbox unexpectedly had `pkg-config`-visible `glib-2.0` and a
+working `sudo -n apt-get install` path (no interactive prompt needed,
+unlike every prior session that hit this same blocker). Installed
+`libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev
+libssl-dev libayatana-appindicator3-dev librsvg2-dev` successfully,
+updated the toolchain via `rustup update stable` (1.94.1 → 1.98.0 — the
+workspace requires 1.95+), then ran, directly, on the merged code: `cargo
+build` (clean), `cargo test` (**629 lib tests + every integration test
+file, 0 failures**), `cargo clippy --all-targets -- -D warnings`
+(clean, zero warnings), `cargo fmt --check` (clean). This is a real,
+first-ever-in-this-project direct confirmation, not the hand-verification
+fallback used previously.
+
+Full context on the original blocker: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
+sandbox is missing the Tauri/GTK system libraries (`glib-2.0`, surfaced
+via `pkg-config` when `cargo build` runs) that
+`docs/adr/0041-minimal-ci-foundation.md`'s own Ubuntu CI job installs
+via `sudo apt-get install libwebkit2gtk-4.1-dev build-essential curl
+wget file libxdo-dev libssl-dev libayatana-appindicator3-dev
+librsvg2-dev`. That install needed interactive approval this
+unattended session could not obtain, so `cargo build`/`cargo test`/
+`cargo clippy --all-targets -- -D warnings`/`cargo fmt --check` (the
+last one alone succeeded, since it needs no compilation) could not be
+run against the reconciled Rust code (the new `export/{sf4,sf5,sf6}.rs`
+modules, the extended `commands/export.rs`, and `lib.rs`'s command
+registration).
+
+**Mitigation actually performed, not a substitute**: every non-trivial
+public type and function signature the ported Rust code calls
+(`repository::{attendance,school,section,section_advisory,
+section_membership,class_record,grading,grading_computation,role}`'s
+structs/functions, `auth::authorize_adviser_of_section`) was
+cross-checked by hand, field-by-field, against this repository's actual
+current source via direct `grep`/`Read` — not assumed correct from the
+source branch's own (differently-verified) claims.
+
+**Not yet done**: an actual `cargo build`/`cargo test`/`cargo clippy`
+run. Closed once either (a) the reconciliation PR's GitHub Actions
+Quality Gate (Ubuntu, GTK packages present) runs green, or (b) a future
+session with a working Rust toolchain runs the full `quality:full` gate
+and confirms it directly — whichever comes first. Do not claim this
+closed without one of those two actually happening. PR #18 merged
+2026-09-01 with Quality Gate and Security Gate both green on the exact
+head SHA — closing item (a): GitHub CI (Ubuntu, GTK packages present)
+confirmed the Rust build/test/clippy path for real.
+
+## Wave 3I: native Rust compile/test/clippy — CLOSED (2026-08-31, closed 2026-09-01)
+
+**Closed for real 2026-09-01**, after merging this PR: see the Wave 3m
+reconciliation entry above — the same session's direct `cargo
+build`/`cargo test`/`cargo clippy --all-targets -- -D warnings` run
+covered this wave's `auth::admin_reset_teacher_password` and migration
+24 code too (part of the same merged tree), all clean, 0 failures.
+
+Original blocker, for context: `cargo test`/`cargo clippy` could not run in this session's sandbox: no
 `sudo`/interactive-approval path to `apt-get install
 libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev` (the exact packages
 `.github/workflows/quality.yml` installs for CI), and `cargo build`

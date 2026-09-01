@@ -569,7 +569,7 @@ pub fn authorize_capability_with_actor(
     Ok((school_id, user_id))
 }
 
-/// Admin-Assisted Password Reset (Wave 3I, ADR-0057): a School Head sets
+/// Admin-Assisted Password Reset (Wave 3I, ADR-0061): a School Head sets
 /// a new password directly for a colleague in their own school,
 /// effective immediately. Deliberately reuses `ManageSchoolMembership`
 /// rather than a new `Capability` variant -- resetting a colleague's
@@ -1759,7 +1759,7 @@ mod tests {
         );
     }
 
-    // ---- Wave 3I: admin_reset_teacher_password (ADR-0057) ----
+    // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----
 
     fn setup_school_head_and_teacher(
         conn: &Connection,

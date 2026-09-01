@@ -27,7 +27,7 @@ export interface CurrentSession {
  * password reset) — not a general data-mutation audit trail. See
  * `docs/adr/0021-authentication-audit-log.md` for why this is scoped
  * narrower than "audit everything." `password_reset_by_admin` was added
- * in Wave 3I (ADR-0057) and is the only event type so far where the
+ * in Wave 3I (ADR-0061) and is the only event type so far where the
  * acting user and the event's subject genuinely differ — see
  * `AuditLogEntry.actorUserId`.
  */

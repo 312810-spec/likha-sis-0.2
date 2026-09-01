@@ -2809,13 +2809,38 @@ production use with real learner PII.
 migration/workflow/harness-metadata file touched — see
 `docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
 
+## Wave 3m Reconciliation (added 2026-09-01)
+
+Full record: `docs/adr/0060-wave-3m-reconciliation.md`. Two independent
+delivery lineages (`main`'s own harness-restoration line and a
+different coding agent's `antigravity/likha-sis-wave3m-*` product line)
+diverged from the same Wave 3E checkpoint and were reconciled by hand
+(not a blind merge — their independent Adviser View reimplementations
+conflict at the content level). **`main` kept its own Adviser View/
+Section Adviser Management implementation** (already reviewed,
+Playwright-verified, and free of a real `session_date <= as_of_date`
+regression the parallel Wave 3m version still carries) and **adopted
+Wave 3m's genuinely new work on top of it**: SF2/report-card class-
+adviser byline, School Form 5 Section Promotion (ADR-0057), School Form
+6 School Promotion Summary (ADR-0058), School Form 4 Monthly Attendance
+Consolidation (ADR-0059, backend/port-layer only — deliberately no UI
+trigger yet). `npm run quality` 777/777 vitest, typecheck/lint/format/
+architecture clean. `cargo build`/`cargo test`/`cargo clippy` could not
+run locally this session (missing Tauri/GTK system libraries,
+`sudo apt-get` install needed unavailable interactive approval) — every
+dependent Rust signature was instead hand-verified against the actual
+current repository source; this is disclosed verification debt
+(`docs/VERIFICATION-DEBT.md`), pending GitHub Actions CI confirmation.
+Merged as PR #18 (2026-09-01) after Quality Gate and Security Gate both
+confirmed green on the exact head SHA, zero open review threads.
+
 ## Wave 3I — Admin-Assisted Password Reset (added 2026-08-31)
 
 Implementation wave, run from GitHub issue #9 (a delivery-retry of an
 earlier same-issue run whose ephemeral session produced no durable
 artifact). Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c`
 (confirmed exactly the issue's expected checkpoint). Full record:
-`docs/adr/0057-admin-assisted-password-reset.md`;
+`docs/adr/0061-admin-assisted-password-reset.md`;
 `docs/CURRENT-HANDOFF.md`'s new top entry.
 
 Closes the gap Wave 3H's survey identified: a teacher who forgets their

@@ -5,7 +5,7 @@ import type { SchoolMember } from "../domain/school-member";
 
 /** `listMembers` takes no input to validate, matching every other
  * same-school reference-data read in this codebase. `resetPassword`
- * (Wave 3I, ADR-0057) validates shape/length only -- the same
+ * (Wave 3I, ADR-0061) validates shape/length only -- the same
  * `MIN_PASSWORD_LENGTH` floor `UserApplicationService`/
  * `SetupApplicationService` already share, a UX convenience only; the
  * backend stays authoritative on who is allowed to call this at all. */

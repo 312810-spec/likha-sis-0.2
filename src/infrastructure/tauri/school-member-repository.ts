@@ -3,7 +3,7 @@ import type { SchoolMember } from "../../domain/school-member";
 import { invoke } from "./invoke";
 
 /** Tauri adapter for `list_school_members` (Wave 2Y) and
- * `admin_reset_teacher_password` (Wave 3I, ADR-0057). */
+ * `admin_reset_teacher_password` (Wave 3I, ADR-0061). */
 export class TauriSchoolMemberRepository implements SchoolMemberRepository {
   listMembers(): Promise<SchoolMember[]> {
     return invoke<SchoolMember[]>("list_school_members");

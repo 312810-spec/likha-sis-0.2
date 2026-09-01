@@ -1,4 +1,4 @@
-# ADR-0057: Admin-Assisted Password Reset (Wave 3I)
+# ADR-0061: Admin-Assisted Password Reset (Wave 3I)
 
 Status: Accepted
 

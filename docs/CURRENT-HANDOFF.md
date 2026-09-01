@@ -1,5 +1,106 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Merge PR #18 and PR #11, real Rust verification, complete)
+
+User-directed: merge both green PRs, resolve any conflicts, continue
+waves after. **PR #18 merged clean** (no conflicts). **PR #11 hit a
+real merge conflict** against the new `main` (both branches had prepended
+entries to the same four project-state docs): resolved by hand,
+preserving both PRs' entries in chronological order (newest first) in
+`CURRENT-HANDOFF.md`, `ACTIVE-PLAN.md`, `PROJECT-MEMORY.md`,
+`VERIFICATION-DEBT.md` — nothing dropped. Also found and fixed a real
+**ADR-number collision**: PR #11's `docs/adr/0057-admin-assisted-password-reset.md`
+collided with PR #18's already-merged `docs/adr/0057-sf5-promotion-foundation.md`.
+Renamed PR #11's ADR to `0061-admin-assisted-password-reset.md` and
+updated every reference to it (`src-tauri/src/{auth/mod.rs,db/migrations.rs}`,
+`src/{domain/session.ts,domain/ports/school-member-repository.ts,
+application/school-member-service.ts,infrastructure/tauri/school-member-repository.ts,
+ui/AdminPasswordResetScreen.tsx}`, and the three docs above).
+
+**Real Rust verification finally ran, for the first time this
+project's history** — this sandbox unexpectedly had a working
+`sudo -n apt-get install` path (no interactive prompt, unlike every
+prior session): installed the GTK/WebKit system packages, ran `rustup
+update stable` (1.94.1 → 1.98.0, the workspace needs 1.95+), then
+directly ran `cargo build` (clean), `cargo test` (629 lib tests + every
+integration test file, **0 failures**), `cargo clippy --all-targets --
+-D warnings` (**0 warnings**), `cargo fmt --check` (clean) against the
+fully-merged tree (Wave 3m reconciliation + Wave 3I password reset
+together). This closes the `docs/VERIFICATION-DEBT.md` entries both
+PRs had recorded for "no local Rust build" — see the updated entries
+there. `npm run quality` (791 tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), and `git diff --check` all also re-ran clean on the merged
+tree.
+
+Pushed the conflict-resolution commit to `claude/issue-9-20260831-1305`
+(PR #11's branch); next action is merging PR #11 once GitHub's own CI
+re-confirms green on the new head, then continuing autonomous wave
+development per the user's standing instruction.
+
+## Active Task (2026-09-01, this session — Wave 3m Reconciliation, complete)
+
+From GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full
+record: `docs/adr/0060-wave-3m-reconciliation.md`.
+
+**Repository truth at trigger time**: `main` at `fd437e5` (Wave 3H +
+the ChatGPT/Codex-automation-switch-and-restore saga, `41e1af9`/
+`fd437e5`); `antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation`
+(a different coding agent's independent lineage) at `35ed7f0`, 12
+commits ahead of and 21 commits behind `main`, both diverged from the
+same Wave 3E checkpoint (`4de3973`).
+
+**What happened**: both lineages had independently rebuilt Adviser View
+(Wave 3F) and Section Adviser Management UI (Wave 3G) from that same
+starting point, then diverged — `main` into harness restoration, Wave
+3m into SF2 class-adviser-byline integration → SF5 (School Form 5,
+Report on Promotion and Level of Proficiency) → SF6 (School Form 6,
+Summarized Promotion Report) → SF4 (School Form 4, Monthly Attendance
+Consolidation). A blind merge was rejected (the two lineages' Adviser
+View reimplementations conflict at the content level, not just the
+line level). Instead, every changed file was classified and
+reconciled by hand — see the ADR for the full file-by-file record.
+
+**Decision**: kept `main`'s own Adviser View/Section Adviser
+Management implementation (already reviewed, already Playwright-
+verified, and free of a real regression Wave 3m's parallel version
+still carries — see the ADR's "Investigation"/"Decision" sections for
+the concrete evidence). Brought forward everything Wave 3m built that
+`main` didn't already have: the SF2/report-card adviser byline, SF5
+(ADR-0057), SF6 (ADR-0058), and SF4 (ADR-0059) — all layered onto
+`main`'s existing, unmodified Section Advisory foundation (ADR-0056),
+not a parallel copy of it.
+
+**Verification actually run this session**: `npm run quality` —
+typecheck/lint/format/`check:architecture`/vitest all clean, **777/777
+tests passing**. `cargo fmt --check` clean (one pure-whitespace `cargo
+fmt` pass reconciled the two lineages' formatting). `git diff --check`
+clean. `cargo build`/`cargo test`/`cargo clippy` **could not run** —
+this sandbox is missing the Tauri/GTK system libraries
+(`glib-2.0`) `docs/adr/0041-minimal-ci-foundation.md`'s own CI job
+installs via `sudo apt-get`, and installing them here needed
+interactive approval unavailable in this unattended session. Every
+non-trivial Rust type/function signature the ported code depends on
+was instead hand-verified against this repository's actual current
+source (not the source branch's possibly-stale version) — see the ADR
+for the full list checked. This is real, disclosed verification debt
+(`docs/VERIFICATION-DEBT.md`), not a claimed pass.
+
+**Gate decision**: reconciliation is complete and locally green on
+every check this sandbox can run. Merged as PR #18 (2026-09-01) after
+Quality Gate and Security Gate both confirmed green on the exact head
+SHA, with zero open review threads.
+
+**Recommended next slice (not started)**: SF4 shipped with no UI
+trigger (deliberately, matching this project's zero-UI-first
+precedent — see ADR-0059). The natural next slice is wiring an
+"Export SF4" action into `MonthlySummaryScreen.tsx` (the same
+school-wide, month-scoped screen that already triggers the SF2
+export), giving School Heads a School Form 4 button next to the
+section-level SF2 one. Runner-up: closing the still-open Wave
+2Z-3H-era review/verification debt items already recorded further down
+this file, none of which this reconciliation touched.
+
 ## Active Task (2026-08-31, this session — Wave 3I: Admin-Assisted Password Reset, complete)
 
 Implementation wave, run from GitHub issue #9 (a delivery-retry of an
@@ -9,12 +110,12 @@ and re-verified from scratch here, not merely re-pushed). Branch
 `claude/issue-9-20260831-1305`, starting `HEAD` `fa8d21c` (confirmed
 exactly the issue's expected checkpoint). `main` not fetched/switched/
 merged/modified. Full scope contract: `docs/product/WAVE-3H-DECISION.md`'s
-Wave 3I section. Full decision record: `docs/adr/0057-admin-assisted-password-reset.md`.
+Wave 3I section. Full decision record: `docs/adr/0061-admin-assisted-password-reset.md`.
 
 **What shipped**: `admin_reset_teacher_password` (Rust command,
 `src-tauri/src/commands/user.rs`) lets a School Head set a new password
 directly for a colleague in their own school, effective immediately —
-the Recommended mechanism from ADR-0057's 10-scenario decision process
+the Recommended mechanism from ADR-0061's 10-scenario decision process
 (Next Best, explicitly deferred not rejected: a system-generated
 temporary password with forced change at next login). Gated by the
 existing `Capability::ManageSchoolMembership` (no new capability
