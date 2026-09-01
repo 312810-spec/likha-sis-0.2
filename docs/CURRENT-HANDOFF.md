@@ -1,5 +1,45 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Self-disabling-button focus-loss fix, complete)
+
+User-directed continuation. Picked up the app-wide debt flagged by the
+UX-03 accessibility review retry (`docs/VERIFICATION-DEBT.md`):
+buttons that use the native `disabled` attribute to block
+double-submission blur to `<body>` the instant they're clicked, since
+the focused element itself becomes unfocusable mid-interaction.
+
+**Scoped deliberately, not a mechanical app-wide sweep**: fixed the
+three specific instances the reviews this session actually re-confirmed
+present — `AttendanceScreen.tsx`'s "Mark all present" button and
+`MonthlySummaryScreen.tsx`'s "Export SF2"/"Export SF4" buttons.
+Pattern: `disabled={cond}` → `aria-disabled={cond}` (keeps the button
+focusable/tabbable) + an early-return guard for the same condition
+inside the handler itself (`aria-disabled` doesn't block clicks at the
+DOM level, so the handler has to). Added a matching
+`button[aria-disabled="true"]` CSS rule mirroring the existing
+`button:disabled` visual treatment (cursor + opacity), so nothing looks
+different to a sighted user. Other screens sharing this same
+`disabled={...}` pattern (`LearnerListScreen`, `SubjectAttendanceScreen`,
+etc.) are **not** touched — that's a much larger sweep, left as its own
+future slice, not expanded into here.
+
+Two existing tests that asserted `.toBeDisabled()` on the changed
+buttons were updated to assert `aria-disabled="true"` instead. Two new
+tests added — one per changed screen — that actually click the
+aria-disabled button and assert the underlying repository call did
+**not** fire, proving the handler-level guard works, not just that the
+button looks disabled.
+
+**Verified this wave**: `npm run quality` — 796/796 tests (2 new),
+typecheck/lint/format/architecture clean. `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s app-wide self-disabling-button entry
+updated: these three instances closed; the broader app-wide sweep
+(remaining screens) stays open, now with the concrete pattern already
+proven here to follow.
+
 ## Active Task (2026-09-01, this session — UX-02/UX-03 independent review retry, complete)
 
 Dispatched fresh reviews against the two remaining long-open

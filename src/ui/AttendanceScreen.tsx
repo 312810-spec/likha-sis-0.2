@@ -221,6 +221,7 @@ export function AttendanceScreen({
   }
 
   async function handleMarkAllPresent() {
+    if (bulkMarking || roster.every((entry) => entry.status !== null)) return;
     setRosterError(null);
     setConfirmation(null);
     setBulkMarking(true);
@@ -370,7 +371,7 @@ export function AttendanceScreen({
               <button
                 type="button"
                 className="button-primary"
-                disabled={bulkMarking || roster.every((entry) => entry.status !== null)}
+                aria-disabled={bulkMarking || roster.every((entry) => entry.status !== null)}
                 onClick={handleMarkAllPresent}
               >
                 {bulkMarking ? "Marking…" : "Mark all present"}
