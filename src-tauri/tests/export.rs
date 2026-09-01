@@ -437,14 +437,7 @@ fn sf5_authorization_uses_the_schools_actual_last_grading_period_date() {
 
     let adviser = user::create_user(&conn, "adviser.actual", "pw", "Actual Adviser").unwrap();
     user::add_school_membership(&conn, &adviser.id, &school.id).unwrap();
-    section_advisory::assign(
-        &conn,
-        &school.id,
-        &section.id,
-        &adviser.id,
-        "2026-07-01",
-    )
-    .unwrap();
+    section_advisory::assign(&conn, &school.id, &section.id, &adviser.id, "2026-07-01").unwrap();
 
     let sessions = SessionManager::new();
     auth::login(&conn, &sessions, "adviser.actual", "pw", &school.id).unwrap();
@@ -736,8 +729,7 @@ fn export_sf4_as_current_session(
     let mut section_summaries = Vec::new();
 
     for sec in sections {
-        let report =
-            attendance::monthly_grid_for_section(conn, &school_id, &sec.id, year, month)?;
+        let report = attendance::monthly_grid_for_section(conn, &school_id, &sec.id, year, month)?;
         let adviser =
             section_advisory::current_adviser_for_section(conn, &school_id, &sec.id, &as_of_date)?;
         let adviser_name = if let Some(adv) = adviser {
@@ -877,14 +869,8 @@ fn sf4_export_school_wide_consolidation_and_isolation() {
 
     section_membership::enroll(&conn, &s1.id, &sec1.id, &l1.id, "2026-09-01").unwrap();
     section_membership::enroll(&conn, &s1.id, &sec2.id, &l2.id, "2026-09-01").unwrap();
-    section_membership::enroll(
-        &conn,
-        &s2.id,
-        &sec_foreign.id,
-        &l_foreign.id,
-        "2026-09-01",
-    )
-    .unwrap();
+    section_membership::enroll(&conn, &s2.id, &sec_foreign.id, &l_foreign.id, "2026-09-01")
+        .unwrap();
 
     // Mark attendance for September 2026 (e.g. 2026-09-01 is Tuesday)
     attendance::record(

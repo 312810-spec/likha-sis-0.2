@@ -634,8 +634,7 @@ pub fn export_school_monthly_attendance_sf4(
     let mut section_summaries = Vec::new();
 
     for sec in sections {
-        let report =
-            attendance::monthly_grid_for_section(&conn, &school_id, &sec.id, year, month)?;
+        let report = attendance::monthly_grid_for_section(&conn, &school_id, &sec.id, year, month)?;
         let adviser =
             section_advisory::current_adviser_for_section(&conn, &school_id, &sec.id, &as_of_date)?;
         let adviser_name = if let Some(adv) = adviser {

@@ -285,7 +285,9 @@ mod tests {
 
         assert!(export.csv.contains("Mabini Central Elementary School"));
         assert!(export.csv.contains("September 2026"));
-        assert!(export.csv.contains("SCHOOL GRAND TOTAL,,,0,0,0,0.00,0.00,0.00,0.00%,0.00%,0.00%"));
+        assert!(export
+            .csv
+            .contains("SCHOOL GRAND TOTAL,,,0,0,0,0.00,0.00,0.00,0.00%,0.00%,0.00%"));
         assert_eq!(export.disclosure.populated_fields.len(), 8);
         assert_eq!(export.disclosure.omitted_fields.len(), 3);
     }
@@ -312,8 +314,12 @@ mod tests {
         let export = build_sf4_export(&school, 2026, 9, &sections);
         assert!(export.csv.contains("Grade 7 - Rizal"));
         assert!(export.csv.contains("Juan Dela Cruz"));
-        assert!(export.csv.contains("SUBTOTAL (Grade 7),,,10,10,20,9.50,9.00,18.50,95.00%,90.00%,92.50%"));
-        assert!(export.csv.contains("SCHOOL GRAND TOTAL,,,10,10,20,9.50,9.00,18.50,95.00%,90.00%,92.50%"));
+        assert!(export
+            .csv
+            .contains("SUBTOTAL (Grade 7),,,10,10,20,9.50,9.00,18.50,95.00%,90.00%,92.50%"));
+        assert!(export
+            .csv
+            .contains("SCHOOL GRAND TOTAL,,,10,10,20,9.50,9.00,18.50,95.00%,90.00%,92.50%"));
     }
 
     #[test]
@@ -370,12 +376,18 @@ mod tests {
         let export = build_sf4_export(&school, 2026, 10, &sections);
         assert!(export.csv.contains("October 2026"));
         // Grade 7 subtotal: 20 M, 20 F, 40 Total; daily avg: 18 M, 18 F, 36 Total -> (18/20)*100 = 90%
-        assert!(export.csv.contains("SUBTOTAL (Grade 7),,,20,20,40,18.00,18.00,36.00,90.00%,90.00%,90.00%"));
+        assert!(export
+            .csv
+            .contains("SUBTOTAL (Grade 7),,,20,20,40,18.00,18.00,36.00,90.00%,90.00%,90.00%"));
         // Grade 8 subtotal: 15 M, 15 F, 30 Total; daily avg: 15 M, 12 F, 27 Total -> 100%, 80%, 90%
-        assert!(export.csv.contains("SUBTOTAL (Grade 8),,,15,15,30,15.00,12.00,27.00,100.00%,80.00%,90.00%"));
+        assert!(export
+            .csv
+            .contains("SUBTOTAL (Grade 8),,,15,15,30,15.00,12.00,27.00,100.00%,80.00%,90.00%"));
         // Grand Total: 35 M, 35 F, 70 Total; daily avg: 33 M, 30 F, 63 Total
         // Pct: (33/35)*100 = 94.29%, (30/35)*100 = 85.71%, (63/70)*100 = 90.00%
-        assert!(export.csv.contains("SCHOOL GRAND TOTAL,,,35,35,70,33.00,30.00,63.00,94.29%,85.71%,90.00%"));
+        assert!(export
+            .csv
+            .contains("SCHOOL GRAND TOTAL,,,35,35,70,33.00,30.00,63.00,94.29%,85.71%,90.00%"));
     }
 
     #[test]
