@@ -2906,21 +2906,34 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## App-wide: self-disabling buttons lose focus to `<body>` on click (open)
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
 
 Found by the UX-03 `accessibility-reviewer` retry (2026-09-01): buttons
 that use the native `disabled` attribute to prevent double-submission
-(e.g. `AttendanceScreen.tsx:373`, `MonthlySummaryScreen.tsx:326,353`)
 synchronously blur to `<body>` the instant they're clicked, since the
-element with focus is disabled mid-interaction. Confirmed **pre-existing
-and shared across `LearnerListScreen.tsx`, `SubjectAttendanceScreen.tsx`,
-and likely every other "disable while saving" button in this codebase**
-— not introduced by UX-03's own changes, and not fixed as part of that
-review's own scope. Fixing it properly means an app-wide pattern change
-(`aria-disabled` + a click-guard, or explicit focus restoration on state
-change) across many screens at once — a real, scoped slice of its own,
-not a one-file tweak. Revisit when a UI-polish wave has room for an
-app-wide sweep; low severity, not blocking.
+element with focus is disabled mid-interaction.
+
+**Fixed this session**: `AttendanceScreen.tsx`'s "Mark all present"
+button and `MonthlySummaryScreen.tsx`'s "Export SF2"/"Export SF4"
+buttons — the three instances the review actually re-confirmed
+present. Pattern used (now the reference for the rest): `disabled=` →
+`aria-disabled=` (keeps the button focusable) + an early-return guard
+for the same condition inside the handler (aria-disabled doesn't block
+clicks at the DOM level). Matching CSS
+(`button[aria-disabled="true"]`) mirrors `button:disabled`'s visual
+treatment. Proven with a real interaction test per screen — clicking
+the aria-disabled button and asserting the underlying call did not
+fire — not just a static attribute assertion.
+
+**Still open, deliberately not swept in this same pass**: confirmed
+**shared across `LearnerListScreen.tsx`, `SubjectAttendanceScreen.tsx`,
+and likely every other "disable while saving" button in this
+codebase**. Applying the now-proven pattern to the remaining screens is
+its own scoped slice — a mechanical sweep across many files, not a
+one-file tweak — deliberately not done in the same pass as the first
+three instances to keep this change reviewable. Low severity, not
+blocking. Revisit as its own slice; the fix shape is settled, just not
+yet applied everywhere.
 
 ## App-wide: export results show a raw file path with no reveal/open affordance (open)
 

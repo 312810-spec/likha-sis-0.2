@@ -406,7 +406,24 @@ describe("MonthlySummaryScreen", () => {
     renderScreen();
     await screen.findByText("No learners enrolled in this section yet.");
 
-    expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("does not export when clicking Export SF2 while it is aria-disabled", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await screen.findByText("No learners enrolled in this section yet.");
+
+    // aria-disabled (not the native disabled attribute) keeps the button
+    // clickable at the DOM level -- the guard inside the handler is what
+    // actually blocks the export. This proves that guard works, not just
+    // that the button looks disabled.
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+
+    expect(exportRepo.calls).toEqual([]);
   });
 
   it("never shows a previous section's report after switching to a section whose load fails", async () => {

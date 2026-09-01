@@ -193,6 +193,7 @@ export function MonthlySummaryScreen({
   }
 
   async function handleExportSf2() {
+    if (exporting || loading || !report || report.learners.length === 0) return;
     const requestId = ++exportRequestRef.current;
     setExportError(null);
     setExporting(true);
@@ -218,6 +219,7 @@ export function MonthlySummaryScreen({
   }
 
   async function handleExportSf4() {
+    if (exportingSf4) return;
     const requestId = ++exportSf4RequestRef.current;
     setExportSf4Error(null);
     setExportingSf4(true);
@@ -323,7 +325,7 @@ export function MonthlySummaryScreen({
           <button
             type="button"
             className="button-primary"
-            disabled={exporting || loading || !report || report.learners.length === 0}
+            aria-disabled={exporting || loading || !report || report.learners.length === 0}
             onClick={handleExportSf2}
           >
             {exporting ? "Exporting…" : "Export SF2 (CSV)"}
@@ -350,7 +352,7 @@ export function MonthlySummaryScreen({
             </Alert>
           )}
 
-          <button type="button" disabled={exportingSf4} onClick={handleExportSf4}>
+          <button type="button" aria-disabled={exportingSf4} onClick={handleExportSf4}>
             {exportingSf4 ? "Exporting…" : "Export SF4 (CSV, whole school)"}
           </button>
 
