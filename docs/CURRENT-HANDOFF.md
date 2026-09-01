@@ -1,5 +1,30 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3H: Section Advisory Form Header Integration, COMPLETE)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3H addendum;
+`docs/PROJECT-MEMORY.md` Wave 3H entry; `docs/VERIFICATION-DEBT.md` Wave 3H entry.
+**New dedicated branch** `antigravity/likha-sis-wave3h-section-advisory-export-integration`, created
+from `antigravity/likha-sis-wave3g-section-advisory-ui` at `0f0d2c3`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: Section Advisory Form Header Integration. Connects the temporal `section_advisories`
+foundation established in Wave 3E/3G into existing DepEd export pipelines (`export::sf2` and `export::report_card` / SF9),
+populating the official "Class Adviser" header row dynamically using temporal resolution as of the export date,
+and updating `FieldDisclosure` disclosures accordingly.
+
+**What shipped**:
+
+- `src-tauri/src/export/sf2.rs`: Added `adviser_name: Option<&str>` parameter to `build_sf2_export`, rendered `"Class Adviser"` header row, updated `FieldDisclosure` (added `"Class Adviser (if assigned)"` to `populated_fields`, documented unassigned scenario in `omitted_fields`), updated unit tests.
+- `src-tauri/src/export/report_card.rs`: Added `adviser_name: Option<&str>` parameter to `build_report_card_export`, rendered `"Class Adviser"` header row, updated `FieldDisclosure`, updated unit tests.
+- `src-tauri/src/commands/export.rs`: Updated `export_section_monthly_sf2` and `export_class_record_report_card` commands to query `section_advisory::current_adviser_for_section`, resolve user display name via `user::find_by_id`, and supply adviser name to builders.
+- `src-tauri/tests/export.rs`: Added integration tests verifying assigned adviser name rendering and clean blank string for unassigned adviser.
+
+**Verification**:
+
+- `npm run quality:full` clean (Vitest 750/750 across 78 files, cargo test 604 lib tests + 11 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-09-01 — Wave 3G: Section Advisory Management UI, COMPLETE)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3G addendum;

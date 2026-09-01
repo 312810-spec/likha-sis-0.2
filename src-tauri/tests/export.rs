@@ -13,7 +13,9 @@ use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::export::learner_roster::{self, LearnerRosterExport};
 use app_lib::export::sf2::{self, Sf2Export};
-use app_lib::repository::{attendance, learner, school, section, section_membership, user};
+use app_lib::repository::{
+    attendance, learner, school, section, section_advisory, section_membership, user,
+};
 
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
@@ -49,7 +51,27 @@ fn export_as_current_session(
     };
     let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
 
-    Ok(Some(sf2::build_sf2_export(&school, &section, &report)))
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+    let adviser =
+        section_advisory::current_adviser_for_section(conn, &school_id, section_id, &as_of_date)?;
+    let adviser_name = if let Some(adv) = adviser {
+        user::find_by_id(conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+    } else {
+        None
+    };
+
+    Ok(Some(sf2::build_sf2_export(
+        &school,
+        &section,
+        adviser_name.as_deref(),
+        &report,
+    )))
 }
 
 /// Standing in for the non-I/O portion of `commands::export::export_learner_roster`.
@@ -93,6 +115,34 @@ fn a_teacher_can_export_their_own_sections_monthly_sf2() {
 
     assert!(export.csv.contains("Section,Mabini"));
     assert!(export.csv.contains("Juan"));
+}
+
+#[test]
+fn sf2_export_renders_assigned_adviser_name() {
+    let conn = open_test_db();
+    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let adviser = user::create_user(&conn, "adviser.a", "password", "Maria Clara").unwrap();
+    user::add_school_membership(&conn, &adviser.id, &school_id).unwrap();
+    section_advisory::assign(&conn, &school_id, &section_id, &adviser.id, "2026-06-01").unwrap();
+
+    let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("Class Adviser,Maria Clara"));
+}
+
+#[test]
+fn sf2_export_renders_blank_for_unassigned_adviser() {
+    let conn = open_test_db();
+    let (_school_id, section_id, sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+
+    let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("Class Adviser,"));
 }
 
 #[test]

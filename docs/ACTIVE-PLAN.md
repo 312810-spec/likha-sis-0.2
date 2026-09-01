@@ -1,5 +1,27 @@
 # ACTIVE PLAN
 
+## Wave 3H: Section Advisory Form Header Integration (added 2026-09-01) — complete
+
+Full record: `docs/adr/0056-*` Wave 3H addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3H entry;
+`docs/VERIFICATION-DEBT.md` Wave 3H entry. **New branch**
+`antigravity/likha-sis-wave3h-section-advisory-export-integration`, created from `0f0d2c3` (Wave
+3G's checkpoint).
+
+**Scope**: Integration of section advisory lookup into `sf2` and `report_card` (SF9) CSV exports.
+Dynamically resolves the active class adviser name as of the export period and populates the
+"Class Adviser" header row, updating `FieldDisclosure` metadata.
+
+**Built**:
+
+- `src-tauri/src/export/sf2.rs`: Updated `build_sf2_export` and `disclosure` to support adviser name parameter.
+- `src-tauri/src/export/report_card.rs`: Updated `build_report_card_export` and `disclosure` to support adviser name parameter.
+- `src-tauri/src/commands/export.rs`: Queried `section_advisory` and `user` repositories to resolve adviser `display_name` in `export_section_monthly_sf2` and `export_class_record_report_card`.
+- `src-tauri/tests/export.rs`: Added integration test coverage for assigned and unassigned adviser exports.
+
+**Verification**: `cargo test` 604 lib tests + 11 integration test binaries clean;
+`npm run quality:full` clean; `npm run build`, `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3G: Section Advisory Management UI (added 2026-09-01) — complete
 
 Full record: `docs/adr/0056-*` Wave 3G addendum; `docs/CURRENT-HANDOFF.md`

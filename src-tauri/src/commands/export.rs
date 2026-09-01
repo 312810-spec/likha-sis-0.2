@@ -13,7 +13,8 @@ use crate::export::sanitize_filename_component;
 use crate::export::sf2;
 use crate::export::FieldDisclosure;
 use crate::repository::{
-    attendance, class_record, grading_computation, learner, school, section, section_membership,
+    attendance, class_record, grading_computation, learner, school, section, section_advisory,
+    section_membership, user,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -52,7 +53,22 @@ pub fn export_section_monthly_sf2(
     };
     let report = attendance::monthly_grid_for_section(&conn, &school_id, &section_id, year, month)?;
 
-    let export = sf2::build_sf2_export(&school, &section, &report);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+    let adviser =
+        section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &as_of_date)?;
+    let adviser_name = if let Some(adv) = adviser {
+        user::find_by_id(&conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+    } else {
+        None
+    };
+
+    let export = sf2::build_sf2_export(&school, &section, adviser_name.as_deref(), &report);
 
     let export_dir = app
         .path()
@@ -140,7 +156,16 @@ pub fn export_class_record_report_card(
         });
     }
 
-    let export = report_card::build_report_card_export(&school, &detail, &rows);
+    let adviser =
+        section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &ends_on)?;
+    let adviser_name = if let Some(adv) = adviser {
+        user::find_by_id(&conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+    } else {
+        None
+    };
+
+    let export =
+        report_card::build_report_card_export(&school, &detail, adviser_name.as_deref(), &rows);
 
     let export_dir = app
         .path()

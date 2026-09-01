@@ -257,3 +257,23 @@ Wave 3E established the backend foundation (`section_advisories` table, `assign_
    - Wired `sectionAdvisoryService` in `src/composition.ts` and `src/App.tsx`.
    - Enhanced `SectionsScreen.tsx` to display active section advisers on each section row, provide an accessible inline "Manage adviser" panel to assign (teacher dropdown filtered by teacher role, start date) or end an advisory (effective end date), handle all outcomes and permissions, and provide Guided mode guidance.
    - Comprehensive test suite in `src/ui/SectionsScreen.test.tsx` verifying display, assign, end, validation, permissions, and axe-core accessibility.
+
+## Wave 3H Addendum: Section Advisory Form Header Integration (2026-09-01)
+
+Status: Accepted / Shipped
+
+### Context & Need
+
+With section advisory management established in Waves 3E and 3G, official DepEd form exports (such as School Form 2 Monthly Attendance and School Form 9 Report Card) required the assigned Class Adviser name in their official header metadata. Prior to this wave, adviser headers were either blank or omitted from disclosures.
+
+### Decision & Implementation
+
+1. **Export Engine Update**:
+   - `src-tauri/src/export/sf2.rs`: Updated `build_sf2_export` signature to accept `adviser_name: Option<&str>`. Added `"Class Adviser"` header row (`adviser_name.unwrap_or("")`). Added `"Class Adviser (if assigned)"` to `populated_fields` in `FieldDisclosure` and added explicit note for unassigned adviser in `omitted_fields`. Added unit tests for assigned and unassigned adviser scenarios.
+   - `src-tauri/src/export/report_card.rs`: Updated `build_report_card_export` signature to accept `adviser_name: Option<&str>`. Added `"Class Adviser"` header row, updated `FieldDisclosure`, and added unit tests.
+2. **Command Layer Integration**:
+   - `src-tauri/src/commands/export.rs`: Updated `export_section_monthly_sf2` to resolve the month-end date and query `section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &as_of_date)`, resolving teacher display name via `user::find_by_id(&conn, &advisory.teacher_user_id)` and passing it to `build_sf2_export`.
+   - Updated `export_class_record_report_card` to resolve `ends_on` of the grading period and perform the same temporal adviser lookup, passing the adviser name to `build_report_card_export`.
+3. **Verification**:
+   - Integration tests in `src-tauri/tests/export.rs` testing assigned and unassigned adviser rendering against real database sessions and exported CSV content.
+   - All quality gates, cargo tests, clippy, fmt, and harness verify 100/100 pass cleanly.

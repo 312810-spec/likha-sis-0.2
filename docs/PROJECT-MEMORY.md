@@ -2729,6 +2729,21 @@ Full record: `docs/adr/0056-*` Wave 3G addendum;
   `npm run quality:full` clean; `npm run build`, `check:dev-preview-isolation`,
   `check:deadcode`, `quality:security`, `harness:verify` (100/100 certified) all clean.
 
+## Wave 3H — Section Advisory Form Header Integration (added 2026-09-01)
+
+Full record: `docs/adr/0056-*` Wave 3H addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3H entry. **New branch**
+`antigravity/likha-sis-wave3h-section-advisory-export-integration`, created from `0f0d2c3` (Wave
+3G's checkpoint).
+
+- **Built**: Connected section advisory temporal resolution to `export::sf2` and `export::report_card` (SF9).
+  Added dynamic `"Class Adviser"` CSV header row and updated `FieldDisclosure` disclosures in both export builders.
+  Updated `export_section_monthly_sf2` and `export_class_record_report_card` commands to query `section_advisory::current_adviser_for_section`
+  and resolve the teacher's `display_name` via `user::find_by_id`.
+- **Verification/checkpoint**: `cargo test` 604 lib tests (+2) + 11 integration test binaries green (+2 integration tests);
+  `npm run quality:full` clean (750/750 vitest, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

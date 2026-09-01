@@ -1,5 +1,14 @@
 # Verification Debt
 
+## Wave 3H — Section Advisory Form Header Integration (2026-09-01)
+
+Full record: `docs/adr/0056-*` Wave 3H addendum; `docs/PROJECT-MEMORY.md`
+Wave 3H entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **None.** The changes are purely backend export formatting and command layer resolution covered by unit tests in `src/export/sf2.rs`, `src/export/report_card.rs`, and integration tests in `tests/export.rs`. No new UI or dependencies were added.
+
 ## Wave 3G — Section Advisory Management UI (2026-09-01)
 
 Full record: `docs/adr/0056-*` Wave 3G addendum; `docs/PROJECT-MEMORY.md`
