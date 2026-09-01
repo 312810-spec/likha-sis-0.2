@@ -279,7 +279,18 @@ pub fn export_section_eosy_sf5(
 ) -> AppResult<Option<Sf5ExportResult>> {
     let conn = lock_db(&db);
 
-    let periods = grading::list_by_school_year(&conn, "", &school_year).unwrap_or_default();
+    // Session-derived only, never client-supplied -- used here purely to
+    // compute a correct `as_of_date` fallback before the real authorization
+    // check below (which independently re-derives and re-verifies
+    // school_id/section ownership; this lookup grants nothing on its own).
+    // A prior version of this query passed an empty-string school_id here,
+    // which `grading::list_by_school_year`'s exact-match `WHERE` clause can
+    // never match -- `periods` was silently always empty, so `as_of_date`
+    // silently always took the year-boundary fallback below instead of the
+    // real last grading period's end date.
+    let session_school_id = sessions.require_active_school_scope(&conn)?;
+    let periods =
+        grading::list_by_school_year(&conn, &session_school_id, &school_year).unwrap_or_default();
     let as_of_date = if let Some(last_period) = periods.last() {
         last_period.ends_on.clone()
     } else {

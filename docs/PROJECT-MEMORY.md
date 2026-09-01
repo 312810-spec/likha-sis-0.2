@@ -2819,9 +2819,14 @@ section's report (SF4 is school-wide, not section-scoped) — only a
 valid month gates it. `npm run quality` 794/794 (3 new tests), build,
 `check:dev-preview-isolation`, `harness:verify` 100/100, `git diff
 --check` all clean. No Rust files touched — pure TS/UI change against
-an already-CI-verified Rust command. SF5/SF6 UI triggers remain
-deliberately unwired (ADR-0059's zero-UI-first precedent), not part of
-this slice.
+an already-CI-verified Rust command. **Self-correction, same session**:
+this entry originally (and PR #19's body) wrongly claimed SF5/SF6 UI
+triggers were "deliberately unwired" per ADR-0059 — that ADR's "no UI"
+claim was only ever about SF4. SF5 (`SectionRosterScreen.tsx`) and SF6
+(`SectionsScreen.tsx`) already shipped real UI during the Wave 3m
+reconciliation (ADR-0057/0058's own "Addendum" sections); only their
+dev-preview fixture demo stub was unwired. See
+`docs/CURRENT-HANDOFF.md`'s top entry for the full correction.
 
 ## Wave 3m Reconciliation (added 2026-09-01)
 

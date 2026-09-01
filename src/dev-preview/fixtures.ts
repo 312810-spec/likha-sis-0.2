@@ -423,14 +423,29 @@ export class FixtureExportRepository implements ExportRepository {
     };
   }
 
-  async exportSectionEosySf5(): Promise<import("../domain/export").Sf5ExportResult | null> {
-    throw new Error(
-      "dev-preview fixture: exportSectionEosySf5() is not wired -- read-only fixture",
-    );
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<import("../domain/export").Sf5ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF5_${sectionId}_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Final grades and promotion decisions"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+      },
+    };
   }
 
-  async exportSchoolEosySf6(): Promise<import("../domain/export").Sf6ExportResult | null> {
-    throw new Error("dev-preview fixture: exportSchoolEosySf6() is not wired -- read-only fixture");
+  async exportSchoolEosySf6(
+    schoolYear: string,
+  ): Promise<import("../domain/export").Sf6ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "School-wide promotion summary"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+      },
+    };
   }
 
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
