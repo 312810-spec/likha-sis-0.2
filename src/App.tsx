@@ -201,6 +201,7 @@ function App() {
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
+                exportService={exportService}
                 onOpenRoster={(sectionId) => {
                   setRosterSectionId(sectionId);
                   setActiveTab("section-roster");
@@ -219,6 +220,7 @@ function App() {
                 <SectionRosterScreen
                   sectionService={sectionService}
                   formGenerationService={formGenerationService}
+                  exportService={exportService}
                   sectionId={rosterSectionId}
                   onBack={() => setActiveTab("sections")}
                 />
@@ -229,6 +231,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -264,6 +267,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -294,6 +298,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -324,6 +329,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");

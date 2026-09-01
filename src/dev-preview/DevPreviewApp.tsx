@@ -168,6 +168,7 @@ export function DevPreviewApp() {
           <SectionsScreen
             sectionService={sectionService}
             learnerService={learnerService}
+            exportService={exportService}
             onOpenRoster={() => {}}
             onManageAssignments={() => {}}
             onManageAdviser={(sectionId, sectionName) => {

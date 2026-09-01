@@ -407,6 +407,24 @@ export class FixtureExportRepository implements ExportRepository {
     };
   }
 
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error(
+      "dev-preview fixture: exportSchoolMonthlyAttendanceSf4() is not wired -- read-only fixture",
+    );
+  }
+
+  async exportSectionEosySf5(): Promise<import("../domain/export").Sf5ExportResult | null> {
+    throw new Error(
+      "dev-preview fixture: exportSectionEosySf5() is not wired -- read-only fixture",
+    );
+  }
+
+  async exportSchoolEosySf6(): Promise<import("../domain/export").Sf6ExportResult | null> {
+    throw new Error("dev-preview fixture: exportSchoolEosySf6() is not wired -- read-only fixture");
+  }
+
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
     throw new Error(
       "dev-preview fixture: exportClassRecordReportCard() is not wired -- read-only fixture",

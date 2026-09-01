@@ -1,5 +1,74 @@
 # Verification Debt
 
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure (2026-09-01)
+
+A `security-reviewer` was dispatched against the reconciliation diff
+(multi-tenant isolation of the three new export commands, CSV/formula-
+injection defense, filename sanitization, and the
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` categorization decision —
+see `docs/adr/0060-wave-3m-reconciliation.md`). It completed real work
+but its structured findings could not be retrieved from the tool
+result; a `SendMessage` resume of the same agent (the one permitted
+retry, per `.claude/rules/autonomous-development.md`'s established
+rule for this recurring harness issue) also returned no retrievable
+content. This is the same class of failure recorded repeatedly
+elsewhere in this project's history (see `docs/PROJECT-MEMORY.md`'s
+M7-M20-era entries).
+
+**Self-review performed instead, per the established fallback**: direct
+inspection confirmed (1) every teacher/school-entered field in
+`export/{sf4,sf5,sf6}.rs` is written through the shared `csv::row()`
+helper (`export/csv.rs`), which neutralizes a leading `=`/`+`/`-`/`@`/
+tab and RFC-4180-quotes commas/quotes/newlines per field — no `format!`
+bypasses it; (2) every filename built by the six export commands in
+`commands/export.rs` (including the three new ones) routes through
+`sanitize_filename_component`; (3) `export_school_monthly_attendance_sf4`
+and `export_school_eosy_sf6` take no client-supplied section/school id
+at all — `school_id` comes only from
+`sessions.require_active_school_scope(&conn)` — and
+`export_section_eosy_sf5` is gated by the existing, already-reviewed
+`auth::authorize_adviser_of_section` before any data access. No
+BLOCKING issue found by this self-review.
+
+**Retained as independent-review debt, not closed**: a real
+non-self-review of this diff is still owed. Retry in a future session
+once the agent-resume/retrieval mechanism is confirmed reliably
+working again, per the project's standing instruction not to keep
+spending large amounts of context chasing a known-broken retrieval
+path.
+
+## Wave 3m reconciliation — no local Rust build/test/clippy (2026-09-01)
+
+Full context: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
+sandbox is missing the Tauri/GTK system libraries (`glib-2.0`, surfaced
+via `pkg-config` when `cargo build` runs) that
+`docs/adr/0041-minimal-ci-foundation.md`'s own Ubuntu CI job installs
+via `sudo apt-get install libwebkit2gtk-4.1-dev build-essential curl
+wget file libxdo-dev libssl-dev libayatana-appindicator3-dev
+librsvg2-dev`. That install needed interactive approval this
+unattended session could not obtain, so `cargo build`/`cargo test`/
+`cargo clippy --all-targets -- -D warnings`/`cargo fmt --check` (the
+last one alone succeeded, since it needs no compilation) could not be
+run against the reconciled Rust code (the new `export/{sf4,sf5,sf6}.rs`
+modules, the extended `commands/export.rs`, and `lib.rs`'s command
+registration).
+
+**Mitigation actually performed, not a substitute**: every non-trivial
+public type and function signature the ported Rust code calls
+(`repository::{attendance,school,section,section_advisory,
+section_membership,class_record,grading,grading_computation,role}`'s
+structs/functions, `auth::authorize_adviser_of_section`) was
+cross-checked by hand, field-by-field, against this repository's actual
+current source via direct `grep`/`Read` — not assumed correct from the
+source branch's own (differently-verified) claims.
+
+**Not yet done**: an actual `cargo build`/`cargo test`/`cargo clippy`
+run. Closed once either (a) the reconciliation PR's GitHub Actions
+Quality Gate (Ubuntu, GTK packages present) runs green, or (b) a future
+session with a working Rust toolchain runs the full `quality:full` gate
+and confirms it directly — whichever comes first. Do not claim this
+closed without one of those two actually happening.
+
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 
 The user reported (not this session's own finding — no reproduction
