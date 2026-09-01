@@ -328,7 +328,7 @@ describe("MonthlySummaryScreen", () => {
     expect(exportRepo.sf4Calls).toEqual([{ year: 2026, month: 8 }]);
   });
 
-  it("shows an error when the school could not be resolved for the SF4 export", async () => {
+  it("shows an error when the school could not be found for the SF4 export", async () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen(reportWith("present"));
     exportRepo.sf4ResultToReturn = null;
@@ -336,9 +336,7 @@ describe("MonthlySummaryScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
 
-    await waitFor(() =>
-      expect(screen.getByText(/school could not be resolved/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/school could not be found/i)).toBeInTheDocument());
   });
 
   it("does not gate the SF4 export button on the section report having learners", async () => {
