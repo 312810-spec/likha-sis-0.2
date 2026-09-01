@@ -1,5 +1,14 @@
 # Verification Debt
 
+## Wave 3L — School Form 6 (SF6) School Promotion Summary UI (2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum; `docs/PROJECT-MEMORY.md`
+Wave 3L entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/WebKit) screenshot pass for SF6 export panel rendering.** `SectionsScreen`'s SF6 export panel, dynamic school year selector, alert display, disabled states, and Guided mode hints are covered by jsdom + `@testing-library/react` and axe-core (`expectNoAccessibilityViolations`) with 15 tests in `SectionsScreen.test.tsx`, but not in a headless desktop browser environment.
+
 ## Wave 3K — School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (2026-09-01)
 
 Full record: `docs/adr/0058-sf6-school-promotion-summary.md`; `docs/PROJECT-MEMORY.md`

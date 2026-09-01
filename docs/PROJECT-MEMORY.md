@@ -2791,6 +2791,21 @@ Full record: `docs/adr/0058-sf6-school-promotion-summary.md`;
   `npm run quality:full` clean (763/763 vitest across 78 files, +5 tests net, cargo test, clippy, fmt, linters); `npm run build`,
   `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
 
+## Wave 3L — School Form 6 (SF6) School Promotion Summary UI (added 2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3L entry. **New branch**
+`antigravity/likha-sis-wave3l-sf6-school-promotion-ui`, created from `c3858ae` (Wave
+3K's checkpoint).
+
+- **Built**: User-facing DepEd School Form 6 (SF6) School Promotion Summary export interface in `SectionsScreen.tsx`.
+  Added "End-of-School-Year Summary (SF6)" form panel allowing School Heads, Administrators, and Teachers to export the official DepEd SF6 End-of-School-Year report for a chosen school year.
+  Dynamic school year picker resolving existing school years across sections with text input fallback.
+  Teacher mode contextual support (Guided mode guidance citing DepEd Order No. 4, s. 2014 & DO 8 s. 2015), in-flight disablement guards, success feedback with file path and structured field disclosures, and error messaging.
+  Wired `exportService={exportService}` to `SectionsScreen` in `src/App.tsx`.
+- **Verification/checkpoint**: `npm run quality:full` clean (Vitest 766/766 across 78 files, +3 tests net, cargo test 613 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`,
+  `check:dev-preview-isolation`, `harness:verify` (100/100 certified) all pass.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

@@ -5,12 +5,21 @@ import { LearnerApplicationService } from "../application/learner-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SchoolMemberApplicationService } from "../application/school-member-service";
+import { ExportApplicationService } from "../application/export-service";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { SectionAdvisoryRepository } from "../domain/ports/section-advisory-repository";
 import type { SchoolMemberRepository } from "../domain/ports/school-member-repository";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
+} from "../domain/export";
 import type {
   SectionAdvisory,
   AssignAdviserOutcome,
@@ -187,9 +196,52 @@ class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {
   }
 }
 
+class FakeExportRepository implements ExportRepository {
+  sf6Calls: string[] = [];
+  sf6ToReturn: Sf6ExportResult | null = {
+    filePath: "C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv",
+    disclosure: {
+      populatedFields: [
+        "School ID",
+        "School Name",
+        "School Year",
+        "Promotion Status Summary",
+        "Level of Proficiency Summary",
+      ],
+      omittedFields: [
+        { field: "School Head Certification Signature", reason: "manual ink signature required" },
+      ],
+    },
+  };
+  sf6Error: Error | null = null;
+
+  async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    this.sf6Calls.push(schoolYear);
+    if (this.sf6Error) throw this.sf6Error;
+    return this.sf6ToReturn;
+  }
+
+  async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("not used in this test");
+  }
+}
+
 function renderScreen(
   sections: Section[] = [],
   initialAdvisories: Record<string, SectionAdvisory | null> = {},
+  exportOverrides: Partial<FakeExportRepository> = {},
 ) {
   const sectionRepo = new FakeSectionRepository(sections);
   const sectionService = new SectionApplicationService(sectionRepo);
@@ -197,6 +249,9 @@ function renderScreen(
   const advisoryRepo = new FakeSectionAdvisoryRepository(initialAdvisories);
   const sectionAdvisoryService = new SectionAdvisoryApplicationService(advisoryRepo);
   const memberService = new SchoolMemberApplicationService(new FakeSchoolMemberRepository());
+  const exportRepo = new FakeExportRepository();
+  Object.assign(exportRepo, exportOverrides);
+  const exportService = new ExportApplicationService(exportRepo);
 
   const openRosterCalls: string[] = [];
   const manageAssignmentsCalls: Array<[string, string]> = [];
@@ -207,6 +262,7 @@ function renderScreen(
         learnerService={learnerService}
         sectionAdvisoryService={sectionAdvisoryService}
         schoolMemberService={memberService}
+        exportService={exportService}
         onOpenRoster={(sectionId) => openRosterCalls.push(sectionId)}
         onManageAssignments={(sectionId, sectionName) =>
           manageAssignmentsCalls.push([sectionId, sectionName])
@@ -218,6 +274,7 @@ function renderScreen(
     ...result,
     sectionRepo,
     advisoryRepo,
+    exportRepo,
     openRosterCalls,
     manageAssignmentsCalls,
   };
@@ -477,5 +534,95 @@ describe("SectionsScreen", () => {
     expect(screen.getByRole("heading", { name: "Manage adviser for Mabini" })).toBeInTheDocument();
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("exports SF6 for a selected school year and displays success disclosure", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { exportRepo, container } = renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    expect(
+      screen.getByRole("heading", { name: "End-of-School-Year Summary (SF6)" }),
+    ).toBeInTheDocument();
+
+    const exportBtn = screen.getByRole("button", {
+      name: "Export SF6 (Promotion & Proficiency Summary)",
+    });
+    expect(exportBtn).toBeInTheDocument();
+    expect(exportBtn).not.toBeDisabled();
+
+    await user.click(exportBtn);
+
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(
+      screen.getByText("C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv"),
+    ).toBeInTheDocument();
+
+    expect(exportRepo.sf6Calls).toEqual(["2025-2026"]);
+    expect(
+      screen.getByText(/DepEd SF6 Summarized Report on Promotion and Level of Proficiency/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Table 1:/)).toBeInTheDocument();
+    expect(screen.getByText(/Table 2:/)).toBeInTheDocument();
+    expect(screen.getByText(/School Head Certification Signature/)).toBeInTheDocument();
+
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("exports SF6 when school year is typed in text input when no sections exist", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([]);
+    await screen.findByText("No sections created yet.");
+
+    const syInput = screen.getByLabelText("School year for SF6");
+    await user.type(syInput, "2024-2025");
+
+    const exportBtn = screen.getByRole("button", {
+      name: "Export SF6 (Promotion & Proficiency Summary)",
+    });
+    await user.click(exportBtn);
+
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(
+      screen.getByText("C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv"),
+    ).toBeInTheDocument();
+
+    expect(exportRepo.sf6Calls).toEqual(["2024-2025"]);
+  });
+
+  it("handles SF6 export error gracefully and displays error alert", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { exportRepo } = renderScreen([section]);
+    exportRepo.sf6Error = new Error("Failed to consolidate promotion records");
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    const exportBtn = screen.getByRole("button", {
+      name: "Export SF6 (Promotion & Proficiency Summary)",
+    });
+    await user.click(exportBtn);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Could not export SF6 — check that you have permission to export school summaries, or that school year records are complete.",
+        ),
+      ).toBeInTheDocument(),
+    );
   });
 });

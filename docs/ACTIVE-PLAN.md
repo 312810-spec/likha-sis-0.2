@@ -1,5 +1,27 @@
 # ACTIVE PLAN
 
+## Wave 3L: School Form 6 (SF6) School Promotion Summary UI (added 2026-09-01) — complete
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3L entry;
+`docs/VERIFICATION-DEBT.md` Wave 3L entry. **New branch**
+`antigravity/likha-sis-wave3l-sf6-school-promotion-ui`, created from `c3858ae` (Wave
+3K's checkpoint).
+
+**Scope**: User-facing DepEd School Form 6 (SF6) School Promotion Summary export interface.
+Delivers the "Export SF6 (Promotion & Proficiency Summary)" panel in `SectionsScreen.tsx`,
+allowing School Heads, Administrators, and Teachers to export the official DepEd SF6 End-of-School-Year
+summarized report for a selected school year with automatic school year discovery, in-flight mutation guarding,
+structured `FieldDisclosure` presentation, error recovery, and teacher mode support.
+
+**Built**:
+
+- `src/ui/SectionsScreen.tsx`: Added `exportService` optional prop in `SectionsScreenProps`, `sf6SchoolYear`, `sf6Exporting`, `sf6Result`, and `sf6Error` state, `handleExportSf6` handler, "End-of-School-Year Summary (SF6)" form panel with school year dropdown/input and "Export SF6 (Promotion & Proficiency Summary)" action button, success/error alerts rendering file path and field disclosures, and Guided mode contextual assistance.
+- `src/App.tsx`: Wired `exportService={exportService}` to `SectionsScreen` instances.
+- `src/ui/SectionsScreen.test.tsx`: Added `FakeExportRepository` and unit/a11y test coverage for SF6 export execution, manual school year entry fallback, error handling, and axe-core compliance (+3 tests net, 766 tests passing).
+
+**Verification**: `npm run quality:full` clean (Vitest 766/766 across 78 files, cargo test 613 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`, `check:dev-preview-isolation`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3K: School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (added 2026-09-01) — complete
 
 Full record: `docs/adr/0058-sf6-school-promotion-summary.md`; `docs/CURRENT-HANDOFF.md`

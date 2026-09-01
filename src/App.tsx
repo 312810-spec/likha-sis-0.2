@@ -194,6 +194,7 @@ function App() {
                 learnerService={learnerService}
                 sectionAdvisoryService={sectionAdvisoryService}
                 schoolMemberService={schoolMemberService}
+                exportService={exportService}
                 onOpenRoster={(sectionId) => {
                   setRosterSectionId(sectionId);
                   setActiveTab("section-roster");
@@ -221,6 +222,7 @@ function App() {
                   learnerService={learnerService}
                   sectionAdvisoryService={sectionAdvisoryService}
                   schoolMemberService={schoolMemberService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -254,6 +256,7 @@ function App() {
                   learnerService={learnerService}
                   sectionAdvisoryService={sectionAdvisoryService}
                   schoolMemberService={schoolMemberService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -282,6 +285,7 @@ function App() {
                   learnerService={learnerService}
                   sectionAdvisoryService={sectionAdvisoryService}
                   schoolMemberService={schoolMemberService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");

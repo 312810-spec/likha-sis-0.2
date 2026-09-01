@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (Wave 3K delivered)
+Accepted (Wave 3K and Wave 3L delivered)
 
 ## Context
 
@@ -42,8 +42,13 @@ SF6 is the school-level counterpart and consolidation of SF5 (delivered in Waves
    - Extended `ExportRepository` port and `TauriExportRepository` with `exportSchoolEosySf6(schoolYear)`.
    - Added `exportSchoolEosySf6` with validation (non-empty trimmed school year) to `ExportApplicationService`.
    - Registered `export_school_eosy_sf6` in `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` in `src/infrastructure/tauri/invoke.ts`.
+4. **Wave 3L User-Facing Promotion Summary Interface**:
+   - Added `exportService` optional prop to `SectionsScreen.tsx`, rendering an accessible "End-of-School-Year Summary (SF6)" form panel.
+   - Dynamically selects from existing school years found across sections with fallback to manual entry when no sections exist.
+   - Provides teacher mode contextual support (Guided mode guidance citing DepEd Order No. 4, s. 2014 & DO 8 s. 2015), in-flight disablement guards, success feedback with file path and structured field disclosures, and error messaging.
+   - Wired `exportService={exportService}` to `SectionsScreen` in `src/App.tsx`.
 
 ## Consequences
 
-- Full End-of-School-Year reporting pipeline (SF5 Section Promotion + SF6 School Summarized Promotion) is established with strict multi-tenant isolation and 0 data leakage.
-- Unit and integration tests expanded to 613 lib tests + 14 integration test suites and 763 Vitest tests.
+- Full End-of-School-Year reporting pipeline (SF5 Section Promotion + SF6 School Summarized Promotion) is completely delivered across backend, frontend ports, and UI layers with strict multi-tenant isolation and 0 data leakage.
+- Expanded Vitest test suite to 766 tests across 78 files and 613 Rust lib tests + 14 integration test suites with zero accessibility violations.

@@ -3,7 +3,9 @@ import type { SectionApplicationService } from "../application/section-service";
 import type { LearnerApplicationService } from "../application/learner-service";
 import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SchoolMemberApplicationService } from "../application/school-member-service";
+import type { ExportApplicationService } from "../application/export-service";
 import { ValidationError } from "../domain/errors";
+import type { Sf6ExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
 import type { SchoolMember } from "../domain/school-member";
 import type { Section } from "../domain/section";
@@ -18,6 +20,7 @@ export interface SectionsScreenProps {
   learnerService: LearnerApplicationService;
   sectionAdvisoryService?: SectionAdvisoryApplicationService;
   schoolMemberService?: SchoolMemberApplicationService;
+  exportService?: ExportApplicationService;
   /** Open the read-only roster for one section (Wave 2O). A callback +
    * parent state handoff, not a route -- the same pattern
    * TeacherWorkspaceScreen uses for "open attendance for this section". */
@@ -42,6 +45,7 @@ export function SectionsScreen({
   learnerService,
   sectionAdvisoryService,
   schoolMemberService,
+  exportService,
   onOpenRoster,
   onManageAssignments,
 }: SectionsScreenProps) {
@@ -71,6 +75,12 @@ export function SectionsScreen({
   const [assignStartsOn, setAssignStartsOn] = useState(todayAsIsoDate);
   const [endAdvisoryEndsOn, setEndAdvisoryEndsOn] = useState(todayAsIsoDate);
   const [savingAdvisory, setSavingAdvisory] = useState(false);
+
+  // SF6 School Promotion Summary export state
+  const [sf6SchoolYear, setSf6SchoolYear] = useState("");
+  const [sf6Exporting, setSf6Exporting] = useState(false);
+  const [sf6Result, setSf6Result] = useState<Sf6ExportResult | null>(null);
+  const [sf6Error, setSf6Error] = useState<string | null>(null);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -114,6 +124,9 @@ export function SectionsScreen({
   }, [sectionService, learnerService, sectionAdvisoryService, schoolMemberService]);
 
   const teachers = members.filter((member) => member.roles.includes("teacher"));
+  const availableSchoolYears = Array.from(
+    new Set(sections.map((s) => s.schoolYear).filter(Boolean)),
+  );
 
   function teacherName(teacherUserId: string): string {
     return members.find((member) => member.id === teacherUserId)?.displayName ?? teacherUserId;
@@ -240,6 +253,31 @@ export function SectionsScreen({
       );
     } finally {
       setSavingAdvisory(false);
+    }
+  }
+
+  async function handleExportSf6(event: FormEvent) {
+    event.preventDefault();
+    if (!exportService) return;
+    setSf6Error(null);
+    setSf6Result(null);
+    setSf6Exporting(true);
+    try {
+      const effectiveSy = sf6SchoolYear.trim() || availableSchoolYears[0] || "";
+      if (!effectiveSy) {
+        setSf6Error("Please enter or select a school year to export SF6.");
+        return;
+      }
+      const result = await exportService.exportSchoolEosySf6(effectiveSy);
+      setSf6Result(result);
+    } catch (err) {
+      setSf6Error(
+        err instanceof ValidationError
+          ? err.message
+          : "Could not export SF6 — check that you have permission to export school summaries, or that school year records are complete.",
+      );
+    } finally {
+      setSf6Exporting(false);
     }
   }
 
@@ -536,6 +574,104 @@ export function SectionsScreen({
           {enrolling ? "Enrolling…" : "Enroll learner"}
         </button>
       </form>
+
+      {exportService && (
+        <section
+          aria-label="School Form 6 (SF6) Summarized Promotion Report"
+          style={{ marginTop: "2rem" }}
+        >
+          <h3>End-of-School-Year Summary (SF6)</h3>
+          {mode === "guided" && (
+            <p className="field-hint">
+              School Form 6 (SF6) consolidates promotion decisions (Promoted, Conditional, Retained)
+              and levels of proficiency across all sections and grade levels in the school for the
+              selected school year per DepEd Order No. 4, s. 2014 and DepEd Order No. 8, s. 2015.
+            </p>
+          )}
+
+          {sf6Error && <Alert tone="error">{sf6Error}</Alert>}
+          {sf6Result && (
+            <Alert tone="success">
+              <p>
+                Saved to <code>{sf6Result.filePath}</code>.
+              </p>
+              <p>
+                This file is a DepEd SF6 Summarized Report on Promotion and Level of Proficiency for
+                school year{" "}
+                <strong>
+                  {sf6SchoolYear.trim() || availableSchoolYears[0] || "the selected school year"}
+                </strong>
+                . It consolidates:
+              </p>
+              <ul>
+                <li>
+                  <strong>Table 1:</strong> Summary of Promotion Decisions (Promoted, Conditional,
+                  Retained) by section, grade level, and school total.
+                </li>
+                <li>
+                  <strong>Table 2:</strong> Level of Proficiency distributions (Did Not Meet
+                  Expectations to Outstanding) by section, grade level, and school total.
+                </li>
+              </ul>
+              {sf6Result.disclosure.omittedFields.length > 0 && (
+                <>
+                  <p>
+                    It does <strong>not</strong> include:
+                  </p>
+                  <ul>
+                    {sf6Result.disclosure.omittedFields.map((omitted) => (
+                      <li key={omitted.field}>
+                        <strong>{omitted.field}</strong> — {omitted.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Alert>
+          )}
+
+          <form onSubmit={handleExportSf6} aria-label="Export SF6 School Promotion Summary">
+            <div className="form-row" style={{ alignItems: "flex-end" }}>
+              <div className="field">
+                <label htmlFor="sf6-school-year">School year for SF6</label>
+                {availableSchoolYears.length > 0 ? (
+                  <select
+                    id="sf6-school-year"
+                    value={sf6SchoolYear || availableSchoolYears[0]}
+                    onChange={(e) => setSf6SchoolYear(e.target.value)}
+                    disabled={sf6Exporting}
+                  >
+                    {availableSchoolYears.map((sy) => (
+                      <option key={sy} value={sy}>
+                        {sy}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="sf6-school-year"
+                    type="text"
+                    placeholder="2025-2026"
+                    value={sf6SchoolYear}
+                    onChange={(e) => setSf6SchoolYear(e.target.value)}
+                    disabled={sf6Exporting}
+                    required
+                  />
+                )}
+              </div>
+              <button
+                type="submit"
+                className="button-primary"
+                disabled={
+                  sf6Exporting || (availableSchoolYears.length === 0 && !sf6SchoolYear.trim())
+                }
+              >
+                {sf6Exporting ? "Exporting SF6…" : "Export SF6 (Promotion & Proficiency Summary)"}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
     </section>
   );
 }

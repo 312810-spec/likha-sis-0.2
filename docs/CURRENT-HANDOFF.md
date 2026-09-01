@@ -1,5 +1,30 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3L: School Form 6 (SF6) School Promotion Summary UI, COMPLETE)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum;
+`docs/PROJECT-MEMORY.md` Wave 3L entry; `docs/VERIFICATION-DEBT.md` Wave 3L entry.
+**New dedicated branch** `antigravity/likha-sis-wave3l-sf6-school-promotion-ui`, created
+from `antigravity/likha-sis-wave3k-sf6-school-promotion-foundation` at `c3858ae`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: School Form 6 (SF6) School Promotion Summary UI.
+Connects the backend SF6 export engine from Wave 3K directly into `SectionsScreen.tsx`,
+allowing School Heads, Administrators, and Teachers to export the official DepEd SF6 End-of-School-Year
+summarized report per school year with dynamic school year selection, in-flight mutation guarding, structured
+field disclosure rendering, error recovery, and complete teacher mode support.
+
+**What shipped**:
+
+- `src/ui/SectionsScreen.tsx`: Added `exportService` optional prop in `SectionsScreenProps`, `sf6SchoolYear`, `sf6Exporting`, `sf6Result`, and `sf6Error` state, `handleExportSf6` handler, "End-of-School-Year Summary (SF6)" form panel under its own `<section>`, success/error alerts rendering file path and field disclosures, and Guided mode contextual assistance.
+- `src/App.tsx`: Wired `exportService={exportService}` to `SectionsScreen` instances.
+- `src/ui/SectionsScreen.test.tsx`: Added `FakeExportRepository` and unit/a11y test coverage for SF6 export execution, manual school year input, error handling, and axe-core compliance (+3 tests net, 766 tests passing).
+
+**Verification**:
+
+- `npm run quality:full` clean (Vitest 766/766 across 78 files, cargo test 613 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-09-01 — Wave 3K: School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation, COMPLETE)
 
 Full record: `docs/adr/0058-sf6-school-promotion-summary.md`;
