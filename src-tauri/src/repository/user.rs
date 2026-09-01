@@ -188,6 +188,31 @@ fn reset_failed_login_attempts(conn: &Connection, user_id: &str) -> AppResult<()
     Ok(())
 }
 
+/// Admin-Assisted Password Reset (Wave 3I, ADR-0057): hashes
+/// `new_password` with the same Argon2id path `create_user` uses and
+/// overwrites `target_user_id`'s hash. Also clears any existing lockout
+/// state (`failed_login_attempts`/`locked_until`) in the same statement
+/// -- a teacher must never stay locked out after a School Head just
+/// handed them a fresh, correct password (Scenario 6 of ADR-0057's
+/// 10-scenario decision). The caller
+/// (`auth::authorize_admin_password_reset`) has already verified
+/// `target_user_id` is a real member of the acting School Head's own
+/// school before this is called; this function does not re-check
+/// existence itself.
+pub fn admin_reset_password(
+    conn: &Connection,
+    target_user_id: &str,
+    new_password: &str,
+) -> AppResult<()> {
+    let hash = auth::hash_password(new_password)?;
+    conn.execute(
+        "UPDATE users SET password_hash = ?2, failed_login_attempts = 0, locked_until = NULL \
+         WHERE id = ?1",
+        (target_user_id, &hash),
+    )?;
+    Ok(())
+}
+
 pub fn add_school_membership(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<()> {
     conn.execute(
         "INSERT INTO user_school_memberships (user_id, school_id) VALUES (?1, ?2)",
@@ -291,6 +316,34 @@ mod tests {
 
     fn open_test_db() -> Connection {
         db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
+    }
+
+    #[test]
+    fn admin_reset_password_replaces_the_hash_and_verifies_with_the_new_password() {
+        let conn = open_test_db();
+        let created = create_user(&conn, "ana.cruz", "old-password", "Ana Cruz").unwrap();
+
+        admin_reset_password(&conn, &created.id, "brand-new-password").unwrap();
+
+        assert!(verify_credentials(&conn, "ana.cruz", "old-password").is_err());
+        assert!(verify_credentials(&conn, "ana.cruz", "brand-new-password").is_ok());
+    }
+
+    #[test]
+    fn admin_reset_password_clears_an_existing_lockout() {
+        let conn = open_test_db();
+        let created = create_user(&conn, "ana.cruz", "old-password", "Ana Cruz").unwrap();
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = verify_credentials(&conn, "ana.cruz", "wrong");
+        }
+        assert!(matches!(
+            verify_credentials(&conn, "ana.cruz", "old-password"),
+            Err(AppError::AccountLocked)
+        ));
+
+        admin_reset_password(&conn, &created.id, "brand-new-password").unwrap();
+
+        assert!(verify_credentials(&conn, "ana.cruz", "brand-new-password").is_ok());
     }
 
     #[test]

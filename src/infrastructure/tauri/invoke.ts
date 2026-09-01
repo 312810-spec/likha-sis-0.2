@@ -93,6 +93,7 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "create_schedule_meeting",
   "remove_schedule_meeting",
   "list_schedule_meetings_by_assignment",
+  "admin_reset_teacher_password",
 ]);
 
 /**

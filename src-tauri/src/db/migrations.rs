@@ -1242,6 +1242,37 @@ pub fn migrations() -> Migrations<'static> {
             ON section_advisories(section_id) WHERE ends_on IS NULL;
         "#,
         ),
+        M::up(
+            r#"
+        -- Admin-Assisted Password Reset (Wave 3I). See
+        -- docs/adr/0057-admin-assisted-password-reset.md. Widens
+        -- `audit_log.event_type`'s CHECK constraint to accept
+        -- 'password_reset_by_admin' -- SQLite cannot ALTER a CHECK
+        -- constraint in place, so the table is rebuilt, matching the
+        -- exact pattern migration 5 already used for
+        -- `attendance_records_new`. No column added, no row touched
+        -- beyond copying every existing one unchanged.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new (id, school_id, user_id, username, event_type, created_at)
+        SELECT id, school_id, user_id, username, event_type, created_at FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
     ])
 }
 

@@ -16,7 +16,8 @@ export type SignedInTab =
   | "monthly-summary"
   | "grading-periods"
   | "class-records"
-  | "audit-log";
+  | "audit-log"
+  | "school-members";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -44,6 +45,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "grading-periods": "Grading Periods",
   "class-records": "Class Records",
   "audit-log": "Sign-in Activity",
+  "school-members": "School Members",
 };
 
 interface NavGroup {
@@ -87,6 +89,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Security",
-    tabs: [tab("audit-log")],
+    tabs: [tab("audit-log"), tab("school-members")],
   },
 ];

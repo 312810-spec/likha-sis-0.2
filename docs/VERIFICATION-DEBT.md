@@ -1,5 +1,51 @@
 # Verification Debt
 
+## Wave 3I — Admin-Assisted Password Reset (2026-09-01)
+
+Full record: `docs/adr/0057-admin-assisted-password-reset.md`;
+`docs/PROJECT-MEMORY.md` Wave 3I entry; `docs/CURRENT-HANDOFF.md` top
+entry.
+
+**Newly recorded debt:**
+
+1. **`osv-scanner` could not reach the OSV vulnerability database from
+   this environment.** `api.osv.dev` returned `403 Forbidden` through
+   this session's outbound proxy allowlist — the tool itself was
+   installed and ran, but its actual database query never completed, so
+   "0 vulnerabilities" here is not a real clean result, only "could not
+   check." `gitleaks` and `cargo deny check` both ran to real completion
+   and found nothing. CI's own Security Gate (OSV-Scanner via GitHub
+   Actions, unaffected by this local proxy restriction) remains the
+   authoritative result for this check, per the same
+   per-machine-vs-CI-authoritative pattern this file has recorded for
+   gitleaks/cargo-deny/osv-scanner availability since Wave 2S.
+2. **No browser-rendered (Playwright/axe) screenshot coverage for
+   `SchoolMembersScreen`.** Not wired into `src/dev-preview/fixtures.ts`
+   this wave — the same disclosed gap every recent wave's new UI has
+   left open (Waves 2U through 3G). Coverage is jsdom + axe-core
+   (`expectNoAccessibilityViolations`, 3 states: populated, reset-form
+   open, empty) only.
+3. **The audit log has no column recording which School Head performed a
+   reset** — only that a reset happened, when, and against which target
+   account. Disclosed explicitly in ADR-0057's "Design" section as a
+   deliberate scope limit (adding an actor column would touch every
+   existing `audit_log` row's shape for one new event type), not an
+   oversight.
+4. **Scenario 2 of ADR-0057 (temporary password + forced change at next
+   login) remains unbuilt** — recorded as the explicit Next Best with its
+   own switch condition (real evidence of School Heads misusing knowledge
+   of a reset password, or a future self-service channel needing a
+   companion forced-change mechanism), not silently dropped.
+5. **No self-service "forgot password" flow exists** — explicit,
+   evidence-based non-goal for this slice (no email/SMS/OTP channel
+   exists in this deployment model); a mock pilot with real participants
+   will still hit "forgot password, ask the School Head," which is the
+   intended in-app answer now, not a gap in this slice specifically.
+
+**Debt closed this wave**: the previously undisclosed gap Wave 3H's own
+survey identified — a teacher who forgets their password had zero
+in-app recovery path — is now closed for the admin-assisted case.
+
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 
 The user reported (not this session's own finding — no reproduction

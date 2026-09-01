@@ -7,6 +7,7 @@ import { UserApplicationService } from "./user-service";
 class FakeUserRepository implements UserRepository {
   registerCalls: Array<{ username: string; password: string; displayName: string }> = [];
   membershipCalls: Array<{ userId: string; schoolId: string }> = [];
+  resetCalls: Array<{ targetUserId: string; newPassword: string }> = [];
 
   async registerUser(username: string, password: string, displayName: string): Promise<User> {
     this.registerCalls.push({ username, password, displayName });
@@ -15,6 +16,10 @@ class FakeUserRepository implements UserRepository {
 
   async addUserToSchool(userId: string, schoolId: string): Promise<void> {
     this.membershipCalls.push({ userId, schoolId });
+  }
+
+  async adminResetPassword(targetUserId: string, newPassword: string): Promise<void> {
+    this.resetCalls.push({ targetUserId, newPassword });
   }
 }
 
@@ -68,5 +73,33 @@ describe("UserApplicationService", () => {
     await service.addUserToSchool("u1", "s1");
 
     expect(repo.membershipCalls).toEqual([{ userId: "u1", schoolId: "s1" }]);
+  });
+
+  it("adminResetPassword delegates to the repository", async () => {
+    const repo = new FakeUserRepository();
+    const service = new UserApplicationService(repo);
+
+    await service.adminResetPassword("u1", "a fresh strong password");
+
+    expect(repo.resetCalls).toEqual([
+      { targetUserId: "u1", newPassword: "a fresh strong password" },
+    ]);
+  });
+
+  it("rejects a reset password shorter than the minimum length without calling the repository", async () => {
+    const repo = new FakeUserRepository();
+    const service = new UserApplicationService(repo);
+
+    await expect(service.adminResetPassword("u1", "short")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.resetCalls).toEqual([]);
+  });
+
+  it("does not trim a reset password", async () => {
+    const repo = new FakeUserRepository();
+    const service = new UserApplicationService(repo);
+
+    await service.adminResetPassword("u1", "  spaced out password  ");
+
+    expect(repo.resetCalls[0]?.newPassword).toBe("  spaced out password  ");
   });
 });

@@ -34,4 +34,14 @@ export class UserApplicationService {
   addUserToSchool(userId: string, schoolId: string): Promise<void> {
     return this.users.addUserToSchool(userId, schoolId);
   }
+
+  /** Wave 3I: same minimum-length rule as `registerUser`, never trimmed
+   * (a password's own leading/trailing characters are significant — see
+   * `auth-service.test.ts`'s "does not trim the password" case). */
+  async adminResetPassword(targetUserId: string, newPassword: string): Promise<void> {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      throw new ValidationError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    return this.users.adminResetPassword(targetUserId, newPassword);
+  }
 }

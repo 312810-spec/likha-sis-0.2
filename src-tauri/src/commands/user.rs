@@ -7,6 +7,7 @@ use zeroize::Zeroize;
 use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
+use crate::repository::audit_log::{self, AuditEventType};
 use crate::repository::role;
 use crate::repository::user::{self, SchoolMember, User};
 
@@ -68,4 +69,39 @@ pub fn list_school_members(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     user::list_members_in_school(&conn, &school_id)
+}
+
+/// Admin-Assisted Password Reset (Wave 3I) -- see
+/// `docs/adr/0057-admin-assisted-password-reset.md` for the full
+/// 10-scenario decision. Only a School Head may reset a colleague's
+/// password, and only for a colleague in their own school --
+/// `auth::authorize_admin_password_reset` independently re-verifies
+/// both before any write, never trusting the client-supplied
+/// `target_user_id`'s school. Also clears the target's existing
+/// lockout state (see `user::admin_reset_password`) and records a
+/// `PasswordResetByAdmin` audit event against the target account,
+/// matching every other `audit_log` row's "whose account" shape.
+#[tauri::command]
+pub fn admin_reset_teacher_password(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    target_user_id: String,
+    mut new_password: String,
+) -> AppResult<()> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_admin_password_reset(&conn, &sessions, &target_user_id)?;
+    let result = (|| {
+        user::admin_reset_password(&conn, &target_user_id, &new_password)?;
+        let target = user::find_by_id(&conn, &target_user_id)?
+            .expect("authorize_admin_password_reset already verified this user exists");
+        audit_log::record(
+            &conn,
+            &school_id,
+            Some(&target_user_id),
+            &target.username,
+            AuditEventType::PasswordResetByAdmin,
+        )
+    })();
+    new_password.zeroize();
+    result
 }

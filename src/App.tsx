@@ -20,6 +20,7 @@ import {
   subjectAttendanceService,
   subjectService,
   teachingAssignmentService,
+  userService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
 import { AppShell } from "./ui/AppShell";
@@ -38,6 +39,7 @@ import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
+import { SchoolMembersScreen } from "./ui/SchoolMembersScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
@@ -409,6 +411,11 @@ function App() {
               />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
+            ) : activeTab === "school-members" ? (
+              <SchoolMembersScreen
+                schoolMemberService={schoolMemberService}
+                userService={userService}
+              />
             ) : null}
           </>
         ) : (

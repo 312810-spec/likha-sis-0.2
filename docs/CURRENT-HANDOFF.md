@@ -1,5 +1,125 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Wave 3I: Admin-Assisted Password Reset, complete)
+
+Continued directly from Wave 3H's own recorded recommendation
+(`docs/product/WAVE-3H-DECISION.md`), on branch
+`claude/likha-verification-debt-6xrq4i`, which was already at `main`'s
+tip (`41e1af9`) at session start — no rebase/integration decision was
+needed this time.
+
+**Pre-work verification-debt check (per this session's instruction to
+check for issues first)**: re-read `docs/CURRENT-HANDOFF.md`,
+`docs/ACTIVE-PLAN.md`, `docs/PROJECT-MEMORY.md`,
+`docs/VERIFICATION-DEBT.md` in full. Every open item there is a disclosed,
+non-blocking gap (native NVDA/Narrator passes needing Windows hardware,
+per-machine security-tool availability, unwired dev-preview fixtures for
+several teacher screens) — none of them blocked starting Wave 3I, and
+none required a fix before proceeding, per
+`.claude/rules/autonomous-development.md`'s own criteria for what counts
+as a blocking vs. retained-debt item. `npm run harness:verify` reconfirmed
+exactly 100/100 before any code was touched.
+
+**This session's environment needed real setup, disclosed rather than
+worked around**: `node_modules` was not installed (`npm ci`); the
+container's `rustc` was 1.94.1 but this crate requires 1.95+ (`rustup
+update stable` → 1.98.0); the Tauri Linux GTK/glib/WebKit apt
+dependencies were missing (`libgtk-3-dev`, `libwebkit2gtk-4.1-dev`,
+`libayatana-appindicator3-dev`, `librsvg2-dev`, `libsoup-3.0-dev` —
+installed via `apt-get`, the same known gap `docs/PROJECT-MEMORY.md`'s
+Minimal CI Foundation entry already names); none of `gitleaks`/
+`cargo-deny`/`osv-scanner` were present (installed fresh this session —
+`gitleaks` via `apt`, `cargo-deny` via `cargo install --locked`,
+`osv-scanner` v2.5.1's official static binary, SHA-256 re-verified
+against the value already recorded in `docs/SOURCE-REGISTRY.md`). Once
+installed, this session's local Rust toolchain could build and run the
+**full** native test/clippy suite — a first for several recent sessions
+that could only run Ubuntu/Windows CI for that layer.
+
+**Decision**: ran the project's own 10-scenario process for the exact
+reset mechanism (required for an auth-touching decision per `CLAUDE.md`)
+and recorded it as `docs/adr/0057-admin-assisted-password-reset.md`.
+Selected **School Head sets a new password directly**, immediately, no
+forced-change-at-next-login flag — reuses four already-proven patterns
+end to end (a `Capability::ManageSchoolMembership` gate mirroring
+`authorize_school_membership_grant`'s cross-school-membership check, the
+existing Argon2id hashing path, the existing school-scoping pattern, and
+the existing `audit_log` table) with **zero schema migration beyond
+widening one CHECK constraint** — no new column, no new table. The
+"School Head learns the new password" risk this rejects a
+forced-change flag over is explicitly accepted, not silently ignored:
+the ADR records why, and records the temporary-password/forced-change
+alternative as the explicit Next Best with its own switch condition.
+
+**What shipped**: `auth::authorize_admin_password_reset` (School Head +
+independent cross-school-membership re-verification, fails closed with
+the same generic `Unauthorized` for "not a School Head," "target doesn't
+exist," and "target in a different school" — no enumeration);
+`repository::user::admin_reset_password` (Argon2id hash replacement +
+clears any existing lockout in the same statement); a new
+`AuditEventType::PasswordResetByAdmin`, requiring a migration that
+rebuilds `audit_log` to widen its `event_type` CHECK constraint (the
+same rebuild pattern migration 5 already used for
+`attendance_records_new`); the new `admin_reset_teacher_password`
+command, added to `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`
+set in this same commit (Wave 3B's own recorded debt: every new
+`Capability`-gated command must be added by hand); a new
+`SchoolMembersScreen.tsx` (any authenticated member may view the list,
+matching `list_school_members`'s existing reference-data convention;
+only a School Head's write succeeds, enforced solely server-side) reached
+from a new `school-members` tab under the existing "Security" nav group.
+
+**Verification, all actually run this session** (see
+`docs/VERIFICATION-DEBT.md`'s new entry for the one disclosed gap):
+`npm run quality` **770/770** (up from 756 — 14 new tests across
+application/infrastructure/UI layers, including 3 new axe passes on
+`SchoolMembersScreen`); typecheck/eslint/format/architecture all clean;
+`npm run build` + `check:dev-preview-isolation` clean; `npx knip`
+unchanged from the pre-existing baseline. `cargo test` — full native
+suite, run twice for determinism, both **green with zero failures**
+across every lib/integration test binary (18/18 in `tests/auth.rs`,
+including 7 new Wave 3I command-boundary tests: same-school success with
+old-password-stops-working/new-password-works-immediately, lockout
+cleared by a reset, denied for a non-School-Head, denied for a
+cross-school target with proof the target's password is unchanged,
+denied for a nonexistent target, denied with no session, and an
+audit-log entry written against the target account). `cargo fmt --check`
+clean. `cargo clippy --all-targets -- -D warnings` clean, zero warnings.
+`npm run harness:verify` still exactly 100/100, unchanged. `gitleaks
+detect` clean (no leaks). `cargo deny check`: advisories/bans/licenses/
+sources all `ok`. `osv-scanner` ran but could not reach the OSV
+vulnerability database (`api.osv.dev` — `403 Forbidden` through this
+environment's outbound proxy allowlist) — disclosed as a real gap, not
+claimed as a clean result; CI's own Security Gate remains authoritative
+for this check.
+
+**Independent security review — dispatched and completed** (required:
+this is an auth-touching milestone per
+`.claude/rules/security-privacy.md`). First dispatch hit this project's
+long-documented agent-resume/findings-retrieval issue (no retrievable
+text after completion); the one permitted retry (asking the same agent to
+restate its conclusion as plain prose) succeeded this time: **"Final: no
+new findings. BLOCKING: none. SHOULD-FIX: none."** No self-review
+substitution was needed.
+
+**Gate decision: WAVE 3I COMPLETE, ALL VERIFICATION GREEN INCLUDING A
+SUCCESSFUL INDEPENDENT REVIEW.** Per the user's explicit mid-session
+instruction ("pause before you start a new wave"), no further wave is
+started. The next slice is recorded below and left for a future,
+separately-authorized continuation.
+
+**Recommended next slice, not started**: the runner-up already named in
+Wave 3H's own decision record — close the Adviser View dev-preview/
+Playwright verification debt (`docs/VERIFICATION-DEBT.md`'s Wave 3F item
+2), now genuinely actionable since this environment has a working
+Chromium and this session proved the full local Rust/GTK toolchain can
+be stood up from scratch here too. Alternatives carried forward
+unchanged: Wave 5 (Sync)'s own 10-scenario cloud-target decision; Key
+Stage 1 descriptive grading and Grade 12 DO 8 carryover (both need a
+fresh DepEd research pass first); Scenario 2 of ADR-0057 itself
+(temporary password + forced change at next login), if real evidence
+ever justifies it.
+
 ## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
 
 Planning-only wave, run from GitHub issue #6, on branch

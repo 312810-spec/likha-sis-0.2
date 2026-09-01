@@ -569,6 +569,29 @@ pub fn authorize_capability_with_actor(
     Ok((school_id, user_id))
 }
 
+/// Admin-Assisted Password Reset (Wave 3I, ADR-0057). Only a School Head
+/// (`ManageSchoolMembership`) may reset a password, and only for a
+/// `target_user_id` that is actually a member of the caller's own
+/// school -- role membership alone says nothing about which school
+/// `target_user_id` belongs to, the same reasoning
+/// `authorize_view_teacher_load`/`authorize_school_membership_grant`
+/// already established for this codebase's other cross-entity gates.
+/// Fails closed with the same `Unauthorized` for "not a School Head,"
+/// "target doesn't exist," and "target belongs to a different school" --
+/// no enumeration of which case occurred, matching
+/// `verify_credentials`'s established non-disclosure discipline.
+pub fn authorize_admin_password_reset(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+) -> AppResult<String> {
+    let school_id = authorize_capability(conn, sessions, Capability::ManageSchoolMembership)?;
+    if !user_repo::is_member_of_school(conn, target_user_id, &school_id)? {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(school_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1684,5 +1707,74 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority in their own school must not extend to a different school's section"
         );
+    }
+
+    // ---- Admin-Assisted Password Reset (Wave 3I, ADR-0057) ----
+
+    #[test]
+    fn authorize_admin_password_reset_allows_a_school_head_for_a_colleague_in_their_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let colleague = user::create_user(&conn, "colleague", "password", "Colleague").unwrap();
+        user::add_school_membership(&conn, &colleague.id, &s.id).unwrap();
+
+        assert!(authorize_admin_password_reset(&conn, &sessions, &colleague.id).is_ok());
+    }
+
+    #[test]
+    fn authorize_admin_password_reset_denies_a_non_school_head() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+        let colleague = user::create_user(&conn, "colleague", "password", "Colleague").unwrap();
+        user::add_school_membership(&conn, &colleague.id, &s.id).unwrap();
+
+        let result = authorize_admin_password_reset(&conn, &sessions, &colleague.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_admin_password_reset_denies_a_target_in_a_different_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_teacher =
+            user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &other_school.id).unwrap();
+
+        let result = authorize_admin_password_reset(&conn, &sessions, &other_teacher.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a School Head's authority does not extend to a colleague outside their own school"
+        );
+    }
+
+    #[test]
+    fn authorize_admin_password_reset_denies_a_target_that_does_not_exist() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        let result = authorize_admin_password_reset(&conn, &sessions, "does-not-exist");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_admin_password_reset_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_admin_password_reset(&conn, &sessions, "someone");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 }

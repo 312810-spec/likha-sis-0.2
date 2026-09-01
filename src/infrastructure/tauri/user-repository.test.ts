@@ -36,4 +36,15 @@ describe("TauriUserRepository", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("add_user_to_school", { userId: "u1", schoolId: "s1" });
   });
+
+  it("adminResetPassword invokes admin_reset_teacher_password with targetUserId, newPassword", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await new TauriUserRepository().adminResetPassword("u1", "a fresh strong password");
+
+    expect(mockInvoke).toHaveBeenCalledWith("admin_reset_teacher_password", {
+      targetUserId: "u1",
+      newPassword: "a fresh strong password",
+    });
+  });
 });

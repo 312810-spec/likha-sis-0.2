@@ -11,4 +11,8 @@ export class TauriUserRepository implements UserRepository {
   addUserToSchool(userId: string, schoolId: string): Promise<void> {
     return invoke<void>("add_user_to_school", { userId, schoolId });
   }
+
+  adminResetPassword(targetUserId: string, newPassword: string): Promise<void> {
+    return invoke<void>("admin_reset_teacher_password", { targetUserId, newPassword });
+  }
 }

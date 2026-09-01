@@ -14,6 +14,13 @@ pub enum AuditEventType {
     LoginFailed,
     AccountLocked,
     Logout,
+    /// A School Head reset this account's password via
+    /// `admin_reset_teacher_password` (Wave 3I, ADR-0057). Recorded
+    /// against the target account (whose password changed), matching
+    /// every other row's "whose account" shape -- this schema has no
+    /// column for which School Head performed the reset; see ADR-0057's
+    /// "Design" section for that disclosed limitation.
+    PasswordResetByAdmin,
 }
 
 impl AuditEventType {
@@ -23,6 +30,7 @@ impl AuditEventType {
             AuditEventType::LoginFailed => "login_failed",
             AuditEventType::AccountLocked => "account_locked",
             AuditEventType::Logout => "logout",
+            AuditEventType::PasswordResetByAdmin => "password_reset_by_admin",
         }
     }
 
@@ -32,6 +40,7 @@ impl AuditEventType {
             "login_failed" => Ok(AuditEventType::LoginFailed),
             "account_locked" => Ok(AuditEventType::AccountLocked),
             "logout" => Ok(AuditEventType::Logout),
+            "password_reset_by_admin" => Ok(AuditEventType::PasswordResetByAdmin),
             other => Err(rusqlite::Error::FromSqlConversionFailure(
                 0,
                 rusqlite::types::Type::Text,

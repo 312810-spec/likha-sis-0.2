@@ -2809,6 +2809,57 @@ production use with real learner PII.
 migration/workflow/harness-metadata file touched — see
 `docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
 
+## Wave 3I — Admin-Assisted Password Reset (added 2026-09-01)
+
+Full record: `docs/adr/0057-admin-assisted-password-reset.md`;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/ACTIVE-PLAN.md`'s new top
+section; `docs/VERIFICATION-DEBT.md`'s new top entry. Implemented Wave
+3H's own recommended next slice: a School Head resets a colleague's
+LIKHA login password within their own school, closing the previously
+undisclosed gap that a teacher who forgot their password had zero in-app
+recovery path at all.
+
+**Decision (10-scenario process, ADR-0057)**: School Head sets a new
+password directly, immediately, no forced-change-at-next-login flag —
+reuses four already-proven patterns (a `Capability` gate, Argon2id
+hashing, school-scoping, the audit log) with zero new schema beyond
+widening `audit_log.event_type`'s CHECK constraint (table-rebuild
+migration, same pattern migration 5 already used). The "School Head
+learns the new password" tradeoff is explicitly accepted, not silently
+ignored — Scenario 2 (temporary password + forced change) is the
+recorded Next Best with its own switch condition.
+
+**Real environment gap closed this session, not just disclosed**: this
+container's local Rust toolchain could not previously build/test/clippy
+the native crate at all (missing Tauri Linux GTK/glib/WebKit apt
+packages, an outdated rustc). Both were fixed this session (`apt-get
+install` for the system libraries, `rustup update stable` for the
+compiler) — the **full** native `cargo test`/`cargo clippy` suite ran
+locally for the first time in several recent sessions, not just via CI.
+`gitleaks`/`cargo-deny` were also installed fresh and ran clean;
+`osv-scanner` was installed and ran but could not reach its remote
+vulnerability database through this environment's proxy allowlist — see
+`docs/VERIFICATION-DEBT.md` for that disclosed limitation.
+
+**Independent review**: a `security-reviewer` was dispatched (required —
+auth-touching milestone). The first pass hit this project's
+long-documented agent-resume/findings-retrieval issue; the one permitted
+retry succeeded this time with a plain-text restatement: no BLOCKING, no
+SHOULD-FIX findings. No self-review substitution was needed.
+
+**Verification, all actually run this session**: `npm run quality`
+770/770 (+14); typecheck/eslint/format/architecture clean; `npm run
+build` + `check:dev-preview-isolation` clean. `cargo test` full suite
+green twice; `cargo fmt --check` clean; `cargo clippy --all-targets --
+-D warnings` clean (zero warnings, not just zero errors); `npm run
+harness:verify` still exactly 100/100.
+
+**Gate decision: WAVE 3I COMPLETE.** Per the user's explicit
+mid-session instruction to pause before starting a new wave, no further
+wave was started — the next slice is recorded in
+`docs/CURRENT-HANDOFF.md` and left for a future, separately-authorized
+continuation.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

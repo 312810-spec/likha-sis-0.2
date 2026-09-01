@@ -1,5 +1,42 @@
 # ACTIVE PLAN
 
+## Wave 3I: Admin-Assisted Password Reset (added 2026-09-01) — complete
+
+Full record: `docs/adr/0057-admin-assisted-password-reset.md`;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 3I
+entry; `docs/VERIFICATION-DEBT.md` Wave 3I entry. Same branch
+(`claude/likha-verification-debt-6xrq4i`, already at `main`'s tip
+`41e1af9`).
+
+**Scope**: the exact next slice Wave 3H's own survey recommended — a
+School Head resets a colleague's LIKHA login password within their own
+school. 10-scenario decision, migration widening `audit_log`'s CHECK
+constraint (no new column/table), new `authorize_admin_password_reset`
+gate, new `admin_reset_teacher_password` command, new
+`SchoolMembersScreen.tsx`.
+
+**Verification, all actually run this session**: `npm run quality`
+770/770 (+14); typecheck/lint/format/architecture clean; `npm run build`
+
+- `check:dev-preview-isolation` clean. `cargo test` full suite green
+  twice (determinism check); `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `npm run harness:verify` 100/100
+  unchanged. `gitleaks` clean; `cargo deny check` all `ok`; `osv-scanner`
+  could not reach `api.osv.dev` through this environment's proxy (disclosed
+  gap, CI Security Gate authoritative). Independent `security-reviewer`
+  completed on the one permitted retry: no BLOCKING, no SHOULD-FIX
+  findings.
+
+**Not done this milestone**: pushing/CI confirmation on `origin` (see
+`docs/CURRENT-HANDOFF.md` for the exact commit/CI-run ids once
+available); Scenario 2 of the ADR (temporary password + forced change at
+next login) — recorded Next Best, not built.
+
+**Gate decision: WAVE 3I COMPLETE.** Per the user's explicit
+mid-session instruction, no further wave started this session — the
+next slice is recorded in `docs/CURRENT-HANDOFF.md` and left for a
+future continuation.
+
 ## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
 
 Planning-only wave (GitHub issue #6), branch

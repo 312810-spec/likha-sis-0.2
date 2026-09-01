@@ -8,8 +8,8 @@ use std::path::Path;
 
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
-use app_lib::repository::audit_log::{self, AuditLogEntry};
-use app_lib::repository::{learner, school, user};
+use app_lib::repository::audit_log::{self, AuditEventType, AuditLogEntry};
+use app_lib::repository::{learner, role, school, user};
 
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
@@ -285,4 +285,257 @@ fn a_teachers_audit_log_never_includes_another_schools_events() {
         "must never include another school's audit events"
     );
     assert!(entries.iter().any(|e| e.username == "teacher.a"));
+}
+
+/// Standing in for `commands::user::admin_reset_teacher_password`
+/// (Wave 3I, ADR-0057).
+fn admin_reset_teacher_password_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    new_password: &str,
+) -> app_lib::error::AppResult<()> {
+    let school_id = auth::authorize_admin_password_reset(conn, sessions, target_user_id)?;
+    user::admin_reset_password(conn, target_user_id, new_password)?;
+    let target = user::find_by_id(conn, target_user_id)?.expect("target must exist");
+    audit_log::record(
+        conn,
+        &school_id,
+        Some(target_user_id),
+        &target.username,
+        AuditEventType::PasswordResetByAdmin,
+    )
+}
+
+#[test]
+fn a_school_head_can_reset_a_colleagues_password_and_it_is_immediately_usable() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let head = user::create_user(&conn, "head.a", "head-password", "Head A").unwrap();
+    user::add_school_membership(&conn, &head.id, &school_a.id).unwrap();
+    role::grant(&conn, &head.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+    let teacher = user::create_user(&conn, "teacher.a", "old-password", "Teacher A").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &school_a.id).unwrap();
+    let head_sessions = SessionManager::new();
+    auth::login(
+        &conn,
+        &head_sessions,
+        "head.a",
+        "head-password",
+        &school_a.id,
+    )
+    .unwrap();
+
+    admin_reset_teacher_password_as_current_session(
+        &conn,
+        &head_sessions,
+        &teacher.id,
+        "brand-new-password",
+    )
+    .unwrap();
+
+    let teacher_sessions = SessionManager::new();
+    assert!(
+        auth::login(
+            &conn,
+            &teacher_sessions,
+            "teacher.a",
+            "old-password",
+            &school_a.id
+        )
+        .is_err(),
+        "the old password must no longer work after a reset"
+    );
+    assert!(
+        auth::login(
+            &conn,
+            &teacher_sessions,
+            "teacher.a",
+            "brand-new-password",
+            &school_a.id
+        )
+        .is_ok(),
+        "the new password must work immediately after a reset"
+    );
+}
+
+#[test]
+fn admin_reset_teacher_password_clears_an_existing_lockout() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let head = user::create_user(&conn, "head.a", "head-password", "Head A").unwrap();
+    user::add_school_membership(&conn, &head.id, &school_a.id).unwrap();
+    role::grant(&conn, &head.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+    let teacher = user::create_user(&conn, "teacher.a", "old-password", "Teacher A").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &school_a.id).unwrap();
+    let head_sessions = SessionManager::new();
+    auth::login(
+        &conn,
+        &head_sessions,
+        "head.a",
+        "head-password",
+        &school_a.id,
+    )
+    .unwrap();
+    // `user::MAX_FAILED_LOGIN_ATTEMPTS` is `pub(crate)`, not visible from
+    // an integration test -- 5 is its current value (ADR-0019).
+    for _ in 0..5 {
+        let attempt_sessions = SessionManager::new();
+        let _ = auth::login(&conn, &attempt_sessions, "teacher.a", "wrong", &school_a.id);
+    }
+    let locked_out_sessions = SessionManager::new();
+    assert!(matches!(
+        auth::login(
+            &conn,
+            &locked_out_sessions,
+            "teacher.a",
+            "old-password",
+            &school_a.id
+        ),
+        Err(AppError::AccountLocked)
+    ));
+
+    admin_reset_teacher_password_as_current_session(
+        &conn,
+        &head_sessions,
+        &teacher.id,
+        "brand-new-password",
+    )
+    .unwrap();
+
+    let after_reset_sessions = SessionManager::new();
+    assert!(
+        auth::login(
+            &conn,
+            &after_reset_sessions,
+            "teacher.a",
+            "brand-new-password",
+            &school_a.id
+        )
+        .is_ok(),
+        "a reset must clear the lockout, not just change the password"
+    );
+}
+
+#[test]
+fn admin_reset_teacher_password_is_denied_for_a_non_school_head() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let teacher_actor =
+        user::create_user(&conn, "teacher.actor", "password", "Teacher Actor").unwrap();
+    user::add_school_membership(&conn, &teacher_actor.id, &school_a.id).unwrap();
+    let target = user::create_user(&conn, "teacher.b", "old-password", "Teacher B").unwrap();
+    user::add_school_membership(&conn, &target.id, &school_a.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "teacher.actor", "password", &school_a.id).unwrap();
+
+    let result = admin_reset_teacher_password_as_current_session(
+        &conn,
+        &sessions,
+        &target.id,
+        "new-password",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn admin_reset_teacher_password_is_denied_for_a_target_in_a_different_school() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let school_b = school::create(&conn, "School B").unwrap();
+    let head = user::create_user(&conn, "head.a", "head-password", "Head A").unwrap();
+    user::add_school_membership(&conn, &head.id, &school_a.id).unwrap();
+    role::grant(&conn, &head.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+    let other_teacher = user::create_user(&conn, "teacher.b", "old-password", "Teacher B").unwrap();
+    user::add_school_membership(&conn, &other_teacher.id, &school_b.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "head.a", "head-password", &school_a.id).unwrap();
+
+    let result = admin_reset_teacher_password_as_current_session(
+        &conn,
+        &sessions,
+        &other_teacher.id,
+        "new-password",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+    let after = auth::login(
+        &conn,
+        &SessionManager::new(),
+        "teacher.b",
+        "old-password",
+        &school_b.id,
+    );
+    assert!(
+        after.is_ok(),
+        "a denied cross-school reset must never change the target's password"
+    );
+}
+
+#[test]
+fn admin_reset_teacher_password_is_denied_for_a_target_that_does_not_exist() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let head = user::create_user(&conn, "head.a", "head-password", "Head A").unwrap();
+    user::add_school_membership(&conn, &head.id, &school_a.id).unwrap();
+    role::grant(&conn, &head.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "head.a", "head-password", &school_a.id).unwrap();
+
+    let result = admin_reset_teacher_password_as_current_session(
+        &conn,
+        &sessions,
+        "does-not-exist",
+        "new-password",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn admin_reset_teacher_password_requires_a_session_even_if_a_caller_tries_to_bypass_ui_checks() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let target = user::create_user(&conn, "teacher.b", "old-password", "Teacher B").unwrap();
+    user::add_school_membership(&conn, &target.id, &school_a.id).unwrap();
+    let sessions = SessionManager::new(); // nobody logged in
+
+    let result = admin_reset_teacher_password_as_current_session(
+        &conn,
+        &sessions,
+        &target.id,
+        "new-password",
+    );
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn admin_reset_teacher_password_writes_an_audit_log_entry_against_the_target_account() {
+    let conn = open_test_db();
+    let school_a = school::create(&conn, "School A").unwrap();
+    let head = user::create_user(&conn, "head.a", "head-password", "Head A").unwrap();
+    user::add_school_membership(&conn, &head.id, &school_a.id).unwrap();
+    role::grant(&conn, &head.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+    let teacher = user::create_user(&conn, "teacher.a", "old-password", "Teacher A").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &school_a.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "head.a", "head-password", &school_a.id).unwrap();
+
+    admin_reset_teacher_password_as_current_session(
+        &conn,
+        &sessions,
+        &teacher.id,
+        "brand-new-password",
+    )
+    .unwrap();
+
+    let entries = audit_log::list_for_school(&conn, &school_a.id, 50).unwrap();
+    let reset_entry = entries
+        .iter()
+        .find(|e| e.event_type == AuditEventType::PasswordResetByAdmin)
+        .expect("a password_reset_by_admin event must be recorded");
+    assert_eq!(reset_entry.user_id, Some(teacher.id.clone()));
+    assert_eq!(reset_entry.username, "teacher.a");
 }
