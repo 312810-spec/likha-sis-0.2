@@ -2744,6 +2744,21 @@ Full record: `docs/adr/0056-*` Wave 3H addendum;
   `npm run quality:full` clean (750/750 vitest, cargo test, clippy, fmt, linters); `npm run build`,
   `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
 
+## Wave 3I — School Form 5 (SF5) Promotion & Learning Progress Foundation (added 2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md`;
+`docs/VERIFICATION-DEBT.md` Wave 3I entry. **New branch**
+`antigravity/likha-sis-wave3i-sf5-promotion-foundation`, created from `10bc2f5` (Wave
+3H's checkpoint).
+
+- **Built**: DepEd Order No. 8, s. 2015 / DepEd Order No. 58, s. 2017 compliant SF5 export engine.
+  Pure domain model `src-tauri/src/export/sf5.rs` (`PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow`, `ProficiencySummary`, `build_sf5_export`),
+  Tauri command `export_section_eosy_sf5` gated on `auth::authorize_adviser_of_section`,
+  frontend port `ExportRepository.exportSectionEosySf5`, `TauriExportRepository`, `ExportApplicationService`, and session exemption in `invoke.ts`.
+- **Verification/checkpoint**: `cargo test` 611 lib tests (+7) + 14 integration test binaries green (+3 integration tests);
+  `npm run quality:full` clean (755/755 vitest across 78 files, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

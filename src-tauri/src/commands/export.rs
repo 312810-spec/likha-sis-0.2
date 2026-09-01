@@ -4,18 +4,26 @@ use rusqlite::Connection;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::auth::SessionManager;
+use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::export::learner_roster;
 use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
 use crate::export::sf2;
+use crate::export::sf5::{self, Sf5LearnerRow, Sf5SubjectGrade};
 use crate::export::FieldDisclosure;
 use crate::repository::{
-    attendance, class_record, grading_computation, learner, school, section, section_advisory,
-    section_membership, user,
+    attendance, class_record, grading, grading_computation, learner, school, section,
+    section_advisory, section_membership, user,
 };
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sf5ExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -234,6 +242,192 @@ pub fn export_learner_roster(
     std::fs::write(&file_path, export.csv)?;
 
     Ok(Some(LearnerRosterExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+
+/// Writes a section-level School Form 5 (SF5) End of School Year (EOSY)
+/// Report on Promotion and Level of Proficiency export to `<Documents>/LIKHA-SIS/`.
+///
+/// Gated by `auth::authorize_adviser_of_section` so that only the assigned
+/// class adviser for the section (or a School Head in the same school) can
+/// generate the section's official SF5 report.
+#[tauri::command]
+pub fn export_section_eosy_sf5(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    school_year: String,
+) -> AppResult<Option<Sf5ExportResult>> {
+    let conn = lock_db(&db);
+
+    let periods = grading::list_by_school_year(&conn, "", &school_year).unwrap_or_default();
+    let as_of_date = if let Some(last_period) = periods.last() {
+        last_period.ends_on.clone()
+    } else {
+        // Fallback to year boundary if no periods exist
+        let end_year = school_year
+            .split('-')
+            .nth(1)
+            .and_then(|y| y.parse::<i32>().ok())
+            .unwrap_or(2027);
+        format!("{end_year}-06-30")
+    };
+
+    let (_user_id, school_id) =
+        match auth::authorize_adviser_of_section(&conn, &sessions, &section_id, &as_of_date) {
+            Ok(pair) => pair,
+            Err(crate::error::AppError::Unauthorized) => {
+                return Err(crate::error::AppError::Unauthorized)
+            }
+            Err(_) => return Ok(None),
+        };
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(section) = section::find_by_id_in_school(&conn, &school_id, &section_id)? else {
+        return Ok(None);
+    };
+
+    let school_periods = grading::list_by_school_year(&conn, &school_id, &school_year)?;
+    let start_date = school_periods
+        .first()
+        .map(|p| p.starts_on.clone())
+        .unwrap_or_else(|| {
+            let start_year = school_year
+                .split('-')
+                .next()
+                .and_then(|y| y.parse::<i32>().ok())
+                .unwrap_or(2026);
+            format!("{start_year}-06-01")
+        });
+    let end_date = school_periods
+        .last()
+        .map(|p| p.ends_on.clone())
+        .unwrap_or_else(|| as_of_date.clone());
+
+    let adviser =
+        section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &end_date)?;
+    let adviser_name = if let Some(adv) = adviser {
+        user::find_by_id(&conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+    } else {
+        None
+    };
+
+    let roster = section_membership::roster_for_section_over_range(
+        &conn,
+        &school_id,
+        &section_id,
+        &start_date,
+        &end_date,
+    )?;
+
+    let class_records = class_record::list_by_section_in_school(&conn, &school_id, &section_id)?;
+    let filtered_records: Vec<_> = class_records
+        .into_iter()
+        .filter(|cr| cr.school_year == school_year)
+        .collect();
+
+    let mut distinct_subjects: Vec<String> = filtered_records
+        .iter()
+        .map(|cr| cr.subject_name.clone())
+        .collect();
+    distinct_subjects.sort();
+    distinct_subjects.dedup();
+
+    let mut learner_rows = Vec::with_capacity(roster.len());
+    for member in roster {
+        let mut subject_grades = Vec::with_capacity(distinct_subjects.len());
+
+        for subj in &distinct_subjects {
+            let subj_records: Vec<_> = filtered_records
+                .iter()
+                .filter(|cr| cr.subject_name == *subj)
+                .collect();
+
+            if subj_records.is_empty() {
+                subject_grades.push(Sf5SubjectGrade {
+                    subject_name: subj.clone(),
+                    final_grade: None,
+                });
+            } else {
+                let mut sum = 0.0;
+                let mut count = 0;
+                let mut all_scored = true;
+
+                for cr in subj_records {
+                    let computed = grading_computation::compute_term_grade(
+                        &conn,
+                        &school_id,
+                        &cr.id,
+                        &member.learner_id,
+                    )?;
+                    match computed {
+                        Some(grade) => {
+                            sum += grade.term_grade as f64;
+                            count += 1;
+                        }
+                        None => {
+                            all_scored = false;
+                        }
+                    }
+                }
+
+                let final_grade = if all_scored && count > 0 {
+                    Some((sum / count as f64).round() as u32)
+                } else {
+                    None
+                };
+
+                subject_grades.push(Sf5SubjectGrade {
+                    subject_name: subj.clone(),
+                    final_grade,
+                });
+            }
+        }
+
+        let (general_average, promotion_status) = Sf5LearnerRow::compute_status(&subject_grades);
+        learner_rows.push(Sf5LearnerRow {
+            learner_id: member.learner_id,
+            given_name: member.given_name,
+            family_name: member.family_name,
+            sex: member.sex,
+            lrn: member.lrn,
+            subject_grades,
+            general_average,
+            promotion_status,
+        });
+    }
+
+    let export = sf5::build_sf5_export(
+        &school,
+        &section.name,
+        &section.grade_level,
+        &school_year,
+        adviser_name.as_deref(),
+        &distinct_subjects,
+        &learner_rows,
+    );
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "SF5_{}_{}.csv",
+        sanitize_filename_component(&section.name.replace(' ', "_")),
+        sanitize_filename_component(&school_year.replace(' ', "_"))
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(Sf5ExportResult {
         file_path: file_path.to_string_lossy().to_string(),
         disclosure: export.disclosure,
     }))

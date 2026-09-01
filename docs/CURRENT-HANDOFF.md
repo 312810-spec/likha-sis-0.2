@@ -1,5 +1,30 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3I: School Form 5 (SF5) Promotion & Learning Progress Foundation, COMPLETE)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md`;
+`docs/PROJECT-MEMORY.md` Wave 3I entry; `docs/VERIFICATION-DEBT.md` Wave 3I entry.
+**New dedicated branch** `antigravity/likha-sis-wave3i-sf5-promotion-foundation`, created
+from `antigravity/likha-sis-wave3h-section-advisory-export-integration` at `10bc2f5`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: School Form 5 (SF5) Report on Promotion and Level of Proficiency Foundation.
+Establishes the backend and frontend export engine for DepEd SF5 End-of-School-Year reporting per section,
+evaluating subject final grades, general average, promotion status (Promoted, Conditional, Retained, Pending),
+sex-disaggregated proficiency summaries, and field disclosures, gated by adviser/School Head authorization.
+
+**What shipped**:
+- `src-tauri/src/export/sf5.rs`: Pure domain types `PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow::compute_status`, `ProficiencySummary::compute`, `build_sf5_export`, and exhaustive unit tests.
+- `src-tauri/src/commands/export.rs`: Added `export_section_eosy_sf5` command gated by `auth::authorize_adviser_of_section`, computing subject final averages from class records and generating CSV exports with sanitized file paths.
+- `src-tauri/src/lib.rs`: Registered `commands::export::export_section_eosy_sf5`.
+- `src-tauri/tests/export.rs`: Added integration tests verifying authorization gates, cross-school isolation, adviser name rendering, and learner promotion data.
+- Frontend: Added `Sf5ExportResult` in `src/domain/export.ts`, `ExportRepository.exportSectionEosySf5` port in `src/domain/ports/export-repository.ts`, `TauriExportRepository` implementation, and `ExportApplicationService.exportSectionEosySf5` application method with trimmed parameter validation.
+- `src/infrastructure/tauri/invoke.ts`: Added `export_section_eosy_sf5` to `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`.
+
+**Verification**:
+- `npm run quality:full` clean (Vitest 755/755 across 78 files, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-09-01 — Wave 3H: Section Advisory Form Header Integration, COMPLETE)
 
 Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3H addendum;

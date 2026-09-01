@@ -4,6 +4,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import { ExportApplicationService } from "./export-service";
@@ -22,6 +23,20 @@ class FakeExportRepository implements ExportRepository {
   ): Promise<Sf2ExportResult | null> {
     this.calls.push({ sectionId, year, month });
     return this.resultToReturn;
+  }
+
+  sf5Calls: Array<{ sectionId: string; schoolYear: string }> = [];
+  sf5ResultToReturn: Sf5ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF5_Mabini_2026-2027.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    this.sf5Calls.push({ sectionId, schoolYear });
+    return this.sf5ResultToReturn;
   }
 
   reportCardCalls: Array<{ classRecordId: string }> = [];
@@ -97,6 +112,39 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportSectionMonthlySf2("sec-1", 2026, 8);
+
+    expect(result).toBeNull();
+  });
+
+  it("exportSectionEosySf5 delegates to the repository with trimmed arguments", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSectionEosySf5(" sec-1 ", " 2026-2027 ");
+
+    expect(result).toEqual(repo.sf5ResultToReturn);
+    expect(repo.sf5Calls).toEqual([{ sectionId: "sec-1", schoolYear: "2026-2027" }]);
+  });
+
+  it("exportSectionEosySf5 rejects an empty section id or school year", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSectionEosySf5("  ", "2026-2027")).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    await expect(service.exportSectionEosySf5("sec-1", "  ")).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.sf5Calls).toEqual([]);
+  });
+
+  it("exportSectionEosySf5 returns null when the section could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.sf5ResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSectionEosySf5("sec-1", "2026-2027");
 
     expect(result).toBeNull();
   });

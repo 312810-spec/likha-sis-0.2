@@ -19,6 +19,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type {
@@ -65,6 +66,9 @@ class FakeAssessmentRepository implements AssessmentRepository {
 
 class FakeExportRepository implements ExportRepository {
   async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
     throw new Error("not used in this test");
   }
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {

@@ -47,6 +47,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
@@ -394,6 +395,38 @@ export class FixtureExportRepository implements ExportRepository {
         omittedFields: [
           { field: "School ID (EBEIS)", reason: "not tracked by this app" },
           { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
+        ],
+      },
+    };
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF5_${sectionId}_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: [
+          "School Name",
+          "Grade Level",
+          "Section",
+          "School Year",
+          "Class Adviser",
+          "Learner Name",
+          "LRN",
+          "Sex",
+          "Subject Final Grades",
+          "General Average",
+          "Action Taken",
+          "Summary of Proficiency Levels",
+          "Summary of Promotion Decisions",
+        ],
+        omittedFields: [
+          {
+            field: "Signature of Class Adviser / Signature of School Head",
+            reason: "Physical certification step intentionally left for signing after printing.",
+          },
         ],
       },
     };

@@ -1,5 +1,14 @@
 # Verification Debt
 
+## Wave 3I — School Form 5 (SF5) Promotion & Learning Progress Foundation (2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md`; `docs/PROJECT-MEMORY.md`
+Wave 3I entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **None.** Wave 3I is a domain, export calculation, and backend/frontend application port foundation. Pure computation and CSV rendering are covered by unit tests in `src-tauri/src/export/sf5.rs`, integration tests in `src-tauri/tests/export.rs`, and TypeScript unit tests in `src/infrastructure/tauri/export-repository.test.ts` and `src/application/export-service.test.ts`. User-facing SF5 UI buttons and generation modal will be integrated in follow-up Wave 3J (SF5 Section Promotion UI).
+
 ## Wave 3H — Section Advisory Form Header Integration (2026-09-01)
 
 Full record: `docs/adr/0056-*` Wave 3H addendum; `docs/PROJECT-MEMORY.md`

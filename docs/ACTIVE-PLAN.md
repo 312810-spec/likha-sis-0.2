@@ -1,5 +1,29 @@
 # ACTIVE PLAN
 
+## Wave 3I: School Form 5 (SF5) Promotion & Learning Progress Foundation (added 2026-09-01) — complete
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md`; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3I entry;
+`docs/VERIFICATION-DEBT.md` Wave 3I entry. **New branch**
+`antigravity/likha-sis-wave3i-sf5-promotion-foundation`, created from `10bc2f5` (Wave
+3H's checkpoint).
+
+**Scope**: DepEd School Form 5 (SF5) Report on Promotion and Level of Proficiency Foundation.
+Establishes the backend and frontend export engine for DepEd SF5 End-of-School-Year reporting per section,
+evaluating subject final grades, general average, promotion status (Promoted, Conditional, Retained, Pending),
+sex-disaggregated proficiency summaries, and field disclosures, gated by adviser/School Head authorization.
+
+**Built**:
+- `src-tauri/src/export/sf5.rs`: Pure domain types `PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow::compute_status`, `ProficiencySummary::compute`, `build_sf5_export`, and unit tests.
+- `src-tauri/src/commands/export.rs`: Added `export_section_eosy_sf5` command gated by `auth::authorize_adviser_of_section`, computing subject final averages from class records and generating CSV exports with sanitized file paths.
+- `src-tauri/src/lib.rs`: Registered `commands::export::export_section_eosy_sf5`.
+- `src-tauri/tests/export.rs`: Added integration tests verifying authorization gates, cross-school isolation, adviser name rendering, and learner promotion data.
+- Frontend: Added `Sf5ExportResult` in `src/domain/export.ts`, `ExportRepository.exportSectionEosySf5` port in `src/domain/ports/export-repository.ts`, `TauriExportRepository` implementation, and `ExportApplicationService.exportSectionEosySf5` application method with trimmed parameter validation.
+- `src/infrastructure/tauri/invoke.ts`: Added `export_section_eosy_sf5` to `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`.
+
+**Verification**: `cargo test` 611 lib tests + 14 integration test binaries clean;
+`npm run quality:full` clean (755/755 vitest); `npm run build`, `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3H: Section Advisory Form Header Integration (added 2026-09-01) — complete
 
 Full record: `docs/adr/0056-*` Wave 3H addendum; `docs/CURRENT-HANDOFF.md`

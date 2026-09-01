@@ -3,6 +3,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 
@@ -36,6 +37,22 @@ export class ExportApplicationService {
     }
 
     return this.exports.exportSectionMonthlySf2(trimmedSectionId, year, month);
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    const trimmedSectionId = sectionId.trim();
+    if (trimmedSectionId.length === 0) {
+      throw new ValidationError("Section is required.");
+    }
+    const trimmedSchoolYear = schoolYear.trim();
+    if (trimmedSchoolYear.length === 0) {
+      throw new ValidationError("School year is required.");
+    }
+
+    return this.exports.exportSectionEosySf5(trimmedSectionId, trimmedSchoolYear);
   }
 
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {

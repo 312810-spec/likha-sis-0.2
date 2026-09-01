@@ -3,6 +3,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
 } from "../../domain/export";
 import type { ExportRepository } from "../../domain/ports/export-repository";
 
@@ -17,6 +18,13 @@ export class TauriExportRepository implements ExportRepository {
       sectionId,
       year,
       month,
+    });
+  }
+
+  exportSectionEosySf5(sectionId: string, schoolYear: string): Promise<Sf5ExportResult | null> {
+    return invoke<Sf5ExportResult | null>("export_section_eosy_sf5", {
+      sectionId,
+      schoolYear,
     });
   }
 
