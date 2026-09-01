@@ -1,5 +1,42 @@
 # Verification Debt
 
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure (2026-09-01)
+
+A `security-reviewer` was dispatched against the reconciliation diff
+(multi-tenant isolation of the three new export commands, CSV/formula-
+injection defense, filename sanitization, and the
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` categorization decision —
+see `docs/adr/0060-wave-3m-reconciliation.md`). It completed real work
+but its structured findings could not be retrieved from the tool
+result; a `SendMessage` resume of the same agent (the one permitted
+retry, per `.claude/rules/autonomous-development.md`'s established
+rule for this recurring harness issue) also returned no retrievable
+content. This is the same class of failure recorded repeatedly
+elsewhere in this project's history (see `docs/PROJECT-MEMORY.md`'s
+M7-M20-era entries).
+
+**Self-review performed instead, per the established fallback**: direct
+inspection confirmed (1) every teacher/school-entered field in
+`export/{sf4,sf5,sf6}.rs` is written through the shared `csv::row()`
+helper (`export/csv.rs`), which neutralizes a leading `=`/`+`/`-`/`@`/
+tab and RFC-4180-quotes commas/quotes/newlines per field — no `format!`
+bypasses it; (2) every filename built by the six export commands in
+`commands/export.rs` (including the three new ones) routes through
+`sanitize_filename_component`; (3) `export_school_monthly_attendance_sf4`
+and `export_school_eosy_sf6` take no client-supplied section/school id
+at all — `school_id` comes only from
+`sessions.require_active_school_scope(&conn)` — and
+`export_section_eosy_sf5` is gated by the existing, already-reviewed
+`auth::authorize_adviser_of_section` before any data access. No
+BLOCKING issue found by this self-review.
+
+**Retained as independent-review debt, not closed**: a real
+non-self-review of this diff is still owed. Retry in a future session
+once the agent-resume/retrieval mechanism is confirmed reliably
+working again, per the project's standing instruction not to keep
+spending large amounts of context chasing a known-broken retrieval
+path.
+
 ## Wave 3m reconciliation — no local Rust build/test/clippy (2026-09-01)
 
 Full context: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
