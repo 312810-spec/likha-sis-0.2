@@ -1,5 +1,53 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — UX-04 independent review retry, complete)
+
+Dispatched fresh `teacher-ux-reviewer` and `accessibility-reviewer` runs
+against `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx` — the
+long-open UX-04 independent-review debt (`docs/VERIFICATION-DEBT.md`,
+recorded 2026-08-25, both reviewers previously hit the agent-resume/
+retrieval failure twice each). **Both retrievals succeeded this time**
+(the third successful review retry today, after the earlier SF5
+security review) — the harness issue appears to be intermittent rather
+than permanent, at least in this session.
+
+**Findings, both NEEDS-ATTENTION (minor), all fixed**:
+
+- Teacher-UX: (1) Medium — deleting an assessment item gave no success
+  confirmation, inconsistent with this file's own create-item and
+  `ScheduleMeetingsScreen`'s delete-confirmation precedent; (2) Low —
+  editing/renaming an item had the same gap; (3) Low — the
+  weighting-name fallback text read as "unknown" (alarming) rather than
+  a benign gap; (4) Low — the DepEd weighting-coverage caveat sat below
+  the export button, not above it, so a top-to-bottom reader could hit
+  "Export" before the caveat.
+- Accessibility: (1) Medium — the selected-assessment-item button set
+  `aria-pressed` but had no matching CSS rule, so it carried zero visual
+  cue for which item was selected (`.attendance-roster` already has this
+  exact pattern — `.assessment-item-list` didn't). Verified the
+  previously-fixed Edit/Delete accessible-name collision (`role="group"`)
+  remains correctly in place, not regressed.
+
+**Fixed**: added `setConfirmation` calls to delete/edit success paths;
+changed `"unknown"` → `"not shown"` fallback text (both occurrences);
+moved the DepEd caveat paragraph above the export button; added a
+`.assessment-item-list button[aria-pressed="true"]` CSS rule mirroring
+`.attendance-roster`'s (background/color change + non-color `✓` cue,
+WCAG 1.4.1). Extended the 3 affected existing tests with assertions for
+the new confirmation text; CSS-only fix has no direct unit-test
+coverage (matches how `.attendance-roster`'s identical rule is
+verified — visually/structurally, not via a CSS-in-jsdom assertion).
+
+**Verified this wave**: `npm run quality` — 794/794 tests (existing
+tests extended, no new `it` blocks, so count unchanged), typecheck/
+lint/format/architecture clean. `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s UX-04 entry updated to CLOSED — both
+reviews actually completed and returned findings this time, and every
+finding from both is now fixed.
+
 ## Active Task (2026-09-01, this session — SF5 export as_of_date bug fix + dev-preview SF5/SF6 wiring, complete)
 
 Follow-up to Wave 3J below. Dispatched an independent `security-reviewer`

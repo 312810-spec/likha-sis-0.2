@@ -337,6 +337,7 @@ describe("ClassRecordWorkspace", () => {
       expect(assessmentRepo.renameCalls).toEqual([{ id: "ai-1", name: "Quiz 1 (Retake)" }]),
     );
     expect(assessmentRepo.updateCalls).toEqual([]);
+    await waitFor(() => expect(screen.getByText("Quiz 1 (Retake) updated.")).toBeInTheDocument());
   });
 
   it("fully edits an unscored item's name, category, and max score", async () => {
@@ -368,6 +369,7 @@ describe("ClassRecordWorkspace", () => {
         { id: "ai-1", name: "Quiz 1 (Revised)", categoryId: "cat-1", maxScore: 25 },
       ]),
     );
+    await waitFor(() => expect(screen.getByText("Quiz 1 (Revised) updated.")).toBeInTheDocument());
   });
 
   it("deletes an unscored item only after a second confirming click", async () => {
@@ -383,6 +385,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Confirm delete" }));
 
     await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
+    await waitFor(() => expect(screen.getByText("Quiz 1 deleted.")).toBeInTheDocument());
   });
 
   it("does not offer to delete an item that already has recorded scores", async () => {

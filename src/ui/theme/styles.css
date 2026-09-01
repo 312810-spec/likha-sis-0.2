@@ -947,6 +947,22 @@ label {
   }
 }
 
+/* Same treatment as .attendance-roster's selected-toggle button --
+   without this, the currently-selected assessment item had no visual
+   cue at all beyond the heading appearing below it (WCAG 1.4.1: not
+   color alone, so a non-color ✓ cue too, same as .attendance-roster
+   and .mode-switcher use). */
+.assessment-item-list button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+.assessment-item-list button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
 /* Narrow (phone-width): each assessment item's own action row (select
    button, Edit, Delete/blocked-reason text) wraps onto one crowded line
    by default -- stack them instead so every control stays a clear,

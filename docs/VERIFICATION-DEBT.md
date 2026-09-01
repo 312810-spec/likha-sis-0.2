@@ -2687,9 +2687,26 @@ NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
    `security-reviewer` dispatched for an adversarial pass. Still not
    reachable from any UI (unchanged).
 
-## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
 
-Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
+**Closed for real 2026-09-01**: fresh `teacher-ux-reviewer` and
+`accessibility-reviewer` dispatches against the same two files **both
+actually retrieved findings this time** — the agent-resume/retrieval
+failure did not recur (the third successful independent-review retry
+in this same session, after an earlier SF4/SF5/SF6 security review).
+Teacher-UX found one Medium (no delete confirmation) and three Low
+findings (no edit confirmation; alarming "unknown" fallback text;
+DepEd caveat placed after, not before, the export button).
+Accessibility found one Medium finding (selected-item button had
+`aria-pressed` but no matching CSS, so no visual selection cue) and
+confirmed the previously-fixed Edit/Delete accessible-name collision
+remains correctly fixed, not regressed. **All five findings fixed** —
+see `docs/CURRENT-HANDOFF.md`'s matching entry and the git history for
+`src/ui/ClassRecordWorkspace.tsx`/`src/ui/theme/styles.css`. Original
+self-review record retained below for the historical trail.
+
+Original entry, retained for context: both `teacher-ux-reviewer` and
+`accessibility-reviewer` were dispatched
 against UX-04's `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx`
 changes (2026-08-25) and hit the same recurring agent-resume/retrieval
 failure documented since M7 (see `docs/adr/0027-audit-timestamp-readability-fix.md`,

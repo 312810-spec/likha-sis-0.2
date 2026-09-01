@@ -275,6 +275,7 @@ export function ClassRecordWorkspace({
         const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
         setItems(refreshed);
         setEditingItemId(null);
+        setConfirmation(`${updated.name} updated.`);
       }
     } catch (err) {
       setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
@@ -299,6 +300,7 @@ export function ClassRecordWorkspace({
         setItems(refreshed);
         if (selectedItemId === item.id) setSelectedItemId(null);
         setConfirmingDeleteItemId(null);
+        setConfirmation(`${item.name} deleted.`);
       }
     } catch (err) {
       setItemActionError(
@@ -857,7 +859,7 @@ export function ClassRecordWorkspace({
           {roster.length > 0 && (
             <div className="term-grades">
               <p className="field-hint">
-                Grading weighting: <strong>{weightPolicyName ?? "unknown"}</strong>
+                Grading weighting: <strong>{weightPolicyName ?? "not shown"}</strong>
               </p>
               <button type="button" disabled={termGradesLoading} onClick={handleShowTermGrades}>
                 {termGradesLoading ? "Computing…" : "Show term grades"}
@@ -915,6 +917,12 @@ export function ClassRecordWorkspace({
                 </table>
               )}
 
+              <p className="field-hint">
+                This export uses the <strong>{weightPolicyName ?? "not shown"}</strong> weighting
+                chosen for this class record. Only two DepEd weighting groups are available so far —
+                if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is
+                DepEd-compliant for it yet.
+              </p>
               <button
                 type="button"
                 className="button-primary"
@@ -923,12 +931,6 @@ export function ClassRecordWorkspace({
               >
                 {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
               </button>
-              <p className="field-hint">
-                This export uses the <strong>{weightPolicyName ?? "unknown"}</strong> weighting
-                chosen for this class record. Only two DepEd weighting groups are available so far —
-                if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is
-                DepEd-compliant for it yet.
-              </p>
 
               {reportCardResult && (
                 <Alert tone="success">
