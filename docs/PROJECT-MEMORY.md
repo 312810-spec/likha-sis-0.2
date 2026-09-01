@@ -2809,6 +2809,20 @@ production use with real learner PII.
 migration/workflow/harness-metadata file touched — see
 `docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
 
+## Wave 3J: SF4 Export UI Trigger (added 2026-09-01)
+
+Full record: `docs/CURRENT-HANDOFF.md`'s top entry. Recommended next
+slice from the Wave 3m reconciliation below, now shipped: a second
+export button in `MonthlySummaryScreen.tsx` calling the already-shipped
+`exportSchoolMonthlyAttendanceSf4`, enabled independent of the selected
+section's report (SF4 is school-wide, not section-scoped) — only a
+valid month gates it. `npm run quality` 794/794 (3 new tests), build,
+`check:dev-preview-isolation`, `harness:verify` 100/100, `git diff
+--check` all clean. No Rust files touched — pure TS/UI change against
+an already-CI-verified Rust command. SF5/SF6 UI triggers remain
+deliberately unwired (ADR-0059's zero-UI-first precedent), not part of
+this slice.
+
 ## Wave 3m Reconciliation (added 2026-09-01)
 
 Full record: `docs/adr/0060-wave-3m-reconciliation.md`. Two independent

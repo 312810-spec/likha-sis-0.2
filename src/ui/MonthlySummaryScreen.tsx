@@ -4,7 +4,7 @@ import type { ExportApplicationService } from "../application/export-service";
 import type { SectionApplicationService } from "../application/section-service";
 import type { AttendanceStatus, MonthlyAttendanceReport } from "../domain/attendance";
 import { ValidationError } from "../domain/errors";
-import type { Sf2ExportResult } from "../domain/export";
+import type { Sf2ExportResult, Sf4ExportResult } from "../domain/export";
 import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
@@ -82,13 +82,19 @@ export function MonthlySummaryScreen({
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<Sf2ExportResult | null>(null);
+  const [exportingSf4, setExportingSf4] = useState(false);
+  const [exportSf4Error, setExportSf4Error] = useState<string | null>(null);
+  const [exportSf4Result, setExportSf4Result] = useState<Sf4ExportResult | null>(null);
 
   // Request identity for the section-list, report, and export requests --
   // guards against an in-flight request whose context (section/month) has
   // since changed from applying its result to the now-current context.
+  // SF4 is school-wide, not section-scoped, so it gets its own request ref
+  // invalidated only by a month change, never a section change.
   const sectionsRequestRef = useRef(0);
   const reportRequestRef = useRef(0);
   const exportRequestRef = useRef(0);
+  const exportSf4RequestRef = useRef(0);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -173,6 +179,9 @@ export function MonthlySummaryScreen({
     exportRequestRef.current += 1;
     setExportResult(null);
     setExportError(null);
+    exportSf4RequestRef.current += 1;
+    setExportSf4Result(null);
+    setExportSf4Error(null);
     setYearMonth({ year: newYear, month: newMonth });
   }
 
@@ -205,6 +214,31 @@ export function MonthlySummaryScreen({
       );
     } finally {
       if (exportRequestRef.current === requestId) setExporting(false);
+    }
+  }
+
+  async function handleExportSf4() {
+    const requestId = ++exportSf4RequestRef.current;
+    setExportSf4Error(null);
+    setExportingSf4(true);
+    try {
+      const result = await exportService.exportSchoolMonthlyAttendanceSf4(year, month);
+      // The teacher may have changed month while the export was in
+      // flight -- never show a stale export's result (success or
+      // failure) once the context it was for is no longer current.
+      if (exportSf4RequestRef.current !== requestId) return;
+      if (result === null) {
+        setExportSf4Error("Could not export — your school could not be resolved.");
+      } else {
+        setExportSf4Result(result);
+      }
+    } catch (err) {
+      if (exportSf4RequestRef.current !== requestId) return;
+      setExportSf4Error(
+        err instanceof ValidationError ? err.message : "Could not export this report.",
+      );
+    } finally {
+      if (exportSf4RequestRef.current === requestId) setExportingSf4(false);
     }
   }
 
@@ -308,6 +342,31 @@ export function MonthlySummaryScreen({
               </p>
               <ul>
                 {exportResult.disclosure.omittedFields.map((omitted) => (
+                  <li key={omitted.field}>
+                    <strong>{omitted.field}</strong> — {omitted.reason}
+                  </li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+
+          <button type="button" disabled={exportingSf4} onClick={handleExportSf4}>
+            {exportingSf4 ? "Exporting…" : "Export SF4 (CSV, whole school)"}
+          </button>
+
+          {exportSf4Error && <Alert tone="error">{exportSf4Error}</Alert>}
+
+          {exportSf4Result && (
+            <Alert tone="success">
+              <p>
+                Saved to <code>{exportSf4Result.filePath}</code>.
+              </p>
+              <p>
+                This file is DepEd-SF4-<em>inspired</em>, not a submission-ready reproduction. It
+                does <strong>not</strong> include:
+              </p>
+              <ul>
+                {exportSf4Result.disclosure.omittedFields.map((omitted) => (
                   <li key={omitted.field}>
                     <strong>{omitted.field}</strong> — {omitted.reason}
                   </li>

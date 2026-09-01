@@ -1,5 +1,44 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Wave 3J: SF4 Export UI Trigger, complete)
+
+User-directed continuation, following the merges below. Full scope:
+the recommended next slice from the Wave 3m reconciliation entry —
+wire an "Export SF4" trigger into `MonthlySummaryScreen.tsx`, the same
+school-wide, month-scoped screen that already triggers the SF2 export.
+
+**What shipped**: a second export button, "Export SF4 (CSV, whole
+school)", next to the existing "Export SF2 (CSV)" one in
+`MonthlySummaryScreen.tsx`. Calls the already-existing
+`exportService.exportSchoolMonthlyAttendanceSf4(year, month)` (backend
+shipped in Wave 3m with no UI trigger, deliberately, per ADR-0059).
+Deliberately **not** gated on the currently-selected section or its
+report data — SF4 is school-wide, unlike SF2's section scope — so it's
+enabled whenever a valid month is selected, independent of which
+section the teacher happens to have picked. Gets its own request-
+invalidation ref (`exportSf4RequestRef`), invalidated on month change
+but not section change, mirroring the existing SF2 pattern's
+stale-response guard. Also wired `FixtureExportRepository.exportSchoolMonthlyAttendanceSf4`
+in `src/dev-preview/fixtures.ts` (previously an unwired "not wired"
+throw stub, like SF5/SF6 still are) with a real synthetic result, so
+the dev-preview screen actually demonstrates the new button end-to-end
+— matching the fixture's existing SF2 convention.
+
+**Verified this wave**: `npm run quality` — typecheck, eslint,
+`prettier --check`, `check:architecture`, `vitest run` all clean,
+**794/794 tests passing** (3 new: successful SF4 export, school-not-
+resolved error path, and the button not being gated on section-report
+data). `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), and `git diff --check` all also clean. No
+Rust files touched — this was a pure TS/UI change against an
+already-shipped, already-CI-verified Rust command.
+
+**Not done, deliberately out of scope**: SF5/SF6 UI triggers (both
+still deliberately unwired in the dev-preview fixture, matching
+ADR-0059's zero-UI-first precedent for those two forms — not part of
+this slice's recommendation). No product-code change beyond the two
+files above plus the dev-preview fixture.
+
 ## Active Task (2026-09-01, this session — Merge PR #18 and PR #11, real Rust verification, complete)
 
 User-directed: merge both green PRs, resolve any conflicts, continue
