@@ -1,6 +1,6 @@
 ---
 name: codex-delegation
-description: Use when considering delegating an implementation or review task to the official OpenAI Codex plugin (`codex@openai-codex`), or when reviewing work that came back from Codex. ACTIVE again as of 2026-09-01 — the Gemini replacement is on hold, see gemini-delegation.
+description: PAUSED (user instruction, 2026-09-01) — do not delegate to Codex right now. Stopped alongside gemini-delegation while the user has this session work GitHub PRs/issues and product waves directly.
 ---
 
 # Codex Delegation (PILOT — not ADOPT)

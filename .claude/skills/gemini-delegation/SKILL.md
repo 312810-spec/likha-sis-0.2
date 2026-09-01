@@ -1,6 +1,6 @@
 ---
 name: gemini-delegation
-description: ON HOLD (2026-09-01) — blocked by an unresolved upstream Google OAuth bug. Use codex-delegation instead for active delegation work. Only consult this skill to check whether the upstream bug is resolved yet, or once it is.
+description: PAUSED (user instruction, 2026-09-01) — do not delegate here either; also separately blocked by an unresolved upstream Google OAuth bug (kept below for when both are lifted).
 ---
 
 # Gemini Delegation (ON HOLD — blocked upstream)
