@@ -1,5 +1,62 @@
 # ACTIVE PLAN
 
+## Wave 3m Reconciliation (added 2026-09-01) — complete
+
+GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full record:
+`docs/adr/0060-wave-3m-reconciliation.md`; per-form ADRs
+`docs/adr/0057-sf5-promotion-foundation.md`,
+`docs/adr/0058-sf6-school-promotion-summary.md`,
+`docs/adr/0059-sf4-monthly-attendance-consolidation.md`.
+
+**Scope**: reconcile `main` (restored Claude Code harness +
+independently-built Adviser View/Section Adviser Management, through
+Wave 3H) against the separately-developed
+`antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation`
+lineage (SF2 adviser-byline integration, SF5, SF6, SF4), both diverged
+from the same Wave 3E checkpoint. Not a blind merge — every changed
+file classified and reconciled by hand; see the ADR for the full
+file-by-file record and the reasoning for keeping `main`'s own Adviser
+View implementation over Wave 3m's parallel one.
+
+**Files touched this wave**: new —
+`src-tauri/src/export/{sf4,sf5,sf6}.rs`; extended —
+`src-tauri/src/{lib.rs,commands/export.rs}`,
+`src-tauri/tests/export.rs`, `src/{App.tsx,domain/export.ts,
+domain/ports/export-repository.ts,application/export-service.ts(.test),
+infrastructure/tauri/{export-repository.ts(.test),invoke.ts},
+ui/{SectionsScreen.tsx(.test),SectionRosterScreen.tsx(.test),
+ClassRecordWorkspace.test.tsx,ClassRecordsScreen.test.tsx,
+LearnerListScreen.test.tsx,MonthlySummaryScreen.test.tsx},
+dev-preview/{DevPreviewApp.tsx,fixtures.ts}}`; new ADRs
+`docs/adr/{0057,0058,0059,0060}-*.md`.
+
+**Verification actually run**: `npm run quality` (typecheck, eslint,
+`prettier --check`, `check:architecture`, `vitest run`) — all clean,
+**777/777 tests passing**. `cargo fmt --check` clean (one `cargo fmt`
+pass first, reconciling pure whitespace drift between the two
+lineages' formatting — no semantic change). `git diff --check` clean.
+Every non-trivial Rust type/function signature the ported code calls
+was hand-verified against the actual current repository source (see
+ADR-0060's "Verification" section for the full list) since `cargo
+build`/`cargo test`/`cargo clippy` could not run in this sandbox
+(missing Tauri/GTK system libraries, `sudo apt-get` install needed
+interactive approval unavailable here) — recorded as verification debt
+in `docs/VERIFICATION-DEBT.md`, closed once the GitHub Actions Quality
+Gate (which has the GTK packages, per ADR-0041) confirms it, or a
+future session with working Rust tooling does.
+
+**Not done this wave, deliberately**: SF4 has no UI trigger yet (see
+ADR-0059 — matches this project's zero-UI-first precedent for new
+exports); the reconciliation PR's GitHub Actions gates had not yet been
+dispatched/confirmed at the point this entry was written (see
+`docs/CURRENT-HANDOFF.md` for the exact next action once they are).
+
+**Gate decision**: WAVE 3m RECONCILIATION LOCALLY COMPLETE. Next: push
+→ open/update the reconciliation PR → dispatch and confirm GitHub
+Actions Quality + Security gates green → merge. Recommended next
+product slice after merge: wire an "Export SF4" trigger into
+`MonthlySummaryScreen.tsx` (see `docs/CURRENT-HANDOFF.md`).
+
 ## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
 
 Planning-only wave (GitHub issue #6), branch

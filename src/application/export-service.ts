@@ -3,6 +3,9 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 
@@ -36,6 +39,45 @@ export class ExportApplicationService {
     }
 
     return this.exports.exportSectionMonthlySf2(trimmedSectionId, year, month);
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new ValidationError("Month must be between 1 and 12.");
+    }
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      throw new ValidationError("Year is out of range.");
+    }
+
+    return this.exports.exportSchoolMonthlyAttendanceSf4(year, month);
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    const trimmedSectionId = sectionId.trim();
+    if (trimmedSectionId.length === 0) {
+      throw new ValidationError("Section is required.");
+    }
+    const trimmedSchoolYear = schoolYear.trim();
+    if (trimmedSchoolYear.length === 0) {
+      throw new ValidationError("School year is required.");
+    }
+
+    return this.exports.exportSectionEosySf5(trimmedSectionId, trimmedSchoolYear);
+  }
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    const trimmedSchoolYear = schoolYear.trim();
+    if (trimmedSchoolYear.length === 0) {
+      throw new ValidationError("School year is required.");
+    }
+
+    return this.exports.exportSchoolEosySf6(trimmedSchoolYear);
   }
 
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {

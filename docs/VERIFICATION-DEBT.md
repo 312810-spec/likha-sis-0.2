@@ -1,5 +1,37 @@
 # Verification Debt
 
+## Wave 3m reconciliation — no local Rust build/test/clippy (2026-09-01)
+
+Full context: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
+sandbox is missing the Tauri/GTK system libraries (`glib-2.0`, surfaced
+via `pkg-config` when `cargo build` runs) that
+`docs/adr/0041-minimal-ci-foundation.md`'s own Ubuntu CI job installs
+via `sudo apt-get install libwebkit2gtk-4.1-dev build-essential curl
+wget file libxdo-dev libssl-dev libayatana-appindicator3-dev
+librsvg2-dev`. That install needed interactive approval this
+unattended session could not obtain, so `cargo build`/`cargo test`/
+`cargo clippy --all-targets -- -D warnings`/`cargo fmt --check` (the
+last one alone succeeded, since it needs no compilation) could not be
+run against the reconciled Rust code (the new `export/{sf4,sf5,sf6}.rs`
+modules, the extended `commands/export.rs`, and `lib.rs`'s command
+registration).
+
+**Mitigation actually performed, not a substitute**: every non-trivial
+public type and function signature the ported Rust code calls
+(`repository::{attendance,school,section,section_advisory,
+section_membership,class_record,grading,grading_computation,role}`'s
+structs/functions, `auth::authorize_adviser_of_section`) was
+cross-checked by hand, field-by-field, against this repository's actual
+current source via direct `grep`/`Read` — not assumed correct from the
+source branch's own (differently-verified) claims.
+
+**Not yet done**: an actual `cargo build`/`cargo test`/`cargo clippy`
+run. Closed once either (a) the reconciliation PR's GitHub Actions
+Quality Gate (Ubuntu, GTK packages present) runs green, or (b) a future
+session with a working Rust toolchain runs the full `quality:full` gate
+and confirms it directly — whichever comes first. Do not claim this
+closed without one of those two actually happening.
+
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 
 The user reported (not this session's own finding — no reproduction
