@@ -3,6 +3,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
   Sf5ExportResult,
   Sf6ExportResult,
 } from "../domain/export";
@@ -38,6 +39,20 @@ export class ExportApplicationService {
     }
 
     return this.exports.exportSectionMonthlySf2(trimmedSectionId, year, month);
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new ValidationError("Month must be between 1 and 12.");
+    }
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      throw new ValidationError("Year is out of range.");
+    }
+
+    return this.exports.exportSchoolMonthlyAttendanceSf4(year, month);
   }
 
   async exportSectionEosySf5(

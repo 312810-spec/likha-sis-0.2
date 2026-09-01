@@ -8,15 +8,25 @@ import { EnrollmentHistoryApplicationService } from "../application/enrollment-h
 import { GradingApplicationService } from "../application/grading-service";
 import { LearnerApplicationService } from "../application/learner-service";
 import { LearnerScoreApplicationService } from "../application/learner-score-service";
+import { SchoolMemberApplicationService } from "../application/school-member-service";
+import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
+import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { AppShell } from "../ui/AppShell";
+import { AdviserViewScreen } from "../ui/AdviserViewScreen";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { LearnerListScreen } from "../ui/LearnerListScreen";
+import { ScheduleMeetingsScreen } from "../ui/ScheduleMeetingsScreen";
+import { SectionsScreen } from "../ui/SectionsScreen";
+import { SubjectMonitorScreen } from "../ui/SubjectMonitorScreen";
+import { TeacherLoadScreen } from "../ui/TeacherLoadScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
+import { TeachingAssignmentsScreen } from "../ui/TeachingAssignmentsScreen";
 import { WorkbenchNav } from "../ui/components/WorkbenchNav";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
 import { ModeProvider } from "../ui/theme/ModeContext";
@@ -32,8 +42,12 @@ import {
   FixtureGradingRepository,
   FixtureLearnerRepository,
   FixtureLearnerScoreRepository,
+  FixtureSchoolMemberRepository,
+  FixtureSectionAdvisoryRepository,
   FixtureSectionRepository,
+  FixtureSubjectAttendanceRepository,
   FixtureSubjectRepository,
+  FixtureTeachingAssignmentRepository,
 } from "./fixtures";
 
 /**
@@ -48,28 +62,43 @@ import {
  *   unconditionally -- there is no path from this file to real
  *   authentication, a real session, Tauri, or SQLite.
  *
- * Renders the exact same `AppShell`, `WorkbenchNav`, and screen
- * components production uses (reused, not duplicated), only three
- * destinations wired (Workspace, Attendance, Sign-in Activity -- enough
- * to visually verify UX-02's own changes and the section-preselection
- * flow between them) so this stays a narrow verification tool, not a
- * second app shell to maintain.
+ * Wired screens (expanded progressively as each wave added a new screen):
+ * Workspace, Attendance, Monthly Summary, Learners, Class Records,
+ * Sign-in Activity (UX-02 through UX-04), Sections (Wave 3G/3K/3L --
+ * now includes the advisory management panel and SF6 export panel),
+ * Teaching Assignments (Wave 2Y), Class Schedule (Wave 2Z),
+ * Subject Monitor (Wave 3D), Adviser View (Wave 3F),
+ * Teacher Load (Wave 3A/3C).
  */
+const fixtureTeachingAssignmentRepository = new FixtureTeachingAssignmentRepository();
+const fixtureSubjectAttendanceRepository = new FixtureSubjectAttendanceRepository();
+const fixtureSectionRepository = new FixtureSectionRepository();
+
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
 const exportService = new ExportApplicationService(new FixtureExportRepository());
 const gradingService = new GradingApplicationService(new FixtureGradingRepository());
 const learnerService = new LearnerApplicationService(new FixtureLearnerRepository());
-const sectionRepository = new FixtureSectionRepository();
-const sectionService = new SectionApplicationService(sectionRepository);
+const sectionService = new SectionApplicationService(fixtureSectionRepository);
 const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
   new FixtureEnrollmentHistoryRepository(),
-  sectionRepository,
+  fixtureSectionRepository,
 );
 const subjectService = new SubjectApplicationService(new FixtureSubjectRepository());
 const classRecordService = new ClassRecordApplicationService(new FixtureClassRecordRepository());
 const assessmentService = new AssessmentApplicationService(new FixtureAssessmentRepository());
 const learnerScoreService = new LearnerScoreApplicationService(new FixtureLearnerScoreRepository());
+const schoolMemberService = new SchoolMemberApplicationService(new FixtureSchoolMemberRepository());
+const sectionAdvisoryService = new SectionAdvisoryApplicationService(
+  new FixtureSectionAdvisoryRepository(),
+);
+const subjectAttendanceService = new SubjectAttendanceApplicationService(
+  fixtureSubjectAttendanceRepository,
+  fixtureTeachingAssignmentRepository,
+);
+const teachingAssignmentService = new TeachingAssignmentApplicationService(
+  fixtureTeachingAssignmentRepository,
+);
 
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
@@ -79,6 +108,16 @@ export function DevPreviewApp() {
     year: number;
     month: number;
   } | null>(null);
+  // Contextual handoff from SectionsScreen → TeachingAssignmentsScreen,
+  // matching the same narrowly-typed pattern App.tsx uses (not a router
+  // param or global store).
+  const [assignmentsSectionId, setAssignmentsSectionId] = useState<string | null>(null);
+  const [assignmentsSectionName, setAssignmentsSectionName] = useState<string>("");
+  // Contextual handoff from TeachingAssignmentsScreen → ScheduleMeetingsScreen.
+  const [scheduleMeetingAssignmentId, setScheduleMeetingAssignmentId] = useState<string | null>(
+    null,
+  );
+  const [scheduleMeetingSubjectName, setScheduleMeetingSubjectName] = useState<string>("");
 
   return (
     <ModeProvider>
@@ -135,6 +174,61 @@ export function DevPreviewApp() {
             exportService={exportService}
             enrollmentHistoryService={enrollmentHistoryService}
           />
+        ) : activeTab === "sections" ? (
+          <SectionsScreen
+            sectionService={sectionService}
+            learnerService={learnerService}
+            sectionAdvisoryService={sectionAdvisoryService}
+            schoolMemberService={schoolMemberService}
+            exportService={exportService}
+            onOpenRoster={() => {
+              /* roster screen not wired in dev-preview (out of scope) */
+            }}
+            onManageAssignments={(sectionId, sectionName) => {
+              setAssignmentsSectionId(sectionId);
+              setAssignmentsSectionName(sectionName);
+              setActiveTab("teaching-assignments");
+            }}
+          />
+        ) : activeTab === "teaching-assignments" ? (
+          <TeachingAssignmentsScreen
+            teachingAssignmentService={teachingAssignmentService}
+            subjectService={subjectService}
+            schoolMemberService={schoolMemberService}
+            sectionId={assignmentsSectionId ?? "sec-not-started"}
+            sectionName={assignmentsSectionName || "Mabini"}
+            onBack={() => setActiveTab("sections")}
+            onManageSchedule={(teachingAssignmentId, subjectName) => {
+              setScheduleMeetingAssignmentId(teachingAssignmentId);
+              setScheduleMeetingSubjectName(subjectName);
+              setActiveTab("schedule-meetings");
+            }}
+          />
+        ) : activeTab === "schedule-meetings" ? (
+          <ScheduleMeetingsScreen
+            teachingAssignmentService={teachingAssignmentService}
+            teachingAssignmentId={scheduleMeetingAssignmentId ?? "ta-math-mabini"}
+            subjectName={scheduleMeetingSubjectName || "Mathematics"}
+            sectionName={assignmentsSectionName || "Mabini"}
+            onBack={() => setActiveTab("teaching-assignments")}
+          />
+        ) : activeTab === "subject-monitor" ? (
+          <SubjectMonitorScreen
+            subjectAttendanceService={subjectAttendanceService}
+            teacherUserId={FIXTURE_SESSION.userId}
+          />
+        ) : activeTab === "adviser-view" ? (
+          <AdviserViewScreen
+            subjectAttendanceService={subjectAttendanceService}
+            sectionService={sectionService}
+          />
+        ) : activeTab === "teacher-load" ? (
+          <TeacherLoadScreen
+            teachingAssignmentService={teachingAssignmentService}
+            subjectAttendanceService={subjectAttendanceService}
+            schoolMemberService={schoolMemberService}
+            teacherUserId={FIXTURE_SESSION.userId}
+          />
         ) : activeTab === "class-records" ? (
           <ClassRecordsScreen
             classRecordService={classRecordService}
@@ -149,7 +243,7 @@ export function DevPreviewApp() {
           <AuditLogScreen authService={authService} />
         ) : (
           <div className="alert alert-info" role="status">
-            <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
+            <p>This destination isn&apos;t wired in the dev preview.</p>
           </div>
         )}
       </AppShell>

@@ -115,6 +115,12 @@ class FakeExportRepository implements ExportRepository {
     return this.resultToReturn;
   }
 
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
   async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
     throw new Error("not used in this test");
   }
@@ -432,6 +438,11 @@ describe("MonthlySummaryScreen", () => {
         return new Promise((resolve) => {
           this.resolveExport = resolve;
         });
+      }
+      async exportSchoolMonthlyAttendanceSf4(): Promise<
+        import("../domain/export").Sf4ExportResult | null
+      > {
+        throw new Error("not used in this test");
       }
       async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
         throw new Error("not used in this test");

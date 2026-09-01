@@ -27,8 +27,12 @@ import type { EnrollmentHistoryRepository } from "../domain/ports/enrollment-his
 import type { GradingRepository } from "../domain/ports/grading-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
+import type { SchoolMemberRepository } from "../domain/ports/school-member-repository";
+import type { SectionAdvisoryRepository } from "../domain/ports/section-advisory-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
+import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { SubjectRepository } from "../domain/ports/subject-repository";
+import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type {
   AssessmentCategory,
   AssessmentCategorySet,
@@ -47,6 +51,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
   Sf5ExportResult,
   Sf6ExportResult,
 } from "../domain/export";
@@ -59,8 +64,25 @@ import type {
   LearnerScoreStatus,
 } from "../domain/learner-score";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
+import type {
+  AssignAdviserOutcome,
+  EndAdvisoryOutcome,
+  SectionAdvisory,
+} from "../domain/section-advisory";
 import type { AuditLogEntry, CurrentSession } from "../domain/session";
+import type { SchoolMember } from "../domain/school-member";
+import type {
+  AdviserAssignmentMonitor,
+  RecordEntryOutcome,
+  SubjectAttendanceMonitor,
+  SubjectAttendanceRosterRow,
+  SubjectAttendanceSession,
+  TeachingAssignmentSummary,
+} from "../domain/subject-attendance";
 import type { Subject } from "../domain/subject";
+import type { TeacherLoad } from "../domain/teacher-load";
+import type { TeachingAssignment, TeachingAssignmentDetail } from "../domain/teaching-assignment";
+import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
 
 /** A plain data object, not a real session -- see this file's own doc
  * comment. Rendered only as a prop to `AppShell`/`TeacherWorkspaceScreen`
@@ -397,6 +419,19 @@ export class FixtureExportRepository implements ExportRepository {
           { field: "School ID (EBEIS)", reason: "not tracked by this app" },
           { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
         ],
+      },
+    };
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_School_${year}-${String(month).padStart(2, "0")}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Monthly Attendance Summary per Section"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
       },
     };
   }
@@ -1072,5 +1107,259 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
       wasTransmuted: false,
       wasFloored: termGrade === 60 && initialGrade < 60,
     };
+  }
+}
+
+/*
+ * ==== Subject Attendance / Teaching Assignments / Teacher Load / Section Advisory ====
+ *
+ * Fixture repositories for the screens not yet wired into the dev-preview:
+ * SubjectMonitorScreen (Wave 3D), AdviserViewScreen (Wave 3F),
+ * TeachingAssignmentsScreen (Wave 2Y), ScheduleMeetingsScreen (Wave 2Z),
+ * TeacherLoadScreen (Wave 3A/3C), and SectionsScreen's advisory + SF6
+ * export panels (Waves 3G/3K/3L). Each follows the established
+ * fixture pattern: read-path returns representative synthetic data;
+ * write-path methods that are not exercised by the visual preview throw
+ * the standard "not wired" sentinel.
+ */
+
+/** Representative school members for the Teaching Assignments and
+ * Teacher Load pickers. Includes the signed-in teacher (fixture-user)
+ * and a School Head colleague so both picker options are visible. */
+const FIXTURE_SCHOOL_MEMBERS: SchoolMember[] = [
+  {
+    id: "fixture-user",
+    username: "juan.delacruz",
+    displayName: "Juan Dela Cruz (Teacher)",
+    roles: ["Teacher"],
+  },
+  {
+    id: "fixture-head",
+    username: "maria.reyes",
+    displayName: "Maria Reyes (School Head)",
+    roles: ["SchoolHead"],
+  },
+];
+
+/** Two fixture teaching assignments -- one for the Mathematics subject on
+ * sec-not-started, one for Science on sec-partial -- so the
+ * TeachingAssignmentsScreen list and the SubjectMonitorScreen picker
+ * both have something concrete to show. */
+const FIXTURE_TEACHING_ASSIGNMENTS: TeachingAssignmentDetail[] = [
+  {
+    id: "ta-math-mabini",
+    sectionId: "sec-not-started",
+    sectionName: "Mabini",
+    schoolYear: "2026-2027",
+    subjectId: "sub-math",
+    subjectName: "Mathematics",
+    teacherUserId: "fixture-user",
+  },
+  {
+    id: "ta-science-rizal",
+    sectionId: "sec-partial",
+    sectionName: "Rizal",
+    schoolYear: "2026-2027",
+    subjectId: "sub-science",
+    subjectName: "Science",
+    teacherUserId: "fixture-user",
+  },
+];
+
+/** Schedule meetings for the Mathematics assignment only, so
+ * ScheduleMeetingsScreen shows a non-empty list when arriving from
+ * ta-math-mabini. */
+const FIXTURE_MEETINGS: ScheduleMeeting[] = [
+  {
+    id: "meet-mon",
+    teachingAssignmentId: "ta-math-mabini",
+    weekday: 1,
+    startsAt: "07:30",
+    endsAt: "08:30",
+    room: "Room 101",
+  },
+  {
+    id: "meet-wed",
+    teachingAssignmentId: "ta-math-mabini",
+    weekday: 3,
+    startsAt: "07:30",
+    endsAt: "08:30",
+    room: "Room 101",
+  },
+  {
+    id: "meet-fri",
+    teachingAssignmentId: "ta-math-mabini",
+    weekday: 5,
+    startsAt: "07:30",
+    endsAt: "08:30",
+    room: null,
+  },
+];
+
+/** The summary shape SubjectAttendanceApplicationService.listMyAssignments
+ * expects -- a minimal view of each assignment for the picker. */
+const FIXTURE_ASSIGNMENT_SUMMARIES: TeachingAssignmentSummary[] = FIXTURE_TEACHING_ASSIGNMENTS.map(
+  (a) => ({
+    id: a.id,
+    sectionId: a.sectionId,
+    sectionName: a.sectionName,
+    schoolYear: a.schoolYear,
+    subjectId: a.subjectId,
+    subjectName: a.subjectName,
+  }),
+);
+
+/** A synthetic SubjectAttendanceMonitor for SubjectMonitorScreen and
+ * AdviserViewScreen -- three learners, a mix of attendance counts, and
+ * a two-absence streak for one learner so the streak column is
+ * non-trivial. */
+const FIXTURE_MONITOR: SubjectAttendanceMonitor = {
+  heldSessionCount: 8,
+  rows: [
+    {
+      membershipId: "mbr-l1-mabini",
+      learnerId: "l1",
+      givenName: "Ana",
+      familyName: "Santos",
+      presentCount: 7,
+      absentCount: 1,
+      lateCount: 0,
+      excusedCount: 0,
+      currentConsecutiveAbsences: 0,
+    },
+    {
+      membershipId: "mbr-l2-mabini",
+      learnerId: "l2",
+      givenName: "Bayani",
+      familyName: "Cruz",
+      presentCount: 5,
+      absentCount: 2,
+      lateCount: 1,
+      excusedCount: 0,
+      currentConsecutiveAbsences: 2,
+    },
+    {
+      membershipId: "mbr-l3-mabini",
+      learnerId: "l3",
+      givenName: "Maria Corazon",
+      familyName: "Dela Peña-Villanueva",
+      presentCount: 8,
+      absentCount: 0,
+      lateCount: 0,
+      excusedCount: 0,
+      currentConsecutiveAbsences: 0,
+    },
+  ],
+};
+
+export class FixtureSubjectAttendanceRepository implements SubjectAttendanceRepository {
+  async openSession(): Promise<SubjectAttendanceSession | null> {
+    throw new Error("dev-preview fixture: openSession() is not wired -- read-only fixture");
+  }
+  async markNoClass(): Promise<SubjectAttendanceSession | null> {
+    throw new Error("dev-preview fixture: markNoClass() is not wired -- read-only fixture");
+  }
+  async recordEntry(): Promise<RecordEntryOutcome> {
+    throw new Error("dev-preview fixture: recordEntry() is not wired -- read-only fixture");
+  }
+  async markAllPresent(): Promise<SubjectAttendanceRosterRow[] | null> {
+    throw new Error("dev-preview fixture: markAllPresent() is not wired -- read-only fixture");
+  }
+  async rosterForSession(): Promise<SubjectAttendanceRosterRow[] | null> {
+    throw new Error("dev-preview fixture: rosterForSession() is not wired -- read-only fixture");
+  }
+  async listSessions(): Promise<SubjectAttendanceSession[]> {
+    return [];
+  }
+  async monitor(teachingAssignmentId: string): Promise<SubjectAttendanceMonitor | null> {
+    if (teachingAssignmentId === "ta-math-mabini" || teachingAssignmentId === "ta-science-rizal") {
+      return FIXTURE_MONITOR;
+    }
+    return null;
+  }
+  async adviserSectionMonitor(sectionId: string): Promise<AdviserAssignmentMonitor[]> {
+    if (sectionId !== "sec-not-started") return [];
+    return [
+      {
+        teachingAssignmentId: "ta-math-mabini",
+        subjectId: "sub-math",
+        subjectName: "Mathematics",
+        teacherUserId: "fixture-user",
+        monitor: FIXTURE_MONITOR,
+      },
+      {
+        teachingAssignmentId: "ta-science-rizal",
+        subjectId: "sub-science",
+        subjectName: "Science",
+        teacherUserId: "fixture-user",
+        monitor: {
+          heldSessionCount: 6,
+          rows: FIXTURE_MONITOR.rows.map((r) => ({ ...r, presentCount: r.presentCount - 1 })),
+        },
+      },
+    ];
+  }
+}
+
+export class FixtureTeachingAssignmentRepository implements TeachingAssignmentRepository {
+  async listMine(): Promise<TeachingAssignmentSummary[]> {
+    return FIXTURE_ASSIGNMENT_SUMMARIES;
+  }
+  async listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]> {
+    return FIXTURE_MEETINGS.filter((m) => m.teachingAssignmentId === teachingAssignmentId);
+  }
+  async listBySection(sectionId: string): Promise<TeachingAssignmentDetail[]> {
+    return FIXTURE_TEACHING_ASSIGNMENTS.filter((a) => a.sectionId === sectionId);
+  }
+  async create(): Promise<TeachingAssignment | null> {
+    throw new Error("dev-preview fixture: create() is not wired -- read-only fixture");
+  }
+  async remove(): Promise<boolean> {
+    throw new Error("dev-preview fixture: remove() is not wired -- read-only fixture");
+  }
+  async createMeeting(): Promise<CreateMeetingOutcome> {
+    throw new Error("dev-preview fixture: createMeeting() is not wired -- read-only fixture");
+  }
+  async removeMeeting(): Promise<boolean> {
+    throw new Error("dev-preview fixture: removeMeeting() is not wired -- read-only fixture");
+  }
+  async getLoad(): Promise<TeacherLoad> {
+    return {
+      assignmentCount: FIXTURE_ASSIGNMENT_SUMMARIES.length,
+      distinctSubjectCount: 2,
+      weeklyInstructionalMinutes: FIXTURE_MEETINGS.length * 60,
+    };
+  }
+}
+
+export class FixtureSchoolMemberRepository implements SchoolMemberRepository {
+  async listMembers(): Promise<SchoolMember[]> {
+    return FIXTURE_SCHOOL_MEMBERS;
+  }
+}
+
+/** A fixture section advisory: the fixture teacher is currently the
+ * adviser for sec-not-started (Mabini), with no end date, so the
+ * advisory panel in SectionsScreen shows an active adviser instead of
+ * the empty-state. All other sections return null (no current adviser). */
+const FIXTURE_ADVISORY: SectionAdvisory = {
+  id: "adv-mabini-001",
+  schoolId: "fixture-school",
+  sectionId: "sec-not-started",
+  teacherUserId: "fixture-user",
+  startsOn: "2026-06-01",
+  endsOn: null,
+  createdAt: "2026-06-01T00:00:00.000Z",
+};
+
+export class FixtureSectionAdvisoryRepository implements SectionAdvisoryRepository {
+  async getCurrentAdviser(sectionId: string): Promise<SectionAdvisory | null> {
+    return sectionId === "sec-not-started" ? FIXTURE_ADVISORY : null;
+  }
+  async assignAdviser(): Promise<AssignAdviserOutcome> {
+    throw new Error("dev-preview fixture: assignAdviser() is not wired -- read-only fixture");
+  }
+  async endAdviser(): Promise<EndAdvisoryOutcome> {
+    throw new Error("dev-preview fixture: endAdviser() is not wired -- read-only fixture");
   }
 }

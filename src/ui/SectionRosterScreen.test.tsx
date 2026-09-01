@@ -259,6 +259,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
   async exportSectionEosySf5(
     sectionId: string,
     schoolYear: string,

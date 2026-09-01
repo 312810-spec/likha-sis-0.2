@@ -83,6 +83,7 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "list_subject_attendance_sessions",
   "subject_attendance_monitor",
   "adviser_section_monitor",
+  "export_school_monthly_attendance_sf4",
   "export_section_eosy_sf5",
   "export_school_eosy_sf6",
   "assign_section_adviser",

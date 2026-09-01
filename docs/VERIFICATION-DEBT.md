@@ -1,6 +1,52 @@
 # Verification Debt
 
+## Verification Debt Closure Pass (2026-09-01)
+
+Full record: `src/dev-preview/fixtures.ts`, `src/dev-preview/DevPreviewApp.tsx`.
+Verified: `npm run quality` — 78 test files, 771 tests, 0 failures.
+
+**Dev-preview wiring gaps closed (one pass, all outstanding items):**
+
+Every wave from 3A through 3L recorded the same recurring debt: newly-added
+screens were covered by jsdom + axe-core unit tests but not wired into
+`src/dev-preview/fixtures.ts`, blocking Playwright browser-rendered screenshot
+verification. All open wiring gaps are now closed:
+
+| Screen | Wave | How closed |
+|--------|------|------------|
+| `TeachingAssignmentsScreen` | 2Y | New `FixtureTeachingAssignmentRepository`; wired in `DevPreviewApp.tsx` with `SectionsScreen` → `TeachingAssignmentsScreen` handoff state |
+| `ScheduleMeetingsScreen` | 2Z | Same repository; wired with `TeachingAssignmentsScreen` → `ScheduleMeetingsScreen` handoff state |
+| `TeacherLoadScreen` | 3A/3C | Same repository + new `FixtureSchoolMemberRepository`; wired as direct tab |
+| `SubjectMonitorScreen` | 3D | New `FixtureSubjectAttendanceRepository`; wired as direct tab |
+| `AdviserViewScreen` | 3F | Same subject-attendance repository; wired as direct tab |
+| `SectionsScreen` advisory panel | 3G | New `FixtureSectionAdvisoryRepository`; `SectionsScreen` now receives `sectionAdvisoryService` + `schoolMemberService` |
+| `SectionsScreen` SF6 export panel | 3K/3L | `SectionsScreen` now receives `exportService` (was already available, just not passed through) |
+| `SectionRosterScreen` SF5 export | 3J | Wired through existing `FixtureExportRepository` (already had `exportSectionEosySf5`) |
+
+**Pre-existing TypeScript regression discovered and fixed (same pass):**
+
+`exportSchoolMonthlyAttendanceSf4` was added to the `ExportRepository` port
+(Wave 3K) but never backfilled into six test fake repositories
+(`ClassRecordsScreen.test.tsx`, `ClassRecordWorkspace.test.tsx`,
+`LearnerListScreen.test.tsx`, `MonthlySummaryScreen.test.tsx` ×2,
+`SectionRosterScreen.test.tsx`, `SectionsScreen.test.tsx`) or into
+`FixtureExportRepository`. This was a pre-existing typecheck regression that
+had never been caught because `npm run quality` had not been run against this
+full set of files since the port change. Fixed in the same commit by adding
+the missing stub method (throws "not used in this test") to all six test fakes
+and a synthetic returning implementation to `FixtureExportRepository`.
+
+**Open debt remaining (not actionable by code changes):**
+
+- **UX-02/UX-03/UX-04 independent reviewer dispatch not retrievable**: agent-resume/retrieval harness issue; retry when harness is confirmed fixed. Still open.
+- **Native NVDA/Narrator screen-reader pass**: requires physical Windows hardware + NVDA. Still open.
+- **Native Tauri WebDriver E2E (`@wdio/tauri-service`)**: only a browser-only Playwright fixture exists; native-binary IPC not exercised. Still open.
+- **`enroll` `[D,D)` single-day exemption** and **`roster_for_section` `l.school_id` predicate**: deliberate Rust-side deferred fixes. Still open.
+- **SF1/SF9/SF10 fidelity `NOT_VERIFIED` items**: require external DepEd template materials. Still open.
+- **Wave 3B Rust `Forbidden`/`Unauthorized` type split**: deliberate architecture deferred decision. Still open.
+
 ## Wave 3L — School Form 6 (SF6) School Promotion Summary UI (2026-09-01)
+
 
 Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum; `docs/PROJECT-MEMORY.md`
 Wave 3L entry; `docs/CURRENT-HANDOFF.md` top entry.

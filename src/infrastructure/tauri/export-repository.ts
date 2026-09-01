@@ -3,6 +3,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
   Sf5ExportResult,
   Sf6ExportResult,
 } from "../../domain/export";
@@ -17,6 +18,13 @@ export class TauriExportRepository implements ExportRepository {
   ): Promise<Sf2ExportResult | null> {
     return invoke<Sf2ExportResult | null>("export_section_monthly_sf2", {
       sectionId,
+      year,
+      month,
+    });
+  }
+
+  exportSchoolMonthlyAttendanceSf4(year: number, month: number): Promise<Sf4ExportResult | null> {
+    return invoke<Sf4ExportResult | null>("export_school_monthly_attendance_sf4", {
       year,
       month,
     });

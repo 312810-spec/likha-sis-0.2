@@ -11,6 +11,7 @@ use crate::export::learner_roster;
 use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
 use crate::export::sf2;
+use crate::export::sf4::{self, Sf4SectionSummary};
 use crate::export::sf5::{self, Sf5LearnerRow, Sf5SubjectGrade};
 use crate::export::sf6::{self, Sf6SectionSummary};
 use crate::export::FieldDisclosure;
@@ -18,6 +19,13 @@ use crate::repository::{
     attendance, class_record, grading, grading_computation, learner, school, section,
     section_advisory, section_membership, user,
 };
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sf4ExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -588,3 +596,152 @@ pub fn export_school_eosy_sf6(
         disclosure: export.disclosure,
     }))
 }
+
+/// Consolidates monthly attendance and learner movement metrics across all sections
+/// and grade levels in the school for a given month and year into a DepEd School Form 4 (SF4)
+/// CSV export file.
+#[tauri::command]
+pub fn export_school_monthly_attendance_sf4(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    year: i32,
+    month: u32,
+) -> AppResult<Option<Sf4ExportResult>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+
+    if !(1..=12).contains(&month) {
+        return Ok(None);
+    }
+
+    let sections = section::list_by_school(&conn, &school_id)?;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+
+    let mut section_summaries = Vec::new();
+
+    for sec in sections {
+        let report =
+            attendance::monthly_grid_for_section(&conn, &school_id, &sec.id, year, month)?;
+        let adviser =
+            section_advisory::current_adviser_for_section(&conn, &school_id, &sec.id, &as_of_date)?;
+        let adviser_name = if let Some(adv) = adviser {
+            user::find_by_id(&conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+        } else {
+            None
+        };
+
+        let mut reg_m: u32 = 0;
+        let mut reg_f: u32 = 0;
+        let mut att_days_m: u32 = 0;
+        let mut att_days_f: u32 = 0;
+        let mut att_days_total: u32 = 0;
+
+        for l in &report.learners {
+            let is_m = l
+                .sex
+                .as_deref()
+                .map(|s| s.eq_ignore_ascii_case("male") || s.eq_ignore_ascii_case("m"))
+                .unwrap_or(false);
+            let is_f = l
+                .sex
+                .as_deref()
+                .map(|s| s.eq_ignore_ascii_case("female") || s.eq_ignore_ascii_case("f"))
+                .unwrap_or(false);
+
+            let l_att = l.present_count + l.tardy_count;
+            if is_m {
+                reg_m += 1;
+                att_days_m += l_att;
+            } else if is_f {
+                reg_f += 1;
+                att_days_f += l_att;
+            }
+            att_days_total += l_att;
+        }
+        let reg_total = report.learners.len() as u32;
+
+        let num_school_days = report.school_days.len();
+        let num_days_f64 = num_school_days as f64;
+
+        let daily_avg_m = if num_school_days > 0 {
+            att_days_m as f64 / num_days_f64
+        } else {
+            0.0
+        };
+        let daily_avg_f = if num_school_days > 0 {
+            att_days_f as f64 / num_days_f64
+        } else {
+            0.0
+        };
+        let daily_avg_total = if num_school_days > 0 {
+            att_days_total as f64 / num_days_f64
+        } else {
+            0.0
+        };
+
+        let attendance_pct_m = if reg_m > 0 && num_school_days > 0 {
+            (att_days_m as f64 / (reg_m as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+        let attendance_pct_f = if reg_f > 0 && num_school_days > 0 {
+            (att_days_f as f64 / (reg_f as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+        let attendance_pct_total = if reg_total > 0 && num_school_days > 0 {
+            (att_days_total as f64 / (reg_total as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+
+        section_summaries.push(Sf4SectionSummary {
+            section_id: sec.id,
+            section_name: sec.name,
+            grade_level: sec.grade_level,
+            adviser_name,
+            registered_male: reg_m,
+            registered_female: reg_f,
+            registered_total: reg_total,
+            daily_avg_male: daily_avg_m,
+            daily_avg_female: daily_avg_f,
+            daily_avg_total,
+            attendance_pct_male: attendance_pct_m,
+            attendance_pct_female: attendance_pct_f,
+            attendance_pct_total,
+        });
+    }
+
+    let export = sf4::build_sf4_export(&school, year, month, &section_summaries);
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "SF4_{}_{year}-{month:02}.csv",
+        sanitize_filename_component(&school.name.replace(' ', "_"))
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(Sf4ExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+

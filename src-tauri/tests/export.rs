@@ -13,6 +13,7 @@ use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::export::learner_roster::{self, LearnerRosterExport};
 use app_lib::export::sf2::{self, Sf2Export};
+use app_lib::export::sf4::{self, Sf4Export, Sf4SectionSummary};
 use app_lib::export::sf5::{self, Sf5Export, Sf5LearnerRow, Sf5SubjectGrade};
 use app_lib::export::sf6::{self, Sf6Export, Sf6SectionSummary};
 use app_lib::repository::{
@@ -641,3 +642,240 @@ fn sf6_export_school_wide_consolidation_and_isolation() {
     assert!(export.csv.contains("SCHOOL GRAND TOTAL"));
     assert_eq!(export.disclosure.populated_fields.len(), 6);
 }
+
+fn export_sf4_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    year: i32,
+    month: u32,
+) -> Result<Option<Sf4Export>, AppError> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+
+    if !(1..=12).contains(&month) {
+        return Ok(None);
+    }
+
+    let sections = section::list_by_school(conn, &school_id)?;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+
+    let mut section_summaries = Vec::new();
+
+    for sec in sections {
+        let report =
+            attendance::monthly_grid_for_section(conn, &school_id, &sec.id, year, month)?;
+        let adviser =
+            section_advisory::current_adviser_for_section(conn, &school_id, &sec.id, &as_of_date)?;
+        let adviser_name = if let Some(adv) = adviser {
+            user::find_by_id(conn, &adv.teacher_user_id)?.map(|u| u.display_name)
+        } else {
+            None
+        };
+
+        let mut reg_m: u32 = 0;
+        let mut reg_f: u32 = 0;
+        let mut att_days_m: u32 = 0;
+        let mut att_days_f: u32 = 0;
+        let mut att_days_total: u32 = 0;
+
+        for l in &report.learners {
+            let is_m = l
+                .sex
+                .as_deref()
+                .map(|s| s.eq_ignore_ascii_case("male") || s.eq_ignore_ascii_case("m"))
+                .unwrap_or(false);
+            let is_f = l
+                .sex
+                .as_deref()
+                .map(|s| s.eq_ignore_ascii_case("female") || s.eq_ignore_ascii_case("f"))
+                .unwrap_or(false);
+
+            let l_att = l.present_count + l.tardy_count;
+            if is_m {
+                reg_m += 1;
+                att_days_m += l_att;
+            } else if is_f {
+                reg_f += 1;
+                att_days_f += l_att;
+            }
+            att_days_total += l_att;
+        }
+        let reg_total = report.learners.len() as u32;
+
+        let num_school_days = report.school_days.len();
+        let num_days_f64 = num_school_days as f64;
+
+        let daily_avg_m = if num_school_days > 0 {
+            att_days_m as f64 / num_days_f64
+        } else {
+            0.0
+        };
+        let daily_avg_f = if num_school_days > 0 {
+            att_days_f as f64 / num_days_f64
+        } else {
+            0.0
+        };
+        let daily_avg_total = if num_school_days > 0 {
+            att_days_total as f64 / num_days_f64
+        } else {
+            0.0
+        };
+
+        let attendance_pct_m = if reg_m > 0 && num_school_days > 0 {
+            (att_days_m as f64 / (reg_m as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+        let attendance_pct_f = if reg_f > 0 && num_school_days > 0 {
+            (att_days_f as f64 / (reg_f as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+        let attendance_pct_total = if reg_total > 0 && num_school_days > 0 {
+            (att_days_total as f64 / (reg_total as f64 * num_days_f64)) * 100.0
+        } else {
+            0.0
+        };
+
+        section_summaries.push(Sf4SectionSummary {
+            section_id: sec.id,
+            section_name: sec.name,
+            grade_level: sec.grade_level,
+            adviser_name,
+            registered_male: reg_m,
+            registered_female: reg_f,
+            registered_total: reg_total,
+            daily_avg_male: daily_avg_m,
+            daily_avg_female: daily_avg_f,
+            daily_avg_total,
+            attendance_pct_male: attendance_pct_m,
+            attendance_pct_female: attendance_pct_f,
+            attendance_pct_total,
+        });
+    }
+
+    Ok(Some(sf4::build_sf4_export(
+        &school,
+        year,
+        month,
+        &section_summaries,
+    )))
+}
+
+#[test]
+fn sf4_export_school_wide_consolidation_and_isolation() {
+    let conn = open_test_db();
+    let s1 = school::create(&conn, "School Alpha").unwrap();
+    let s2 = school::create(&conn, "School Beta").unwrap();
+
+    let sec1 = section::create(&conn, &s1.id, "2026-2027", "Grade 7", "Section 1").unwrap();
+    let sec2 = section::create(&conn, &s1.id, "2026-2027", "Grade 8", "Section 2").unwrap();
+    let sec_foreign =
+        section::create(&conn, &s2.id, "2026-2027", "Grade 7", "Foreign Section").unwrap();
+
+    let l1 = learner::create(
+        &conn,
+        &s1.id,
+        "Pedro",
+        "Penduko",
+        Some("111111111111"),
+        Some("M"),
+    )
+    .unwrap();
+    let l2 = learner::create(
+        &conn,
+        &s1.id,
+        "Maria",
+        "Clara",
+        Some("222222222222"),
+        Some("F"),
+    )
+    .unwrap();
+    let l_foreign = learner::create(
+        &conn,
+        &s2.id,
+        "Foreign",
+        "Learner",
+        Some("333333333333"),
+        Some("M"),
+    )
+    .unwrap();
+
+    section_membership::enroll(&conn, &s1.id, &sec1.id, &l1.id, "2026-09-01").unwrap();
+    section_membership::enroll(&conn, &s1.id, &sec2.id, &l2.id, "2026-09-01").unwrap();
+    section_membership::enroll(
+        &conn,
+        &s2.id,
+        &sec_foreign.id,
+        &l_foreign.id,
+        "2026-09-01",
+    )
+    .unwrap();
+
+    // Mark attendance for September 2026 (e.g. 2026-09-01 is Tuesday)
+    attendance::record(
+        &conn,
+        &s1.id,
+        &sec1.id,
+        &l1.id,
+        "2026-09-01",
+        attendance::AttendanceStatus::Present,
+    )
+    .unwrap();
+    attendance::record(
+        &conn,
+        &s1.id,
+        &sec2.id,
+        &l2.id,
+        "2026-09-01",
+        attendance::AttendanceStatus::Present,
+    )
+    .unwrap();
+    attendance::record(
+        &conn,
+        &s2.id,
+        &sec_foreign.id,
+        &l_foreign.id,
+        "2026-09-01",
+        attendance::AttendanceStatus::Present,
+    )
+    .unwrap();
+
+    // Assign adviser to sec1
+    let t1 = user::create_user(&conn, "adviser.one", "pw", "Teacher One").unwrap();
+    user::add_school_membership(&conn, &t1.id, &s1.id).unwrap();
+    section_advisory::assign(&conn, &s1.id, &sec1.id, &t1.id, "2026-09-01").unwrap();
+
+    let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
+    user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
+
+    let export = export_sf4_as_current_session(&conn, &sessions, 2026, 9)
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("School Form 4 (SF4)"));
+    assert!(export.csv.contains("School Alpha"));
+    assert!(export.csv.contains("September 2026"));
+    assert!(export.csv.contains("Grade 7,Section 1,Teacher One"));
+    assert!(export.csv.contains("Grade 8,Section 2,"));
+    // Verify foreign school section is NOT present
+    assert!(!export.csv.contains("Foreign Section"));
+    assert!(!export.csv.contains("Foreign Learner"));
+    // Check subtotals and grand totals
+    assert!(export.csv.contains("SUBTOTAL (Grade 7)"));
+    assert!(export.csv.contains("SUBTOTAL (Grade 8)"));
+    assert!(export.csv.contains("SCHOOL GRAND TOTAL"));
+    assert_eq!(export.disclosure.populated_fields.len(), 8);
+    assert_eq!(export.disclosure.omitted_fields.len(), 3);
+}
+

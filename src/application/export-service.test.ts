@@ -4,6 +4,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
   Sf5ExportResult,
   Sf6ExportResult,
 } from "../domain/export";
@@ -24,6 +25,20 @@ class FakeExportRepository implements ExportRepository {
   ): Promise<Sf2ExportResult | null> {
     this.calls.push({ sectionId, year, month });
     return this.resultToReturn;
+  }
+
+  sf4Calls: Array<{ year: number; month: number }> = [];
+  sf4ResultToReturn: Sf4ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_Mabini_2026-09.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    this.sf4Calls.push({ year, month });
+    return this.sf4ResultToReturn;
   }
 
   sf5Calls: Array<{ sectionId: string; schoolYear: string }> = [];
@@ -124,6 +139,42 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportSectionMonthlySf2("sec-1", 2026, 8);
+
+    expect(result).toBeNull();
+  });
+
+  it("exportSchoolMonthlyAttendanceSf4 delegates to the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSchoolMonthlyAttendanceSf4(2026, 9);
+
+    expect(result).toEqual(repo.sf4ResultToReturn);
+    expect(repo.sf4Calls).toEqual([{ year: 2026, month: 9 }]);
+  });
+
+  it("exportSchoolMonthlyAttendanceSf4 rejects an invalid month or year", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSchoolMonthlyAttendanceSf4(2026, 0)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    await expect(service.exportSchoolMonthlyAttendanceSf4(2026, 13)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    await expect(service.exportSchoolMonthlyAttendanceSf4(1999, 9)).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.sf4Calls).toEqual([]);
+  });
+
+  it("exportSchoolMonthlyAttendanceSf4 returns null when school could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.sf4ResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSchoolMonthlyAttendanceSf4(2026, 9);
 
     expect(result).toBeNull();
   });

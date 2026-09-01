@@ -20,6 +20,11 @@ export interface Sf2ExportResult {
   disclosure: FieldDisclosure;
 }
 
+export interface Sf4ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
 export interface ReportCardExportResult {
   filePath: string;
   disclosure: FieldDisclosure;
