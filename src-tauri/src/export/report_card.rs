@@ -53,6 +53,7 @@ fn disclosure() -> FieldDisclosure {
         populated_fields: vec![
             "School Name".to_string(),
             "Section".to_string(),
+            "Class Adviser (if assigned)".to_string(),
             "Subject".to_string(),
             "Grading Period".to_string(),
             "School Year".to_string(),
@@ -65,8 +66,12 @@ fn disclosure() -> FieldDisclosure {
         ],
         omitted_fields: vec![
             OmittedField {
+                field: "Class Adviser for a section without an active advisory assignment".to_string(),
+                reason: "LIKHA-SIS allows sections without an assigned class adviser -- when none is active, the Class Adviser header field renders blank rather than a fabricated placeholder.".to_string(),
+            },
+            OmittedField {
                 field: "LRN for a learner who does not yet have one recorded".to_string(),
-                reason: "LRN was added in M17 (docs/adr/0017-learner-reference-number-and-sex.md) and is optional per learner -- a learner enrolled before this milestone, or simply not yet given one, renders blank in that column rather than a fabricated placeholder.".to_string(),
+                reason: "LRN was added in M17 (docs/adr/0017-learner-reference-number-and-sex.md) and are optional per learner -- a learner enrolled before this milestone, or simply not yet given one, renders blank in that column rather than a fabricated placeholder.".to_string(),
             },
             OmittedField {
                 field: "Weighting for EPP/TLE, MAPEH, and any Senior High School subject".to_string(),
@@ -86,7 +91,7 @@ fn disclosure() -> FieldDisclosure {
             },
             OmittedField {
                 field: "Signature of Teacher / Signature of School Head".to_string(),
-                reason: "The certification block is a physical/manual step, intentionally left for the teacher to complete after printing.".to_string(),
+                reason: "The certification block is a physical/manual step, intentionally left for the teacher/adviser and School Head to sign after printing.".to_string(),
             },
         ],
     }
@@ -100,6 +105,7 @@ fn disclosure() -> FieldDisclosure {
 pub fn build_report_card_export(
     school: &School,
     class_record: &ClassRecordDetail,
+    adviser_name: Option<&str>,
     rows: &[ReportCardRow],
 ) -> ReportCardExport {
     let disclosure = disclosure();
@@ -107,6 +113,10 @@ pub fn build_report_card_export(
     let mut lines: Vec<String> = vec![
         csv::row(&["School Name".to_string(), school.name.clone()]),
         csv::row(&["Section".to_string(), class_record.section_name.clone()]),
+        csv::row(&[
+            "Class Adviser".to_string(),
+            adviser_name.unwrap_or("").to_string(),
+        ]),
         csv::row(&["Subject".to_string(), class_record.subject_name.clone()]),
         csv::row(&[
             "Grading Period".to_string(),
@@ -216,13 +226,26 @@ mod tests {
 
     #[test]
     fn header_rows_carry_school_section_subject_period_and_year() {
-        let export = build_report_card_export(&a_school(), &a_class_record(), &[]);
+        let export = build_report_card_export(
+            &a_school(),
+            &a_class_record(),
+            Some("Crisostomo Ibarra"),
+            &[],
+        );
 
         assert!(export.csv.contains("School Name,Rizal Elementary"));
         assert!(export.csv.contains("Section,Mabini"));
+        assert!(export.csv.contains("Class Adviser,Crisostomo Ibarra"));
         assert!(export.csv.contains("Subject,Science"));
         assert!(export.csv.contains("Grading Period,1st Term"));
         assert!(export.csv.contains("School Year,2026-2027"));
+    }
+
+    #[test]
+    fn unassigned_adviser_renders_blank_header() {
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &[]);
+
+        assert!(export.csv.contains("Class Adviser,"));
     }
 
     #[test]
@@ -234,7 +257,7 @@ mod tests {
             lrn: Some("123456789012".to_string()),
             grade: Some(a_grade()),
         }];
-        let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
 
         assert!(export
             .csv
@@ -255,7 +278,7 @@ mod tests {
                 was_floored: true,
             }),
         }];
-        let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
 
         assert!(export.csv.contains("Raised to the minimum of 60"));
         assert!(export.csv.contains("Zero-Based"));
@@ -270,7 +293,7 @@ mod tests {
             lrn: None,
             grade: None,
         }];
-        let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
 
         assert!(export
             .csv
@@ -280,7 +303,7 @@ mod tests {
 
     #[test]
     fn the_disclosure_lists_every_field_actually_referenced_in_the_comment_block() {
-        let export = build_report_card_export(&a_school(), &a_class_record(), &[]);
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &[]);
 
         assert!(!export.disclosure.omitted_fields.is_empty());
         for omitted in &export.disclosure.omitted_fields {
@@ -297,7 +320,7 @@ mod tests {
             lrn: Some("123456789012".to_string()),
             grade: Some(a_grade()),
         }];
-        let export = build_report_card_export(&a_school(), &a_class_record(), &rows);
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
 
         for forbidden in ["Outstanding", "Very Satisfactory", "Fairly Satisfactory"] {
             assert!(

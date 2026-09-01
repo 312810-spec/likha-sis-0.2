@@ -14,6 +14,8 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
@@ -111,6 +113,20 @@ class FakeExportRepository implements ExportRepository {
   ): Promise<Sf2ExportResult | null> {
     this.calls.push({ sectionId, year, month });
     return this.resultToReturn;
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+    throw new Error("not used in this test");
   }
 
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
@@ -422,6 +438,17 @@ describe("MonthlySummaryScreen", () => {
         return new Promise((resolve) => {
           this.resolveExport = resolve;
         });
+      }
+      async exportSchoolMonthlyAttendanceSf4(): Promise<
+        import("../domain/export").Sf4ExportResult | null
+      > {
+        throw new Error("not used in this test");
+      }
+      async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+        throw new Error("not used in this test");
       }
       async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
         throw new Error("not used in this test");

@@ -24,6 +24,7 @@ import {
 import type { CurrentSession } from "./domain/session";
 import { AppShell } from "./ui/AppShell";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
+import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
@@ -201,6 +202,7 @@ function App() {
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
+                exportService={exportService}
                 onOpenRoster={(sectionId) => {
                   setRosterSectionId(sectionId);
                   setActiveTab("section-roster");
@@ -219,6 +221,7 @@ function App() {
                 <SectionRosterScreen
                   sectionService={sectionService}
                   formGenerationService={formGenerationService}
+                  exportService={exportService}
                   sectionId={rosterSectionId}
                   onBack={() => setActiveTab("sections")}
                 />
@@ -229,6 +232,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -264,6 +268,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -294,6 +299,7 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  exportService={exportService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -409,6 +415,8 @@ function App() {
               />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
+            ) : activeTab === "admin-password-reset" ? (
+              <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
             ) : null}
           </>
         ) : (

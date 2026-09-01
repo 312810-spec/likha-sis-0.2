@@ -266,7 +266,17 @@ ADR-0001's layering statement, never implemented. The "Cloudflare Worker
 Built today: Argon2id hashing, timing-safe unknown-user handling,
 in-memory-only sessions, account lockout (ADR-0019), idle-timeout +
 warning (ADR-0020/0026), global session expiry (ADR-0022), audit log
-(ADR-0021). An "offline-capable session with periodic re-authentication,
+(ADR-0021), admin-assisted password reset (ADR-0060, Wave 3N) — a
+School Head sets a new password directly for a colleague in their own
+school, gated by the existing `Capability::ManageSchoolMembership`,
+audited as a distinct attributable `password_reset_by_admin` event, and
+clearing the target account's lockout as a deliberate side effect.
+Deliberately **not** built: a self-service "forgot password" flow (no
+out-of-band email/SMS channel exists in this offline, shared-computer
+deployment model to make one safe) and a forced-password-change-at-
+next-login flag (ADR-0060's recorded Next Best, explicitly deferred —
+would need a new `users` schema flag and a new login-flow interception
+point). An "offline-capable session with periodic re-authentication,
 roughly an 8-hour protection window" is a **product-requirement
 candidate**, not a locked policy — any concrete numeric threshold needs
 a security-focused decision pass (the `security-reviewer`/

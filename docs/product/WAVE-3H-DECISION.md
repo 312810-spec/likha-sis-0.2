@@ -129,12 +129,12 @@ started" already on record in `docs/CURRENT-HANDOFF.md`'s own top entry.
 Bounded, low-risk (verification only, no behavior change), and completes
 a debt this project has been carrying since Wave 3F. **Switch condition**:
 pick this instead of the recommended slice if a fresh scoping pass at
-Wave 3I's start finds the admin-reset mechanism needs more product-policy
+Wave 3N's start finds the admin-reset mechanism needs more product-policy
 judgment than expected (unlikely, per the reasoning above, but the
 10-scenario process should still be run explicitly, not skipped, given
 `CLAUDE.md`'s standing rule for auth-touching decisions).
 
-## Wave 3I — exact scope for the next implementation wave
+## Wave 3N — exact scope for the next implementation wave
 
 **In scope:**
 
@@ -167,7 +167,7 @@ judgment than expected (unlikely, per the reasoning above, but the
   non-School-Head denial, target-not-found handling, audit-log entry
   written.
 
-**Non-goals for Wave 3I specifically:**
+**Non-goals for Wave 3N specifically:**
 
 - No self-service ("forgot password" from the login screen) flow — no
   out-of-band channel exists to make that safe; this remains
@@ -272,10 +272,10 @@ Both figures are this session's own reasoned estimate from repository
 evidence, not a previously-recorded metric — treat them as directional,
 not authoritative.
 
-## Recommended exact Wave 3I implementation prompt
+## Recommended exact Wave 3N implementation prompt
 
 ```
-Execute exactly one bounded LIKHA implementation wave: Wave 3I —
+Execute exactly one bounded LIKHA implementation wave: Wave 3N —
 Admin-Assisted Password Reset.
 
 Read docs/product/WAVE-3H-DECISION.md in full first — it is this wave's
@@ -300,7 +300,7 @@ current state.
    follow the established self-review-substitute + retained-debt
    protocol in .claude/rules/autonomous-development.md — do not treat it
    as an automatic stop.
-5. Run the "Acceptance checks" WAVE-3H-DECISION.md's Wave 3I section
+5. Run the "Acceptance checks" WAVE-3H-DECISION.md's Wave 3N section
    lists. Record real results only.
 6. Update docs/CURRENT-HANDOFF.md, docs/ACTIVE-PLAN.md,
    docs/PROJECT-MEMORY.md, docs/VERIFICATION-DEBT.md, and

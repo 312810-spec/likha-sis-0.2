@@ -47,6 +47,9 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
@@ -402,6 +405,73 @@ export class FixtureExportRepository implements ExportRepository {
         omittedFields: [
           { field: "School ID (EBEIS)", reason: "not tracked by this app" },
           { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
+        ],
+      },
+    };
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_School_${year}-${String(month).padStart(2, "0")}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Monthly Attendance Summary per Section"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+      },
+    };
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF5_${sectionId}_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: [
+          "School Name",
+          "Grade Level",
+          "Section",
+          "School Year",
+          "Class Adviser",
+          "Learner Name",
+          "LRN",
+          "Sex",
+          "Subject Final Grades",
+          "General Average",
+          "Action Taken",
+          "Summary of Proficiency Levels",
+          "Summary of Promotion Decisions",
+        ],
+        omittedFields: [
+          {
+            field: "Signature of Class Adviser / Signature of School Head",
+            reason: "Physical certification step intentionally left for signing after printing.",
+          },
+        ],
+      },
+    };
+  }
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_School_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: [
+          "School ID",
+          "School Name",
+          "School Year",
+          "Grade Levels & Section Names",
+          "Promotion Status Summary",
+          "Level of Proficiency Summary",
+        ],
+        omittedFields: [
+          {
+            field: "Division / District / Region",
+            reason: "Not tracked by this app",
+          },
         ],
       },
     };
@@ -1046,6 +1116,10 @@ const FIXTURE_SCHOOL_MEMBERS: SchoolMember[] = [
 export class FixtureSchoolMemberRepository implements SchoolMemberRepository {
   async listMembers(): Promise<SchoolMember[]> {
     return FIXTURE_SCHOOL_MEMBERS;
+  }
+
+  async resetPassword(targetUserId: string): Promise<boolean> {
+    return FIXTURE_SCHOOL_MEMBERS.some((member) => member.id === targetUserId);
   }
 }
 

@@ -1,5 +1,91 @@
 # ACTIVE PLAN
 
+## GitHub reconciliation checkpoint (2026-09-01)
+
+- [x] Audit all open issues, PRs, review threads, branch ancestry, and current
+      `main`.
+- [x] Integrate the hardened admin-assisted password-reset implementation from
+      PR #11.
+- [x] Preserve `main`'s verified Adviser/Section Adviser lineage and replay only
+      PR #15's newer SF2/SF9 adviser-header, SF5, SF6, and SF4 commits.
+- [x] Resolve the duplicate Wave 3I / ADR-0057 identity: SF5 keeps Wave 3I /
+      ADR-0057; password reset becomes Wave 3N / ADR-0060.
+- [x] Pass local TypeScript quality (80 files, 791 tests), production build,
+      dev-preview isolation, architecture checks, and harness 100/100.
+- [ ] Push the exact reconciliation checkpoint and require both GitHub Quality
+      and Security gates to pass for that SHA.
+- [ ] Merge the reconciliation PR, then close superseded PRs #11/#15 and issues
+      #9/#16 with links to the canonical merge.
+
+Do not begin another product wave until this exact checkpoint is green and
+merged. The next slice must be selected from the reconciled project brain, not
+from either stale parallel handoff independently.
+
+## Wave 3N: Admin-Assisted Password Reset (added 2026-08-31) — complete
+
+Implementation wave (GitHub issue #9, a delivery-retry of an earlier
+same-issue run whose ephemeral session produced no durable artifact —
+independently reconstructed and re-verified here, not re-pushed).
+Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c` (verified
+exactly the issue's expected checkpoint). Full scope contract:
+`docs/product/WAVE-3H-DECISION.md`'s Wave 3N section. Full decision
+record: `docs/adr/0060-admin-assisted-password-reset.md`.
+
+**Shipped**:
+
+- `admin_reset_teacher_password` Rust command
+  (`src-tauri/src/commands/user.rs` → `auth::admin_reset_teacher_password`),
+  gated by the existing `Capability::ManageSchoolMembership` (no new
+  capability variant).
+- Server-side same-school target re-verification on every call; an
+  unknown target and a cross-school target collapse to an identical
+  `Ok(false)` with no audit write (enumeration safety).
+- Existing Argon2id hashing path reused unchanged; raw password
+  zeroized in the command layer.
+- `repository::user::set_password_and_clear_lockout` — a successful
+  reset also clears the target account's lockout state.
+- Migration 24: widens `audit_log` (nullable `actor_user_id`, new
+  `password_reset_by_admin` event type) via the same 12-step
+  recreate-table pattern migration 5 established; every pre-existing
+  row preserved losslessly.
+- `repository::audit_log::record_admin_action` — actor/target
+  attribution for the new event type; `list_for_school` resolves
+  `actor_username` via a join for display.
+- `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` gained
+  the new command in the same commit (Wave 3B's own recorded debt).
+- `AdminPasswordResetScreen.tsx` (new School Head UI, reached from the
+  "Security" nav group), following `SectionAdviserScreen`'s established
+  generic-error/no-client-side-enforcement convention.
+- Command-boundary tests (same-school success, cross-school denial,
+  non-School-Head denial, no-session denial, unknown-target vs.
+  cross-school-target indistinguishability, lockout clearing, audit
+  actor/target attribution) and UI/application tests (validation,
+  success/failure paths, accessibility).
+
+**Verification actually run**: `npm run quality` 770/770 (typecheck,
+lint, format, architecture, vitest); `npm run build`; `npm run
+check:dev-preview-isolation`; `npm run harness:verify` 100/100; `cargo
+fmt --check`; `git diff --check` — all clean. `cargo test`/`cargo
+clippy` could not run (missing Linux GTK/WebKit system libraries in
+this sandbox; `apt-get install` requires interactive approval
+unavailable in this unattended session) — mitigated with careful manual
+review of every changed `.rs` file; retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent before completion (auth-touching milestone
+per `.claude/rules/security-privacy.md`) — see this session's own final
+report for the actual outcome.
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+policy or idle-timeout behavior; no Sync/cloud/billing/backup work;
+synthetic fixtures only throughout.
+
+**Next**: Wave 3J (Adviser View dev-preview/Playwright verification
+debt closure) — `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current — deliberately not started here.
+
 ## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
 
 Planning-only wave (GitHub issue #6), branch
@@ -10,8 +96,8 @@ workflow/harness-metadata file touched.
 **Full record**: `docs/product/WAVE-3H-DECISION.md` — 11 candidates
 evaluated against the live repository (not assumed from memory),
 scored against LIKHA's priority order, recommended slice + runner-up +
-exact Wave 3I scope/non-goals/risks/acceptance-checks, completion-
-percentage and mock-pilot-readiness estimates, and a copy-ready Wave 3I
+exact Wave 3N scope/non-goals/risks/acceptance-checks, completion-
+percentage and mock-pilot-readiness estimates, and a copy-ready Wave 3N
 prompt.
 
 **Recommended next slice**: Admin-Assisted Password Reset (School Head
@@ -26,7 +112,7 @@ quality`, `git diff --check` run as this wave's gate (see
 `docs/CURRENT-HANDOFF.md`'s top entry and this session's final report
 for actual results).
 
-**Next**: Wave 3I (Admin-Assisted Password Reset), per the issue's
+**Next**: Wave 3N (Admin-Assisted Password Reset), per the issue's
 explicit instruction, deliberately not started in this wave.
 
 ## Wave 3G: Section Adviser Management UI (added 2026-08-31) — complete

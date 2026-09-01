@@ -1,5 +1,30 @@
 # PROJECT MEMORY
 
+## 2026-09-01 — Canonical reconciliation of parallel Claude and Antigravity lineages
+
+Repository truth was reconciled from `main` `fd437e5`, PR #11
+(`c129cec`, admin-assisted password reset), and PR #15
+(`35ed7f0`, Antigravity through SF4). The canonical tree keeps `main`'s
+restored Claude automation/harness and already verified Adviser View + Section
+Adviser Management, integrates PR #11's hardened authentication work, and
+replays only the six later Antigravity product commits for adviser-aware
+SF2/SF9 exports, SF5, SF6, and SF4. Duplicate older Adviser/relay commits were
+not replayed.
+
+Reconciliation review corrections are canonical: SF5's adviser gate resolves
+the actual school-year period end inside the active school scope; SF4/SF6 use
+the dedicated `ExportSchoolReports` capability (Registrar + School Head); SF6
+shows and totals pending/incomplete learners rather than omitting them.
+
+Canonical identity after reconciliation: SF5 is Wave 3I / ADR-0057;
+admin-assisted password reset is Wave 3N / ADR-0060. This resolves a parallel
+numbering collision without changing either feature's behavior.
+
+Combined local gate: 80 Vitest files / 791 tests, TypeScript, lint, Prettier,
+architecture, build, dev-preview isolation, and harness 100/100 passed. Native
+Rust and supply-chain/security binaries are unavailable on this runner, so the
+exact-head GitHub Quality and Security gates remain required before merge.
+
 ## Purpose
 
 Durable project facts only. Do not use this as a transcript.
@@ -2784,7 +2809,7 @@ RBAC shipped since (ADR-0036, Wave 1) and this candidate was never
 re-scored — the original blocker is gone. Recorded here so a future
 session doesn't re-read the stale 4.20 score without this correction.
 
-**Recommended (Wave 3I, not started)**: Admin-Assisted Password Reset —
+**Recommended (renumbered to Wave 3N during reconciliation, not started here)**: Admin-Assisted Password Reset —
 a School Head resets a colleague's LIKHA password within their own
 school, reusing `Capability::ManageSchoolMembership`, existing Argon2id
 hashing, school-scoping, and the audit-log table unchanged. Deliberately
@@ -2808,6 +2833,126 @@ production use with real learner PII.
 **Verification**: doc-only wave; no product/Rust/test/dependency/
 migration/workflow/harness-metadata file touched — see
 `docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
+
+## Wave 3N — Admin-Assisted Password Reset (added 2026-08-31)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact). Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c`
+(confirmed exactly the issue's expected checkpoint). Full record:
+`docs/adr/0060-admin-assisted-password-reset.md`;
+`docs/CURRENT-HANDOFF.md`'s new top entry.
+
+Closes the gap Wave 3H's survey identified: a teacher who forgets their
+LIKHA password (distinct from the existing 15-minute lockout, which
+already self-clears) previously had no legitimate in-app recovery path
+at all. Ran the project's 10-scenario decision process; selected
+**School Head sets a new password directly, effective immediately**
+(reuses `Capability::ManageSchoolMembership`, the existing Argon2id
+path, and the existing `audit_log` table, widened not replaced).
+Recorded **Next Best, explicitly deferred not rejected**: a
+system-generated temporary password with forced change at next login —
+would need a new `users` schema flag and a new login-flow interception
+point this codebase doesn't have yet; the switch condition is a future
+finding that School-Head-durably-knows-the-password is unacceptable for
+this deployment model, not effort alone.
+
+**Durable facts for future sessions**: `admin_reset_teacher_password`
+is the first `audit_log` event type where the acting user
+(`actor_user_id`) genuinely differs from the event's subject
+(`user_id`/`username`) — migration 24 widened the table for this,
+preserving every pre-existing row losslessly with `actor_user_id =
+NULL`. A successful reset also clears the target account's lockout
+state as a deliberate, in-scope side effect (not a change to ADR-0019's
+lockout policy itself). An unknown target and a target in a different
+school are indistinguishable (`Ok(false)`, no audit write) —
+enumeration-safety by construction, not code-review vigilance.
+
+**Verification**: `npm run quality` 770/770; `npm run build`; `npm run
+harness:verify` 100/100; `cargo fmt --check`; `git diff --check`; all
+clean. `cargo test`/`cargo clippy` could not run in-session (missing
+Linux GTK/WebKit system libraries, `apt-get install` needs interactive
+approval unavailable here) — retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for that check.
+Independent security review dispatched — see this wave's own final
+report and `docs/VERIFICATION-DEBT.md` for the actual outcome.
+
+## Wave 3H — Section Advisory Form Header Integration (added 2026-09-01)
+
+Full record: `docs/adr/0056-*` Wave 3H addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3H entry. **New branch**
+`antigravity/likha-sis-wave3h-section-advisory-export-integration`, created from `0f0d2c3` (Wave
+3G's checkpoint).
+
+- **Built**: Connected section advisory temporal resolution to `export::sf2` and `export::report_card` (SF9).
+  Added dynamic `"Class Adviser"` CSV header row and updated `FieldDisclosure` disclosures in both export builders.
+  Updated `export_section_monthly_sf2` and `export_class_record_report_card` commands to query `section_advisory::current_adviser_for_section`
+  and resolve the teacher's `display_name` via `user::find_by_id`.
+- **Verification/checkpoint**: `cargo test` 604 lib tests (+2) + 11 integration test binaries green (+2 integration tests);
+  `npm run quality:full` clean (750/750 vitest, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
+## Wave 3I — School Form 5 (SF5) Promotion & Learning Progress Foundation (added 2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md`;
+`docs/VERIFICATION-DEBT.md` Wave 3I entry. **New branch**
+`antigravity/likha-sis-wave3i-sf5-promotion-foundation`, created from `10bc2f5` (Wave
+3H's checkpoint).
+
+- **Built**: DepEd Order No. 8, s. 2015 / DepEd Order No. 58, s. 2017 compliant SF5 export engine.
+  Pure domain model `src-tauri/src/export/sf5.rs` (`PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow`, `ProficiencySummary`, `build_sf5_export`),
+  Tauri command `export_section_eosy_sf5` gated on `auth::authorize_adviser_of_section`,
+  frontend port `ExportRepository.exportSectionEosySf5`, `TauriExportRepository`, `ExportApplicationService`, and session exemption in `invoke.ts`.
+- **Verification/checkpoint**: `cargo test` 611 lib tests (+7) + 14 integration test binaries green (+3 integration tests);
+  `npm run quality:full` clean (755/755 vitest across 78 files, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
+## Wave 3J — School Form 5 (SF5) Section Promotion UI (added 2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3J entry. **New branch**
+`antigravity/likha-sis-wave3j-sf5-section-promotion-ui`, created from `e5c5041` (Wave
+3I's checkpoint).
+
+- **Built**: Integrated SF5 (Report on Promotion and Level of Proficiency) into `SectionRosterScreen.tsx`.
+  Added "Export SF5 (Promotion & Level of Proficiency)" button under `.section-roster-forms`,
+  wired `exportService` through `App.tsx`, managed `sf5Exporting`/`sf5Result`/`sf5Error` state,
+  guarded against concurrent actions (`anyActionInFlight`), displayed output file path and `FieldDisclosure`
+  omitted fields disclaimers in alert banners, and added Guided mode contextual assistance.
+- **Verification/checkpoint**: `npm run quality:full` clean (758/758 vitest across 78 files, +3 tests net, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
+## Wave 3K — School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (added 2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md`;
+`docs/VERIFICATION-DEBT.md` Wave 3K entry. **New branch**
+`antigravity/likha-sis-wave3k-sf6-school-promotion-foundation`, created from `2ebf450` (Wave
+3J's checkpoint).
+
+- **Built**: DepEd Order No. 4, s. 2014 / DepEd Order No. 8, s. 2015 / DepEd Order No. 58, s. 2017 compliant SF6 school summary export engine.
+  Pure domain model `src-tauri/src/export/sf6.rs` (`Sf6SectionSummary`, `Sf6Export`, `build_sf6_export`),
+  Table 1 (Promotion Decisions by Section, Grade Level Subtotal, School Grand Total),
+  Table 2 (Summary of Level of Proficiency by Section, Grade Level Subtotal, School Grand Total),
+  Tauri backend command `export_school_eosy_sf6` in `src-tauri/src/commands/export.rs` with session-scoped school isolation,
+  frontend domain model `Sf6ExportResult`, port `ExportRepository.exportSchoolEosySf6`, `TauriExportRepository`, `ExportApplicationService`, and session exemption in `invoke.ts`.
+- **Verification/checkpoint**: `cargo test` 613 lib tests (+2) + 14 integration test binaries green (+1 integration test in `tests/export.rs`);
+  `npm run quality:full` clean (763/763 vitest across 78 files, +5 tests net, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
+## Wave 3L — School Form 6 (SF6) School Promotion Summary UI (added 2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md` Wave 3L addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3L entry. **New branch**
+`antigravity/likha-sis-wave3l-sf6-school-promotion-ui`, created from `c3858ae` (Wave
+3K's checkpoint).
+
+- **Built**: User-facing DepEd School Form 6 (SF6) School Promotion Summary export interface in `SectionsScreen.tsx`.
+  Added "End-of-School-Year Summary (SF6)" form panel allowing School Heads, Administrators, and Teachers to export the official DepEd SF6 End-of-School-Year report for a chosen school year.
+  Dynamic school year picker resolving existing school years across sections with text input fallback.
+  Teacher mode contextual support (Guided mode guidance citing DepEd Order No. 4, s. 2014 & DO 8 s. 2015), in-flight disablement guards, success feedback with file path and structured field disclosures, and error messaging.
+  Wired `exportService={exportService}` to `SectionsScreen` in `src/App.tsx`.
+- **Verification/checkpoint**: `npm run quality:full` clean (Vitest 766/766 across 78 files, +3 tests net, cargo test 613 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`,
+  `check:dev-preview-isolation`, `harness:verify` (100/100 certified) all pass.
 
 ## Current Milestone
 

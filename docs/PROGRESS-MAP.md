@@ -264,7 +264,7 @@ CURRENT ← Wave 1 + Wave 4 complete; `main` fast-forwarded through Waves
   2Z-3G (Subject Attendance + Section Advisory, a full feature line
   delivered outside this table, fully reviewed and verified). Wave 3H
   (2026-08-31, planning-only, docs/product/WAVE-3H-DECISION.md) surveyed
-  the roadmap fresh and recommends Wave 3I: Admin-Assisted Password
+  the roadmap fresh and recommends Wave 3N: Admin-Assisted Password
   Reset (newly unblocked now that Wave 1's RBAC exists — see the
   decision record for why the old low score no longer applies) — see
   docs/CURRENT-HANDOFF.md for exact next-action detail.

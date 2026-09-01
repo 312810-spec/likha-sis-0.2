@@ -14,6 +14,8 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type {
   ComputedTermGrade,
@@ -213,6 +215,20 @@ class FakeExportRepository implements ExportRepository {
   };
 
   async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
     throw new Error("not used in this test");
   }
 

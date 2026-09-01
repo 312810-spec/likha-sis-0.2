@@ -1,5 +1,127 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — GitHub issue/PR reconciliation, integration complete locally)
+
+Reconciled current `main` (`fd437e5`) with both open product lines without
+discarding either lineage:
+
+- PR #11 head `c129cec`: admin-assisted password reset, including the
+  post-review fixes for exclusive-school scope, target-session revocation,
+  atomic password/audit/session writes, and rejected-target timing work;
+- PR #15's genuinely newer product commits `10bc2f5..35ed7f0`: adviser
+  headers in SF2/SF9 exports, SF5 foundation and UI, SF6 foundation and UI,
+  and SF4 monthly attendance consolidation;
+- current `main`'s restored Claude workflow, locked harness, verified Adviser
+  View, and separate Section Adviser Management screen.
+
+The older duplicate Adviser View/Section Adviser and relay commits from PR #15
+were not replayed because their functionality already exists on the newer,
+verified `main` lineage. This is preservation by semantic equivalence, not a
+blind conflicting merge.
+
+Independent reconciliation review found and corrected three integration
+blockers before checkpointing: SF5 authorization now uses the caller school's
+actual last grading-period date (not an empty-school lookup/fallback); SF4 and
+SF6 school-wide exports require `ExportSchoolReports` (Registrar or School
+Head), so an ordinary Teacher cannot export every section's attendance/grades;
+and SF6 explicitly counts pending/incomplete learners instead of dropping them
+from displayed totals.
+
+Parallel agents had assigned both ADR-0057 and Wave 3I to different features.
+The canonical reconciled numbering is now: SF5 remains Wave 3I / ADR-0057;
+admin-assisted password reset is Wave 3N / ADR-0060. The feature behavior did
+not change during renumbering.
+
+Local verification on the combined tree: `npm run quality` passed 80 files and
+791 tests; `npm run harness:verify` remains certified at 100/100; production
+build and dev-preview isolation passed. `quality:full` reached the native step
+but this runner has no `cargo`; local gitleaks/cargo-deny/OSV tools are also
+absent. Exact-head GitHub Quality and Security gates remain authoritative and
+must be green before merge.
+
+## Active Task (2026-08-31, this session — Wave 3N: Admin-Assisted Password Reset, complete)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact — that run's uncommitted work was independently reconstructed
+and re-verified from scratch here, not merely re-pushed). Branch
+`claude/issue-9-20260831-1305`, starting `HEAD` `fa8d21c` (confirmed
+exactly the issue's expected checkpoint). `main` not fetched/switched/
+merged/modified. Full scope contract: `docs/product/WAVE-3H-DECISION.md`'s
+Wave 3N section. Full decision record: `docs/adr/0060-admin-assisted-password-reset.md`.
+
+**What shipped**: `admin_reset_teacher_password` (Rust command,
+`src-tauri/src/commands/user.rs`) lets a School Head set a new password
+directly for a colleague in their own school, effective immediately —
+the Recommended mechanism from ADR-0060's 10-scenario decision process
+(Next Best, explicitly deferred not rejected: a system-generated
+temporary password with forced change at next login). Gated by the
+existing `Capability::ManageSchoolMembership` (no new capability
+variant — reuses the same authority tier as onboarding a member).
+Target school membership is re-verified server-side on every call; an
+unknown target and a target in a different school collapse to an
+identical `Ok(false)` with no audit write, so neither can be used to
+enumerate accounts in another school. Reuses the existing Argon2id
+hashing path unchanged; the raw password is zeroized in the command
+layer. A successful reset also clears any lockout in effect on the
+target account (`repository::user::set_password_and_clear_lockout`) —
+a locked-out account is very often exactly why the reset was requested.
+Migration 24 widens `audit_log` (the same 12-step recreate-table
+pattern migration 5 established, since SQLite cannot `ALTER` a `CHECK`
+constraint in place) with a nullable `actor_user_id` column and a new
+`password_reset_by_admin` event type; every pre-existing row is
+preserved losslessly with `actor_user_id = NULL`.
+`admin_reset_teacher_password` was added to `invoke.ts`'s session-
+expiry exemption set in the same commit (Wave 3B's own recorded debt:
+every new capability-gated command must be added by hand). A new
+`AdminPasswordResetScreen` (reached from the "Security" nav group)
+shows the same form to every authenticated school member, following
+`SectionAdviserScreen`'s established generic-error/no-client-side-
+enforcement convention.
+
+**Verified this wave**: `npm run quality` 770/770 (typecheck, lint,
+format, architecture, vitest all clean); `npm run build` clean; `npm
+run check:dev-preview-isolation` clean; `npm run harness:verify`
+100/100; `cargo fmt --check` clean; `git diff --check` clean. New Rust
+command-boundary tests cover same-school authorized success,
+cross-school denial (returns `false`, not an error, with no audit
+write), non-School-Head denial (`Unauthorized`), no-session denial,
+an unknown-target vs. cross-school-target indistinguishability
+assertion, lockout clearing on reset, and audit actor/target
+attribution. New TS tests cover the application-service validation
+layer, the Tauri adapter's exact `invoke` call shape, the UI screen's
+success/generic-failure/validation paths, and accessibility.
+**`cargo test`/`cargo clippy` could not run in this session's sandbox**
+(no `libglib2.0-dev`/`libgtk-3-dev`/`libwebkit2gtk-4.1-dev` — the exact
+packages `.github/workflows/quality.yml` installs for CI — and
+`apt-get install` requires interactive approval unavailable in this
+unattended run) — mitigated with careful manual review of every
+changed `.rs` file and an independent security review (see below);
+retained as debt in `docs/VERIFICATION-DEBT.md`; GitHub CI is
+authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent, scoped to authorization correctness,
+cross-school isolation, enumeration safety, password handling, the
+lockout side effect, audit correctness, the `invoke.ts` exemption
+change, and the frontend's UI-hiding-is-not-security posture — see this
+session's own final report for the actual outcome (recorded honestly,
+including if the known agent-retrieval failure recurred).
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+_policy_ (ADR-0019) or idle-timeout behavior (ADR-0020) — only one
+already-authorized write path's side effect on one specific account; no
+Sync/cloud/billing/backup work; synthetic fixtures only.
+
+**Gate decision: WAVE 3I COMPLETE.** Persisted durably to the
+issue-managed branch (commit SHA and PR link in this session's own
+final report — not duplicated here to avoid drift). Next planned slice
+(not started, from `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current by this session): Wave 3J —
+Adviser View dev-preview/Playwright verification debt closure. Stopping
+here per the wave contract.
+
 ## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
 
 Planning-only wave, run from GitHub issue #6, on branch
@@ -27,7 +149,7 @@ holds and the roadmap was never revisited to reflect it — exactly the
 "newly discovered evidence changes the best sequence" case
 `.claude/rules/autonomous-development.md` calls out.
 
-**Recommended next slice (Wave 3I, not started)**: Admin-Assisted
+**Recommended next slice (Wave 3N, not started)**: Admin-Assisted
 Password Reset — a School Head resets a colleague's LIKHA login password
 within their own school, reusing the existing `Capability::ManageSchoolMembership`
 gate, Argon2id hashing, school-scoping, and audit-log patterns unchanged.
@@ -37,9 +159,9 @@ debt named in this file's prior entry below. Both Wave 5 Sync's
 were evaluated and deliberately not selected — both are decision-shaped,
 not narrow-implementation-shaped, and each needs its own dedicated
 scenario-process wave first (same reasoning already applied to Sync).
-Full scope/non-goals/risks/acceptance-checks for Wave 3I, current
+Full scope/non-goals/risks/acceptance-checks for Wave 3N, current
 completion-percentage and mock-pilot-readiness estimates, and the exact
-recommended Wave 3I prompt are all in `docs/product/WAVE-3H-DECISION.md`
+recommended Wave 3N prompt are all in `docs/product/WAVE-3H-DECISION.md`
 — not duplicated here.
 
 **Verification this wave**: doc-only change; `npm run harness:verify`,
@@ -48,7 +170,7 @@ recommended Wave 3I prompt are all in `docs/product/WAVE-3H-DECISION.md`
 review confirms only planning/brain documents changed.
 
 **Gate decision: WAVE 3H COMPLETE.** Per the issue's explicit
-instruction, Wave 3I is not implemented here. Stopping and waiting for
+instruction, Wave 3N is not implemented here. Stopping and waiting for
 the next continuation instruction.
 
 ## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)

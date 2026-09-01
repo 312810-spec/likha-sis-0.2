@@ -3,7 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { LearnerApplicationService } from "../application/learner-service";
 import { SectionApplicationService } from "../application/section-service";
+import { ExportApplicationService } from "../application/export-service";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
+} from "../domain/export";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { Section, SectionMembership, SectionRosterMember } from "../domain/section";
@@ -104,10 +113,58 @@ class FakeSectionRepository implements SectionRepository {
   }
 }
 
-function renderScreen(sections: Section[] = []) {
+class FakeExportRepository implements ExportRepository {
+  sf6Calls: string[] = [];
+  sf6Error: Error | null = null;
+  sf6ToReturn: Sf6ExportResult | null = {
+    filePath: "C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv",
+    disclosure: {
+      populatedFields: ["School Year", "Promotion Status Summary"],
+      omittedFields: [
+        { field: "School Head Certification Signature", reason: "manual signature required" },
+      ],
+    },
+  };
+
+  async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    this.sf6Calls.push(schoolYear);
+    if (this.sf6Error) throw this.sf6Error;
+    return this.sf6ToReturn;
+  }
+
+  async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("not used in this test");
+  }
+}
+
+function renderScreen(
+  sections: Section[] = [],
+  exportOverrides: Partial<FakeExportRepository> = {},
+) {
   const sectionRepo = new FakeSectionRepository(sections);
   const sectionService = new SectionApplicationService(sectionRepo);
   const learnerService = new LearnerApplicationService(new FakeLearnerRepository());
+  const exportRepo = new FakeExportRepository();
+  Object.assign(exportRepo, exportOverrides);
+  const exportService = new ExportApplicationService(exportRepo);
   const openRosterCalls: string[] = [];
   const manageAssignmentsCalls: Array<[string, string]> = [];
   const manageAdviserCalls: Array<[string, string]> = [];
@@ -116,6 +173,7 @@ function renderScreen(sections: Section[] = []) {
       <SectionsScreen
         sectionService={sectionService}
         learnerService={learnerService}
+        exportService={exportService}
         onOpenRoster={(sectionId) => openRosterCalls.push(sectionId)}
         onManageAssignments={(sectionId, sectionName) =>
           manageAssignmentsCalls.push([sectionId, sectionName])
@@ -126,7 +184,14 @@ function renderScreen(sections: Section[] = []) {
       />
     </ModeProvider>,
   );
-  return { ...result, sectionRepo, openRosterCalls, manageAssignmentsCalls, manageAdviserCalls };
+  return {
+    ...result,
+    sectionRepo,
+    exportRepo,
+    openRosterCalls,
+    manageAssignmentsCalls,
+    manageAdviserCalls,
+  };
 }
 
 beforeEach(() => {
@@ -256,5 +321,67 @@ describe("SectionsScreen", () => {
     await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("exports SF6 for an existing school year and shows the saved file", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { exportRepo, container } = renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF6 (Promotion & Proficiency Summary)" }),
+    );
+
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(screen.getByText(/SF6_TestSchool_2025-2026.csv/)).toBeInTheDocument();
+    expect(screen.getByText(/School Head Certification Signature/)).toBeInTheDocument();
+    expect(exportRepo.sf6Calls).toEqual(["2025-2026"]);
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("exports SF6 for a manually entered school year when no sections exist", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([]);
+    await screen.findByText("No sections created yet.");
+
+    await user.type(screen.getByLabelText("School year for SF6"), "2024-2025");
+    await user.click(
+      screen.getByRole("button", { name: "Export SF6 (Promotion & Proficiency Summary)" }),
+    );
+
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(exportRepo.sf6Calls).toEqual(["2024-2025"]);
+  });
+
+  it("shows a generic recovery message when SF6 export fails", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    renderScreen([section], { sf6Error: new Error("synthetic failure") });
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF6 (Promotion & Proficiency Summary)" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Could not export SF6 — check that you have permission to export school summaries, or that school year records are complete.",
+      ),
+    ).toBeInTheDocument();
   });
 });
