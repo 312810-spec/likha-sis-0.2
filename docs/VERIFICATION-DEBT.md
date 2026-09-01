@@ -1,5 +1,17 @@
 # Verification Debt
 
+## Wave 3G — Section Advisory Management UI (2026-09-01)
+
+Full record: `docs/adr/0056-*` Wave 3G addendum; `docs/PROJECT-MEMORY.md`
+Wave 3G entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/axe) screenshot coverage for the
+   section advisory modal/panel interaction.** `SectionsScreen`'s
+   advisory management panel is tested via jsdom + axe-core (`expectNoAccessibilityViolations`)
+   with full panel lifecycle coverage, but not in a live browser rendering test.
+
 ## Wave 3F — Adviser View (2026-08-30)
 
 Full record: `docs/adr/0055-*` Wave 3F addendum; `docs/PROJECT-MEMORY.md`

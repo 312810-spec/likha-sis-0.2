@@ -235,3 +235,25 @@ self-review** — recorded as higher-priority debt in
 `docs/VERIFICATION-DEBT.md`, to be retried in a later session once the
 reviewer harness appears healthy, per this project's own periodic-retry
 rule.
+
+## Wave 3G Addendum: Section Advisory Management UI (2026-09-01)
+
+Status: Accepted / Shipped
+
+### Context & Need
+
+Wave 3E established the backend foundation (`section_advisories` table, `assign_section_adviser`, `end_section_adviser`, `current_section_adviser`, and `Capability::ManageSectionAdvisories` authorization), and Wave 3F created `AdviserViewScreen` for reading subject attendance. However, no UI existed for a School Head to assign or end section advisories or for teachers to view the assigned class adviser directly in section management.
+
+### Decision & Implementation
+
+1. **Domain & Ports**:
+   - Created `SectionAdvisory`, `AssignAdviserOutcome`, and `EndAdvisoryOutcome` in `src/domain/section-advisory.ts`.
+   - Created `SectionAdvisoryRepository` port in `src/domain/ports/section-advisory-repository.ts`.
+2. **Infrastructure**:
+   - Created `TauriSectionAdvisoryRepository` implementing `getCurrentAdviser`, `assignAdviser`, and `endAdviser` via `invoke()`, thoroughly tested in `src/infrastructure/tauri/section-advisory-repository.test.ts`.
+3. **Application Service**:
+   - Created `SectionAdvisoryApplicationService` in `src/application/section-advisory-service.ts` with ISO date and non-empty string validation, tested in `src/application/section-advisory-service.test.ts`.
+4. **Composition & UI**:
+   - Wired `sectionAdvisoryService` in `src/composition.ts` and `src/App.tsx`.
+   - Enhanced `SectionsScreen.tsx` to display active section advisers on each section row, provide an accessible inline "Manage adviser" panel to assign (teacher dropdown filtered by teacher role, start date) or end an advisory (effective end date), handle all outcomes and permissions, and provide Guided mode guidance.
+   - Comprehensive test suite in `src/ui/SectionsScreen.test.tsx` verifying display, assign, end, validation, permissions, and axe-core accessibility.

@@ -13,6 +13,7 @@ import {
   onSessionExpired,
   schoolMemberService,
   schoolService,
+  sectionAdvisoryService,
   sectionService,
   setupService,
   sf1ImportService,
@@ -191,6 +192,8 @@ function App() {
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
+                sectionAdvisoryService={sectionAdvisoryService}
+                schoolMemberService={schoolMemberService}
                 onOpenRoster={(sectionId) => {
                   setRosterSectionId(sectionId);
                   setActiveTab("section-roster");
@@ -215,6 +218,8 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  sectionAdvisoryService={sectionAdvisoryService}
+                  schoolMemberService={schoolMemberService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -246,6 +251,8 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  sectionAdvisoryService={sectionAdvisoryService}
+                  schoolMemberService={schoolMemberService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");
@@ -272,6 +279,8 @@ function App() {
                 <SectionsScreen
                   sectionService={sectionService}
                   learnerService={learnerService}
+                  sectionAdvisoryService={sectionAdvisoryService}
+                  schoolMemberService={schoolMemberService}
                   onOpenRoster={(sectionId) => {
                     setRosterSectionId(sectionId);
                     setActiveTab("section-roster");

@@ -1,5 +1,31 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3G: Section Advisory Management UI, COMPLETE)
+
+Full record: `docs/adr/0056-section-advisory-foundation.md` Wave 3G addendum;
+`docs/PROJECT-MEMORY.md` Wave 3G entry; `docs/VERIFICATION-DEBT.md` Wave 3G entry.
+**New dedicated branch** `antigravity/likha-sis-wave3g-section-advisory-ui`, created
+from `chore/chatgpt-claude-wave-relay` at `8609925b30887260b48ea1b78fa9bf7d368d4928`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: Section Advisory Management UI. Closes the gap between Wave 3E's
+Rust backend commands and the frontend, providing the full teacher and school head
+workflow for managing and viewing section class advisers directly inside `SectionsScreen.tsx`.
+
+**What shipped**:
+
+- Domain models (`SectionAdvisory`, `AssignAdviserOutcome`, `EndAdvisoryOutcome`).
+- Port `SectionAdvisoryRepository` and Tauri adapter `TauriSectionAdvisoryRepository`.
+- Application service `SectionAdvisoryApplicationService` with ISO date and non-empty string validation.
+- Wired composition in `src/composition.ts` and `src/App.tsx`.
+- UI: Active adviser label per section, inline accessible "Manage adviser" form panel allowing School Heads to assign (teacher role picker, start date) or end an active advisory (end date), clear feedback alerts, and mode parity.
+- Unit & a11y tests across all layers (750 tests passing in vitest).
+
+**Verification**:
+
+- `npm run quality:full` clean (Vitest 750/750 across 78 files, cargo test 602 lib + 11 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run check:deadcode`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-08-30 — Wave 3F: Adviser View, COMPLETE)
 
 Full record: `docs/adr/0055-subject-attendance-foundation.md` Wave 3F

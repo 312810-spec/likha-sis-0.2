@@ -1,5 +1,32 @@
 # ACTIVE PLAN
 
+## Wave 3G: Section Advisory Management UI (added 2026-09-01) — complete
+
+Full record: `docs/adr/0056-*` Wave 3G addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3G entry;
+`docs/VERIFICATION-DEBT.md` Wave 3G entry. **New branch**
+`antigravity/likha-sis-wave3g-section-advisory-ui`, created from `8609925` (Wave
+3F's own final, CI-confirmed relay checkpoint).
+
+**Scope**: Frontend and application layer for Section Advisory Management.
+Connects the backend commands (`assign_section_adviser`, `end_section_adviser`,
+`current_section_adviser`) into `SectionsScreen.tsx`, allowing School Heads to
+assign/end advisers with role filtering and effective dates, and all school
+members to view the assigned class adviser per section.
+
+**Built**:
+
+- Domain: `SectionAdvisory`, `AssignAdviserOutcome`, `EndAdvisoryOutcome` in `src/domain/section-advisory.ts`.
+- Repository Port: `SectionAdvisoryRepository` in `src/domain/ports/section-advisory-repository.ts`.
+- Infrastructure: `TauriSectionAdvisoryRepository` in `src/infrastructure/tauri/section-advisory-repository.ts` with tests in `src/infrastructure/tauri/section-advisory-repository.test.ts`.
+- Application Service: `SectionAdvisoryApplicationService` in `src/application/section-advisory-service.ts` with tests in `src/application/section-advisory-service.test.ts`.
+- Composition & App: Wired `sectionAdvisoryService` in `src/composition.ts` and `src/App.tsx`.
+- UI: Enhanced `SectionsScreen.tsx` with adviser display, accessible inline management panel, Guided mode contextual help, and comprehensive tests in `src/ui/SectionsScreen.test.tsx` (all axe-core clean).
+
+**Verification**: `npm run quality` 750/750 vitest (78 files, +35 net tests);
+`cargo test` 602 lib tests + 11 integration test binaries green; `npm run quality:full` clean;
+`npm run build`, `check:dev-preview-isolation`, `check:deadcode`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3F: Adviser View (added 2026-08-30) — complete
 
 Full record: `docs/adr/0055-*` Wave 3F addendum; `docs/CURRENT-HANDOFF.md`

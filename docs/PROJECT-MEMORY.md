@@ -2708,6 +2708,27 @@ Full record: `docs/adr/0055-*` Wave 3F addendum;
   fresh roadmap survey (SF5, authoritative-template SF9). No candidate
   pre-selected.
 
+## Wave 3G — Section Advisory Management UI (added 2026-09-01)
+
+Full record: `docs/adr/0056-*` Wave 3G addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3G entry. **New branch**
+`antigravity/likha-sis-wave3g-section-advisory-ui`, created from `8609925` (Wave
+3F's relay checkpoint).
+
+- **Built**: Complete TypeScript & React frontend for Section Advisory Management.
+  Domain entities (`SectionAdvisory`, `AssignAdviserOutcome`, `EndAdvisoryOutcome`),
+  repository port (`SectionAdvisoryRepository`), Tauri adapter (`TauriSectionAdvisoryRepository`),
+  application service with date/input validation (`SectionAdvisoryApplicationService`),
+  composition wiring in `composition.ts` and `App.tsx`.
+- **UI & Accessibility**: Enhanced `SectionsScreen.tsx` to show current section
+  advisers, inline accessible panel to assign or end section advisories with teacher
+  role filtering and effective dates, error/success notifications, and full Guided/
+  Comfortable/Efficient mode parity.
+- **Verification/checkpoint**: `npm run quality` 750/750 vitest (78 files, +35 net tests);
+  `cargo test` 602 lib tests + 11 integration test binaries green;
+  `npm run quality:full` clean; `npm run build`, `check:dev-preview-isolation`,
+  `check:deadcode`, `quality:security`, `harness:verify` (100/100 certified) all clean.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
