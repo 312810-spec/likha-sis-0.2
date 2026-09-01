@@ -2935,7 +2935,7 @@ three instances to keep this change reviewable. Low severity, not
 blocking. Revisit as its own slice; the fix shape is settled, just not
 yet applied everywhere.
 
-## App-wide: export results show a raw file path with no reveal/open affordance (open)
+## App-wide: export results show a raw file path with no reveal/open affordance — PARTIALLY CLOSED (2026-09-01, SF2/SF4 in MonthlySummaryScreen)
 
 Found by the UX-03 `teacher-ux-reviewer` retry (2026-09-01):
 `MonthlySummaryScreen.tsx`'s export-result alerts (and every other
@@ -2943,10 +2943,22 @@ export result across the app — SF2/SF4/SF5/SF6, report card, learner
 roster) show the saved file's path as plain `<code>` text with no way
 to open it or reveal it in the OS file browser. Low severity (the path
 is still visible, teachers can navigate there manually), but a real
-missing convenience. Fixing it needs a real Tauri-side "reveal in
-folder" command (the `shell`/`opener` plugin or equivalent) plus UI
-wiring across every export result — a genuine new feature, not a
-review-fix nit. Revisit as its own scoped slice.
+missing convenience.
+
+**SF2/SF4 in `MonthlySummaryScreen.tsx` closed 2026-09-01**: added
+`tauri-plugin-opener` v2.5.5 (official first-party Tauri 2 plugin,
+`revealItemInDir`), wired end-to-end through `ExportRepository` →
+`TauriExportRepository` → `ExportApplicationService` →
+`revealExportedFile`, with an "Open folder" button next to each SF2/SF4
+result. See `docs/CURRENT-HANDOFF.md`'s matching entry and
+`docs/SOURCE-REGISTRY.md` for the dependency writeup (including the
+fixed CVE-2025-31477 and the untrusted-path discipline this feature
+depends on). **Remains open for SF5, SF6, report card export, and
+learner roster export** — the same plumbing pattern now exists on every
+layer (`FixtureExportRepository.revealExportedFile` is already wired as
+a genuine no-op for all export kinds), so extending it to the remaining
+screens is UI wiring only, not a new backend feature. Revisit as its own
+scoped slice.
 
 ## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
 

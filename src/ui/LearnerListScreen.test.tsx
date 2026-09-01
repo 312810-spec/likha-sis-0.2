@@ -135,6 +135,10 @@ class FakeExportRepository implements ExportRepository {
     this.exportLearnerRosterCalls += 1;
     return this.resultToReturn;
   }
+
+  async revealExportedFile(): Promise<void> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeEnrollmentHistoryRepository implements EnrollmentHistoryRepository {

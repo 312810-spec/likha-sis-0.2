@@ -55,6 +55,7 @@ umya-spreadsheet = "3"
 # releases, which would silently break a fingerprint persisted in SQLite
 # after a toolchain upgrade.
 sha2 = "0.10"
+tauri-plugin-opener = "2.5.5"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

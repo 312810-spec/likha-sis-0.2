@@ -1,5 +1,16 @@
 # Source Registry
 
+## Reveal-Exported-File Feature (added 2026-09-01)
+
+Full context: `docs/CURRENT-HANDOFF.md` reveal-in-folder entry. Adds an
+"Open folder" affordance next to SF2/SF4 export results so a teacher can
+jump straight to the saved file instead of copying the raw path shown in
+the export confirmation.
+
+| Source                                                                               | Purpose                                                                                                     | Status    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tauri-plugin-opener` v2.5.5 (Rust crate) + `@tauri-apps/plugin-opener` v2.5.5 (npm) | Official first-party Tauri 2 plugin providing `revealItemInDir` to open the OS file manager at a given path | **ADOPT** | Anthropic/Tauri-maintained, actively released, MIT OR Apache-2.0. Had a real, since-fixed CVE (CVE-2025-31477 / GHSA-c9pr-q8gx-3mgp) in its `open`-family APIs' path/URL-scope validation when fed untrusted input — fixed upstream in 2.2.1+; this project pins 2.5.5. Discipline: only ever called with a `filePath` this app itself just returned from a successful export, never a user-typed or otherwise untrusted string (enforced at `TauriExportRepository.revealExportedFile` and `ExportApplicationService.revealExportedFile`). Unsupported on Android/iOS — acceptable, this app is Windows-first, Android later. Capability granted narrowly: `opener:allow-reveal-item-in-dir` only, in `src-tauri/capabilities/default.json`. |
+
 ## Wave 2N — SF10 Evidence Closure (added 2026-08-27)
 
 Full context: `docs/adr/0053-*` Wave 2N addendum, `docs/form-evidence/sf10/README.md`.

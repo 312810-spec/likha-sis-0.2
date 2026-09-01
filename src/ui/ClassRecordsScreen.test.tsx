@@ -86,6 +86,10 @@ class FakeExportRepository implements ExportRepository {
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
   }
+
+  async revealExportedFile(): Promise<void> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeLearnerScoreRepository implements LearnerScoreRepository {

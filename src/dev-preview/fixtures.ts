@@ -457,6 +457,13 @@ export class FixtureExportRepository implements ExportRepository {
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("dev-preview fixture: exportLearnerRoster() is not wired -- read-only fixture");
   }
+
+  async revealExportedFile(): Promise<void> {
+    // No real OS file manager in a browser-hosted dev-preview -- a no-op
+    // is the honest fixture behavior here, not a throw (unlike the other
+    // unwired methods above, clicking "Open folder" in dev-preview isn't
+    // a bug to surface, it's simply unavailable in this environment).
+  }
 }
 
 export class FixtureGradingRepository implements GradingRepository {

@@ -87,6 +87,12 @@ class FakeExportRepository implements ExportRepository {
     this.learnerRosterCalls += 1;
     return this.learnerRosterResultToReturn;
   }
+
+  revealCalls: string[] = [];
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+  }
 }
 
 describe("ExportApplicationService", () => {
@@ -286,5 +292,22 @@ describe("ExportApplicationService", () => {
     const result = await service.exportLearnerRoster();
 
     expect(result).toBeNull();
+  });
+
+  it("revealExportedFile delegates a trimmed path to the repository", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await service.revealExportedFile("  C:\\Users\\teacher\\Documents\\export.csv  ");
+
+    expect(repo.revealCalls).toEqual(["C:\\Users\\teacher\\Documents\\export.csv"]);
+  });
+
+  it("revealExportedFile rejects an empty path", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.revealExportedFile("   ")).rejects.toThrow(ValidationError);
+    expect(repo.revealCalls).toEqual([]);
   });
 });

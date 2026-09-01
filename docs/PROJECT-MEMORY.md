@@ -2896,6 +2896,42 @@ approval unavailable here) — retained as debt in
 Independent security review dispatched — see this wave's own final
 report and `docs/VERIFICATION-DEBT.md` for the actual outcome.
 
+## Reveal-Exported-File ("Open folder") Feature (added 2026-09-01)
+
+User-directed continuation. Second of two app-wide debts the UX-03
+teacher-ux review retry flagged (the first, self-disabling buttons, was
+already fixed). Scoped to SF2/SF4 in `MonthlySummaryScreen.tsx` only —
+remaining export surfaces (SF5, SF6, report card, learner roster) stay
+open debt, pattern proven.
+
+Added `tauri-plugin-opener` v2.5.5 (Rust) / `@tauri-apps/plugin-opener`
+v2.5.5 (npm) — official first-party Tauri 2 plugin, `revealItemInDir()`
+opens the OS file manager at a path. Registered in `src-tauri/src/lib.rs`;
+capability `opener:allow-reveal-item-in-dir` granted narrowly. Has a
+real, fixed CVE (CVE-2025-31477) in its `open`-family APIs' untrusted-
+input path/URL-scope validation, patched upstream at 2.2.1+, this
+project pins 2.5.5 — the standing discipline (enforced in doc comments
+at every layer) is to only ever call `revealExportedFile` with a path
+this app itself just returned from a successful export, never a
+user-typed or otherwise untrusted string. See `docs/SOURCE-REGISTRY.md`.
+
+Plumbing: `revealExportedFile(filePath)` added to `ExportRepository` →
+`TauriExportRepository` → `ExportApplicationService` (trims, rejects
+empty) → `FixtureExportRepository` (genuine no-op, dev-preview has no OS
+file manager to open). UI: an "Open folder" button next to each of the
+SF2/SF4 result blocks in `MonthlySummaryScreen.tsx`, with its own
+loading/error state, reset on section/month change.
+
+**Verified**: `npm run quality` 801/801 (9 new tests, plus a
+`revealExportedFile` stub added to every existing `FakeExportRepository`/
+`SlowExportRepository` test double the interface change touched), `npm
+run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` 100/100, `git diff --check` — all clean. Rust touched
+(`lib.rs`, `Cargo.toml`, `capabilities/default.json`): `cargo build`
+clean; `cargo test`/`cargo clippy --all-targets -- -D warnings`/`cargo
+fmt --check` run this wave — see `docs/CURRENT-HANDOFF.md`'s top entry
+for the confirmed outcome.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

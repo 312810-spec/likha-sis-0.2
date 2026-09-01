@@ -27,6 +27,15 @@ pub fn run() {
             // (Wave 2C) -- the official first-party Tauri plugin, not a
             // free-text path the frontend invents on its own.
             app.handle().plugin(tauri_plugin_dialog::init())?;
+            // "Reveal in file manager" for exported files -- official
+            // first-party Tauri plugin. Only ever called with a path this
+            // app itself just wrote (an export's own returned filePath),
+            // never a user-typed or otherwise untrusted string -- see
+            // CVE-2025-31477 (fixed upstream in 2.2.1+, we pin 2.5.5) for
+            // why that discipline matters for this plugin's open-family
+            // APIs. Unsupported on Android/iOS; this app is Windows-first,
+            // Android later, so that's a future feature-gate, not a bug now.
+            app.handle().plugin(tauri_plugin_opener::init())?;
 
             let conn = db::open_app_db(app.handle())?;
             app.manage(Mutex::new(conn));
