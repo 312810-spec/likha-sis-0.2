@@ -571,15 +571,6 @@ mod tests {
         );
     }
 
-    fn user_id_of(conn: &Connection, username: &str) -> String {
-        conn.query_row(
-            "SELECT id FROM users WHERE username = ?1",
-            [username],
-            |row| row.get(0),
-        )
-        .unwrap()
-    }
-
     #[test]
     fn password_hash_is_never_stored_as_plaintext_or_returned_by_find() {
         let conn = open_test_db();
