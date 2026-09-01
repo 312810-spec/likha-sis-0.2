@@ -569,6 +569,79 @@ pub fn authorize_capability_with_actor(
     Ok((school_id, user_id))
 }
 
+/// Admin-Assisted Password Reset (Wave 3I, ADR-0061): a School Head sets
+/// a new password directly for a colleague in their own school,
+/// effective immediately. Deliberately reuses `ManageSchoolMembership`
+/// rather than a new `Capability` variant -- resetting a colleague's
+/// login credential is the same authority class as onboarding them in
+/// the first place (`authorize_school_membership_grant`), and both
+/// already resolve to School-Head-only. Reuses the existing Argon2id
+/// hashing path (`hash_password`) unchanged, and the existing
+/// `audit_log` table (widened by migration 24) via
+/// `audit_log_repo::record_admin_action`.
+///
+/// Target resolution is entirely server-side and re-verified fresh on
+/// every call, exactly like every other `authorize_*` gate in this
+/// module -- `target_user_id` is never trusted to already belong to the
+/// caller's school just because the frontend's own member list would
+/// only ever show same-school colleagues.
+///
+/// Returns `Ok(false)` -- not an error -- both when `target_user_id`
+/// does not exist at all AND when it exists but belongs to a different
+/// school. This is a deliberate enumeration-safety choice: collapsing
+/// both cases into one identical, auditless outcome means neither can
+/// be used to probe whether a given user id exists in another school.
+/// `Err(Unauthorized)` is reserved for the capability check itself (no
+/// session, or a session without `ManageSchoolMembership` in its own
+/// school) -- a fundamentally different situation the frontend already
+/// has to distinguish for every other capability-gated command (see
+/// `invoke.ts`'s exemption-set doc comment).
+pub fn admin_reset_teacher_password(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    new_password: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_exclusively_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+    let new_hash = hash_password(new_password)?;
+    conn.execute_batch("SAVEPOINT admin_password_reset")?;
+    let reset = (|| -> AppResult<bool> {
+        if !user_repo::set_password_and_clear_lockout(conn, &target.id, &school_id, &new_hash)? {
+            return Ok(false);
+        }
+        session_repo::revoke_all_for_user(conn, &target.id)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::PasswordResetByAdmin,
+        )?;
+        Ok(true)
+    })();
+    match reset {
+        Ok(succeeded) => {
+            conn.execute_batch("RELEASE admin_password_reset")?;
+            Ok(succeeded)
+        }
+        Err(error) => {
+            let _ = conn
+                .execute_batch("ROLLBACK TO admin_password_reset; RELEASE admin_password_reset");
+            Err(error)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1684,5 +1757,233 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority in their own school must not extend to a different school's section"
         );
+    }
+
+    // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----
+
+    fn setup_school_head_and_teacher(
+        conn: &Connection,
+        sessions: &SessionManager,
+    ) -> (crate::repository::school::School, user::User) {
+        let s = school::create(conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(conn, &head.id, &s.id).unwrap();
+        role_repo::grant(conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(conn, sessions, "corazon.santos", "head-password", &s.id).unwrap();
+
+        let teacher = user::create_user(conn, "ana.cruz", "old-password", "Ana Cruz").unwrap();
+        user::add_school_membership(conn, &teacher.id, &s.id).unwrap();
+        role_repo::grant(conn, &teacher.id, &s.id, role_repo::TEACHER).unwrap();
+
+        (s, teacher)
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_succeeds_for_a_school_head_resetting_a_same_school_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result =
+            admin_reset_teacher_password(&conn, &sessions, &teacher.id, "brand-new-password");
+
+        assert!(result.unwrap());
+        assert!(matches!(
+            user::verify_credentials(&conn, "ana.cruz", "old-password"),
+            Err(AppError::AuthenticationFailed)
+        ));
+        assert!(user::verify_credentials(&conn, "ana.cruz", "brand-new-password").is_ok());
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        admin_reset_teacher_password(&conn, &sessions, &teacher.id, "brand-new-password").unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let reset_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::PasswordResetByAdmin)
+            .expect("a password_reset_by_admin event must be recorded");
+        assert_eq!(
+            reset_entry.user_id,
+            Some(teacher.id),
+            "the event's subject is the account whose password changed"
+        );
+        assert_eq!(reset_entry.username, "ana.cruz");
+        assert_eq!(
+            reset_entry.actor_user_id,
+            Some(head_id),
+            "the event's actor is the School Head who performed the reset"
+        );
+        assert_eq!(
+            reset_entry.actor_username,
+            Some("corazon.santos".to_string())
+        );
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_clears_a_lockout_on_the_target_account() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        for _ in 0..user::MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = user::verify_credentials(&conn, "ana.cruz", "wrong-guess");
+        }
+        assert!(matches!(
+            user::verify_credentials(&conn, "ana.cruz", "old-password"),
+            Err(AppError::AccountLocked)
+        ));
+
+        admin_reset_teacher_password(&conn, &sessions, &teacher.id, "brand-new-password").unwrap();
+
+        assert!(
+            user::verify_credentials(&conn, "ana.cruz", "brand-new-password").is_ok(),
+            "a locked-out account is very often exactly why the reset was requested -- the \
+             teacher must not stay rejected by the old lockout after a successful reset"
+        );
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "old-password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+
+        let result = admin_reset_teacher_password(&conn, &sessions, &teacher_b.id, "new-password");
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "an ordinary Teacher must not be able to reset a colleague's password"
+        );
+        assert!(user::verify_credentials(&conn, "teacher.b", "old-password").is_ok());
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = admin_reset_teacher_password(&conn, &sessions, "some-user-id", "new-password");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_returns_false_without_writing_an_audit_event_for_an_unknown_target(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result =
+            admin_reset_teacher_password(&conn, &sessions, "does-not-exist", "new-password");
+
+        assert!(!result.unwrap());
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert!(entries
+            .iter()
+            .all(|e| e.event_type != AuditEventType::PasswordResetByAdmin));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "old-password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+
+        let not_found_result =
+            admin_reset_teacher_password(&conn, &sessions, "does-not-exist", "new-password");
+        let wrong_school_result =
+            admin_reset_teacher_password(&conn, &sessions, &outsider.id, "new-password");
+
+        assert_eq!(
+            not_found_result.unwrap(),
+            wrong_school_result.unwrap(),
+            "a nonexistent target and a real target in a different school must be \
+             indistinguishable, so neither can be used to enumerate accounts in another school"
+        );
+        assert!(
+            user::verify_credentials(&conn, "outsider", "old-password").is_ok(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_rejects_a_target_with_memberships_outside_the_actors_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &other_school.id).unwrap();
+
+        let result =
+            admin_reset_teacher_password(&conn, &sessions, &teacher.id, "brand-new-password");
+
+        assert!(!result.unwrap());
+        assert!(user::verify_credentials(&conn, "ana.cruz", "old-password").is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_revokes_every_existing_target_session() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+
+        admin_reset_teacher_password(&conn, &head_sessions, &teacher.id, "brand-new-password")
+            .unwrap();
+
+        assert!(matches!(
+            teacher_sessions.require_active_session(&conn),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn admin_reset_teacher_password_rolls_back_password_sessions_and_audit_together() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_admin_reset_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'password_reset_by_admin' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result =
+            admin_reset_teacher_password(&conn, &head_sessions, &teacher.id, "brand-new-password");
+
+        assert!(result.is_err());
+        assert!(user::verify_credentials(&conn, "ana.cruz", "old-password").is_ok());
+        assert!(teacher_sessions.require_active_session(&conn).is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
     }
 }

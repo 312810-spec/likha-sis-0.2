@@ -51,11 +51,76 @@ exports); the reconciliation PR's GitHub Actions gates had not yet been
 dispatched/confirmed at the point this entry was written (see
 `docs/CURRENT-HANDOFF.md` for the exact next action once they are).
 
-**Gate decision**: WAVE 3m RECONCILIATION LOCALLY COMPLETE. Next: push
-→ open/update the reconciliation PR → dispatch and confirm GitHub
-Actions Quality + Security gates green → merge. Recommended next
+**Gate decision**: WAVE 3m RECONCILIATION COMPLETE. Merged as PR #18
+(2026-09-01) after Quality Gate and Security Gate both confirmed green
+on the exact head SHA, with zero open review threads. Recommended next
 product slice after merge: wire an "Export SF4" trigger into
 `MonthlySummaryScreen.tsx` (see `docs/CURRENT-HANDOFF.md`).
+
+## Wave 3I: Admin-Assisted Password Reset (added 2026-08-31) — complete
+
+Implementation wave (GitHub issue #9, a delivery-retry of an earlier
+same-issue run whose ephemeral session produced no durable artifact —
+independently reconstructed and re-verified here, not re-pushed).
+Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c` (verified
+exactly the issue's expected checkpoint). Full scope contract:
+`docs/product/WAVE-3H-DECISION.md`'s Wave 3I section. Full decision
+record: `docs/adr/0061-admin-assisted-password-reset.md`.
+
+**Shipped**:
+
+- `admin_reset_teacher_password` Rust command
+  (`src-tauri/src/commands/user.rs` → `auth::admin_reset_teacher_password`),
+  gated by the existing `Capability::ManageSchoolMembership` (no new
+  capability variant).
+- Server-side same-school target re-verification on every call; an
+  unknown target and a cross-school target collapse to an identical
+  `Ok(false)` with no audit write (enumeration safety).
+- Existing Argon2id hashing path reused unchanged; raw password
+  zeroized in the command layer.
+- `repository::user::set_password_and_clear_lockout` — a successful
+  reset also clears the target account's lockout state.
+- Migration 24: widens `audit_log` (nullable `actor_user_id`, new
+  `password_reset_by_admin` event type) via the same 12-step
+  recreate-table pattern migration 5 established; every pre-existing
+  row preserved losslessly.
+- `repository::audit_log::record_admin_action` — actor/target
+  attribution for the new event type; `list_for_school` resolves
+  `actor_username` via a join for display.
+- `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` gained
+  the new command in the same commit (Wave 3B's own recorded debt).
+- `AdminPasswordResetScreen.tsx` (new School Head UI, reached from the
+  "Security" nav group), following `SectionAdviserScreen`'s established
+  generic-error/no-client-side-enforcement convention.
+- Command-boundary tests (same-school success, cross-school denial,
+  non-School-Head denial, no-session denial, unknown-target vs.
+  cross-school-target indistinguishability, lockout clearing, audit
+  actor/target attribution) and UI/application tests (validation,
+  success/failure paths, accessibility).
+
+**Verification actually run**: `npm run quality` 770/770 (typecheck,
+lint, format, architecture, vitest); `npm run build`; `npm run
+check:dev-preview-isolation`; `npm run harness:verify` 100/100; `cargo
+fmt --check`; `git diff --check` — all clean. `cargo test`/`cargo
+clippy` could not run (missing Linux GTK/WebKit system libraries in
+this sandbox; `apt-get install` requires interactive approval
+unavailable in this unattended session) — mitigated with careful manual
+review of every changed `.rs` file; retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent before completion (auth-touching milestone
+per `.claude/rules/security-privacy.md`) — see this session's own final
+report for the actual outcome.
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+policy or idle-timeout behavior; no Sync/cloud/billing/backup work;
+synthetic fixtures only throughout.
+
+**Next**: Wave 3J (Adviser View dev-preview/Playwright verification
+debt closure) — `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current — deliberately not started here.
 
 ## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
 

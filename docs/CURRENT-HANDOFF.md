@@ -1,5 +1,43 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Merge PR #18 and PR #11, real Rust verification, complete)
+
+User-directed: merge both green PRs, resolve any conflicts, continue
+waves after. **PR #18 merged clean** (no conflicts). **PR #11 hit a
+real merge conflict** against the new `main` (both branches had prepended
+entries to the same four project-state docs): resolved by hand,
+preserving both PRs' entries in chronological order (newest first) in
+`CURRENT-HANDOFF.md`, `ACTIVE-PLAN.md`, `PROJECT-MEMORY.md`,
+`VERIFICATION-DEBT.md` — nothing dropped. Also found and fixed a real
+**ADR-number collision**: PR #11's `docs/adr/0057-admin-assisted-password-reset.md`
+collided with PR #18's already-merged `docs/adr/0057-sf5-promotion-foundation.md`.
+Renamed PR #11's ADR to `0061-admin-assisted-password-reset.md` and
+updated every reference to it (`src-tauri/src/{auth/mod.rs,db/migrations.rs}`,
+`src/{domain/session.ts,domain/ports/school-member-repository.ts,
+application/school-member-service.ts,infrastructure/tauri/school-member-repository.ts,
+ui/AdminPasswordResetScreen.tsx}`, and the three docs above).
+
+**Real Rust verification finally ran, for the first time this
+project's history** — this sandbox unexpectedly had a working
+`sudo -n apt-get install` path (no interactive prompt, unlike every
+prior session): installed the GTK/WebKit system packages, ran `rustup
+update stable` (1.94.1 → 1.98.0, the workspace needs 1.95+), then
+directly ran `cargo build` (clean), `cargo test` (629 lib tests + every
+integration test file, **0 failures**), `cargo clippy --all-targets --
+-D warnings` (**0 warnings**), `cargo fmt --check` (clean) against the
+fully-merged tree (Wave 3m reconciliation + Wave 3I password reset
+together). This closes the `docs/VERIFICATION-DEBT.md` entries both
+PRs had recorded for "no local Rust build" — see the updated entries
+there. `npm run quality` (791 tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), and `git diff --check` all also re-ran clean on the merged
+tree.
+
+Pushed the conflict-resolution commit to `claude/issue-9-20260831-1305`
+(PR #11's branch); next action is merging PR #11 once GitHub's own CI
+re-confirms green on the new head, then continuing autonomous wave
+development per the user's standing instruction.
+
 ## Active Task (2026-09-01, this session — Wave 3m Reconciliation, complete)
 
 From GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full
@@ -49,12 +87,9 @@ for the full list checked. This is real, disclosed verification debt
 (`docs/VERIFICATION-DEBT.md`), not a claimed pass.
 
 **Gate decision**: reconciliation is complete and locally green on
-every check this sandbox can run. Per the issue's delivery
-authorization, the next step is push → open/update the reconciliation
-PR → dispatch the GitHub Actions Quality and Security gates (which run
-on Ubuntu with the GTK packages installed, so they are the first
-authoritative confirmation of the Rust side) → merge only once both are
-green.
+every check this sandbox can run. Merged as PR #18 (2026-09-01) after
+Quality Gate and Security Gate both confirmed green on the exact head
+SHA, with zero open review threads.
 
 **Recommended next slice (not started)**: SF4 shipped with no UI
 trigger (deliberately, matching this project's zero-UI-first
@@ -65,6 +100,89 @@ export), giving School Heads a School Form 4 button next to the
 section-level SF2 one. Runner-up: closing the still-open Wave
 2Z-3H-era review/verification debt items already recorded further down
 this file, none of which this reconciliation touched.
+
+## Active Task (2026-08-31, this session — Wave 3I: Admin-Assisted Password Reset, complete)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact — that run's uncommitted work was independently reconstructed
+and re-verified from scratch here, not merely re-pushed). Branch
+`claude/issue-9-20260831-1305`, starting `HEAD` `fa8d21c` (confirmed
+exactly the issue's expected checkpoint). `main` not fetched/switched/
+merged/modified. Full scope contract: `docs/product/WAVE-3H-DECISION.md`'s
+Wave 3I section. Full decision record: `docs/adr/0061-admin-assisted-password-reset.md`.
+
+**What shipped**: `admin_reset_teacher_password` (Rust command,
+`src-tauri/src/commands/user.rs`) lets a School Head set a new password
+directly for a colleague in their own school, effective immediately —
+the Recommended mechanism from ADR-0061's 10-scenario decision process
+(Next Best, explicitly deferred not rejected: a system-generated
+temporary password with forced change at next login). Gated by the
+existing `Capability::ManageSchoolMembership` (no new capability
+variant — reuses the same authority tier as onboarding a member).
+Target school membership is re-verified server-side on every call; an
+unknown target and a target in a different school collapse to an
+identical `Ok(false)` with no audit write, so neither can be used to
+enumerate accounts in another school. Reuses the existing Argon2id
+hashing path unchanged; the raw password is zeroized in the command
+layer. A successful reset also clears any lockout in effect on the
+target account (`repository::user::set_password_and_clear_lockout`) —
+a locked-out account is very often exactly why the reset was requested.
+Migration 24 widens `audit_log` (the same 12-step recreate-table
+pattern migration 5 established, since SQLite cannot `ALTER` a `CHECK`
+constraint in place) with a nullable `actor_user_id` column and a new
+`password_reset_by_admin` event type; every pre-existing row is
+preserved losslessly with `actor_user_id = NULL`.
+`admin_reset_teacher_password` was added to `invoke.ts`'s session-
+expiry exemption set in the same commit (Wave 3B's own recorded debt:
+every new capability-gated command must be added by hand). A new
+`AdminPasswordResetScreen` (reached from the "Security" nav group)
+shows the same form to every authenticated school member, following
+`SectionAdviserScreen`'s established generic-error/no-client-side-
+enforcement convention.
+
+**Verified this wave**: `npm run quality` 770/770 (typecheck, lint,
+format, architecture, vitest all clean); `npm run build` clean; `npm
+run check:dev-preview-isolation` clean; `npm run harness:verify`
+100/100; `cargo fmt --check` clean; `git diff --check` clean. New Rust
+command-boundary tests cover same-school authorized success,
+cross-school denial (returns `false`, not an error, with no audit
+write), non-School-Head denial (`Unauthorized`), no-session denial,
+an unknown-target vs. cross-school-target indistinguishability
+assertion, lockout clearing on reset, and audit actor/target
+attribution. New TS tests cover the application-service validation
+layer, the Tauri adapter's exact `invoke` call shape, the UI screen's
+success/generic-failure/validation paths, and accessibility.
+**`cargo test`/`cargo clippy` could not run in this session's sandbox**
+(no `libglib2.0-dev`/`libgtk-3-dev`/`libwebkit2gtk-4.1-dev` — the exact
+packages `.github/workflows/quality.yml` installs for CI — and
+`apt-get install` requires interactive approval unavailable in this
+unattended run) — mitigated with careful manual review of every
+changed `.rs` file and an independent security review (see below);
+retained as debt in `docs/VERIFICATION-DEBT.md`; GitHub CI is
+authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent, scoped to authorization correctness,
+cross-school isolation, enumeration safety, password handling, the
+lockout side effect, audit correctness, the `invoke.ts` exemption
+change, and the frontend's UI-hiding-is-not-security posture — see this
+session's own final report for the actual outcome (recorded honestly,
+including if the known agent-retrieval failure recurred).
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+_policy_ (ADR-0019) or idle-timeout behavior (ADR-0020) — only one
+already-authorized write path's side effect on one specific account; no
+Sync/cloud/billing/backup work; synthetic fixtures only.
+
+**Gate decision: WAVE 3I COMPLETE.** Persisted durably to the
+issue-managed branch (commit SHA and PR link in this session's own
+final report — not duplicated here to avoid drift). Next planned slice
+(not started, from `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current by this session): Wave 3J —
+Adviser View dev-preview/Playwright verification debt closure. Stopping
+here per the wave contract.
 
 ## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
 

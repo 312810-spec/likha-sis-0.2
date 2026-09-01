@@ -23,17 +23,29 @@ export interface CurrentSession {
 }
 
 /**
- * Authentication events only (login/logout/lockout) — not a general
- * data-mutation audit trail. See `docs/adr/0021-authentication-audit-log.md`
- * for why this is scoped narrower than "audit everything."
+ * Authentication events only (login/logout/lockout/admin-assisted
+ * password reset) — not a general data-mutation audit trail. See
+ * `docs/adr/0021-authentication-audit-log.md` for why this is scoped
+ * narrower than "audit everything." `password_reset_by_admin` was added
+ * in Wave 3I (ADR-0061) and is the only event type so far where the
+ * acting user and the event's subject genuinely differ — see
+ * `AuditLogEntry.actorUserId`.
  */
-export type AuditEventType = "login_success" | "login_failed" | "account_locked" | "logout";
+export type AuditEventType =
+  "login_success" | "login_failed" | "account_locked" | "logout" | "password_reset_by_admin";
 
 export interface AuditLogEntry {
   id: string;
   schoolId: string;
   userId: string | null;
   username: string;
+  /** Who performed the action, when that differs from `userId` (the
+   * event's subject) — `null`/absent for every event type except
+   * `password_reset_by_admin`. Optional so every pre-existing fixture/
+   * test literal built before Wave 3I stays valid without change. */
+  actorUserId?: string | null;
+  /** `actorUserId`'s username, resolved server-side for display. */
+  actorUsername?: string | null;
   eventType: AuditEventType;
   createdAt: string;
 }

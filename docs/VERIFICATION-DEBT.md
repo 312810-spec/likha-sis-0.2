@@ -37,9 +37,24 @@ working again, per the project's standing instruction not to keep
 spending large amounts of context chasing a known-broken retrieval
 path.
 
-## Wave 3m reconciliation — no local Rust build/test/clippy (2026-09-01)
+## Wave 3m reconciliation — no local Rust build/test/clippy — CLOSED (2026-09-01)
 
-Full context: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
+**Closed for real this session** (not the GitHub-CI-will-confirm-it
+deferral originally recorded below): after merging PR #18 and #11, this
+session's sandbox unexpectedly had `pkg-config`-visible `glib-2.0` and a
+working `sudo -n apt-get install` path (no interactive prompt needed,
+unlike every prior session that hit this same blocker). Installed
+`libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev
+libssl-dev libayatana-appindicator3-dev librsvg2-dev` successfully,
+updated the toolchain via `rustup update stable` (1.94.1 → 1.98.0 — the
+workspace requires 1.95+), then ran, directly, on the merged code: `cargo
+build` (clean), `cargo test` (**629 lib tests + every integration test
+file, 0 failures**), `cargo clippy --all-targets -- -D warnings`
+(clean, zero warnings), `cargo fmt --check` (clean). This is a real,
+first-ever-in-this-project direct confirmation, not the hand-verification
+fallback used previously.
+
+Full context on the original blocker: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
 sandbox is missing the Tauri/GTK system libraries (`glib-2.0`, surfaced
 via `pkg-config` when `cargo build` runs) that
 `docs/adr/0041-minimal-ci-foundation.md`'s own Ubuntu CI job installs
@@ -67,7 +82,100 @@ run. Closed once either (a) the reconciliation PR's GitHub Actions
 Quality Gate (Ubuntu, GTK packages present) runs green, or (b) a future
 session with a working Rust toolchain runs the full `quality:full` gate
 and confirms it directly — whichever comes first. Do not claim this
-closed without one of those two actually happening.
+closed without one of those two actually happening. PR #18 merged
+2026-09-01 with Quality Gate and Security Gate both green on the exact
+head SHA — closing item (a): GitHub CI (Ubuntu, GTK packages present)
+confirmed the Rust build/test/clippy path for real.
+
+## Wave 3I: native Rust compile/test/clippy — CLOSED (2026-08-31, closed 2026-09-01)
+
+**Closed for real 2026-09-01**, after merging this PR: see the Wave 3m
+reconciliation entry above — the same session's direct `cargo
+build`/`cargo test`/`cargo clippy --all-targets -- -D warnings` run
+covered this wave's `auth::admin_reset_teacher_password` and migration
+24 code too (part of the same merged tree), all clean, 0 failures.
+
+Original blocker, for context: `cargo test`/`cargo clippy` could not run in this session's sandbox: no
+`sudo`/interactive-approval path to `apt-get install
+libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev` (the exact packages
+`.github/workflows/quality.yml` installs for CI), and `cargo build`
+fails at `glib-sys`'s build script (`pkg-config` cannot find
+`glib-2.0`) before reaching this wave's own code. `cargo fmt --check`
+does not need these system libraries and ran clean. Mitigated with
+careful manual review of every changed `.rs` file (syntax, borrow
+shapes, return types matching sibling functions, migration SQL mirrored
+exactly against migration 5's already-proven 12-step recreate-table
+pattern) and an independent security review (see the entry below).
+**GitHub CI is authoritative for this check** — treat any real CI
+compile failure as a genuine defect, not a flaky retry. Revisit whenever
+a session's sandbox has these packages available or root access to
+install them.
+
+## Wave 3I: independent security review owed — reviewer harness failed twice, self-review substituted (2026-08-31)
+
+An independent `security-reviewer` agent was dispatched before this
+milestone was marked complete (auth-touching, per
+`.claude/rules/security-privacy.md`), scoped to authorization
+correctness, cross-school isolation, enumeration safety, password
+handling, the lockout side effect, audit correctness, the `invoke.ts`
+exemption change, and the frontend's UI-hiding-is-not-security posture.
+**The established agent-resume/retrieval failure recurred**: the agent
+did real work both times (38 tool uses / ~100k tokens on the initial
+dispatch; 38 tool uses / ~106k tokens on the one permitted retry via
+`SendMessage`), but no findings text was retrievable either time.
+
+Per `.claude/rules/autonomous-development.md`'s established protocol, a
+rigorous **self-review** substituted across the same 8 dimensions
+listed above. Findings, confirmed by direct source reading (not
+assumed from the design doc alone):
+
+- Authorization: `set_password_and_clear_lockout` and
+  `record_admin_action` are called from exactly one production call
+  site (`auth::admin_reset_teacher_password`), which itself calls
+  `authorize_capability_with_actor(.., Capability::ManageSchoolMembership)`
+  as its first statement, before any read or write of the target —
+  confirmed by grep, no second path exists.
+- Cross-school isolation: `school_id` passed to
+  `user_repo::is_member_of_school` comes only from the session-derived
+  return of `authorize_capability_with_actor`, never from
+  `target_user_id` (client-supplied) or any other parameter.
+- Enumeration safety: both the "target doesn't exist" and "target in a
+  different school" branches `return Ok(false)` before `hash_password`,
+  the `set_password_and_clear_lockout` write, or the audit write —
+  confirmed by the dedicated indistinguishability test.
+- Password handling: `hash_password` (existing Argon2id path) is
+  reused unchanged; `commands::user::admin_reset_teacher_password`
+  zeroizes the owned `new_password` `String` after use, mirroring
+  `register_user`'s established convention; no `log::` call anywhere on
+  this path references the raw password.
+- Lockout clearing: only reachable through the same capability-gated
+  function; does not alter ADR-0019's lockout policy/thresholds, only
+  one already-authorized write path's side effect on one row.
+- Audit correctness: `record_admin_action`'s INSERT column list
+  (`id, school_id, user_id, username, actor_user_id, event_type`) and
+  its value tuple (`&id, school_id, target_user_id, target_username,
+actor_user_id, event_type.as_db_str()`) align positionally by hand
+  verification; `list_for_school`'s `row.get(N)` indices were checked
+  one-by-one against its `SELECT` column order.
+- `invoke.ts`: the exemption-set addition is a pure frontend
+  reclassification of an already-correct backend `Unauthorized`; no
+  Rust-side authorization logic changed in the same commit.
+- Frontend: `AdminPasswordResetScreen.tsx` has no role/capability check
+  gating which UI renders — confirmed by reading the full file; the
+  backend alone decides success/failure.
+
+**No blocking issue found.** One pre-existing, unchanged posture noted
+for completeness, not a regression: like `register_user`/
+`bootstrap_installation` before it, the backend itself enforces no
+minimum password length — `MIN_PASSWORD_LENGTH` is a client-side
+(`SchoolMemberApplicationService`) convenience only, the same disclosed
+convention `src/domain/password-policy.ts`'s own doc comment already
+states for every other account-credential path in this codebase.
+
+**A real, non-self independent security review remains owed** —
+retained as debt here, not dropped. Retry opportunistically in a future
+session when the reviewer harness appears healthy; do not spend large
+context repeatedly trying to recover this specific attempt.
 
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 

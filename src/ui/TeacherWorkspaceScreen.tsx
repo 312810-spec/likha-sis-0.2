@@ -61,6 +61,7 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   login_failed: "failed sign-in attempt",
   account_locked: "account temporarily locked",
   logout: "signed out",
+  password_reset_by_admin: "had their password reset by an administrator",
 };
 
 /** Formats an ISO timestamp as a readable local date and time -- raw
