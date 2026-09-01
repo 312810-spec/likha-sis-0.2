@@ -1036,12 +1036,14 @@ re-reading the ADR:
   reconfirmed identical) — this milestone's Rust is manually reviewed,
   not compiler-verified.
 
-## Codex Delegation Harness (added 2026-08-25, SUPERSEDED 2026-09-01)
+## Codex Delegation Harness (added 2026-08-25, ACTIVE again as of 2026-09-01)
 
-**SUPERSEDED by Gemini Delegation Harness (below)** — user-directed
-replacement, not an autonomous change. See
-`docs/adr/0057-gemini-delegation-replaces-codex.md`. Retained below as
-historical record and a documented fallback.
+**ACTIVE (PILOT) again**, after a same-day round trip: briefly marked
+superseded by Gemini (below), then reinstated the same day because
+Gemini's chosen auth mode (`oauth-personal`) turned out to be blocked by
+an open, unresolved upstream Google bug. See
+`docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md`. This is the
+active delegation pattern; Gemini stays installed but ON HOLD.
 
 **PILOT, not ADOPT.** Full record: `docs/adr/0038-codex-delegation-harness.md`,
 `.claude/skills/codex-delegation/SKILL.md`. Durable facts:
@@ -1069,11 +1071,24 @@ historical record and a documented fallback.
   whether credentials exist. A real pilot task requires a machine
   without that restriction.
 
-## Gemini Delegation Harness (added 2026-09-01, replaces Codex)
+## Gemini Delegation Harness (added 2026-09-01, ON HOLD same day)
 
-**PILOT, not ADOPT.** Full record:
+**ON HOLD — blocked upstream, not usable right now.** Full record:
 `docs/adr/0057-gemini-delegation-replaces-codex.md`,
-`.claude/skills/gemini-delegation/SKILL.md`. Durable facts:
+`docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md`,
+`.claude/skills/gemini-delegation/SKILL.md`. When the user tried to
+actually log in, `oauth-personal` failed with `"This client is no longer
+supported for Gemini Code Assist for individuals. To continue using
+Gemini, please migrate to the Antigravity suite of products."` Confirmed
+via direct primary-source research as a real, open, unresolved bug
+(`google-gemini/gemini-cli` issue #28229, `priority/p1`, no maintainer
+fix) — not a local config problem, not fixed by reinstalling/upgrading
+(a related issue, #28717, notes even 0.54.0+ silently falls back to
+API-key onboarding instead of real OAuth). The user chose to hold
+Gemini and fall back to Codex rather than approve billed
+`gemini-api-key` mode. The plugin stays installed; only the OAuth login
+path is blocked. Durable facts about the pattern itself (still valid,
+reusable once unblocked):
 
 - User-directed replacement of the Codex/ChatGPT delegation pattern with
   Gemini, specifically to use the user's existing Gemini Pro subscription

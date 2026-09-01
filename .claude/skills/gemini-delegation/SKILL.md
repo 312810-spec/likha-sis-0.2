@@ -1,11 +1,42 @@
 ---
 name: gemini-delegation
-description: Use when considering delegating an implementation or review task to the Gemini plugin (`gemini@gemini-plugin-cc`), or when reviewing work that came back from Gemini. Replaces the earlier Codex/ChatGPT delegation pattern (see codex-delegation, superseded).
+description: ON HOLD (2026-09-01) — blocked by an unresolved upstream Google OAuth bug. Use codex-delegation instead for active delegation work. Only consult this skill to check whether the upstream bug is resolved yet, or once it is.
 ---
 
-# Gemini Delegation (PILOT — not ADOPT)
+# Gemini Delegation (ON HOLD — blocked upstream)
 
-Status: **PILOT**, added 2026-09-01, replacing the Codex PILOT. See
+**Status: ON HOLD, 2026-09-01.** Not usable right now — do not attempt
+to delegate through this pattern. `codex-delegation` is active again;
+use that instead. See
+`docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md` for the full
+record.
+
+**Why**: the user's chosen auth mode, `oauth-personal` (Gemini Pro
+subscription login), fails with `"This client is no longer supported for
+Gemini Code Assist for individuals. To continue using Gemini, please
+migrate to the Antigravity suite of products."` This is a real,
+confirmed, **open, unresolved bug in `gemini-cli` itself**
+(`google-gemini/gemini-cli` issue #28229, `priority/p1`, no maintainer
+fix as of this writing) — not a local configuration problem, not
+something reinstalling or upgrading fixes (a related issue, #28717,
+notes even 0.54.0+ silently falls back to API-key onboarding instead of
+real OAuth). The plugin (`gemini@gemini-plugin-cc`) stays installed;
+only the OAuth login path is blocked.
+
+**To resume this pattern**: either (a) Google fixes the upstream OAuth
+bug — check `google-gemini/gemini-cli` issue #28229's status before
+retrying `oauth-personal`, or (b) the user explicitly approves switching
+to `gemini-api-key` mode (a separate, billed API key from
+`aistudio.google.com/apikey` — this project's no-paid-infra rule
+requires their explicit sign-off for that, distinct from the
+subscription-OAuth risk already accepted in ADR-0057). Do not silently
+default to (b) without asking again.
+
+---
+
+Original PILOT content below, preserved for when this pattern resumes.
+
+Status: **PILOT**, added 2026-09-01. See
 `docs/adr/0057-gemini-delegation-replaces-codex.md` and
 `docs/SOURCE-REGISTRY.md` for the evaluation record. Do not treat this
 as a settled, always-use workflow — it has not yet had a real,

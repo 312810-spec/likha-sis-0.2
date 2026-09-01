@@ -1,5 +1,34 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Gemini OAuth Blocked Upstream, Codex Reinstated, complete)
+
+Same-day follow-up to the entry directly below. The user tried to
+actually run `oauth-personal` login on their own machine and it failed
+with `"This client is no longer supported for Gemini Code Assist for
+individuals. To continue using Gemini, please migrate to the Antigravity
+suite of products."` Confirmed via direct GitHub research (not assumed)
+that this is a real, open, unresolved upstream bug
+(`google-gemini/gemini-cli` issue #28229, `priority/p1`) affecting
+Google AI Pro/individual subscribers broadly — not a local config issue,
+not fixed by reinstalling or upgrading `gemini-cli`.
+
+Presented the user three options (billed `gemini-api-key`; hold Gemini
+and fall back to Codex; wait and do nothing). **User chose: hold Gemini,
+fall back to Codex.** `codex-delegation` is reinstated as the active
+delegation pattern; `gemini-delegation` moves to ON HOLD (plugin stays
+installed, not deleted — the verification/research work from the entry
+below remains valid for whenever Google fixes the upstream bug).
+
+Full record: `docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md`.
+Updated to match: `.claude/skills/codex-delegation/SKILL.md` (active
+again), `.claude/skills/gemini-delegation/SKILL.md` (ON HOLD, with the
+exact error and issue number recorded), `docs/SOURCE-REGISTRY.md` (both
+entries' Status column flipped), `docs/PROJECT-MEMORY.md` (both
+sections' headers/durable facts updated), `docs/VERIFICATION-DEBT.md`
+(Gemini's entry now says "blocked upstream," not just "not yet run").
+No product code, schema, or existing verification/architecture script
+touched. Does not change the Wave 3H/3I roadmap entry further below.
+
 ## Active Task (2026-09-01, this session — Gemini Delegation Harness Replaces Codex, complete)
 
 User-directed harness change, not product work — does not change the

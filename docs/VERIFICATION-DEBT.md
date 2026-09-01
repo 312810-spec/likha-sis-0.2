@@ -1,19 +1,27 @@
 # Verification Debt
 
-## Gemini delegation plugin — no live credentialed run yet (2026-09-01)
+## Gemini delegation plugin — BLOCKED upstream, not just unrun (2026-09-01)
 
 `gemini@gemini-plugin-cc` was verified real and installable
-(`docs/adr/0057-gemini-delegation-replaces-codex.md`), but this
-sandboxed session has no `gemini` CLI binary and no Google OAuth
-session, so two things remain unrun: `/gemini:setup --verify` (to
-actually complete `oauth-personal` login against the user's Gemini Pro
-subscription) and a real, credentialed end-to-end delegation task. Both
-require the user's own machine. This mirrors the identical, still-open
-verification debt ADR-0038 recorded for the now-superseded Codex PILOT.
-Revisit for promotion to ADOPT once the user has run `/gemini:setup
---verify` locally and a real delegated task has gone through the
-implementation/return contract and independent review in
-`.claude/skills/gemini-delegation/SKILL.md`.
+(`docs/adr/0057-gemini-delegation-replaces-codex.md`), but when the user
+attempted `oauth-personal` login on their own machine it failed with
+`"This client is no longer supported for Gemini Code Assist for
+individuals. To continue using Gemini, please migrate to the Antigravity
+suite of products."` This is a confirmed real, open, unresolved upstream
+bug (`google-gemini/gemini-cli` issue #28229, `priority/p1`) — not
+something this project's own verification steps can close, and not
+fixed by reinstalling or upgrading (see `docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md`
+for the full research). The user chose to hold Gemini and fall back to
+`codex-delegation` (now active again) rather than approve billed
+`gemini-api-key` mode.
+
+**Not actionable by this project right now.** Periodically re-check
+`google-gemini/gemini-cli` issue #28229's status; once it's resolved
+upstream, resume at `/gemini:setup --verify` (to complete
+`oauth-personal` login) and a real, credentialed end-to-end delegation
+task, both of which still require the user's own machine. This mirrors
+the identical, still-open verification debt ADR-0038 recorded for
+Codex — that debt is unchanged and still open too.
 
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 

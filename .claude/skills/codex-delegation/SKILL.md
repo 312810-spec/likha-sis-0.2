@@ -1,28 +1,24 @@
 ---
 name: codex-delegation
-description: SUPERSEDED by gemini-delegation (2026-09-01) — use that skill instead for new delegation work. Kept only as historical record and a documented fallback if the Gemini pilot underperforms.
+description: Use when considering delegating an implementation or review task to the official OpenAI Codex plugin (`codex@openai-codex`), or when reviewing work that came back from Codex. ACTIVE again as of 2026-09-01 — the Gemini replacement is on hold, see gemini-delegation.
 ---
 
-# Codex Delegation (SUPERSEDED — see gemini-delegation)
+# Codex Delegation (PILOT — not ADOPT)
 
-**Status: SUPERSEDED, 2026-09-01.** The user asked to replace the
-Codex/ChatGPT delegation pattern with Gemini. See
-`docs/adr/0057-gemini-delegation-replaces-codex.md` for the replacement
-decision and `.claude/skills/gemini-delegation/SKILL.md` for the current
-skill. This file is retained only as a historical record of the
-research/contract pattern and as a documented fallback path — do not use
-it for new delegation work without a new instruction to revert.
+**Status: ACTIVE (PILOT), reinstated 2026-09-01.** Briefly marked
+superseded by `gemini-delegation`, then reinstated the same day: Gemini
+CLI's `oauth-personal` login (the auth mode the user chose) turned out to
+be broken by an open, unresolved upstream Google bug — see
+`docs/adr/0058-gemini-oauth-blocked-codex-reinstated.md`. The Gemini
+plugin stays installed but on hold, not deleted; this is the active
+delegation pattern again until that upstream issue is resolved.
 
----
-
-Original content below, preserved for reference.
-
-Status: **PILOT (superseded)**, added 2026-08-25. See `docs/adr/0038-codex-delegation-harness.md`
+Status: **PILOT**, added 2026-08-25. See `docs/adr/0038-codex-delegation-harness.md`
 and `docs/SOURCE-REGISTRY.md` for the evaluation record. Do not treat
 this as a settled, always-use workflow — it has not yet had a real,
 credentialed end-to-end run on this repository (this environment has no
 ChatGPT subscription or OpenAI API key; ADR-0038 documents the exact
-blocker).
+blocker). Re-evaluate for promotion once that real run has happened.
 
 ## What Codex is here
 
