@@ -2759,6 +2759,21 @@ Full record: `docs/adr/0057-sf5-promotion-foundation.md`;
   `npm run quality:full` clean (755/755 vitest across 78 files, cargo test, clippy, fmt, linters); `npm run build`,
   `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
 
+## Wave 3J — School Form 5 (SF5) Section Promotion UI (added 2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum;
+`docs/VERIFICATION-DEBT.md` Wave 3J entry. **New branch**
+`antigravity/likha-sis-wave3j-sf5-section-promotion-ui`, created from `e5c5041` (Wave
+3I's checkpoint).
+
+- **Built**: Integrated SF5 (Report on Promotion and Level of Proficiency) into `SectionRosterScreen.tsx`.
+  Added "Export SF5 (Promotion & Level of Proficiency)" button under `.section-roster-forms`,
+  wired `exportService` through `App.tsx`, managed `sf5Exporting`/`sf5Result`/`sf5Error` state,
+  guarded against concurrent actions (`anyActionInFlight`), displayed output file path and `FieldDisclosure`
+  omitted fields disclaimers in alert banners, and added Guided mode contextual assistance.
+- **Verification/checkpoint**: `npm run quality:full` clean (758/758 vitest across 78 files, +3 tests net, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

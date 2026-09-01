@@ -2,13 +2,14 @@
 
 ## Status
 
-Accepted (Wave 3I delivered)
+Accepted (Wave 3J delivered)
 
 ## Context
 
-Philippine Department of Education (DepEd) Order No. 8, s. 2015 and DepEd Order No. 58, s. 2017 govern the official End of School Year (EOSY) Report on Promotion and Level of Proficiency (School Form 5 / SF5). 
+Philippine Department of Education (DepEd) Order No. 8, s. 2015 and DepEd Order No. 58, s. 2017 govern the official End of School Year (EOSY) Report on Promotion and Level of Proficiency (School Form 5 / SF5).
 
 SF5 is an official form generated per section at the end of the school year by the designated Class Adviser and certified by the School Head. It tabulates:
+
 1. Learner final grades across all learning areas (subjects).
 2. Computed General Average (rounded to two decimal places / nearest whole number per DepEd standard).
 3. Action Taken / Promotion Decision:
@@ -37,8 +38,19 @@ SF5 is an official form generated per section at the end of the school year by t
    - Updated `ExportApplicationService` with validation on trimmed parameters.
    - Updated `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` in `src/infrastructure/tauri/invoke.ts` so permission denials do not trigger accidental global logouts.
 
+## Addendum — Wave 3J: Section Promotion UI (2026-09-01)
+
+Delivered user-facing SF5 export capability in `SectionRosterScreen.tsx`:
+
+1. Added "Export SF5 (Promotion & Level of Proficiency)" button under `.section-roster-forms`.
+2. Passed `exportService` through `App.tsx` and `SectionRosterScreenProps`.
+3. Integrated `sf5Exporting` in `anyActionInFlight` to avoid concurrent mutations or multiple exports racing.
+4. Rendered clear success alert with file path and structured `FieldDisclosure` omitted fields disclaimer.
+5. Preserved teacher modes (Guided mode contextual help explaining who can export SF5 and for what purpose).
+6. Comprehensive unit and accessibility test suite across all states.
+
 ## Consequences
 
 - Teachers assigned as class advisers and school heads can officially generate section-level SF5 exports with zero data leakage across schools.
 - Promotion calculations strictly follow DepEd Order No. 8, s. 2015 without ad-hoc rules.
-- Test coverage expanded to 611 lib tests + 14 integration test suites and 755 vitest tests.
+- Test coverage expanded to 611 lib tests + 14 integration test suites and 758 vitest tests.

@@ -1,5 +1,26 @@
 # ACTIVE PLAN
 
+## Wave 3J: School Form 5 (SF5) Section Promotion UI (added 2026-09-01) — complete
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3J entry;
+`docs/VERIFICATION-DEBT.md` Wave 3J entry. **New branch**
+`antigravity/likha-sis-wave3j-sf5-section-promotion-ui`, created from `e5c5041` (Wave
+3I's checkpoint).
+
+**Scope**: User-facing DepEd School Form 5 (SF5) Section Promotion export interface.
+Delivers the "Export SF5 (Promotion & Level of Proficiency)" button in `SectionRosterScreen.tsx`,
+connecting the backend export engine with active section school year context, in-flight
+guarding, structured `FieldDisclosure` alerts, error feedback, and complete teacher mode support.
+
+**Built**:
+
+- `src/ui/SectionRosterScreen.tsx`: Added `exportService` prop, `sf5Exporting`, `sf5Result`, and `sf5Error` state, `handleExportSf5` handler, "Export SF5 (Promotion & Level of Proficiency)" action button under `.section-roster-forms`, success/error alerts rendering file path and field disclosures, and Guided mode contextual assistance.
+- `src/App.tsx`: Wired `exportService={exportService}` to `SectionRosterScreen`.
+- `src/ui/SectionRosterScreen.test.tsx`: Added `FakeExportRepository` and exhaustive unit/a11y test coverage for SF5 export execution, error handling, disabled states, Guided hints, and axe-core compliance.
+
+**Verification**: `npm run quality:full` clean (Vitest 758/758 across 78 files, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`, `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3I: School Form 5 (SF5) Promotion & Learning Progress Foundation (added 2026-09-01) — complete
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md`; `docs/CURRENT-HANDOFF.md`
@@ -14,6 +35,7 @@ evaluating subject final grades, general average, promotion status (Promoted, Co
 sex-disaggregated proficiency summaries, and field disclosures, gated by adviser/School Head authorization.
 
 **Built**:
+
 - `src-tauri/src/export/sf5.rs`: Pure domain types `PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow::compute_status`, `ProficiencySummary::compute`, `build_sf5_export`, and unit tests.
 - `src-tauri/src/commands/export.rs`: Added `export_section_eosy_sf5` command gated by `auth::authorize_adviser_of_section`, computing subject final averages from class records and generating CSV exports with sanitized file paths.
 - `src-tauri/src/lib.rs`: Registered `commands::export::export_section_eosy_sf5`.

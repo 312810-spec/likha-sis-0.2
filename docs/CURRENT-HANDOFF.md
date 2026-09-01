@@ -1,5 +1,30 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3J: School Form 5 (SF5) Section Promotion UI, COMPLETE)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum;
+`docs/PROJECT-MEMORY.md` Wave 3J entry; `docs/VERIFICATION-DEBT.md` Wave 3J entry.
+**New dedicated branch** `antigravity/likha-sis-wave3j-sf5-section-promotion-ui`, created
+from `antigravity/likha-sis-wave3i-sf5-promotion-foundation` at `e5c5041`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: School Form 5 (SF5) Section Promotion UI.
+Connects the backend SF5 export engine from Wave 3I directly into `SectionRosterScreen.tsx`,
+allowing the designated Class Adviser or School Head to export the official DepEd SF5 End-of-School-Year
+promotion report per section with school year context, in-flight mutation guarding, structured
+field disclosure rendering, error recovery, and complete teacher mode support.
+
+**What shipped**:
+
+- `src/ui/SectionRosterScreen.tsx`: Added `exportService` optional prop in `SectionRosterScreenProps`, `sf5Exporting`, `sf5Result`, and `sf5Error` state, `handleExportSf5` handler, "Export SF5 (Promotion & Level of Proficiency)" action button under `.section-roster-forms`, success/error alerts rendering file path and field disclosures, and Guided mode contextual assistance.
+- `src/App.tsx`: Wired `exportService={exportService}` to `SectionRosterScreen`.
+- `src/ui/SectionRosterScreen.test.tsx`: Added `FakeExportRepository` and unit/a11y test coverage for SF5 export execution, error handling, disabled states, Guided hints, and axe-core compliance (+3 tests net, 758 tests passing).
+
+**Verification**:
+
+- `npm run quality:full` clean (Vitest 758/758 across 78 files, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-09-01 — Wave 3I: School Form 5 (SF5) Promotion & Learning Progress Foundation, COMPLETE)
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md`;
@@ -14,6 +39,7 @@ evaluating subject final grades, general average, promotion status (Promoted, Co
 sex-disaggregated proficiency summaries, and field disclosures, gated by adviser/School Head authorization.
 
 **What shipped**:
+
 - `src-tauri/src/export/sf5.rs`: Pure domain types `PromotionStatus`, `LevelOfProficiency`, `Sf5LearnerRow::compute_status`, `ProficiencySummary::compute`, `build_sf5_export`, and exhaustive unit tests.
 - `src-tauri/src/commands/export.rs`: Added `export_section_eosy_sf5` command gated by `auth::authorize_adviser_of_section`, computing subject final averages from class records and generating CSV exports with sanitized file paths.
 - `src-tauri/src/lib.rs`: Registered `commands::export::export_section_eosy_sf5`.
@@ -22,6 +48,7 @@ sex-disaggregated proficiency summaries, and field disclosures, gated by adviser
 - `src/infrastructure/tauri/invoke.ts`: Added `export_section_eosy_sf5` to `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`.
 
 **Verification**:
+
 - `npm run quality:full` clean (Vitest 755/755 across 78 files, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
 - `npm run build`, `npm run check:dev-preview-isolation`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
 

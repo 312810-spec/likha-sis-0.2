@@ -208,6 +208,7 @@ function App() {
                 <SectionRosterScreen
                   sectionService={sectionService}
                   formGenerationService={formGenerationService}
+                  exportService={exportService}
                   sectionId={rosterSectionId}
                   onBack={() => setActiveTab("sections")}
                 />

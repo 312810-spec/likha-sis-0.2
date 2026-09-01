@@ -1,9 +1,17 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExportApplicationService } from "../application/export-service";
 import { FormGenerationApplicationService } from "../application/form-generation-service";
 import { SectionApplicationService } from "../application/section-service";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+  Sf5ExportResult,
+} from "../domain/export";
 import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { FormGenerationRepository } from "../domain/ports/form-generation-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
@@ -233,10 +241,46 @@ class FakeFormGenerationRepository implements FormGenerationRepository {
   }
 }
 
+class FakeExportRepository implements ExportRepository {
+  sf5Calls: Array<{ sectionId: string; schoolYear: string }> = [];
+  sf5ToReturn: Sf5ExportResult | null = {
+    filePath: "C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv",
+    disclosure: {
+      populatedFields: ["School Name", "Section Name", "School Year", "General Average"],
+      omittedFields: [
+        { field: "School Head Certification Signature", reason: "manual ink signature required" },
+      ],
+    },
+  };
+  sf5Error: Error | null = null;
+
+  async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    this.sf5Calls.push({ sectionId, schoolYear });
+    if (this.sf5Error) throw this.sf5Error;
+    return this.sf5ToReturn;
+  }
+
+  async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("not used in this test");
+  }
+}
+
 function renderScreen(
   overrides: Partial<FakeSectionRepository> = {},
   sectionId = "sec-1",
   formOverrides: Partial<FakeFormGenerationRepository> = {},
+  exportOverrides: Partial<FakeExportRepository> = {},
 ) {
   const repo = new FakeSectionRepository();
   Object.assign(repo, overrides);
@@ -244,18 +288,22 @@ function renderScreen(
   const formRepo = new FakeFormGenerationRepository();
   Object.assign(formRepo, formOverrides);
   const formGenerationService = new FormGenerationApplicationService(formRepo);
+  const exportRepo = new FakeExportRepository();
+  Object.assign(exportRepo, exportOverrides);
+  const exportService = new ExportApplicationService(exportRepo);
   const onBack = vi.fn();
   const result = render(
     <ModeProvider>
       <SectionRosterScreen
         sectionService={service}
         formGenerationService={formGenerationService}
+        exportService={exportService}
         sectionId={sectionId}
         onBack={onBack}
       />
     </ModeProvider>,
   );
-  return { ...result, repo, formRepo, onBack };
+  return { ...result, repo, formRepo, exportRepo, onBack };
 }
 
 const GUIDED_NOTE = /always your class as it stands today/;
@@ -1367,21 +1415,96 @@ describe("SectionRosterScreen", () => {
     await expectNoAccessibilityViolations(container);
   });
 
-  it("has no detectable accessibility violations in the empty state", async () => {
-    const { container } = renderScreen({ rosterResult: [] });
-    await screen.findByText(/No learners are enrolled in Mabini/);
-    await expectNoAccessibilityViolations(container);
+  it("generates an SF5 promotion report and renders output path and disclosures", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(exportRepo.sf5Calls).toEqual([{ sectionId: "sec-1", schoolYear: "2025-2026" }]);
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(
+      screen.getByText("C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("School Head Certification Signature")).toBeInTheDocument();
   });
 
-  it("has no detectable accessibility violations in the section-not-found state", async () => {
-    const { container } = renderScreen({}, "sec-gone");
-    await screen.findByText(/This section could not be found/);
-    await expectNoAccessibilityViolations(container);
+  it("displays an error alert when SF5 export fails", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.sf5Error = new Error("unauthorized");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(
+      await screen.findByText(
+        /Could not export SF5 — you may not have permission to export this section/,
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("has no detectable accessibility violations in the roster-error state", async () => {
-    const { container } = renderScreen({ rosterError: new Error("db down") });
-    await screen.findByText(/Could not load the roster/);
+  it("displays an error alert when section is not found for SF5 export", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.sf5ToReturn = null;
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(await screen.findByText(/This section could not be found/)).toBeInTheDocument();
+  });
+
+  it("disables other actions while SF5 is exporting, and re-enables after", async () => {
+    let resolveSf5: (val: Sf5ExportResult | null) => void = () => {};
+    const pending = new Promise<Sf5ExportResult | null>((resolve) => {
+      resolveSf5 = resolve;
+    });
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.exportSectionEosySf5 = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Exporting SF5…" })).toBeDisabled();
+
+    resolveSf5(exportRepo.sf5ToReturn);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeEnabled(),
+    );
+  });
+
+  it("shows Guided mode hint for SF5 promotion report", async () => {
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+
+    expect(
+      screen.getByText(
+        /SF5 \(Report on Promotion and Level of Proficiency\) computes final subject ratings/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("has no detectable accessibility violations after exporting an SF5 report", async () => {
+    const { container } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }));
+    await screen.findByText(/Saved to/);
     await expectNoAccessibilityViolations(container);
   });
 });

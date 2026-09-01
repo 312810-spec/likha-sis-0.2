@@ -1,5 +1,14 @@
 # Verification Debt
 
+## Wave 3J — School Form 5 (SF5) Section Promotion UI (2026-09-01)
+
+Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum; `docs/PROJECT-MEMORY.md`
+Wave 3J entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **No browser-rendered (Playwright/WebKit) screenshot pass for SF5 export alert rendering.** `SectionRosterScreen`'s SF5 export button, alert display, disabled states, and Guided mode hint are covered by jsdom + `@testing-library/react` and axe-core (`expectNoAccessibilityViolations`) with 77 tests in `SectionRosterScreen.test.tsx`, but not in a headless desktop browser environment.
+
 ## Wave 3I — School Form 5 (SF5) Promotion & Learning Progress Foundation (2026-09-01)
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md`; `docs/PROJECT-MEMORY.md`
