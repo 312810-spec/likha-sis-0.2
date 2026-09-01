@@ -132,6 +132,35 @@ compile failure as a genuine defect, not a flaky retry. Revisit whenever
 a session's sandbox has these packages available or root access to
 install them.
 
+## Wave 3I: independent security review owed — CLOSED (2026-08-31, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `security-reviewer` dispatch
+against the same scope (authorization gate placement, cross-school
+isolation, enumeration safety, password handling/zeroization, the
+lockout-clearing side effect's scope, audit-log column alignment, and
+whether the frontend relies on any client-side check) actually retrieved
+findings this time — the agent-resume/retrieval failure did not recur.
+**Verdict: 0 BLOCKING, 1 SHOULD-FIX.** Six of the seven reviewed items
+independently confirmed no issue, each with its own file/line evidence,
+matching this file's self-review below. The one SHOULD-FIX: no Rust-side
+minimum-password-length enforcement in
+`auth::admin_reset_teacher_password` — the floor exists only in
+`src/application/school-member-service.ts:24-26`
+(`MIN_PASSWORD_LENGTH`).
+
+**Not fixed inline, by design, not oversight**: this is the same
+disclosed, deliberate convention `src/domain/password-policy.ts`'s own
+doc comment already states for every other account-credential path in
+this codebase (`register_user`, `bootstrap_installation`) — a client-
+side UX convenience only, with Argon2id hashing on the Rust side stated
+as "the real security property." Adding server-side length enforcement
+to only this one path would create an undocumented asymmetry with the
+other two paths rather than fix a genuine gap unique to this feature.
+Retained as a **project-wide** (not admin-reset-specific) follow-up:
+if this convention is ever revisited, apply it to `register_user`,
+`bootstrap_installation`, and `admin_reset_teacher_password` together,
+not to this one path in isolation.
+
 ## Wave 3I: independent security review owed — reviewer harness failed twice, self-review substituted (2026-08-31)
 
 An independent `security-reviewer` agent was dispatched before this
@@ -3028,7 +3057,7 @@ open debt. Retry in a future session once there's reason to believe the
 harness issue is fixed; remove this entry once a real review actually
 completes and its findings are recorded.
 
-## Native visual / screen-reader inspection (open)
+## Native visual / screen-reader inspection — visual pass closed for the 4 M0–M6 screens (2026-09-01), screen-reader pass still open
 
 No browser/screenshot/rendering tool was available in the sessions that
 built M0–M6. Structural/accessibility correctness was verified via React
@@ -3036,8 +3065,46 @@ Testing Library + `axe-core` (see `src/test/a11y.ts`) and computed WCAG
 contrast ratios from actual hex values — not by looking at the rendered
 UI. A human visual pass (does it look premium/comfortable, not just
 structurally valid?) and a real screen-reader pass (NVDA/Narrator) on the
-compiled app are still owed for every screen shipped so far
-(`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+compiled app were owed for every screen shipped so far (`LoginScreen`,
+`LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+
+**Visual pass closed 2026-09-01** using the `playwright-cli` browser-
+mismatch workaround (drive `playwright` directly with `chromium.launch({
+executablePath: "/opt/pw-browsers/chromium" })` — see this file's own
+entry on that workaround). `LoginScreen` is reachable directly from real
+`vite dev` (it already degrades gracefully — "Could not load the list of
+schools" — when the Tauri IPC bridge is absent, rather than crashing).
+`FirstRunSetupScreen` needed a one-off mock of
+`window.__TAURI_INTERNALS__.invoke` for `installation_status`/
+`current_session` only (a throwaway probe script, not a new fixture — the
+dev-preview architecture remains the project's real answer for
+authenticated screens). `AppShell` and `LearnerListScreen` were verified
+through the existing dev-preview fixture. All four screenshotted at two
+viewports (1366×900, 768×900) × two color schemes (light/dark) × the
+default Comfortable teacher mode; no console errors beyond the two
+already-expected, already-disclosed `invoke` failures on the real (non-
+mocked) `LoginScreen` path.
+
+**One real layout bug found and fixed by this pass**: `WorkbenchNav`'s
+nav-group divider used `border-right` (a same-row separator) — correct
+only when every group shares one row. Once `.workbench-nav`'s own
+flex-wrap pushed a later group onto its own row, which turns out to
+happen at ordinary desktop widths too (confirmed at 850px, 1024px, and
+even the primary 1366px desktop width, once "Daily Teaching" grows to
+two internal rows), an earlier group's `border-right` became an orphaned
+vertical line with nothing beside it. Fixed in
+`src/ui/theme/styles.css` by making the group divider an unconditional
+`border-bottom` (removing the narrow-viewport-only special case that
+previously used it) — this degrades correctly regardless of how
+`.workbench-nav` wraps, so it isn't just pushing the same bug to a
+different breakpoint. Re-screenshotted at 850/1024/1366px to confirm.
+`npm run quality` (801/801, no regressions), `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Screen-reader pass (NVDA/Narrator) remains open** — this sandbox has
+no Windows screen reader available; a real screen-reader pass on the
+compiled Windows binary is still owed.
 
 ## Browser-pane dev-server port was misconfigured — fixed 2026-08-25 (closed)
 
