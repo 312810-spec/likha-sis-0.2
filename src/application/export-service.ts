@@ -92,4 +92,16 @@ export class ExportApplicationService {
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     return this.exports.exportLearnerRoster();
   }
+
+  /** `filePath` must come from an export result this service itself
+   * already returned -- never from a user-editable field -- so the
+   * validation here is only a non-empty check, not a path/format check. */
+  async revealExportedFile(filePath: string): Promise<void> {
+    const trimmedPath = filePath.trim();
+    if (trimmedPath.length === 0) {
+      throw new ValidationError("File path is required.");
+    }
+
+    return this.exports.revealExportedFile(trimmedPath);
+  }
 }

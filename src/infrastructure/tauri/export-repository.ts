@@ -1,3 +1,4 @@
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "./invoke";
 import type {
   LearnerRosterExportResult,
@@ -51,5 +52,18 @@ export class TauriExportRepository implements ExportRepository {
 
   exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     return invoke<LearnerRosterExportResult | null>("export_learner_roster");
+  }
+
+  /** Uses the official `@tauri-apps/plugin-opener` plugin, not a raw
+   * shell/protocol open -- `revealItemInDir` only opens the OS file
+   * manager at a location, it doesn't dispatch through a URL-scheme
+   * handler. Still, only ever call this with `filePath` from this
+   * repository's own export methods' results -- never a user-typed or
+   * otherwise untrusted string. See CVE-2025-31477 (fixed upstream in
+   * this plugin's 2.2.1+, this project pins 2.5.5): the same plugin
+   * family's `open`-style APIs have had real path/URL-scope validation
+   * bugs when fed untrusted input. */
+  revealExportedFile(filePath: string): Promise<void> {
+    return revealItemInDir(filePath);
   }
 }

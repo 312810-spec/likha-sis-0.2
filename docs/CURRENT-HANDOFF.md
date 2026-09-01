@@ -1,5 +1,58 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Reveal-exported-file ("Open folder") feature, complete)
+
+User-directed continuation ("continue"). Picked up the second app-wide
+debt flagged by the UX-03 teacher-ux review retry (previous entry
+below): export results show only a raw OS file path with no way to jump
+to the saved file. Scoped to SF2/SF4 in `MonthlySummaryScreen.tsx` only
+— the same "prove the pattern on a small, reviewable slice; defer the
+full sweep" discipline as the self-disabling-button fix. Remaining
+export surfaces (SF5, SF6, report card export, learner roster export)
+stay open debt with the pattern now proven to follow.
+
+**Backend**: added `tauri-plugin-opener` v2.5.5 (Rust) /
+`@tauri-apps/plugin-opener` v2.5.5 (npm) — official first-party Tauri 2
+plugin, `revealItemInDir()` opens the OS file manager at a path. Fixed
+CVE-2025-31477 in its `open`-family APIs (untrusted-input path/URL-scope
+validation), patched upstream at 2.2.1+, this project pins 2.5.5.
+Registered in `src-tauri/src/lib.rs`; capability
+`opener:allow-reveal-item-in-dir` granted narrowly in
+`src-tauri/capabilities/default.json`. See
+`docs/SOURCE-REGISTRY.md`'s new entry for the full dependency writeup.
+
+**Plumbing**: `revealExportedFile(filePath)` added end-to-end —
+`ExportRepository` port → `TauriExportRepository` (calls the plugin,
+doc-commented with the untrusted-path discipline: only ever call with a
+path this app itself just returned from an export, never a user-typed
+string) → `ExportApplicationService` (trims, rejects empty) →
+`FixtureExportRepository` (genuine no-op for the browser-hosted
+dev-preview tool, not a throw — this really is unavailable there, not a
+bug to surface).
+
+**UI**: `MonthlySummaryScreen.tsx` — added an "Open folder" button next
+to each of the SF2 and SF4 "Saved to `<path>`" result blocks, each with
+its own loading/error state (`revealingSf2`/`revealSf2Error`,
+`revealingSf4`/`revealSf4Error`), reset on section/month change like the
+existing export state. Failure shows a plain-language inline error
+rather than throwing.
+
+**Verified this wave**: `npm run quality` — 801/801 tests (9 new: 3 new
+`MonthlySummaryScreen` interaction tests, 2 new
+`ExportApplicationService` unit tests, plus a `revealExportedFile` stub
+added to every other `FakeExportRepository`/`SlowExportRepository` test
+double the interface change touched), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`,
+`npm run harness:verify` (100/100), `git diff --check` — all clean.
+Rust touched (`lib.rs`, `Cargo.toml`, `capabilities/default.json`):
+`cargo build` clean; `cargo test` (all suites, including every
+integration test file) 0 failures; `cargo clippy --all-targets -- -D
+warnings` 0 warnings; `cargo fmt --check` clean.
+
+`docs/VERIFICATION-DEBT.md`'s reveal-affordance entry updated: SF2/SF4
+in `MonthlySummaryScreen` closed; SF5/SF6/report-card/roster exports
+remain open, pattern proven.
+
 ## Active Task (2026-09-01, this session — Self-disabling-button focus-loss fix, complete)
 
 User-directed continuation. Picked up the app-wide debt flagged by the

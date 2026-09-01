@@ -147,6 +147,16 @@ class FakeExportRepository implements ExportRepository {
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
   }
+
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) {
+      throw new Error("could not open folder");
+    }
+  }
 }
 
 const EMPTY_REPORT: MonthlyAttendanceReport = {
@@ -302,6 +312,37 @@ describe("MonthlySummaryScreen", () => {
     expect(exportRepo.calls).toEqual([{ sectionId: "sec-1", year: 2026, month: 8 }]);
   });
 
+  it("opens the folder for the exported SF2 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv",
+      ]),
+    );
+  });
+
+  it("shows an error when the SF2 export folder could not be opened", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    exportRepo.revealShouldThrow = true;
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Could not open the folder for this file.")).toBeInTheDocument(),
+    );
+  });
+
   it("shows an error when the section could not be resolved for export", async () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen(reportWith("present"));
@@ -326,6 +367,22 @@ describe("MonthlySummaryScreen", () => {
       ).toBeInTheDocument(),
     );
     expect(exportRepo.sf4Calls).toEqual([{ year: 2026, month: 8 }]);
+  });
+
+  it("opens the folder for the exported SF4 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv",
+      ]),
+    );
   });
 
   it("shows an error when the school could not be found for the SF4 export", async () => {
@@ -515,6 +572,9 @@ describe("MonthlySummaryScreen", () => {
         throw new Error("not used in this test");
       }
       async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async revealExportedFile(): Promise<void> {
         throw new Error("not used in this test");
       }
     }

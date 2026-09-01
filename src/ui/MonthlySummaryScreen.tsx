@@ -85,6 +85,10 @@ export function MonthlySummaryScreen({
   const [exportingSf4, setExportingSf4] = useState(false);
   const [exportSf4Error, setExportSf4Error] = useState<string | null>(null);
   const [exportSf4Result, setExportSf4Result] = useState<Sf4ExportResult | null>(null);
+  const [revealingSf2, setRevealingSf2] = useState(false);
+  const [revealSf2Error, setRevealSf2Error] = useState<string | null>(null);
+  const [revealingSf4, setRevealingSf4] = useState(false);
+  const [revealSf4Error, setRevealSf4Error] = useState<string | null>(null);
 
   // Request identity for the section-list, report, and export requests --
   // guards against an in-flight request whose context (section/month) has
@@ -179,9 +183,11 @@ export function MonthlySummaryScreen({
     exportRequestRef.current += 1;
     setExportResult(null);
     setExportError(null);
+    setRevealSf2Error(null);
     exportSf4RequestRef.current += 1;
     setExportSf4Result(null);
     setExportSf4Error(null);
+    setRevealSf4Error(null);
     setYearMonth({ year: newYear, month: newMonth });
   }
 
@@ -189,6 +195,7 @@ export function MonthlySummaryScreen({
     exportRequestRef.current += 1;
     setExportResult(null);
     setExportError(null);
+    setRevealSf2Error(null);
     setSectionId(newSectionId);
   }
 
@@ -241,6 +248,32 @@ export function MonthlySummaryScreen({
       );
     } finally {
       if (exportSf4RequestRef.current === requestId) setExportingSf4(false);
+    }
+  }
+
+  async function handleRevealSf2() {
+    if (revealingSf2 || !exportResult) return;
+    setRevealSf2Error(null);
+    setRevealingSf2(true);
+    try {
+      await exportService.revealExportedFile(exportResult.filePath);
+    } catch {
+      setRevealSf2Error("Could not open the folder for this file.");
+    } finally {
+      setRevealingSf2(false);
+    }
+  }
+
+  async function handleRevealSf4() {
+    if (revealingSf4 || !exportSf4Result) return;
+    setRevealSf4Error(null);
+    setRevealingSf4(true);
+    try {
+      await exportService.revealExportedFile(exportSf4Result.filePath);
+    } catch {
+      setRevealSf4Error("Could not open the folder for this file.");
+    } finally {
+      setRevealingSf4(false);
     }
   }
 
@@ -338,6 +371,10 @@ export function MonthlySummaryScreen({
               <p>
                 Saved to <code>{exportResult.filePath}</code>.
               </p>
+              <button type="button" aria-disabled={revealingSf2} onClick={handleRevealSf2}>
+                {revealingSf2 ? "Opening…" : "Open folder"}
+              </button>
+              {revealSf2Error && <p role="alert">{revealSf2Error}</p>}
               <p>
                 This file is DepEd-SF2-<em>inspired</em>, not a submission-ready reproduction. It
                 does <strong>not</strong> include:
@@ -363,6 +400,10 @@ export function MonthlySummaryScreen({
               <p>
                 Saved to <code>{exportSf4Result.filePath}</code>.
               </p>
+              <button type="button" aria-disabled={revealingSf4} onClick={handleRevealSf4}>
+                {revealingSf4 ? "Opening…" : "Open folder"}
+              </button>
+              {revealSf4Error && <p role="alert">{revealSf4Error}</p>}
               <p>
                 This file is DepEd-SF4-<em>inspired</em>, not a submission-ready reproduction. It
                 does <strong>not</strong> include:
