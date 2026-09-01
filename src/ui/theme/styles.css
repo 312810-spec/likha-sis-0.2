@@ -435,13 +435,21 @@ label {
   align-items: center;
   flex-wrap: wrap;
   gap: calc(var(--spacing-unit) * 0.5);
-  padding-right: calc(var(--spacing-unit) * 1.25);
-  border-right: 1px solid var(--color-border);
+  /* A side (border-right) divider only reads correctly when every group
+     shares one row -- once `.workbench-nav`'s own flex-wrap pushes a
+     later group onto its own row (which happens at ordinary desktop
+     widths too, not just narrow ones, once enough nav items exist), a
+     border-right on an earlier group becomes an orphaned vertical line
+     with nothing beside it. A bottom divider degrades correctly in
+     every wrap configuration, so it's unconditional rather than a
+     narrow-viewport-only override. */
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .nav-group:last-child {
-  border-right: none;
-  padding-right: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .nav-group-label {
@@ -508,19 +516,6 @@ label {
     flex-direction: column;
     align-items: stretch;
     gap: var(--spacing-unit);
-  }
-
-  .nav-group {
-    flex-wrap: wrap;
-    border-right: none;
-    padding-right: 0;
-    padding-bottom: calc(var(--spacing-unit) * 0.5);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .nav-group:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
   }
 
   .nav-item {

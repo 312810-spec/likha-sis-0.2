@@ -1,5 +1,46 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Verification debt sweep: Wave 3I security review retry + native visual pass, complete)
+
+User asked to "work on verification debts." Picked the two highest-
+priority actionable items per project priority order (security first).
+
+**Wave 3I independent security review, retried and closed**: the
+`security-reviewer` harness's agent-resume/retrieval failure had blocked
+this twice before (self-review substituted at the time). Retried this
+session — succeeded. Verdict: 0 BLOCKING, 1 SHOULD-FIX (no Rust-side
+minimum-password-length enforcement in `admin_reset_teacher_password`,
+matching the same disclosed, deliberate convention already documented
+for `register_user`/`bootstrap_installation` in
+`src/domain/password-policy.ts` — not fixed inline, since doing so only
+for this one path would create an undocumented asymmetry; recorded as a
+project-wide follow-up instead). Full record:
+`docs/VERIFICATION-DEBT.md`'s Wave 3I entry.
+
+**Native visual pass, closed for the 4 outstanding M0–M6 screens**:
+using the documented `playwright-cli` browser-mismatch workaround
+(`chromium.launch({ executablePath: "/opt/pw-browsers/chromium" })`),
+screenshotted `LoginScreen` (direct, real `vite dev`), `FirstRunSetupScreen`
+(needed a one-off `window.__TAURI_INTERNALS__.invoke` mock — a throwaway
+probe, not a new fixture), and `AppShell`/`LearnerListScreen` (via the
+existing dev-preview fixture) — 2 viewports × 2 color schemes each, 16
+screenshots total. **Found and fixed a real layout bug**: `WorkbenchNav`'s
+nav-group divider used `border-right`, which only reads correctly when
+every group shares one row — once a later group wraps to its own row
+(confirmed happening even at the primary 1366px desktop width once
+"Daily Teaching" grows past one internal row), the earlier group's
+`border-right` became an orphaned floating line. Fixed in
+`src/ui/theme/styles.css`: unconditional `border-bottom` divider,
+removing the narrow-viewport-only special case — verified correct at
+850px, 1024px, and 1366px. Screen-reader pass (NVDA/Narrator) stays open
+— no Windows screen reader available in this sandbox. Full record:
+`docs/VERIFICATION-DEBT.md`'s Native visual/screen-reader entry.
+
+**Verified**: `npm run quality` 801/801 (no regressions), `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. Only `src/ui/theme/styles.css`
+changed; no Rust touched, no cargo checks needed.
+
 ## Active Task (2026-09-01, this session — Reveal-exported-file ("Open folder") feature, complete)
 
 User-directed continuation ("continue"). Picked up the second app-wide

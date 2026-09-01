@@ -2932,6 +2932,38 @@ clean; `cargo test`/`cargo clippy --all-targets -- -D warnings`/`cargo
 fmt --check` run this wave — see `docs/CURRENT-HANDOFF.md`'s top entry
 for the confirmed outcome.
 
+## Verification Debt Sweep: Wave 3I Security Review Retry + Native Visual Pass (added 2026-09-01)
+
+User-directed ("work on verification debts"). Retried the previously
+agent-resume-blocked Wave 3I `security-reviewer` — succeeded this time.
+0 BLOCKING, 1 SHOULD-FIX (missing Rust-side minimum password length in
+`admin_reset_teacher_password`; deliberately not fixed inline, since it
+matches an already-disclosed, deliberate codebase-wide convention
+documented in `src/domain/password-policy.ts` — fixing only this one
+path would create an undocumented asymmetry with `register_user`/
+`bootstrap_installation`; recorded as a project-wide follow-up).
+
+Closed the visual half of the long-open "Native visual / screen-reader
+inspection" debt for the four M0–M6 screens (`LoginScreen`,
+`FirstRunSetupScreen`, `AppShell`, `LearnerListScreen`) using the
+documented `playwright-cli` workaround (`chromium.launch({
+executablePath: "/opt/pw-browsers/chromium" })`). Found and fixed a real
+layout bug in the process: `WorkbenchNav`'s CSS used a `border-right`
+divider between nav groups, correct only when every group shares one
+row — once `.workbench-nav`'s flex-wrap pushes a later group onto its
+own row (which happens at ordinary desktop widths too, not just narrow
+ones, confirmed even at the primary 1366px width), an earlier group's
+divider became an orphaned floating line. Fixed by making the divider an
+unconditional `border-bottom` in `src/ui/theme/styles.css`, which
+degrades correctly under any wrap configuration — this is the kind of
+finding jsdom-based structural tests structurally cannot catch, which is
+exactly why this debt category exists. Screen-reader pass (NVDA/Narrator)
+remains open — no Windows screen reader available in this sandbox.
+
+`npm run quality` 801/801 (no regressions), `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean. Only `src/ui/theme/styles.css` changed.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
