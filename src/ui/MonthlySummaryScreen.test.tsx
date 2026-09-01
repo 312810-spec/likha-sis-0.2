@@ -15,6 +15,7 @@ import type {
   ReportCardExportResult,
   Sf2ExportResult,
   Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
@@ -115,6 +116,10 @@ class FakeExportRepository implements ExportRepository {
   }
 
   async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
     throw new Error("not used in this test");
   }
 
@@ -429,6 +434,9 @@ describe("MonthlySummaryScreen", () => {
         });
       }
       async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
         throw new Error("not used in this test");
       }
       async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {

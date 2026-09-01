@@ -9,6 +9,7 @@ import type {
   ReportCardExportResult,
   Sf2ExportResult,
   Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
 import type { ExportRepository } from "../domain/ports/export-repository";
@@ -265,6 +266,10 @@ class FakeExportRepository implements ExportRepository {
     this.sf5Calls.push({ sectionId, schoolYear });
     if (this.sf5Error) throw this.sf5Error;
     return this.sf5ToReturn;
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+    throw new Error("not used in this test");
   }
 
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {

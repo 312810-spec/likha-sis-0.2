@@ -1,5 +1,30 @@
 # ACTIVE PLAN
 
+## Wave 3K: School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (added 2026-09-01) — complete
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md`; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/PROJECT-MEMORY.md` Wave 3K entry;
+`docs/VERIFICATION-DEBT.md` Wave 3K entry. **New branch**
+`antigravity/likha-sis-wave3k-sf6-school-promotion-foundation`, created from `2ebf450` (Wave
+3J's checkpoint).
+
+**Scope**: DepEd School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation.
+Establishes the school-wide promotion consolidation engine aggregating all sections and grade levels for a given
+school year into the official DepEd SF6 report with Table 1 (Promotion Decisions), Table 2 (Level of Proficiency),
+grade level subtotals, school grand totals, and field disclosures under strict multi-tenant session isolation.
+
+**Built**:
+
+- `src-tauri/src/export/sf6.rs`: Pure domain types `Sf6SectionSummary`, `Sf6Export`, and `build_sf6_export` formatting double-table CSV with subtotals/grand totals and `FieldDisclosure`.
+- `src-tauri/src/commands/export.rs`: Added `export_school_eosy_sf6` command querying all school sections and computing promotion/proficiency distributions per section.
+- `src-tauri/src/lib.rs`: Registered `commands::export::export_school_eosy_sf6`.
+- `src-tauri/tests/export.rs`: Added integration test `sf6_export_school_wide_consolidation_and_isolation` in `tests/export.rs`.
+- Frontend: Added `Sf6ExportResult` in `src/domain/export.ts`, `ExportRepository.exportSchoolEosySf6` port in `src/domain/ports/export-repository.ts`, `TauriExportRepository` implementation, and `ExportApplicationService.exportSchoolEosySf6` application service method with validation.
+- `src/infrastructure/tauri/invoke.ts`: Added `export_school_eosy_sf6` to `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`.
+
+**Verification**: `cargo test` 613 lib tests + 14 integration test binaries clean;
+`npm run quality:full` clean (763/763 vitest across 78 files); `npm run build`, `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Wave 3J: School Form 5 (SF5) Section Promotion UI (added 2026-09-01) — complete
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum; `docs/CURRENT-HANDOFF.md`

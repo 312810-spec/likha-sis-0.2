@@ -69,6 +69,32 @@ describe("TauriExportRepository", () => {
     expect(result).toBeNull();
   });
 
+  it("exportSchoolEosySf6 invokes export_school_eosy_sf6 with schoolYear", async () => {
+    const result = {
+      filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_Mabini_2026-2027.csv",
+      disclosure: {
+        populatedFields: ["School Name", "Promotion Status Summary"],
+        omittedFields: [],
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const returned = await new TauriExportRepository().exportSchoolEosySf6("2026-2027");
+
+    expect(mockInvoke).toHaveBeenCalledWith("export_school_eosy_sf6", {
+      schoolYear: "2026-2027",
+    });
+    expect(returned).toEqual(result);
+  });
+
+  it("exportSchoolEosySf6 returns null when the school could not be resolved", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    const result = await new TauriExportRepository().exportSchoolEosySf6("2026-2027");
+
+    expect(result).toBeNull();
+  });
+
   it("exportClassRecordReportCard invokes export_class_record_report_card with classRecordId", async () => {
     const result: ReportCardExportResult = {
       filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ReportCard_Mabini_Science_1st_Term.csv",

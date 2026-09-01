@@ -14,6 +14,7 @@ use app_lib::error::AppError;
 use app_lib::export::learner_roster::{self, LearnerRosterExport};
 use app_lib::export::sf2::{self, Sf2Export};
 use app_lib::export::sf5::{self, Sf5Export, Sf5LearnerRow, Sf5SubjectGrade};
+use app_lib::export::sf6::{self, Sf6Export, Sf6SectionSummary};
 use app_lib::repository::{
     attendance, class_record, grading, grading_computation, learner, role, school, section,
     section_advisory, section_membership, user,
@@ -463,4 +464,180 @@ fn sf5_export_renders_assigned_adviser_and_learners() {
     assert!(export.csv.contains("School Form 5 (SF5)"));
     assert!(export.csv.contains("Class Adviser,Adviser Maria"));
     assert!(export.csv.contains("123456789012,\"Dela Cruz, Juan\",M"));
+}
+
+/// Standing in for the non-I/O portion of `commands::export::export_school_eosy_sf6`.
+fn export_sf6_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    school_year: &str,
+) -> app_lib::error::AppResult<Option<Sf6Export>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+
+    let school_periods = grading::list_by_school_year(conn, &school_id, school_year)?;
+    let start_date = school_periods
+        .first()
+        .map(|p| p.starts_on.clone())
+        .unwrap_or_else(|| "2000-01-01".to_string());
+    let end_date = school_periods
+        .last()
+        .map(|p| p.ends_on.clone())
+        .unwrap_or_else(|| "2099-12-31".to_string());
+
+    let sections = section::list_by_school(conn, &school_id)?;
+    let mut section_summaries = Vec::with_capacity(sections.len());
+
+    for sec in sections {
+        let roster = section_membership::roster_for_section_over_range(
+            conn,
+            &school_id,
+            &sec.id,
+            &start_date,
+            &end_date,
+        )?;
+        let class_records = class_record::list_by_section_in_school(conn, &school_id, &sec.id)?;
+        let filtered_records: Vec<_> = class_records
+            .into_iter()
+            .filter(|cr| cr.school_year == school_year)
+            .collect();
+
+        let mut distinct_subjects: Vec<String> = filtered_records
+            .iter()
+            .map(|cr| cr.subject_name.clone())
+            .collect();
+        distinct_subjects.sort();
+        distinct_subjects.dedup();
+
+        let mut learner_rows = Vec::with_capacity(roster.len());
+        for member in roster {
+            let mut subject_grades = Vec::with_capacity(distinct_subjects.len());
+
+            for subj in &distinct_subjects {
+                let subj_records: Vec<_> = filtered_records
+                    .iter()
+                    .filter(|cr| cr.subject_name == *subj)
+                    .collect();
+
+                if subj_records.is_empty() {
+                    subject_grades.push(Sf5SubjectGrade {
+                        subject_name: subj.clone(),
+                        final_grade: None,
+                    });
+                } else {
+                    let mut sum = 0.0;
+                    let mut count = 0;
+                    let mut all_scored = true;
+
+                    for cr in subj_records {
+                        let computed = grading_computation::compute_term_grade(
+                            conn,
+                            &school_id,
+                            &cr.id,
+                            &member.learner_id,
+                        )?;
+                        match computed {
+                            Some(grade) => {
+                                sum += grade.term_grade as f64;
+                                count += 1;
+                            }
+                            None => {
+                                all_scored = false;
+                            }
+                        }
+                    }
+
+                    let final_grade = if all_scored && count > 0 {
+                        Some((sum / count as f64).round() as u32)
+                    } else {
+                        None
+                    };
+
+                    subject_grades.push(Sf5SubjectGrade {
+                        subject_name: subj.clone(),
+                        final_grade,
+                    });
+                }
+            }
+
+            let (general_average, promotion_status) =
+                Sf5LearnerRow::compute_status(&subject_grades);
+            learner_rows.push(Sf5LearnerRow {
+                learner_id: member.learner_id,
+                given_name: member.given_name,
+                family_name: member.family_name,
+                sex: member.sex,
+                lrn: member.lrn,
+                subject_grades,
+                general_average,
+                promotion_status,
+            });
+        }
+
+        let summary = sf5::ProficiencySummary::compute(&learner_rows);
+        section_summaries.push(Sf6SectionSummary {
+            section_id: sec.id,
+            section_name: sec.name,
+            grade_level: sec.grade_level,
+            summary,
+        });
+    }
+
+    Ok(Some(sf6::build_sf6_export(
+        &school,
+        school_year,
+        &section_summaries,
+    )))
+}
+
+#[test]
+fn sf6_export_school_wide_consolidation_and_isolation() {
+    let conn = open_test_db();
+    let s1 = school::create(&conn, "School Alpha").unwrap();
+    let sec1 = section::create(&conn, &s1.id, "2026-2027", "7", "Section 1").unwrap();
+    let sec2 = section::create(&conn, &s1.id, "2026-2027", "8", "Section 2").unwrap();
+
+    let l1 = learner::create(
+        &conn,
+        &s1.id,
+        "Pedro",
+        "Penduko",
+        Some("111111111111"),
+        Some("M"),
+    )
+    .unwrap();
+    let l2 = learner::create(
+        &conn,
+        &s1.id,
+        "Maria",
+        "Clara",
+        Some("222222222222"),
+        Some("F"),
+    )
+    .unwrap();
+
+    section_membership::enroll(&conn, &s1.id, &sec1.id, &l1.id, "2026-06-01").unwrap();
+    section_membership::enroll(&conn, &s1.id, &sec2.id, &l2.id, "2026-06-01").unwrap();
+
+    // User in School Alpha
+    let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
+    user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
+
+    let export = export_sf6_as_current_session(&conn, &sessions, "2026-2027")
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("School Form 6 (SF6)"));
+    assert!(export.csv.contains("School Alpha"));
+    assert!(export.csv.contains("7,Section 1"));
+    assert!(export.csv.contains("8,Section 2"));
+    assert!(export.csv.contains("TOTAL 7"));
+    assert!(export.csv.contains("TOTAL 8"));
+    assert!(export.csv.contains("SCHOOL GRAND TOTAL"));
+    assert_eq!(export.disclosure.populated_fields.len(), 6);
 }

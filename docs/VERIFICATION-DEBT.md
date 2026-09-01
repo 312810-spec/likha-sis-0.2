@@ -1,5 +1,14 @@
 # Verification Debt
 
+## Wave 3K — School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md`; `docs/PROJECT-MEMORY.md`
+Wave 3K entry; `docs/CURRENT-HANDOFF.md` top entry.
+
+**Newly recorded debt:**
+
+1. **None.** Wave 3K is a pure domain export builder, backend aggregation command, and frontend application port foundation. Multi-section aggregation and multi-tenant isolation are verified by unit tests in `src-tauri/src/export/sf6.rs`, integration tests in `src-tauri/tests/export.rs`, and TypeScript unit tests in `src/infrastructure/tauri/export-repository.test.ts` and `src/application/export-service.test.ts`. User-facing School Head export action buttons and summary visualization will be integrated in follow-up Wave 3L (SF6 School Summary UI).
+
 ## Wave 3J — School Form 5 (SF5) Section Promotion UI (2026-09-01)
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum; `docs/PROJECT-MEMORY.md`

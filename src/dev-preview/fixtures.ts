@@ -48,6 +48,7 @@ import type {
   ReportCardExportResult,
   Sf2ExportResult,
   Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
@@ -426,6 +427,28 @@ export class FixtureExportRepository implements ExportRepository {
           {
             field: "Signature of Class Adviser / Signature of School Head",
             reason: "Physical certification step intentionally left for signing after printing.",
+          },
+        ],
+      },
+    };
+  }
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_School_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: [
+          "School ID",
+          "School Name",
+          "School Year",
+          "Grade Levels & Section Names",
+          "Promotion Status Summary",
+          "Level of Proficiency Summary",
+        ],
+        omittedFields: [
+          {
+            field: "Division / District / Region",
+            reason: "Not tracked by this app",
           },
         ],
       },

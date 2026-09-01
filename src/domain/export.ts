@@ -30,6 +30,11 @@ export interface Sf5ExportResult {
   disclosure: FieldDisclosure;
 }
 
+export interface Sf6ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
 export interface LearnerRosterExportResult {
   filePath: string;
   disclosure: FieldDisclosure;

@@ -12,11 +12,19 @@ use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
 use crate::export::sf2;
 use crate::export::sf5::{self, Sf5LearnerRow, Sf5SubjectGrade};
+use crate::export::sf6::{self, Sf6SectionSummary};
 use crate::export::FieldDisclosure;
 use crate::repository::{
     attendance, class_record, grading, grading_computation, learner, school, section,
     section_advisory, section_membership, user,
 };
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sf6ExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -428,6 +436,154 @@ pub fn export_section_eosy_sf5(
     std::fs::write(&file_path, export.csv)?;
 
     Ok(Some(Sf5ExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+
+/// Writes a school-wide, DepEd-SF6-inspired summarized promotion and proficiency export to
+/// `<Documents>/LIKHA-SIS/` (falling back to the app data directory if Documents cannot be resolved).
+/// `school_id` is derived strictly from the authenticated session.
+#[tauri::command]
+pub fn export_school_eosy_sf6(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    school_year: String,
+) -> AppResult<Option<Sf6ExportResult>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+
+    let school_periods = grading::list_by_school_year(&conn, &school_id, &school_year)?;
+    let start_date = school_periods
+        .first()
+        .map(|p| p.starts_on.clone())
+        .unwrap_or_else(|| "2000-01-01".to_string());
+    let end_date = school_periods
+        .last()
+        .map(|p| p.ends_on.clone())
+        .unwrap_or_else(|| "2099-12-31".to_string());
+
+    let sections = section::list_by_school(&conn, &school_id)?;
+    let mut section_summaries = Vec::with_capacity(sections.len());
+
+    for sec in sections {
+        let roster = section_membership::roster_for_section_over_range(
+            &conn,
+            &school_id,
+            &sec.id,
+            &start_date,
+            &end_date,
+        )?;
+        let class_records = class_record::list_by_section_in_school(&conn, &school_id, &sec.id)?;
+        let filtered_records: Vec<_> = class_records
+            .into_iter()
+            .filter(|cr| cr.school_year == school_year)
+            .collect();
+
+        let mut distinct_subjects: Vec<String> = filtered_records
+            .iter()
+            .map(|cr| cr.subject_name.clone())
+            .collect();
+        distinct_subjects.sort();
+        distinct_subjects.dedup();
+
+        let mut learner_rows = Vec::with_capacity(roster.len());
+        for member in roster {
+            let mut subject_grades = Vec::with_capacity(distinct_subjects.len());
+
+            for subj in &distinct_subjects {
+                let subj_records: Vec<_> = filtered_records
+                    .iter()
+                    .filter(|cr| cr.subject_name == *subj)
+                    .collect();
+
+                if subj_records.is_empty() {
+                    subject_grades.push(Sf5SubjectGrade {
+                        subject_name: subj.clone(),
+                        final_grade: None,
+                    });
+                } else {
+                    let mut sum = 0.0;
+                    let mut count = 0;
+                    let mut all_scored = true;
+
+                    for cr in subj_records {
+                        let computed = grading_computation::compute_term_grade(
+                            &conn,
+                            &school_id,
+                            &cr.id,
+                            &member.learner_id,
+                        )?;
+                        match computed {
+                            Some(grade) => {
+                                sum += grade.term_grade as f64;
+                                count += 1;
+                            }
+                            None => {
+                                all_scored = false;
+                            }
+                        }
+                    }
+
+                    let final_grade = if all_scored && count > 0 {
+                        Some((sum / count as f64).round() as u32)
+                    } else {
+                        None
+                    };
+
+                    subject_grades.push(Sf5SubjectGrade {
+                        subject_name: subj.clone(),
+                        final_grade,
+                    });
+                }
+            }
+
+            let (general_average, promotion_status) =
+                Sf5LearnerRow::compute_status(&subject_grades);
+            learner_rows.push(Sf5LearnerRow {
+                learner_id: member.learner_id,
+                given_name: member.given_name,
+                family_name: member.family_name,
+                sex: member.sex,
+                lrn: member.lrn,
+                subject_grades,
+                general_average,
+                promotion_status,
+            });
+        }
+
+        let summary = sf5::ProficiencySummary::compute(&learner_rows);
+        section_summaries.push(Sf6SectionSummary {
+            section_id: sec.id,
+            section_name: sec.name,
+            grade_level: sec.grade_level,
+            summary,
+        });
+    }
+
+    let export = sf6::build_sf6_export(&school, &school_year, &section_summaries);
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "SF6_{}_{}.csv",
+        sanitize_filename_component(&school.name.replace(' ', "_")),
+        sanitize_filename_component(&school_year.replace(' ', "_"))
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(Sf6ExportResult {
         file_path: file_path.to_string_lossy().to_string(),
         disclosure: export.disclosure,
     }))

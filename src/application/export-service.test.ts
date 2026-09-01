@@ -5,6 +5,7 @@ import type {
   ReportCardExportResult,
   Sf2ExportResult,
   Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { ExportRepository } from "../domain/ports/export-repository";
 import { ExportApplicationService } from "./export-service";
@@ -37,6 +38,17 @@ class FakeExportRepository implements ExportRepository {
   ): Promise<Sf5ExportResult | null> {
     this.sf5Calls.push({ sectionId, schoolYear });
     return this.sf5ResultToReturn;
+  }
+
+  sf6Calls: Array<{ schoolYear: string }> = [];
+  sf6ResultToReturn: Sf6ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_Mabini_2026-2027.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    this.sf6Calls.push({ schoolYear });
+    return this.sf6ResultToReturn;
   }
 
   reportCardCalls: Array<{ classRecordId: string }> = [];
@@ -145,6 +157,34 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportSectionEosySf5("sec-1", "2026-2027");
+
+    expect(result).toBeNull();
+  });
+
+  it("exportSchoolEosySf6 delegates to the repository with trimmed arguments", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSchoolEosySf6(" 2026-2027 ");
+
+    expect(result).toEqual(repo.sf6ResultToReturn);
+    expect(repo.sf6Calls).toEqual([{ schoolYear: "2026-2027" }]);
+  });
+
+  it("exportSchoolEosySf6 rejects an empty school year", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportSchoolEosySf6("   ")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.sf6Calls).toEqual([]);
+  });
+
+  it("exportSchoolEosySf6 returns null when the school could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.sf6ResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportSchoolEosySf6("2026-2027");
 
     expect(result).toBeNull();
   });

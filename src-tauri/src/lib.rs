@@ -70,6 +70,7 @@ pub fn run() {
             commands::section::get_current_enrollment,
             commands::export::export_section_monthly_sf2,
             commands::export::export_section_eosy_sf5,
+            commands::export::export_school_eosy_sf6,
             commands::export::export_class_record_report_card,
             commands::export::export_learner_roster,
             commands::grading::list_grading_policies,

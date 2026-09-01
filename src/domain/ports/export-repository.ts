@@ -3,6 +3,7 @@ import type {
   ReportCardExportResult,
   Sf2ExportResult,
   Sf5ExportResult,
+  Sf6ExportResult,
 } from "../export";
 
 /**
@@ -17,6 +18,7 @@ export interface ExportRepository {
     month: number,
   ): Promise<Sf2ExportResult | null>;
   exportSectionEosySf5(sectionId: string, schoolYear: string): Promise<Sf5ExportResult | null>;
+  exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null>;
   exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null>;
   exportLearnerRoster(): Promise<LearnerRosterExportResult | null>;
 }

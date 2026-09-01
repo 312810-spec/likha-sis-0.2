@@ -1,5 +1,32 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01 — Wave 3K: School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation, COMPLETE)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md`;
+`docs/PROJECT-MEMORY.md` Wave 3K entry; `docs/VERIFICATION-DEBT.md` Wave 3K entry.
+**New dedicated branch** `antigravity/likha-sis-wave3k-sf6-school-promotion-foundation`, created
+from `antigravity/likha-sis-wave3j-sf5-section-promotion-ui` at `2ebf450`.
+Harness v2 stayed locked and computes **100/100**.
+
+**Scope chosen**: School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation.
+Consolidates section-level SF5 promotion and proficiency distributions across all sections and grade levels
+in the school for a given school year into the official school-wide summary report per DepEd Order No. 4, s. 2014,
+DepEd Order No. 8, s. 2015, and DepEd Order No. 58, s. 2017.
+
+**What shipped**:
+
+- `src-tauri/src/export/sf6.rs`: Pure domain exporter `build_sf6_export` with `Sf6SectionSummary`, `Sf6Export`, Table 1 (Promotion Decisions by Section/Grade Level/Grand Total), Table 2 (Level of Proficiency by Section/Grade Level/Grand Total), and structured `FieldDisclosure`.
+- `src-tauri/src/commands/export.rs`: Added `export_school_eosy_sf6` command aggregating all school sections and class records for `school_year` with strict session-scoped school isolation.
+- `src-tauri/src/lib.rs`: Registered `commands::export::export_school_eosy_sf6`.
+- `src-tauri/tests/export.rs`: Added integration test `sf6_export_school_wide_consolidation_and_isolation` verifying multi-section consolidation, grade level subtotals, grand totals, and cross-school isolation.
+- Frontend: Added `Sf6ExportResult` in `src/domain/export.ts`, `ExportRepository.exportSchoolEosySf6` port in `src/domain/ports/export-repository.ts`, `TauriExportRepository` implementation and test, and `ExportApplicationService.exportSchoolEosySf6` method with validation and test suite (+5 net tests, 763 Vitest tests passing).
+- `src/infrastructure/tauri/invoke.ts`: Added `export_school_eosy_sf6` to `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`.
+
+**Verification**:
+
+- `npm run quality:full` clean (Vitest 763/763 across 78 files, cargo test 613 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture).
+- `npm run build`, `npm run check:dev-preview-isolation`, `npm run quality:security`, `npm run harness:verify` (100/100 certified).
+
 ## Active Task (2026-09-01 — Wave 3J: School Form 5 (SF5) Section Promotion UI, COMPLETE)
 
 Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum;

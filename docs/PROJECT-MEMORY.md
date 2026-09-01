@@ -2774,6 +2774,23 @@ Full record: `docs/adr/0057-sf5-promotion-foundation.md` Wave 3J addendum;
 - **Verification/checkpoint**: `npm run quality:full` clean (758/758 vitest across 78 files, +3 tests net, cargo test 611 lib tests + 14 integration test binaries, cargo fmt/clippy, ESLint, Prettier, check:architecture); `npm run build`,
   `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
 
+## Wave 3K — School Form 6 (SF6) Summarized Report on Promotion and Level of Proficiency Foundation (added 2026-09-01)
+
+Full record: `docs/adr/0058-sf6-school-promotion-summary.md`;
+`docs/VERIFICATION-DEBT.md` Wave 3K entry. **New branch**
+`antigravity/likha-sis-wave3k-sf6-school-promotion-foundation`, created from `2ebf450` (Wave
+3J's checkpoint).
+
+- **Built**: DepEd Order No. 4, s. 2014 / DepEd Order No. 8, s. 2015 / DepEd Order No. 58, s. 2017 compliant SF6 school summary export engine.
+  Pure domain model `src-tauri/src/export/sf6.rs` (`Sf6SectionSummary`, `Sf6Export`, `build_sf6_export`),
+  Table 1 (Promotion Decisions by Section, Grade Level Subtotal, School Grand Total),
+  Table 2 (Summary of Level of Proficiency by Section, Grade Level Subtotal, School Grand Total),
+  Tauri backend command `export_school_eosy_sf6` in `src-tauri/src/commands/export.rs` with session-scoped school isolation,
+  frontend domain model `Sf6ExportResult`, port `ExportRepository.exportSchoolEosySf6`, `TauriExportRepository`, `ExportApplicationService`, and session exemption in `invoke.ts`.
+- **Verification/checkpoint**: `cargo test` 613 lib tests (+2) + 14 integration test binaries green (+1 integration test in `tests/export.rs`);
+  `npm run quality:full` clean (763/763 vitest across 78 files, +5 tests net, cargo test, clippy, fmt, linters); `npm run build`,
+  `check:dev-preview-isolation`, `quality:security`, `harness:verify` (100/100 certified) all pass.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
