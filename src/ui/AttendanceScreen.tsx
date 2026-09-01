@@ -436,7 +436,7 @@ export function AttendanceScreen({
                               <span>{rowError.message}</span>{" "}
                               <button
                                 type="button"
-
+                                aria-label={`Retry marking attendance for ${entry.givenName} ${entry.familyName}`}
                                 onClick={() => handleMark(entry.learnerId, rowError.status)}
                               >
                                 Retry

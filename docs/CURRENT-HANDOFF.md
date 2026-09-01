@@ -1,5 +1,53 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — UX-02/UX-03 independent review retry, complete)
+
+Dispatched fresh reviews against the two remaining long-open
+independent-review debts: `accessibility-reviewer` for UX-02
+(`TeacherWorkspaceScreen.tsx`), and both `teacher-ux-reviewer` +
+`accessibility-reviewer` for UX-03 (`AttendanceScreen.tsx`/
+`MonthlySummaryScreen.tsx`). All three retrievals succeeded (the 4th,
+5th, and 6th successful review retries today).
+
+**UX-02 accessibility: LOOKS-GOOD**, no findings — closed clean.
+
+**UX-03 teacher-ux findings, fixed**: (1) Medium — "resolved" jargon in
+the SF4 export error (`MonthlySummaryScreen.tsx`), inconsistent with
+the plainer SF2 sibling message — this was this session's own wording
+from the earlier SF4 PR, not inherited debt; changed to match SF2's
+"could not be found" phrasing. (2) Low — raw file path shown with no
+open/reveal affordance — an existing, systemic pattern shared by every
+export result across the app (SF2/4/5/6, report card, roster); **not
+fixed here** — a real UI feature (reveal-in-folder), out of scope for a
+review-fix PR, would need its own scoped slice. (3) Low — AttendanceScreen's
+per-row "Retry" buttons shared one accessible name across the whole
+roster — fixed with a learner-specific `aria-label`, same pattern as
+UX-04's Edit/Delete fix.
+
+**UX-03 accessibility findings, fixed**: (1) Moderate — the monthly
+summary table's scrollable container had no `tabIndex`/accessible name
+(WCAG 2.1.1, axe's `scrollable-region-focusable` rule — invisible to
+`jsdom`-based `expectNoAccessibilityViolations`, since jsdom doesn't
+compute real scroll dimensions) — fixed with `tabIndex={0}` +
+`aria-label`. (2) Low — self-disabling buttons (native `disabled`)
+lose focus to `<body>` on click — confirmed **pre-existing, shared
+across `LearnerListScreen`/`SubjectAttendanceScreen`/etc., not new to
+UX-03** — recorded as debt, not fixed here (a real app-wide pattern
+change, out of scope for a targeted review-fix). (3) Minor — some
+`field-hint` instructional text isn't `aria-describedby`-linked to its
+control — non-blocking, left as-is per the reviewer's own
+"worth tightening only if revisited" call.
+
+**Verified this wave**: `npm run quality` — 794/794 tests (existing
+tests extended), typecheck/lint/format/architecture clean. `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s UX-02 and UX-03 entries updated to
+CLOSED. A new debt entry records the app-wide self-disabling-button
+focus-loss pattern (not this wave's to fix) and the
+export-result-no-reveal-affordance pattern.
+
 ## Active Task (2026-09-01, this session — UX-04 independent review retry, complete)
 
 Dispatched fresh `teacher-ux-reviewer` and `accessibility-reviewer` runs

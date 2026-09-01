@@ -2906,6 +2906,61 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
+## App-wide: self-disabling buttons lose focus to `<body>` on click (open)
+
+Found by the UX-03 `accessibility-reviewer` retry (2026-09-01): buttons
+that use the native `disabled` attribute to prevent double-submission
+(e.g. `AttendanceScreen.tsx:373`, `MonthlySummaryScreen.tsx:326,353`)
+synchronously blur to `<body>` the instant they're clicked, since the
+element with focus is disabled mid-interaction. Confirmed **pre-existing
+and shared across `LearnerListScreen.tsx`, `SubjectAttendanceScreen.tsx`,
+and likely every other "disable while saving" button in this codebase**
+— not introduced by UX-03's own changes, and not fixed as part of that
+review's own scope. Fixing it properly means an app-wide pattern change
+(`aria-disabled` + a click-guard, or explicit focus restoration on state
+change) across many screens at once — a real, scoped slice of its own,
+not a one-file tweak. Revisit when a UI-polish wave has room for an
+app-wide sweep; low severity, not blocking.
+
+## App-wide: export results show a raw file path with no reveal/open affordance (open)
+
+Found by the UX-03 `teacher-ux-reviewer` retry (2026-09-01):
+`MonthlySummaryScreen.tsx`'s export-result alerts (and every other
+export result across the app — SF2/SF4/SF5/SF6, report card, learner
+roster) show the saved file's path as plain `<code>` text with no way
+to open it or reveal it in the OS file browser. Low severity (the path
+is still visible, teachers can navigate there manually), but a real
+missing convenience. Fixing it needs a real Tauri-side "reveal in
+folder" command (the `shell`/`opener` plugin or equivalent) plus UI
+wiring across every export result — a genuine new feature, not a
+review-fix nit. Revisit as its own scoped slice.
+
+## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `accessibility-reviewer`
+dispatch against `TeacherWorkspaceScreen.tsx` actually retrieved
+findings this time. **Verdict: LOOKS-GOOD** — contrast, color-only
+state, target size, labels, focus management, and structural test
+coverage all independently verified and passed (one minor evidence-
+quality correction noted and self-corrected by the reviewer: initial
+border-contrast figures were computed against pure white/black rather
+than this app's actual `--color-bg`/`--color-surface` tokens; recomputed
+against the real tokens, still comfortably passing). No findings to fix.
+Original self-review record retained below for the historical trail.
+
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: fresh `teacher-ux-reviewer` and
+`accessibility-reviewer` dispatches against
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` both actually
+retrieved findings this time. Findings and fixes recorded in
+`docs/CURRENT-HANDOFF.md`'s matching entry; two findings deferred as
+their own separate app-wide debt entries above (self-disabling-button
+focus loss; export-result reveal affordance) rather than fixed inline,
+since both are pre-existing patterns spanning many files, not specific
+to UX-03. Original self-review record retained below for the historical
+trail.
+
 ## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched

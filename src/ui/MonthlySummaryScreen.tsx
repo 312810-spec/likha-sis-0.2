@@ -228,7 +228,7 @@ export function MonthlySummaryScreen({
       // failure) once the context it was for is no longer current.
       if (exportSf4RequestRef.current !== requestId) return;
       if (result === null) {
-        setExportSf4Error("Could not export — your school could not be resolved.");
+        setExportSf4Error("Could not export — your school could not be found.");
       } else {
         setExportSf4Result(result);
       }
@@ -389,7 +389,11 @@ export function MonthlySummaryScreen({
           ) : reportError ? null : !report || report.learners.length === 0 ? (
             <EmptyState>No learners enrolled in this section yet.</EmptyState>
           ) : (
-            <div className="monthly-summary-scroll">
+            <div
+              className="monthly-summary-scroll"
+              tabIndex={0}
+              aria-label="Monthly attendance table, scrollable"
+            >
               <table className="monthly-summary">
                 <caption>
                   {schoolName}
