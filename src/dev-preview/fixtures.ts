@@ -407,12 +407,20 @@ export class FixtureExportRepository implements ExportRepository {
     };
   }
 
-  async exportSchoolMonthlyAttendanceSf4(): Promise<
-    import("../domain/export").Sf4ExportResult | null
-  > {
-    throw new Error(
-      "dev-preview fixture: exportSchoolMonthlyAttendanceSf4() is not wired -- read-only fixture",
-    );
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<import("../domain/export").Sf4ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_${year}-${String(month).padStart(2, "0")}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Present/Absent/Tardy per day, whole school"],
+        omittedFields: [
+          { field: "School ID (EBEIS)", reason: "not tracked by this app" },
+          { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
+        ],
+      },
+    };
   }
 
   async exportSectionEosySf5(): Promise<import("../domain/export").Sf5ExportResult | null> {

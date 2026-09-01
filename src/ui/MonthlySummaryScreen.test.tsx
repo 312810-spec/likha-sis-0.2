@@ -14,6 +14,7 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
   Sf5ExportResult,
   Sf6ExportResult,
 } from "../domain/export";
@@ -105,6 +106,14 @@ class FakeExportRepository implements ExportRepository {
       omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
     },
   };
+  sf4Calls: Array<{ year: number; month: number }> = [];
+  sf4ResultToReturn: Sf4ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv",
+    disclosure: {
+      populatedFields: ["School Name"],
+      omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+    },
+  };
 
   async exportSectionMonthlySf2(
     sectionId: string,
@@ -115,10 +124,12 @@ class FakeExportRepository implements ExportRepository {
     return this.resultToReturn;
   }
 
-  async exportSchoolMonthlyAttendanceSf4(): Promise<
-    import("../domain/export").Sf4ExportResult | null
-  > {
-    throw new Error("not used in this test");
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    this.sf4Calls.push({ year, month });
+    return this.sf4ResultToReturn;
   }
 
   async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
@@ -300,6 +311,41 @@ describe("MonthlySummaryScreen", () => {
     await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
 
     await waitFor(() => expect(screen.getByText(/could not export/i)).toBeInTheDocument());
+  });
+
+  it("exports SF4 for the whole school and shows the saved path plus disclosure", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv"),
+      ).toBeInTheDocument(),
+    );
+    expect(exportRepo.sf4Calls).toEqual([{ year: 2026, month: 8 }]);
+  });
+
+  it("shows an error when the school could not be resolved for the SF4 export", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    exportRepo.sf4ResultToReturn = null;
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/school could not be resolved/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("does not gate the SF4 export button on the section report having learners", async () => {
+    renderScreen();
+    await screen.findByText("No learners enrolled in this section yet.");
+
+    expect(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" })).toBeEnabled();
   });
 
   it("opens with the supplied initial section and year/month when the section still exists", async () => {

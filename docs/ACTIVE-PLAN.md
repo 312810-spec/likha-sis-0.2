@@ -1,5 +1,29 @@
 # ACTIVE PLAN
 
+## Wave 3J: SF4 Export UI Trigger (added 2026-09-01) — complete
+
+The recommended next slice from the Wave 3m reconciliation below: wire
+an "Export SF4" trigger into `MonthlySummaryScreen.tsx`. Full record:
+`docs/CURRENT-HANDOFF.md`'s top entry.
+
+**Shipped**: a second export button ("Export SF4 (CSV, whole school)")
+in `MonthlySummaryScreen.tsx`, calling the already-shipped
+`exportService.exportSchoolMonthlyAttendanceSf4(year, month)`. Not
+gated on the selected section's report data (SF4 is school-wide, not
+section-scoped) — only on a valid month being selected. Own
+request-invalidation ref, cleared on month change only. Wired the
+dev-preview fixture's SF4 stub with a real synthetic result to match
+SF2's existing fixture convention.
+
+**Verification actually run**: `npm run quality` (794/794 tests, 3
+new), `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` — all clean. No Rust
+files touched.
+
+**Not done, deliberately**: SF5/SF6 UI triggers — both remain
+unwired in the dev-preview fixture, matching ADR-0059's zero-UI-first
+precedent; not part of this slice.
+
 ## Wave 3m Reconciliation (added 2026-09-01) — complete
 
 GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full record:
