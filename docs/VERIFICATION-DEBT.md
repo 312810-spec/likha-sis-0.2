@@ -1,5 +1,20 @@
 # Verification Debt
 
+## Gemini delegation plugin — no live credentialed run yet (2026-09-01)
+
+`gemini@gemini-plugin-cc` was verified real and installable
+(`docs/adr/0057-gemini-delegation-replaces-codex.md`), but this
+sandboxed session has no `gemini` CLI binary and no Google OAuth
+session, so two things remain unrun: `/gemini:setup --verify` (to
+actually complete `oauth-personal` login against the user's Gemini Pro
+subscription) and a real, credentialed end-to-end delegation task. Both
+require the user's own machine. This mirrors the identical, still-open
+verification debt ADR-0038 recorded for the now-superseded Codex PILOT.
+Revisit for promotion to ADOPT once the user has run `/gemini:setup
+--verify` locally and a real delegated task has gone through the
+implementation/return contract and independent review in
+`.claude/skills/gemini-delegation/SKILL.md`.
+
 ## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
 
 The user reported (not this session's own finding — no reproduction

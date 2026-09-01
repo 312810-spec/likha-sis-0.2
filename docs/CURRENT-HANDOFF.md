@@ -1,5 +1,33 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — Gemini Delegation Harness Replaces Codex, complete)
+
+User-directed harness change, not product work — does not change the
+Wave 3H/3I roadmap entry below. Full record:
+`docs/adr/0057-gemini-delegation-replaces-codex.md`,
+`.claude/skills/gemini-delegation/SKILL.md`, `docs/PROJECT-MEMORY.md`'s
+new "Gemini Delegation Harness" entry, `docs/VERIFICATION-DEBT.md`'s new
+top entry.
+
+Replaced the Codex/ChatGPT delegation PILOT (ADR-0038) with
+`gemini@gemini-plugin-cc` at the user's explicit request, since they
+have a Gemini Pro subscription rather than a ChatGPT/OpenAI credential.
+Verified real via a live `claude plugin marketplace add` /
+`claude plugin install` (same bar ADR-0038 held Codex to): Apache-2.0,
+forked from the Codex plugin, 10 skills/1 agent/3 hooks/0 MCP servers,
+~441 tokens always-on. Disclosed a real account risk (Google's Feb 2026
+enforcement sweep against automated tools driving Gemini CLI's OAuth
+session, GitHub discussion #20632) to the user before any auth mode was
+chosen; the user explicitly accepted it and chose `oauth-personal`
+(their subscription login). `codex-plugin-cc`'s SOURCE-REGISTRY entry
+and skill are marked superseded, not deleted.
+
+**Not done, and cannot be done from this sandbox**: `/gemini:setup
+--verify` and a real credentialed delegation task both need the user's
+own machine (no `gemini` CLI or Google OAuth session here) — tracked as
+open verification debt. No product code, schema, or existing
+verification/architecture script touched.
+
 ## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
 
 Planning-only wave, run from GitHub issue #6, on branch

@@ -1036,7 +1036,12 @@ re-reading the ADR:
   reconfirmed identical) — this milestone's Rust is manually reviewed,
   not compiler-verified.
 
-## Codex Delegation Harness (added 2026-08-25)
+## Codex Delegation Harness (added 2026-08-25, SUPERSEDED 2026-09-01)
+
+**SUPERSEDED by Gemini Delegation Harness (below)** — user-directed
+replacement, not an autonomous change. See
+`docs/adr/0057-gemini-delegation-replaces-codex.md`. Retained below as
+historical record and a documented fallback.
 
 **PILOT, not ADOPT.** Full record: `docs/adr/0038-codex-delegation-harness.md`,
 `.claude/skills/codex-delegation/SKILL.md`. Durable facts:
@@ -1063,6 +1068,40 @@ re-reading the ADR:
   websocket endpoint, confirmed via a real probe), independent of
   whether credentials exist. A real pilot task requires a machine
   without that restriction.
+
+## Gemini Delegation Harness (added 2026-09-01, replaces Codex)
+
+**PILOT, not ADOPT.** Full record:
+`docs/adr/0057-gemini-delegation-replaces-codex.md`,
+`.claude/skills/gemini-delegation/SKILL.md`. Durable facts:
+
+- User-directed replacement of the Codex/ChatGPT delegation pattern with
+  Gemini, specifically to use the user's existing Gemini Pro subscription
+  login rather than pay for a separate API. `gemini@gemini-plugin-cc` is
+  real (verified via an actual `git clone` and successful install — its
+  README states it is forked from `openai/codex-plugin-cc`, same
+  architecture already piloted here). Wraps the user's local `gemini`
+  CLI — same repository checkout, same machine, no separate sandbox.
+- Same risk-routing/contract rules as the superseded Codex pattern:
+  Claude architects/orchestrates; Gemini is a bounded LOW/MEDIUM-risk
+  implementation worker and second-vendor adversarial reviewer for
+  HIGH-risk work; Claude always independently reviews the actual diff;
+  Gemini never decides RBAC/auth/encryption/sync/schema/provider
+  questions.
+- **LIKHA's own `PreToolUse` secret/PII hooks do not fire for
+  Gemini-originated writes** (same class of gap as Codex) — independent
+  review is the only real safety net.
+- **Auth mode: `oauth-personal`** (the user's Gemini Pro subscription
+  login), chosen explicitly by the user after being told of a real,
+  disclosed account risk: Google suspended a batch of Gemini CLI
+  accounts in Feb 2026 for third-party automated tools driving Gemini
+  CLI's OAuth session (primary source: `google-gemini/gemini-cli`
+  GitHub discussion #20632); the unban process was not reliable for
+  everyone through May 2026. The user accepted this risk knowingly.
+- Not promotable to ADOPT yet: this sandboxed session has no `gemini`
+  CLI binary and no Google OAuth session. A real pilot task, plus
+  `/gemini:setup --verify`, requires the user's own machine — tracked in
+  `docs/VERIFICATION-DEBT.md`.
 
 ## RBAC Authorization Corrective Gate (added 2026-08-25)
 
