@@ -21,6 +21,8 @@ use app_lib::repository::{
     section_advisory, section_membership, user,
 };
 
+const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
 }
@@ -247,7 +249,9 @@ fn export_sf5_as_current_session(
     section_id: &str,
     school_year: &str,
 ) -> app_lib::error::AppResult<Option<Sf5Export>> {
-    let periods = grading::list_by_school_year(conn, "", school_year).unwrap_or_default();
+    let session_school_id = sessions.require_active_school_scope(conn)?;
+    let periods =
+        grading::list_by_school_year(conn, &session_school_id, school_year).unwrap_or_default();
     let as_of_date = if let Some(last_period) = periods.last() {
         last_period.ends_on.clone()
     } else {
@@ -465,6 +469,67 @@ fn sf5_export_renders_assigned_adviser_and_learners() {
     assert!(export.csv.contains("School Form 5 (SF5)"));
     assert!(export.csv.contains("Class Adviser,Adviser Maria"));
     assert!(export.csv.contains("123456789012,\"Dela Cruz, Juan\",M"));
+}
+
+/// Regression test for a real bug this project's own security review
+/// caught: the SF5 export's `as_of_date` fallback logic used to query
+/// `grading::list_by_school_year` with a hardcoded empty-string
+/// `school_id`, which that repository function's exact-match `WHERE`
+/// clause can never match -- `periods` was silently always empty, so
+/// `as_of_date` silently always took the year-boundary fallback instead
+/// of the real last grading period's end date. This is observable: an
+/// adviser whose advisory ended between the real last grading period's
+/// end and the year-boundary fallback would be wrongly treated as "not
+/// the current adviser" and denied, purely because the wrong date was
+/// used to ask the question -- not because they actually aren't the
+/// adviser.
+#[test]
+fn sf5_export_authorization_uses_the_real_last_grading_periods_end_date_not_a_year_end_fallback() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+
+    let adv = user::create_user(&conn, "adviser.a", "pw", "Adviser Maria").unwrap();
+    user::add_school_membership(&conn, &adv.id, &s.id).unwrap();
+    role::grant(&conn, &adv.id, &s.id, role::TEACHER).unwrap();
+    let advisory =
+        match section_advisory::assign(&conn, &s.id, &sec.id, &adv.id, "2026-06-01").unwrap() {
+            section_advisory::AssignAdviserOutcome::Assigned { advisory } => advisory,
+            other => panic!("expected Assigned, got {other:?}"),
+        };
+
+    // The real last grading period for this school year ends well before
+    // the year-boundary fallback ("2027-06-30").
+    grading::create(
+        &conn,
+        &s.id,
+        "2026-2027",
+        TERM_1,
+        "2026-06-08",
+        "2026-09-15",
+    )
+    .unwrap()
+    .unwrap();
+
+    // The adviser's advisory ends after the real grading period's end
+    // date, but before the year-boundary fallback -- exactly the window
+    // where the bug and the fix disagree on whether this adviser is
+    // "current."
+    section_advisory::end(&conn, &s.id, &sec.id, &advisory.id, "2027-01-01").unwrap();
+
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "adviser.a", "pw", &s.id).unwrap();
+
+    let export = export_sf5_as_current_session(&conn, &sessions, &sec.id, "2026-2027")
+        .unwrap()
+        .unwrap();
+
+    assert!(
+        export.csv.contains("Class Adviser,Adviser Maria"),
+        "adviser should be recognized as current as of the real last grading \
+         period's end date (2026-09-15), not the year-boundary fallback \
+         (2027-06-30) by which their advisory had already ended"
+    );
 }
 
 /// Standing in for the non-I/O portion of `commands::export::export_school_eosy_sf6`.

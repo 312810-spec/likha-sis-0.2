@@ -1,5 +1,26 @@
 # Verification Debt
 
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure — CLOSED (2026-09-01, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `security-reviewer` dispatch
+against the same three export commands (SF4/SF5/SF6) **actually
+retrieved findings this time** — the agent-resume/retrieval failure did
+not recur. Verdict: **NOT BLOCKING**, one **SHOULD-FIX** (a real
+correctness bug, not a security/tenant-isolation defect): SF5's
+`as_of_date` computation used a hardcoded empty-string `school_id`
+that could never match any real school, silently always falling back
+to the year-boundary date instead of the real last grading period's
+end — wrongly denying an adviser whose advisory ended in that window.
+Fixed and covered by a new regression test (verified red-then-green
+against the actual bug, not just written); see this file's own
+`CURRENT-HANDOFF.md`-mirrored entry and the git history for
+`src-tauri/src/commands/export.rs`. Every other check this self-review
+below already covered (tenant isolation, CSV/formula-injection defense,
+filename sanitization, authorization-gate parity) was independently
+re-confirmed by the fresh review too. Original self-review record
+retained below for the historical trail, not because the debt is still
+open.
+
 ## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure (2026-09-01)
 
 A `security-reviewer` was dispatched against the reconciliation diff

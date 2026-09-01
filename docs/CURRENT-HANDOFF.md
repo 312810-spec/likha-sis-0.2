@@ -1,5 +1,66 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-01, this session — SF5 export as_of_date bug fix + dev-preview SF5/SF6 wiring, complete)
+
+Follow-up to Wave 3J below. Dispatched an independent `security-reviewer`
+against the three Wave 3m export commands (SF4/SF5/SF6) — **this attempt
+actually retrieved findings**, unlike the two prior agent-resume/
+retrieval failures recorded in `docs/VERIFICATION-DEBT.md` for this
+same review. Verdict: **NOT BLOCKING**, one **SHOULD-FIX**.
+
+**Real bug found and fixed**: `commands::export::export_section_eosy_sf5`
+(`src-tauri/src/commands/export.rs`) queried
+`grading::list_by_school_year(&conn, "", &school_year)` — a hardcoded
+**empty-string** `school_id` — purely to compute the `as_of_date`
+fallback used by the `authorize_adviser_of_section` check. That
+repository function's exact-match `WHERE school_id = ?1` clause can
+never match an empty string (school ids are always non-empty UUIDv7s),
+so this call silently, always returned zero rows — `as_of_date` always
+took the year-boundary fallback (e.g. `"2027-06-30"`) rather than the
+real last grading period's end date. Concretely: an adviser whose
+advisory ended between the real last grading period's end and the
+year-boundary fallback was wrongly evaluated as "not the current
+adviser" at that wrong date and denied — not because they actually
+aren't the adviser, just because the wrong date was asked about. Not
+exploitable as a tenant-isolation bug (confirmed: it never returns
+cross-school data, just always-empty), but a real **correctness/
+availability** bug for advisers near a school year's actual end.
+
+**Fix**: derive the school_id from the session first
+(`sessions.require_active_school_scope`, this file's own established
+pattern, used elsewhere in the same function seconds later anyway) and
+use _that_ for the `as_of_date` lookup, before calling
+`authorize_adviser_of_section` (which independently re-derives and
+re-verifies school_id/section ownership — no authorization logic
+changed, only the date the question is asked about). Fixed identically
+in the integration test file's parallel "standing in for the command"
+helper (`src-tauri/tests/export.rs`), which had copied the same bug.
+
+**New regression test**:
+`sf5_export_authorization_uses_the_real_last_grading_periods_end_date_not_a_year_end_fallback`
+— constructs exactly the window where the bug and the fix disagree
+(adviser's advisory ends after the real last grading period but before
+the year-boundary fallback), and **proves** the regression: verified it
+actually fails with `Unauthorized` against the pre-fix code (temporarily
+reverted, ran red, then reapplied the fix and reran green) before
+committing — not just written and assumed correct.
+
+**Also fixed while here**: the dev-preview fixture's `exportSectionEosySf5`/
+`exportSchoolEosySf6` stubs were unwired "throw" placeholders — and
+`SectionsScreen.tsx` (which calls `exportSchoolEosySf6`) **is** wired
+into `DevPreviewApp.tsx`, so that throw was a live bug in the
+dev-preview tool itself (clicking "Export SF6" there would have thrown
+an unhandled error). Wired both with real synthetic results, matching
+the existing SF2/SF4 fixture convention.
+
+**Verified this wave**: `cargo build`/`cargo test` (629 lib tests + all
+integration files, 0 failures, including the new regression test) /
+`cargo clippy --all-targets -- -D warnings` (0 warnings) / `cargo fmt
+--check` all clean. `npm run quality` (794/794 tests, typecheck/lint/
+format/architecture clean), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean.
+
 ## Active Task (2026-09-01, this session — Wave 3J: SF4 Export UI Trigger, complete)
 
 User-directed continuation, following the merges below. Full scope:
@@ -20,9 +81,25 @@ invalidation ref (`exportSf4RequestRef`), invalidated on month change
 but not section change, mirroring the existing SF2 pattern's
 stale-response guard. Also wired `FixtureExportRepository.exportSchoolMonthlyAttendanceSf4`
 in `src/dev-preview/fixtures.ts` (previously an unwired "not wired"
-throw stub, like SF5/SF6 still are) with a real synthetic result, so
-the dev-preview screen actually demonstrates the new button end-to-end
-— matching the fixture's existing SF2 convention.
+throw stub) with a real synthetic result, so the dev-preview screen
+actually demonstrates the new button end-to-end — matching the
+fixture's existing SF2 convention.
+
+**Self-correction, same session**: PR #19's own body (and this entry,
+before this edit) incorrectly claimed "SF5/SF6 UI triggers remain
+deliberately unwired... matching ADR-0059's zero-UI-first precedent for
+those two forms." **That was wrong** — checked only the dev-preview
+fixture's stub methods, not the real product screens. ADR-0059's "no
+UI trigger" claim was **only ever about SF4**; ADR-0057/0058's own
+"Addendum" sections record that SF5 (`SectionRosterScreen.tsx`,
+"Export SF5 (Promotion & Level of Proficiency)") and SF6
+(`SectionsScreen.tsx`, "Export SF6 (Promotion & Proficiency Summary)")
+already shipped real UI triggers during the Wave 3m reconciliation
+itself — confirmed by direct grep of both files on `main` after
+merging PR #19. SF4 (this PR) was the only one of the three actually
+missing a trigger. Corrected here so a future session doesn't inherit
+the false claim; PR #19 is already merged, so its body can't be
+edited, but this is the durable-memory correction.
 
 **Verified this wave**: `npm run quality` — typecheck, eslint,
 `prettier --check`, `check:architecture`, `vitest run` all clean,
@@ -33,11 +110,11 @@ harness:verify` (100/100), and `git diff --check` all also clean. No
 Rust files touched — this was a pure TS/UI change against an
 already-shipped, already-CI-verified Rust command.
 
-**Not done, deliberately out of scope**: SF5/SF6 UI triggers (both
-still deliberately unwired in the dev-preview fixture, matching
-ADR-0059's zero-UI-first precedent for those two forms — not part of
-this slice's recommendation). No product-code change beyond the two
-files above plus the dev-preview fixture.
+**Not done**: SF5/SF6 in the dev-preview fixture still throw
+"not wired" stubs (their real product-screen UI is already shipped —
+see the self-correction above; only the _dev-preview demo_ fixture for
+those two lags). No other product-code change beyond the two files
+above plus the dev-preview fixture.
 
 ## Active Task (2026-09-01, this session — Merge PR #18 and PR #11, real Rust verification, complete)
 

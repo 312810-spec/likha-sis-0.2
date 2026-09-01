@@ -20,9 +20,15 @@ new), `npm run build`, `npm run check:dev-preview-isolation`, `npm run
 harness:verify` (100/100), `git diff --check` — all clean. No Rust
 files touched.
 
-**Not done, deliberately**: SF5/SF6 UI triggers — both remain
-unwired in the dev-preview fixture, matching ADR-0059's zero-UI-first
-precedent; not part of this slice.
+**Self-correction, same session**: this entry and PR #19's body
+originally claimed SF5/SF6 UI triggers were "deliberately unwired,
+matching ADR-0059's zero-UI-first precedent" — **wrong**. ADR-0059's
+"no UI trigger" claim was only ever about SF4. SF5
+(`SectionRosterScreen.tsx`) and SF6 (`SectionsScreen.tsx`) already
+shipped real product UI during the Wave 3m reconciliation itself (see
+ADR-0057/0058's own "Addendum" sections) — only their _dev-preview
+fixture_ demo stub is still unwired, unrelated to product correctness.
+See `docs/CURRENT-HANDOFF.md`'s top entry for the full correction.
 
 ## Wave 3m Reconciliation (added 2026-09-01) — complete
 
