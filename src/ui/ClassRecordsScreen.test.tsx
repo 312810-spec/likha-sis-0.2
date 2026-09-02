@@ -159,12 +159,14 @@ class FakeSectionRepository implements SectionRepository {
 
 class FakeSubjectRepository implements SubjectRepository {
   createCalls: string[] = [];
+  pending = false;
   constructor(private subjects: Subject[] = [SUBJECT]) {}
   async list(): Promise<Subject[]> {
     return this.subjects;
   }
   async create(name: string): Promise<Subject> {
     this.createCalls.push(name);
+    if (this.pending) return new Promise(() => {});
     const subject: Subject = { id: "sub-2", schoolId: "s1", name, createdAt: "now" };
     this.subjects = [...this.subjects, subject];
     return subject;
@@ -212,6 +214,7 @@ class FakeClassRecordRepository implements ClassRecordRepository {
   };
   weightPolicies: GradingWeightPolicy[] = [WEIGHT_POLICY];
   listCallCount = 0;
+  pending = false;
   constructor(public records: ClassRecordDetail[] = []) {}
   async list(): Promise<ClassRecordDetail[]> {
     this.listCallCount += 1;
@@ -224,6 +227,7 @@ class FakeClassRecordRepository implements ClassRecordRepository {
     weightPolicyId: string,
   ): Promise<ClassRecord | null> {
     this.createCalls.push({ sectionId, subjectId, gradingPeriodId, weightPolicyId });
+    if (this.pending) return new Promise(() => {});
     if (this.createResult) {
       const detail: ClassRecordDetail = {
         id: this.createResult.id,
@@ -301,6 +305,27 @@ describe("ClassRecordsScreen", () => {
     ]);
   });
 
+  it("does not open a second class record while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const classRecordRepo = new FakeClassRecordRepository();
+    classRecordRepo.pending = true;
+    renderScreen({ classRecordRepo });
+    await screen.findByLabelText("Section");
+    await waitFor(() => expect(screen.getByLabelText("Grading period")).toHaveValue("gp-1"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("DepEd grading weighting")).toHaveValue("wp-1"),
+    );
+
+    const openButton = screen.getByRole("button", { name: "Open class record" });
+    await user.click(openButton);
+    await waitFor(() => expect(classRecordRepo.createCalls).toHaveLength(1));
+
+    expect(openButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(openButton);
+
+    expect(classRecordRepo.createCalls).toHaveLength(1);
+  });
+
   it("shows an error when the combination is rejected", async () => {
     const user = userEvent.setup();
     const classRecordRepo = new FakeClassRecordRepository();
@@ -328,6 +353,24 @@ describe("ClassRecordsScreen", () => {
     await waitFor(() => expect(screen.getByText("Science added.")).toBeInTheDocument());
     expect(subjectRepo.createCalls).toEqual(["Science"]);
     expect(screen.getByLabelText("Subject")).toHaveValue("sub-2");
+  });
+
+  it("does not add a second subject while the first add is still in flight", async () => {
+    const user = userEvent.setup();
+    const subjectRepo = new FakeSubjectRepository();
+    subjectRepo.pending = true;
+    renderScreen({ subjectRepo });
+    await screen.findByLabelText("Section");
+
+    await user.type(screen.getByLabelText("Add a subject"), "Science");
+    const addButton = screen.getByRole("button", { name: "Add subject" });
+    await user.click(addButton);
+    await waitFor(() => expect(subjectRepo.createCalls).toHaveLength(1));
+
+    expect(addButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(addButton);
+
+    expect(subjectRepo.createCalls).toHaveLength(1);
   });
 
   it("lists existing class records", async () => {

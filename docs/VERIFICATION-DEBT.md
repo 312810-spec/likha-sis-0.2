@@ -2935,7 +2935,29 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## App-wide: self-disabling buttons lose focus to `<body>` on click — 12 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x2)
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 19 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x3)
+
+**Extended 2026-09-02 (batch 3)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to seven more instances:
+`ClassRecordsScreen.tsx`'s "Open class record" and "Add subject"
+buttons, `SectionAdviserScreen.tsx`'s "End advisory" and "Assign
+adviser" buttons, and `LearnerListScreen.tsx`'s "Export learner list
+(CSV)" button, per-row "Save" (edit) button, and "Enroll learner"
+submit button (plus its "Create separate learner" duplicate-review
+button). `LearnerListScreen.tsx`'s per-row "View history"/"Edit"
+buttons (disabled only while a _different_ row is being edited) and the
+"Cancel" buttons next to the fixed ones were deliberately left as
+native `disabled` — they are not instances of this bug, since the
+element that actually receives the click either gets unmounted (Edit
+swaps to an inline form, handled by this screen's own existing
+`editFirstFieldRef` focus-management effect) or is a different element
+than the one whose own click handler disables it. Each proven with a
+real interaction test: hang the underlying repository call, click once,
+assert `aria-disabled="true"`, click again, assert the call count did
+not increase. `npm run quality` 821/821 (7 new tests), typecheck/lint/
+format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
 
 **Extended 2026-09-02 (batch 2)**: applied the same `disabled=` →
 `aria-disabled=` + handler-guard pattern to five more instances:
@@ -2977,11 +2999,9 @@ check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
 diff --check` all clean; no Rust touched.
 
 **Still open**: every other "disable while saving/removing/creating"
-button across `ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
-`LearnerListScreen.tsx` (several beyond the export button already
-fixed), `SectionAdviserScreen.tsx`, `SectionRosterScreen.tsx`,
+button across `ClassRecordWorkspace.tsx`, `SectionRosterScreen.tsx`,
 `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, and
-`SubjectAttendanceScreen.tsx` — roughly 25+ remaining button instances.
+`SubjectAttendanceScreen.tsx` — roughly 18+ remaining button instances.
 The pattern is fully proven and mechanical to apply; revisit as further
 scoped slices (e.g. grouped by screen or by feature area) rather than
 one large sweep, per this project's established "prove the pattern,

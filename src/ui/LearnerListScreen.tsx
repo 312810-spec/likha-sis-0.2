@@ -206,6 +206,7 @@ export function LearnerListScreen({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
     setError(null);
     setConfirmation(null);
     setSubmitting(true);
@@ -231,6 +232,7 @@ export function LearnerListScreen({
    * `learner::create_with_duplicate_check`'s doc comment). Never used to
    * override an `lrnConflict`, which is not overridable at all. */
   async function handleConfirmCreateSeparate() {
+    if (submitting) return;
     setError(null);
     setConfirmation(null);
     setSubmitting(true);
@@ -272,6 +274,7 @@ export function LearnerListScreen({
   }
 
   async function handleExportRoster() {
+    if (exporting) return;
     setError(null);
     setConfirmation(null);
     setExportResult(null);
@@ -306,7 +309,7 @@ export function LearnerListScreen({
 
   async function handleSaveEdit(event: FormEvent) {
     event.preventDefault();
-    if (!editingId) return;
+    if (!editingId || savingEdit) return;
     setError(null);
     setConfirmation(null);
     setSavingEdit(true);
@@ -357,7 +360,7 @@ export function LearnerListScreen({
             />
           </div>
 
-          <button type="button" disabled={exporting} onClick={handleExportRoster}>
+          <button type="button" aria-disabled={exporting} onClick={handleExportRoster}>
             {exporting ? "Exporting…" : "Export learner list (CSV)"}
           </button>
 
@@ -446,7 +449,7 @@ export function LearnerListScreen({
                       </select>
                     </div>
                   </div>
-                  <button type="submit" className="button-primary" disabled={savingEdit}>
+                  <button type="submit" className="button-primary" aria-disabled={savingEdit}>
                     {savingEdit ? "Saving…" : "Save"}
                   </button>
                   <button type="button" disabled={savingEdit} onClick={handleCancelEdit}>
@@ -667,7 +670,7 @@ export function LearnerListScreen({
                 type="button"
                 className="button-primary"
                 onClick={handleConfirmCreateSeparate}
-                disabled={submitting}
+                aria-disabled={submitting}
               >
                 {submitting ? "Creating…" : "Create separate learner"}
               </button>
@@ -679,7 +682,7 @@ export function LearnerListScreen({
         )}
 
         {!duplicateCandidates && !lrnConflict && (
-          <button type="submit" className="button-primary" disabled={submitting}>
+          <button type="submit" className="button-primary" aria-disabled={submitting}>
             {submitting ? "Enrolling…" : "Enroll learner"}
           </button>
         )}
