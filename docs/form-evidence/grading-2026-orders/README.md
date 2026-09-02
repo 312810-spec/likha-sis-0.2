@@ -287,11 +287,27 @@ reference it. Corrected here after inspecting
      cross-transfer numeric conversion matrix) is a structurally
      different computation from the weighted-numeric one
      `grading_computation` implements — not yet modeled at all.
+     **Explicitly banked by the project owner (2026-09-02): deferred to
+     a future release, pending the owner's own further research on this
+     specific form/computation.** Not a technical blocker — a deliberate
+     scope decision.
    - **Grade 12's DO 8 s.2015 carryover weights** — ADR-0013 could not
      primary-source-confirm DO 8's own percentages; this session's read
      of DO 015 s.2026 did not include DO 8's text either (DO 015 only
-     lists DO 8 in its References, doesn't restate its numbers), so this
-     remains unresolved.
+     lists DO 8 in its References, doesn't restate its numbers).
+     **Strengthened 2026-09-02**: a further WebSearch pass (scribd.com,
+     studocu.com, coursehero.com, slideshare.net — multiple independent
+     sources agreeing on the same numbers) found DO 8 s.2015's own
+     Table 4 percentages: Languages (English/Filipino/AP) — Written
+     Work 30%, Performance Tasks 50%, Quarterly Assessment 20%; Science/
+     Math — 40/40/20; MAPEH/EPP-TLE — 20/60/20. **Still WebSearch-only,
+     not primary-source-read** — per this project's own
+     `deped-compliance` rule ("do not infer or copy historical
+     weighting merely because it is familiar"), these numbers should
+     not be implemented from this corroboration alone if the Grade 12
+     carve-out is ever picked up; they do, however, make a future
+     primary-source lookup easier to verify (specific table/numbers to
+     confirm, not a blind search).
    - **The KS2-KS4-vs-KS2-KS3 zero-based-grading scope tension** flagged
      above (DO 015's own text is internally inconsistent on this) is not
      currently load-bearing — `uses_zero_based_grading` applies

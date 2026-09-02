@@ -41,7 +41,19 @@ clean of PII.
   national central-office numbers or a Division's own tracking numbers
   re-issuing a central memo was **not confirmed** this session (the
   same ambiguity found for eSF7's Division-level memo numbers — see
-  `docs/form-evidence/esf7/README.md`).
+  `docs/form-evidence/esf7/README.md`). **Re-checked 2026-09-02, still
+  unresolved**: a second WebSearch pass found only the same Caloocan
+  Division source, no independent national-level citation.
+- **New this pass**: `depedtambayanph.net` hosts downloadable SF9
+  templates explicitly labeled "DO 15 s. 2026" for two grade bands —
+  "Grade 1, 2, and 3" and "Grades 4, 5, and 6" (dated August 2026,
+  after DO 015 s.2026's confirmed issuance). This is independent
+  confirmation that **current, actively-circulated 2026 SF9 templates
+  are explicitly tied to DO 015 s.2026** (matches this project's own
+  primary-source read of DO 015's Annex C/F naming SF9 as "the
+  Learner's Progress Report") — but these are third-party redistributed
+  files, not deped.gov.ph/LIS-support-portal originals, and were not
+  compared cell-by-cell against this project's three candidate files.
 - Grade-band/track-specific templates matching our exact candidate
   shapes are described in multiple independent secondary sources:
   Grades 4-6, Grades 7-10 (JHS), and — **strong structural
@@ -82,35 +94,45 @@ pass (sheet/merge/formula counts) did not specifically count term
 columns. This must be checked by hand before any provenance/fidelity
 work proceeds on these candidates.
 
-**Broader implication, flagged for the project owner, not just this
-form's evidence record**: it is now reasonably well-established (not
-just a lead) that DO 009 s.2026 replaces the quarterly/semestral
-calendar with a three-term one for SY 2026-2027. LIKHA-SIS's own
-`grading`/`grading_computation` domain modules — built around a
-grading-_period_ concept — likely need re-examination for SY 2026-2027
-onward. This is a new finding outside this research task's original
-scope. See `docs/CURRENT-HANDOFF.md`.
+**Broader implication for the project, resolved, not just flagged**:
+`grading`/`grading_computation` already implements the three-term model
+(see the correction in `docs/form-evidence/grading-2026-orders/README.md`
+— this was implemented in M11/M13, not a new gap). No further action
+needed there from this SF9 work specifically.
+
+## Term-column structure: inspected and confirmed three-term (2026-09-02)
+
+Direct structural inspection (`openpyxl`, full-workbook cell scan for
+"quarter"/"term" text) of all three original candidate files: **all
+three use "Term 1" / "Term 2" / "Term 3" column headers throughout**
+(the `SF9-Back (A5)` and `SF9` sheets in every variant, plus the
+`HELPER` sheet in both SHS variants). **No "quarter" terminology appears
+anywhere in any of the three files.** This directly answers the
+previously-open question: these three candidates already reflect the
+**post-reform, three-term structure** DO 009 s.2026 establishes for SY
+2026-2027 — they are not stale quarterly-era templates. This is
+independent structural evidence (not just naming/citation
+corroboration) that the candidates are recent, matching the
+`depedtambayanph.net` "DO 15 s. 2026"-labeled redistributions noted
+above.
 
 ## Classification, per variant
 
-All three candidate template files: still **`CandidateUnverified`** —
-"DM 576/577 s.2026"'s national-vs-division status remains unconfirmed,
-and the candidates' own term-column structure has not been inspected
-against DO 009 s.2026's three-term structure. The **governing orders
-themselves** (DO 015 s.2026 and DO 009 s.2026) are now
-`AuthoritativeSourceConfirmed` (see above) — real progress since
-ADR-0049, but this does not by itself confirm these three candidate
-_files_ are current SF9 templates; it confirms what a current SF9
-template would need to reflect.
+All three candidate template files: **upgraded from `CandidateUnverified`
+on the term-structure question** — that specific question (quarterly vs.
+three-term) is now resolved by direct inspection, confirmed three-term.
+**Still `CandidateUnverified` overall**: "DM 576/577 s.2026"'s
+national-vs-division status remains unconfirmed (re-checked this
+session, still only a Division source found), and no primary DepEd
+source (national or LIS-support-portal) was directly read to confirm
+these exact files — as opposed to their term-structure and DO-015-era
+grading-scale shape — are the official current template. The
+**governing orders themselves** (DO 015 s.2026 and DO 009 s.2026) are
+`AuthoritativeSourceConfirmed`.
 
 ## Next step
 
-1. Confirm DM 576/577 s.2026's national-vs-division status and read its
-   primary text.
-2. Manually inspect the three candidates' term-column structure
-   (quarterly vs. three-term) against DO 009 s.2026's confirmed
-   three-term calendar (June 8-Sep 15 / Sep 16-Dec 18 / Jan 4-Apr 8),
-   and their grading-scale fields against DO 015 s.2026's confirmed KS1
-   five-level descriptive scale / KS2+ Adjusted Transmutation Table
-   (`docs/form-evidence/grading-2026-orders/README.md`), to determine
-   whether these three files are pre- or post-2026-reform SF9 layouts.
+Confirm DM 576/577 s.2026's national-vs-division status and read its
+primary text, once egress access allows it or the owner supplies the
+memo directly — this is now the single remaining gap for these three
+candidates (term structure and grading-order tie-in are both resolved).

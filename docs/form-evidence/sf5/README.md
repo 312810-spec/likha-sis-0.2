@@ -44,7 +44,13 @@ text, no learner data) — verified clean of PII.
     LIS coordinator; curriculum/assessment). Conducts a pre-checking
     pass on all learner records before the scheduled Division Checking
     Committee (DCC) review. SF1, SF4, SF5, SF6, and SF10 are all
-    subject to this same SCC/DCC cadence.
+    subject to this same SCC/DCC cadence. **Strengthened 2026-09-02**:
+    a second WebSearch pass independently corroborates this same
+    SCC/DCC structure (scribd.com, depeddasma.edu.ph, eduknasyon.blogspot.com)
+    and adds one new specific detail not previously recorded — once the
+    SCC completes checking for all classes/grade levels, it "shall
+    accomplish the **School Forms Checking Report (SFCR1)**." Still not
+    a primary-source read; the order's own PDF was not opened.
 - **DepEd Order No. 8, s. 2015** ("Policy Guidelines on Classroom
   Assessment") — defines the proficiency bands (Outstanding 90-100,
   Very Satisfactory 85-89, Satisfactory 80-84, Fairly Satisfactory
