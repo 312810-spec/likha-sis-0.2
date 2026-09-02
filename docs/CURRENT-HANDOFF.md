@@ -1,43 +1,57 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-09-02, this session — retried UX-02/UX-03 owed independent reviews, self-review substituted again)
+## Active Task (2026-09-02, this session — UX-02/UX-03 CLOSED for real via a new file-based review workaround; ADR-0062)
 
-User-directed continuation ("continue working on verification debts").
-With the self-disabling-button sweep fully closed (see the entry
-below), retried the two remaining owed independent-review debts
-recorded in `docs/VERIFICATION-DEBT.md`: `accessibility-reviewer`
-against `TeacherWorkspaceScreen.tsx` (UX-02) and `teacher-ux-reviewer`
-against `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` (UX-03). Both
-dispatches, plus the one permitted `SendMessage` resume each, hit the
-same recurring agent-resume/retrieval failure again (real work done —
-32-35 tool calls per attempt — but no retrievable findings text). Per
-the established fallback, substituted a rigorous self-review for both:
-read every file involved end-to-end (screens, `StatusChip`/
-`PageHeader`/`Loading`/`Alert` components, relevant `styles.css`
-tokens). **No blocking issue found in either.** One non-blocking
-observation recorded for UX-03: `AttendanceScreen.tsx`'s per-row status
-buttons still use native `disabled={bulkMarking}` rather than the
-`aria-disabled` pattern from the self-disabling-button sweep, but this
-is not an instance of that bug (the button that becomes disabled is
-never the one that was focused), so no fix was made. Full self-review
-detail is in `docs/VERIFICATION-DEBT.md`'s UX-02 and UX-03 entries.
+User-directed continuation ("continue working on verification debts",
+then "initiate solid workaround or replacement to the agent-resume/
+retrieval [failure]"). Direct dispatches of `accessibility-reviewer`
+(UX-02, `TeacherWorkspaceScreen.tsx`) and `teacher-ux-reviewer` (UX-03,
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`) — including the one
+permitted `SendMessage` resume each, and a third attempt using
+`run_in_background: false` to test whether forcing synchronous
+execution avoided the failure — all hit the same recurring
+agent-resume/retrieval failure (real work done, no findings text
+retrievable). Self-review substituted first (recorded, no blocking
+issue), then built and validated a real workaround instead of accepting
+another round of open debt.
 
-Both debt entries remain open (a self-review is not a substitute for a
-real independent review, per project rules) — retry again in a future
-session once there's reason to believe the harness's agent-resume
-issue is fixed. No code changes this session; only
-`docs/VERIFICATION-DEBT.md` was updated. `git status` clean after
-commit/push.
+**Workaround** (`docs/adr/0062-file-based-review-output-workaround.md`):
+route review output through the filesystem instead of the broken
+notification channel. Adding `Write` access to the dedicated reviewer
+agents was considered and rejected — `architecture-reviewer.md` and
+`security-reviewer.md` both explicitly flag a reviewer with `Write`
+access as a harness defect, and weakening that to work around an
+unrelated bug would trade one real defect for another. Instead: dispatch
+via the already-`Write`-capable `general-purpose` agent, with the
+dedicated reviewer's own checklist inlined into the prompt, instructed
+to touch nothing in the repository except one findings file under the
+session scratchpad; then read that file directly, ignoring the (still
+broken) notification result text. Validated live against both UX-02 and
+UX-03 — both returned real, evidence-backed, retrievable findings
+(computed contrast ratios from actual hex values, line-cited mode-parity
+checks, etc.), both verdict **LOOKS-GOOD**. Full findings in
+`docs/VERIFICATION-DEBT.md`'s now-CLOSED UX-02 and UX-03 entries.
 
-**Verified**: no new code — this was a review/documentation-only
-session. No test suite run since nothing changed under `src/` or
+Both debt entries are **CLOSED for real** — not self-review substitutes.
+No application code changes this session (both reviews found nothing to
+fix); `docs/adr/0062-*.md` (new), `docs/VERIFICATION-DEBT.md`, and this
+file were updated. `git status` clean after commit/push.
+
+**Verified**: no application code changed — review/documentation/ADR
+session only. No test suite run since nothing changed under `src/` or
 `src-tauri/`.
 
-Next candidates unchanged from the prior entry below: (1) keep retrying
-UX-02/UX-03 in future sessions as the harness allows, or (2)
-product-shaped work — SF10 Permanent Record (safest immediately-
-implementable slice) or the authoritative-template form-output pipeline
-(higher value, currently paused pending more user-supplied DepEd
+**For future sessions**: when a dedicated reviewer agent (or any
+subagent whose result you need back) hits the agent-resume/retrieval
+failure again (empty/placeholder notification after real tool-call
+activity), after the one permitted `SendMessage` resume, use the
+file-based workaround from ADR-0062 next — don't fall straight to
+self-review, and don't grant `Write` to the dedicated reviewer agents.
+
+Next candidates: (1) product-shaped work — SF10 Permanent Record
+(safest immediately-implementable slice) or the authoritative-template
+form-output pipeline (higher value, currently paused pending more
+user-supplied DepEd
 templates).
 
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecordWorkspace/SectionRosterScreen, CLOSES the debt)

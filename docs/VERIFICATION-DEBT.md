@@ -3171,6 +3171,35 @@ since both are pre-existing patterns spanning many files, not specific
 to UX-03. Original self-review record retained below for the historical
 trail.
 
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: two direct `teacher-ux-reviewer`
+dispatches against `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`
+(the original 2026-08-25 attempt and a same-day 2026-09-02 retry, each
+including the one permitted `SendMessage` resume) all hit the same
+agent-resume/retrieval failure — real work done, no findings text
+retrievable. Rather than retry the same broken channel again, routed the
+review through a file-based output workaround instead (see
+`docs/adr/0062-file-based-review-output-workaround.md`): dispatched via
+the `general-purpose` agent with the `teacher-ux-reviewer` checklist
+inlined into the prompt, instructed to touch nothing in the repository
+except one findings file under the session scratchpad, then read that
+file directly rather than relying on the notification channel. This
+worked — a real, evidence-backed, retrievable review came back.
+**Verdict: LOOKS-GOOD.** Checked and confirmed: no jargon in visible
+copy; full functional parity across Efficient/Comfortable/Guided for
+every `mode === "guided"` conditional in both files (each renders only
+supplementary hint text, never gates a control or a piece of
+information); every failure message is outcome-oriented with no leaked
+internal detail; every async action has its own loading/confirmation
+state, including an honest "nothing changed" case for
+"Mark all present"; `Alert` role usage is consistent with the rest of the
+app; the SF2/SF4 disclosure banners are candid about what's omitted and
+match the same `disclosure.omittedFields` pattern used consistently
+across every other DepEd-form export in the app. This closes the debt
+for real — not a self-review substitute. Original self-review record
+retained below for the historical trail.
+
 ## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 
 **Retried 2026-09-02, still not retrievable**: dispatched a fresh
@@ -3222,6 +3251,38 @@ means listed — because this environment/session lacked the tool, device,
 or hardware. This is **not** a bug backlog; move an item here only when
 the underlying work is otherwise done and reviewed, and remove it once
 the missing verification actually happens (record what ran and when).
+
+## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: two direct `accessibility-reviewer`
+dispatches against `TeacherWorkspaceScreen.tsx` (the original 2026-08-25
+attempt and a same-day 2026-09-02 retry, each including the one
+permitted `SendMessage` resume, plus a third attempt this session that
+tried `run_in_background: false` specifically to test whether forcing
+synchronous execution avoided the failure — it didn't) all hit the same
+agent-resume/retrieval failure. Routed the review through a file-based
+output workaround instead (see
+`docs/adr/0062-file-based-review-output-workaround.md`): dispatched via
+the `general-purpose` agent with the `accessibility-reviewer` checklist
+inlined into the prompt, instructed to touch nothing in the repository
+except one findings file under the session scratchpad, then read that
+file directly. This worked. **Verdict: LOOKS-GOOD.** Checked and
+confirmed with real computed evidence: WCAG contrast ratios recomputed
+from the actual `--color-*` hex values in both the light and dark
+`styles.css` blocks (lowest relevant ratio 4.61:1, still clearing the
+4.5:1 text bar); `StatusChip` state is always paired with a distinct
+text label, never color alone; `PageHeader`'s mount-focus behavior
+doesn't get re-triggered by sibling loading/error state changes and
+never drops focus to `<body>`; target size clears WCAG 2.2 SC 2.5.8's
+24px floor in every teacher mode, including Efficient's 34px
+`--control-height` (checkbox/radio inputs are explicitly floored via a
+`max(24px, ...)` clamp); every button's accessible name comes from
+visible text; `Loading`/`Alert` role usage matches WCAG 4.1.3 guidance
+for polite vs. assertive live regions; heading hierarchy has no skipped
+level; `TeacherWorkspaceScreen.test.tsx` calls
+`expectNoAccessibilityViolations`. This closes the debt for real — not a
+self-review substitute. Original self-review record retained below for
+the historical trail.
 
 ## UX-02 accessibility-reviewer independent review not retrievable (open)
 
