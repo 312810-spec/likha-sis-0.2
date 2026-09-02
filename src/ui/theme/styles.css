@@ -1504,4 +1504,119 @@ label {
 }
 .app-bottomnav button[aria-current="page"] {
   color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* Redesign shell -- layout grid (ADR-0057). */
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.app-layout-sidebar {
+  min-width: 0;
+}
+
+.app-layout-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-canvas {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content-width-wide);
+  margin: 0 auto;
+  padding: calc(var(--spacing-unit) * 1.5);
+}
+
+.app-layout-scrim {
+  display: none;
+}
+
+/* Pre-auth chrome: Login / First-run setup / the initial status check
+   render here, deliberately outside the shell. */
+.app-boot {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 1.5);
+}
+.app-boot-brand {
+  margin: 0 0 var(--spacing-unit);
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Phone: sidebar becomes an off-canvas drawer; a bottom tab bar appears;
+   the top bar gains a hamburger and drops the mode switcher (it moves
+   into the drawer). 860px matches the spec's phone regime. */
+@media (max-width: 860px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .app-layout-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform var(--motion-duration-meaningful) var(--motion-easing-standard);
+    box-shadow: var(--elevation-2);
+  }
+  .app-layout[data-drawer="open"] .app-layout-sidebar {
+    transform: none;
+  }
+
+  .app-layout-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(10, 14, 20, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-duration-routine) var(--motion-easing-standard);
+  }
+  .app-layout[data-drawer="open"] .app-layout-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .app-topbar-menu {
+    display: inline-flex;
+  }
+  .app-topbar-modes {
+    display: none;
+  }
+  .app-topbar-identity {
+    display: none;
+  }
+  .app-sidebar-modes {
+    display: flex;
+  }
+
+  .app-bottomnav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border-soft);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .app-canvas {
+    padding-bottom: calc(var(--spacing-unit) * 6);
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1080px) {
+  :root {
+    --sidebar-width: 224px;
+  }
 }
