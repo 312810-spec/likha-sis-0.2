@@ -7,3 +7,6 @@ package-lock.json
 # -- third-party script files, not reformatted per its own "don't edit the
 # hook scripts themselves" convention.
 .claude/skills/impeccable
+
+# Subagent-driven-development workspace (disposable scratch, git-ignored)
+.superpowers/
