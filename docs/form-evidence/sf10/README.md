@@ -256,3 +256,68 @@ Secondary-source only (NOT authority-confirmed):
    (Wave 2M did structural inspection only; no field-level mapping).
 6. Render fidelity of any SF10 output: `NotVerified` — no SF10
    generator exists and none was built (Wave 2M step 12).
+
+---
+
+## 2026-09-02 — two new candidate files, JHS re-verification, no change
+
+User supplied two new candidate files this session:
+
+- **`SchoolForm10SF10SSHSSF10v2026.xlsx`** — SHA-256:
+  `40e0c08c2eeafb6e28536be5d11e5d7ef39210d25a67102a1ed4f6c7d5ee9587`.
+  Sheets FRONT/BACK/ANNEX/HELPER_SUBJECTS — same shape as the
+  already-`AuthoritativeSourceConfirmed` SSHS candidate above. Hash not
+  cross-checked byte-for-byte against the original Wave 2M/2N candidate
+  in this session (that file was never committed to the repo, per this
+  project's own no-binary-workbook-in-repo convention — see the top of
+  this file); treated as the same confirmed provenance record given the
+  identical filename, sheet shape, and prior confirmed citation (DM 020,
+  s. 2026 §5(b)), not re-derived from scratch.
+- **`SchoolForm10SF10JHS2026.xlsx`** — SHA-256:
+  `3f9707f953279a2b0736b3823a2de6aa19813acf0cce3aaaaf757b356239b9e5`.
+  Sheets Front/SirWedz Guides/Back — same community-touched shape as
+  the already-recorded JHS candidate above (the `SirWedz Guides` sheet
+  is the same non-DepEd annotation marker). Both structurally blank,
+  clean of PII.
+
+**Environment limitation this session** (see
+`docs/form-evidence/sf1/README.md` for full detail): this session's
+network egress proxy blocked `WebFetch`/direct HTTP access to
+`deped.gov.ph`, `support.lis.deped.gov.ph`, and every division/regional
+mirror tested — a harder block than Wave 2M/2N hit (those got a clean
+`curl` 200 from `deped.gov.ph` itself; this session got 403 from
+everything). Only `WebSearch` (a separate, non-proxied backend) was
+reachable, so nothing below is a primary-source re-read — it is
+search-snippet corroboration only.
+
+**JHS re-verification result: no change, still EVIDENCE BLOCKED.**
+
+- No new clean/pristine DepEd-hosted JHS SF10 master was found — search
+  results still surface only the same `SirWedz Guides`-marked file
+  family already on record.
+- **STR-250331-0910-PS's primary PDF still not obtained.** New facts
+  from this session's search: issuing office is the Office of the
+  Undersecretary for Strategic Management; technical-office contact is
+  identified as **PPS-EMISD** (`ps.emisd@deped.gov.ph`,
+  (02) 8635-3958/8637-6204) — a concrete channel for a future session
+  (or the project owner) to request the primary document directly
+  rather than continuing to search for a public posting that may not
+  exist. The memo's content (Annexes I/II/III = Grades 1/4/7 only; old
+  SF10 preserved/attached, not redone; effective SY 2025-2026) is now
+  corroborated by more independent re-publications than before, but
+  none is `deped.gov.ph` itself, so this remains secondary corroboration
+  only.
+- No 2025/2026 DepEd Memorandum was found naming an exact JHS SF10
+  filename the way DM 020 §5(b) named the SSHS file — this remains the
+  single most decisive gap versus the SSHS confirmation.
+- Grade-level scope unchanged: **Grade 7 only**, fail-closed for 8-10.
+  A MATATAG curriculum phase-in schedule was found (Grade 8 for SY
+  2025-2026, Grades 6/9/10 for SY 2026-2027 per one secondary source)
+  but nothing ties any SF10 annex/filename to those grades — this is a
+  forward-looking lead only, not evidence, and does **not** justify
+  extending the `["7"]` modeling in `formgen::template_version`.
+
+**No change to `docs/adr/0053-sf10-template-applicability-and-versioning.md`
+or this file's classifications.** The one actionable new fact: PPS-EMISD
+is now an identified direct-request channel for the still-missing
+STR-250331-0910-PS primary text.

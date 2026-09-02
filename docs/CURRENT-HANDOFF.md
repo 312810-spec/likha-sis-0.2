@@ -1,5 +1,104 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — authoritative-template form evidence: SF1/SF2/SF4/SF5/SF6/SF9/SF10/eSF7, all NOT CONFIRMABLE; two important new DepEd findings)
+
+User resumed the paused authoritative-template form-output work
+("continue the school forms") and supplied 11 real DepEd template
+files: SF1, SF2, SF4, SF5, SF6 (`.xls`), three SF9 variants (JHS,
+SHS Grade 11 TechPro, SHS Grade 11 Academic), two SF10 variants (JHS,
+SSHS v2026), and eSF7 (`.xlsb`, personnel-management tool). None of
+these files are committed to the repository — this project's
+established convention (see `docs/form-evidence/sf10/README.md`) keeps
+workbook binaries out of the repo, evidence/citations only.
+
+**PII found and fixed before anything else**: `SF2.xls` had a real
+School Head's name filled into a signature
+cell — the user's own cleanup missed this one cell. Confirmed via a
+full-workbook cell scan of all 11 files (not a sample) — this was the
+only PII found across all 11. Redacted (the one cell blanked, nothing
+else touched) with the user's explicit authorization before any
+further work; the original as-uploaded file was never committed.
+
+**A real, hard environment limitation was discovered and diagnosed**:
+this session's network egress proxy blocks `WebFetch`/direct HTTP
+access to essentially every external domain, confirmed via the proxy's
+own `/__agentproxy/status` diagnostic as an organization-policy 403
+denial (not a bug, not something to route around) — `deped.gov.ph`,
+`support.lis.deped.gov.ph`, every DepEd division/regional mirror, and
+even `en.wikipedia.org` as a control all failed identically. Only
+`WebSearch` (a separate, non-proxied backend) was reachable. This
+explains why the background `deped-researcher` dispatches this session
+seemed unproductive — they weren't hitting the harness's
+agent-resume/retrieval bug (that was separately confirmed fixed via
+ADR-0062's file-based workaround, tested and working earlier this
+session), they were hitting this network wall. **User authorized
+"replac[ing] these agents"** — the actual fix applied was to stop
+delegating to subagents for this task entirely and do the research
+directly in the main session via `WebSearch`, which sidesteps the
+egress block structurally (no subagent boundary needed at all). This
+is disclosed as new debt below, not silently worked around.
+
+**All 11 candidates classified `NOT CONFIRMABLE FROM AVAILABLE
+SOURCES`** (or, for eSF7, `NOT CONFIRMABLE` for the specific artifact
+while the underlying national requirement is confirmable) — full detail
+in seven new/extended `docs/form-evidence/<form>/README.md` files
+(sf1, sf2, sf4, sf5, sf6, sf9, esf7 new; sf10 extended). Every one
+traces to real, well-corroborated governing DepEd Orders (mostly
+**DepEd Order No. 4, s. 2014**, the founding order for SF1-SF7), but
+none was confirmed by directly reading primary-source text this
+session — everything is WebSearch-snippet corroboration, a materially
+weaker evidentiary basis than Wave 2N's direct `curl`+`pdftotext` read
+of DM 020 for the SSHS SF10 confirmation. No promotion to
+`AuthoritativeSourceConfirmed` was made for any of them.
+
+**⚠️ Two important new findings requiring your attention, not just
+routine provenance debt** — neither was previously known to this
+project:
+
+1. **DepEd Order No. 015, s. 2026** — a revised classroom-assessment/
+   grading-system order, reportedly effective **the current school
+   year (SY 2026-2027)**, reportedly superseding DO 8, s. 2015 (the
+   order this project's own promotion/proficiency-band logic — SF5/SF6/
+   SF9's grading — is built on). Reported to introduce a non-numeric
+   grading system for Key Stage 1 and revised component weights for
+   Key Stages 2-4.
+2. **DepEd Order No. 009, s. 2026** — reportedly establishes a new
+   **three-term (trimestral) school calendar** for SY 2026-2027,
+   replacing the prior quarterly/semestral structure. Current (2026)
+   SF9 templates found via search are explicitly built around this
+   three-term structure.
+
+**Neither was read in primary form this session** (egress blocked) —
+both are corroborated only by multiple independent secondary sources.
+If accurate, **this could mean LIKHA-SIS's own `grading`/
+`grading_computation` domain modules — built around a grading-period
+concept — need re-examination for the current school year**, and the
+SF5/SF6/SF9 candidates on hand may already reflect a superseded
+(quarterly) shape rather than the current (three-term) one. This is
+flagged explicitly rather than silently absorbed into routine
+provenance-debt records, because it's outside this task's original
+scope and could affect shipped, in-use grading logic. **Recommend:
+verify DO 015 s.2026 and DO 009 s.2026 directly (a session with working
+`deped.gov.ph` access, or the project owner sourcing the PDFs
+directly) before doing anything else with the grading/SF5/SF6/SF9
+template work.**
+
+**Verified this session**: full-cell PII scan of all 11 uploaded files
+(not just a sample) via `xlrd`/`openpyxl`/`pyxlsb`, SHA-256 computed
+for all 11, structural manifest (sheet names, merges, formulas, data
+validations) gathered for all `.xlsx` candidates via the project's
+existing `inspect_template_candidate` tool. No code changes this
+session — evidence/documentation only. No `npm run quality`/`cargo
+test` run since nothing under `src/`/`src-tauri/src/` changed.
+
+Next candidates: (1) verify DO 015 s.2026 / DO 009 s.2026 directly —
+recommended first, given the potential grading-model impact; (2)
+resume the authoritative-template pipeline work once primary-source
+access is available for the SF1-SF7/SF9/SF10/eSF7 citations; (3) SF10
+Permanent Record wave's own next-candidate note (product-shaped work)
+remains available if the user prefers to defer the template work
+further.
+
 ## Active Task (2026-09-02, this session — Wave: SF10 Permanent Record shipped, ADR-0063)
 
 User-directed continuation ("continue but do sf10, i will tell you if i am

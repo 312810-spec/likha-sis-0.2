@@ -1,5 +1,38 @@
 # Verification Debt
 
+## Session network egress blocks all external fetch except WebSearch — open, session-specific (2026-09-02)
+
+While researching DepEd-issuance provenance for 11 school-form
+template candidates, this session's network egress proxy was found to
+block `WebFetch`/direct HTTP access to essentially every external
+domain — `deped.gov.ph`, `support.lis.deped.gov.ph`, every DepEd
+division/regional mirror, and `en.wikipedia.org` as a control all
+failed identically. Confirmed via the proxy's own
+`/__agentproxy/status` diagnostic as an organization-policy 403 denial
+("gateway answered 403 to CONNECT (policy denial or upstream
+failure)"), not a transient error — the proxy's own README explicitly
+says not to retry or route around this class of failure. Only
+`WebSearch` (a separate, non-proxied backend) was reachable.
+
+Prior sessions (Wave 2M/2N) had working `curl`/fetch access to
+`deped.gov.ph` directly (confirmed via `pdftotext` reads of actual DM
+PDFs) — this is either session-specific policy variance or a change
+since then, not a permanent characteristic of this project's
+environment. Because of this, all provenance research this session
+(`docs/form-evidence/{sf1,sf2,sf4,sf5,sf6,sf9,esf7}/README.md`, new;
+`sf10/README.md`, extended) is built from `WebSearch` result snippets
+only, not directly-read primary-source text — a materially weaker
+evidentiary basis than Wave 2N's direct reads. No candidate was
+promoted past `CandidateUnverified`/`NOT CONFIRMABLE FROM AVAILABLE
+SOURCES` as a result.
+
+**Not yet done**: no fix possible from within this session (per the
+proxy's own "do not route around" guidance) — a future session should
+first check whether `deped.gov.ph`/`support.lis.deped.gov.ph` fetch
+access has returned before re-attempting the same provenance research;
+if the block persists, it should be reported to the environment
+administrator rather than repeatedly worked around.
+
 ## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure — CLOSED (2026-09-01, closed 2026-09-01)
 
 **Closed for real 2026-09-01**: a fresh `security-reviewer` dispatch

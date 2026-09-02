@@ -3064,6 +3064,27 @@ Deliberately unrelated to the separate, still-evidence-blocked official
 this is the same disclosure-not-refusal CSV pattern SF2/SF4/SF5/SF6
 already ship. Full detail: `docs/adr/0063-sf10-permanent-record.md`.
 
+## Authoritative-Template Form Evidence: SF1/SF2/SF4/SF5/SF6/SF9/SF10/eSF7 (added 2026-09-02)
+
+User supplied 11 real DepEd template candidates. All classified `NOT
+CONFIRMABLE FROM AVAILABLE SOURCES` (evidence in
+`docs/form-evidence/{sf1,sf2,sf4,sf5,sf6,sf9,esf7,sf10}/README.md`) —
+this session's network egress blocked all direct primary-source fetch
+(see `docs/VERIFICATION-DEBT.md`), so findings are WebSearch-snippet
+corroboration only, not verbatim-read citations. Two important new
+DepEd issuances surfaced, unread in primary form, possibly affecting
+this project's core grading model for the current school year: **DepEd
+Order No. 015, s. 2026** (revised grading system, reportedly
+superseding DO 8 s.2015) and **DepEd Order No. 009, s. 2026**
+(reportedly a new three-term/trimestral school calendar for SY
+2026-2027, replacing quarterly/semestral). Neither confirmed — see
+`docs/CURRENT-HANDOFF.md` for the full flag and recommended next step
+(verify these two orders directly before further grading/template
+work). One real PII leak (a School Head's name in `SF2.xls`) was found
+and redacted with the user's authorization before any other work; no
+template binaries are committed to the repository (established
+convention, see `docs/form-evidence/sf10/README.md`).
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
