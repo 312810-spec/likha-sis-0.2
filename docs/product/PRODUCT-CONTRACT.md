@@ -51,15 +51,20 @@ future explicit "authorized organization switch" for legitimate
 multi-school membership is **HYPOTHESIS** — not needed until a real
 multi-school user is a confirmed requirement.
 
-## 3. Roles/permissions (RBAC) — DIRECTION SET, not yet implemented
+## 3. Roles/permissions (RBAC) — BUILT (three-role foundation), 8-role expansion DIRECTION SET
 
-No role concept exists anywhere in the code today (`user_school_memberships`
-has no role column; `auth`/`session.ts` have no role checks). This was a
-deliberate, explicit deferral (`docs/product/M8-DECISION.md`, stop
-condition #8: changing access expectations without a documented
-requirement needs the user, not autonomous choice).
+**Built** (Wave 1A RBAC Foundation, ADR-0036; made actually usable by
+ADR-0064 "Roles & Permissions" — both stale claims below corrected
+2026-09-02): `user_school_roles` (a user may hold multiple roles per
+school), `auth::Capability` (`ManageLearners`, `ManageSchoolMembership`,
+`ManageTeachingAssignments`, `ManageSectionAdvisories`, `ManageRoles`,
+`ViewSchoolWideReports`), and `commands::user::{grant_school_role,
+revoke_school_role}` (School Head only) — the first commands able to
+grant/revoke Registrar or School Head for anyone past a fresh
+installation's founding user. `RoleManagementScreen` is the first UI for
+it.
 
-**Starting role model, already confirmed with the user** (M8-DECISION.md
+**Starting role model, confirmed with the user** (M8-DECISION.md
 follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
 
 - School Head: sees/manages all teachers' data within the school.
@@ -67,11 +72,41 @@ follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
   separate from grading/attendance.
 - Teacher: scoped to their own classes/sections, as today.
 
-**Not yet decided**: the exact authority boundaries between these three
-(e.g., can a Registrar edit a grade? can a School Head impersonate a
-teacher's session?) — do not implement from assumption; this needs its
-own short scoping pass when RBAC is actually built, using the confirmed
-three-role starting point as the anchor, not a blank slate.
+**Authority boundaries, now decided and enforced (ADR-0064,
+2026-09-02)** — previously "not yet decided" here:
+
+- Whole-school consolidated exports (SF4, SF6) require
+  `Capability::ViewSchoolWideReports` (Registrar or School Head) — a
+  Teacher may no longer pull another section's or the whole school's
+  consolidated data.
+- Section-scoped exports (SF2, SF5) require the section's current
+  adviser, or a School Head (`auth::authorize_adviser_of_section`).
+- Class-record-scoped exports (report cards) require the teacher
+  actually assigned to that class record's section/subject, or a School
+  Head (`auth::authorize_teacher_of_class_record`) — deliberately not
+  the section's adviser, since a subject teacher and the homeroom
+  adviser are frequently different people.
+- Still open, deliberately not decided from assumption: can a Registrar
+  edit a grade (no `ManageX` capability currently grants write access to
+  grading data at all, Registrar included — this has not come up as a
+  real gap yet); can a School Head impersonate a teacher's session (no —
+  `admin_reset_teacher_password`, ADR-0061, is the only School-Head-on-
+  behalf-of-a-teacher action that exists, and it is a distinct,
+  audited, narrowly-scoped action, not impersonation).
+
+**Not yet built (separate, later milestone, direction set by the owner
+2026-09-02)**: the full 8-role taxonomy the owner supplied — School
+Head (Super Admin), Head/Master Teacher (department oversight, Grade
+Sheets/COT), Class Adviser vs. Subject Teacher as distinct roles (SF1/
+SF2/SF5/SF9/SF10 vs. Electronic Class Record), ICT Coordinator (EBEIS/
+LIS exports), Admin Officer/ADAS (SF10/SF7/Form 48 DTR), Property
+Custodian (SF3/inventory), Health Officer (SF8/clinic logs). Do not
+implement any of this from assumption — the three-role model above
+remains the only confirmed, built one until that milestone's own
+scoping pass (migration 16's CHECK constraint, `Capability` variants,
+and each new role's exact form/capability mapping all need their own
+decision, using this milestone's own additive pattern as precedent, not
+a restructure).
 
 ## 4. Curriculum / Key Stage versioning — BUILT (foundation), narrower than the full cohort model
 

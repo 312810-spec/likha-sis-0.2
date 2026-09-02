@@ -34,4 +34,26 @@ describe("TauriSchoolMemberRepository", () => {
     });
     expect(result).toBe(true);
   });
+
+  it("grants a role via grant_school_role", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await new TauriSchoolMemberRepository().grantRole("u-1", "registrar");
+
+    expect(mockInvoke).toHaveBeenCalledWith("grant_school_role", {
+      targetUserId: "u-1",
+      roleName: "registrar",
+    });
+  });
+
+  it("revokes a role via revoke_school_role", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+
+    await new TauriSchoolMemberRepository().revokeRole("u-1", "school_head");
+
+    expect(mockInvoke).toHaveBeenCalledWith("revoke_school_role", {
+      targetUserId: "u-1",
+      roleName: "school_head",
+    });
+  });
 });

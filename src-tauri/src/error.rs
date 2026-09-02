@@ -55,6 +55,13 @@ pub enum AppError {
     /// error text — a malformed/corrupted workbook's internal error
     /// detail must never cross the Tauri IPC boundary.
     FormGeneration(String),
+    /// A `role::revoke` call would remove the last remaining
+    /// `SCHOOL_HEAD` from a school. Distinct from `Unauthorized` — this
+    /// isn't a permissions problem (the caller genuinely holds
+    /// `ManageRoles`), it's a standing invariant this app has no other
+    /// path out of (no super-admin, no support-desk override). See
+    /// `repository::role::revoke`'s doc comment.
+    CannotRemoveLastSchoolHead,
 }
 
 impl std::fmt::Display for AppError {
@@ -70,6 +77,9 @@ impl std::fmt::Display for AppError {
             AppError::AlreadyInitialized => write!(f, "already initialized"),
             AppError::Import(msg) => write!(f, "import error: {msg}"),
             AppError::FormGeneration(msg) => write!(f, "form generation error: {msg}"),
+            AppError::CannotRemoveLastSchoolHead => {
+                write!(f, "cannot remove the last School Head from a school")
+            }
         }
     }
 }
@@ -125,6 +135,7 @@ impl Serialize for AppError {
             AppError::AlreadyInitialized => "already_initialized",
             AppError::Import(_) => "import_error",
             AppError::FormGeneration(_) => "form_generation_error",
+            AppError::CannotRemoveLastSchoolHead => "cannot_remove_last_school_head",
         };
         serializer.serialize_str(category)
     }

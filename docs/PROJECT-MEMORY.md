@@ -3094,6 +3094,44 @@ from the PDF matches `grading_computation::ADJUSTED_TRANSMUTATION_TABLE`
 band-for-band). No grading-domain code change is recommended from this
 research.
 
+## Roles & Permissions: RBAC made usable, three-role model (added 2026-09-02)
+
+User-directed milestone (ADR-0064) closing two disclosed gaps in the
+Wave 1A RBAC Foundation: (1) no command could ever grant Registrar/
+School Head to anyone past first-run bootstrap — new
+`grant_school_role`/`revoke_school_role` commands (School Head only,
+`Capability::ManageRoles`) and a new `RoleManagementScreen` close it;
+(2) almost nothing was actually gated by role — SF2/report-card exports
+now require the section's adviser or teacher-of-record (or School
+Head); SF4/SF6 whole-school exports now require
+`Capability::ViewSchoolWideReports` (Registrar or School Head). New
+`repository::role::revoke` refuses to remove a school's last School
+Head (`AppError::CannotRemoveLastSchoolHead`). New
+`auth::authorize_teacher_of_class_record` deliberately does not reuse
+`authorize_adviser_of_section` — a class record's subject teacher and
+the section's adviser are frequently different people.
+
+Explicitly scoped to the confirmed three-role model only (Teacher/
+Registrar/School Head) — the user separately supplied a fuller 8-role
+taxonomy (School Head, Head/Master Teacher, Class Adviser, Subject
+Teacher, ICT Coordinator, Admin Officer/ADAS, Property Custodian,
+Health Officer) intended as a **separate, later milestone**, not
+bundled into this one. `docs/product/PRODUCT-CONTRACT.md`'s RBAC
+section (§3) is updated with both the newly-decided authority
+boundaries and the 8-role expansion's own direction-set note.
+
+**Verified**: `cargo test` (665+ lib/integration tests including new
+`role.rs`/`teaching_assignment.rs`/`auth`/`tests/role_management.rs`/
+`tests/export.rs` coverage), `cargo clippy -D warnings` clean, `cargo
+fmt --check` clean. `npm run quality` (866/866 tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100) all clean. `git diff --check` clean.
+
+**Not done**: an independent `security-reviewer` pass — owed per
+`.claude/rules/security-privacy.md` (auth-touching milestone), recorded
+as debt in `docs/VERIFICATION-DEBT.md`, not yet dispatched this
+session.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

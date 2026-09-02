@@ -4,9 +4,9 @@ use rusqlite::Connection;
 use tauri::State;
 use zeroize::Zeroize;
 
-use crate::auth::{self, SessionManager};
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::role;
 use crate::repository::user::{self, SchoolMember, User};
 
@@ -36,11 +36,11 @@ pub fn register_user(
 /// RBAC-corrective-gate fix (this command previously let any
 /// authenticated Teacher add a new member; confirmed exploitable and
 /// closed). Grants the new member the Teacher role by default -- the
-/// least-privilege starting point (see
-/// `docs/adr/0036-rbac-foundation.md`); this codebase still builds no
-/// UI/command to grant Registrar/School Head to anyone other than a
-/// fresh installation's founding user (`auth::bootstrap_installation`),
-/// deliberately out of scope here too.
+/// least-privilege starting point (see `docs/adr/0036-rbac-foundation.md`).
+/// `grant_school_role`/`revoke_school_role` below (Roles & Permissions
+/// milestone) close the gap this doc comment used to disclose here: this
+/// codebase previously built no UI/command to grant Registrar/School
+/// Head to anyone past a fresh installation's founding user.
 #[tauri::command]
 pub fn add_user_to_school(
     db: State<'_, Mutex<Connection>>,
@@ -52,6 +52,52 @@ pub fn add_user_to_school(
     auth::authorize_school_membership_grant(&conn, &sessions, &school_id)?;
     user::add_school_membership(&conn, &user_id, &school_id)?;
     role::grant(&conn, &user_id, &school_id, role::TEACHER)
+}
+
+/// Grants `role_name` (must be `role::REGISTRAR` or `role::SCHOOL_HEAD` --
+/// see the doc comment below) to `target_user_id` within the caller's own
+/// school. School Head only (`Capability::ManageRoles`). `role::TEACHER`
+/// is deliberately not grantable through this command -- it is already
+/// the automatic default `add_user_to_school` grants at membership time,
+/// so a second path to grant it would be redundant, not a new capability.
+#[tauri::command]
+pub fn grant_school_role(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    target_user_id: String,
+    role_name: String,
+) -> AppResult<()> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageRoles)?;
+    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+        return Err(AppError::Unauthorized);
+    }
+    if !user::is_member_of_school(&conn, &target_user_id, &school_id)? {
+        return Err(AppError::Unauthorized);
+    }
+    role::grant(&conn, &target_user_id, &school_id, &role_name)
+}
+
+/// Revokes `role_name` (must be `role::REGISTRAR` or `role::SCHOOL_HEAD`)
+/// from `target_user_id` within the caller's own school. School Head only
+/// (`Capability::ManageRoles`), same as `grant_school_role`. Fails with
+/// `AppError::CannotRemoveLastSchoolHead` rather than silently succeeding
+/// if this would leave the school with zero School Heads -- see
+/// `repository::role::revoke`'s doc comment; the frontend surfaces this
+/// as a specific, actionable message rather than a generic failure.
+#[tauri::command]
+pub fn revoke_school_role(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    target_user_id: String,
+    role_name: String,
+) -> AppResult<()> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageRoles)?;
+    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+        return Err(AppError::Unauthorized);
+    }
+    role::revoke(&conn, &target_user_id, &school_id, &role_name)
 }
 
 /// Wave 3I (ADR-0057): a School Head sets a new password directly for a

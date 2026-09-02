@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 /// The confirmed starting role set for WAVE 1A RBAC Foundation -- see
 /// `docs/product/PRODUCT-CONTRACT.md`'s RBAC section and
@@ -69,6 +69,42 @@ pub fn has_any_role(
         }
     }
     Ok(false)
+}
+
+/// How many users hold `role` within `school_id`. Used by `revoke` to
+/// guard against removing the last `SCHOOL_HEAD` in a school -- without
+/// at least one, nobody could ever exercise `ManageRoles`/
+/// `ManageSchoolMembership`/etc. again, an unrecoverable lockout this app
+/// has no other path out of (no super-admin, no support-desk override —
+/// see `docs/adr/0003-encryption-at-rest.md`'s "fails closed, no backdoor"
+/// posture, which this mirrors at the RBAC layer).
+pub fn count_role_holders(conn: &Connection, school_id: &str, role: &str) -> AppResult<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM user_school_roles WHERE school_id = ?1 AND role = ?2",
+        (school_id, role),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
+/// Revokes `role` from `user_id` within `school_id`. A no-op (not an
+/// error) if the role wasn't held. **Refuses to remove the last
+/// `SCHOOL_HEAD` in a school** — see `count_role_holders`'s doc comment;
+/// every other role has no such guard, since losing the last Registrar
+/// or Teacher is recoverable (a School Head can always re-grant it),
+/// unlike losing the last School Head.
+pub fn revoke(conn: &Connection, user_id: &str, school_id: &str, role: &str) -> AppResult<()> {
+    if role == SCHOOL_HEAD
+        && has_any_role(conn, user_id, school_id, &[SCHOOL_HEAD])?
+        && count_role_holders(conn, school_id, SCHOOL_HEAD)? <= 1
+    {
+        return Err(AppError::CannotRemoveLastSchoolHead);
+    }
+    conn.execute(
+        "DELETE FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2 AND role = ?3",
+        (user_id, school_id, role),
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -152,5 +188,69 @@ mod tests {
         let result = grant(&conn, &user_id, &school_id, "principal");
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn revoke_removes_a_held_role() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        grant(&conn, &user_id, &school_id, REGISTRAR).unwrap();
+
+        revoke(&conn, &user_id, &school_id, REGISTRAR).unwrap();
+
+        assert!(!has_any_role(&conn, &user_id, &school_id, &[REGISTRAR]).unwrap());
+    }
+
+    #[test]
+    fn revoke_of_an_unheld_role_is_a_harmless_no_op() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        let result = revoke(&conn, &user_id, &school_id, REGISTRAR);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn revoke_refuses_to_remove_the_last_school_head() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        grant(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
+
+        let result = revoke(&conn, &user_id, &school_id, SCHOOL_HEAD);
+
+        assert!(matches!(result, Err(AppError::CannotRemoveLastSchoolHead)));
+        assert!(has_any_role(&conn, &user_id, &school_id, &[SCHOOL_HEAD]).unwrap());
+    }
+
+    #[test]
+    fn revoke_allows_removing_a_school_head_when_another_remains() {
+        let conn = open_test_db();
+        let (user1, school_id) = seed_member(&conn);
+        let user2 = user::create_user(&conn, "second.head", "password12345", "Second Head")
+            .unwrap()
+            .id;
+        user::add_school_membership(&conn, &user2, &school_id).unwrap();
+        grant(&conn, &user1, &school_id, SCHOOL_HEAD).unwrap();
+        grant(&conn, &user2, &school_id, SCHOOL_HEAD).unwrap();
+
+        revoke(&conn, &user1, &school_id, SCHOOL_HEAD).unwrap();
+
+        assert!(!has_any_role(&conn, &user1, &school_id, &[SCHOOL_HEAD]).unwrap());
+        assert!(has_any_role(&conn, &user2, &school_id, &[SCHOOL_HEAD]).unwrap());
+    }
+
+    #[test]
+    fn count_role_holders_counts_only_the_named_role_in_the_named_school() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        grant(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+
+        assert_eq!(
+            count_role_holders(&conn, &school_id, SCHOOL_HEAD).unwrap(),
+            1
+        );
+        assert_eq!(count_role_holders(&conn, &school_id, REGISTRAR).unwrap(), 0);
     }
 }

@@ -1,5 +1,46 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Roles & Permissions: RBAC made usable, ADR-0064)
+
+User-directed milestone (explicit direction: "roles and permissions").
+Closed two disclosed gaps in the Wave 1A RBAC Foundation: no command
+could grant Registrar/School Head past first-run bootstrap, and almost
+no export command was actually gated by role. Full detail:
+`docs/adr/0064-roles-and-permissions-usable-rbac.md`,
+`docs/PROJECT-MEMORY.md`'s matching entry.
+
+**Shipped**: `grant_school_role`/`revoke_school_role` commands +
+`RoleManagementScreen` (School Head only); `Capability::ManageRoles`/
+`ViewSchoolWideReports`; SF4/SF6 exports now require Registrar or
+School Head; SF2/report-card exports now require the section's adviser
+or the class record's assigned teacher (new
+`auth::authorize_teacher_of_class_record`, deliberately not reusing the
+adviser check — a subject teacher and the section's adviser are
+frequently different people); `role::revoke` refuses to remove a
+school's last School Head.
+
+**Explicitly scoped to the confirmed three-role model only** — the
+user separately supplied a fuller 8-role taxonomy (School Head, Head/
+Master Teacher, Class Adviser, Subject Teacher, ICT Coordinator, Admin
+Officer/ADAS, Property Custodian, Health Officer) as direction for a
+**next, separate milestone**, confirmed by the user not to be bundled
+into this one.
+
+**Verified**: `cargo test`/`clippy`/`fmt` all clean; `npm run quality`
+866/866; `npm run build`; `npm run check:dev-preview-isolation`; `npm
+run harness:verify` 100/100; `git diff --check` clean.
+
+**Not done**: independent `security-reviewer` pass — recorded as owed
+in `docs/VERIFICATION-DEBT.md`, not blocking (thorough self-review/TDD
+coverage in place), not yet dispatched.
+
+**Exact next slice, per the user's own explicit instruction**: expand
+the role model to the full 8-role taxonomy the user supplied (School
+Head/Head-Master Teacher/Class Adviser/Subject Teacher/ICT Coordinator/
+Admin Officer-ADAS/Property Custodian/Health Officer), then move to
+other pending waves/tasks, then to general UI work — in that order, per
+the user's own sequencing.
+
 ## Active Task (2026-09-02, this session — DO 015/DO 009 s.2026 now primary-source confirmed, direct from owner-supplied PDFs)
 
 Following the egress-blocked `WebSearch`-only pass below, the user

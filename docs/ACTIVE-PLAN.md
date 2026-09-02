@@ -1,5 +1,35 @@
 # ACTIVE PLAN
 
+## Wave: Roles & Permissions — RBAC made usable (added 2026-09-02) — complete
+
+User-directed. Full record: `docs/adr/0064-roles-and-permissions-usable-rbac.md`.
+
+**Shipped**: `grant_school_role`/`revoke_school_role` commands and
+`RoleManagementScreen` (School Head only, closing the previously
+disclosed "no way to grant Registrar/School Head past bootstrap" gap);
+`Capability::ManageRoles`/`ViewSchoolWideReports`; SF4/SF6 whole-school
+exports now Registrar-or-School-Head only; SF2/report-card exports now
+require the section's adviser or the class record's assigned teacher
+(`auth::authorize_teacher_of_class_record`, new); `role::revoke`
+refuses to remove a school's last School Head
+(`AppError::CannotRemoveLastSchoolHead`).
+
+**Verification actually run**: `cargo test` (all green, extensive new
+coverage), `cargo clippy -D warnings` clean, `cargo fmt --check` clean,
+`npm run quality` 866/866, `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` 100/100, `git
+diff --check` clean.
+
+**Not done**: independent `security-reviewer` pass — recorded as debt
+in `docs/VERIFICATION-DEBT.md`, self-reviewed and TDD-covered, not
+blocking.
+
+**Gate decision**: WAVE COMPLETE. Scoped explicitly to the confirmed
+three-role model (Teacher/Registrar/School Head) only, per the user's
+own direction — the fuller 8-role taxonomy the user separately supplied
+is the confirmed next wave (see `docs/CURRENT-HANDOFF.md`), not bundled
+into this one.
+
 ## Wave 3J: SF4 Export UI Trigger (added 2026-09-01) — complete
 
 The recommended next slice from the Wave 3m reconciliation below: wire

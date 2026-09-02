@@ -38,6 +38,12 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
   async resetPassword(): Promise<boolean> {
     throw new Error("not used in this test");
   }
+  async grantRole(): Promise<void> {
+    throw new Error("not used in this test");
+  }
+  async revokeRole(): Promise<void> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {

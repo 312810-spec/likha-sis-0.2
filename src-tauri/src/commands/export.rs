@@ -61,10 +61,13 @@ pub struct Sf2ExportResult {
 /// Documents directory cannot be resolved). `school_id` is derived from the
 /// session, never a parameter — same convention as every other command
 /// here. `section_id` is client-supplied the same way it already is for
-/// `attendance_roster_for_date`/`monthly_attendance_summary`; isolation
-/// holds because `section::find_by_id_in_school` resolves to `None` for a
-/// foreign section, returning `None` here too rather than exporting
-/// anything. See `docs/adr/0009-sf2-export-and-official-form-engine.md`.
+/// `attendance_roster_for_date`/`monthly_attendance_summary`; isolation is
+/// enforced by `auth::authorize_adviser_of_section` (the section's current
+/// adviser, or a School Head) — **tightened in the Roles & Permissions
+/// milestone**: this command previously only checked
+/// `require_active_school_scope`, letting any authenticated school member
+/// (Teacher included) export any other section's attendance, not just
+/// their own. See `docs/adr/0009-sf2-export-and-official-form-engine.md`.
 #[tauri::command]
 pub fn export_section_monthly_sf2(
     app: AppHandle,
@@ -75,7 +78,28 @@ pub fn export_section_monthly_sf2(
     month: u32,
 ) -> AppResult<Option<Sf2ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+
+    // Only the section's current adviser (or a School Head) may export
+    // its SF2 -- matches `export_section_eosy_sf5`'s established pattern
+    // (Roles & Permissions milestone: this command previously let any
+    // authenticated school member, Teacher included, export any
+    // section's attendance).
+    let (_user_id, school_id) =
+        match auth::authorize_adviser_of_section(&conn, &sessions, &section_id, &as_of_date) {
+            Ok(pair) => pair,
+            Err(crate::error::AppError::Unauthorized) => {
+                return Err(crate::error::AppError::Unauthorized)
+            }
+            Err(_) => return Ok(None),
+        };
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -85,13 +109,6 @@ pub fn export_section_monthly_sf2(
     };
     let report = attendance::monthly_grid_for_section(&conn, &school_id, &section_id, year, month)?;
 
-    let days_in_month = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
-        _ => 28,
-    };
-    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
     let adviser =
         section_advisory::current_adviser_for_section(&conn, &school_id, &section_id, &as_of_date)?;
     let adviser_name = if let Some(adv) = adviser {
@@ -137,9 +154,13 @@ pub struct ReportCardExportResult {
 /// grade isn't computable yet — see `report_card`'s module doc comment).
 /// `school_id` is derived from the session, never a parameter.
 /// `class_record_id` is client-supplied the same legitimate way
-/// `section_id` already is for the SF2 export above; isolation holds
-/// because `class_record::find_detail_by_id_in_school` resolves to `None`
-/// for a foreign class record, returning `None` here too.
+/// `section_id` already is for the SF2 export above; isolation is
+/// enforced by `auth::authorize_teacher_of_class_record` (the teacher
+/// actually assigned to this class record's section/subject, or a School
+/// Head) — **tightened in the Roles & Permissions milestone**: this
+/// command previously only checked `require_active_school_scope`,
+/// letting any authenticated school member export any class record's
+/// report card, not just the subject teacher's own.
 #[tauri::command]
 pub fn export_class_record_report_card(
     app: AppHandle,
@@ -148,7 +169,14 @@ pub fn export_class_record_report_card(
     class_record_id: String,
 ) -> AppResult<Option<ReportCardExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let (_user_id, school_id) =
+        match auth::authorize_teacher_of_class_record(&conn, &sessions, &class_record_id) {
+            Ok(pair) => pair,
+            Err(crate::error::AppError::Unauthorized) => {
+                return Err(crate::error::AppError::Unauthorized)
+            }
+            Err(_) => return Ok(None),
+        };
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -470,7 +498,13 @@ pub fn export_section_eosy_sf5(
 
 /// Writes a school-wide, DepEd-SF6-inspired summarized promotion and proficiency export to
 /// `<Documents>/LIKHA-SIS/` (falling back to the app data directory if Documents cannot be resolved).
-/// `school_id` is derived strictly from the authenticated session.
+/// `school_id` is derived strictly from the authenticated session. Gated by
+/// `Capability::ViewSchoolWideReports` (Registrar or School Head) --
+/// **tightened in the Roles & Permissions milestone**: this command
+/// previously only checked `require_active_school_scope`, letting any
+/// Teacher pull the whole school's promotion summary, not just their own
+/// section's (see `export_section_eosy_sf5` for the section-scoped
+/// equivalent every Teacher can still reach).
 #[tauri::command]
 pub fn export_school_eosy_sf6(
     app: AppHandle,
@@ -479,7 +513,8 @@ pub fn export_school_eosy_sf6(
     school_year: String,
 ) -> AppResult<Option<Sf6ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ViewSchoolWideReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);
@@ -618,7 +653,12 @@ pub fn export_school_eosy_sf6(
 
 /// Consolidates monthly attendance and learner movement metrics across all sections
 /// and grade levels in the school for a given month and year into a DepEd School Form 4 (SF4)
-/// CSV export file.
+/// CSV export file. Gated by `Capability::ViewSchoolWideReports` (Registrar
+/// or School Head) -- **tightened in the Roles & Permissions milestone**:
+/// this command previously only checked `require_active_school_scope`,
+/// letting any Teacher pull the whole school's monthly attendance, not
+/// just their own section's (see `export_section_monthly_sf2` for the
+/// section-scoped equivalent every Teacher can still reach).
 #[tauri::command]
 pub fn export_school_monthly_attendance_sf4(
     app: AppHandle,
@@ -628,7 +668,8 @@ pub fn export_school_monthly_attendance_sf4(
     month: u32,
 ) -> AppResult<Option<Sf4ExportResult>> {
     let conn = lock_db(&db);
-    let school_id = sessions.require_active_school_scope(&conn)?;
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ViewSchoolWideReports)?;
 
     let Some(school) = school::find_by_id(&conn, &school_id)? else {
         return Ok(None);

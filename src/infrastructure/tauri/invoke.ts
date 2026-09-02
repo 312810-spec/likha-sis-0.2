@@ -24,9 +24,10 @@ export function onSessionExpired(listener: SessionExpiredListener): () => void {
 
 /**
  * Every Rust command that additionally gates on a `Capability`, on
- * `authorize_view_teacher_load` (self-or-School-Head), or on
- * `subject_attendance::authorize_own_assignment`, or on
- * `authorize_adviser_of_section` -- see
+ * `authorize_view_teacher_load` (self-or-School-Head), on
+ * `subject_attendance::authorize_own_assignment`, on
+ * `authorize_adviser_of_section`, or on
+ * `authorize_teacher_of_class_record` -- see
  * `src-tauri/src/auth/mod.rs`'s `authorize_*` functions and
  * `repository::subject_attendance::authorize_own_assignment`. Each of
  * these can reject `Unauthorized` for a session that is completely
@@ -86,6 +87,12 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "subject_attendance_monitor",
   "adviser_subject_attendance_overview",
   "export_section_eosy_sf5",
+  "export_section_monthly_sf2",
+  "export_class_record_report_card",
+  "export_school_eosy_sf6",
+  "export_school_monthly_attendance_sf4",
+  "grant_school_role",
+  "revoke_school_role",
   "assign_section_adviser",
   "end_section_adviser",
   "create_teaching_assignment",

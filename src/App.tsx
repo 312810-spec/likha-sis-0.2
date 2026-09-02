@@ -25,6 +25,7 @@ import type { CurrentSession } from "./domain/session";
 import { AppShell } from "./ui/AppShell";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
+import { RoleManagementScreen } from "./ui/RoleManagementScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
@@ -418,6 +419,8 @@ function App() {
               <AuditLogScreen authService={authService} />
             ) : activeTab === "admin-password-reset" ? (
               <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+            ) : activeTab === "role-management" ? (
+              <RoleManagementScreen schoolMemberService={schoolMemberService} />
             ) : null}
           </>
         ) : (

@@ -175,6 +175,29 @@ pub fn list_by_section_in_school(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// True if `teacher_user_id` holds a teaching assignment for exactly this
+/// `section_id`/`subject_id` pair within `school_id` — the authorization
+/// primitive `auth::authorize_teacher_of_class_record` is built on. A
+/// class record's own `section_id`/`subject_id` is what's checked, not
+/// the class record's own `id` directly, since a teaching assignment is
+/// about who teaches a subject to a section for the whole school year,
+/// independent of how many grading-period class records exist under it.
+pub fn is_assigned_to_section_subject(
+    conn: &Connection,
+    school_id: &str,
+    teacher_user_id: &str,
+    section_id: &str,
+    subject_id: &str,
+) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM teaching_assignments \
+         WHERE school_id = ?1 AND teacher_user_id = ?2 AND section_id = ?3 AND subject_id = ?4)",
+        (school_id, teacher_user_id, section_id, subject_id),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
 /// `assignment_count`/`distinct_subject_count` are plain aggregates over
 /// `teaching_assignments`; `weekly_instructional_minutes` sums every
 /// `schedule_meeting` duration across all of the teacher's assignments
@@ -431,5 +454,53 @@ mod tests {
             load.weekly_instructional_minutes, 0,
             "no schedule_meetings exist yet"
         );
+    }
+
+    #[test]
+    fn is_assigned_to_section_subject_is_true_once_the_assignment_exists() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        create(&conn, &school_id, &teacher_id, &section_id, &subject_id).unwrap();
+
+        assert!(is_assigned_to_section_subject(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &section_id,
+            &subject_id
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn is_assigned_to_section_subject_is_false_with_no_matching_assignment() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+
+        assert!(!is_assigned_to_section_subject(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &section_id,
+            &subject_id
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn is_assigned_to_section_subject_is_false_for_a_different_subject() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        create(&conn, &school_id, &teacher_id, &section_id, &subject_id).unwrap();
+        let other_subject = subject::create(&conn, &school_id, "Science").unwrap();
+
+        assert!(!is_assigned_to_section_subject(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &section_id,
+            &other_subject.id
+        )
+        .unwrap());
     }
 }

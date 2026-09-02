@@ -12,6 +12,7 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::export::learner_roster::{self, LearnerRosterExport};
+use app_lib::export::report_card::{self, ReportCardExport, ReportCardRow};
 use app_lib::export::sf10::{self, Sf10Export, Sf10YearRow};
 use app_lib::export::sf2::{self, Sf2Export};
 use app_lib::export::sf4::{self, Sf4Export, Sf4SectionSummary};
@@ -19,10 +20,11 @@ use app_lib::export::sf5::{self, Sf5Export, Sf5LearnerRow, Sf5SubjectGrade};
 use app_lib::export::sf6::{self, Sf6Export, Sf6SectionSummary};
 use app_lib::repository::{
     attendance, class_record, grading, grading_computation, learner, role, school, section,
-    section_advisory, section_membership, user,
+    section_advisory, section_membership, subject, teaching_assignment, user,
 };
 
 const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
 
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
@@ -41,6 +43,9 @@ fn login_as_a_teacher_at(
 }
 
 /// Standing in for the non-I/O portion of `commands::export::export_section_monthly_sf2`.
+/// Mirrors the command's own `authorize_adviser_of_section` gate (Roles &
+/// Permissions milestone) -- a plain school member with no adviser
+/// assignment must now fail this the same way the real command would.
 fn export_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
@@ -48,7 +53,20 @@ fn export_as_current_session(
     year: i32,
     month: u32,
 ) -> app_lib::error::AppResult<Option<Sf2Export>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
+        _ => 28,
+    };
+    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
+
+    let (_user_id, school_id) =
+        match auth::authorize_adviser_of_section(conn, sessions, section_id, &as_of_date) {
+            Ok(pair) => pair,
+            Err(AppError::Unauthorized) => return Err(AppError::Unauthorized),
+            Err(_) => return Ok(None),
+        };
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -58,13 +76,6 @@ fn export_as_current_session(
     };
     let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
 
-    let days_in_month = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) => 29,
-        _ => 28,
-    };
-    let as_of_date = format!("{year}-{month:02}-{days_in_month:02}");
     let adviser =
         section_advisory::current_adviser_for_section(conn, &school_id, section_id, &as_of_date)?;
     let adviser_name = if let Some(adv) = adviser {
@@ -113,8 +124,9 @@ fn setup_enrolled_learner_with_session(
 #[test]
 fn a_teacher_can_export_their_own_sections_monthly_sf2() {
     let conn = open_test_db();
-    let (_school_id, section_id, sessions) =
-        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    section_advisory::assign(&conn, &school_id, &section_id, &user_id, "2026-06-01").unwrap();
 
     let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
         .unwrap()
@@ -128,6 +140,8 @@ fn a_teacher_can_export_their_own_sections_monthly_sf2() {
 fn sf2_export_renders_assigned_adviser_name() {
     let conn = open_test_db();
     let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    role::grant(&conn, &user_id, &school_id, role::SCHOOL_HEAD).unwrap();
     let adviser = user::create_user(&conn, "adviser.a", "password", "Maria Clara").unwrap();
     user::add_school_membership(&conn, &adviser.id, &school_id).unwrap();
     section_advisory::assign(&conn, &school_id, &section_id, &adviser.id, "2026-06-01").unwrap();
@@ -142,8 +156,9 @@ fn sf2_export_renders_assigned_adviser_name() {
 #[test]
 fn sf2_export_renders_blank_for_unassigned_adviser() {
     let conn = open_test_db();
-    let (_school_id, section_id, sessions) =
-        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    role::grant(&conn, &user_id, &school_id, role::SCHOOL_HEAD).unwrap();
 
     let export = export_as_current_session(&conn, &sessions, &section_id, 2026, 8)
         .unwrap()
@@ -153,19 +168,38 @@ fn sf2_export_renders_blank_for_unassigned_adviser() {
 }
 
 #[test]
-fn exporting_a_foreign_schools_section_returns_none_not_an_error() {
+fn exporting_a_foreign_schools_section_is_unauthorized() {
+    // Behavior tightened in the Roles & Permissions milestone: gating now
+    // goes through `authorize_adviser_of_section`, matching
+    // `sf5_export_cross_school_isolation`'s already-established
+    // Err(Unauthorized) shape for a cross-school section, not a silent
+    // `None` — a foreign section_id resolves to "you are not this
+    // section's adviser or a School Head here" the same way any other
+    // non-adviser caller does.
     let conn = open_test_db();
     let school_a = school::create(&conn, "School A").unwrap();
     let sessions = login_as_a_teacher_at(&conn, &school_a.id, "teacher.a");
     let school_b = school::create(&conn, "School B").unwrap();
     let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
 
-    let result = export_as_current_session(&conn, &sessions, &section_b.id, 2026, 8).unwrap();
+    let result = export_as_current_session(&conn, &sessions, &section_b.id, 2026, 8);
 
-    assert!(
-        result.is_none(),
-        "a foreign section_id must not resolve to any data"
-    );
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn sf2_export_denies_a_teacher_who_is_not_the_sections_adviser() {
+    let conn = open_test_db();
+    let (school_id, section_id, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let adviser = user::create_user(&conn, "adviser.a", "password", "Maria Clara").unwrap();
+    user::add_school_membership(&conn, &adviser.id, &school_id).unwrap();
+    section_advisory::assign(&conn, &school_id, &section_id, &adviser.id, "2026-06-01").unwrap();
+
+    // teacher.a is a plain school member, not the assigned adviser and not
+    // a School Head.
+    let result = export_as_current_session(&conn, &sessions, &section_id, 2026, 8);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }
 
 #[test]
@@ -194,7 +228,9 @@ fn the_export_never_includes_another_schools_learners() {
         "2026-08-01",
     )
     .unwrap();
-    let (_school_a, section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (school_a, section_a, sessions) = setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    section_advisory::assign(&conn, &school_a, &section_a, &user_id, "2026-06-01").unwrap();
 
     let export = export_as_current_session(&conn, &sessions, &section_a, 2026, 8)
         .unwrap()
@@ -815,7 +851,8 @@ fn export_sf6_as_current_session(
     sessions: &SessionManager,
     school_year: &str,
 ) -> app_lib::error::AppResult<Option<Sf6Export>> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id =
+        auth::authorize_capability(conn, sessions, auth::Capability::ViewSchoolWideReports)?;
 
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
@@ -968,6 +1005,7 @@ fn sf6_export_school_wide_consolidation_and_isolation() {
     // User in School Alpha
     let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
     user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    role::grant(&conn, &head.id, &s1.id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
 
@@ -985,13 +1023,33 @@ fn sf6_export_school_wide_consolidation_and_isolation() {
     assert_eq!(export.disclosure.populated_fields.len(), 6);
 }
 
+#[test]
+fn sf6_export_requires_registrar_or_school_head() {
+    // Roles & Permissions milestone: previously any authenticated Teacher
+    // could pull the whole school's SF6, not just their own section's.
+    let conn = open_test_db();
+    let s = school::create(&conn, "School Alpha").unwrap();
+    let teacher = user::create_user(&conn, "teacher.plain", "pw", "Teacher Plain").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "teacher.plain", "pw", &s.id).unwrap();
+
+    let result = export_sf6_as_current_session(&conn, &sessions, "2026-2027");
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+
+    role::grant(&conn, &teacher.id, &s.id, role::REGISTRAR).unwrap();
+    let registrar_result = export_sf6_as_current_session(&conn, &sessions, "2026-2027");
+    assert!(registrar_result.is_ok());
+}
+
 fn export_sf4_as_current_session(
     conn: &rusqlite::Connection,
     sessions: &SessionManager,
     year: i32,
     month: u32,
 ) -> Result<Option<Sf4Export>, AppError> {
-    let school_id = sessions.require_active_school_scope(conn)?;
+    let school_id =
+        auth::authorize_capability(conn, sessions, auth::Capability::ViewSchoolWideReports)?;
     let Some(school) = school::find_by_id(conn, &school_id)? else {
         return Ok(None);
     };
@@ -1191,6 +1249,7 @@ fn sf4_export_school_wide_consolidation_and_isolation() {
 
     let head = user::create_user(&conn, "head.alpha", "pw", "Head Alpha").unwrap();
     user::add_school_membership(&conn, &head.id, &s1.id).unwrap();
+    role::grant(&conn, &head.id, &s1.id, role::SCHOOL_HEAD).unwrap();
     let sessions = SessionManager::new();
     auth::login(&conn, &sessions, "head.alpha", "pw", &s1.id).unwrap();
 
@@ -1212,4 +1271,176 @@ fn sf4_export_school_wide_consolidation_and_isolation() {
     assert!(export.csv.contains("SCHOOL GRAND TOTAL"));
     assert_eq!(export.disclosure.populated_fields.len(), 8);
     assert_eq!(export.disclosure.omitted_fields.len(), 3);
+}
+
+#[test]
+fn sf4_export_requires_registrar_or_school_head() {
+    // Roles & Permissions milestone: previously any authenticated Teacher
+    // could pull the whole school's SF4, not just their own section's.
+    let conn = open_test_db();
+    let s = school::create(&conn, "School Alpha").unwrap();
+    let teacher = user::create_user(&conn, "teacher.plain", "pw", "Teacher Plain").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "teacher.plain", "pw", &s.id).unwrap();
+
+    let result = export_sf4_as_current_session(&conn, &sessions, 2026, 9);
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+
+    role::grant(&conn, &teacher.id, &s.id, role::REGISTRAR).unwrap();
+    let registrar_result = export_sf4_as_current_session(&conn, &sessions, 2026, 9);
+    assert!(registrar_result.is_ok());
+}
+
+// ---- Roles & Permissions: export_class_record_report_card gating ----
+
+/// Standing in for the non-I/O portion of
+/// `commands::export::export_class_record_report_card`, including its new
+/// `authorize_teacher_of_class_record` gate.
+fn export_report_card_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> app_lib::error::AppResult<Option<ReportCardExport>> {
+    let (_user_id, school_id) =
+        match auth::authorize_teacher_of_class_record(conn, sessions, class_record_id) {
+            Ok(pair) => pair,
+            Err(AppError::Unauthorized) => return Err(AppError::Unauthorized),
+            Err(_) => return Ok(None),
+        };
+
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(detail) =
+        class_record::find_detail_by_id_in_school(conn, &school_id, class_record_id)?
+    else {
+        return Ok(None);
+    };
+    let Some((section_id, starts_on, ends_on)) =
+        class_record::section_and_period_range_in_school(conn, &school_id, class_record_id)?
+    else {
+        return Ok(None);
+    };
+
+    let roster = section_membership::roster_for_section_over_range(
+        conn,
+        &school_id,
+        &section_id,
+        &starts_on,
+        &ends_on,
+    )?;
+    let mut rows = Vec::with_capacity(roster.len());
+    for member in roster {
+        let grade = grading_computation::compute_term_grade(
+            conn,
+            &school_id,
+            class_record_id,
+            &member.learner_id,
+        )?;
+        rows.push(ReportCardRow {
+            learner_id: member.learner_id,
+            given_name: member.given_name,
+            family_name: member.family_name,
+            lrn: member.lrn,
+            grade,
+        });
+    }
+
+    Ok(Some(report_card::build_report_card_export(
+        &school, &detail, None, &rows,
+    )))
+}
+
+/// A school, a section, a subject, a grading period, and one class record
+/// on it -- the happy-path fixture these tests build on.
+fn setup_class_record_with_school_and_session(
+    conn: &rusqlite::Connection,
+    username: &str,
+) -> (String, String, String, SessionManager) {
+    let s = school::create(conn, "School Alpha").unwrap();
+    let sec = section::create(conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+    let sub = subject::create(conn, &s.id, "Mathematics").unwrap();
+    let period = grading::create(conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
+        .unwrap()
+        .unwrap();
+    let cr = class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
+        .unwrap()
+        .unwrap();
+    let sessions = login_as_a_teacher_at(conn, &s.id, username);
+    (s.id, sec.id, cr.id, sessions)
+}
+
+#[test]
+fn report_card_export_allows_the_assigned_subject_teacher() {
+    let conn = open_test_db();
+    let (school_id, section_id, cr_id, sessions) =
+        setup_class_record_with_school_and_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    let detail = class_record::find_detail_by_id_in_school(&conn, &school_id, &cr_id)
+        .unwrap()
+        .unwrap();
+    teaching_assignment::create(&conn, &school_id, &user_id, &section_id, &detail.subject_id)
+        .unwrap();
+
+    let result = export_report_card_as_current_session(&conn, &sessions, &cr_id);
+
+    assert!(result.unwrap().is_some());
+}
+
+#[test]
+fn report_card_export_denies_a_teacher_with_no_teaching_assignment() {
+    let conn = open_test_db();
+    let (_school_id, _section_id, cr_id, sessions) =
+        setup_class_record_with_school_and_session(&conn, "teacher.a");
+
+    let result = export_report_card_as_current_session(&conn, &sessions, &cr_id);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn report_card_export_denies_the_sections_adviser_alone_without_a_teaching_assignment() {
+    // The adviser and the class record's own subject teacher are
+    // frequently different people -- proves this command does not
+    // wrongly accept "advises the section" as a substitute for "teaches
+    // this subject to it."
+    let conn = open_test_db();
+    let (school_id, section_id, cr_id, sessions) =
+        setup_class_record_with_school_and_session(&conn, "teacher.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    section_advisory::assign(&conn, &school_id, &section_id, &user_id, "2026-06-01").unwrap();
+
+    let result = export_report_card_as_current_session(&conn, &sessions, &cr_id);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn report_card_export_allows_a_school_head_without_a_teaching_assignment() {
+    let conn = open_test_db();
+    let (school_id, _section_id, cr_id, sessions) =
+        setup_class_record_with_school_and_session(&conn, "head.a");
+    let (user_id, _) = sessions.require_active_session(&conn).unwrap();
+    role::grant(&conn, &user_id, &school_id, role::SCHOOL_HEAD).unwrap();
+
+    let result = export_report_card_as_current_session(&conn, &sessions, &cr_id);
+
+    assert!(result.unwrap().is_some());
+}
+
+#[test]
+fn report_card_export_cross_school_isolation() {
+    let conn = open_test_db();
+    let (_school_id, _section_id, cr_id, _sessions) =
+        setup_class_record_with_school_and_session(&conn, "teacher.a");
+    let s2 = school::create(&conn, "School Beta").unwrap();
+    let outsider = user::create_user(&conn, "outsider", "pw", "Outsider").unwrap();
+    user::add_school_membership(&conn, &outsider.id, &s2.id).unwrap();
+    let sessions2 = SessionManager::new();
+    auth::login(&conn, &sessions2, "outsider", "pw", &s2.id).unwrap();
+
+    let result = export_report_card_as_current_session(&conn, &sessions2, &cr_id);
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
 }

@@ -10,9 +10,10 @@ use rusqlite::Connection;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    audit_log as audit_log_repo, installation as installation_repo, role as role_repo,
-    school as school_repo, section as section_repo, section_advisory as section_advisory_repo,
-    session as session_repo, user as user_repo,
+    audit_log as audit_log_repo, class_record as class_record_repo,
+    installation as installation_repo, role as role_repo, school as school_repo,
+    section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
+    teaching_assignment as teaching_assignment_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -412,6 +413,27 @@ pub enum Capability {
     /// about not reusing `ManageSchoolMembership`), even though today
     /// both capabilities resolve to the same role.
     ManageSectionAdvisories,
+    /// Grant or revoke a school member's role (`repository::role::grant`/
+    /// `revoke`). School Head only — deliberately its own variant rather
+    /// than reusing `ManageSchoolMembership` (onboarding a new member vs.
+    /// changing an existing member's authority are distinct decisions,
+    /// matching this module's established precedent of one variant per
+    /// distinct decision even when the allowed-role set is currently
+    /// identical). See the Roles & Permissions milestone that closed the
+    /// gap `commands::user::add_user_to_school`'s own doc comment
+    /// disclosed: this codebase had a role model with no command able to
+    /// grant Registrar/School Head to anyone past first-run bootstrap.
+    ManageRoles,
+    /// Read school-wide, cross-section consolidated reports (SF4 monthly
+    /// attendance, SF6 promotion summary, the full learner roster export)
+    /// — Registrar or School Head, per the confirmed starting role model
+    /// (`docs/product/PRODUCT-CONTRACT.md`'s RBAC section: "Registrar:
+    /// focused on official-form exports and learner records... Teacher:
+    /// scoped to their own classes/sections"). Deliberately excludes plain
+    /// Teacher — a Teacher's own section/class-record exports (SF2,
+    /// SF5, report cards) go through `authorize_adviser_of_section`/
+    /// `authorize_teacher_of_class_record` instead, not this capability.
+    ViewSchoolWideReports,
 }
 
 impl Capability {
@@ -421,6 +443,8 @@ impl Capability {
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageRoles => &[role_repo::SCHOOL_HEAD],
+            Capability::ViewSchoolWideReports => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -466,13 +490,11 @@ pub fn authorize_view_teacher_load(
 /// School-Head-oversight gate in this module). Mirrors
 /// `authorize_view_teacher_load`'s self-or-School-Head shape exactly.
 ///
-/// Not yet called by any command -- this is Section Advisory
-/// Foundation (Wave 3E), the authorization boundary a future Subject
-/// Attendance "Adviser View" read will be built on, matching this
-/// project's own established zero-UI-first precedent for a new domain
-/// (RBAC, Curriculum, Teacher Load, Subject Attendance Foundation all
-/// shipped their first increment with full test coverage and no
-/// caller). See `docs/adr/0056-section-advisory-foundation.md`.
+/// Now called by `commands::export::export_section_eosy_sf5` (Wave 3m)
+/// and `export_section_monthly_sf2` (Roles & Permissions milestone) --
+/// this doc comment previously said "not yet called by any command,"
+/// which stopped being true once SF5's export shipped; corrected rather
+/// than left stale. See `docs/adr/0056-section-advisory-foundation.md`.
 pub fn authorize_adviser_of_section(
     conn: &Connection,
     sessions: &SessionManager,
@@ -502,6 +524,47 @@ pub fn authorize_adviser_of_section(
         &user_id,
         &school_id,
         Capability::ManageSectionAdvisories.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// A teacher holding the `TeachingAssignment` for `class_record_id`'s own
+/// `section_id`/`subject_id` pair may export/view its report card, and so
+/// may anyone holding `ManageTeachingAssignments` (a School Head, matching
+/// this module's established School-Head-oversight shape). Deliberately
+/// checks the section/subject pair, not "is this teacher the section's
+/// homeroom adviser" (`authorize_adviser_of_section`) — a class record's
+/// subject teacher and the section's adviser are frequently different
+/// people (e.g. a Math specialist teaching several sections none of which
+/// they advise), so reusing the adviser check here would wrongly deny a
+/// legitimate subject teacher access to their own class record.
+pub fn authorize_teacher_of_class_record(
+    conn: &Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let Some(detail) =
+        class_record_repo::find_detail_by_id_in_school(conn, &school_id, class_record_id)?
+    else {
+        return Err(AppError::Unauthorized);
+    };
+    if teaching_assignment_repo::is_assigned_to_section_subject(
+        conn,
+        &school_id,
+        &user_id,
+        &detail.section_id,
+        &detail.subject_id,
+    )? {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageTeachingAssignments.allowed_roles(),
     )? {
         return Ok((user_id, school_id));
     }
@@ -647,7 +710,9 @@ mod tests {
     use super::*;
     use crate::{
         db,
-        repository::{learner, school, section, user},
+        repository::{
+            class_record, grading, learner, school, section, subject, teaching_assignment, user,
+        },
     };
     use std::path::Path;
 
@@ -1757,6 +1822,113 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority in their own school must not extend to a different school's section"
         );
+    }
+
+    // ---- Roles & Permissions: authorize_teacher_of_class_record ----
+
+    const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+    const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+    /// A school, a section/subject/grading-period, and one class record —
+    /// the happy-path fixture these tests build on, matching
+    /// `repository::class_record::tests::setup`'s own constants.
+    fn setup_class_record(conn: &Connection, school_id: &str, section_id: &str) -> String {
+        let sub = subject::create(conn, school_id, "Mathematics").unwrap();
+        let period = grading::create(
+            conn,
+            school_id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        class_record::create(
+            conn, school_id, section_id, &sub.id, &period.id, K10_POLICY, None,
+        )
+        .unwrap()
+        .unwrap()
+        .id
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_allows_the_assigned_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let cr_id = setup_class_record(&conn, &s.id, &sec.id);
+        let cr = class_record::find_detail_by_id_in_school(&conn, &s.id, &cr_id)
+            .unwrap()
+            .unwrap();
+        teaching_assignment::create(&conn, &s.id, &u.id, &sec.id, &cr.subject_id).unwrap();
+
+        assert!(authorize_teacher_of_class_record(&conn, &sessions, &cr_id).is_ok());
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_denies_a_teacher_with_no_assignment() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let cr_id = setup_class_record(&conn, &s.id, &sec.id);
+
+        let result = authorize_teacher_of_class_record(&conn, &sessions, &cr_id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_denies_the_sections_adviser_alone_without_a_teaching_assignment(
+    ) {
+        // The adviser and the subject teacher are frequently different
+        // people -- this is the exact regression `authorize_adviser_of_section`
+        // reuse would have caused, proven directly.
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &u.id, "2026-06-01").unwrap();
+        let cr_id = setup_class_record(&conn, &s.id, &sec.id);
+
+        let result = authorize_teacher_of_class_record(&conn, &sessions, &cr_id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_allows_a_school_head_without_a_teaching_assignment() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let cr_id = setup_class_record(&conn, &s.id, &sec.id);
+
+        assert!(authorize_teacher_of_class_record(&conn, &sessions, &cr_id).is_ok());
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_denies_an_unknown_class_record() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _u) = setup_member_with_session(&conn, &sessions);
+
+        let result = authorize_teacher_of_class_record(&conn, &sessions, "does-not-exist");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_teacher_of_class_record_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_teacher_of_class_record(&conn, &sessions, "some-class-record");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 
     // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----

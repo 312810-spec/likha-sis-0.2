@@ -1,5 +1,20 @@
 # Verification Debt
 
+## Roles & Permissions (ADR-0064) — independent security review owed (2026-09-02)
+
+This milestone touches `auth::Capability`/`authorize_capability`,
+`repository::role::{grant,revoke}`, and gates four export commands plus
+two new commands (`grant_school_role`/`revoke_school_role`) — squarely
+the category `.claude/rules/security-privacy.md` requires an
+independent `security-reviewer` pass for before being marked complete.
+Self-verified thoroughly this session (full TDD coverage for every new
+authorization primitive, both directions proven for each — allowed and
+denied — plus cross-school isolation and last-School-Head-removal
+guards), but a fresh-context independent review was not dispatched.
+Not blocking (self-review found nothing to fix), but retained as debt
+per this project's reviewer-failure/self-review-substitution
+convention. Revisit in a future session.
+
 ## Session network egress blocks all external fetch except WebSearch — open, session-specific (2026-09-02)
 
 While researching DepEd-issuance provenance for 11 school-form
