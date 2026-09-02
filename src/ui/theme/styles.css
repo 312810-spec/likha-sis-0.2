@@ -1482,3 +1482,26 @@ label {
 .app-topbar-identity {
   color: var(--color-text-muted);
 }
+
+/* Redesign shell -- phone bottom tab bar (ADR-0057). Hidden until the
+   phone breakpoint (see the shell responsive block in Task 7 Step 5). */
+.app-bottomnav {
+  display: none;
+}
+.app-bottomnav button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: calc(var(--spacing-unit) * 0.4) 0;
+  border: 0;
+  background: none;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.app-bottomnav button[aria-current="page"] {
+  color: var(--color-primary);
+}
