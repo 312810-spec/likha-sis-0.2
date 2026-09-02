@@ -2980,6 +2980,23 @@ PR #24, so no backend change was needed. This closes the app-wide
 `npm run check:dev-preview-isolation`, `npm run harness:verify`
 (100/100), `git diff --check` all clean. No Rust touched.
 
+## Self-Disabling-Button Sweep: GradingPeriods/ScheduleMeetings/TeachingAssignments (added 2026-09-02)
+
+Second batch of the self-disabling-button sweep, prepared in parallel
+with PR #27's first batch (auth/session screens) while its CI ran.
+Applied the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern to `GradingPeriodsScreen.tsx` (per-row "Save"),
+`ScheduleMeetingsScreen.tsx` ("Schedule meeting" + per-row "Remove"),
+and `TeachingAssignmentsScreen.tsx` ("Assign teacher" + per-row
+"Remove") — five instances across three screens sharing a simple
+create-form-plus-removable-row shape. Per-row guards check the specific
+row/id already in flight, preserving each screen's existing per-row
+(not whole-list) disabling behavior.
+
+`npm run quality` 810/810 (5 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
 ## Self-Disabling-Button Sweep: Auth/Session-Critical Screens (added 2026-09-02)
 
 Extended the proven `disabled=` → `aria-disabled=` + handler-guard

@@ -58,6 +58,12 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   assignments: TeachingAssignmentDetail[];
   createResult: TeachingAssignment | null | "reject" = null;
   removeResult = true;
+  /** When set, `create`/`remove` never resolve on their own -- the test
+   * controls completion. Used to prove the in-flight guards block a
+   * second submission while the first is still pending. */
+  pending = false;
+  createCalls = 0;
+  removeCalls = 0;
 
   constructor(assignments: TeachingAssignmentDetail[] = []) {
     this.assignments = assignments;
@@ -73,6 +79,8 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     return this.assignments.filter((a) => a.sectionId === sectionId);
   }
   async create(teacherUserId: string, sectionId: string, subjectId: string) {
+    this.createCalls += 1;
+    if (this.pending) return new Promise<TeachingAssignment | null>(() => {});
     if (this.createResult === "reject") {
       throw new Error("duplicate");
     }
@@ -89,6 +97,8 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     return this.createResult;
   }
   async remove(id: string) {
+    this.removeCalls += 1;
+    if (this.pending) return new Promise<boolean>(() => {});
     this.assignments = this.assignments.filter((a) => a.id !== id);
     return this.removeResult;
   }
@@ -171,6 +181,40 @@ describe("TeachingAssignmentsScreen", () => {
 
     expect(await screen.findByText("Teacher assigned.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("cell", { name: "Ana Cruz" })).toBeInTheDocument());
+  });
+
+  it("does not submit a second assignment while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { teachingAssignmentRepo } = renderScreen();
+    teachingAssignmentRepo.pending = true;
+    await screen.findByRole("combobox", { name: "Subject" });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Subject" }), "sub-math");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Teacher" }), "teacher-1");
+    const assignButton = screen.getByRole("button", { name: "Assign teacher" });
+    await user.click(assignButton);
+    await waitFor(() => expect(teachingAssignmentRepo.createCalls).toBe(1));
+
+    expect(assignButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(assignButton);
+
+    expect(teachingAssignmentRepo.createCalls).toBe(1);
+  });
+
+  it("does not remove the same assignment a second time while the first removal is still in flight", async () => {
+    const user = userEvent.setup();
+    const { teachingAssignmentRepo } = renderScreen({ assignments: [ASSIGNMENT] });
+    teachingAssignmentRepo.pending = true;
+    await screen.findByRole("rowheader", { name: "Mathematics" });
+
+    const removeButton = screen.getByRole("button", { name: "Remove Ana Cruz from Mathematics" });
+    await user.click(removeButton);
+    await waitFor(() => expect(teachingAssignmentRepo.removeCalls).toBe(1));
+
+    expect(removeButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(removeButton);
+
+    expect(teachingAssignmentRepo.removeCalls).toBe(1);
   });
 
   it("calls onManageSchedule with the assignment id and subject name", async () => {

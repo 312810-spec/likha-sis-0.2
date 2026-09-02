@@ -1,5 +1,35 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: GradingPeriods/ScheduleMeetings/TeachingAssignments, complete)
+
+User-directed continuation ("continue working on the waves"). Continued
+the self-disabling-button sweep with a second batch, prepared while PR
+#27 (the first batch — auth/session screens) was still in CI: applied
+the same `disabled=` → `aria-disabled=` + handler-guard pattern to
+`GradingPeriodsScreen.tsx`'s per-row "Save" button,
+`ScheduleMeetingsScreen.tsx`'s "Schedule meeting" and per-row "Remove"
+button, and `TeachingAssignmentsScreen.tsx`'s "Assign teacher" and
+per-row "Remove" button — five instances across three screens that
+share a simple, consistent create-form-plus-removable-row shape. For
+the per-row buttons, the guard checks the specific row/id already in
+flight (e.g. `savingPeriodId === policyPeriodId`), not a blanket
+any-action-in-flight guard, preserving each screen's existing per-row
+disabling behavior exactly.
+
+**Verified**: `npm run quality` 810/810 (5 new interaction tests, each
+proving the handler guard blocks a second submission for the same
+row/form while the first is still in flight), typecheck/lint/format/
+architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated with
+this batch's specifics; remaining instances across
+`ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`LearnerListScreen.tsx`, `SectionAdviserScreen.tsx`,
+`SectionRosterScreen.tsx`, `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`,
+`SubjectAttendanceScreen.tsx` still open, pattern proven.
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: auth/session-critical screens, complete)
 
 User-directed continuation ("continue"). Picked up the recorded next
