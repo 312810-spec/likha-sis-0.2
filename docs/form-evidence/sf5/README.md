@@ -52,18 +52,21 @@ text, no learner data) — verified clean of PII.
   rule (≤2 failed learning areas → remedial; more → retained) that SF5
   computes and reports. Clarified by DO 29, s. 2015.
 
-## ⚠️ Important finding: DepEd Order No. 015, s. 2026
+## ⚠️ Important finding: DepEd Order No. 015, s. 2026 — now primary-source confirmed
 
 **Not previously on this project's radar, not cited by the candidate
-file, and directly relevant to SF5's core computation.** Full research
-(now confirmed as real and in effect via multiple independent, detailed
-secondary sources, including specific transition-timeline detail) is
-in the shared record: `docs/form-evidence/grading-2026-orders/README.md`.
-Summary: DO 015, s. 2026 reportedly supersedes DO 8, s. 2015 (the order
-SF5's proficiency bands and promotion rule are built on), introduces
-descriptive/non-numeric grading for Key Stage 1, and a two-year
-transition to zero-based grading for Key Stages 2-4. **Flagged
-explicitly for the project owner** — see `docs/CURRENT-HANDOFF.md`.
+file, and directly relevant to SF5's core computation.** Full text of
+this order (and the related DO 009, s. 2026 three-term calendar order)
+was read directly this session from owner-supplied primary-source PDFs.
+Record: `docs/form-evidence/grading-2026-orders/README.md`
+(`ProvenanceState::AuthoritativeSourceConfirmed`). Confirmed: DO 015,
+s. 2026 supersedes the assessment/grading rules SF5's proficiency bands
+and promotion rule were built on (DO 8, s. 2015 is listed in DO 015's
+own references as a prior related issuance), introduces descriptive/
+non-numeric grading for Key Stage 1, and a phased transition (SY
+2026-2027 adjusted transmutation table, SY 2027-2028 zero-based grading)
+for Key Stages 2 onward. **Flagged explicitly for the project owner** —
+see `docs/CURRENT-HANDOFF.md`.
 
 ## Official downloadability
 
@@ -81,15 +84,18 @@ LIS.
 
 ## Classification
 
-**NOT CONFIRMABLE FROM AVAILABLE SOURCES.** Founding and process orders
-are well-corroborated; a newer, unread 2026 order (DO 015 s.2026)
-potentially changes the grading rules SF5 reports on for the current
-school year, which was not accounted for when this candidate was
-supplied.
+**Candidate template: still `CandidateUnverified`** (DO 4 s.2014 and
+DO 11 s.2018 have not been primary-source-read, only corroborated).
+**DO 015 s.2026 itself is now `AuthoritativeSourceConfirmed`** (see
+above) — it is confirmed, not merely a lead, that the grading rules
+SF5 was built to report on (DO 8 s.2015-era proficiency bands) are
+superseded for the current school year. This candidate's own
+proficiency-band/promotion text should now be treated as **outdated**
+for SY 2026-2027 onward, pending the grading-domain review below.
 
 ## Next step
 
-Read DO 4 s.2014, DO 11 s.2018, and — with priority — **DO 015, s.
-2026** primary text directly, once egress access allows it, before any
-provenance promotion or before treating this candidate's grading-band
-logic as current.
+Read DO 4 s.2014 and DO 11 s.2018 primary text directly (still not
+done — the network-egress limitation for these older, less-recently-
+searched orders is unchanged) before any further provenance promotion
+of the SF5 template candidate itself.

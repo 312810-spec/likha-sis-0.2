@@ -53,21 +53,26 @@ clean of PII.
   `AcademicElectiveTerms`/`DESCRIPTOR` defined names found in both SHS
   candidates during structural inspection.
 
-## ⚠️ Important findings: two separate 2026 DepEd Orders
+## ⚠️ Important findings: two separate 2026 DepEd Orders — now primary-source confirmed
 
-Neither previously on this project's radar. Full research — now
-confirmed as real and in effect via multiple independent, detailed
-secondary sources (a second research pass strengthened this
-considerably) — is in the shared record:
-`docs/form-evidence/grading-2026-orders/README.md`.
+Neither previously on this project's radar. Both orders' full text was
+read directly this session from owner-supplied primary-source PDFs
+(`ProvenanceState::AuthoritativeSourceConfirmed` for both orders
+themselves). Full record: `docs/form-evidence/grading-2026-orders/README.md`.
 
 - **DepEd Order No. 015, s. 2026** — revised classroom assessment/
-  grading system.
+  grading system. Confirmed: SF9 is explicitly named in this order's own
+  text (Annex C, Annex F) as "the Learner's Progress Report (SF9)" — the
+  KS1 reporting instrument tied directly to the order's descriptive
+  five-level grading scale (Advancing/Benchmarking/Connecting/
+  Developing/Emerging) and the PACE Form recording process.
 - **DepEd Order No. 009, s. 2026** — a **separate** order establishing
   a new **three-term (trimestral) school calendar** for SY 2026-2027
-  (specific term dates now confirmed: June 8 - Sep 15, Sep 16 - Dec 18,
-  Jan 4 - Apr 8, 201 class days total), replacing the prior quarterly/
-  semestral structure.
+  (specific term dates confirmed verbatim from the order's own Figure 3:
+  June 8 - Sep 15 [69 days], Sep 16 - Dec 18 [65 days], Jan 4 - Apr 8
+  [67 days], 201 class days total), replacing the prior quarterly/
+  semestral structure, for all public elementary/secondary schools and
+  CLCs.
 
 Current (2026) SF9 templates found via search are explicitly described
 as "three-term" under these two orders. **Whether our three candidate
@@ -88,20 +93,24 @@ scope. See `docs/CURRENT-HANDOFF.md`.
 
 ## Classification, per variant
 
-All three: **NOT CONFIRMABLE FROM AVAILABLE SOURCES.** Real progress
-since ADR-0049 (a plausible governing DM was found, and the
-Academic/TechPro split is now well-corroborated structurally), but no
-primary-source text was read, "DM 576/577 s.2026"'s national-vs-
-division status is unconfirmed, and the candidates' term structure
-relative to DO 015/DO 009 s.2026 is unverified.
+All three candidate template files: still **`CandidateUnverified`** —
+"DM 576/577 s.2026"'s national-vs-division status remains unconfirmed,
+and the candidates' own term-column structure has not been inspected
+against DO 009 s.2026's three-term structure. The **governing orders
+themselves** (DO 015 s.2026 and DO 009 s.2026) are now
+`AuthoritativeSourceConfirmed` (see above) — real progress since
+ADR-0049, but this does not by itself confirm these three candidate
+_files_ are current SF9 templates; it confirms what a current SF9
+template would need to reflect.
 
 ## Next step
 
 1. Confirm DM 576/577 s.2026's national-vs-division status and read its
    primary text.
-2. Read DO 015 s.2026 and DO 009 s.2026 primary text — high priority,
-   given the possible impact on this project's core grading-period
-   model.
-3. Manually inspect the three candidates' term-column structure
-   (quarterly vs. three-term) against whatever DO 009 s.2026 actually
-   specifies.
+2. Manually inspect the three candidates' term-column structure
+   (quarterly vs. three-term) against DO 009 s.2026's confirmed
+   three-term calendar (June 8-Sep 15 / Sep 16-Dec 18 / Jan 4-Apr 8),
+   and their grading-scale fields against DO 015 s.2026's confirmed KS1
+   five-level descriptive scale / KS2+ Adjusted Transmutation Table
+   (`docs/form-evidence/grading-2026-orders/README.md`), to determine
+   whether these three files are pre- or post-2026-reform SF9 layouts.

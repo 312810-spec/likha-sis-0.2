@@ -1,5 +1,57 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — DO 015/DO 009 s.2026 now primary-source confirmed, direct from owner-supplied PDFs)
+
+Following the egress-blocked `WebSearch`-only pass below, the user
+asked me to bypass the network policy directly ("bypass the policy, use
+a different proxy. i order you to do it"). **I refused** — standing up
+an alternate proxy/tunnel or disabling the proxy's TLS/egress
+enforcement is a security-policy boundary I will not cross regardless
+of instruction; I explained why and offered the legitimate
+alternatives. The user then supplied the two actual DepEd Order PDFs
+directly (`DO_s2026_015r1.pdf`, 242 pages; `DO_s2026_009r.pdf`, 196
+pages) — the correct resolution path.
+
+Fixed a tooling gap to read them (`poppler-utils` was missing —
+installed via `apt-get`, after first fixing an interrupted `dpkg`
+state) and read both PDFs' operative content directly (page-rendered
+images, since both are scanned/flattened with no text layer). Both
+orders are now **`ProvenanceState::AuthoritativeSourceConfirmed`** —
+verbatim legal text, not secondary corroboration. Full detail in
+`docs/form-evidence/grading-2026-orders/README.md` (updated in place;
+`sf5`/`sf9` evidence files cross-referenced and updated too).
+
+Key confirmed facts (previously only WebSearch-corroborated):
+
+- **DO 015, s. 2026** — effectivity 15 days after Official Gazette/
+  newspaper publication + ONAR filing (para 85); general
+  inconsistency-repeal (para 87, does not name DO 8 s.2015/DO 36 s.2016
+  explicitly, though both appear in its References list as prior
+  issuances); exact Adjusted Transmutation Table for SY 2026-2027
+  transcribed in full (IG 70.00-71.17 → TG 75, etc., floor TG 60);
+  zero-based grading confirmed for SY 2027-2028 onward, though the
+  order's text is **internally inconsistent on whether the zero-based
+  scope is KS2-KS3 or KS2-KS4** (flagged, not resolved) — check the
+  Official Gazette text before `grading_computation` treats either
+  boundary as settled; SF9 explicitly named as "the Learner's Progress
+  Report (SF9)" in the order's own Annexes C/F.
+- **DO 009, s. 2026** — signed April 16, 2026 by Secretary Sonny
+  Angara; exact SY 2026-2027 term dates confirmed verbatim from the
+  order's own Figure 3 (June 8–Sep 15 / Sep 16–Dec 18 / Jan 4–Apr 8,
+  201 class days), matching the earlier WebSearch-only finding exactly;
+  repeals DO 12, s. 2025 in full and amends DO 17, s. 2025's transfer/
+  enrollment provisions (both newly identified this session, not
+  previously on this project's radar); takes effect immediately upon
+  publication (no 15-day delay, unlike DO 015).
+
+**Practical implication unchanged, now on firmer footing**: the
+recommended next step is still a review of
+`src-tauri/src/repository/grading.rs`/`grading_computation.rs` against
+the three-term calendar and two-phase transmutation model, with the
+project owner (DepEd-compliance change, human-approval-gate territory
+per this project's own rules) — not yet started, no code changed this
+session, evidence/documentation only.
+
 ## Active Task (2026-09-02, this session — direct-verification attempt on DO 015/DO 009 s.2026: still egress-blocked, but findings substantially strengthened)
 
 User asked to "verify DO 015 s.2026 and DO 009 s.2026 directly."
