@@ -26,7 +26,7 @@ export type SignedInTab =
  * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
-  workspace: "Workspace",
+  workspace: "Home",
   learners: "Learners",
   sections: "Sections",
   "section-roster": "Section Roster",
@@ -67,7 +67,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
     tabs: [
-      tab("workspace"),
       tab("today-classes"),
       tab("attendance"),
       tab("subject-attendance"),
@@ -90,3 +89,47 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     tabs: [tab("audit-log")],
   },
 ];
+
+/** The pinned Home destination, rendered above the groups in the sidebar
+ * and first in the bottom nav. Wave 1: this is still the existing
+ * `workspace` tab (TeacherWorkspaceScreen). Wave 3 repoints it at the new
+ * role-adaptive HomeScreen. */
+export const HOME_DESTINATION: { id: SignedInTab; label: string } = {
+  id: "workspace",
+  label: "Home",
+};
+
+/** The four real destinations of the phone bottom-tab bar. `BottomNav.tsx`
+ * appends a synthetic fifth "More" control that opens the drawer -- it is
+ * not a `SignedInTab`, so it is not listed here. */
+export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
+  { id: "workspace", label: "Home" },
+  { id: "today-classes", label: "Classes" },
+  { id: "learners", label: "Learners" },
+  { id: "class-records", label: "Grades" },
+];
+
+const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
+  "section-roster": "sections",
+  "teaching-assignments": "sections",
+  "section-adviser": "sections",
+  "schedule-meetings": "sections",
+};
+
+/** Collapses a contextual sub-screen tab to the group destination it was
+ * reached from, so the sidebar highlights the right item and the
+ * breadcrumb names the right group. Every other tab returns itself. */
+export function normalizeTab(tab: SignedInTab): SignedInTab {
+  return CONTEXTUAL_PARENT[tab] ?? tab;
+}
+
+/** The nav-group label that owns a tab (contextual tabs resolved via
+ * `normalizeTab`). `null` for the pinned Home destination, which sits
+ * outside every group. */
+export function groupLabelForTab(tab: SignedInTab): string | null {
+  const id = normalizeTab(tab);
+  for (const group of NAV_GROUPS) {
+    if (group.tabs.some((t) => t.id === id)) return group.label;
+  }
+  return null;
+}

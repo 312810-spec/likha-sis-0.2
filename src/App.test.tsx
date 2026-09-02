@@ -93,7 +93,6 @@ describe("App", () => {
       expect(screen.getByRole("group", { name: groupName })).toBeInTheDocument();
     }
     for (const destination of [
-      "Workspace",
       "Attendance",
       "Monthly Summary",
       "Learners",
@@ -119,7 +118,7 @@ describe("App", () => {
 
     render(<App />);
     await screen.findByRole("region", { name: "Workspace" });
-    await waitFor(() => expect(document.title).toBe("Workspace · LIKHA-SIS"));
+    await waitFor(() => expect(document.title).toBe("Home · LIKHA-SIS"));
 
     await user.click(screen.getByRole("button", { name: "Learners" }));
 
