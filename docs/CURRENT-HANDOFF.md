@@ -1,5 +1,45 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — retried UX-02/UX-03 owed independent reviews, self-review substituted again)
+
+User-directed continuation ("continue working on verification debts").
+With the self-disabling-button sweep fully closed (see the entry
+below), retried the two remaining owed independent-review debts
+recorded in `docs/VERIFICATION-DEBT.md`: `accessibility-reviewer`
+against `TeacherWorkspaceScreen.tsx` (UX-02) and `teacher-ux-reviewer`
+against `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` (UX-03). Both
+dispatches, plus the one permitted `SendMessage` resume each, hit the
+same recurring agent-resume/retrieval failure again (real work done —
+32-35 tool calls per attempt — but no retrievable findings text). Per
+the established fallback, substituted a rigorous self-review for both:
+read every file involved end-to-end (screens, `StatusChip`/
+`PageHeader`/`Loading`/`Alert` components, relevant `styles.css`
+tokens). **No blocking issue found in either.** One non-blocking
+observation recorded for UX-03: `AttendanceScreen.tsx`'s per-row status
+buttons still use native `disabled={bulkMarking}` rather than the
+`aria-disabled` pattern from the self-disabling-button sweep, but this
+is not an instance of that bug (the button that becomes disabled is
+never the one that was focused), so no fix was made. Full self-review
+detail is in `docs/VERIFICATION-DEBT.md`'s UX-02 and UX-03 entries.
+
+Both debt entries remain open (a self-review is not a substitute for a
+real independent review, per project rules) — retry again in a future
+session once there's reason to believe the harness's agent-resume
+issue is fixed. No code changes this session; only
+`docs/VERIFICATION-DEBT.md` was updated. `git status` clean after
+commit/push.
+
+**Verified**: no new code — this was a review/documentation-only
+session. No test suite run since nothing changed under `src/` or
+`src-tauri/`.
+
+Next candidates unchanged from the prior entry below: (1) keep retrying
+UX-02/UX-03 in future sessions as the harness allows, or (2)
+product-shaped work — SF10 Permanent Record (safest immediately-
+implementable slice) or the authoritative-template form-output pipeline
+(higher value, currently paused pending more user-supplied DepEd
+templates).
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecordWorkspace/SectionRosterScreen, CLOSES the debt)
 
 User-directed continuation ("continue" / "focus on the debts and next
@@ -446,10 +486,10 @@ exploitable as a tenant-isolation bug (confirmed: it never returns
 cross-school data, just always-empty), but a real **correctness/
 availability** bug for advisers near a school year's actual end.
 
-**Fix**: derive the school_id from the session first
+**Fix**: derive the school*id from the session first
 (`sessions.require_active_school_scope`, this file's own established
 pattern, used elsewhere in the same function seconds later anyway) and
-use _that_ for the `as_of_date` lookup, before calling
+use \_that* for the `as_of_date` lookup, before calling
 `authorize_adviser_of_section` (which independently re-derives and
 re-verifies school_id/section ownership — no authorization logic
 changed, only the date the question is asked about). Fixed identically

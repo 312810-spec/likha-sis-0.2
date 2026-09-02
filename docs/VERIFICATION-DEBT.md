@@ -3225,6 +3225,32 @@ the missing verification actually happens (record what ran and when).
 
 ## UX-02 accessibility-reviewer independent review not retrievable (open)
 
+**Retried 2026-09-02, still not retrievable**: dispatched a fresh
+`accessibility-reviewer` against `TeacherWorkspaceScreen.tsx`. The
+initial dispatch and the one permitted `SendMessage` resume both
+completed real work (32-34 tool calls) but returned no retrievable
+findings text, same as the original 2026-08-25 attempt. Self-review
+substituted again: read the screen end-to-end plus `StatusChip.tsx`,
+`PageHeader.tsx`, `Loading.tsx`, `Alert.tsx`, and the relevant
+`styles.css` tokens/rules. No blocking issue found. `StatusChip` labels
+carry the state in text, never color alone (each of the four
+attendance states has a distinct label string, not just a tone).
+`PageHeader` moves focus to the `<h2>` on mount, same as every other
+screen. `Loading` uses `role="status"`, `Alert` uses `role="alert"` for
+error/warning and `role="status"` for success/info — matching the
+existing app-wide pattern. Heading hierarchy is correct (`h2` then two
+`h3`s). Every interactive element is a native `<button>`. Target size:
+`--control-height` is 34px in Efficient mode, 40px Comfortable, 48px
+Guided — all above WCAG 2.2's 24px AA minimum — and
+`.workspace-priority-item > button` gets an explicit 44px min-height
+under the narrow-viewport (`max-width: 640px`) media query. Contrast
+against this app's actual `--color-*` tokens was already computed and
+passed by the 2026-09-01 successful `accessibility-reviewer` dispatch
+against this same file (see the CLOSED entry below); the file has not
+materially changed since, so that result was not recomputed here.
+Owed independent review remains open — retry again in a future session
+once there's reason to believe the harness issue is fixed.
+
 `accessibility-reviewer` was dispatched against UX-02's rewritten
 `TeacherWorkspaceScreen.tsx` (2026-08-25) and hit the same recurring
 agent-resume/retrieval failure first documented in
