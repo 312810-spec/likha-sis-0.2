@@ -78,6 +78,7 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (resetting) return;
     setError(null);
     setConfirmation(null);
     setResetting(true);
@@ -159,7 +160,7 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
               />
             </div>
           </div>
-          <button type="submit" className="button-primary" disabled={resetting}>
+          <button type="submit" className="button-primary" aria-disabled={resetting}>
             {resetting ? "Resetting…" : "Reset password"}
           </button>
         </form>

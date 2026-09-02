@@ -30,6 +30,40 @@ this batch's specifics; remaining instances across
 `SectionRosterScreen.tsx`, `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`,
 `SubjectAttendanceScreen.tsx` still open, pattern proven.
 
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: auth/session-critical screens, complete)
+
+User-directed continuation ("continue"). Picked up the recorded next
+slice from the self-disabling-button debt: apply the proven `disabled=`
+→ `aria-disabled=` + handler-guard pattern (from the earlier 3-instance
+fix) to more screens. Scoped this slice to the four standalone
+auth/session-critical submit buttons — `LoginScreen.tsx` ("Sign in"),
+`FirstRunSetupScreen.tsx` ("Finish setup"), `AdminPasswordResetScreen.tsx`
+("Reset password"), `IdleTimeoutWarning.tsx` ("Stay signed in") —
+deliberately not the full ~40-instance sweep across ~15 files, to keep
+this change reviewable. Each screen has exactly one self-contained
+submit button and is among the first things every teacher touches.
+
+Each fix proven with a real interaction test (not just an attribute
+assertion): the underlying repository call is made to hang via an
+unresolved `Promise`, the button is clicked once, `aria-disabled="true"`
+is asserted, clicked again, and the repository call count is asserted
+unchanged — proving the handler-level guard actually blocks the second
+submission, not just that the button looks disabled.
+
+**Verified**: `npm run quality` 809/809 (4 new tests), typecheck/lint/
+format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated:
+7 of ~45 total instances now fixed; the remaining ~30+ across
+`ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`GradingPeriodsScreen.tsx`, `LearnerListScreen.tsx`,
+`ScheduleMeetingsScreen.tsx`, `SectionAdviserScreen.tsx`,
+`SectionRosterScreen.tsx`, `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`,
+`SubjectAttendanceScreen.tsx`, `TeachingAssignmentsScreen.tsx` remain
+open, pattern proven and mechanical to apply in further slices.
+
 ## Active Task (2026-09-02, this session — Reveal-in-folder: SF5/SF6/report card/roster, complete)
 
 User-directed continuation ("continue"). Picked up the recorded exact

@@ -2935,28 +2935,57 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## App-wide: self-disabling buttons lose focus to `<body>` on click — extended 2026-09-02 (GradingPeriods/ScheduleMeetings/TeachingAssignments)
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 12 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x2)
 
-**Extended 2026-09-02**: applied the same `disabled=` → `aria-disabled=`
-
-- handler-guard pattern to five more instances: `GradingPeriodsScreen.tsx`'s
-  per-row "Save" button, `ScheduleMeetingsScreen.tsx`'s "Schedule meeting"
-  and per-row "Remove" button, and `TeachingAssignmentsScreen.tsx`'s
-  "Assign teacher" and per-row "Remove" button. Chosen next because these
-  three screens share a simple, consistent shape (one create-form submit
-  button plus a per-row remove/save button keyed by id), making the sweep
-  mechanical and low-risk. For the per-row buttons, the handler guard
-  checks the specific row/id already being saved or removed
-  (`savingPeriodId === policyPeriodId`, `removingId === meeting.id`, etc.)
-  rather than a blanket "any action in flight" guard — preserving the
-  screens' existing behavior of only disabling the one row currently in
-  flight, not the whole list. Each proven with a real interaction test:
-  hang the underlying repository call, click once, assert
-  `aria-disabled="true"`, click again, assert the call count did not
-  increase. `npm run quality` 810/810 (5 new tests), typecheck/lint/
-  format/architecture clean; `npm run build`, `npm run
+**Extended 2026-09-02 (batch 2)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to five more instances:
+`GradingPeriodsScreen.tsx`'s per-row "Save" button,
+`ScheduleMeetingsScreen.tsx`'s "Schedule meeting" and per-row "Remove"
+button, and `TeachingAssignmentsScreen.tsx`'s "Assign teacher" and
+per-row "Remove" button. Chosen next because these three screens share
+a simple, consistent shape (one create-form submit button plus a
+per-row remove/save button keyed by id), making the sweep mechanical
+and low-risk. For the per-row buttons, the handler guard checks the
+specific row/id already being saved or removed
+(`savingPeriodId === policyPeriodId`, `removingId === meeting.id`, etc.)
+rather than a blanket "any action in flight" guard — preserving the
+screens' existing behavior of only disabling the one row currently in
+flight, not the whole list. Each proven with a real interaction test:
+hang the underlying repository call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase. `npm run quality` 810/810 (5 new tests), typecheck/lint/
+format/architecture clean; `npm run build`, `npm run
 check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
 diff --check` all clean; no Rust touched.
+
+**Extended 2026-09-02 (batch 1)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to the four standalone
+auth/session-critical submit buttons — `LoginScreen.tsx`'s "Sign in",
+`FirstRunSetupScreen.tsx`'s "Finish setup", `AdminPasswordResetScreen.tsx`'s
+"Reset password", and `IdleTimeoutWarning.tsx`'s "Stay signed in".
+Chosen first among the remaining ~40 instances across ~15 files because
+these are the screens every teacher touches before anything else
+(sign-in, first-run setup, the session-expiry warning) and each has
+exactly one self-contained submit button, keeping this slice small and
+reviewable rather than one large mechanical sweep. Each proven with a
+real interaction test: make the underlying repository call hang (an
+unresolved `Promise`), click the button once, assert
+`aria-disabled="true"`, click again, assert the repository call count
+did not increase. `npm run quality` 809/809 (4 new tests), typecheck/
+lint/format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Still open**: every other "disable while saving/removing/creating"
+button across `ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`LearnerListScreen.tsx` (several beyond the export button already
+fixed), `SectionAdviserScreen.tsx`, `SectionRosterScreen.tsx`,
+`SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, and
+`SubjectAttendanceScreen.tsx` — roughly 25+ remaining button instances.
+The pattern is fully proven and mechanical to apply; revisit as further
+scoped slices (e.g. grouped by screen or by feature area) rather than
+one large sweep, per this project's established "prove the pattern,
+defer the full sweep" discipline.
 
 ## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
 

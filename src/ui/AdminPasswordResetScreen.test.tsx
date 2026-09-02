@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { SchoolMemberApplicationService } from "../application/school-member-service";
@@ -16,6 +16,10 @@ const MEMBERS: SchoolMember[] = [
 class FakeSchoolMemberRepository implements SchoolMemberRepository {
   resetPasswordResult: boolean | "reject" = true;
   resetPasswordCalls: Array<{ targetUserId: string; newPassword: string }> = [];
+  /** When set, `resetPassword` never resolves on its own -- the test
+   * controls completion. Used to prove the in-flight guard blocks a
+   * second submission while the first is still pending. */
+  pending = false;
 
   constructor(private members: SchoolMember[] = MEMBERS) {}
 
@@ -25,6 +29,9 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
 
   async resetPassword(targetUserId: string, newPassword: string): Promise<boolean> {
     this.resetPasswordCalls.push({ targetUserId, newPassword });
+    if (this.pending) {
+      return new Promise(() => {});
+    }
     if (this.resetPasswordResult === "reject") {
       throw new Error("unauthorized");
     }
@@ -71,6 +78,30 @@ describe("AdminPasswordResetScreen", () => {
     expect(repo.resetPasswordCalls).toEqual([
       { targetUserId: "teacher-1", newPassword: "brand-new-password" },
     ]);
+  });
+
+  it("does not submit a second reset while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeSchoolMemberRepository();
+    repo.pending = true;
+    const schoolMemberService = new SchoolMemberApplicationService(repo);
+    render(
+      <ModeProvider>
+        <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+      </ModeProvider>,
+    );
+    await screen.findByRole("combobox", { name: "Teacher" });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Teacher" }), "teacher-1");
+    await user.type(screen.getByLabelText("New password"), "brand-new-password");
+    const resetButton = screen.getByRole("button", { name: "Reset password" });
+    await user.click(resetButton);
+    await waitFor(() => expect(repo.resetPasswordCalls).toHaveLength(1));
+
+    expect(resetButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(resetButton);
+
+    expect(repo.resetPasswordCalls).toHaveLength(1);
   });
 
   it("shows a generic message when the backend returns false (unknown target or a different school), never distinguishing which", async () => {
