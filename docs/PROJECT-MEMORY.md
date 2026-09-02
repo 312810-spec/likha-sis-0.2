@@ -3172,6 +3172,21 @@ clean. `git diff --check` clean.
 the three-role milestone, recorded in `docs/VERIFICATION-DEBT.md`, not
 yet dispatched.
 
+**Independent-review debt closed (2026-09-02)**: the `security-reviewer`
+pass owed for both role milestones above, plus UX-02's
+`accessibility-reviewer` and UX-03's `teacher-ux-reviewer` retries, all
+completed for real via the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`) — dispatch a
+`general-purpose` agent with the dedicated reviewer's checklist inlined,
+write findings to a scratchpad file, read the file directly instead of
+the broken notification channel. All three verdicts: NOT
+BLOCKING/LOOKS-GOOD; one small SHOULD-FIX (a missing SF4 plain-language
+gloss on `MonthlySummaryScreen.tsx`, parallel to the existing SF2 gloss)
+was found and fixed. Full findings in `docs/VERIFICATION-DEBT.md`'s
+matching entries. This workaround should be the default next step for
+any future review whose dedicated-agent dispatch fails to return
+retrievable findings, rather than falling straight to self-review.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

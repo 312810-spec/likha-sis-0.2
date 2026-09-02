@@ -1,8 +1,41 @@
 # Verification Debt
 
-## Roles & Permissions (ADR-0064, extended by ADR-0065) — independent security review owed (2026-09-02)
+## Roles & Permissions (ADR-0064, extended by ADR-0065) — independent security review owed — CLOSED (2026-09-02, closed 2026-09-02)
 
-Two milestones this session touch `auth::Capability`/`authorize_capability`,
+**Closed for real 2026-09-02**: routed a fresh `security-reviewer` pass
+covering both milestones together through the file-based output
+workaround (`docs/adr/0062-file-based-review-output-workaround.md`) —
+dispatched via `general-purpose` with the checklist inlined, writing
+findings to a scratchpad file instead of relying on the notification
+channel. This produced a real, retrievable, evidence-backed review.
+**Verdict: NOT BLOCKING**, zero should-fix items. Confirmed: `is_grantable()`
+is the only path any caller-supplied role string can take before reaching
+`grant`/`revoke` (traced every call site), backed by migration 25's
+closed-enumeration CHECK constraint as an independent second backstop;
+`grant()` uses `ON CONFLICT ... DO NOTHING` (not the previously-flagged
+`OR IGNORE`, which would silently swallow CHECK violations); every
+`school_id` used by the new commands/gates is session-derived, never
+caller-supplied; `revoke()`'s last-School-Head SELECT-then-act sequence
+is not the same failure class as the previously-fixed bootstrap race,
+because it executes entirely inside the app's single held
+`Mutex<Connection>` lock (verified by tracing `lib.rs`'s connection
+registration and `commands::lock_db`'s guard lifetime) — no window for a
+second writer to interleave; the four tightened export gates are real
+authorization calls with `Unauthorized` genuinely propagated, not
+comment-only claims; all six newly-gated commands are present in
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`; `AppError::CannotRemoveLastSchoolHead`'s
+`Serialize` impl leaks no internal detail, matching every other variant's
+shape; ADR-0065's "foundation only" claim (no `Capability` wiring for the
+seven new roles) was independently confirmed true in code, not just
+documented. One non-blocking observation, not a fix: `revoke_school_role`
+skips the membership check `grant_school_role` has, but this has no
+exploitable effect since the delete is `school_id`-scoped and a no-op for
+a non-member. This closes the debt for real — not a self-review
+substitute. Original self-review record retained below for the
+historical trail.
+
+**Original entry (2026-09-02, before closing)**: Two milestones this
+session touch `auth::Capability`/`authorize_capability`,
 `repository::role::{grant,revoke,is_grantable}`, four gated export
 commands, `grant_school_role`/`revoke_school_role`, and migration 25
 (widening `user_school_roles`) — squarely the category
@@ -14,10 +47,7 @@ cross-school isolation and last-School-Head-removal guards), but a
 fresh-context independent review was not dispatched for either. Not
 blocking (self-review found nothing to fix both times), but retained
 as debt per this project's reviewer-failure/self-review-substitution
-convention. Revisit in a future session — one pass can reasonably cover
-both milestones together, since ADR-0065 only widens the role
-vocabulary and adds no new authorization behavior beyond
-`is_grantable`.
+convention.
 
 ## Session network egress blocks all external fetch except WebSearch — open, session-specific (2026-09-02)
 
@@ -3252,33 +3282,30 @@ across every other DepEd-form export in the app. This closes the debt
 for real — not a self-review substitute. Original self-review record
 retained below for the historical trail.
 
-## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
 
-**Retried 2026-09-02, still not retrievable**: dispatched a fresh
-`teacher-ux-reviewer` against `AttendanceScreen.tsx`/
-`MonthlySummaryScreen.tsx` (the same scope). The initial dispatch and
-the one permitted `SendMessage` resume both completed real work (35
-tool calls each) but returned no retrievable findings text, same as
-the original 2026-08-25 attempt. Self-review substituted again, per the
-established fallback: read both files end-to-end. No blocking issue
-found — language is plain and DepEd-terminology-correct (the SF2/SF4
-disclosure banners are explicit that these are DepEd-inspired working
-references, not submission-ready reproductions); mode parity holds
-(the guided-only hints in both screens are supplementary text only —
-every action, button, and keyboard shortcut is present and functional
-in Efficient/Comfortable too, confirmed by reading the JSX rather than
-assuming); trust signals are present (clear "Saving…"/error/retry
-states per row, an explicit confirmation message after bulk-marking
-naming exactly what changed, and the legend explaining "—" means
-not-recorded rather than present). One non-blocking observation, not a
-bug: `AttendanceScreen.tsx`'s per-row status buttons use native
-`disabled={bulkMarking}` (line ~417) rather than the `aria-disabled`
-pattern used elsewhere in this sweep — but this does not reproduce the
-focus-loss bug that pattern fixes, since the button that becomes
-disabled is never the one that was focused (the teacher clicks "Mark
-all present" to trigger it, not a row button), so no fix needed. Owed
-independent review remains open — retry again in a future session once
-there's reason to believe the harness issue is fixed.
+**Closed for real 2026-09-02**: routed a fresh `teacher-ux-reviewer`
+pass through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`) — dispatched via
+`general-purpose` with the checklist inlined, writing findings to a
+scratchpad file instead of relying on the notification channel. This
+produced a real, retrievable, evidence-backed review.
+**Verdict: LOOKS-GOOD**, one **SHOULD-FIX**: `MonthlySummaryScreen.tsx`
+glossed "School Form 2 (SF2)" in plain language before first use but
+never glossed "SF4" anywhere on the screen — inconsistent support for a
+teacher who knows one acronym but not the other. Fixed: added a
+`field-hint` paragraph before the SF4 export button ("School Form 4
+(SF4) is a whole-school monthly attendance movement report, covering
+every section, not just this one."), mirroring the SF2 disclosure's
+phrasing. Verified with `npx vitest run src/ui/MonthlySummaryScreen.test.tsx`
+(23 passed). Two non-blocking observations recorded, not fixed (neither
+is a defect): `MonthlySummaryScreen`'s Guided mode has no contextual
+hint near its export/reveal actions the way `AttendanceScreen`'s Guided
+mode does for "Mark all present"; and Comfortable-as-default could not
+be confirmed from these two files alone (it lives in
+`useTeacherMode`/`ModeProvider`, outside this review's scope). This
+closes the debt for real — not a self-review substitute. Prior
+self-review record retained below for the historical trail.
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
 against UX-03's `AttendanceScreen`/`MonthlySummaryScreen` changes
@@ -3336,33 +3363,30 @@ level; `TeacherWorkspaceScreen.test.tsx` calls
 self-review substitute. Original self-review record retained below for
 the historical trail.
 
-## UX-02 accessibility-reviewer independent review not retrievable (open)
+## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
 
-**Retried 2026-09-02, still not retrievable**: dispatched a fresh
-`accessibility-reviewer` against `TeacherWorkspaceScreen.tsx`. The
-initial dispatch and the one permitted `SendMessage` resume both
-completed real work (32-34 tool calls) but returned no retrievable
-findings text, same as the original 2026-08-25 attempt. Self-review
-substituted again: read the screen end-to-end plus `StatusChip.tsx`,
-`PageHeader.tsx`, `Loading.tsx`, `Alert.tsx`, and the relevant
-`styles.css` tokens/rules. No blocking issue found. `StatusChip` labels
-carry the state in text, never color alone (each of the four
-attendance states has a distinct label string, not just a tone).
-`PageHeader` moves focus to the `<h2>` on mount, same as every other
-screen. `Loading` uses `role="status"`, `Alert` uses `role="alert"` for
-error/warning and `role="status"` for success/info — matching the
-existing app-wide pattern. Heading hierarchy is correct (`h2` then two
-`h3`s). Every interactive element is a native `<button>`. Target size:
-`--control-height` is 34px in Efficient mode, 40px Comfortable, 48px
-Guided — all above WCAG 2.2's 24px AA minimum — and
-`.workspace-priority-item > button` gets an explicit 44px min-height
-under the narrow-viewport (`max-width: 640px`) media query. Contrast
-against this app's actual `--color-*` tokens was already computed and
-passed by the 2026-09-01 successful `accessibility-reviewer` dispatch
-against this same file (see the CLOSED entry below); the file has not
-materially changed since, so that result was not recomputed here.
-Owed independent review remains open — retry again in a future session
-once there's reason to believe the harness issue is fixed.
+**Closed for real 2026-09-02**: routed a fresh `accessibility-reviewer`
+pass through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`) — dispatched via
+`general-purpose` with the checklist inlined, writing findings to a
+scratchpad file instead of relying on the notification channel. This
+produced a real, retrievable, evidence-backed review.
+**Verdict: LOOKS-GOOD.** Recomputed every relevant `--color-*` contrast
+pair from the actual hex values in both the light and dark `styles.css`
+blocks (12 pairs checked, tightest 3.40:1 light / 3.74:1 dark for
+`status-chip-neutral`'s border, still above the 3:1 non-text floor);
+confirmed state is never color-only (`ATTENDANCE_STATE_LABEL` gives each
+attendance state a distinct text label, plus a differently-worded action
+button per state); confirmed every control clears the 24px target-size
+floor in all three modes (34/40/48px); confirmed `PageHeader` moves
+focus to the heading on mount and both load-error paths use
+`role="alert"` with a retry button; confirmed
+`TeacherWorkspaceScreen.test.tsx` calls `expectNoAccessibilityViolations`
+against loaded (non-empty) content; confirmed the still-open
+NVDA/Narrator human pass gap is honestly recorded elsewhere in this file
+and not implied as covered. No findings to fix. This closes the debt for
+real — not a self-review substitute. Prior self-review record retained
+below for the historical trail.
 
 `accessibility-reviewer` was dispatched against UX-02's rewritten
 `TeacherWorkspaceScreen.tsx` (2026-08-25) and hit the same recurring

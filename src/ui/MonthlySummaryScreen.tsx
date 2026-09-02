@@ -389,6 +389,11 @@ export function MonthlySummaryScreen({
             </Alert>
           )}
 
+          <p className="field-hint">
+            School Form 4 (SF4) is a whole-school monthly attendance movement report, covering every
+            section, not just this one.
+          </p>
+
           <button type="button" aria-disabled={exportingSf4} onClick={handleExportSf4}>
             {exportingSf4 ? "Exporting…" : "Export SF4 (CSV, whole school)"}
           </button>
