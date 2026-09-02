@@ -87,6 +87,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
   async revealExportedFile(): Promise<void> {
     throw new Error("not used in this test");
   }

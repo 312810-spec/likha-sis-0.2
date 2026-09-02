@@ -82,6 +82,7 @@ pub fn run() {
             commands::export::export_school_monthly_attendance_sf4,
             commands::export::export_section_eosy_sf5,
             commands::export::export_school_eosy_sf6,
+            commands::export::export_learner_permanent_record_sf10,
             commands::export::export_class_record_report_card,
             commands::export::export_learner_roster,
             commands::grading::list_grading_policies,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
+  Sf10ExportResult,
   Sf2ExportResult,
 } from "../../domain/export";
 import { TauriExportRepository } from "./export-repository";
@@ -168,6 +169,32 @@ describe("TauriExportRepository", () => {
     mockInvoke.mockResolvedValueOnce(null);
 
     const result = await new TauriExportRepository().exportLearnerRoster();
+
+    expect(result).toBeNull();
+  });
+
+  it("exportLearnerPermanentRecordSf10 invokes export_learner_permanent_record_sf10 with learnerId", async () => {
+    const result: Sf10ExportResult = {
+      filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF10_Dela_Cruz_Juan_123456789012.csv",
+      disclosure: {
+        populatedFields: ["School Name", "General Average (per year enrolled)"],
+        omittedFields: [{ field: "Official DepEd SF10 template", reason: "content-only export" }],
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const returned = await new TauriExportRepository().exportLearnerPermanentRecordSf10("l1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("export_learner_permanent_record_sf10", {
+      learnerId: "l1",
+    });
+    expect(returned).toEqual(result);
+  });
+
+  it("exportLearnerPermanentRecordSf10 returns null when the learner could not be resolved", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    const result = await new TauriExportRepository().exportLearnerPermanentRecordSf10("unknown");
 
     expect(result).toBeNull();
   });

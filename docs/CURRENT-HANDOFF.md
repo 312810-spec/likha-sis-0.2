@@ -1,5 +1,124 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Wave: SF10 Permanent Record shipped, ADR-0063)
+
+User-directed continuation ("continue but do sf10, i will tell you if i am
+ready to work on the templates"). Built SF10 Permanent Record as a
+content-based CSV export (DepEd-content-faithful, not the official
+`.xlsx` template — that track, `formgen::template_version`, stays
+evidence-blocked per ADR-0053 and was not touched), following exactly
+the SF5/SF6 reuse pattern the prior handoff entry identified as the
+safest next slice. Full design/rationale in
+`docs/adr/0063-sf10-permanent-record.md`.
+
+**What shipped**: `src-tauri/src/export/sf10.rs` (new — reuses
+`PromotionStatus`/`Sf5SubjectGrade`/`Sf5LearnerRow::compute_status`
+from `sf5.rs` unchanged), a new
+`commands::export::export_learner_permanent_record_sf10` command
+(gated by `Capability::ManageLearners`, the same Registrar-or-School-
+Head gate as `create_learner`/`update_learner` — neither SF5's
+adviser-of-section gate nor SF6's plain session-scope gate fit a
+single learner's whole multi-year history), full frontend port/
+service/UI wiring, and a new per-learner-row "Export SF10 (Permanent
+Record)" button on `LearnerListScreen.tsx`. A same-school-year
+mid-year transfer collapses into one row (labeled with the latest
+section, subject grades aggregated across every section that year),
+not a duplicate. `export_learner_permanent_record_sf10` added to
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`, matching
+`create_learner`'s convention for `ManageLearners`-gated commands.
+
+**Verified for real, not hand-verified**: this session's sandbox had a
+working `sudo apt-get` path (unlike most prior sessions) — installed
+the GTK/WebKit system libraries, ran `rustup update stable` (1.94.1 →
+1.98.0, required), then ran `cargo build`, `cargo test` (633 lib tests
+
+- all integration binaries, including 4 new `export::sf10` unit tests
+  and 7 new `tests/export.rs` integration tests — authorization gate,
+  cross-school isolation, unknown-learner-id, empty history, multi-year
+  ordering, mid-year-transfer collapsing, no-cross-school-leakage),
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` — all
+  clean, all directly confirmed. One real bug was caught by `cargo test`
+  during development (a CSV header label containing a comma caused the
+  label itself to get quoted, breaking a test's expected substring) and
+  fixed before commit — see the ADR for detail. `npm run quality` —
+  853/853 vitest (was 843), typecheck/lint/format/architecture clean; 10
+  new TS tests. `npm run build`, `npm run check:dev-preview-isolation`,
+  `npm run harness:verify` (100/100) all clean. No new dependency, no
+  migration, no change to `formgen/`.
+
+**Independent security review**: dispatched via the file-based
+workaround from ADR-0062 (this session's own earlier fix for the
+agent-resume/retrieval bug) — a real, retrievable review, not a self-
+review substitute. **Verdict: NO BLOCKING FINDINGS.** Checked and
+confirmed: authorization runs before any data read and `school_id` is
+never client-supplied; every downstream lookup (`learner`, `section`,
+`class_record`, `section_membership`) is independently tenant-scoped
+and cross-school-tested; every CSV row routes through the shared
+`csv::row`/`escape_field` formula-injection defense; every
+user-controlled filename component routes through
+`sanitize_filename_component`; no learner PII reaches a log or error
+string; neither of this project's two previously-shipped failure
+classes (unauthenticated self-grant; SELECT-then-act race) recurs.
+Full findings in `docs/adr/0063-sf10-permanent-record.md`.
+
+Next candidate: the authoritative-template form-output pipeline
+remains paused, per your instruction, until you say you're ready to
+continue supplying DepEd templates.
+
+## Active Task (2026-09-02, this session — UX-02/UX-03 CLOSED for real via a new file-based review workaround; ADR-0062)
+
+User-directed continuation ("continue working on verification debts",
+then "initiate solid workaround or replacement to the agent-resume/
+retrieval [failure]"). Direct dispatches of `accessibility-reviewer`
+(UX-02, `TeacherWorkspaceScreen.tsx`) and `teacher-ux-reviewer` (UX-03,
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`) — including the one
+permitted `SendMessage` resume each, and a third attempt using
+`run_in_background: false` to test whether forcing synchronous
+execution avoided the failure — all hit the same recurring
+agent-resume/retrieval failure (real work done, no findings text
+retrievable). Self-review substituted first (recorded, no blocking
+issue), then built and validated a real workaround instead of accepting
+another round of open debt.
+
+**Workaround** (`docs/adr/0062-file-based-review-output-workaround.md`):
+route review output through the filesystem instead of the broken
+notification channel. Adding `Write` access to the dedicated reviewer
+agents was considered and rejected — `architecture-reviewer.md` and
+`security-reviewer.md` both explicitly flag a reviewer with `Write`
+access as a harness defect, and weakening that to work around an
+unrelated bug would trade one real defect for another. Instead: dispatch
+via the already-`Write`-capable `general-purpose` agent, with the
+dedicated reviewer's own checklist inlined into the prompt, instructed
+to touch nothing in the repository except one findings file under the
+session scratchpad; then read that file directly, ignoring the (still
+broken) notification result text. Validated live against both UX-02 and
+UX-03 — both returned real, evidence-backed, retrievable findings
+(computed contrast ratios from actual hex values, line-cited mode-parity
+checks, etc.), both verdict **LOOKS-GOOD**. Full findings in
+`docs/VERIFICATION-DEBT.md`'s now-CLOSED UX-02 and UX-03 entries.
+
+Both debt entries are **CLOSED for real** — not self-review substitutes.
+No application code changes this session (both reviews found nothing to
+fix); `docs/adr/0062-*.md` (new), `docs/VERIFICATION-DEBT.md`, and this
+file were updated. `git status` clean after commit/push.
+
+**Verified**: no application code changed — review/documentation/ADR
+session only. No test suite run since nothing changed under `src/` or
+`src-tauri/`.
+
+**For future sessions**: when a dedicated reviewer agent (or any
+subagent whose result you need back) hits the agent-resume/retrieval
+failure again (empty/placeholder notification after real tool-call
+activity), after the one permitted `SendMessage` resume, use the
+file-based workaround from ADR-0062 next — don't fall straight to
+self-review, and don't grant `Write` to the dedicated reviewer agents.
+
+Next candidates: (1) product-shaped work — SF10 Permanent Record
+(safest immediately-implementable slice) or the authoritative-template
+form-output pipeline (higher value, currently paused pending more
+user-supplied DepEd
+templates).
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecordWorkspace/SectionRosterScreen, CLOSES the debt)
 
 User-directed continuation ("continue" / "focus on the debts and next
@@ -446,10 +565,10 @@ exploitable as a tenant-isolation bug (confirmed: it never returns
 cross-school data, just always-empty), but a real **correctness/
 availability** bug for advisers near a school year's actual end.
 
-**Fix**: derive the school_id from the session first
+**Fix**: derive the school*id from the session first
 (`sessions.require_active_school_scope`, this file's own established
 pattern, used elsewhere in the same function seconds later anyway) and
-use _that_ for the `as_of_date` lookup, before calling
+use \_that* for the `as_of_date` lookup, before calling
 `authorize_adviser_of_section` (which independently re-derives and
 re-verifies school_id/section ownership — no authorization logic
 changed, only the date the question is asked about). Fixed identically

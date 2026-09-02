@@ -3034,6 +3034,36 @@ confirming by reading the code that neither is an instance of this bug.
 (100/100), `git diff --check` all clean. No Rust touched. 19 of ~45
 total instances now fixed across 10 screens.
 
+## File-Based Independent-Review Workaround (added 2026-09-02)
+
+The recurring agent-resume/retrieval failure (dispatched reviewer
+subagents complete real work but their findings text never comes back
+to the orchestrating session — documented since M7) now has a real
+workaround, not just a self-review fallback: dispatch via the
+`general-purpose` agent instead of a dedicated reviewer agent, with
+the dedicated reviewer's own checklist inlined into the prompt,
+restricted to writing exactly one findings file to the session
+scratchpad (no repository edits), then read that file directly instead
+of relying on the notification channel. Validated live: UX-02, UX-03,
+and the SF10 security review all returned real, retrievable,
+evidence-backed findings this way after direct dispatches (plus the
+one permitted resume) kept failing. Deliberately does **not** grant
+`Write` to the dedicated reviewer agents themselves — see ADR-0062 for
+why that was ruled out. Use this pattern next time the failure recurs,
+after the one permitted resume, before falling back to self-review.
+
+## SF10 Permanent Record (added 2026-09-02)
+
+Content-based CSV export of a learner's cumulative academic history
+(grades/promotion status per school year, across every school year
+ever enrolled) — `export::sf10` + `export_learner_permanent_record_sf10`,
+gated by `Capability::ManageLearners` (Registrar/School Head only,
+unlike SF5's adviser-of-section or SF6's plain session-scope gates).
+Deliberately unrelated to the separate, still-evidence-blocked official
+`.xlsx` SF10 template track (`formgen::template_version`, ADR-0053) —
+this is the same disclosure-not-refusal CSV pattern SF2/SF4/SF5/SF6
+already ship. Full detail: `docs/adr/0063-sf10-permanent-record.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

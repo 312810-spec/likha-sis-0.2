@@ -458,6 +458,14 @@ export class FixtureExportRepository implements ExportRepository {
     throw new Error("dev-preview fixture: exportLearnerRoster() is not wired -- read-only fixture");
   }
 
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error(
+      "dev-preview fixture: exportLearnerPermanentRecordSf10() is not wired -- read-only fixture",
+    );
+  }
+
   async revealExportedFile(): Promise<void> {
     // No real OS file manager in a browser-hosted dev-preview -- a no-op
     // is the honest fixture behavior here, not a throw (unlike the other
