@@ -1181,6 +1181,23 @@ label {
   border: 0;
 }
 
+/* Roles and Permissions (ADR-0064/0065) -- a member's held grantable
+   roles, each rendered as a plain-text badge or (for the roles that can
+   be revoked here) a small revoke button, laid out as a wrapping row
+   rather than a stacked list. */
+.role-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) / 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.role-badge-list li {
+  display: inline-flex;
+}
+
 /* SF1 Import (Wave 2C, ADR-0043) -- the classification summary strip:
    New/Existing/Needs review/Errors as a row of count + status-chip
    pairs, not color-only tiles. */

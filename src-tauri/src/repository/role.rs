@@ -5,15 +5,53 @@ use crate::error::{AppError, AppResult};
 /// The confirmed starting role set for WAVE 1A RBAC Foundation -- see
 /// `docs/product/PRODUCT-CONTRACT.md`'s RBAC section and
 /// `docs/product/M8-DECISION.md`'s follow-up, where this exact
-/// three-role model was already asked and answered with the user.
-/// Explicitly **not** the final LIKHA role universe (Adviser, LIS
-/// Coordinator, ICT Coordinator, Master Teacher/Department Head are
-/// expected later) -- adding a role means widening migration 16's CHECK
-/// constraint in a new migration, never changing these constants' type
-/// or any function signature below.
+/// three-role model was already asked and answered with the user. These
+/// three remain the only roles with any actual authorization wiring
+/// (`auth::Capability::allowed_roles`) -- see the extended set below for
+/// the roles migration 25 made grantable but deliberately left
+/// unwired.
 pub const TEACHER: &str = "teacher";
 pub const REGISTRAR: &str = "registrar";
 pub const SCHOOL_HEAD: &str = "school_head";
+
+/// The project owner's confirmed full role taxonomy (2026-09-02),
+/// widened into the CHECK constraint by migration 25 -- see
+/// `docs/adr/0065-eight-role-taxonomy-foundation.md`. **Foundation
+/// only**: each of these is grantable through
+/// `commands::user::{grant_school_role,revoke_school_role}` today, but
+/// none has any `Capability` variant or command gate wired to it yet --
+/// most map to forms/tools (IPCRF, Department Grade Sheets, Certificate
+/// of Observation/COT, EBEIS/LIS exports, Form 48 DTR, Inventory
+/// Tagging, SF8 clinic logs) that do not exist as features in this app
+/// yet. Wiring a role's actual authorization is each role's own future
+/// slice, once the feature it gates exists -- do not invent a
+/// `Capability` for one of these from assumption.
+pub const MASTER_TEACHER: &str = "master_teacher";
+pub const CLASS_ADVISER: &str = "class_adviser";
+pub const SUBJECT_TEACHER: &str = "subject_teacher";
+pub const ICT_COORDINATOR: &str = "ict_coordinator";
+pub const ADMIN_OFFICER: &str = "admin_officer";
+pub const PROPERTY_CUSTODIAN: &str = "property_custodian";
+pub const HEALTH_OFFICER: &str = "health_officer";
+
+/// Every role `commands::user::{grant_school_role,revoke_school_role}`
+/// will accept -- the single source of truth for that boundary, so a
+/// future role addition never needs its own copy of this list
+/// maintained separately in `commands::user`. `TEACHER` is deliberately
+/// excluded: it is the automatic default `add_user_to_school` grants at
+/// membership time, so a second path to grant it would be redundant,
+/// not a new capability.
+pub fn is_grantable(role: &str) -> bool {
+    role == REGISTRAR
+        || role == SCHOOL_HEAD
+        || role == MASTER_TEACHER
+        || role == CLASS_ADVISER
+        || role == SUBJECT_TEACHER
+        || role == ICT_COORDINATOR
+        || role == ADMIN_OFFICER
+        || role == PROPERTY_CUSTODIAN
+        || role == HEALTH_OFFICER
+}
 
 /// Grants `role` to `user_id` within `school_id`. A user may hold more
 /// than one role in the same school at once (e.g. Teacher + a future
@@ -188,6 +226,28 @@ mod tests {
         let result = grant(&conn, &user_id, &school_id, "principal");
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn grant_accepts_every_role_in_the_extended_taxonomy() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        for role in [
+            MASTER_TEACHER,
+            CLASS_ADVISER,
+            SUBJECT_TEACHER,
+            ICT_COORDINATOR,
+            ADMIN_OFFICER,
+            PROPERTY_CUSTODIAN,
+            HEALTH_OFFICER,
+        ] {
+            grant(&conn, &user_id, &school_id, role).unwrap();
+            assert!(
+                has_any_role(&conn, &user_id, &school_id, &[role]).unwrap(),
+                "{role} should be grantable"
+            );
+        }
     }
 
     #[test]

@@ -74,23 +74,42 @@ function renderScreen(options: { members?: SchoolMember[] } = {}) {
   return { ...result, repo };
 }
 
+function rowFor(name: string): HTMLElement {
+  return screen.getByRole("rowheader", { name }).closest("tr")!;
+}
+
+async function grantRole(user: ReturnType<typeof userEvent.setup>, row: HTMLElement, role: string) {
+  await user.selectOptions(within(row).getByRole("combobox"), role);
+  await user.click(within(row).getByRole("button", { name: "Grant" }));
+}
+
 describe("RoleManagementScreen", () => {
-  it("shows every school member with their current roles and grant/revoke buttons -- no client-side role gating", async () => {
+  it("shows every school member with their current roles and a grant picker -- no client-side role gating", async () => {
     renderScreen();
 
-    expect(await screen.findByRole("cell", { name: "Teacher" })).toBeInTheDocument();
-    const anaRow = screen.getByRole("rowheader", { name: "Ana Cruz" }).closest("tr")!;
-    expect(within(anaRow).getByRole("button", { name: "Grant Registrar" })).toBeInTheDocument();
-    const boRow = screen.getByRole("rowheader", { name: "Bo Reyes" }).closest("tr")!;
+    expect(await screen.findByRole("rowheader", { name: "Ana Cruz" })).toBeInTheDocument();
+    const anaRow = rowFor("Ana Cruz");
+    expect(within(anaRow).getByText("Teacher only")).toBeInTheDocument();
+    expect(within(anaRow).getByRole("combobox")).toBeInTheDocument();
+    expect(within(anaRow).getByRole("option", { name: "School Head" })).toBeInTheDocument();
+
+    const boRow = rowFor("Bo Reyes");
     expect(within(boRow).getByRole("button", { name: "Revoke School Head" })).toBeInTheDocument();
+  });
+
+  it("renders each held role exactly once -- not as both plain text and a revoke button", async () => {
+    renderScreen();
+    await screen.findByRole("rowheader", { name: "Bo Reyes" });
+
+    expect(within(rowFor("Bo Reyes")).getAllByText(/School Head/)).toHaveLength(1);
   });
 
   it("grants a role and shows the confirmation", async () => {
     const user = userEvent.setup();
     const { repo } = renderScreen();
-    const anaRow = (await screen.findByRole("rowheader", { name: "Ana Cruz" })).closest("tr")!;
+    await screen.findByRole("rowheader", { name: "Ana Cruz" });
 
-    await user.click(within(anaRow).getByRole("button", { name: "Grant Registrar" }));
+    await grantRole(user, rowFor("Ana Cruz"), "registrar");
 
     expect(await screen.findByText("Ana Cruz is now a Registrar.")).toBeInTheDocument();
     expect(repo.grantRoleCalls).toEqual([{ targetUserId: "teacher-1", roleName: "registrar" }]);
@@ -99,15 +118,17 @@ describe("RoleManagementScreen", () => {
   it("revokes a role and shows the confirmation", async () => {
     const user = userEvent.setup();
     const { repo } = renderScreen();
-    const boRow = (await screen.findByRole("rowheader", { name: "Bo Reyes" })).closest("tr")!;
+    await screen.findByRole("rowheader", { name: "Bo Reyes" });
 
-    await user.click(within(boRow).getByRole("button", { name: "Revoke School Head" }));
+    await user.click(
+      within(rowFor("Bo Reyes")).getByRole("button", { name: "Revoke School Head" }),
+    );
 
     expect(await screen.findByText("Bo Reyes is no longer a School Head.")).toBeInTheDocument();
     expect(repo.revokeRoleCalls).toEqual([{ targetUserId: "head-1", roleName: "school_head" }]);
   });
 
-  it("does not submit a second action for the same button while the first is still in flight", async () => {
+  it("does not submit a second grant while the first is still in flight", async () => {
     const user = userEvent.setup();
     const repo = new FakeSchoolMemberRepository();
     repo.pending = true;
@@ -117,9 +138,11 @@ describe("RoleManagementScreen", () => {
         <RoleManagementScreen schoolMemberService={schoolMemberService} />
       </ModeProvider>,
     );
-    const anaRow = (await screen.findByRole("rowheader", { name: "Ana Cruz" })).closest("tr")!;
+    await screen.findByRole("rowheader", { name: "Ana Cruz" });
+    const anaRow = rowFor("Ana Cruz");
 
-    const grantButton = within(anaRow).getByRole("button", { name: "Grant Registrar" });
+    await user.selectOptions(within(anaRow).getByRole("combobox"), "registrar");
+    const grantButton = within(anaRow).getByRole("button", { name: "Grant" });
     await user.click(grantButton);
     await waitFor(() => expect(repo.grantRoleCalls).toHaveLength(1));
 
@@ -142,9 +165,11 @@ describe("RoleManagementScreen", () => {
         <RoleManagementScreen schoolMemberService={schoolMemberService} />
       </ModeProvider>,
     );
-    const boRow = (await screen.findByRole("rowheader", { name: "Bo Reyes" })).closest("tr")!;
+    await screen.findByRole("rowheader", { name: "Bo Reyes" });
 
-    await user.click(within(boRow).getByRole("button", { name: "Revoke School Head" }));
+    await user.click(
+      within(rowFor("Bo Reyes")).getByRole("button", { name: "Revoke School Head" }),
+    );
 
     expect(
       await screen.findByText(
@@ -163,9 +188,9 @@ describe("RoleManagementScreen", () => {
         <RoleManagementScreen schoolMemberService={schoolMemberService} />
       </ModeProvider>,
     );
-    const anaRow = (await screen.findByRole("rowheader", { name: "Ana Cruz" })).closest("tr")!;
+    await screen.findByRole("rowheader", { name: "Ana Cruz" });
 
-    await user.click(within(anaRow).getByRole("button", { name: "Grant Registrar" }));
+    await grantRole(user, rowFor("Ana Cruz"), "registrar");
 
     expect(await screen.findByText("Could not grant Registrar to Ana Cruz.")).toBeInTheDocument();
   });

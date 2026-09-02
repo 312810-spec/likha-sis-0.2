@@ -54,12 +54,9 @@ pub fn add_user_to_school(
     role::grant(&conn, &user_id, &school_id, role::TEACHER)
 }
 
-/// Grants `role_name` (must be `role::REGISTRAR` or `role::SCHOOL_HEAD` --
-/// see the doc comment below) to `target_user_id` within the caller's own
-/// school. School Head only (`Capability::ManageRoles`). `role::TEACHER`
-/// is deliberately not grantable through this command -- it is already
-/// the automatic default `add_user_to_school` grants at membership time,
-/// so a second path to grant it would be redundant, not a new capability.
+/// Grants `role_name` (must satisfy `role::is_grantable` -- see that
+/// function's doc comment) to `target_user_id` within the caller's own
+/// school. School Head only (`Capability::ManageRoles`).
 #[tauri::command]
 pub fn grant_school_role(
     db: State<'_, Mutex<Connection>>,
@@ -69,7 +66,7 @@ pub fn grant_school_role(
 ) -> AppResult<()> {
     let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageRoles)?;
-    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+    if !role::is_grantable(&role_name) {
         return Err(AppError::Unauthorized);
     }
     if !user::is_member_of_school(&conn, &target_user_id, &school_id)? {
@@ -78,8 +75,8 @@ pub fn grant_school_role(
     role::grant(&conn, &target_user_id, &school_id, &role_name)
 }
 
-/// Revokes `role_name` (must be `role::REGISTRAR` or `role::SCHOOL_HEAD`)
-/// from `target_user_id` within the caller's own school. School Head only
+/// Revokes `role_name` (must satisfy `role::is_grantable`) from
+/// `target_user_id` within the caller's own school. School Head only
 /// (`Capability::ManageRoles`), same as `grant_school_role`. Fails with
 /// `AppError::CannotRemoveLastSchoolHead` rather than silently succeeding
 /// if this would leave the school with zero School Heads -- see
@@ -94,7 +91,7 @@ pub fn revoke_school_role(
 ) -> AppResult<()> {
     let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageRoles)?;
-    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+    if !role::is_grantable(&role_name) {
         return Err(AppError::Unauthorized);
     }
     role::revoke(&conn, &target_user_id, &school_id, &role_name)

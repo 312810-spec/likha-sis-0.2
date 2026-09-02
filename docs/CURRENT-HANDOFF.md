@@ -1,5 +1,42 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Roles & Permissions: 8-role taxonomy widened, foundation only, ADR-0065)
+
+Direct follow-up to the three-role milestone below, per the user's own
+confirmed sequencing. Full detail: `docs/adr/0065-eight-role-taxonomy-foundation.md`,
+`docs/PROJECT-MEMORY.md`'s matching entry.
+
+**Shipped**: migration 25 widens `user_school_roles` to the user's full
+8-role table (in `docs/product/PRODUCT-CONTRACT.md`'s RBAC section);
+`repository::role::is_grantable` (replaces a hardcoded two-value check
+in `grant_school_role`/`revoke_school_role`); `RoleManagementScreen`
+redesigned (badge list + single-select grant control, since nine
+grantable roles no longer fit as table columns) — caught and fixed a
+real duplicate-badge rendering bug during that redesign, proven by a
+new regression test.
+
+**Deliberately foundation only** — no `Capability`/command gate for any
+of the seven new roles; most map to features that don't exist in this
+app yet (IPCRF, Department Grade Sheets, COT, EBEIS/LIS exports, Form
+48 DTR, Inventory Tagging, SF8). Class Adviser/Subject Teacher
+confirmed by the user to stay separate from the existing
+`section_advisories`/plain-`teacher` mechanisms, not merged into them.
+
+**Verified**: `cargo test`/`clippy`/`fmt` clean; `npm run quality`
+867/867; `npm run build`; `npm run check:dev-preview-isolation`; `npm
+run harness:verify` 100/100; `git diff --check` clean.
+
+**Not done**: independent `security-reviewer` pass — same owed debt as
+the three-role milestone, recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Exact next slice, per the user's own explicit instruction**: move to
+other pending waves/tasks, then to general UI work, in that order.
+Nothing pre-selected for the "other pending waves/tasks" step — pick
+using this project's own priority order
+(privacy/security → correctness → DepEd compliance → teacher usability
+→ offline reliability → maintainability → zero billing → performance →
+speed) and current evidence, per `.claude/rules/autonomous-development.md`.
+
 ## Active Task (2026-09-02, this session — Roles & Permissions: RBAC made usable, ADR-0064)
 
 User-directed milestone (explicit direction: "roles and permissions").

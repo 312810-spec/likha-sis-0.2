@@ -3132,6 +3132,46 @@ fmt --check` clean. `npm run quality` (866/866 tests), `npm run build`,
 as debt in `docs/VERIFICATION-DEBT.md`, not yet dispatched this
 session.
 
+## Roles & Permissions: 8-role taxonomy widened, foundation only (added 2026-09-02, ADR-0065)
+
+Follow-up to the three-role RBAC milestone above, per the user's own
+confirmed sequencing (three-role work first, then this). Migration 25
+widens `user_school_roles`'s CHECK constraint to the user's own
+confirmed 8-role table (School Head, Head/Master Teacher, Class
+Adviser, Subject Teacher, ICT Coordinator, Admin Officer/ADAS, Property
+Custodian, Health Officer — full table in
+`docs/product/PRODUCT-CONTRACT.md`'s RBAC section). All seven new roles
+are grantable today through `grant_school_role`/`revoke_school_role`/
+`RoleManagementScreen` (redesigned from a per-role-column table to a
+badge-list-plus-selector layout — nine grantable roles no longer fit as
+columns). New `repository::role::is_grantable` replaces a hardcoded
+two-value check in both commands.
+
+**Deliberately foundation only**: no `Capability` or command gate
+exists for any of the seven new roles — most of what the user's table
+maps them to (IPCRF, Department Grade Sheets, COT, EBEIS/LIS exports as
+their own feature, Form 48 DTR, Inventory Tagging, SF8 clinic logs)
+isn't built in this app yet, so a capability gate for it now would be a
+guess. Class Adviser and Subject Teacher were confirmed by the user to
+stay separate, additional role grants rather than merging into the
+existing `section_advisories`/plain-`teacher` mechanisms that
+partially overlap their scope.
+
+Caught and fixed during this milestone's own UI redesign, before
+shipping: a duplicate-rendering bug (a held role briefly rendered as
+both plain text and a revoke button) — proven fixed by a new regression
+test, not just visual inspection.
+
+**Verified**: `cargo test` (649 lib tests including new migration-25
+and `role.rs` coverage), `cargo clippy -D warnings` clean, `cargo fmt
+--check` clean. `npm run quality` 867/867, `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100) all
+clean. `git diff --check` clean.
+
+**Not done**: independent `security-reviewer` pass — same owed debt as
+the three-role milestone, recorded in `docs/VERIFICATION-DEBT.md`, not
+yet dispatched.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

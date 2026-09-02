@@ -51,7 +51,7 @@ fn grant_role_as_current_session(
     role_name: &str,
 ) -> app_lib::error::AppResult<()> {
     let school_id = auth::authorize_capability(conn, sessions, Capability::ManageRoles)?;
-    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+    if !role::is_grantable(role_name) {
         return Err(AppError::Unauthorized);
     }
     if !user::is_member_of_school(conn, target_user_id, &school_id)? {
@@ -68,7 +68,7 @@ fn revoke_role_as_current_session(
     role_name: &str,
 ) -> app_lib::error::AppResult<()> {
     let school_id = auth::authorize_capability(conn, sessions, Capability::ManageRoles)?;
-    if role_name != role::REGISTRAR && role_name != role::SCHOOL_HEAD {
+    if !role::is_grantable(role_name) {
         return Err(AppError::Unauthorized);
     }
     role::revoke(conn, target_user_id, &school_id, role_name)
@@ -96,6 +96,38 @@ fn a_school_head_can_grant_school_head_to_a_colleague() {
     grant_role_as_current_session(&conn, &sessions, &teacher_id, role::SCHOOL_HEAD).unwrap();
 
     assert!(role::has_any_role(&conn, &teacher_id, &s.id, &[role::SCHOOL_HEAD]).unwrap());
+}
+
+#[test]
+fn a_school_head_can_grant_every_role_in_the_extended_taxonomy() {
+    // Roles & Permissions 8-role expansion (ADR-0065): foundation only,
+    // but grant/revoke must work for all seven new roles, not just
+    // Registrar/School Head.
+    let conn = open_test_db();
+    let s = school::create(&conn, "Rizal Elementary").unwrap();
+    let (_head_id, sessions) = login_as_a_school_head_at(&conn, &s.id, "head.a");
+    let (teacher_id, _) = login_as_a_teacher_at(&conn, &s.id, "teacher.a");
+
+    for extended_role in [
+        role::MASTER_TEACHER,
+        role::CLASS_ADVISER,
+        role::SUBJECT_TEACHER,
+        role::ICT_COORDINATOR,
+        role::ADMIN_OFFICER,
+        role::PROPERTY_CUSTODIAN,
+        role::HEALTH_OFFICER,
+    ] {
+        grant_role_as_current_session(&conn, &sessions, &teacher_id, extended_role).unwrap();
+        assert!(
+            role::has_any_role(&conn, &teacher_id, &s.id, &[extended_role]).unwrap(),
+            "{extended_role} should be grantable through the command boundary"
+        );
+        revoke_role_as_current_session(&conn, &sessions, &teacher_id, extended_role).unwrap();
+        assert!(
+            !role::has_any_role(&conn, &teacher_id, &s.id, &[extended_role]).unwrap(),
+            "{extended_role} should be revocable through the command boundary"
+        );
+    }
 }
 
 #[test]

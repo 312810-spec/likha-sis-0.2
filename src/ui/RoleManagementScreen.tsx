@@ -11,16 +11,23 @@ interface RoleManagementScreenProps {
   schoolMemberService: SchoolMemberApplicationService;
 }
 
-/** Roles & Permissions milestone: the first UI able to grant or revoke
- * Registrar/School Head for a colleague at all — `add_user_to_school`
- * has only ever granted Teacher automatically; this closes that
- * disclosed gap. Any authenticated school member may view this screen
- * (matching `list_school_members`'s reference-data convention, and this
+/** Roles & Permissions milestone: the first UI able to grant or revoke a
+ * role beyond Teacher for a colleague at all — `add_user_to_school` has
+ * only ever granted Teacher automatically; this closes that disclosed
+ * gap. Any authenticated school member may view this screen (matching
+ * `list_school_members`'s reference-data convention, and this
  * codebase's "security must not rely on UI hiding" rule); the backend
  * alone enforces `ManageRoles` (School Head only) — a non-School-Head
- * sees the same buttons and gets a generic error if they try. Teacher is
- * deliberately not shown as grantable/revocable here — it's the
- * automatic default every member already has. */
+ * sees the same controls and gets a generic error if they try. Teacher
+ * is deliberately not shown as grantable/revocable here — it's the
+ * automatic default every member already has.
+ *
+ * One badge-plus-selector row per member, not one table column per
+ * `GRANTABLE_ROLES` entry — the 8-role taxonomy expansion (ADR-0065)
+ * made a per-role column layout unworkable (9 grantable roles would
+ * mean 9 columns). Each held role renders as a labeled "Revoke" button;
+ * a `<select>` plus one "Grant" button offers whichever grantable roles
+ * the member doesn't already hold. */
 export function RoleManagementScreen({ schoolMemberService }: RoleManagementScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -30,6 +37,10 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  /** The role selected in each member's "grant a role" picker, keyed by
+   * member id — a plain object is fine here, this never needs to be
+   * reactive beyond triggering the picker's own re-render. */
+  const [selectedRole, setSelectedRole] = useState<Record<string, GrantableRole | "">>({});
   /** `${userId}:${role}` of the one grant/revoke currently in flight, if
    * any — disables only that specific button (via `aria-disabled` +
    * this guard, never plain `disabled`, so it never loses focus on
@@ -78,6 +89,7 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
     try {
       await schoolMemberService.grantRole(member.id, role);
       setConfirmation(`${member.displayName} is now a ${roleLabel(role)}.`);
+      setSelectedRole((prev) => ({ ...prev, [member.id]: "" }));
       load();
     } catch (err) {
       setError(
@@ -122,9 +134,8 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
       </h2>
       {mode === "guided" && (
         <p className="field-hint">
-          Every teacher already has the Teacher role. Grant Registrar to a colleague who handles
-          official-form exports and learner records, or School Head to a colleague who needs full
-          oversight — only a School Head can make these changes.
+          Every teacher already has the Teacher role. Grant a colleague another role for the
+          responsibilities they hold at your school — only a School Head can make these changes.
         </p>
       )}
 
@@ -147,47 +158,87 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
             <tr>
               <th scope="col">Member</th>
               <th scope="col">Roles</th>
-              {GRANTABLE_ROLES.map((role) => (
-                <th scope="col" key={role}>
-                  {roleLabel(role)}
-                </th>
-              ))}
+              <th scope="col">Grant a role</th>
             </tr>
           </thead>
           <tbody>
-            {members.map((member) => (
-              <tr key={member.id}>
-                <th scope="row">{member.displayName}</th>
-                <td>{member.roles.map(roleLabel).join(", ") || "—"}</td>
-                {GRANTABLE_ROLES.map((role) => {
-                  const held = member.roles.includes(role);
-                  const key = `${member.id}:${role}`;
-                  const busy = pendingKey === key;
-                  return (
-                    <td key={role}>
-                      <button
-                        type="button"
-                        aria-disabled={busy}
-                        onClick={() => {
-                          if (busy) return;
-                          if (held) {
-                            void handleRevoke(member, role);
-                          } else {
-                            void handleGrant(member, role);
+            {members.map((member) => {
+              const heldGrantable = GRANTABLE_ROLES.filter((role) => member.roles.includes(role));
+              const availableToGrant = GRANTABLE_ROLES.filter(
+                (role) => !member.roles.includes(role),
+              );
+              const picked = selectedRole[member.id] ?? "";
+
+              return (
+                <tr key={member.id}>
+                  <th scope="row">{member.displayName}</th>
+                  <td>
+                    {heldGrantable.length === 0 ? (
+                      "Teacher only"
+                    ) : (
+                      <ul className="role-badge-list">
+                        {heldGrantable.map((role) => {
+                          const key = `${member.id}:${role}`;
+                          const busy = pendingKey === key;
+                          return (
+                            <li key={`revoke-${role}`}>
+                              <button
+                                type="button"
+                                aria-disabled={busy}
+                                onClick={() => {
+                                  if (busy) return;
+                                  void handleRevoke(member, role);
+                                }}
+                              >
+                                {busy ? "Working…" : `Revoke ${roleLabel(role)}`}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </td>
+                  <td>
+                    {availableToGrant.length === 0 ? (
+                      "Holds every grantable role"
+                    ) : (
+                      <div className="form-row">
+                        <label className="visually-hidden" htmlFor={`grant-role-${member.id}`}>
+                          Role to grant to {member.displayName}
+                        </label>
+                        <select
+                          id={`grant-role-${member.id}`}
+                          value={picked}
+                          onChange={(event) =>
+                            setSelectedRole((prev) => ({
+                              ...prev,
+                              [member.id]: event.target.value as GrantableRole | "",
+                            }))
                           }
-                        }}
-                      >
-                        {busy
-                          ? "Working…"
-                          : held
-                            ? `Revoke ${roleLabel(role)}`
-                            : `Grant ${roleLabel(role)}`}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                        >
+                          <option value="">Select a role</option>
+                          {availableToGrant.map((role) => (
+                            <option key={role} value={role}>
+                              {roleLabel(role)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          aria-disabled={!picked || pendingKey === `${member.id}:${picked}`}
+                          onClick={() => {
+                            if (!picked || pendingKey === `${member.id}:${picked}`) return;
+                            void handleGrant(member, picked);
+                          }}
+                        >
+                          {pendingKey === `${member.id}:${picked}` && picked ? "Working…" : "Grant"}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

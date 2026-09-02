@@ -1,19 +1,23 @@
 # Verification Debt
 
-## Roles & Permissions (ADR-0064) — independent security review owed (2026-09-02)
+## Roles & Permissions (ADR-0064, extended by ADR-0065) — independent security review owed (2026-09-02)
 
-This milestone touches `auth::Capability`/`authorize_capability`,
-`repository::role::{grant,revoke}`, and gates four export commands plus
-two new commands (`grant_school_role`/`revoke_school_role`) — squarely
-the category `.claude/rules/security-privacy.md` requires an
-independent `security-reviewer` pass for before being marked complete.
-Self-verified thoroughly this session (full TDD coverage for every new
-authorization primitive, both directions proven for each — allowed and
-denied — plus cross-school isolation and last-School-Head-removal
-guards), but a fresh-context independent review was not dispatched.
-Not blocking (self-review found nothing to fix), but retained as debt
-per this project's reviewer-failure/self-review-substitution
-convention. Revisit in a future session.
+Two milestones this session touch `auth::Capability`/`authorize_capability`,
+`repository::role::{grant,revoke,is_grantable}`, four gated export
+commands, `grant_school_role`/`revoke_school_role`, and migration 25
+(widening `user_school_roles`) — squarely the category
+`.claude/rules/security-privacy.md` requires an independent
+`security-reviewer` pass for before being marked complete. Self-verified
+thoroughly both times (full TDD coverage for every new authorization
+primitive, both directions proven for each — allowed and denied — plus
+cross-school isolation and last-School-Head-removal guards), but a
+fresh-context independent review was not dispatched for either. Not
+blocking (self-review found nothing to fix both times), but retained
+as debt per this project's reviewer-failure/self-review-substitution
+convention. Revisit in a future session — one pass can reasonably cover
+both milestones together, since ADR-0065 only widens the role
+vocabulary and adds no new authorization behavior beyond
+`is_grantable`.
 
 ## Session network egress blocks all external fetch except WebSearch — open, session-specific (2026-09-02)
 

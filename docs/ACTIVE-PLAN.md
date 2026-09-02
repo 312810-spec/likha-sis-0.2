@@ -1,5 +1,35 @@
 # ACTIVE PLAN
 
+## Wave: Roles & Permissions — 8-role taxonomy widened, foundation only (added 2026-09-02) — complete
+
+Direct follow-up to the three-role wave below, per the user's own
+confirmed sequencing. Full record: `docs/adr/0065-eight-role-taxonomy-foundation.md`.
+
+**Shipped**: migration 25 (widens `user_school_roles`'s CHECK
+constraint to the user's full 8-role table); `repository::role::is_grantable`;
+`RoleManagementScreen` redesigned for nine grantable roles (badge list
+
+- single-select, replacing the per-role-column table) with a
+  duplicate-rendering bug caught and fixed via a new regression test
+  before shipping.
+
+**Deliberately foundation only** — no `Capability`/command gate for any
+of the seven new roles (most map to features not built in this app
+yet); Class Adviser/Subject Teacher confirmed by the user to stay
+separate from `section_advisories`/plain-`teacher`, not merged.
+
+**Verification actually run**: `cargo test` (649 lib tests), `cargo
+clippy -D warnings` clean, `cargo fmt --check` clean, `npm run quality`
+867/867, `npm run build`, `npm run check:dev-preview-isolation`, `npm
+run harness:verify` 100/100, `git diff --check` clean.
+
+**Not done**: independent `security-reviewer` pass — recorded as debt
+in `docs/VERIFICATION-DEBT.md`.
+
+**Gate decision**: WAVE COMPLETE. Per the user's own explicit
+sequencing, next is other pending waves/tasks, then general UI work —
+see `docs/CURRENT-HANDOFF.md` for the exact next-slice note.
+
 ## Wave: Roles & Permissions — RBAC made usable (added 2026-09-02) — complete
 
 User-directed. Full record: `docs/adr/0064-roles-and-permissions-usable-rbac.md`.

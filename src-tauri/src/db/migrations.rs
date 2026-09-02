@@ -1284,6 +1284,52 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- Roles & Permissions: 8-role expansion, foundation only (ADR-0065).
+        -- Widens user_school_roles' CHECK constraint to the project owner's
+        -- confirmed full role taxonomy -- exactly the widening migration
+        -- 6's own comment already anticipated ("A future role... is added
+        -- by widening this CHECK constraint in a new migration, never a
+        -- redesign of this table's shape"). Same recreate-table pattern
+        -- migration 24 (audit_log) and migration 5 (attendance_records)
+        -- already established -- SQLite cannot ALTER a CHECK constraint in
+        -- place. No column change, no index change (this table has never
+        -- had one beyond its own composite primary key), every existing
+        -- row preserved losslessly.
+        --
+        -- Foundation only: these seven new role values are grantable
+        -- through the existing grant_school_role/revoke_school_role
+        -- commands (Roles & Permissions milestone, ADR-0064), but no new
+        -- Capability variant or command gate is added by this migration --
+        -- most of the forms/tools the owner's own role table maps them to
+        -- (IPCRF, Department Grade Sheets, Certificate of Observation/COT,
+        -- EBEIS/LIS exports, Form 48 DTR, Inventory Tagging, SF8 clinic
+        -- logs) do not exist as features in this app yet, so inventing a
+        -- capability gate for them now would be guessing, not building.
+        -- Each role's actual authorization wiring is deliberately deferred
+        -- to its own future slice, once the feature it gates exists.
+        CREATE TABLE user_school_roles_new (
+            user_id TEXT NOT NULL,
+            school_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN (
+                'teacher', 'registrar', 'school_head',
+                'master_teacher', 'class_adviser', 'subject_teacher',
+                'ict_coordinator', 'admin_officer', 'property_custodian',
+                'health_officer'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (user_id, school_id, role),
+            FOREIGN KEY (user_id, school_id) REFERENCES user_school_memberships(user_id, school_id) ON DELETE CASCADE
+        );
+
+        INSERT INTO user_school_roles_new (user_id, school_id, role, created_at)
+        SELECT user_id, school_id, role, created_at FROM user_school_roles;
+
+        DROP TABLE user_school_roles;
+        ALTER TABLE user_school_roles_new RENAME TO user_school_roles;
+        "#,
+        ),
     ])
 }
 
@@ -3170,6 +3216,73 @@ mod tests {
         assert!(
             rejected.is_err(),
             "an unrecognized event type must still be rejected by the widened CHECK constraint"
+        );
+    }
+
+    #[test]
+    fn migration_25_widens_user_school_roles_without_losing_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+
+        // Apply only migrations 1-24 (pre-widen schema) to reproduce the
+        // exact state this migration must convert.
+        migrations().to_version(&mut conn, 24).unwrap();
+
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'ana.cruz', 'hash', 'Ana Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_memberships (user_id, school_id) VALUES ('u1', 's1')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'teacher')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM user_school_roles", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "no rows should be lost during the widening");
+
+        for role in [
+            "master_teacher",
+            "class_adviser",
+            "subject_teacher",
+            "ict_coordinator",
+            "admin_officer",
+            "property_custodian",
+            "health_officer",
+        ] {
+            let accepted = conn.execute(
+                "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', ?1)",
+                [role],
+            );
+            assert!(
+                accepted.is_ok(),
+                "the new role '{role}' must be accepted by the widened CHECK constraint"
+            );
+        }
+
+        let rejected = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'principal')",
+            [],
+        );
+        assert!(
+            rejected.is_err(),
+            "an unrecognized role must still be rejected by the widened CHECK constraint"
         );
     }
 }

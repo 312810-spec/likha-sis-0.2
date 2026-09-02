@@ -51,7 +51,7 @@ future explicit "authorized organization switch" for legitimate
 multi-school membership is **HYPOTHESIS** — not needed until a real
 multi-school user is a confirmed requirement.
 
-## 3. Roles/permissions (RBAC) — BUILT (three-role foundation), 8-role expansion DIRECTION SET
+## 3. Roles/permissions (RBAC) — BUILT: three-role model fully wired, 8-role taxonomy grantable (foundation only)
 
 **Built** (Wave 1A RBAC Foundation, ADR-0036; made actually usable by
 ADR-0064 "Roles & Permissions" — both stale claims below corrected
@@ -94,19 +94,36 @@ follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
   behalf-of-a-teacher action that exists, and it is a distinct,
   audited, narrowly-scoped action, not impersonation).
 
-**Not yet built (separate, later milestone, direction set by the owner
-2026-09-02)**: the full 8-role taxonomy the owner supplied — School
-Head (Super Admin), Head/Master Teacher (department oversight, Grade
-Sheets/COT), Class Adviser vs. Subject Teacher as distinct roles (SF1/
-SF2/SF5/SF9/SF10 vs. Electronic Class Record), ICT Coordinator (EBEIS/
-LIS exports), Admin Officer/ADAS (SF10/SF7/Form 48 DTR), Property
-Custodian (SF3/inventory), Health Officer (SF8/clinic logs). Do not
-implement any of this from assumption — the three-role model above
-remains the only confirmed, built one until that milestone's own
-scoping pass (migration 16's CHECK constraint, `Capability` variants,
-and each new role's exact form/capability mapping all need their own
-decision, using this milestone's own additive pattern as precedent, not
-a restructure).
+**Eight-role taxonomy — grantable, but foundation only (ADR-0065,
+2026-09-02)**. The owner supplied the full role table directly (roles,
+core functional scope, primary DepEd forms, system access level):
+
+| Role                  | Core Functional Scope              | Primary DepEd Forms Managed   | System Access Level          |
+| --------------------- | ---------------------------------- | ----------------------------- | ---------------------------- |
+| School Head           | School-wide approval & oversight   | SF4, SF5, SF6, SF7, IPCRF     | Super Admin / Final Approver |
+| Head / Master Teacher | Department monitoring & review     | Department Grade Sheets, COT  | Supervisory / Reviewer       |
+| Class Adviser         | Homeroom & learner tracking        | SF1, SF2, SF5, SF9, SF10      | Section Admin (Read/Write)   |
+| Subject Teacher       | Grade calculation & attendance     | Electronic Class Record (ECR) | Class Editor (Read/Write)    |
+| ICT Coordinator       | System & infrastructure config     | EBEIS, LIS Exports            | Technical Admin              |
+| Admin Officer / ADAS  | Student records & institutional HR | SF10, SF7, Form 48 (DTR)      | Records Admin                |
+| Property Custodian    | Supplies & inventory management    | SF3, Inventory Tagging        | Inventory Admin              |
+| Health Officer        | Clinic logs & nutritional records  | SF8                           | —                            |
+
+Migration 25 widened `user_school_roles` to accept all seven new role
+values (School Head already existed); all are grantable today through
+`grant_school_role`/`revoke_school_role`/`RoleManagementScreen`. **No
+`Capability` or command gate exists for any of the seven new roles** —
+most of what the table maps them to (IPCRF, Department Grade Sheets,
+COT, EBEIS/LIS exports as a feature, Form 48 DTR, Inventory Tagging,
+SF8 clinic logs) is not built in this app at all yet, so inventing an
+authorization gate for it now would be a guess, not an implementation.
+Each role's real wiring is its own future slice, done once the feature
+it gates actually exists — see ADR-0065's "Deliberately not built"
+section for the full reasoning, including the two roles (Class Adviser,
+Subject Teacher) whose scope partially overlaps existing mechanisms
+(`section_advisories`, plain `teacher`) and why they were kept as
+separate, additional role grants rather than merged into those
+mechanisms (the owner's own explicit direction).
 
 ## 4. Curriculum / Key Stage versioning — BUILT (foundation), narrower than the full cohort model
 
