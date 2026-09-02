@@ -1,5 +1,76 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — full redesign: "Bright Command" app shell)
+
+The user asked for a full visual redesign ("epic," "multimillion
+dollar designer," "a dashboard, a dedicated header") — a deliberate
+reversal of the previously-chosen "Calm Civic Classroom" direction.
+Confirmed explicitly via `AskUserQuestion` that this should be a full
+bold replacement, even trading away the low-distraction reasoning
+behind the old direction. The user then supplied a concrete visual
+reference (a Behance case study, screenshotted directly since this
+session's network egress proxy blocks Behance/Medium) rather than
+letting me guess an aesthetic. Full decision record:
+`docs/adr/0066-bright-command-redesign.md`.
+
+**Shipped this session (app-shell checkpoint only)**:
+
+- New "Bright Command" token system in `src/ui/theme/styles.css`:
+  vivid indigo-violet primary + orange-gold gradient accent, bright
+  near-white canvas, Nunito typeface (pinned by the reference's own
+  style guide), glassy elevation scale. Every color pair computed for
+  WCAG AA contrast, both light and dark mode, not eyeballed — see the
+  file's inline comments. `--color-accent` is explicitly restricted to
+  large/bold text and non-text usage (documented inline) since it only
+  clears 3.44:1, not the 4.5:1 body-text floor.
+- `src/ui/AppShell.tsx` restructured: a persistent left sidebar (brand
+  mark, grouped `WorkbenchNav` rendered vertically with a
+  pill-highlighted active item) plus a sticky glass header (segmented
+  gradient-pill mode switcher, avatar-initials session chip). Gained a
+  `nav` prop; `App.tsx` and `src/dev-preview/DevPreviewApp.tsx` updated
+  to pass `WorkbenchNav` into it instead of rendering it as a child.
+  Collapses to a single-column layout with a horizontal nav chip strip
+  below 900px width.
+- `@fontsource/nunito` added (400/700/900), `@fontsource/public-sans`
+  kept, scoped to `--font-numeric` only (its tabular-figure alignment
+  for grade/LRN/date tables was already verified, ADR-0031, and is
+  independent of this typeface swap). See `docs/SOURCE-REGISTRY.md`.
+- The WCAG 1.4.1 checkmark non-color cue on pressed nav/mode-switcher
+  state was deliberately kept visible (an early draft hid it off-screen
+  for a cleaner look and was corrected before shipping — regressing an
+  already-fixed accessibility bug class for a cosmetic gain was not
+  acceptable).
+
+**Deliberately NOT done this pass** (scoped out, not forgotten): no
+fabricated stat tiles, donut charts, or "Star Students"/"Upgrade to
+Pro" style panels copying the reference's own literal content — this
+screen's real data (learner/section counts, today's completion) doesn't
+yet have a dashboard-style visual treatment; that's the recorded next
+slice, not invented here. No other screen's own bespoke layout was
+redesigned — only the shared shell and token layer, which every screen
+inherits automatically through `Alert`/`Loading`/`StatusChip`/
+`PageHeader`/table styles.
+
+**Verified**: `npm run quality` 869/869 (typecheck/lint/format/
+architecture clean, no test changes needed — `AppShell.test.tsx`'s
+`getByText` assertions still match against the split name/school
+spans), `npm run build` clean, `npm run check:dev-preview-isolation`
+clean (51 files). Real browser-rendered verification via the
+documented `playwright-cli` browser-mismatch workaround: screenshots
+taken and inspected directly at 1440px (light + dark) and 800px
+(light, confirms the narrow collapse) — not just claimed. No
+independent design review dispatched for this checkpoint yet (recorded
+as owed in this ADR, not skipped silently).
+
+**Exact next slice**, per the ADR's own recorded plan: redesign
+`TeacherWorkspaceScreen.tsx` into a real dashboard treatment (stat
+tiles for learner/section/completion counts, a ring/donut of today's
+real marked/total split) using this shell's new tokens and only this
+screen's own real data. After that, extend screen-by-screen
+(Learners/Sections/Grading/Auth) rather than one large pass, then
+rewrite `DESIGN.md` end-to-end once enough is actually built to
+describe truthfully.
+
 ## Active Task (2026-09-02, this session — "work on the ui": RoleManagementScreen UX pass)
 
 Per the user's own confirmed sequencing, moved to the final step ("work

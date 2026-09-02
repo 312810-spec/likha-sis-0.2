@@ -26,6 +26,7 @@
     "quality:full": "npm run harness:verify && npm run quality && cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings"
   },
   "dependencies": {
+    "@fontsource/nunito": "5.3.0",
     "@fontsource/public-sans": "5.3.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",

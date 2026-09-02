@@ -1,54 +1,73 @@
-/* Public Sans (OFL-1.1), self-hosted via @fontsource -- no runtime
-   webfont fetch. Chosen for the Calm Civic Classroom direction: a
-   civic/government-service-heritage humanist sans (USWDS/US federal
-   digital services), strong legibility credentials, and good tabular
-   figure support for grades/LRNs/dates. See DESIGN.md and
-   docs/SOURCE-REGISTRY.md. Only the weights actually used are
-   imported: 400 (body), 600 (labels/emphasis, already the codebase's
-   convention), 700 (pressed/active state). */
+/* Nunito (OFL-1.1), self-hosted via @fontsource -- no runtime webfont
+   fetch. UI-First Redesign 2026-09-02: replaces Calm Civic Classroom
+   with "Bright Command" -- a glossy, energetic edtech-SaaS dashboard
+   direction, explicitly chosen by the product owner over the prior
+   restrained direction (see DESIGN.md). Nunito is a pinned brief
+   requirement (matching the approved reference's own style guide), a
+   rounded, friendly, highly legible humanist sans. Weights: 400 (body),
+   700 (labels/emphasis/buttons), 900 (display headings, stat numerals).
+   Public Sans is kept, imported below, and used only for
+   --font-numeric -- its tabular-figure alignment for grade/LRN/date
+   tables was already verified (docs/adr/0031) and is real, hard-won
+   legibility work worth preserving through the redesign, not a
+   nostalgia holdover. */
+@import "@fontsource/nunito/400.css";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/900.css";
 @import "@fontsource/public-sans/400.css";
 @import "@fontsource/public-sans/600.css";
 @import "@fontsource/public-sans/700.css";
 
 :root {
-  /* Calm Civic Classroom palette (DESIGN.md). Every pair below was
-     verified with computed WCAG relative-luminance contrast, not
-     eyeballed — see docs/adr/0031-design-system-and-app-shell.md for
-     the exact ratios. Recompute before changing any of these values. */
-  --color-bg: #fbf8f2;
-  --color-surface: #f3eee3;
+  /* "Bright Command" palette -- a vivid indigo/violet plus a warm
+     orange-gold gradient accent, glossy pastel tile surfaces, on a
+     bright near-white canvas. Every pair below is computed WCAG
+     relative-luminance contrast, not eyeballed, same discipline as the
+     prior palette -- recompute before changing any of these values.
+     Accessibility is a hard floor even under this bolder direction
+     (PRODUCT.md's Product Principles: "never trade... accessibility...
+     for visual spectacle"). */
+  --color-bg: #f6f5fc;
+  --color-surface: #ffffff;
   /* --color-border draws every input/button/divider outline and is often
-     the only visible cue a control exists (fill matches the background).
-     Keep this at >=3:1 against both --color-bg and --color-surface in
-     both light and dark palettes (WCAG 1.4.11 non-text contrast) — do
-     not lighten/darken this without recomputing. Verified: 3.71:1 /
-     3.40:1. */
-  --color-border: #8a7f6e;
-  --color-text: #1b2430;
-  --color-text-muted: #5c6570;
-  /* Structural/trust color -- deep ink/navy, used for primary actions,
-     focus, and structural chrome. Verified 10.85:1 on bg. */
-  --color-primary: #1e3a5f;
+     the only visible cue a control exists. Keep this at >=3:1 against
+     both --color-bg and --color-surface (WCAG 1.4.11 non-text
+     contrast). Verified: 3.23:1 / 3.50:1. */
+  --color-border: #8985ab;
+  --color-text: #191534;
+  --color-text-muted: #656088;
+  /* Vivid indigo/violet -- the dominant brand color, carrying nav
+     selection, primary actions, and focus. Verified 8.34:1 on bg. */
+  --color-primary: #4b2fd9;
   --color-primary-text: #ffffff;
+  --color-primary-soft: #ece7fc;
+  /* Warm orange-gold, the reference's second brand color -- used for
+     the accent gradient and "needs attention" emphasis. Verified 3.44:1
+     on bg, 3.17:1 on its own soft surface -- clears the 3:1 large-text/
+     UI-component floor but NOT 4.5:1, so this token is restricted to
+     large/bold numerals (stat figures), icons, and non-text borders/
+     fills. Never use it for small body or caption text. */
+  --color-accent: #d9600a;
+  --color-accent-soft: #ffe9d2;
+  --gradient-accent: linear-gradient(135deg, #f9b72f, #ff8633);
   /* Restrained teal/jade for "in progress" / productive state --
      distinct from --color-success (a completed/confirmed state).
-     Verified 6.04:1 on bg, 5.58:1 on its own surface tint. */
-  --color-productive: #0f6b5c;
-  --color-productive-surface: #e5f2f0;
-  --color-danger: #a3271f;
-  --color-danger-surface: #fbecea;
-  --color-success: #1d7a5f;
-  --color-success-surface: #e7f3ec;
-  /* Warm sunrise/amber for meaningful attention -- darkened from the
-     first-pass hue to clear 4.5:1 text contrast (the lighter #8a5a00
-     draft only reached 4.10:1). Verified 5.86:1 on bg, 5.55:1 on its
-     own surface tint. */
+     Verified 5.31:1 on bg, 5.20:1 on its own surface tint. */
+  --color-productive: #0d7a68;
+  --color-productive-surface: #dcf3ee;
+  --color-productive-soft: #dcf3ee;
+  --color-danger: #b3261e;
+  --color-danger-surface: #fbeaea;
+  --color-success: #157a52;
+  --color-success-surface: #e1f5eb;
   --color-warning: #8f5209;
   --color-warning-surface: #fbf1de;
-  --color-focus: #1e3a5f;
+  --color-info-soft: #dcecff;
+  --color-focus: #4b2fd9;
 
   --spacing-unit: 12px;
-  --font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-family-display: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Tabular figures for grades, LRNs, dates, and attendance counts --
      digits must align in a column, not just be legible individually. */
   --font-numeric: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -58,13 +77,16 @@
   --line-height-base: 1.5;
   --control-height: 40px;
   --content-width: 720px;
-  --content-width-wide: 1080px;
-  --radius: 6px;
-  --radius-large: 10px;
-  /* Restrained elevation -- one subtle level, not a shadow system.
-     Used sparingly (e.g. the app header separating from scrolled
-     content), never as decoration. */
-  --elevation-1: 0 1px 2px rgba(27, 36, 48, 0.08);
+  --content-width-wide: 1200px;
+  --sidebar-width: 264px;
+  --radius: 10px;
+  --radius-large: 18px;
+  --radius-pill: 999px;
+  /* A real elevation scale -- glossy cards are the point of this
+     direction, not decoration held back as before. */
+  --elevation-1: 0 1px 2px rgba(25, 21, 52, 0.06);
+  --elevation-2: 0 8px 24px rgba(25, 21, 52, 0.08);
+  --elevation-3: 0 16px 40px rgba(75, 47, 217, 0.16);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
@@ -108,23 +130,39 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #14181d;
-    --color-surface: #1c2129;
-    /* Verified 4.12:1 / 3.74:1. */
-    --color-border: #6f7b87;
-    --color-text: #ece9e1;
-    --color-text-muted: #a6adb6;
-    --color-primary: #8fb4dd;
-    --color-primary-text: #0d1720;
-    --color-productive: #6fccb9;
-    --color-productive-surface: #163330;
+    /* "Bright Command" dark variant: deep indigo-black canvas, the same
+       violet/gold brand pair lightened for dark-ground contrast. Every
+       pair computed, not eyeballed -- see the light-mode block above
+       for the same discipline. */
+    --color-bg: #14101f;
+    --color-surface: #1d1830;
+    /* Verified 4.49:1 / 4.12:1. */
+    --color-border: #7e76a8;
+    --color-text: #ece9f7;
+    --color-text-muted: #a79fc9;
+    --color-primary: #9b8afb;
+    --color-primary-text: #16102a;
+    --color-primary-soft: #2a2147;
+    /* Verified 10.41:1 on bg, 7.91:1 on its own soft surface -- clears
+       4.5:1 in dark mode (unlike the light-mode token), but stays
+       restricted to the same large/bold-numeral, icon, and
+       non-text-border usages for cross-theme consistency. */
+    --color-accent: #ffb15c;
+    --color-accent-soft: #3a2711;
+    --gradient-accent: linear-gradient(135deg, #ffb15c, #ff8633);
+    --color-productive: #6fe0c8;
+    --color-productive-surface: #123a33;
+    --color-productive-soft: #123a33;
     --color-danger: #ff9c94;
     --color-danger-surface: #3a1f1d;
-    --color-success: #8fd1a0;
-    --color-success-surface: #17332c;
-    --color-warning: #e8c07d;
+    --color-success: #8fe0b0;
+    --color-success-surface: #123527;
+    --color-warning: #ffcf85;
     --color-warning-surface: #3a2f14;
-    --color-focus: #8fb4dd;
+    --color-info-soft: #17263f;
+    --color-focus: #9b8afb;
+    --elevation-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+    --elevation-3: 0 16px 40px rgba(155, 138, 251, 0.25);
     color-scheme: dark;
   }
 }
@@ -354,59 +392,148 @@ label {
   margin: 0 0 calc(var(--spacing-unit) * 0.35) 0;
 }
 
+/* App shell: a persistent left sidebar (brand + nav) plus a sticky top
+   header, replacing the prior single horizontal-bar layout -- the
+   "Bright Command" redesign's structural centerpiece. Grid, not flex,
+   so the sidebar can span the full viewport height independent of
+   header height. See docs/adr/0066-bright-command-redesign.md. */
 .app-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "sidebar header" "sidebar main";
   min-height: 100%;
+  background: var(--color-bg);
 }
 
-.app-shell-header {
+.app-shell-sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1.5);
+  padding: calc(var(--spacing-unit) * 1.5) var(--spacing-unit);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;
+}
+
+.app-shell-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--spacing-unit);
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: var(--elevation-1);
+  gap: calc(var(--spacing-unit) * 0.6);
+  padding: 0 calc(var(--spacing-unit) * 0.5);
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.app-shell-brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-large);
+  background: var(--gradient-accent);
+  color: #ffffff;
+  font-family: var(--font-family-display);
+  font-weight: 900;
+  font-size: 1.05rem;
+  flex-shrink: 0;
 }
 
 .app-shell-title {
   margin: 0;
-  font-size: var(--font-size-large);
-  font-weight: 700;
+  font-family: var(--font-family-display);
+  font-size: 1.15rem;
+  font-weight: 900;
   color: var(--color-primary);
+  letter-spacing: -0.01em;
+}
+
+.app-shell-header {
+  grid-area: header;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--spacing-unit);
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .app-shell-session {
   display: flex;
   align-items: center;
-  gap: var(--spacing-unit);
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.app-shell-session-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-family: var(--font-family-display);
+  font-weight: 900;
+  font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .app-shell-session-identity {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.app-shell-session-name {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.app-shell-session-school {
+  font-size: var(--font-size-small);
   color: var(--color-text-muted);
 }
 
 .app-shell-main {
-  flex: 1;
-  padding: calc(var(--spacing-unit) * 1.5);
+  grid-area: main;
+  padding: calc(var(--spacing-unit) * 1.75);
   max-width: var(--content-width-wide);
   width: 100%;
   margin: 0 auto;
 }
 
+/* Segmented-pill mode switcher -- a filled rounded track with the
+   active segment carrying the brand gradient, matching the reference's
+   glossy control language. */
 .mode-switcher {
   display: flex;
-  gap: calc(var(--spacing-unit) * 0.5);
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.mode-switcher button {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  min-height: calc(var(--control-height) * 0.8);
 }
 
 .mode-switcher button[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
+  background: var(--gradient-accent);
+  color: #ffffff;
   font-weight: 700;
+  box-shadow: var(--elevation-1);
 }
 
 /* Non-color cue for the pressed mode, alongside the color change above —
@@ -417,110 +544,117 @@ label {
 }
 
 /* Grouped teacher-workbench navigation (src/App.tsx's NAV_GROUPS,
-   src/ui/components/NavItem.tsx) -- replaces the flat 8-button
-   .section-switcher row with clusters matching a teacher's actual
-   daily rhythm (Daily Teaching / Learner Records / Grading /
-   Security). See docs/adr/0031-design-system-and-app-shell.md. */
+   src/ui/components/NavItem.tsx), now rendered as a vertical sidebar
+   rail instead of a horizontal button row -- clusters still match a
+   teacher's actual daily rhythm (Daily Teaching / Learner Records /
+   Grading / Security). See docs/adr/0031 and
+   docs/adr/0066-bright-command-redesign.md. */
 .workbench-nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: calc(var(--spacing-unit) * 1.25);
-  margin-bottom: var(--spacing-unit);
-  padding-bottom: var(--spacing-unit);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .nav-group {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: calc(var(--spacing-unit) * 0.5);
-  /* A side (border-right) divider only reads correctly when every group
-     shares one row -- once `.workbench-nav`'s own flex-wrap pushes a
-     later group onto its own row (which happens at ordinary desktop
-     widths too, not just narrow ones, once enough nav items exist), a
-     border-right on an earlier group becomes an orphaned vertical line
-     with nothing beside it. A bottom divider degrades correctly in
-     every wrap configuration, so it's unconditional rather than a
-     narrow-viewport-only override. */
-  padding-bottom: calc(var(--spacing-unit) * 0.5);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.nav-group:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .nav-group-label {
-  /* Visible group context for sighted users, matching the ledger/
-     class-record rhythm the Calm Civic Classroom direction calls for
-     -- a small caption, not a competing heading. Marked aria-hidden
+  /* Visible group context for sighted users. Marked aria-hidden
      because each nav-group's own role="group" aria-label already
      gives assistive tech the same text as its accessible name; a
      visible duplicate would otherwise be announced twice. */
   font-size: var(--font-size-small);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-right: calc(var(--spacing-unit) * 0.25);
+  letter-spacing: 0.04em;
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  margin-bottom: calc(var(--spacing-unit) * 0.15);
 }
 
 .nav-item {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.65);
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.nav-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: color var(--motion-duration-immediate) var(--motion-easing-standard);
+}
+
+.nav-item:hover {
+  background: var(--color-bg);
 }
 
 .nav-item[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   font-weight: 700;
 }
 
-/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
+.nav-item[aria-pressed="true"] .nav-item-icon {
+  color: var(--color-primary);
+}
+
+/* Same non-color cue as .mode-switcher — WCAG 1.4.1 (Use of Color): a
+   pill fill plus icon-color change is not itself a sufficient non-color
+   cue for every low-vision/colorblind reader, so the established
+   checkmark prefix is kept visible here too, not hidden -- regressing
+   this in just the sidebar would be an inconsistent, real accessibility
+   regression against the rest of the app. */
 .nav-item[aria-pressed="true"]::before {
   content: "✓ ";
 }
 
-/* The one "ledger continuity" motion treatment (DESIGN.md): a selection
-   rule beneath the active destination, drawn in from the center rather
-   than appearing instantly -- a restrained echo of underlining an entry
-   in a ledger, not a decorative flourish. Transform/opacity only (no
-   layout-driving property), so it stays cheap even on ordinary school
-   hardware, and collapses to an instant state change under
-   prefers-reduced-motion via --motion-duration-routine's own reduced-
-   motion override. */
-.nav-item::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-primary-text);
-  transform: scaleX(0);
-  opacity: 0;
-  transition:
-    transform var(--motion-duration-routine) var(--motion-easing-standard),
-    opacity var(--motion-duration-routine) var(--motion-easing-standard);
-}
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "sidebar" "main";
+  }
 
-.nav-item[aria-pressed="true"]::after {
-  transform: scaleX(1);
-  opacity: 1;
-}
+  .app-shell-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-unit);
+  }
 
-@media (max-width: 640px) {
   .workbench-nav {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: var(--spacing-unit);
   }
 
+  .nav-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 0.5);
+  }
+
   .nav-item {
+    width: auto;
     min-height: 44px;
     flex: 1 1 auto;
+    border: 1px solid var(--color-border);
   }
 }
 

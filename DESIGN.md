@@ -1,5 +1,23 @@
 # Design
 
+**SUPERSEDED (2026-09-02) for the app shell**: the "Calm Civic
+Classroom" direction below was explicitly replaced by "Bright Command"
+per the product owner's direct request — see
+`docs/adr/0066-bright-command-redesign.md` for the decision, rationale,
+and exact scope. As of that ADR, `src/ui/AppShell.tsx` (header +
+sidebar) and the shared token/component layer
+(`src/ui/theme/styles.css`) implement the new direction; individual
+screens (Learner/Section/Grading/Auth/Audit, and
+`TeacherWorkspaceScreen`'s own dashboard treatment) have NOT yet been
+redesigned and still visually describe the sections below only insofar
+as they inherit the shared tokens — their own bespoke layouts are
+unchanged. This file will be rewritten end-to-end once enough of the
+surface is redesigned to describe truthfully (see that ADR's "Next
+slice"). Until then, treat every claim below as historical record of
+the superseded direction, not current ground truth for the app shell.
+
+---
+
 **Status**: chosen direction for the UI-First World-Class Product
 Program (ADR-0030), written at UX-00. **As of UX-01 (ADR-0031), the
 token palette, typography, and shared component set below are

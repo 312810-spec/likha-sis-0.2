@@ -100,7 +100,11 @@ export function DevPreviewApp() {
 
   return (
     <ModeProvider>
-      <AppShell session={FIXTURE_SESSION} onLogout={() => {}}>
+      <AppShell
+        session={FIXTURE_SESSION}
+        onLogout={() => {}}
+        nav={<WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />}
+      >
         <div className="alert alert-info" role="status">
           <p>
             <strong>Development preview — synthetic data, not the production app.</strong> No real
@@ -108,7 +112,6 @@ export function DevPreviewApp() {
             .
           </p>
         </div>
-        <WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />
         {activeTab === "workspace" ? (
           <TeacherWorkspaceScreen
             displayName={FIXTURE_SESSION.displayName}

@@ -166,7 +166,18 @@ function App() {
 
   return (
     <ModeProvider>
-      <AppShell session={session} onLogout={handleLogout}>
+      <AppShell
+        session={session}
+        onLogout={handleLogout}
+        nav={
+          !checkingStatus && !needsSetup && session ? (
+            <WorkbenchNav
+              activeTab={activeTab === "section-roster" ? "sections" : activeTab}
+              onTabChange={setActiveTab}
+            />
+          ) : undefined
+        }
+      >
         {checkingStatus ? (
           <p role="status">Loading…</p>
         ) : needsSetup ? (
@@ -174,10 +185,6 @@ function App() {
         ) : session ? (
           <>
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
-            <WorkbenchNav
-              activeTab={activeTab === "section-roster" ? "sections" : activeTab}
-              onTabChange={setActiveTab}
-            />
             {activeTab === "workspace" ? (
               <TeacherWorkspaceScreen
                 displayName={session.displayName}

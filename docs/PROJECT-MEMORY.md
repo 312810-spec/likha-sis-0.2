@@ -3213,6 +3213,24 @@ nothing today. `RoleManagementScreen` is now wired into
 future sessions can browser-verify it directly rather than re-deriving
 this workaround. `isFoundationOnlyRole()` added to `src/domain/role.ts`.
 
+**"Bright Command" redesign, app-shell checkpoint (2026-09-02)**: the
+user explicitly requested a full visual redesign, reversing the
+previously-chosen "Calm Civic Classroom" direction (ADR-0030–0033) —
+confirmed via `AskUserQuestion` that this trades away the old
+direction's low-distraction reasoning on purpose, then supplied a
+concrete Behance reference as screenshots (this session's network
+egress proxy blocks Behance/Medium directly). Full record:
+`docs/adr/0066-bright-command-redesign.md`. New token system (vivid
+indigo-violet primary, orange-gold gradient accent, Nunito typeface,
+glassy elevation) implemented in `src/ui/theme/styles.css`;
+`src/ui/AppShell.tsx` restructured into a persistent left sidebar +
+sticky glass header (gained a `nav` prop). `DESIGN.md` marked
+superseded for the app shell at its top, not silently left describing
+a direction no longer in effect. Deliberately scoped to the shell only
+this pass — no fabricated stat tiles/charts, no other screen
+redesigned yet. `TeacherWorkspaceScreen`'s own dashboard treatment
+(real data only) is the recorded next slice.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
