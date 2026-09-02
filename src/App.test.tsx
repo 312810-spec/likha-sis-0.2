@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -87,12 +87,16 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("region", { name: "Workspace" });
 
-    const nav = screen.getByRole("navigation", { name: "Teacher workbench" });
+    const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(nav).toBeInTheDocument();
     for (const groupName of ["Daily Teaching", "Learner Records", "Grading", "Security"]) {
-      expect(screen.getByRole("group", { name: groupName })).toBeInTheDocument();
+      expect(within(nav).getByRole("button", { name: groupName })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
     }
     for (const destination of [
+      "Home",
       "Attendance",
       "Monthly Summary",
       "Learners",
@@ -101,7 +105,7 @@ describe("App", () => {
       "Class Records",
       "Sign-in Activity",
     ]) {
-      expect(screen.getByRole("button", { name: destination })).toBeInTheDocument();
+      expect(within(nav).getByRole("button", { name: destination })).toBeInTheDocument();
     }
   });
 
@@ -120,7 +124,8 @@ describe("App", () => {
     await screen.findByRole("region", { name: "Workspace" });
     await waitFor(() => expect(document.title).toBe("Home · LIKHA-SIS"));
 
-    await user.click(screen.getByRole("button", { name: "Learners" }));
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(nav).getByRole("button", { name: "Learners" }));
 
     await waitFor(() => expect(document.title).toBe("Learners · LIKHA-SIS"));
   });
@@ -138,7 +143,8 @@ describe("App", () => {
 
     render(<App />);
     await screen.findByRole("region", { name: "Workspace" });
-    await user.click(screen.getByRole("button", { name: "Learners" }));
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(nav).getByRole("button", { name: "Learners" }));
 
     expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
   });
