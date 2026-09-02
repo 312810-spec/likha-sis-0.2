@@ -20,7 +20,28 @@ Structurally a blank template (34,427 non-empty cells, but the large
 majority are REFERENCE-sheet lookup lists — job-title dropdowns, ethnic
 groups, region names, etc. — not filled personnel data; the VIEW sheet
 where actual entries would render is entirely zero-valued) — verified
-clean of PII across the whole workbook, not just a sample.
+clean of PII in cell content across the whole workbook, not just a
+sample.
+
+**Correction (2026-09-02, later same day)**: the original "verified
+clean of PII" claim above covered cell content only, not document
+metadata — a real methodology gap, not specific to this file (checked
+retroactively across all 11 of this session's candidates, see below).
+The file's `docProps/core.xml` carried a real, non-self-credited name
+in its `lastModifiedBy` field (distinct from the `dc:creator` field,
+which held what looks like a username/ID code, not a personal name).
+Unlike the SF9/SF10 candidates' metadata (see their own evidence
+files — self-credited template authorship, not a live-record leak),
+this name had no such context. **Redacted with the project owner's
+explicit authorization**: a working copy (`eSF7_redacted.xlsb`, session
+scratchpad only, not committed) has both the `dc:creator` and
+`cp:lastModifiedBy` fields blanked, verified empty by re-reading the
+zip's `docProps/core.xml` after the edit. The original as-uploaded file
+is untouched and, per this project's standing convention, was never
+committed. All 5 `.xls` candidates (SF1/SF2/SF4/SF5/SF6) were also
+checked (OLE `SummaryInformation` stream via `olefile`) and carry only
+the project owner's own name in `last_saved_by` — no third-party PII
+found there.
 
 ## Two distinct issuances: paper SF7 vs. electronic eSF7
 
@@ -44,21 +65,40 @@ clean of PII across the whole workbook, not just a sample.
   submitted through an "InsightED" platform, in `.xlsb` format
   specifically — matching the candidate's own format exactly.
 
-## What "RSDO" means — unresolved
+## What "RSDO" means — still unresolved, now checked from inside the file too
 
 No source found (primary or secondary) explicitly defines "RSDO" in a
-DepEd context. The most plausible reading, from context only, is
-"Region [and] Schools Division Office" — i.e. this specific file was
-relabeled by a Region/Division when redistributing the central-office
-tool, not an official central-office filename component. Two documented
-_official_ filename patterns were found
+DepEd context. **Checked further, 2026-09-02**: the string "RSDO" does
+not appear anywhere inside the workbook itself — not in any cell across
+any of the 7 sheets (full-text cell scan via `pyxlsb`), and not in the
+extracted OOXML-package XML parts (`docProps/core.xml`, `app.xml`, or
+any other part) either. This rules out "RSDO" being a built-in
+tool-internal label (e.g. a sheet name, a form title, an embedded
+region code) and is consistent with the existing theory: it is a
+filename-only tag, added when whoever redistributed this copy renamed
+it, not part of the tool's own content. It does not, however, identify
+_which_ Region/Division added it — the document metadata that might
+have (author/company fields) did not contain the string either (see the
+redaction note above; the metadata that did exist was unrelated to
+"RSDO" and has since been removed from the working copy regardless).
+
+The most plausible reading, from context only, remains "Region [and]
+Schools Division Office" — i.e. this specific file was relabeled by a
+Region/Division when redistributing the central-office tool, not an
+official central-office filename component. Two documented _official_
+filename patterns were found
 (`eSF7_SDO<Name>_SchoolID_SchoolName_SY25-26` and
 `ESF7_[SchoolCode]_2026`), and neither contains "RSDO." Divisions have
 a confirmed, documented practice of publishing their own "revised
 template" of eSF7 (e.g. a named Division Memorandum No. 65, s. 2025,
 "Revised Template of the Electronic School Form 7 (ESF7)") — so a
 region/division-labeled variant existing alongside the central tool is
-expected, not unusual, in this ecosystem.
+expected, not unusual, in this ecosystem. **This remains a genuinely
+open question, not one that further generic web search is likely to
+resolve** — the next step that could actually answer it is either a
+direct Region/Division-level source (e.g. searching a specific Region's
+own site for "RSDO" once one is guessed) or asking whoever originally
+supplied this file where they got it.
 
 ## Classification
 

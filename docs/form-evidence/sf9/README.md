@@ -26,7 +26,18 @@ still not primary-source-confirmed) evidence.
 
 All three structurally blank templates (321-1670 non-empty cells,
 signature-line labels only, no filled learner/parent names) — verified
-clean of PII.
+clean of PII in cell content.
+
+**Document-metadata note (2026-09-02, added after checking eSF7 more
+closely — see `docs/form-evidence/esf7/README.md`'s correction)**: all
+three files' `docProps/core.xml` carries a `dc:creator` of "RDM" (SF9
+JHS) — self-consistent with a real template author's initials, and the
+`cp:lastModifiedBy` field across all three is the project owner's own
+name. This reads as voluntary template-authorship attribution (the same
+pattern as SF10 JHS's explicit "redesigned by" credit, see that file's
+own record), not a live-record PII leak, and was **not redacted** —
+unlike eSF7's unrelated, non-self-credited name, there is no comparable
+concern here. Recorded for completeness, not as an open action item.
 
 ## Governing issuances (found, not primary-source-read)
 

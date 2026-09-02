@@ -278,7 +278,15 @@ User supplied two new candidate files this session:
   Sheets Front/SirWedz Guides/Back — same community-touched shape as
   the already-recorded JHS candidate above (the `SirWedz Guides` sheet
   is the same non-DepEd annotation marker). Both structurally blank,
-  clean of PII.
+  clean of PII in cell content. **Cross-check, 2026-09-02**: this
+  file's `docProps` metadata (`cp:category`) independently self-credits
+  "Wedzmer B. Munjilul" ("Sir Wedz") as the 2017 redesigner — the same
+  identity the `SirWedz Guides` sheet name already implied, now
+  corroborated from a second, independent part of the file. Reads as
+  voluntary template-authorship attribution, not a live-record PII
+  leak (see `docs/form-evidence/{sf9,esf7}/README.md` for the fuller
+  metadata-scope note and the one genuine third-party-name finding,
+  in eSF7, that _was_ redacted).
 
 **Environment limitation this session** (see
 `docs/form-evidence/sf1/README.md` for full detail): this session's
