@@ -110,6 +110,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
   }
 
   async function handleSave(policyPeriodId: string) {
+    if (savingPeriodId === policyPeriodId) return;
     setError(null);
     setConfirmation(null);
     setSavingPeriodId(policyPeriodId);
@@ -247,7 +248,7 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
                       <td>
                         <button
                           type="button"
-                          disabled={savingPeriodId === period.id}
+                          aria-disabled={savingPeriodId === period.id}
                           onClick={() => handleSave(period.id)}
                         >
                           {savingPeriodId === period.id ? "Saving…" : "Save"}

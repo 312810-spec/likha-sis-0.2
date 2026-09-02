@@ -57,6 +57,11 @@ class FakeGradingRepository implements GradingRepository {
     return this.existingPeriods;
   }
 
+  /** When set, `createPeriod` never resolves on its own -- the test
+   * controls completion. Used to prove the in-flight guard blocks a
+   * second save for the same row while the first is still pending. */
+  pending = false;
+
   async createPeriod(
     schoolYear: string,
     policyPeriodId: string,
@@ -64,6 +69,9 @@ class FakeGradingRepository implements GradingRepository {
     endsOn: string,
   ): Promise<GradingPeriod | null> {
     this.createCalls.push({ schoolYear, policyPeriodId, startsOn, endsOn });
+    if (this.pending) {
+      return new Promise(() => {});
+    }
     return this.createResult;
   }
 }
@@ -111,6 +119,26 @@ describe("GradingPeriodsScreen", () => {
         endsOn: "2026-09-15",
       },
     ]);
+  });
+
+  it("does not save a second time for the same row while the first save is still in flight", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeGradingRepository();
+    repo.pending = true;
+    renderScreen(repo);
+    await screen.findByText("1st Term");
+
+    const dateInputs = screen.getAllByDisplayValue("");
+    await user.type(dateInputs.at(0)!, "2026-06-08");
+    await user.type(dateInputs.at(1)!, "2026-09-15");
+    const saveButton = screen.getAllByRole("button", { name: "Save" }).at(0)!;
+    await user.click(saveButton);
+    await waitFor(() => expect(repo.createCalls).toHaveLength(1));
+
+    expect(saveButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(saveButton);
+
+    expect(repo.createCalls).toHaveLength(1);
   });
 
   it("shows an already-saved period's dates as read-only, not an editable form", async () => {

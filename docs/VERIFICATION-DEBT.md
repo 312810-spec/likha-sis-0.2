@@ -2935,6 +2935,29 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
+## App-wide: self-disabling buttons lose focus to `<body>` on click — extended 2026-09-02 (GradingPeriods/ScheduleMeetings/TeachingAssignments)
+
+**Extended 2026-09-02**: applied the same `disabled=` → `aria-disabled=`
+
+- handler-guard pattern to five more instances: `GradingPeriodsScreen.tsx`'s
+  per-row "Save" button, `ScheduleMeetingsScreen.tsx`'s "Schedule meeting"
+  and per-row "Remove" button, and `TeachingAssignmentsScreen.tsx`'s
+  "Assign teacher" and per-row "Remove" button. Chosen next because these
+  three screens share a simple, consistent shape (one create-form submit
+  button plus a per-row remove/save button keyed by id), making the sweep
+  mechanical and low-risk. For the per-row buttons, the handler guard
+  checks the specific row/id already being saved or removed
+  (`savingPeriodId === policyPeriodId`, `removingId === meeting.id`, etc.)
+  rather than a blanket "any action in flight" guard — preserving the
+  screens' existing behavior of only disabling the one row currently in
+  flight, not the whole list. Each proven with a real interaction test:
+  hang the underlying repository call, click once, assert
+  `aria-disabled="true"`, click again, assert the call count did not
+  increase. `npm run quality` 810/810 (5 new tests), typecheck/lint/
+  format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
 ## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
 
 Found by the UX-03 `accessibility-reviewer` retry (2026-09-01): buttons

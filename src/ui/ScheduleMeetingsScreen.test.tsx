@@ -21,6 +21,12 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   meetings: ScheduleMeeting[];
   createOutcome: CreateMeetingOutcome | "auto" = "auto";
   nextId = 2;
+  /** When set, `createMeeting`/`removeMeeting` never resolve on their own
+   * -- the test controls completion. Used to prove the in-flight guards
+   * block a second submission while the first is still pending. */
+  pending = false;
+  createMeetingCalls = 0;
+  removeMeetingCalls = 0;
 
   constructor(meetings: ScheduleMeeting[] = []) {
     this.meetings = meetings;
@@ -48,6 +54,8 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     endsAt: string,
     room: string | null,
   ): Promise<CreateMeetingOutcome> {
+    this.createMeetingCalls += 1;
+    if (this.pending) return new Promise(() => {});
     if (this.createOutcome !== "auto") return this.createOutcome;
     const created: ScheduleMeeting = {
       id: `meeting-${this.nextId++}`,
@@ -61,6 +69,8 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
     return { outcome: "created", meeting: created };
   }
   async removeMeeting(id: string) {
+    this.removeMeetingCalls += 1;
+    if (this.pending) return new Promise<boolean>(() => {});
     const before = this.meetings.length;
     this.meetings = this.meetings.filter((m) => m.id !== id);
     return this.meetings.length < before;
@@ -133,6 +143,40 @@ describe("ScheduleMeetingsScreen", () => {
     expect(
       await screen.findByText("This teacher already has another class scheduled at this time."),
     ).toBeInTheDocument();
+  });
+
+  it("does not submit a second create while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen();
+    repo.pending = true;
+    await screen.findByRole("combobox", { name: "Day" });
+
+    await user.type(screen.getByLabelText("Start time"), "08:00");
+    await user.type(screen.getByLabelText("End time"), "08:50");
+    const scheduleButton = screen.getByRole("button", { name: "Schedule meeting" });
+    await user.click(scheduleButton);
+    await waitFor(() => expect(repo.createMeetingCalls).toBe(1));
+
+    expect(scheduleButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(scheduleButton);
+
+    expect(repo.createMeetingCalls).toBe(1);
+  });
+
+  it("does not remove the same meeting a second time while the first removal is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen({ meetings: [MEETING] });
+    repo.pending = true;
+    await screen.findByRole("rowheader", { name: "Monday" });
+
+    const removeButton = screen.getByRole("button", { name: "Remove the Monday 08:00 meeting" });
+    await user.click(removeButton);
+    await waitFor(() => expect(repo.removeMeetingCalls).toBe(1));
+
+    expect(removeButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(removeButton);
+
+    expect(repo.removeMeetingCalls).toBe(1);
   });
 
   it("removes a meeting", async () => {
