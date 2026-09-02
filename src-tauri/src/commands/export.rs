@@ -4,12 +4,13 @@ use rusqlite::Connection;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::auth::{self, SessionManager};
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::export::learner_roster;
 use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
+use crate::export::sf10::{self, Sf10YearRow};
 use crate::export::sf2;
 use crate::export::sf4::{self, Sf4SectionSummary};
 use crate::export::sf5::{self, Sf5LearnerRow, Sf5SubjectGrade};
@@ -37,6 +38,13 @@ pub struct Sf6ExportResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Sf5ExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sf10ExportResult {
     pub file_path: String,
     pub disclosure: FieldDisclosure,
 }
@@ -750,6 +758,191 @@ pub fn export_school_monthly_attendance_sf4(
     std::fs::write(&file_path, export.csv)?;
 
     Ok(Some(Sf4ExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+
+/// Writes a learner-level, DepEd-SF10-inspired cumulative Permanent
+/// Academic Record export to `<Documents>/LIKHA-SIS/` -- one block per
+/// distinct school year the learner has ever been enrolled in (oldest
+/// first, mirroring `section_membership::list_by_learner_in_school`'s own
+/// ordering), each listing that year's subject final grades, computed
+/// General Average, and Action Taken. See `export::sf10`'s module doc
+/// comment: content-based, not the official DepEd `.xlsx` template.
+///
+/// Gated by `Capability::ManageLearners` -- the same Registrar-or-School-
+/// Head gate `create_learner`/`update_learner` already use -- because a
+/// single learner's whole multi-year grade history is more concentrated
+/// PII than a school-wide aggregate summary (SF6, session-only-gated) or
+/// a section-scoped roster (SF5, adviser-of-section-gated); an ordinary
+/// teacher with no administrative role has no reason to pull one
+/// learner's entire academic history at once. `learner_id` is
+/// client-supplied the same legitimate way `section_id`/`class_record_id`
+/// already are elsewhere in this file -- isolation holds because
+/// `learner::find_by_id_in_school` resolves to `None` for a foreign
+/// learner, returning `None` here too rather than exporting anything.
+#[tauri::command]
+pub fn export_learner_permanent_record_sf10(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+) -> AppResult<Option<Sf10ExportResult>> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(learner_row) = learner::find_by_id_in_school(&conn, &school_id, &learner_id)? else {
+        return Ok(None);
+    };
+
+    let memberships =
+        section_membership::list_by_learner_in_school(&conn, &school_id, &learner_id)?;
+
+    // Group memberships by school year, preserving the oldest-first order
+    // `list_by_learner_in_school` already returns. A learner re-sectioned
+    // within one school year (e.g. a mid-year transfer, Wave 2P) collapses
+    // into ONE row for that year, not a duplicate -- the display label
+    // (grade level/section name) tracks the LATEST section seen for that
+    // year, but subject grades below are aggregated across every section
+    // the learner sat in that year, not just the last one.
+    struct YearGroup {
+        school_year: String,
+        grade_level: String,
+        section_name: String,
+        section_ids: Vec<String>,
+    }
+    let mut year_groups: Vec<YearGroup> = Vec::new();
+    for membership in &memberships {
+        let Some(section) =
+            section::find_by_id_in_school(&conn, &school_id, &membership.section_id)?
+        else {
+            continue;
+        };
+        if let Some(group) = year_groups
+            .iter_mut()
+            .find(|g| g.school_year == section.school_year)
+        {
+            group.grade_level = section.grade_level.clone();
+            group.section_name = section.name.clone();
+            if !group.section_ids.contains(&section.id) {
+                group.section_ids.push(section.id.clone());
+            }
+        } else {
+            year_groups.push(YearGroup {
+                school_year: section.school_year.clone(),
+                grade_level: section.grade_level.clone(),
+                section_name: section.name.clone(),
+                section_ids: vec![section.id.clone()],
+            });
+        }
+    }
+
+    let mut year_rows = Vec::with_capacity(year_groups.len());
+    for group in &year_groups {
+        let mut filtered_records = Vec::new();
+        for section_id in &group.section_ids {
+            let class_records =
+                class_record::list_by_section_in_school(&conn, &school_id, section_id)?;
+            filtered_records.extend(
+                class_records
+                    .into_iter()
+                    .filter(|cr| cr.school_year == group.school_year),
+            );
+        }
+
+        let mut distinct_subjects: Vec<String> = filtered_records
+            .iter()
+            .map(|cr| cr.subject_name.clone())
+            .collect();
+        distinct_subjects.sort();
+        distinct_subjects.dedup();
+
+        let mut subject_grades = Vec::with_capacity(distinct_subjects.len());
+        for subj in &distinct_subjects {
+            let subj_records: Vec<_> = filtered_records
+                .iter()
+                .filter(|cr| cr.subject_name == *subj)
+                .collect();
+
+            let mut sum = 0.0;
+            let mut count = 0;
+            let mut all_scored = true;
+            for cr in subj_records {
+                let computed = grading_computation::compute_term_grade(
+                    &conn,
+                    &school_id,
+                    &cr.id,
+                    &learner_id,
+                )?;
+                match computed {
+                    Some(grade) => {
+                        sum += grade.term_grade as f64;
+                        count += 1;
+                    }
+                    None => {
+                        all_scored = false;
+                    }
+                }
+            }
+
+            let final_grade = if all_scored && count > 0 {
+                Some((sum / count as f64).round() as u32)
+            } else {
+                None
+            };
+            subject_grades.push(Sf5SubjectGrade {
+                subject_name: subj.clone(),
+                final_grade,
+            });
+        }
+
+        let (general_average, promotion_status) = Sf5LearnerRow::compute_status(&subject_grades);
+
+        year_rows.push(Sf10YearRow {
+            school_year: group.school_year.clone(),
+            grade_level: group.grade_level.clone(),
+            section_name: group.section_name.clone(),
+            subject_grades,
+            general_average,
+            promotion_status,
+        });
+    }
+
+    let export = sf10::build_sf10_export(
+        &school,
+        &learner_row.given_name,
+        &learner_row.family_name,
+        learner_row.lrn.as_deref(),
+        learner_row.sex.as_deref(),
+        &year_rows,
+    );
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    // Falls back to the learner's own (unique) id rather than a fixed
+    // "NO-LRN" placeholder when LRN is unrecorded -- two same-named
+    // learners without an LRN yet would otherwise collide onto the same
+    // filename and silently overwrite each other's export.
+    let file_name = format!(
+        "SF10_{}_{}.csv",
+        sanitize_filename_component(
+            &format!("{}_{}", learner_row.family_name, learner_row.given_name).replace(' ', "_")
+        ),
+        sanitize_filename_component(learner_row.lrn.as_deref().unwrap_or(&learner_row.id)),
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(Sf10ExportResult {
         file_path: file_path.to_string_lossy().to_string(),
         disclosure: export.disclosure,
     }))

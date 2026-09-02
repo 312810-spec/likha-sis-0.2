@@ -12,6 +12,7 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::export::learner_roster::{self, LearnerRosterExport};
+use app_lib::export::sf10::{self, Sf10Export, Sf10YearRow};
 use app_lib::export::sf2::{self, Sf2Export};
 use app_lib::export::sf4::{self, Sf4Export, Sf4SectionSummary};
 use app_lib::export::sf5::{self, Sf5Export, Sf5LearnerRow, Sf5SubjectGrade};
@@ -530,6 +531,282 @@ fn sf5_export_authorization_uses_the_real_last_grading_periods_end_date_not_a_ye
          period's end date (2026-09-15), not the year-boundary fallback \
          (2027-06-30) by which their advisory had already ended"
     );
+}
+
+/// Standing in for the non-I/O portion of
+/// `commands::export::export_learner_permanent_record_sf10`.
+fn export_sf10_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    learner_id: &str,
+) -> app_lib::error::AppResult<Option<Sf10Export>> {
+    let school_id = auth::authorize_capability(conn, sessions, auth::Capability::ManageLearners)?;
+
+    let Some(school) = school::find_by_id(conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(learner_row) = learner::find_by_id_in_school(conn, &school_id, learner_id)? else {
+        return Ok(None);
+    };
+
+    let memberships = section_membership::list_by_learner_in_school(conn, &school_id, learner_id)?;
+
+    struct YearGroup {
+        school_year: String,
+        grade_level: String,
+        section_name: String,
+        section_ids: Vec<String>,
+    }
+    let mut year_groups: Vec<YearGroup> = Vec::new();
+    for membership in &memberships {
+        let Some(section) =
+            section::find_by_id_in_school(conn, &school_id, &membership.section_id)?
+        else {
+            continue;
+        };
+        if let Some(group) = year_groups
+            .iter_mut()
+            .find(|g| g.school_year == section.school_year)
+        {
+            group.grade_level = section.grade_level.clone();
+            group.section_name = section.name.clone();
+            if !group.section_ids.contains(&section.id) {
+                group.section_ids.push(section.id.clone());
+            }
+        } else {
+            year_groups.push(YearGroup {
+                school_year: section.school_year.clone(),
+                grade_level: section.grade_level.clone(),
+                section_name: section.name.clone(),
+                section_ids: vec![section.id.clone()],
+            });
+        }
+    }
+
+    let mut year_rows = Vec::with_capacity(year_groups.len());
+    for group in &year_groups {
+        let mut filtered_records = Vec::new();
+        for section_id in &group.section_ids {
+            let class_records =
+                class_record::list_by_section_in_school(conn, &school_id, section_id)?;
+            filtered_records.extend(
+                class_records
+                    .into_iter()
+                    .filter(|cr| cr.school_year == group.school_year),
+            );
+        }
+
+        let mut distinct_subjects: Vec<String> = filtered_records
+            .iter()
+            .map(|cr| cr.subject_name.clone())
+            .collect();
+        distinct_subjects.sort();
+        distinct_subjects.dedup();
+
+        let mut subject_grades = Vec::with_capacity(distinct_subjects.len());
+        for subj in &distinct_subjects {
+            let subj_records: Vec<_> = filtered_records
+                .iter()
+                .filter(|cr| cr.subject_name == *subj)
+                .collect();
+
+            let mut sum = 0.0;
+            let mut count = 0;
+            let mut all_scored = true;
+            for cr in subj_records {
+                let computed =
+                    grading_computation::compute_term_grade(conn, &school_id, &cr.id, learner_id)?;
+                match computed {
+                    Some(grade) => {
+                        sum += grade.term_grade as f64;
+                        count += 1;
+                    }
+                    None => {
+                        all_scored = false;
+                    }
+                }
+            }
+
+            let final_grade = if all_scored && count > 0 {
+                Some((sum / count as f64).round() as u32)
+            } else {
+                None
+            };
+            subject_grades.push(Sf5SubjectGrade {
+                subject_name: subj.clone(),
+                final_grade,
+            });
+        }
+
+        let (general_average, promotion_status) = Sf5LearnerRow::compute_status(&subject_grades);
+
+        year_rows.push(Sf10YearRow {
+            school_year: group.school_year.clone(),
+            grade_level: group.grade_level.clone(),
+            section_name: group.section_name.clone(),
+            subject_grades,
+            general_average,
+            promotion_status,
+        });
+    }
+
+    Ok(Some(sf10::build_sf10_export(
+        &school,
+        &learner_row.given_name,
+        &learner_row.family_name,
+        learner_row.lrn.as_deref(),
+        learner_row.sex.as_deref(),
+        &year_rows,
+    )))
+}
+
+fn setup_registrar_session(conn: &rusqlite::Connection, school_id: &str) -> SessionManager {
+    let registrar = user::create_user(conn, "registrar.a", "pw", "Registrar A").unwrap();
+    user::add_school_membership(conn, &registrar.id, school_id).unwrap();
+    role::grant(conn, &registrar.id, school_id, role::REGISTRAR).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(conn, &sessions, "registrar.a", "pw", school_id).unwrap();
+    sessions
+}
+
+#[test]
+fn sf10_export_requires_registrar_or_school_head() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let l = learner::create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+
+    let teacher = user::create_user(&conn, "teacher.plain", "pw", "Teacher Plain").unwrap();
+    user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(&conn, &sessions, "teacher.plain", "pw", &s.id).unwrap();
+
+    let result = export_sf10_as_current_session(&conn, &sessions, &l.id);
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+
+    role::grant(&conn, &teacher.id, &s.id, role::REGISTRAR).unwrap();
+    let registrar_result = export_sf10_as_current_session(&conn, &sessions, &l.id);
+    assert!(registrar_result.is_ok());
+}
+
+#[test]
+fn sf10_export_cross_school_isolation() {
+    let conn = open_test_db();
+    let s1 = school::create(&conn, "School A").unwrap();
+    let l1 = learner::create(&conn, &s1.id, "Juan", "Dela Cruz", None, None).unwrap();
+
+    let s2 = school::create(&conn, "School B").unwrap();
+    let sessions = setup_registrar_session(&conn, &s2.id);
+
+    let result = export_sf10_as_current_session(&conn, &sessions, &l1.id).unwrap();
+    assert!(
+        result.is_none(),
+        "a foreign learner_id must not resolve to any data"
+    );
+}
+
+#[test]
+fn sf10_export_returns_none_for_an_unknown_learner_id() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let sessions = setup_registrar_session(&conn, &s.id);
+
+    let result = export_sf10_as_current_session(&conn, &sessions, "not-a-real-id").unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn sf10_export_renders_a_no_records_note_for_a_learner_never_placed_in_a_section() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let l = learner::create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+    let sessions = setup_registrar_session(&conn, &s.id);
+
+    let export = export_sf10_as_current_session(&conn, &sessions, &l.id)
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("No school-year records available yet."));
+}
+
+#[test]
+fn sf10_export_renders_every_distinct_school_year_the_learner_was_ever_enrolled_in_oldest_first() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let sec_y1 = section::create(&conn, &s.id, "2024-2025", "6", "Mabini").unwrap();
+    let sec_y2 = section::create(&conn, &s.id, "2025-2026", "7", "Rizal").unwrap();
+    let l = learner::create(
+        &conn,
+        &s.id,
+        "Juan",
+        "Dela Cruz",
+        Some("123456789012"),
+        Some("M"),
+    )
+    .unwrap();
+    section_membership::enroll(&conn, &s.id, &sec_y1.id, &l.id, "2024-06-03").unwrap();
+    section_membership::enroll(&conn, &s.id, &sec_y2.id, &l.id, "2025-06-02").unwrap();
+    let sessions = setup_registrar_session(&conn, &s.id);
+
+    let export = export_sf10_as_current_session(&conn, &sessions, &l.id)
+        .unwrap()
+        .unwrap();
+
+    assert!(export.csv.contains("LRN,123456789012"));
+    let year1_pos = export.csv.find("School Year,2024-2025").unwrap();
+    let year2_pos = export.csv.find("School Year,2025-2026").unwrap();
+    assert!(
+        year1_pos < year2_pos,
+        "school years must render oldest-first, matching enrollment order"
+    );
+    assert!(export.csv.contains("Grade Level,6"));
+    assert!(export.csv.contains("Section,Mabini"));
+    assert!(export.csv.contains("Grade Level,7"));
+    assert!(export.csv.contains("Section,Rizal"));
+}
+
+#[test]
+fn sf10_export_collapses_a_mid_year_transfer_into_one_row_for_that_school_year() {
+    let conn = open_test_db();
+    let s = school::create(&conn, "School A").unwrap();
+    let sec_a = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+    let sec_b = section::create(&conn, &s.id, "2026-2027", "7", "Rizal").unwrap();
+    let l = learner::create(&conn, &s.id, "Juan", "Dela Cruz", None, None).unwrap();
+    section_membership::enroll(&conn, &s.id, &sec_a.id, &l.id, "2026-06-01").unwrap();
+    // A same-school-year transfer to a different section (Wave 2P shape) --
+    // `enroll` closes the old membership and opens the new one.
+    section_membership::enroll(&conn, &s.id, &sec_b.id, &l.id, "2026-09-01").unwrap();
+    let sessions = setup_registrar_session(&conn, &s.id);
+
+    let export = export_sf10_as_current_session(&conn, &sessions, &l.id)
+        .unwrap()
+        .unwrap();
+
+    let occurrences = export.csv.matches("School Year,2026-2027").count();
+    assert_eq!(
+        occurrences, 1,
+        "one school year with two sections must collapse into ONE SF10 row, not two"
+    );
+    assert!(
+        export.csv.contains("Section,Rizal"),
+        "the row should label the LATEST section for that year"
+    );
+}
+
+#[test]
+fn sf10_export_never_includes_another_schools_learners() {
+    let conn = open_test_db();
+    let s1 = school::create(&conn, "School A").unwrap();
+    let l1 = learner::create(&conn, &s1.id, "Juan", "Dela Cruz", None, None).unwrap();
+    let sessions = setup_registrar_session(&conn, &s1.id);
+
+    let s2 = school::create(&conn, "School B").unwrap();
+    learner::create(&conn, &s2.id, "Maria", "Santos", None, None).unwrap();
+
+    let export = export_sf10_as_current_session(&conn, &sessions, &l1.id)
+        .unwrap()
+        .unwrap();
+
+    assert!(!export.csv.contains("Santos"));
 }
 
 /// Standing in for the non-I/O portion of `commands::export::export_school_eosy_sf6`.

@@ -3,6 +3,7 @@ import { ValidationError } from "../domain/errors";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
+  Sf10ExportResult,
   Sf2ExportResult,
   Sf4ExportResult,
   Sf5ExportResult,
@@ -86,6 +87,17 @@ class FakeExportRepository implements ExportRepository {
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     this.learnerRosterCalls += 1;
     return this.learnerRosterResultToReturn;
+  }
+
+  sf10Calls: string[] = [];
+  sf10ResultToReturn: Sf10ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF10_Dela_Cruz_Juan_123456789012.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportLearnerPermanentRecordSf10(learnerId: string): Promise<Sf10ExportResult | null> {
+    this.sf10Calls.push(learnerId);
+    return this.sf10ResultToReturn;
   }
 
   revealCalls: string[] = [];
@@ -290,6 +302,36 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportLearnerRoster();
+
+    expect(result).toBeNull();
+  });
+
+  it("exportLearnerPermanentRecordSf10 delegates to the repository with a trimmed id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportLearnerPermanentRecordSf10(" l1 ");
+
+    expect(result).toEqual(repo.sf10ResultToReturn);
+    expect(repo.sf10Calls).toEqual(["l1"]);
+  });
+
+  it("exportLearnerPermanentRecordSf10 rejects an empty learner id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportLearnerPermanentRecordSf10("  ")).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(repo.sf10Calls).toEqual([]);
+  });
+
+  it("exportLearnerPermanentRecordSf10 returns null when the learner could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.sf10ResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportLearnerPermanentRecordSf10("l1");
 
     expect(result).toBeNull();
   });

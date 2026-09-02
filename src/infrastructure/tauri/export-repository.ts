@@ -3,6 +3,7 @@ import { invoke } from "./invoke";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
+  Sf10ExportResult,
   Sf2ExportResult,
   Sf4ExportResult,
   Sf5ExportResult,
@@ -52,6 +53,12 @@ export class TauriExportRepository implements ExportRepository {
 
   exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     return invoke<LearnerRosterExportResult | null>("export_learner_roster");
+  }
+
+  exportLearnerPermanentRecordSf10(learnerId: string): Promise<Sf10ExportResult | null> {
+    return invoke<Sf10ExportResult | null>("export_learner_permanent_record_sf10", {
+      learnerId,
+    });
   }
 
   /** Uses the official `@tauri-apps/plugin-opener` plugin, not a raw

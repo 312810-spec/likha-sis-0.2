@@ -2,6 +2,7 @@ import { ValidationError } from "../domain/errors";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
+  Sf10ExportResult,
   Sf2ExportResult,
   Sf4ExportResult,
   Sf5ExportResult,
@@ -91,6 +92,15 @@ export class ExportApplicationService {
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     return this.exports.exportLearnerRoster();
+  }
+
+  async exportLearnerPermanentRecordSf10(learnerId: string): Promise<Sf10ExportResult | null> {
+    const trimmedLearnerId = learnerId.trim();
+    if (trimmedLearnerId.length === 0) {
+      throw new ValidationError("Learner is required.");
+    }
+
+    return this.exports.exportLearnerPermanentRecordSf10(trimmedLearnerId);
   }
 
   /** `filePath` must come from an export result this service itself

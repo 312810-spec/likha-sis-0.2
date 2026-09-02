@@ -44,3 +44,8 @@ export interface LearnerRosterExportResult {
   filePath: string;
   disclosure: FieldDisclosure;
 }
+
+export interface Sf10ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
