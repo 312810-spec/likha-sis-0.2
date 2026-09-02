@@ -2964,6 +2964,26 @@ three instances to keep this change reviewable. Low severity, not
 blocking. Revisit as its own slice; the fix shape is settled, just not
 yet applied everywhere.
 
+## App-wide: export results show a raw file path with no reveal/open affordance — CLOSED (2026-09-01, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: extended the "Open folder" pattern
+(proven on SF2/SF4 in `MonthlySummaryScreen.tsx`, see below) to every
+remaining export result — SF5 (`SectionRosterScreen.tsx`), SF6
+(`SectionsScreen.tsx`), the class-record report card
+(`ClassRecordWorkspace.tsx`), and the learner roster
+(`LearnerListScreen.tsx`). No new backend work was needed — the
+`revealExportedFile` plumbing (port → `TauriExportRepository` →
+`ExportApplicationService` → `FixtureExportRepository`'s no-op) already
+existed at every layer; this was UI wiring only, mirroring the exact
+button/loading/error-state pattern from the earlier two screens. Every
+new button proven with a real interaction test (click "Open folder",
+assert the repository call fires with the exact saved path) plus an
+error-path test for the reveal call itself failing. `npm run quality`
+805/805 (4 new tests), typecheck/lint/format/architecture clean; `npm
+run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` all clean; no Rust
+touched.
+
 ## App-wide: export results show a raw file path with no reveal/open affordance — PARTIALLY CLOSED (2026-09-01, SF2/SF4 in MonthlySummaryScreen)
 
 Found by the UX-03 `teacher-ux-reviewer` retry (2026-09-01):

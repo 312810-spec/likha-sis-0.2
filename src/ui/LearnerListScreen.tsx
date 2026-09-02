@@ -79,6 +79,8 @@ export function LearnerListScreen({
   const [savingEdit, setSavingEdit] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<LearnerRosterExportResult | null>(null);
+  const [revealingRoster, setRevealingRoster] = useState(false);
+  const [revealRosterError, setRevealRosterError] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState<OpenHistory | null>(null);
   const historyRequestId = useRef(0);
   const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
@@ -273,6 +275,7 @@ export function LearnerListScreen({
     setError(null);
     setConfirmation(null);
     setExportResult(null);
+    setRevealRosterError(null);
     setExporting(true);
     try {
       const result = await exportService.exportLearnerRoster();
@@ -285,6 +288,19 @@ export function LearnerListScreen({
       setError("Could not export the learner list.");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleRevealRoster() {
+    if (revealingRoster || !exportResult) return;
+    setRevealRosterError(null);
+    setRevealingRoster(true);
+    try {
+      await exportService.revealExportedFile(exportResult.filePath);
+    } catch {
+      setRevealRosterError("Could not open the folder for this file.");
+    } finally {
+      setRevealingRoster(false);
     }
   }
 
@@ -350,6 +366,10 @@ export function LearnerListScreen({
               <p>
                 Saved to <code>{exportResult.filePath}</code>.
               </p>
+              <button type="button" aria-disabled={revealingRoster} onClick={handleRevealRoster}>
+                {revealingRoster ? "Opening…" : "Open folder"}
+              </button>
+              {revealRosterError && <p role="alert">{revealRosterError}</p>}
               <p>This file is for your own records — it does not include:</p>
               <ul>
                 {exportResult.disclosure.omittedFields.map((omitted) => (

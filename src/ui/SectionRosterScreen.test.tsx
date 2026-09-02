@@ -286,8 +286,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
-  async revealExportedFile(): Promise<void> {
-    throw new Error("not used in this test");
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
   }
 }
 
@@ -1445,6 +1449,24 @@ describe("SectionRosterScreen", () => {
       screen.getByText("C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv"),
     ).toBeInTheDocument();
     expect(screen.getByText("School Head Certification Signature")).toBeInTheDocument();
+  });
+
+  it("opens the folder for the exported SF5 file when Open folder is clicked", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+    await screen.findByText("C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv",
+      ]),
+    );
   });
 
   it("displays an error alert when SF5 export fails", async () => {

@@ -2964,6 +2964,22 @@ remains open — no Windows screen reader available in this sandbox.
 check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
 diff --check` all clean. Only `src/ui/theme/styles.css` changed.
 
+## Reveal-in-Folder: SF5/SF6/Report Card/Roster (added 2026-09-02)
+
+Extended the "Open folder" reveal affordance (proven on SF2/SF4 in Wave
+"Reveal-Exported-File", PR #24) to the four remaining export surfaces:
+SF5 (`SectionRosterScreen.tsx`), SF6 (`SectionsScreen.tsx`), report
+card export (`ClassRecordWorkspace.tsx`), learner roster export
+(`LearnerListScreen.tsx`). Pure UI wiring — the `revealExportedFile`
+plumbing already existed at every layer (port, `TauriExportRepository`,
+`ExportApplicationService`, `FixtureExportRepository`'s no-op) from
+PR #24, so no backend change was needed. This closes the app-wide
+"raw file path, no reveal affordance" verification debt completely.
+
+`npm run quality` 805/805 (4 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

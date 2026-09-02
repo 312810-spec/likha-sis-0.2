@@ -136,8 +136,12 @@ class FakeExportRepository implements ExportRepository {
     return this.resultToReturn;
   }
 
-  async revealExportedFile(): Promise<void> {
-    throw new Error("not used in this test");
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
   }
 }
 
@@ -284,6 +288,32 @@ describe("LearnerListScreen", () => {
       "LearnerRoster_Rizal_Elementary.csv",
     );
     expect(screen.getByText("Birthdate")).toBeInTheDocument();
+  });
+
+  it("opens the folder for the exported roster file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export learner list (CSV)" }));
+    await screen.findByRole("status");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\LearnerRoster_Rizal_Elementary.csv",
+      ]),
+    );
   });
 
   it("shows an error banner when the export fails to resolve a school", async () => {

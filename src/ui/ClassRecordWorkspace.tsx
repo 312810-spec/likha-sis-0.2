@@ -114,6 +114,8 @@ export function ClassRecordWorkspace({
   const updateFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportCardResult, setReportCardResult] = useState<ReportCardExportResult | null>(null);
   const [exportingReportCard, setExportingReportCard] = useState(false);
+  const [revealingReportCard, setRevealingReportCard] = useState(false);
+  const [revealReportCardError, setRevealReportCardError] = useState<string | null>(null);
 
   const rosterOrder = useMemo(() => roster.map((r) => r.learnerId), [roster]);
   function neighborLearnerId(learnerId: string, direction: 1 | -1): string | undefined {
@@ -476,6 +478,7 @@ export function ClassRecordWorkspace({
 
   async function handleExportReportCard() {
     setError(null);
+    setRevealReportCardError(null);
     setExportingReportCard(true);
     try {
       const result = await exportService.exportClassRecordReportCard(classRecordId);
@@ -488,6 +491,19 @@ export function ClassRecordWorkspace({
       setError(err instanceof ValidationError ? err.message : "Could not export the report card.");
     } finally {
       setExportingReportCard(false);
+    }
+  }
+
+  async function handleRevealReportCard() {
+    if (revealingReportCard || !reportCardResult) return;
+    setRevealReportCardError(null);
+    setRevealingReportCard(true);
+    try {
+      await exportService.revealExportedFile(reportCardResult.filePath);
+    } catch {
+      setRevealReportCardError("Could not open the folder for this file.");
+    } finally {
+      setRevealingReportCard(false);
     }
   }
 
@@ -937,6 +953,14 @@ export function ClassRecordWorkspace({
                   <p>
                     Saved to <code>{reportCardResult.filePath}</code>.
                   </p>
+                  <button
+                    type="button"
+                    aria-disabled={revealingReportCard}
+                    onClick={handleRevealReportCard}
+                  >
+                    {revealingReportCard ? "Opening…" : "Open folder"}
+                  </button>
+                  {revealReportCardError && <p role="alert">{revealReportCardError}</p>}
                   <p>
                     This report card is inspired by DepEd's grade computation rules, not a
                     submission-ready official-form reproduction. It does <strong>not</strong>{" "}
