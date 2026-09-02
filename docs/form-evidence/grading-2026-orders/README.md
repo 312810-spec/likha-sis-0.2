@@ -230,38 +230,81 @@ unresolved and should be checked against the as-published Official
 Gazette text before this project's `grading_computation` module treats
 either boundary as settled.
 
-## Practical implication for LIKHA-SIS — action needed independent of the SF5/SF6/SF9 template work
+## Practical implication for LIKHA-SIS — correction: this is already implemented, not a gap
 
-Now confirmed from primary text, not just inferred from secondary
-sources:
+**This session's earlier framing (both in this file's first version and
+in the corresponding `docs/CURRENT-HANDOFF.md` entries) was wrong to
+present DO 015/DO 009 s.2026 as unaddressed findings needing a future
+review-and-decide pass.** That framing came from the form-evidence
+research track alone, without checking whether the domain layer had
+already handled them. It had, in earlier milestones this project's own
+memory already recorded — the form-evidence work just didn't cross-
+reference it. Corrected here after inspecting
+`src-tauri/src/repository/{grading,grading_computation}.rs` directly:
 
-1. **The school-year structure this project's `grading`/
-   `grading_computation` domain assumes (quarters/semesters) is
-   superseded by a three-term structure for SY 2026-2027**, for all
-   public elementary/secondary schools and CLCs (DO 009 s.2026,
-   confirmed scope and exact term dates above).
-2. **Grading computation is confirmed mid-transition** on a defined,
-   textual basis: SY 2026-2027 uses the Adjusted Transmutation Table
-   (DO 015 s.2026 Annex D Table 4, transcribed above with exact anchor
-   points); SY 2027-2028 moves KS2 (and KS3, per the specific paragraph
-   read — see the caveat above re: whether KS4 is included at that
-   point) to zero-based grading, Term Grade = Initial Grade directly,
-   minimum reportable grade 60, minimum passing grade 75 (unchanged).
-   KS1 already uses the five-level descriptive scale with a
-   cross-transfer-only numeric conversion matrix.
-3. **DO 12, s. 2025 and DO 17, s. 2025 are newly identified** as
-   calendar/enrollment issuances still partly in force (DO 17 s.2025's
-   non-transfer/enrollment provisions) or fully repealed (DO 12 s.2025)
-   — worth a quick check if LIKHA-SIS's enrollment or calendar features
-   ever cite either by number.
+1. **DO 009 s.2026's three-term calendar was implemented in M11**
+   (`docs/adr/0010-grading-period-foundation.md`, 2026-08): the
+   `grading_policies`/`grading_policy_periods`/`grading_periods` schema
+   is already policy-driven and versioned specifically _because_ M11's
+   own research anticipated DepEd's terminology could change, seeding
+   "DepEd Three-Term School Calendar" (Term 1/2/3) as the **default**
+   policy, citing this exact order, alongside a legacy four-quarter
+   policy for historical/transitioning records. This session's
+   primary-source read confirms M11's WebSearch-sourced facts (SY
+   2026-2027 term dates, 201 class days) were already correct — a
+   validation, not a new requirement.
+2. **DO 015 s.2026's grading computation was implemented in M13**
+   (`docs/adr/0013-deped-grade-computation.md`, 2026-08): a prior
+   session's `WebSearch` located and directly read the order's own PDF
+   from `deped.gov.ph` (network access worked in that session; this
+   session's own egress block is session-specific, not a standing
+   project condition). `grading_computation::ADJUSTED_TRANSMUTATION_TABLE`
+   is the verbatim Annex D Table 4 this session independently
+   re-transcribed from the owner-supplied PDF — **the two transcriptions
+   match exactly, band for band**, a strong independent cross-check that
+   both are accurate. `transmute_adjusted`/`round_zero_based`/
+   `uses_zero_based_grading` (keyed off `grading_periods.school_year`,
+   switching at 2027) and the explicit 60-floor are all already coded
+   and tested against the order's own two worked examples (Science KS2
+   IG 85.8 → TG 88 transmuted; Mathematics KS3 IG 83.6 → TG 84
+   zero-based) — both examples this session also independently found
+   in the primary PDF and confirm match.
+3. **Weight-group coverage has since been substantially expanded past
+   M13's original one-group scope**: M15 added EPP/TLE & MAPEH
+   (`docs/adr/0015-expand-grading-policy-coverage.md`); M16 added all six
+   Key Stage 4/SHS weight groups from DO 015's Table 10
+   (`docs/adr/0016-shs-and-exceptional-grading-policies.md`), including
+   the two structurally exceptional shapes (Field Exposure/Arts
+   Apprenticeship/Creative Production's Term-Examination-only
+   Examinations component; Research Electives/Work Immersion's
+   no-Examinations-component shape). See `docs/PROJECT-MEMORY.md`'s M15/
+   M16 entries for the full detail.
+4. **What genuinely remains open**, per ADR-0013's own disclosed scope
+   and this session's new findings — not urgent, not blocking, listed
+   for a future milestone to pick up if/when needed, not as a standing
+   recommendation to act now:
+   - **Key Stage 1 descriptive grading** (five-level scale, PACE Form,
+     cross-transfer numeric conversion matrix) is a structurally
+     different computation from the weighted-numeric one
+     `grading_computation` implements — not yet modeled at all.
+   - **Grade 12's DO 8 s.2015 carryover weights** — ADR-0013 could not
+     primary-source-confirm DO 8's own percentages; this session's read
+     of DO 015 s.2026 did not include DO 8's text either (DO 015 only
+     lists DO 8 in its References, doesn't restate its numbers), so this
+     remains unresolved.
+   - **The KS2-KS4-vs-KS2-KS3 zero-based-grading scope tension** flagged
+     above (DO 015's own text is internally inconsistent on this) is not
+     currently load-bearing — `uses_zero_based_grading` applies
+     uniformly by school year with no Key-Stage parameter, which matches
+     the broader "KS2 to KS4" reading; if a future milestone ever needs
+     KS-specific zero-based rollout timing, resolve the ambiguity against
+     the Official Gazette text first.
+   - **DO 12, s. 2025 and DO 17, s. 2025** (newly identified this
+     session from DO 009's own repeal/amendment clauses) — worth a quick
+     check only if LIKHA-SIS's enrollment or calendar features ever cite
+     either by number; no current feature does.
 
-**Recommended next step, still separate from and higher-priority than
-the SF5/SF6/SF9 template provenance work**: review
-`src-tauri/src/repository/grading.rs` and
-`src-tauri/src/repository/grading_computation.rs` against this
-three-term / two-phase-transmutation model (now with exact confirmed
-transmutation-table values available for implementation, not just a
-policy description), and decide with the project owner whether/how to
-model it — this remains a DepEd-compliance change requiring owner
-sign-off before touching shipped grading logic, per this project's own
-priority order and human-approval-gate rules.
+**No code change is recommended from this evidence-gathering work.**
+The grading domain's DepEd-compliance posture for DO 015/DO 009 s.2026
+is materially stronger than this file's first version suggested — this
+was a documentation-accuracy correction, not a new engineering task.

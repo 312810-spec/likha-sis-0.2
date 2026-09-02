@@ -44,13 +44,24 @@ Key confirmed facts (previously only WebSearch-corroborated):
   previously on this project's radar); takes effect immediately upon
   publication (no 15-day delay, unlike DO 015).
 
-**Practical implication unchanged, now on firmer footing**: the
-recommended next step is still a review of
-`src-tauri/src/repository/grading.rs`/`grading_computation.rs` against
-the three-term calendar and two-phase transmutation model, with the
-project owner (DepEd-compliance change, human-approval-gate territory
-per this project's own rules) — not yet started, no code changed this
-session, evidence/documentation only.
+**Correction, same session, after checking the actual domain code**:
+the "recommended next step" above (and in this file's next entry down,
+and in `docs/PROJECT-MEMORY.md`'s "Authoritative-Template Form Evidence"
+entry) was wrong. `src-tauri/src/repository/grading.rs` and
+`grading_computation.rs` **already implement** both orders — DO 009
+s.2026's three-term calendar since M11 (`docs/adr/0010-*.md`) and DO 015
+s.2026's grading computation since M13 (`docs/adr/0013-*.md`, expanded
+by M15/M16). This session's primary-source read **validates** that
+earlier work rather than finding a gap: the Adjusted Transmutation Table
+this session transcribed from the owner-supplied PDF matches
+`grading_computation::ADJUSTED_TRANSMUTATION_TABLE` band-for-band, and
+both of the order's own worked examples the code is tested against were
+independently re-found in the primary PDF. Full corrected detail:
+`docs/form-evidence/grading-2026-orders/README.md`'s "Practical
+implication" section. No code change is recommended from this
+evidence-gathering work — it was a documentation-accuracy correction,
+not a new engineering task. No code changed this session,
+evidence/documentation only.
 
 ## Active Task (2026-09-02, this session — direct-verification attempt on DO 015/DO 009 s.2026: still egress-blocked, but findings substantially strengthened)
 
