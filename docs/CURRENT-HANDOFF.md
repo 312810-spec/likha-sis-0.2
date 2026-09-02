@@ -1,5 +1,70 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Wave: SF10 Permanent Record shipped, ADR-0063)
+
+User-directed continuation ("continue but do sf10, i will tell you if i am
+ready to work on the templates"). Built SF10 Permanent Record as a
+content-based CSV export (DepEd-content-faithful, not the official
+`.xlsx` template — that track, `formgen::template_version`, stays
+evidence-blocked per ADR-0053 and was not touched), following exactly
+the SF5/SF6 reuse pattern the prior handoff entry identified as the
+safest next slice. Full design/rationale in
+`docs/adr/0063-sf10-permanent-record.md`.
+
+**What shipped**: `src-tauri/src/export/sf10.rs` (new — reuses
+`PromotionStatus`/`Sf5SubjectGrade`/`Sf5LearnerRow::compute_status`
+from `sf5.rs` unchanged), a new
+`commands::export::export_learner_permanent_record_sf10` command
+(gated by `Capability::ManageLearners`, the same Registrar-or-School-
+Head gate as `create_learner`/`update_learner` — neither SF5's
+adviser-of-section gate nor SF6's plain session-scope gate fit a
+single learner's whole multi-year history), full frontend port/
+service/UI wiring, and a new per-learner-row "Export SF10 (Permanent
+Record)" button on `LearnerListScreen.tsx`. A same-school-year
+mid-year transfer collapses into one row (labeled with the latest
+section, subject grades aggregated across every section that year),
+not a duplicate. `export_learner_permanent_record_sf10` added to
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`, matching
+`create_learner`'s convention for `ManageLearners`-gated commands.
+
+**Verified for real, not hand-verified**: this session's sandbox had a
+working `sudo apt-get` path (unlike most prior sessions) — installed
+the GTK/WebKit system libraries, ran `rustup update stable` (1.94.1 →
+1.98.0, required), then ran `cargo build`, `cargo test` (633 lib tests
+
+- all integration binaries, including 4 new `export::sf10` unit tests
+  and 7 new `tests/export.rs` integration tests — authorization gate,
+  cross-school isolation, unknown-learner-id, empty history, multi-year
+  ordering, mid-year-transfer collapsing, no-cross-school-leakage),
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` — all
+  clean, all directly confirmed. One real bug was caught by `cargo test`
+  during development (a CSV header label containing a comma caused the
+  label itself to get quoted, breaking a test's expected substring) and
+  fixed before commit — see the ADR for detail. `npm run quality` —
+  853/853 vitest (was 843), typecheck/lint/format/architecture clean; 10
+  new TS tests. `npm run build`, `npm run check:dev-preview-isolation`,
+  `npm run harness:verify` (100/100) all clean. No new dependency, no
+  migration, no change to `formgen/`.
+
+**Independent security review**: dispatched via the file-based
+workaround from ADR-0062 (this session's own earlier fix for the
+agent-resume/retrieval bug) — a real, retrievable review, not a self-
+review substitute. **Verdict: NO BLOCKING FINDINGS.** Checked and
+confirmed: authorization runs before any data read and `school_id` is
+never client-supplied; every downstream lookup (`learner`, `section`,
+`class_record`, `section_membership`) is independently tenant-scoped
+and cross-school-tested; every CSV row routes through the shared
+`csv::row`/`escape_field` formula-injection defense; every
+user-controlled filename component routes through
+`sanitize_filename_component`; no learner PII reaches a log or error
+string; neither of this project's two previously-shipped failure
+classes (unauthenticated self-grant; SELECT-then-act race) recurs.
+Full findings in `docs/adr/0063-sf10-permanent-record.md`.
+
+Next candidate: the authoritative-template form-output pipeline
+remains paused, per your instruction, until you say you're ready to
+continue supplying DepEd templates.
+
 ## Active Task (2026-09-02, this session — UX-02/UX-03 CLOSED for real via a new file-based review workaround; ADR-0062)
 
 User-directed continuation ("continue working on verification debts",
