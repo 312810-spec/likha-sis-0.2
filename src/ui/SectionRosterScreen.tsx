@@ -220,6 +220,8 @@ export function SectionRosterScreen({
   const [sf5Exporting, setSf5Exporting] = useState(false);
   const [sf5Result, setSf5Result] = useState<Sf5ExportResult | null>(null);
   const [sf5Error, setSf5Error] = useState<string | null>(null);
+  const [revealingSf5, setRevealingSf5] = useState(false);
+  const [revealSf5Error, setRevealSf5Error] = useState<string | null>(null);
   const [sf9GeneratingLearnerId, setSf9GeneratingLearnerId] = useState<string | null>(null);
   const [sf9Result, setSf9Result] = useState<{
     member: SectionRosterMember;
@@ -540,6 +542,7 @@ export function SectionRosterScreen({
     if (!section || !exportService) return;
     setSf5Error(null);
     setSf5Result(null);
+    setRevealSf5Error(null);
     setSf1Result(null);
     setSf1Error(null);
     setSf9Result(null);
@@ -562,6 +565,19 @@ export function SectionRosterScreen({
       );
     } finally {
       setSf5Exporting(false);
+    }
+  }
+
+  async function handleRevealSf5() {
+    if (!exportService || revealingSf5 || !sf5Result) return;
+    setRevealSf5Error(null);
+    setRevealingSf5(true);
+    try {
+      await exportService.revealExportedFile(sf5Result.filePath);
+    } catch {
+      setRevealSf5Error("Could not open the folder for this file.");
+    } finally {
+      setRevealingSf5(false);
     }
   }
 
@@ -1081,6 +1097,12 @@ export function SectionRosterScreen({
               <p>
                 Saved to <code>{sf5Result.filePath}</code>.
               </p>
+              {exportService && (
+                <button type="button" aria-disabled={revealingSf5} onClick={handleRevealSf5}>
+                  {revealingSf5 ? "Opening…" : "Open folder"}
+                </button>
+              )}
+              {revealSf5Error && <p role="alert">{revealSf5Error}</p>}
               <p>
                 This file is a DepEd SF5 End-of-School-Year promotion summary for school year{" "}
                 <strong>{section?.schoolYear}</strong>. It does <strong>not</strong> include:

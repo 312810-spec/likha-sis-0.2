@@ -1,5 +1,27 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Reveal-in-folder: SF5/SF6/report card/roster, complete)
+
+User-directed continuation ("continue"). Picked up the recorded exact
+next slice from the reveal-exported-file feature (PR #24): extend the
+"Open folder" button already proven on SF2/SF4 in
+`MonthlySummaryScreen.tsx` to the remaining four export surfaces —
+SF5 (`SectionRosterScreen.tsx`), SF6 (`SectionsScreen.tsx`), the
+class-record report card (`ClassRecordWorkspace.tsx`), and the learner
+roster (`LearnerListScreen.tsx`). No new backend/plumbing work — the
+`revealExportedFile` port/adapter/service/fixture wiring already existed
+at every layer from PR #24; this was UI-only, mirroring the same
+button + loading/error-state pattern already established. This closes
+the "reveal-affordance" verification debt completely (see
+`docs/VERIFICATION-DEBT.md`).
+
+**Verified**: `npm run quality` 805/805 (4 new interaction tests, one
+per screen, each proving the underlying `revealExportedFile` call fires
+with the exact saved path — not just that a button renders),
+typecheck/lint/format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
 ## Active Task (2026-09-01, this session — Verification debt sweep: Wave 3I security review retry + native visual pass, complete)
 
 User asked to "work on verification debts." Picked the two highest-

@@ -241,8 +241,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
-  async revealExportedFile(): Promise<void> {
-    throw new Error("not used in this test");
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
   }
 }
 
@@ -732,6 +736,26 @@ describe("ClassRecordWorkspace", () => {
       await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false }),
     ).toBeInTheDocument();
     expect(screen.getByText("Qualitative Descriptor", { exact: false })).toBeInTheDocument();
+  });
+
+  it("opens the folder for the exported report card when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false });
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ReportCard_Mabini_Science_1st_Term.csv",
+      ]),
+    );
   });
 
   it("never shows a previous assessment item's roster after switching to an item whose load fails", async () => {

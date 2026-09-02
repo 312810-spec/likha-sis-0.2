@@ -160,8 +160,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
-  async revealExportedFile(): Promise<void> {
-    throw new Error("not used in this test");
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
   }
 }
 
@@ -372,6 +376,32 @@ describe("SectionsScreen", () => {
     expect(screen.getByText(/School Head Certification Signature/)).toBeInTheDocument();
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("opens the folder for the exported SF6 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { exportRepo } = renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+    await user.click(
+      screen.getByRole("button", { name: "Export SF6 (Promotion & Proficiency Summary)" }),
+    );
+    await screen.findByText("C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv",
+      ]),
+    );
   });
 
   it("exports SF6 when school year is typed in text input when no sections exist", async () => {

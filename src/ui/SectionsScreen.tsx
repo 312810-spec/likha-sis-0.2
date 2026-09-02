@@ -72,6 +72,8 @@ export function SectionsScreen({
   const [sf6Exporting, setSf6Exporting] = useState(false);
   const [sf6Result, setSf6Result] = useState<Sf6ExportResult | null>(null);
   const [sf6Error, setSf6Error] = useState<string | null>(null);
+  const [revealingSf6, setRevealingSf6] = useState(false);
+  const [revealSf6Error, setRevealSf6Error] = useState<string | null>(null);
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -147,6 +149,7 @@ export function SectionsScreen({
     if (!exportService) return;
     setSf6Error(null);
     setSf6Result(null);
+    setRevealSf6Error(null);
     setSf6Exporting(true);
     try {
       const effectiveSy = sf6SchoolYear.trim() || availableSchoolYears[0] || "";
@@ -164,6 +167,19 @@ export function SectionsScreen({
       );
     } finally {
       setSf6Exporting(false);
+    }
+  }
+
+  async function handleRevealSf6() {
+    if (!exportService || revealingSf6 || !sf6Result) return;
+    setRevealSf6Error(null);
+    setRevealingSf6(true);
+    try {
+      await exportService.revealExportedFile(sf6Result.filePath);
+    } catch {
+      setRevealSf6Error("Could not open the folder for this file.");
+    } finally {
+      setRevealingSf6(false);
     }
   }
 
@@ -336,6 +352,10 @@ export function SectionsScreen({
               <p>
                 Saved to <code>{sf6Result.filePath}</code>.
               </p>
+              <button type="button" aria-disabled={revealingSf6} onClick={handleRevealSf6}>
+                {revealingSf6 ? "Opening…" : "Open folder"}
+              </button>
+              {revealSf6Error && <p role="alert">{revealSf6Error}</p>}
               <p>
                 This file is a DepEd SF6 Summarized Report on Promotion and Level of Proficiency for
                 school year{" "}
