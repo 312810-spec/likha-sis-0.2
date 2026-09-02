@@ -29,6 +29,9 @@ class FakeLearnerRepository implements LearnerRepository {
     sex?: "M" | "F";
     confirmed: boolean;
   }> = [];
+  pendingCreateWithDuplicateCheck = false;
+  pendingUpdateProfile = false;
+  updateProfileCalls = 0;
 
   constructor(public learners: Learner[] = []) {}
 
@@ -64,6 +67,7 @@ class FakeLearnerRepository implements LearnerRepository {
     confirmed = false,
   ): Promise<CreateLearnerResult> {
     this.createWithDuplicateCheckCalls.push({ givenName, familyName, lrn, sex, confirmed });
+    if (this.pendingCreateWithDuplicateCheck) return new Promise<CreateLearnerResult>(() => {});
     const trimmedGiven = givenName.trim().toLowerCase();
     const trimmedFamily = familyName.trim().toLowerCase();
     const candidates = this.learners.filter(
@@ -92,6 +96,8 @@ class FakeLearnerRepository implements LearnerRepository {
     lrn?: string,
     sex?: "M" | "F",
   ): Promise<Learner | null> {
+    this.updateProfileCalls += 1;
+    if (this.pendingUpdateProfile) return new Promise<Learner | null>(() => {});
     const existing = this.learners.find((l) => l.id === learnerId);
     if (!existing) return null;
     existing.givenName = givenName;
@@ -131,8 +137,11 @@ class FakeExportRepository implements ExportRepository {
   > {
     throw new Error("not used in this test");
   }
+  pendingExport = false;
+
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     this.exportLearnerRosterCalls += 1;
+    if (this.pendingExport) return new Promise<LearnerRosterExportResult | null>(() => {});
     return this.resultToReturn;
   }
 
@@ -316,6 +325,32 @@ describe("LearnerListScreen", () => {
     );
   });
 
+  it("does not submit a second export while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.pendingExport = true;
+    await screen.findByText("Ana Santos");
+
+    const exportButton = screen.getByRole("button", { name: "Export learner list (CSV)" });
+    await user.click(exportButton);
+    await waitFor(() => expect(exportRepo.exportLearnerRosterCalls).toBe(1));
+
+    expect(exportButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(exportButton);
+
+    expect(exportRepo.exportLearnerRosterCalls).toBe(1);
+  });
+
   it("shows an error banner when the export fails to resolve a school", async () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen([
@@ -462,6 +497,34 @@ describe("LearnerListScreen", () => {
       "Ana Santos's profile was updated.",
     );
     expect(repo.learners[0]).toMatchObject({ lrn: "123456789012", sex: "F" });
+  });
+
+  it("does not save a second time while the first save is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    repo.pendingUpdateProfile = true;
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+    const editForm = screen.getByRole("form", { name: "Edit Ana Santos" });
+    const saveButton = within(editForm).getByRole("button", { name: "Save" });
+    await user.click(saveButton);
+    await waitFor(() => expect(repo.updateProfileCalls).toBe(1));
+
+    expect(saveButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(saveButton);
+
+    expect(repo.updateProfileCalls).toBe(1);
   });
 
   it("cancel discards edits and leaves the learner unchanged", async () => {
@@ -680,6 +743,24 @@ describe("LearnerListScreen", () => {
     expect(repo.createCalls).toEqual([
       { givenName: "Ben", familyName: "Reyes", lrn: undefined, sex: undefined },
     ]);
+  });
+
+  it("does not submit a second enrollment while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([]);
+    repo.pendingCreateWithDuplicateCheck = true;
+    await screen.findByText("No learners enrolled yet.");
+
+    await user.type(screen.getByLabelText("Given name"), "Ben");
+    await user.type(screen.getByLabelText("Family name"), "Reyes");
+    const enrollButton = screen.getByRole("button", { name: "Enroll learner" });
+    await user.click(enrollButton);
+    await waitFor(() => expect(repo.createWithDuplicateCheckCalls).toHaveLength(1));
+
+    expect(enrollButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(enrollButton);
+
+    expect(repo.createWithDuplicateCheckCalls).toHaveLength(1);
   });
 
   it("shows a validation message and does not call the repository for an empty name", async () => {

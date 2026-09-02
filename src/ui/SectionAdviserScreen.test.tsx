@@ -44,6 +44,9 @@ class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {
   current: SectionAdvisory | null;
   assignResult: AssignAdviserOutcome | "reject" = { kind: "assigned", advisory: ADVISORY };
   endResult: EndAdvisoryOutcome | "reject" = { kind: "ended", advisory: ADVISORY };
+  pending = false;
+  assignCalls = 0;
+  endCalls = 0;
 
   constructor(current: SectionAdvisory | null = null) {
     this.current = current;
@@ -53,6 +56,8 @@ class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {
     return this.current;
   }
   async assign(sectionId: string, teacherUserId: string, startsOn: string) {
+    this.assignCalls += 1;
+    if (this.pending) return new Promise<AssignAdviserOutcome>(() => {});
     if (this.assignResult === "reject") {
       throw new Error("could not assign");
     }
@@ -72,6 +77,8 @@ class FakeSectionAdvisoryRepository implements SectionAdvisoryRepository {
     return this.assignResult;
   }
   async end(_sectionId: string, _advisoryId: string, endsOn: string) {
+    this.endCalls += 1;
+    if (this.pending) return new Promise<EndAdvisoryOutcome>(() => {});
     if (this.endResult === "reject") {
       throw new Error("could not end");
     }
@@ -146,6 +153,38 @@ describe("SectionAdviserScreen", () => {
     await user.click(screen.getByRole("button", { name: "Assign adviser" }));
 
     expect(await screen.findByText("Ana Cruz was assigned as adviser.")).toBeInTheDocument();
+  });
+
+  it("does not submit a second assignment while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { advisoryRepo } = renderScreen();
+    advisoryRepo.pending = true;
+    await screen.findByRole("combobox", { name: "Teacher" });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Teacher" }), "teacher-1");
+    const assignButton = screen.getByRole("button", { name: "Assign adviser" });
+    await user.click(assignButton);
+    await waitFor(() => expect(advisoryRepo.assignCalls).toBe(1));
+
+    expect(assignButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(assignButton);
+
+    expect(advisoryRepo.assignCalls).toBe(1);
+  });
+
+  it("does not end the advisory a second time while the first end is still in flight", async () => {
+    const user = userEvent.setup();
+    const { advisoryRepo } = renderScreen({ current: ADVISORY });
+    advisoryRepo.pending = true;
+    const endButton = await screen.findByRole("button", { name: "End advisory" });
+
+    await user.click(endButton);
+    await waitFor(() => expect(advisoryRepo.endCalls).toBe(1));
+
+    expect(endButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(endButton);
+
+    expect(advisoryRepo.endCalls).toBe(1);
   });
 
   it("ends the current advisory and returns to the assign form", async () => {

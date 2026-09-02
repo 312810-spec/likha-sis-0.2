@@ -1,5 +1,34 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecords/SectionAdviser/LearnerList, complete)
+
+User-directed continuation ("continue working on the waves"). Third
+batch of the self-disabling-button sweep: applied the proven
+`disabled=` → `aria-disabled=` + handler-guard pattern to
+`ClassRecordsScreen.tsx`'s "Open class record" and "Add subject"
+buttons, `SectionAdviserScreen.tsx`'s "End advisory" and "Assign
+adviser" buttons, and `LearnerListScreen.tsx`'s "Export learner list
+(CSV)" button, per-row "Save" (edit) button, "Enroll learner" submit
+button, and "Create separate learner" duplicate-review button — 7
+instances across 3 screens. Deliberately left `LearnerListScreen.tsx`'s
+per-row "View history"/"Edit" buttons and the "Cancel" buttons as
+native `disabled` — confirmed by reading the code that neither is an
+instance of this bug (Edit's button is unmounted, not disabled, on
+click, and already has its own focus-management effect; Cancel is
+disabled by a sibling button's async state, not its own).
+
+**Verified**: `npm run quality` 821/821 (7 new interaction tests, each
+proving the handler guard blocks a second submission while the first is
+still in flight), typecheck/lint/format/architecture clean. `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated: 19 of
+~45 total instances now fixed across 10 screens; ~18 remaining across
+`ClassRecordWorkspace.tsx`, `SectionRosterScreen.tsx`,
+`SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, and
+`SubjectAttendanceScreen.tsx`.
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: GradingPeriods/ScheduleMeetings/TeachingAssignments, complete)
 
 User-directed continuation ("continue working on the waves"). Continued

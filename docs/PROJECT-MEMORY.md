@@ -3017,6 +3017,23 @@ flight, not just that the button looks disabled), `npm run build`,
 `npm run check:dev-preview-isolation`, `npm run harness:verify`
 (100/100), `git diff --check` all clean. No Rust touched.
 
+## Self-Disabling-Button Sweep: ClassRecords/SectionAdviser/LearnerList (added 2026-09-02)
+
+Third batch of the self-disabling-button sweep. Applied the proven
+`disabled=` → `aria-disabled=` + handler-guard pattern to
+`ClassRecordsScreen.tsx` ("Open class record", "Add subject"),
+`SectionAdviserScreen.tsx` ("End advisory", "Assign adviser"), and
+`LearnerListScreen.tsx` ("Export learner list", per-row "Save",
+"Enroll learner", "Create separate learner") — 7 instances across 3
+screens. `LearnerListScreen.tsx`'s per-row "View history"/"Edit" and
+"Cancel" buttons were deliberately left native `disabled` after
+confirming by reading the code that neither is an instance of this bug.
+
+`npm run quality` 821/821 (7 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched. 19 of ~45
+total instances now fixed across 10 screens.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
