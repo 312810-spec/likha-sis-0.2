@@ -2935,7 +2935,48 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## App-wide: self-disabling buttons lose focus to `<body>` on click — 27 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x4)
+## App-wide: self-disabling buttons lose focus to `<body>` on click — CLOSED, all 15 screens fixed (2026-09-01, closed 2026-09-02)
+
+**Closed 2026-09-02 (batch 5)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to the last two, most
+complex screens: `ClassRecordWorkspace.tsx` (5 instances — "Add
+item", per-item "Save"/"Confirm delete", "Show term grades", "Export
+report card") and `SectionRosterScreen.tsx` (11 instances — the
+"Enroll learner" trigger and its form's "Confirm enrollment"/"Cancel",
+"Generate SF1", "Export SF5", each row's "Transfer"/"End
+enrollment"/"Correct today's placement"/"Generate SF9", and the row
+action panel's "Confirm transfer/end/correction"/"Cancel").
+`SectionRosterScreen.tsx` shares one `anyActionInFlight` flag across
+most of its buttons (by design, so only one write can ever be in
+flight at a time) — each handler's guard now checks that same flag
+rather than inventing a per-button one, preserving the existing
+"every other action disables while one is in flight" behavior
+exactly; the two "Cancel" buttons (enroll panel, row action panel)
+needed an inline guard in their `onClick` since `closeEnroll`/
+`closeAction` are shared, synchronous functions also called from
+non-button code paths. Each fix proven with a real interaction test:
+hang the underlying repository call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase; plus two tests proving the openAction/openEnroll guards
+block opening a second panel while one is already open, and two
+proving the Cancel buttons stay blocked mid-submission. Existing
+tests that asserted native `.toBeDisabled()`/`.toBeEnabled()` on the
+now-`aria-disabled` buttons were updated to
+`toHaveAttribute("aria-disabled", "true")` /
+`not.toHaveAttribute("aria-disabled", "true")`.
+
+**Verified**: `npm run quality` 843/843 (16 new interaction tests, 7
+existing assertions updated for the `aria-disabled` migration),
+typecheck/lint/format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+This closes the self-disabling-button-focus-loss debt across all 15
+screens identified in the original sweep (auth/session screens →
+GradingPeriods/ScheduleMeetings/TeachingAssignments →
+ClassRecords/SectionAdviser/LearnerList → Sections/Sf1Import/
+SubjectAttendance → ClassRecordWorkspace/SectionRosterScreen). No
+further instances of this bug are known to remain in the app.
 
 **Extended 2026-09-02 (batch 4)**: applied the same `disabled=` →
 `aria-disabled=` + handler-guard pattern to eight more instances across
