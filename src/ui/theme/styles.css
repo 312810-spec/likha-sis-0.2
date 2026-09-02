@@ -1287,3 +1287,140 @@ label {
 .sf1-history-filename {
   font-weight: 600;
 }
+
+/* ============================================================
+   Redesign shell -- sidebar (ADR-0057). Replaces .workbench-nav /
+   .nav-group / .nav-item, which are removed once nothing references
+   them (see the ADR's Wave 1 task list).
+   ============================================================ */
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-soft);
+  overflow: hidden;
+}
+
+.app-sidebar-brand {
+  padding: calc(var(--spacing-unit) * 1.25);
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--color-primary);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.app-sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(var(--spacing-unit) * 0.75);
+}
+
+.app-nav-item {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.75);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: left;
+  transition: background-color var(--motion-duration-immediate) var(--motion-easing-standard);
+}
+
+.app-nav-item:hover {
+  background: var(--color-primary-wash);
+}
+
+.app-nav-item[aria-current="page"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 700;
+}
+
+/* Non-colour cue for the active destination -- a left rule, matching the
+   "ledger continuity" treatment from ADR-0031. Drawn with transform so it
+   stays cheap and collapses to instant under prefers-reduced-motion via
+   the shared token. */
+.app-nav-item {
+  position: relative;
+}
+.app-nav-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-primary-text);
+  transform: scaleY(0);
+  transform-origin: center;
+  animation: app-nav-rule var(--motion-duration-routine) var(--motion-easing-standard) forwards;
+}
+@keyframes app-nav-rule {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.app-nav-group {
+  margin-top: var(--spacing-unit);
+}
+
+.app-nav-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app-nav-group-chevron {
+  margin-left: auto;
+  display: inline-flex;
+  transition: transform var(--motion-duration-routine) var(--motion-easing-standard);
+}
+.app-nav-group-toggle[aria-expanded="false"] .app-nav-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.app-nav-group-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-sidebar-modes {
+  display: none; /* desktop shows the mode switcher in the top bar */
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding: var(--spacing-unit);
+  border-top: 1px solid var(--color-border-soft);
+}
+.app-sidebar-modes button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+.app-sidebar-modes button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
