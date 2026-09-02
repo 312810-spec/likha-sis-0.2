@@ -5,7 +5,8 @@ Attendance Report of Learners" template candidate acquired 2026-09-02.
 See `docs/form-evidence/sf1/README.md` for this session's shared
 network-egress limitation note (applies identically here).
 
-**Status**: `ProvenanceState::CandidateUnverified`, `FidelityState::NotVerified`.
+**Status**: `ProvenanceState::CandidateUnverified`, `FidelityState::StructureVerified`
+(updated 2026-09-02 — see the structural comparison below).
 
 ## Candidate — PII found and redacted before this record was written
 
@@ -23,11 +24,15 @@ user (project owner) confirmed and authorized the redaction. Everything
 else in the file — 97 of the original 98 non-empty cells — is template
 labels/headers only, no other PII.
 
-## Governing issuance (found, not primary-source-read)
+## Governing issuance — now primary-source confirmed (2026-09-02)
 
-Same founding order as SF1: **DepEd Order No. 4, s. 2014**. SF2 =
-"Daily Attendance Report of Learners," replacing old Form 1, Form 2, and
-STS Form 4 (Absenteeism and Dropout Profile).
+Same founding order as SF1: **DepEd Order No. 4, s. 2014**, read
+directly this session — full detail:
+`docs/form-evidence/do4-s2014/README.md`
+(`ProvenanceState::AuthoritativeSourceConfirmed` for the order itself).
+SF2 = "Daily Attendance Report for Learner," replacing old Form 1,
+Form 2, and STS Form 4 (Absenteeism and Dropout Profile) — the
+candidate's own subtitle text matches this exactly.
 
 **Confirmed later revisions (search-corroborated, not primary-read)**:
 
@@ -40,18 +45,40 @@ STS Form 4 (Absenteeism and Dropout Profile).
 - A 2026-era secondary source suggests "NLPA" is being reverted to "NLS"
   (No Longer in School) post-pandemic — order number not confirmed.
 
+## Structural comparison against DO 4 s.2014's Enclosure No. 2 (2026-09-02)
+
+The candidate's header row (School ID, School Year, Report Month, Name
+of School, Grade Level, Section, No., Name, daily M/T/W/Th/F columns,
+Total for the Month, Remarks) and its printed guidelines page (found
+during earlier structural inspection — six numbered guideline items
+covering the Registered Learners/Average Daily Attendance/Percentage of
+Attendance/Percentage of Enrolment formulas, and the same 1st-Friday-of-
+June BoSY cutoff the order itself states) **match DO 4 s.2014's
+Enclosure 2 SF2 field list closely** — School ID, School Year, School
+Name, Grade Level, Section, Month, Learner's Name, Date (Daily),
+Total Days Absent/Tardy, Remarks, Enrolment as of 1st Friday of June,
+Percentage of Enrolment, Average Daily Attendance, Percentage of
+Attendance, Signature of Teacher, Signature of School Head — all
+present, with the order's own exact computation formulas reproduced on
+the candidate's own guidelines page nearly verbatim. This is the
+closest match to the 2014 baseline found among this session's five
+`.xls` candidates so far.
+
 ## Classification
 
-**NOT CONFIRMABLE FROM AVAILABLE SOURCES.** Same reasoning as SF1: a
-real founding order exists and is well-corroborated, but the exact
-candidate version string is not tied to any citable primary source in
-this session, and the template has plausibly been revised at least
-twice since 2014 (2021 pandemic interim, 2022 refresh) — whether the
-candidate reflects the current official shape is unconfirmed.
+**Governing order: `ProvenanceState::AuthoritativeSourceConfirmed`**
+(see the shared record). **This candidate file: still
+`ProvenanceState::CandidateUnverified`**, but with the strongest
+structural match to the 2014 baseline of any candidate checked this
+session — no added/missing top-level field was found (unlike SF1's
+"Learning Modality" addition). `FidelityState::StructureVerified`.
 
 ## Next step
 
-Same as SF1 — needs a session with working `deped.gov.ph`/LIS-portal
-fetch access. Additionally worth checking directly: whether the
-pandemic-era NLPA/NLS column naming has been finally settled, since
-that affects the candidate's currency independent of provenance.
+The NLPA/NLS pandemic-era column-naming question (noted above) applies
+to **SF4**, not this SF2 candidate directly — see
+`docs/form-evidence/sf4/README.md`'s own updated comparison, which
+found the SF4 candidate does use a "NLPA"-shaped column, consistent
+with DM 014, s. 2021's reported change. DepEd Order No. 11, s. 2018
+remains unread in primary form for this form's own checking-process
+context.

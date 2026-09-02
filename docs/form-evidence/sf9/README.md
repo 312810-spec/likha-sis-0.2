@@ -48,13 +48,16 @@ concern here. Recorded for completeness, not as an open action item.
 - **DepEd Memorandum No. 576, s. 2026** — "Dissemination and Use of the
   Editable School Form 9 (SF9) or Learner's Progress Report Card
   Templates," with an addendum **DM No. 577, s. 2026**. Found via a
-  Division re-post (depedcaloocan.com) — whether "576"/"577" are
-  national central-office numbers or a Division's own tracking numbers
-  re-issuing a central memo was **not confirmed** this session (the
-  same ambiguity found for eSF7's Division-level memo numbers — see
-  `docs/form-evidence/esf7/README.md`). **Re-checked 2026-09-02, still
-  unresolved**: a second WebSearch pass found only the same Caloocan
-  Division source, no independent national-level citation.
+  Division re-post (depedcaloocan.com). **Resolved 2026-09-02**: the
+  project owner confirmed directly that DM 576/577 are **Caloocan
+  Division-level memo numbers, not national Central Office numbers** —
+  the same pattern already documented for eSF7's Division-level memos
+  (`docs/form-evidence/esf7/README.md`). This means "576"/"577" are not
+  themselves citable as the national issuance for SF9's editable
+  template dissemination; the underlying national basis is DO 015
+  s.2026 itself (which explicitly names SF9 as "the Learner's Progress
+  Report," see below), not a specific Central Office memo number for
+  the template distribution act.
 - **New this pass**: `depedtambayanph.net` hosts downloadable SF9
   templates explicitly labeled "DO 15 s. 2026" for two grade bands —
   "Grade 1, 2, and 3" and "Grades 4, 5, and 6" (dated August 2026,
@@ -132,18 +135,29 @@ above.
 All three candidate template files: **upgraded from `CandidateUnverified`
 on the term-structure question** — that specific question (quarterly vs.
 three-term) is now resolved by direct inspection, confirmed three-term.
-**Still `CandidateUnverified` overall**: "DM 576/577 s.2026"'s
-national-vs-division status remains unconfirmed (re-checked this
-session, still only a Division source found), and no primary DepEd
-source (national or LIS-support-portal) was directly read to confirm
-these exact files — as opposed to their term-structure and DO-015-era
-grading-scale shape — are the official current template. The
-**governing orders themselves** (DO 015 s.2026 and DO 009 s.2026) are
-`AuthoritativeSourceConfirmed`.
+**Still `CandidateUnverified` overall**: DM 576/577 s.2026 is now
+confirmed **Division-level, not national** (per the project owner
+directly, 2026-09-02) — this closes the ambiguity, but as a negative
+result: it means these two memo numbers are not themselves usable as
+the national citation for SF9's editable-template dissemination. No
+primary DepEd source (national or LIS-support-portal) was directly read
+to confirm these exact candidate files — as opposed to their
+term-structure and DO-015-era grading-scale shape — are DepEd's own
+official current template. The **governing orders themselves** (DO 015
+s.2026 and DO 009 s.2026) are `AuthoritativeSourceConfirmed`; **DO 4,
+s. 2014** (SF9's founding-order lineage) is also now confirmed — see
+`docs/form-evidence/do4-s2014/README.md` — though its Enclosure 2 does
+not itself describe SF9 in the detail it gives SF1-SF7 (SF9's own field
+layout traces more directly to DO 015 s.2026's Annex C/F than to the
+2014 order).
 
 ## Next step
 
-Confirm DM 576/577 s.2026's national-vs-division status and read its
-primary text, once egress access allows it or the owner supplies the
-memo directly — this is now the single remaining gap for these three
-candidates (term structure and grading-order tie-in are both resolved).
+DM 576/577's national-vs-division question is now closed (Division-
+level, confirmed). What remains for full provenance of these three
+candidate files specifically: a primary DepEd/LIS-support-portal source
+confirming these exact files (not just their term-structure and
+grading-scale shape) are the current official SF9 artifact — no
+specific next action identified beyond what egress access or a future
+owner-supplied file could resolve, and this is lower priority than it
+was before the term-structure and grading-order questions closed.
