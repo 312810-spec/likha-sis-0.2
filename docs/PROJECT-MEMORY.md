@@ -2980,6 +2980,26 @@ PR #24, so no backend change was needed. This closes the app-wide
 `npm run check:dev-preview-isolation`, `npm run harness:verify`
 (100/100), `git diff --check` all clean. No Rust touched.
 
+## Self-Disabling-Button Sweep: Auth/Session-Critical Screens (added 2026-09-02)
+
+Extended the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern (first fixed for 3 instances in Wave "Self-disabling-button
+focus loss") to four more: `LoginScreen.tsx` ("Sign in"),
+`FirstRunSetupScreen.tsx` ("Finish setup"),
+`AdminPasswordResetScreen.tsx` ("Reset password"), and
+`IdleTimeoutWarning.tsx` ("Stay signed in") — the standalone
+auth/session-critical screens with exactly one self-contained submit
+button each. Deliberately scoped, not the full ~40-instance sweep across
+~15 files, to keep the change reviewable; the remaining instances stay
+open debt with the pattern fully proven (see
+`docs/VERIFICATION-DEBT.md`).
+
+`npm run quality` 809/809 (4 new interaction tests, each proving the
+handler guard blocks a second submission while the first is still in
+flight, not just that the button looks disabled), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

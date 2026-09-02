@@ -29,6 +29,7 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -165,7 +166,7 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
           </label>
         </div>
 
-        <button type="submit" className="button-primary" disabled={submitting}>
+        <button type="submit" className="button-primary" aria-disabled={submitting}>
           {submitting ? "Setting up…" : "Finish setup"}
         </button>
       </form>

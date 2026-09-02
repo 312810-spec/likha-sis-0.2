@@ -2935,6 +2935,38 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 7 of many instances fixed (2026-09-01, extended 2026-09-02)
+
+**Extended 2026-09-02**: applied the same `disabled=` → `aria-disabled=`
+
+- handler-guard pattern to the four standalone auth/session-critical
+  submit buttons — `LoginScreen.tsx`'s "Sign in", `FirstRunSetupScreen.tsx`'s
+  "Finish setup", `AdminPasswordResetScreen.tsx`'s "Reset password", and
+  `IdleTimeoutWarning.tsx`'s "Stay signed in". Chosen first among the
+  remaining ~40 instances across ~15 files because these are the screens
+  every teacher touches before anything else (sign-in, first-run setup,
+  the session-expiry warning) and each has exactly one self-contained
+  submit button, keeping this slice small and reviewable rather than one
+  large mechanical sweep. Each proven with a real interaction test: make
+  the underlying repository call hang (an unresolved `Promise`), click
+  the button once, assert `aria-disabled="true"`, click again, assert the
+  repository call count did not increase. `npm run quality` 809/809 (4
+  new tests), typecheck/lint/format/architecture clean; `npm run build`,
+  `npm run check:dev-preview-isolation`, `npm run harness:verify`
+  (100/100), `git diff --check` all clean; no Rust touched.
+
+**Still open**: every other "disable while saving/removing/creating"
+button across `ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`GradingPeriodsScreen.tsx`, `LearnerListScreen.tsx` (several beyond the
+export button already fixed), `ScheduleMeetingsScreen.tsx`,
+`SectionAdviserScreen.tsx`, `SectionRosterScreen.tsx`,
+`SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, `SubjectAttendanceScreen.tsx`,
+and `TeachingAssignmentsScreen.tsx` — roughly 30+ remaining button
+instances. The pattern is fully proven and mechanical to apply; revisit
+as further scoped slices (e.g. grouped by screen or by feature area)
+rather than one large sweep, per this project's established "prove the
+pattern, defer the full sweep" discipline.
+
 ## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
 
 Found by the UX-03 `accessibility-reviewer` retry (2026-09-01): buttons

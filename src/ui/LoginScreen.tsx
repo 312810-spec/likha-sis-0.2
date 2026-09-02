@@ -60,6 +60,7 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -166,7 +167,7 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
         )}
       </div>
 
-      <button type="submit" className="button-primary" disabled={submitting}>
+      <button type="submit" className="button-primary" aria-disabled={submitting}>
         {submitting ? "Signing in…" : "Sign in"}
       </button>
     </form>

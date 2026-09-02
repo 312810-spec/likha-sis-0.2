@@ -29,9 +29,19 @@ class FakeAuthRepository implements AuthRepository {
   loginCalls: Array<{ username: string; password: string; schoolId: string }> = [];
   shouldFail = false;
   shouldLock = false;
+  /** When set, `login` never resolves on its own -- the test controls
+   * completion by calling this. Used to prove the in-flight guard blocks
+   * a second click while the first submission is still pending. */
+  resolveLogin: ((session: CurrentSession) => void) | null = null;
+  pending = false;
 
   async login(username: string, password: string, schoolId: string): Promise<CurrentSession> {
     this.loginCalls.push({ username, password, schoolId });
+    if (this.pending) {
+      return new Promise((resolve) => {
+        this.resolveLogin = resolve;
+      });
+    }
     if (this.shouldLock) {
       throw new Error("account_locked");
     }
@@ -123,6 +133,28 @@ describe("LoginScreen", () => {
     expect(authRepo.loginCalls).toEqual([
       { username: "ana.cruz", password: "hunter2", schoolId: "s2" },
     ]);
+  });
+
+  it("does not submit a second login while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const authRepo = new FakeAuthRepository();
+    authRepo.pending = true;
+    const { getByRole } = renderLoginScreen({ authRepo });
+
+    await waitFor(() => expect(screen.getByLabelText("School")).toHaveValue("s1"));
+    await user.type(screen.getByLabelText("Username"), "ana.cruz");
+    await user.type(screen.getByLabelText("Password"), "hunter2");
+    const signInButton = getByRole("button", { name: "Sign in" });
+    await user.click(signInButton);
+    await waitFor(() => expect(authRepo.loginCalls).toHaveLength(1));
+
+    // aria-disabled (not native disabled) keeps the button focusable/
+    // clickable at the DOM level -- the guard inside the submit handler
+    // is what actually blocks the second submission.
+    expect(signInButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(signInButton);
+
+    expect(authRepo.loginCalls).toHaveLength(1);
   });
 
   it("shows an error message and never reports a session when login fails", async () => {
