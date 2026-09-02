@@ -1,5 +1,48 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecordWorkspace/SectionRosterScreen, CLOSES the debt)
+
+User-directed continuation ("continue" / "focus on the debts and next
+wave"). Fifth and final batch of the self-disabling-button sweep:
+applied the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern to the last two, most complex screens —
+`ClassRecordWorkspace.tsx` (5 instances: "Add item", per-item "Save"/
+"Confirm delete", "Show term grades", "Export report card") and
+`SectionRosterScreen.tsx` (11 instances, most sharing one
+`anyActionInFlight` flag: "Enroll learner" trigger, "Confirm
+enrollment", enroll-panel "Cancel", "Generate SF1", "Export SF5",
+per-row "Transfer"/"End enrollment"/"Correct today's placement"/
+"Generate SF9", row-panel "Confirm transfer/end/correction", row-panel
+"Cancel"). This closes `docs/VERIFICATION-DEBT.md`'s self-disabling-
+button entry entirely — all 15 screens from the original sweep are
+now fixed.
+
+**Verified**: `npm run quality` 843/843 (16 new interaction tests,
+plus 7 existing `.toBeDisabled()`/`.toBeEnabled()` assertions updated
+to check `aria-disabled` instead), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`, `npm
+run harness:verify` (100/100), `git diff --check` — all clean. No Rust
+files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry is now
+CLOSED. No specific next candidate pre-selected from that debt entry
+since it's fully retired — the recorded next-wave candidates (from the
+earlier "what's next" discussion this session) are: (1) the two owed
+independent reviews (UX-02/UX-03 accessibility-reviewer/teacher-ux-
+reviewer, blocked on a recurring harness agent-resume issue, self-
+review substituted each time — see `docs/VERIFICATION-DEBT.md`), or
+(2) product-shaped work — SF10 Permanent Record (fully unbuilt, can
+reuse SF1's import/reconciliation architecture) is the safest
+immediately-implementable slice; authoritative-template form output
+(real DepEd `.xls` templates via a Tauri→sidecar→Apache POI/HSSF
+pipeline, vs. today's disclosed-CSV-only exports) is the higher-value
+but currently paused candidate — the user has begun supplying real
+DepEd SF9/SF10/SF1/SF2/SF4/SF5/SF6 templates for structural evidence,
+work is paused mid-way (one synthetic SF1 skeleton reviewed and
+approved; user asked to pause further form work until told to
+continue — see the session's own notes, not yet written to a
+dedicated doc since the work is mid-flight and paused).
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: Sections/Sf1Import/SubjectAttendance, complete)
 
 User-directed continuation ("continue"). Fourth batch of the

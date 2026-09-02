@@ -605,8 +605,13 @@ describe("SectionRosterScreen", () => {
     await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     // Every other row action is disabled while a panel is open.
-    expect(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Transfer Cruz, Ben/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: /Transfer Cruz, Ben/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("moves focus into the panel when it opens", async () => {
@@ -693,7 +698,10 @@ describe("SectionRosterScreen", () => {
     await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     expect(screen.getByText(/no other section to move this learner to/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm transfer" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("surfaces a thrown command error inside the panel without losing the entry", async () => {
@@ -879,7 +887,10 @@ describe("SectionRosterScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Enroll learner" }));
     expect(await screen.findByText(/no learners in this school yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("blocks confirm and explains a transfer is needed for a learner enrolled elsewhere", async () => {
@@ -891,7 +902,10 @@ describe("SectionRosterScreen", () => {
     await user.selectOptions(screen.getByLabelText("Learner"), "l-elsewhere");
 
     expect(screen.getByText(/Moving them here is a transfer/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(repo.enrollMembershipCalls).toHaveLength(0);
   });
 
@@ -904,7 +918,10 @@ describe("SectionRosterScreen", () => {
     await user.selectOptions(screen.getByLabelText("Learner"), "l-here");
 
     expect(screen.getByText(/already enrolled in this section/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("surfaces an overlapping-membership outcome as a fixable date error", async () => {
@@ -1340,13 +1357,25 @@ describe("SectionRosterScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
 
-    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Generating…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     resolveSf1();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
     );
   });
 
@@ -1513,13 +1542,25 @@ describe("SectionRosterScreen", () => {
       screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
     );
 
-    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Exporting SF5…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Exporting SF5…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     resolveSf5(exportRepo.sf5ToReturn);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
     );
   });
 
@@ -1533,6 +1574,203 @@ describe("SectionRosterScreen", () => {
         /SF5 \(Report on Promotion and Level of Proficiency\) computes final subject ratings/,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("does not generate SF1 a second time while the first generation is still in flight", async () => {
+    let resolveSf1: () => void = () => {};
+    const pending = new Promise<null>((resolve) => {
+      resolveSf1 = () => resolve(null);
+    });
+    const { formRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    formRepo.generateSf1 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    const button = screen.getByRole("button", { name: "Generate SF1 (School Register)" });
+    await user.click(button);
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Generating…" }));
+
+    expect(calls).toBe(1);
+    resolveSf1();
+  });
+
+  it("does not export SF5 a second time while the first export is still in flight", async () => {
+    let resolveSf5: (val: Sf5ExportResult | null) => void = () => {};
+    const pending = new Promise<Sf5ExportResult | null>((resolve) => {
+      resolveSf5 = resolve;
+    });
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    exportRepo.exportSectionEosySf5 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Exporting SF5…" }));
+
+    expect(calls).toBe(1);
+    resolveSf5(null);
+  });
+
+  it("does not generate SF9 a second time while the first generation is still in flight", async () => {
+    let resolveSf9: (val: Sf9GenerationResult | null) => void = () => {};
+    const pending = new Promise<Sf9GenerationResult | null>((resolve) => {
+      resolveSf9 = resolve;
+    });
+    const { formRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    formRepo.generateSf9 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    const button = screen.getByRole("button", {
+      name: "Generate SF9 report card for Bautista, Ana",
+    });
+    await user.click(button);
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(button);
+
+    expect(calls).toBe(1);
+    resolveSf9(null);
+  });
+
+  it("does not open the Enroll panel while another action is in flight", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    expect(screen.queryByRole("button", { name: "Confirm enrollment" })).not.toBeInTheDocument();
+  });
+
+  it("does not open a second row action panel while one is already open", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await user.click(screen.getByRole("button", { name: /Transfer Cruz, Ben/ }));
+
+    // Still Bautista's panel -- the second click on Cruz's row did nothing.
+    expect(
+      screen.getByRole("heading", { name: "Transfer Bautista, Ana", level: 3 }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not submit enrollment a second time while the first submission is still in flight", async () => {
+    let resolveEnroll: (val: EnrollMembershipResult) => void = () => {};
+    const pending = new Promise<EnrollMembershipResult>((resolve) => {
+      resolveEnroll = resolve;
+    });
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    repo.enrollMembership = (input) => {
+      calls += 1;
+      repo.enrollMembershipCalls.push(input);
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    const confirmButton = screen.getByRole("button", { name: "Confirm enrollment" });
+    await user.click(confirmButton);
+    await waitFor(() => expect(calls).toBe(1));
+
+    expect(confirmButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(confirmButton);
+
+    expect(calls).toBe(1);
+    resolveEnroll({ kind: "enrolled", membership: MEMBERSHIP });
+  });
+
+  it("does not close the Enroll panel via Cancel while a submission is still in flight", async () => {
+    let resolveEnroll: (val: EnrollMembershipResult) => void = () => {};
+    const pending = new Promise<EnrollMembershipResult>((resolve) => {
+      resolveEnroll = resolve;
+    });
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    repo.enrollMembership = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+    await screen.findByRole("button", { name: "Enrolling…" });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Enrolling…" })).toBeInTheDocument();
+    resolveEnroll({ kind: "enrolled", membership: MEMBERSHIP });
+  });
+
+  it("does not submit a transfer a second time while the first submission is still in flight", async () => {
+    let resolveTransfer: (val: TransferResult) => void = () => {};
+    const pending = new Promise<TransferResult>((resolve) => {
+      resolveTransfer = resolve;
+    });
+    const { repo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    repo.transferMembership = (input) => {
+      calls += 1;
+      repo.transferCalls.push(input);
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    const confirmButton = screen.getByRole("button", { name: "Confirm transfer" });
+    await user.click(confirmButton);
+    await waitFor(() => expect(calls).toBe(1));
+
+    expect(confirmButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(confirmButton);
+
+    expect(calls).toBe(1);
+    resolveTransfer({ kind: "membershipNotFound" });
+  });
+
+  it("does not close the row action panel via Cancel while a submission is still in flight", async () => {
+    let resolveTransfer: (val: TransferResult) => void = () => {};
+    const pending = new Promise<TransferResult>((resolve) => {
+      resolveTransfer = resolve;
+    });
+    const { repo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    repo.transferMembership = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+    await screen.findByRole("button", { name: "Saving…" });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeInTheDocument();
+    resolveTransfer({ kind: "membershipNotFound" });
   });
 
   it("has no detectable accessibility violations after exporting an SF5 report", async () => {

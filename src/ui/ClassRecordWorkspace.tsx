@@ -213,6 +213,7 @@ export function ClassRecordWorkspace({
   }, [learnerScoreService, selectedItemId]);
 
   async function handleCreateItem() {
+    if (creatingItem || itemName.trim().length === 0 || !categoryId) return;
     setError(null);
     setConfirmation(null);
     setCreatingItem(true);
@@ -255,6 +256,7 @@ export function ClassRecordWorkspace({
    * which the Rust layer itself re-verifies is still unscored and
    * resolves to a valid leaf category before accepting the change. */
   async function handleSaveEdit(item: AssessmentItemDetail) {
+    if (savingEdit || editName.trim().length === 0) return;
     const isScored = item.recordedCount > 0;
     setSavingEdit(true);
     setItemActionError(null);
@@ -290,6 +292,7 @@ export function ClassRecordWorkspace({
    * armed for this item's id. Only ever reachable for an unscored item --
    * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
+    if (deletingItemId === item.id) return;
     setDeletingItemId(item.id);
     setItemActionError(null);
     try {
@@ -460,6 +463,7 @@ export function ClassRecordWorkspace({
    * Once shown, an individual score change afterward keeps just that one
    * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
+    if (termGradesLoading) return;
     setTermGradesLoading(true);
     try {
       const entries = await Promise.all(
@@ -477,6 +481,7 @@ export function ClassRecordWorkspace({
   }
 
   async function handleExportReportCard() {
+    if (exportingReportCard) return;
     setError(null);
     setRevealReportCardError(null);
     setExportingReportCard(true);
@@ -581,7 +586,7 @@ export function ClassRecordWorkspace({
       </div>
       <button
         type="button"
-        disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
+        aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
         onClick={handleCreateItem}
       >
         {creatingItem ? "Adding…" : "Add item"}
@@ -654,7 +659,7 @@ export function ClassRecordWorkspace({
                     </div>
                     <button
                       type="button"
-                      disabled={savingEdit || editName.trim().length === 0}
+                      aria-disabled={savingEdit || editName.trim().length === 0}
                       onClick={() => void handleSaveEdit(item)}
                     >
                       {savingEdit ? "Saving…" : "Save"}
@@ -692,7 +697,7 @@ export function ClassRecordWorkspace({
                           </span>
                           <button
                             type="button"
-                            disabled={deletingItemId === item.id}
+                            aria-disabled={deletingItemId === item.id}
                             onClick={() => void handleDeleteItem(item)}
                           >
                             {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
@@ -877,7 +882,11 @@ export function ClassRecordWorkspace({
               <p className="field-hint">
                 Grading weighting: <strong>{weightPolicyName ?? "not shown"}</strong>
               </p>
-              <button type="button" disabled={termGradesLoading} onClick={handleShowTermGrades}>
+              <button
+                type="button"
+                aria-disabled={termGradesLoading}
+                onClick={handleShowTermGrades}
+              >
                 {termGradesLoading ? "Computing…" : "Show term grades"}
               </button>
               {mode === "guided" && (
@@ -942,7 +951,7 @@ export function ClassRecordWorkspace({
               <button
                 type="button"
                 className="button-primary"
-                disabled={exportingReportCard}
+                aria-disabled={exportingReportCard}
                 onClick={handleExportReportCard}
               >
                 {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}

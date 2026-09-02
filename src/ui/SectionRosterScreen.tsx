@@ -304,6 +304,7 @@ export function SectionRosterScreen({
   const otherSections = allSections.filter((candidate) => candidate.id !== sectionId);
 
   function openAction(member: SectionRosterMember, kind: ActionKind, trigger: HTMLButtonElement) {
+    if (anyActionInFlight) return;
     triggerRef.current = trigger;
     setConfirmation(null);
     setPanelError(null);
@@ -374,6 +375,7 @@ export function SectionRosterScreen({
   }
 
   function openEnroll() {
+    if (anyActionInFlight) return;
     setConfirmation(null);
     setEnrollError(null);
     setEnrollErrorField(null);
@@ -410,6 +412,7 @@ export function SectionRosterScreen({
   async function handleEnrollConfirm(event: FormEvent) {
     event.preventDefault();
     if (!section) return;
+    if (enrollConfirmDisabled || enrollLoadState !== "ready") return;
     if (!enrollSelected) {
       showEnrollFieldError("learner", "Choose a learner to enroll.");
       return;
@@ -510,7 +513,7 @@ export function SectionRosterScreen({
     enrollOpen;
 
   async function handleGenerateSf1() {
-    if (!section) return;
+    if (!section || anyActionInFlight) return;
     setSf1Error(null);
     setSf1Result(null);
     setSf5Result(null);
@@ -539,7 +542,7 @@ export function SectionRosterScreen({
   }
 
   async function handleExportSf5() {
-    if (!section || !exportService) return;
+    if (!section || !exportService || anyActionInFlight) return;
     setSf5Error(null);
     setSf5Result(null);
     setRevealSf5Error(null);
@@ -582,6 +585,7 @@ export function SectionRosterScreen({
   }
 
   async function handleGenerateSf9(member: SectionRosterMember) {
+    if (anyActionInFlight) return;
     setSf9Error(null);
     setSf9Result(null);
     setSf1Result(null);
@@ -617,6 +621,9 @@ export function SectionRosterScreen({
     event.preventDefault();
     if (!activeAction || !section) return;
     const { member, kind } = activeAction;
+    if (submitting || ((kind === "transfer" || kind === "correct") && otherSections.length === 0)) {
+      return;
+    }
     setPanelError(null);
     setPanelErrorField(null);
     setSubmitting(true);
@@ -876,7 +883,7 @@ export function SectionRosterScreen({
                 type="button"
                 ref={enrollTriggerRef}
                 className="section-roster-enroll-trigger"
-                disabled={anyActionInFlight}
+                aria-disabled={anyActionInFlight}
                 aria-expanded={false}
                 onClick={openEnroll}
               >
@@ -1042,14 +1049,17 @@ export function SectionRosterScreen({
                   <button
                     type="submit"
                     className="button-primary"
-                    disabled={enrollConfirmDisabled || enrollLoadState !== "ready"}
+                    aria-disabled={enrollConfirmDisabled || enrollLoadState !== "ready"}
                   >
                     {enrollSubmitting ? "Enrolling…" : "Confirm enrollment"}
                   </button>
                   <button
                     type="button"
-                    disabled={enrollSubmitting}
-                    onClick={() => closeEnroll(true)}
+                    aria-disabled={enrollSubmitting}
+                    onClick={() => {
+                      if (enrollSubmitting) return;
+                      closeEnroll(true);
+                    }}
                   >
                     Cancel
                   </button>
@@ -1059,11 +1069,11 @@ export function SectionRosterScreen({
           </div>
 
           <div className="section-roster-forms">
-            <button type="button" disabled={anyActionInFlight} onClick={handleGenerateSf1}>
+            <button type="button" aria-disabled={anyActionInFlight} onClick={handleGenerateSf1}>
               {sf1Generating ? "Generating…" : "Generate SF1 (School Register)"}
             </button>
             {exportService && (
-              <button type="button" disabled={anyActionInFlight} onClick={handleExportSf5}>
+              <button type="button" aria-disabled={anyActionInFlight} onClick={handleExportSf5}>
                 {sf5Exporting ? "Exporting SF5…" : "Export SF5 (Promotion & Level of Proficiency)"}
               </button>
             )}
@@ -1210,7 +1220,7 @@ export function SectionRosterScreen({
                           <td role="cell" data-label="Actions" className="section-roster-actions">
                             <button
                               type="button"
-                              disabled={anyActionInFlight}
+                              aria-disabled={anyActionInFlight}
                               aria-expanded={panelOpen && activeAction?.kind === "transfer"}
                               aria-label={`Transfer ${member.familyName}, ${member.givenName}`}
                               onClick={(event) =>
@@ -1221,7 +1231,7 @@ export function SectionRosterScreen({
                             </button>
                             <button
                               type="button"
-                              disabled={anyActionInFlight}
+                              aria-disabled={anyActionInFlight}
                               aria-expanded={panelOpen && activeAction?.kind === "end"}
                               aria-label={`End enrollment for ${member.familyName}, ${member.givenName}`}
                               onClick={(event) => openAction(member, "end", event.currentTarget)}
@@ -1231,7 +1241,7 @@ export function SectionRosterScreen({
                             {member.startsOn === asOfDate && (
                               <button
                                 type="button"
-                                disabled={anyActionInFlight}
+                                aria-disabled={anyActionInFlight}
                                 aria-expanded={panelOpen && activeAction?.kind === "correct"}
                                 aria-label={`Correct today's placement for ${member.familyName}, ${member.givenName}`}
                                 onClick={(event) =>
@@ -1243,7 +1253,7 @@ export function SectionRosterScreen({
                             )}
                             <button
                               type="button"
-                              disabled={anyActionInFlight}
+                              aria-disabled={anyActionInFlight}
                               aria-label={`Generate SF9 report card for ${member.familyName}, ${member.givenName}`}
                               onClick={() => handleGenerateSf9(member)}
                             >
@@ -1423,7 +1433,7 @@ export function SectionRosterScreen({
                                       <button
                                         type="submit"
                                         className="button-primary"
-                                        disabled={
+                                        aria-disabled={
                                           submitting ||
                                           ((activeAction.kind === "transfer" ||
                                             activeAction.kind === "correct") &&
@@ -1440,8 +1450,11 @@ export function SectionRosterScreen({
                                       </button>
                                       <button
                                         type="button"
-                                        disabled={submitting}
-                                        onClick={() => closeAction(true)}
+                                        aria-disabled={submitting}
+                                        onClick={() => {
+                                          if (submitting) return;
+                                          closeAction(true);
+                                        }}
                                       >
                                         Cancel
                                       </button>
