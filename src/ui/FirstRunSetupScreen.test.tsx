@@ -16,6 +16,10 @@ class FakeSetupRepository implements SetupRepository {
     displayName: string;
   }> = [];
   shouldFail = false;
+  /** When set, `bootstrapInstallation` never resolves on its own -- the
+   * test controls completion. Used to prove the in-flight guard blocks a
+   * second submission while the first is still pending. */
+  pending = false;
 
   async installationStatus(): Promise<InstallationStatus> {
     return { needsSetup: true };
@@ -28,6 +32,9 @@ class FakeSetupRepository implements SetupRepository {
     displayName: string,
   ): Promise<CurrentSession> {
     this.bootstrapCalls.push({ schoolName, username, password, displayName });
+    if (this.pending) {
+      return new Promise(() => {});
+    }
     if (this.shouldFail) {
       throw new Error("already_initialized");
     }
@@ -116,6 +123,23 @@ describe("FirstRunSetupScreen", () => {
         displayName: "Ana Cruz",
       },
     ]);
+  });
+
+  it("does not submit a second setup while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeSetupRepository();
+    repo.pending = true;
+    renderScreen({ repo });
+
+    await fillValidForm(user);
+    const finishButton = screen.getByRole("button", { name: "Finish setup" });
+    await user.click(finishButton);
+    await waitFor(() => expect(repo.bootstrapCalls).toHaveLength(1));
+
+    expect(finishButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(finishButton);
+
+    expect(repo.bootstrapCalls).toHaveLength(1);
   });
 
   it("shows a validation message and does not call the repository for mismatched passwords", async () => {
