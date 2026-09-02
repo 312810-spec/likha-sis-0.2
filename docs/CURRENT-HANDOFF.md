@@ -1,5 +1,37 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: Sections/Sf1Import/SubjectAttendance, complete)
+
+User-directed continuation ("continue"). Fourth batch of the
+self-disabling-button sweep: applied the proven `disabled=` →
+`aria-disabled=` + handler-guard pattern to `SectionsScreen.tsx`'s
+"Create section", "Enroll learner", and "Export SF6" submit buttons;
+`Sf1ImportScreen.tsx`'s "Choose Excel file" button; and
+`SubjectAttendanceScreen.tsx`'s "Check attendance", "No class today",
+"Mark all present", and the per-learner per-status roster buttons — 8
+instances across 3 screens. Deliberately left `Sf1ImportScreen.tsx`'s
+"Import learners" button as native `disabled` — confirmed by reading
+the code that it is not an instance of this bug: `handleCommit` sets
+`busy` and `phase: "committing"` together in one batched update, so the
+button unmounts (replaced by a loading state) before it could ever be
+observed disabled-but-focused.
+
+**Verified**: `npm run quality` 829/829 (12 new interaction tests, each
+proving the handler guard blocks a second submission while the first is
+still in flight, plus one proving a per-learner mark is blocked during a
+concurrent bulk mark-all-present), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` — all clean. No Rust files
+touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated: 27 of
+~45 total instances now fixed across 13 screens; ~10 remaining across
+`ClassRecordWorkspace.tsx` and `SectionRosterScreen.tsx` (both use a
+shared `anyActionInFlight` guard across several buttons — the next
+slice should read that guard's usage carefully before converting, since
+converting one button's condition without checking how it's shared
+could change another button's disabled behavior).
+
 ## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecords/SectionAdviser/LearnerList, complete)
 
 User-directed continuation ("continue working on the waves"). Third

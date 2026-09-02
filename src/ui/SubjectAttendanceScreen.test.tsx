@@ -52,6 +52,11 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   sessions: SubjectAttendanceSession[];
   rosterBySessionId: Record<string, SubjectAttendanceRosterRow[]>;
   nextId = 2;
+  pending = false;
+  openSessionCalls = 0;
+  markNoClassCalls = 0;
+  markAllPresentCalls = 0;
+  recordEntryCalls = 0;
 
   constructor(
     sessions: SubjectAttendanceSession[] = [],
@@ -82,10 +87,14 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   }
 
   async openSession(teachingAssignmentId: string, sessionDate: string) {
+    this.openSessionCalls += 1;
+    if (this.pending) return new Promise<SubjectAttendanceSession>(() => {});
     return this.findOrCreate(teachingAssignmentId, sessionDate, "held");
   }
 
   async markNoClass(teachingAssignmentId: string, sessionDate: string) {
+    this.markNoClassCalls += 1;
+    if (this.pending) return new Promise<SubjectAttendanceSession>(() => {});
     return this.findOrCreate(teachingAssignmentId, sessionDate, "no_class");
   }
 
@@ -95,6 +104,8 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
     membershipId: string,
     status: EntryStatus,
   ): Promise<RecordEntryOutcome> {
+    this.recordEntryCalls += 1;
+    if (this.pending) return new Promise<RecordEntryOutcome>(() => {});
     const roster = this.rosterBySessionId[sessionId] ?? [];
     const existing = roster.find((row) => row.membershipId === membershipId);
     if (!existing) return { kind: "membershipNotInSession" };
@@ -117,6 +128,8 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   }
 
   async markAllPresent(_teachingAssignmentId: string, sessionId: string) {
+    this.markAllPresentCalls += 1;
+    if (this.pending) return new Promise<SubjectAttendanceRosterRow[]>(() => {});
     const roster = this.rosterBySessionId[sessionId] ?? [];
     this.rosterBySessionId[sessionId] = roster.map((row) =>
       row.entryStatus === null ? { ...row, entryStatus: "present" } : row,
@@ -367,6 +380,94 @@ describe("SubjectAttendanceScreen", () => {
     await screen.findByRole("button", { name: "Check attendance" });
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("does not open a session twice while the first Check attendance is still in flight", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen();
+    subjectAttendance.pending = true;
+    const checkButton = await screen.findByRole("button", { name: "Check attendance" });
+
+    await user.click(checkButton);
+    await waitFor(() => expect(subjectAttendance.openSessionCalls).toBe(1));
+
+    expect(checkButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(checkButton);
+
+    expect(subjectAttendance.openSessionCalls).toBe(1);
+  });
+
+  it("does not mark no class twice while the first request is still in flight", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen();
+    subjectAttendance.pending = true;
+    const noClassButton = await screen.findByRole("button", { name: "No class today" });
+
+    await user.click(noClassButton);
+    await waitFor(() => expect(subjectAttendance.markNoClassCalls).toBe(1));
+
+    expect(noClassButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(noClassButton);
+
+    expect(subjectAttendance.markNoClassCalls).toBe(1);
+  });
+
+  it("does not mark all present twice while the first request is still in flight", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    await screen.findByText("Ana Cruz");
+    subjectAttendance.pending = true;
+
+    const markAllButton = screen.getByRole("button", { name: "Mark all present" });
+    await user.click(markAllButton);
+    await waitFor(() => expect(subjectAttendance.markAllPresentCalls).toBe(1));
+
+    expect(markAllButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(markAllButton);
+
+    expect(subjectAttendance.markAllPresentCalls).toBe(1);
+  });
+
+  it("does not record a per-learner mark while a bulk mark-all-present is still in flight", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    await screen.findByText("Ana Cruz");
+    subjectAttendance.pending = true;
+
+    await user.click(screen.getByRole("button", { name: "Mark all present" }));
+    await waitFor(() => expect(subjectAttendance.markAllPresentCalls).toBe(1));
+
+    const lateButton = screen.getByRole("button", { name: "Late" });
+    expect(lateButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(lateButton);
+
+    expect(subjectAttendance.recordEntryCalls).toBe(0);
   });
 
   it("preselects the class passed as initialAssignmentId when it exists", async () => {

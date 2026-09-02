@@ -100,6 +100,7 @@ export function SectionsScreen({
 
   async function handleCreateSection(event: FormEvent) {
     event.preventDefault();
+    if (creatingSection) return;
     setError(null);
     setConfirmation(null);
     setCreatingSection(true);
@@ -119,6 +120,7 @@ export function SectionsScreen({
 
   async function handleEnroll(event: FormEvent) {
     event.preventDefault();
+    if (enrolling) return;
     setError(null);
     setConfirmation(null);
     setEnrolling(true);
@@ -146,7 +148,7 @@ export function SectionsScreen({
 
   async function handleExportSf6(event: FormEvent) {
     event.preventDefault();
-    if (!exportService) return;
+    if (!exportService || sf6Exporting) return;
     setSf6Error(null);
     setSf6Result(null);
     setRevealSf6Error(null);
@@ -272,7 +274,7 @@ export function SectionsScreen({
             />
           </div>
         </div>
-        <button type="submit" className="button-primary" disabled={creatingSection}>
+        <button type="submit" className="button-primary" aria-disabled={creatingSection}>
           {creatingSection ? "Creating…" : "Create section"}
         </button>
       </form>
@@ -327,7 +329,7 @@ export function SectionsScreen({
             />
           </div>
         </div>
-        <button type="submit" className="button-primary" disabled={enrolling}>
+        <button type="submit" className="button-primary" aria-disabled={enrolling}>
           {enrolling ? "Enrolling…" : "Enroll learner"}
         </button>
       </form>
@@ -423,7 +425,7 @@ export function SectionsScreen({
               <button
                 type="submit"
                 className="button-primary"
-                disabled={
+                aria-disabled={
                   sf6Exporting || (availableSchoolYears.length === 0 && !sf6SchoolYear.trim())
                 }
               >

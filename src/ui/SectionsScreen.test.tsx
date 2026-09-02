@@ -53,6 +53,7 @@ class FakeLearnerRepository implements LearnerRepository {
 class FakeSectionRepository implements SectionRepository {
   createCalls: Array<{ schoolYear: string; gradeLevel: string; name: string }> = [];
   enrollCalls: Array<{ sectionId: string; learnerId: string; startsOn: string }> = [];
+  pending = false;
 
   constructor(private sections: Section[] = []) {}
 
@@ -62,6 +63,7 @@ class FakeSectionRepository implements SectionRepository {
 
   async create(schoolYear: string, gradeLevel: string, name: string): Promise<Section> {
     this.createCalls.push({ schoolYear, gradeLevel, name });
+    if (this.pending) return new Promise<Section>(() => {});
     const section: Section = {
       id: "sec-1",
       schoolId: "s1",
@@ -80,6 +82,7 @@ class FakeSectionRepository implements SectionRepository {
     startsOn: string,
   ): Promise<SectionMembership | null> {
     this.enrollCalls.push({ sectionId, learnerId, startsOn });
+    if (this.pending) return new Promise<SectionMembership | null>(() => {});
     return {
       id: "mem-1",
       schoolId: "s1",
@@ -115,6 +118,7 @@ class FakeSectionRepository implements SectionRepository {
 
 class FakeExportRepository implements ExportRepository {
   sf6Calls: string[] = [];
+  sf6Pending = false;
   sf6ToReturn: Sf6ExportResult | null = {
     filePath: "C:\\Documents\\LIKHA-SIS\\SF6_TestSchool_2025-2026.csv",
     disclosure: {
@@ -148,6 +152,7 @@ class FakeExportRepository implements ExportRepository {
 
   async exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
     this.sf6Calls.push(schoolYear);
+    if (this.sf6Pending) return new Promise<Sf6ExportResult | null>(() => {});
     if (this.sf6Error) throw this.sf6Error;
     return this.sf6ToReturn;
   }
@@ -451,5 +456,76 @@ describe("SectionsScreen", () => {
         ),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("does not create a second section while the first creation is still in flight", async () => {
+    const user = userEvent.setup();
+    const { sectionRepo } = renderScreen();
+    sectionRepo.pending = true;
+    await screen.findByText("No sections created yet.");
+
+    await user.type(screen.getByLabelText("School year"), "2025-2026");
+    await user.type(screen.getByLabelText("Grade level"), "7");
+    await user.type(screen.getByLabelText("Section name"), "Mabini");
+    const createButton = screen.getByRole("button", { name: "Create section" });
+    await user.click(createButton);
+    await waitFor(() => expect(sectionRepo.createCalls.length).toBe(1));
+
+    expect(createButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(createButton);
+
+    expect(sectionRepo.createCalls.length).toBe(1);
+  });
+
+  it("does not enroll a learner twice while the first enrollment is still in flight", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { sectionRepo } = renderScreen([section]);
+    sectionRepo.pending = true;
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    await user.selectOptions(screen.getByLabelText("Section"), "sec-1");
+    await user.selectOptions(screen.getByLabelText("Learner"), "l1");
+    const enrollButton = screen.getByRole("button", { name: "Enroll learner" });
+    await user.click(enrollButton);
+    await waitFor(() => expect(sectionRepo.enrollCalls.length).toBe(1));
+
+    expect(enrollButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(enrollButton);
+
+    expect(sectionRepo.enrollCalls.length).toBe(1);
+  });
+
+  it("does not export SF6 a second time while the first export is still in flight", async () => {
+    const user = userEvent.setup();
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    const { exportRepo } = renderScreen([section]);
+    exportRepo.sf6Pending = true;
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    const exportBtn = screen.getByRole("button", {
+      name: "Export SF6 (Promotion & Proficiency Summary)",
+    });
+    await user.click(exportBtn);
+    await waitFor(() => expect(exportRepo.sf6Calls.length).toBe(1));
+
+    expect(exportBtn).toHaveAttribute("aria-disabled", "true");
+    await user.click(exportBtn);
+
+    expect(exportRepo.sf6Calls.length).toBe(1);
   });
 });

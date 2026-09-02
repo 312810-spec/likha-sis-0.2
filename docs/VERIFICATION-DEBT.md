@@ -2935,7 +2935,29 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
-## App-wide: self-disabling buttons lose focus to `<body>` on click — 19 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x3)
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 27 of ~45 instances fixed (2026-09-01, extended 2026-09-02 x4)
+
+**Extended 2026-09-02 (batch 4)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to eight more instances across
+three screens: `SectionsScreen.tsx`'s "Create section", "Enroll
+learner", and "Export SF6" submit buttons; `Sf1ImportScreen.tsx`'s
+"Choose Excel file" button; and `SubjectAttendanceScreen.tsx`'s "Check
+attendance", "No class today", "Mark all present", and the per-learner
+per-status roster buttons (guarded against both re-entrancy and a
+concurrent bulk mark-all-present). `Sf1ImportScreen.tsx`'s "Import
+learners" button was deliberately left as native `disabled` — reading
+the code confirmed it is not an instance of this bug: `handleCommit`
+sets `busy` and `phase: "committing"` in the same batched update, so the
+button unmounts (replaced by a loading state) in the same render where
+it would have gone disabled, and is never observably disabled-but-
+focused. Each genuine fix proven with a real interaction test: hang the
+underlying repository/file-picker call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase (plus one test proving a per-learner mark is blocked while a
+bulk mark-all-present is in flight). `npm run quality` 829/829 (12 new
+tests), typecheck/lint/format/architecture clean; `npm run build`, `npm
+run check:dev-preview-isolation`, `npm run harness:verify` (100/100),
+`git diff --check` all clean; no Rust touched.
 
 **Extended 2026-09-02 (batch 3)**: applied the same `disabled=` →
 `aria-disabled=` + handler-guard pattern to seven more instances:
@@ -2999,13 +3021,14 @@ check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
 diff --check` all clean; no Rust touched.
 
 **Still open**: every other "disable while saving/removing/creating"
-button across `ClassRecordWorkspace.tsx`, `SectionRosterScreen.tsx`,
-`SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, and
-`SubjectAttendanceScreen.tsx` — roughly 18+ remaining button instances.
-The pattern is fully proven and mechanical to apply; revisit as further
-scoped slices (e.g. grouped by screen or by feature area) rather than
-one large sweep, per this project's established "prove the pattern,
-defer the full sweep" discipline.
+button across `ClassRecordWorkspace.tsx` and `SectionRosterScreen.tsx`
+— roughly 10 remaining button instances (both screens use a shared
+`anyActionInFlight` guard across several buttons plus some per-row
+guards; `SectionRosterScreen.tsx`'s enroll-form submit already has a
+partial guard condition worth reading carefully before converting). The
+pattern is fully proven and mechanical to apply; revisit as a further
+scoped slice, per this project's established "prove the pattern, defer
+the full sweep" discipline.
 
 ## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
 
