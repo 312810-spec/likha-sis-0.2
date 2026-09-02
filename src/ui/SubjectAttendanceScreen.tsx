@@ -197,6 +197,7 @@ export function SubjectAttendanceScreen({
   }
 
   async function handleOpenSession() {
+    if (openingSession) return;
     setSessionsError(null);
     setOpeningSession(true);
     try {
@@ -212,6 +213,7 @@ export function SubjectAttendanceScreen({
   }
 
   async function handleMarkNoClass() {
+    if (openingSession) return;
     setSessionsError(null);
     setOpeningSession(true);
     try {
@@ -228,6 +230,7 @@ export function SubjectAttendanceScreen({
 
   async function handleMark(row: SubjectAttendanceRosterRow, status: EntryStatus) {
     if (!sessionForDate) return;
+    if (bulkMarking) return;
     if (row.entryStatus === status) return;
 
     setConfirmation(null);
@@ -288,6 +291,7 @@ export function SubjectAttendanceScreen({
 
   async function handleMarkAllPresent() {
     if (!sessionForDate) return;
+    if (bulkMarking) return;
     setRosterError(null);
     setConfirmation(null);
     setBulkMarking(true);
@@ -412,12 +416,12 @@ export function SubjectAttendanceScreen({
               <button
                 type="button"
                 className="button-primary"
-                disabled={openingSession}
+                aria-disabled={openingSession}
                 onClick={handleOpenSession}
               >
                 {openingSession ? "Opening…" : "Check attendance"}
               </button>{" "}
-              <button type="button" disabled={openingSession} onClick={handleMarkNoClass}>
+              <button type="button" aria-disabled={openingSession} onClick={handleMarkNoClass}>
                 No class today
               </button>
               {mode === "guided" && (
@@ -461,7 +465,7 @@ export function SubjectAttendanceScreen({
                   <button
                     type="button"
                     className="button-primary"
-                    disabled={bulkMarking || roster.every((row) => row.entryStatus !== null)}
+                    aria-disabled={bulkMarking || roster.every((row) => row.entryStatus !== null)}
                     onClick={handleMarkAllPresent}
                   >
                     {bulkMarking ? "Marking…" : "Mark all present"}
@@ -501,7 +505,7 @@ export function SubjectAttendanceScreen({
                                       else buttonRefs.current.delete(key);
                                     }}
                                     aria-pressed={row.entryStatus === status}
-                                    disabled={bulkMarking}
+                                    aria-disabled={bulkMarking}
                                     onClick={() => handleMark(row, status)}
                                     onKeyDown={(event) => handleRosterKeyDown(event, row, status)}
                                   >

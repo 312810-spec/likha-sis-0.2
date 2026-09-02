@@ -82,7 +82,11 @@ class FakeSectionRepository implements SectionRepository {
 
 class FakeFilePicker implements FilePicker {
   nextPath: string | null = "C:\\teacher\\sf1.xlsx";
+  pending = false;
+  callCount = 0;
   async pickSf1Workbook(): Promise<string | null> {
+    this.callCount += 1;
+    if (this.pending) return new Promise<string | null>(() => {});
     return this.nextPath;
   }
 }
@@ -714,6 +718,23 @@ describe("Sf1ImportScreen", () => {
       guard += 1;
     }
     expect(document.activeElement).toHaveAccessibleName(/choose excel file/i);
+  });
+
+  it("does not choose a file a second time while the first pick is still in flight", async () => {
+    const user = userEvent.setup();
+    const { filePicker } = renderScreen();
+    filePicker.pending = true;
+    await waitFor(() => screen.getByLabelText(/which section is this sf1 for/i));
+    await user.selectOptions(screen.getByLabelText(/which section is this sf1 for/i), "sec-1");
+
+    const chooseButton = screen.getByRole("button", { name: /choose excel file/i });
+    await user.click(chooseButton);
+    await waitFor(() => expect(filePicker.callCount).toBe(1));
+
+    expect(chooseButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(chooseButton);
+
+    expect(filePicker.callCount).toBe(1);
   });
 
   it("has no detectable accessibility violations on the setup screen", async () => {
