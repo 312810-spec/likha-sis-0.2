@@ -18,6 +18,7 @@ import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { LearnerListScreen } from "../ui/LearnerListScreen";
+import { RoleManagementScreen } from "../ui/RoleManagementScreen";
 import { SectionAdviserScreen } from "../ui/SectionAdviserScreen";
 import { SectionsScreen } from "../ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
@@ -184,6 +185,8 @@ export function DevPreviewApp() {
             sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
             onBack={() => setActiveTab("sections")}
           />
+        ) : activeTab === "role-management" ? (
+          <RoleManagementScreen schoolMemberService={schoolMemberService} />
         ) : (
           <div className="alert alert-info" role="status">
             <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>

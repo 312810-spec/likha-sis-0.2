@@ -51,6 +51,26 @@ export const GRANTABLE_ROLES = [
 
 export type GrantableRole = (typeof GRANTABLE_ROLES)[number];
 
+/** The 7 roles migration 25 made grantable but that have no
+ * `Capability`/command gate wired to anything yet -- see the doc
+ * comment above. A UI offering these for grant must disclose that
+ * granting one records the responsibility without unlocking any new
+ * screen or permission today, the same way this app discloses what an
+ * official-form export omits. */
+const FOUNDATION_ONLY_ROLES: readonly string[] = [
+  MASTER_TEACHER,
+  CLASS_ADVISER,
+  SUBJECT_TEACHER,
+  ICT_COORDINATOR,
+  ADMIN_OFFICER,
+  PROPERTY_CUSTODIAN,
+  HEALTH_OFFICER,
+];
+
+export function isFoundationOnlyRole(role: string): boolean {
+  return FOUNDATION_ONLY_ROLES.includes(role);
+}
+
 const ROLE_LABELS: Record<string, string> = {
   [TEACHER]: "Teacher",
   [REGISTRAR]: "Registrar",

@@ -1,5 +1,65 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — "work on the ui": RoleManagementScreen UX pass)
+
+Per the user's own confirmed sequencing, moved to the final step ("work
+on the ui") after exhausting the actionable `VERIFICATION-DEBT.md`
+items (previous entry below). User picked the scope explicitly: a
+dedicated UX pass on `RoleManagementScreen.tsx`, the screen that
+shipped with ADR-0064/0065 but had never had its own design review.
+
+**Real browser-rendered verification, not just structural tests**:
+wired `RoleManagementScreen` into `src/dev-preview/DevPreviewApp.tsx`
+(previously unwired — a real gap, now closed) with a `FixtureSchoolMemberRepository`
+member gaining a foundation-only role for visual coverage, then drove
+it with a real Chromium instance (`playwright` npm package directly,
+`executablePath: "/opt/pw-browsers/chromium"` — the documented
+workaround for this environment's `playwright-cli` browser mismatch)
+across Efficient/Comfortable/Guided and light/dark. This caught two
+real bugs no structural test had caught:
+
+1. **The `<table>` was missing `className="attendance-roster"`** —
+   every other data table in this app has it; this one didn't, so it
+   rendered with no header divider or row separators, unlike every
+   other table in the app. Fixed by adding the class.
+2. **Grammar bug: "Ana Cruz is now a ICT Coordinator."** — the
+   grant/revoke confirmation message hardcoded "a", never checking
+   whether the role label starts with a vowel sound. Fixed with a
+   small `articleFor()` helper ("a"/"an"), covered by a new test.
+
+**Also fixed, found by reading the code before rendering it** (the
+7-role "foundation only" gap from ADR-0065 — none of those roles are
+wired to any feature yet — was never disclosed anywhere in this
+screen; a School Head granting "ICT Coordinator" today would
+reasonably expect it to unlock something, and nothing would happen):
+added `isFoundationOnlyRole()` to `src/domain/role.ts`, an always-
+visible (not Guided-only) disclosure paragraph on the screen, and a
+"(not yet active)" suffix on each foundation-only option in the grant
+picker.
+
+**Verified**: `npm run quality` 869/869 (2 new tests: the foundation-
+only disclosure, the "an" grammar fix), typecheck/lint/format/
+architecture clean, `npm run build` clean, `npm run
+check:dev-preview-isolation` clean (21 files scanned, no fixture
+trace). No Rust touched. Screenshots taken and inspected directly
+(Efficient/Comfortable/Guided, light/dark) — not just claimed;
+temporary screenshot scripts were scratch-only, never committed.
+
+**Not attempted this pass**: no independent `teacher-ux-reviewer`/
+`accessibility-reviewer` was dispatched for this specific change (small
+enough — one disclosure paragraph, one CSS class, one grammar helper —
+that a same-session self-review plus real browser verification was
+judged sufficient; nothing here touches auth/persistence/sync, so no
+independent-review rule requires one). If a future session wants one
+retroactively, the file-based workaround (`docs/adr/0062-file-based-review-output-workaround.md`)
+is the way to dispatch it.
+
+**Exact next slice**: no further specific UI target was given by the
+user. Candidates for a future "work on the ui" continuation: a broader
+`impeccable`/`premium-teacher-ui` audit pass across other existing
+screens (most have not had a dedicated design review either), or wait
+for the user's next specific instruction.
+
 ## Active Task (2026-09-02, this session — "other pending waves/tasks": closed 8 owed independent reviews)
 
 Per the user's own confirmed sequencing ("once you are done with roles

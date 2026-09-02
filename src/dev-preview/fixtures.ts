@@ -1089,7 +1089,7 @@ const FIXTURE_SCHOOL_MEMBERS: SchoolMember[] = [
     id: "teacher-bayani",
     username: "bayani.reyes",
     displayName: "Bayani Reyes",
-    roles: ["teacher"],
+    roles: ["teacher", "class_adviser", "ict_coordinator"],
   },
   {
     id: "head-corazon",

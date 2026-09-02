@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { SchoolMemberApplicationService } from "../application/school-member-service";
 import { ValidationError } from "../domain/errors";
-import { GRANTABLE_ROLES, roleLabel, type GrantableRole } from "../domain/role";
+import {
+  GRANTABLE_ROLES,
+  isFoundationOnlyRole,
+  roleLabel,
+  type GrantableRole,
+} from "../domain/role";
 import type { SchoolMember } from "../domain/school-member";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
@@ -9,6 +14,14 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface RoleManagementScreenProps {
   schoolMemberService: SchoolMemberApplicationService;
+}
+
+/** "a Registrar" vs "an ICT Coordinator" -- every current role label
+ * happens to be decided correctly by first-letter vowel/consonant alone
+ * (no "an hour"/"a university" exceptions in this set), so a simple
+ * check is enough; revisit if a future role label needs more. */
+function articleFor(label: string): "a" | "an" {
+  return /^[aeiou]/i.test(label) ? "an" : "a";
 }
 
 /** Roles & Permissions milestone: the first UI able to grant or revoke a
@@ -88,7 +101,8 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
     setPendingKey(key);
     try {
       await schoolMemberService.grantRole(member.id, role);
-      setConfirmation(`${member.displayName} is now a ${roleLabel(role)}.`);
+      const label = roleLabel(role);
+      setConfirmation(`${member.displayName} is now ${articleFor(label)} ${label}.`);
       setSelectedRole((prev) => ({ ...prev, [member.id]: "" }));
       load();
     } catch (err) {
@@ -110,7 +124,8 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
     setPendingKey(key);
     try {
       await schoolMemberService.revokeRole(member.id, role);
-      setConfirmation(`${member.displayName} is no longer a ${roleLabel(role)}.`);
+      const label = roleLabel(role);
+      setConfirmation(`${member.displayName} is no longer ${articleFor(label)} ${label}.`);
       load();
     } catch (err) {
       if (err instanceof ValidationError) {
@@ -139,6 +154,13 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
         </p>
       )}
 
+      <p className="field-hint">
+        Registrar and School Head already control what a colleague can do in this app. The other
+        roles below are ready to grant and will be on record — but this app doesn't have matching
+        screens for them yet, so granting one doesn't unlock any new tool today. They're marked "not
+        yet active" in the list below.
+      </p>
+
       {loadError && (
         <Alert tone="error">
           <p>{loadError}</p>
@@ -153,7 +175,7 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
       {loading ? (
         <Loading label="Loading this school's members…" />
       ) : loadError ? null : (
-        <table>
+        <table className="attendance-roster">
           <thead>
             <tr>
               <th scope="col">Member</th>
@@ -220,6 +242,7 @@ export function RoleManagementScreen({ schoolMemberService }: RoleManagementScre
                           {availableToGrant.map((role) => (
                             <option key={role} value={role}>
                               {roleLabel(role)}
+                              {isFoundationOnlyRole(role) ? " (not yet active)" : ""}
                             </option>
                           ))}
                         </select>

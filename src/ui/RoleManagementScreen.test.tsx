@@ -195,6 +195,33 @@ describe("RoleManagementScreen", () => {
     expect(await screen.findByText("Could not grant Registrar to Ana Cruz.")).toBeInTheDocument();
   });
 
+  it("marks a foundation-only role as not yet active in the grant picker, and discloses why", async () => {
+    renderScreen();
+    await screen.findByRole("rowheader", { name: "Ana Cruz" });
+    const anaRow = rowFor("Ana Cruz");
+
+    expect(
+      within(anaRow).getByRole("option", { name: "ICT Coordinator (not yet active)" }),
+    ).toBeInTheDocument();
+    expect(within(anaRow).getByRole("option", { name: "School Head" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/roles below are ready to grant.*this app doesn't have matching screens/s),
+    ).toBeInTheDocument();
+  });
+
+  it("uses 'an' before a role label that starts with a vowel sound", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen();
+    await screen.findByRole("rowheader", { name: "Ana Cruz" });
+
+    await grantRole(user, rowFor("Ana Cruz"), "ict_coordinator");
+
+    expect(await screen.findByText("Ana Cruz is now an ICT Coordinator.")).toBeInTheDocument();
+    expect(repo.grantRoleCalls).toEqual([
+      { targetUserId: "teacher-1", roleName: "ict_coordinator" },
+    ]);
+  });
+
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen();
     await screen.findByRole("rowheader", { name: "Ana Cruz" });

@@ -3196,6 +3196,23 @@ retrievable findings, rather than falling straight to self-review — it
 has now closed 8 previously-stuck debt entries with zero false
 positives/negatives found in the process.
 
+**RoleManagementScreen UX pass (2026-09-02)**: real browser-rendered
+verification (`playwright` npm package directly against `vite dev`'s
+dev-preview, per the documented `playwright-cli` browser-mismatch
+workaround) caught two bugs structural tests missed: the screen's
+`<table>` was the only data table in the app missing
+`className="attendance-roster"` (no header/row dividers rendered), and
+the grant/revoke confirmation message always said "a" even before a
+vowel-starting role label ("a ICT Coordinator"). Also added an
+always-visible disclosure that the 7 ADR-0065 foundation-only roles
+don't unlock any feature yet, plus a "(not yet active)" marker on
+those options in the grant picker — a real gap: nothing on the screen
+previously told a School Head that granting e.g. Health Officer does
+nothing today. `RoleManagementScreen` is now wired into
+`src/dev-preview/DevPreviewApp.tsx` (was previously unwired), so
+future sessions can browser-verify it directly rather than re-deriving
+this workaround. `isFoundationOnlyRole()` added to `src/domain/role.ts`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
