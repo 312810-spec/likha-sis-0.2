@@ -1424,3 +1424,61 @@ label {
 .app-sidebar-modes button[aria-pressed="true"]::before {
   content: "✓ ";
 }
+
+/* Redesign shell -- top bar (ADR-0057). */
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-bg);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.app-topbar-menu {
+  display: none; /* shown only at the phone breakpoint */
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+
+.app-topbar-crumbs {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.app-topbar-crumbs span {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+.app-topbar-crumbs strong {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+}
+
+.app-topbar-spacer {
+  flex: 1;
+}
+
+.app-topbar-modes {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+.app-topbar-modes button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+.app-topbar-modes button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.app-topbar-identity {
+  color: var(--color-text-muted);
+}
