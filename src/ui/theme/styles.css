@@ -17,6 +17,13 @@
      the exact ratios. Recompute before changing any of these values. */
   --color-bg: #fbf8f2;
   --color-surface: #f3eee3;
+  /* Redesign shell tokens (ADR-0057). Contrast computed, not eyeballed --
+     see the ADR for the node snippet and the numbers below. */
+  --color-surface-2: #ffffff; /* card / raised surface fill */
+  /* Hairline dividers and card outlines ONLY -- never the sole cue that a
+     control exists. Real input/button borders stay --color-border. */
+  --color-border-soft: #e4ddce;
+  --color-primary-wash: #eef2f7; /* nav hover/active + table row hover; never carries text meaning */
   /* --color-border draws every input/button/divider outline and is often
      the only visible cue a control exists (fill matches the background).
      Keep this at >=3:1 against both --color-bg and --color-surface in
@@ -59,12 +66,15 @@
   --control-height: 40px;
   --content-width: 720px;
   --content-width-wide: 1080px;
+  --sidebar-width: 264px;
   --radius: 6px;
   --radius-large: 10px;
   /* Restrained elevation -- one subtle level, not a shadow system.
      Used sparingly (e.g. the app header separating from scrolled
      content), never as decoration. */
   --elevation-1: 0 1px 2px rgba(27, 36, 48, 0.08);
+  /* Second elevation level -- drawer / overlay only, never decoration. */
+  --elevation-2: 0 8px 24px -12px rgba(27, 36, 48, 0.22);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
@@ -77,6 +87,9 @@
   --motion-duration-meaningful: 400ms;
   --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Verified (light): text/surface-2 15.65:1, muted/surface-2 5.91:1,
+     text/primary-wash 13.92:1, border/surface-2 3.93:1. */
 
   color-scheme: light;
 }
@@ -110,6 +123,9 @@
   :root {
     --color-bg: #14181d;
     --color-surface: #1c2129;
+    --color-surface-2: #222932;
+    --color-border-soft: #333c47;
+    --color-primary-wash: #1e2a38;
     /* Verified 4.12:1 / 3.74:1. */
     --color-border: #6f7b87;
     --color-text: #ece9e1;
@@ -125,6 +141,9 @@
     --color-warning: #e8c07d;
     --color-warning-surface: #3a2f14;
     --color-focus: #8fb4dd;
+    --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    /* Verified (dark): text/surface-2 12.09:1, muted/surface-2 6.48:1,
+       text/primary-wash 11.99:1, border/surface-2 3.39:1. */
     color-scheme: dark;
   }
 }
