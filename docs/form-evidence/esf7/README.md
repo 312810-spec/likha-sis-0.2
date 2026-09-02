@@ -5,10 +5,12 @@ Personnel Assignment List and Basic Profile" candidate acquired
 2026-09-02. See `docs/form-evidence/sf1/README.md` for this session's
 shared network-egress limitation note (applies identically here).
 
-**Status**: the underlying SF7/eSF7 _requirement_ is
-`ProvenanceState::AuthoritativeSourceConfirmed`-eligible in principle
-(see below); this **specific candidate file** is
-`ProvenanceState::CandidateUnverified`, `FidelityState::NotVerified`.
+**Status** (updated 2026-09-02): the underlying SF7/eSF7 _requirement_
+is `ProvenanceState::AuthoritativeSourceConfirmed` — DO 4 s.2014 and
+DM 052 s.2023 both read directly this session (see below); this
+**specific candidate file** is still `ProvenanceState::CandidateUnverified`,
+`FidelityState::NotVerified` (no field-by-field baseline exists yet to
+run a structural comparison against, unlike SF1-SF6).
 
 ## Candidate
 
@@ -46,19 +48,62 @@ found there.
 ## Two distinct issuances: paper SF7 vs. electronic eSF7
 
 - **DepEd Order No. 4, s. 2014** — founding order (same as SF1/SF2/SF4/
-  SF5/SF6). Established SF7 = "School Personnel Assignment List and
-  Basic Profile," replacing old Forms 12, 19, 29, and 31.
-- **DepEd Memorandum No. 052, s. 2023** (September 5, 2023, signed by
-  Undersecretary Gloria Jumamil-Mercado) — "Adoption of the DepEd
-  Electronic School Form 7 (eSF7)." Per search-corroborated summary
-  (not primary-read): adopted by all public schools effective SY
-  2023-2024; the accomplishment of the electronic form is the School
-  Head's responsibility, explicitly "in adherence to DO 4, s. 2014."
+  SF5/SF6, now primary-source confirmed —
+  `docs/form-evidence/do4-s2014/README.md`). Established SF7 = "School
+  Personnel Assignment List and Basic Profile," replacing old Forms 12,
+  19, 29, and 31.
+- **DepEd Memorandum No. 052, s. 2023 — now primary-source confirmed
+  (2026-09-02)**. The project owner supplied a primary-source PDF
+  directly (a Schools Division of Misamis Oriental dissemination memo,
+  DM No. 523, s. 2023, September 7, 2023, signed by Schools Division
+  Superintendent Edilberto L. Oplenaria, with the actual national
+  memorandum attached in full). **"ADOPTION OF THE DEPED ELECTRONIC
+  SCHOOL FORM 7 (eSF7)"** — DepEd Memorandum No. 052, s. 2023, dated
+  **SEP 05 2023**, issued "By Authority of the Secretary" and signed by
+  **Gloria Jumamil-Mercado, Undersecretary**. References: DepEd Order
+  Nos. 4, s. 2014 and 58, s. 2017. `ProvenanceState::AuthoritativeSourceConfirmed`.
+  Key confirmed facts:
+  - Effective **SY 2023-2024**, adopted by all public schools, as part
+    of the MATATAG Agenda's digitization commitment.
+  - Para 6 (verbatim): "In adherence to DO 4, s. 2014, the
+    accomplishment of this electronic form is the primary
+    responsibility and accountability of the **School Head**." Matches
+    this project's earlier search-only finding exactly.
+  - Para 7: official download at `bit.ly/eSF7` (a data-consolidator
+    template for Division use is at the same link) — a live, specific
+    URL, not resolved/fetched this session (still egress-blocked).
+  - Para 9: **eSF7's commercialization is "highly discouraged"** —
+    explicitly cautions against selling digitized copies of this form
+    "as well as other modified school forms released through DO 4,
+    s. 2014 and DO 58, s. 2017." Directly relevant to this candidate's
+    own provenance question (below).
+  - Enclosure (General Guidelines): accomplished at BoSY by the School
+    Head (non-teaching personnel may assist); **Senior High Schools
+    also resubmit at the start of the Second Semester (Third Grading
+    Period)**; updated on any personnel movement; personnel
+    auto-ranked highest-to-lowest; **one eSF7 per School ID** (an
+    integrated school does not file separately per level); shared-
+    service non-teaching personnel are recorded in their "mother
+    school only"; submitted as both the Excel file and a School-Head-
+    signed scanned PDF to the Division Office by the fourth Friday
+    from the opening of classes.
 - **DM-OUHROD-2024-3470** — "Issuance and Adoption of the Revised
   Electronic School Form 7 (ESF7) Tool Starting School Year 2024-2025,"
   issued by the Office of the Undersecretary for Human Resource and
   Organizational Development (OUHROD) — revises the DM 052 s.2023 tool.
-  Disseminated to Divisions December 2024, orientations early 2025.
+  **Still not primary-text-read** (only DM 052 s.2023 was supplied in
+  full; this later memo's own body text has not been seen), but its
+  existence, exact title, and SY 2024-2025 scope are now corroborated
+  by a **second, independent Division source**: DepEd City Schools
+  Division of Dasmariñas, Division Memorandum No. 078, s. 2025 (January
+  24, 2025, signed by OIC-Schools Division Superintendent Elias A.
+  Alicaya, Jr.), disseminating an orientation on this exact memo,
+  quoting its title verbatim and confirming it "aims to streamline and
+  simplify processes in accomplishing reports in relation to
+  school-based workforce management." This is a genuinely independent
+  second Division (Cavite, vs. the earlier-known ones), strengthening
+  confidence in the citation without yet being a primary read of the
+  memo's own content/revisions.
 - Continuing yearly Division-level submission memos (Zambales DM 254
   s.2025, DepEd Dasmariñas DM 495 s.2025/DM 338 s.2026, DepEd Lapu-Lapu
   DM 336 s.2026) confirm eSF7 continues under SY 2025-2026, now
@@ -102,29 +147,39 @@ supplied this file where they got it.
 
 ## Classification
 
-**(a) The base SF7 reporting requirement**: CONFIRMABLE AS
-AUTHORITATIVE — DepEd Order No. 4, s. 2014, corroborated consistently
-and specifically (what it replaced, who's accountable).
+**(a) The base SF7 reporting requirement**: `ProvenanceState::AuthoritativeSourceConfirmed`
+— DepEd Order No. 4, s. 2014, read directly (`docs/form-evidence/do4-s2014/README.md`).
 
-**(b) eSF7 as a national DepEd tool/mandate**: CONFIRMABLE AS
-AUTHORITATIVE — DM No. 052, s. 2023 and its central-office revision
-DM-OUHROD-2024-3470, both corroborated by multiple independent Division
-re-issuances that consistently cite them.
+**(b) eSF7 as a national DepEd tool/mandate**: `ProvenanceState::AuthoritativeSourceConfirmed`
+for **DM No. 052, s. 2023** (read directly this session, full text
+above). **DM-OUHROD-2024-3470 remains `CandidateUnverified`-adjacent**
+— its existence, title, and scope are now corroborated by two
+independent Divisions (not just one), but its own body text is still
+unread.
 
-**(c) This specific "UPDATED eSF7 RSDO" file**: **NOT CONFIRMABLE FROM
-AVAILABLE SOURCES as the unmodified national central-office artifact.**
-"RSDO" matches no documented official filename convention, and Division-
-level customization of eSF7 is a confirmed real practice — this file
-may be an accurate, faithful copy, or may carry Division-specific
-modifications; neither can be established from available sources this
-session.
+**(c) This specific "UPDATED eSF7 RSDO" file**: **still not confirmable
+as the unmodified national central-office artifact**, but with a
+narrower, more specific gap than before: DM 052 s.2023's General
+Guidelines (now confirmed) describe the _process_ (who submits, when,
+in what format) in detail, but not the _tool's own field layout_ — so
+even with DM 052 s.2023 fully read, there is no primary field-by-field
+description of eSF7 to compare this candidate against, unlike DO 4
+s.2014's Enclosure 2 for SF1-SF7. "RSDO" still matches no documented
+official filename convention (see above), and Division-level
+customization of eSF7 is confirmed real practice by DM 052 s.2023's own
+para 9 (which exists specifically to discourage commercialized/
+unauthorized copies) — this file may be an accurate, faithful copy, or
+may carry Division-specific modifications; neither can be established
+from available sources this session.
 
 ## Next step
 
-With working egress: (1) read DM 052 s.2023 and DM-OUHROD-2024-3470
-primary text directly; (2) attempt to resolve the central `bit.ly/eSF7`
-download link (found via search, not resolved this session) and diff it
-against this candidate; (3) identify which specific Region/Division
-"RSDO" refers to, if it is in fact a regional tag, to assess how much
-local customization (if any) this candidate carries relative to the
-national release.
+Two things remain open, both narrower than before: (1) DM-OUHROD-
+2024-3470's own primary text — what specifically changed in the
+"Revised" eSF7 Tool for SY 2024-2025, still unread; (2) resolving the
+`bit.ly/eSF7` link (now confirmed as the actual current official
+download location per DM 052 s.2023 para 7 itself, not just a search
+result) to get a genuine field-by-field comparison baseline, the way
+DO 4 s.2014's Enclosure 2 provided for SF1-SF7. "RSDO"'s specific
+Region/Division origin remains unidentified and is not expected to
+resolve from further generic search.
