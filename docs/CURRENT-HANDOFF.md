@@ -1,56 +1,84 @@
 # CURRENT HANDOFF
 
-## Active Task (2026-09-02, this session — "other pending waves/tasks": closed 3 owed independent reviews)
+## Active Task (2026-09-02, this session — "other pending waves/tasks": closed 8 owed independent reviews)
 
 Per the user's own confirmed sequencing ("once you are done with roles
 and permissions, you can work on automatically other pending tasks and
 waves, once you are done, work on the ui"), this session moved to
-`docs/VERIFICATION-DEBT.md`'s open items. Selected the independent-
-review-retrieval-failure entries as the actionable candidate, since
-`docs/adr/0062-file-based-review-output-workaround.md`'s workaround was
-already proven to work and could close several at once.
+`docs/VERIFICATION-DEBT.md`'s open items. Selected every remaining
+independent-review-retrieval-failure entry as the actionable candidate,
+since `docs/adr/0062-file-based-review-output-workaround.md`'s
+workaround was already proven to work and could close them at once.
 
 **Closed for real, using the ADR-0062 file-based workaround** (dispatch
 via `general-purpose` with the dedicated reviewer's own checklist
 inlined, findings written to a scratchpad file and read directly,
-touching nothing else in the repo):
+touching nothing else in the repo). All 8 verdicts: NOT
+BLOCKING/LOOKS-GOOD/PASS — only one required a fix:
 
 - **Roles & Permissions (ADR-0064 + ADR-0065) — `security-reviewer`.**
-  Verdict NOT BLOCKING, zero should-fix. Confirmed `is_grantable()` is
-  the only path a caller-supplied role string can take before reaching
-  the DB (migration 25's closed CHECK constraint is an independent
-  second backstop); every `school_id` used by the new commands/gates is
-  session-derived; `revoke()`'s last-School-Head SELECT-then-act
-  sequence is not exploitable (traced: it runs entirely inside the
-  app's single held `Mutex<Connection>` lock, unlike the previously-
-  fixed bootstrap race). Full findings in
-  `docs/VERIFICATION-DEBT.md`'s matching entry.
+  Confirmed `is_grantable()` is the only path a caller-supplied role
+  string can take before reaching the DB (migration 25's closed CHECK
+  constraint is an independent second backstop); every `school_id` used
+  by the new commands/gates is session-derived; `revoke()`'s
+  last-School-Head SELECT-then-act sequence is not exploitable (it runs
+  entirely inside the app's single held `Mutex<Connection>` lock).
 - **UX-02 — `accessibility-reviewer` on `TeacherWorkspaceScreen.tsx`.**
-  Verdict LOOKS-GOOD, nothing to fix. Recomputed 12 real contrast pairs
-  from actual hex tokens (tightest 3.40:1, still clears the 3:1 floor).
+  Recomputed 12 real contrast pairs from actual hex tokens (tightest
+  3.40:1, still clears the 3:1 floor). Nothing to fix.
 - **UX-03 — `teacher-ux-reviewer` on `AttendanceScreen.tsx`/
-  `MonthlySummaryScreen.tsx`.** Verdict LOOKS-GOOD, one SHOULD-FIX:
-  `MonthlySummaryScreen` glossed "SF2" in plain language before first
-  use but never glossed "SF4" — fixed by adding a matching `field-hint`
-  paragraph before the SF4 export button. Verified with `npx vitest run
+  `MonthlySummaryScreen.tsx`.** One SHOULD-FIX: `MonthlySummaryScreen`
+  glossed "SF2" in plain language before first use but never glossed
+  "SF4" — fixed by adding a matching `field-hint` paragraph before the
+  SF4 export button. Verified with `npx vitest run
 src/ui/MonthlySummaryScreen.test.tsx` (23 passed), plus full `npm run
 typecheck`/`lint`/`format:check` clean.
+- **Wave 2A Learner Core + Enrollment — `security-reviewer`.** All six
+  original adversarial questions re-verified true against current code:
+  no `school_id` client parameters, `enroll` gated by
+  `ManageLearners` on every production path, all reads school-scoped in
+  SQL, no string-built SQL, no TOCTOU window.
+- **Integration Review + Main Fast-Forward — `architecture-reviewer`.**
+  `teaching_assignment.rs` commands still route through the expected
+  gates; `check-architecture.mjs` clean; no concept duplication; no
+  leftover debug artifacts.
+- **Teacher Load / Class Schedule Foundation — `security-reviewer`.**
+  Both previously self-caught bugs (cross-school
+  `authorize_view_teacher_load` leak, `INSERT OR IGNORE` masking a
+  weekday CHECK violation) reconfirmed still fixed, not regressed. Also
+  closed this milestone's separate "Rust unverified by compiler" debt
+  for real: `cargo test -p app --lib teaching_assignment`/
+  `schedule_meeting`/`authorize_view_teacher_load` all ran clean (39
+  tests) — this milestone's first real compiler signal.
+- **RBAC Authorization Corrective Gate — `security-reviewer`.** All 10
+  original adversarial questions re-verified true; newly cross-checked
+  against this session's own `grant_school_role`/`revoke_school_role`
+  for drift — none found.
+- **Curriculum / Key-Stage Versioning Foundation — `architecture-reviewer`.**
+  No frontend curriculum/key-stage code exists;
+  `resolved_curriculum_version_id_in_school` unchanged and matches the
+  weight-policy precedent; `check-architecture.mjs` clean.
 
-**Not attempted this pass**: the harness-level agent-resume/retrieval
-bug itself remains unfixed (platform-level, outside this repo) — future
-independent-review dispatches should still try the dedicated reviewer
-agent first and fall back to this same file-based workaround on
-failure, per ADR-0062. Other `VERIFICATION-DEBT.md` entries
-(environment-limited items: session network egress block, Android
-verification, native WebDriver E2E, hardware-dependent recovery
-scenarios) were reviewed but are not actionable from within a session —
-left open, correctly disclosed.
+Full findings for each in `docs/VERIFICATION-DEBT.md`'s matching CLOSED
+entries.
 
-**Exact next slice, per the user's own sequencing**: continue scanning
-`docs/VERIFICATION-DEBT.md` for any other genuinely-actionable open item
-before moving to the user's final-stated step, "work on the ui" (not
-yet scoped — would need its own clarification of what screen/pass is
-meant before starting).
+**Left open, correctly disclosed, not actionable from within a
+session**: the harness-level agent-resume/retrieval bug itself
+(platform-level, outside this repo — future dispatches should still try
+the dedicated reviewer agent first and fall back to this workaround);
+session network egress block (blocks `deped-researcher`'s pending
+retry too); scheduled-wakeup harness reliability; Android verification;
+native WebDriver E2E; hardware-dependent recovery scenarios;
+Playwright CLI's browser-only (not native-binary) coverage gap.
+
+**Exact next slice, per the user's own sequencing**: `docs/VERIFICATION-DEBT.md`'s
+remaining open items are all environment/platform-limited (not
+actionable from within a session) or historical completion records —
+this step is reasonably exhausted. Move to the user's final-stated
+step, "work on the ui" — not yet scoped; needs its own read of what
+screen/pass is meant, likely starting with a general UI/UX audit pass
+across existing screens using the `impeccable`/`premium-teacher-ui`
+skills, since no specific screen was named.
 
 ## Active Task (2026-09-02, this session — Roles & Permissions: 8-role taxonomy widened, foundation only, ADR-0065)
 

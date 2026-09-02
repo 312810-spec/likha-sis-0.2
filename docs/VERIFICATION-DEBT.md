@@ -2165,7 +2165,24 @@ findings, not self-review). **Debt still open, unrelated to this
 milestone**: `gitleaks`/`cargo-deny`/`osv-scanner` remain unavailable
 in this environment.
 
-## Wave 2A Learner Core + Enrollment: `security-reviewer` retrieval failure, self-review substituted (2026-08-26)
+## Wave 2A Learner Core + Enrollment: `security-reviewer` retrieval failure — CLOSED (2026-08-26, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: routed a fresh `security-reviewer` pass
+through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`), re-verifying
+all six adversarial questions below against the CURRENT code (not
+re-reading the old self-review's claims). **Verdict: NOT BLOCKING**,
+zero should-fix. Confirmed: no command in `commands/section.rs` or
+`commands/learner.rs` accepts `school_id` as a parameter;
+`section_membership::enroll`'s only two production callers
+(`enroll_learner_in_section` and `import::commit::commit_import`) are
+both gated by `Capability::ManageLearners`, every other call site is
+test-only; all three read paths filter by `school_id` directly in
+bound SQL parameters; no string-built SQL exists in either repository
+file; every command holds its `Mutex<Connection>` guard for its full
+duration, no TOCTOU window. This closes the debt for real — not a
+self-review substitute. Original self-review record retained below for
+the historical trail.
 
 `security-reviewer` was dispatched for a narrow adversarial pass on the
 real authorization gap this milestone closed
@@ -2226,7 +2243,25 @@ debt for this specific change remains open — re-run `security-reviewer`
 once agent-resume behavior is confirmed reliably working in a future
 session.
 
-## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure, self-review substituted (2026-08-26)
+## Integration Review + Main Fast-Forward: cross-milestone `architecture-reviewer` retrieval failure — CLOSED (2026-08-26, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: routed a fresh `architecture-reviewer`
+pass through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`), re-verifying
+against the CURRENT code. **Verdict: PASS.** Confirmed every command in
+`teaching_assignment.rs` still routes through the expected gate
+(`ManageTeachingAssignments` or `authorize_view_teacher_load`), with
+`list_teaching_assignments_by_section`'s documented open-reference-data
+exception still present and consistent; `node
+scripts/check-architecture.mjs` passes clean across the whole current
+tree; no `TeachingAssignment`/`TeacherLoad`/curriculum/class-record
+concept duplication found; migration chain sequential with 25 `M::up`
+entries, no gaps or duplicates; zero leftover debug artifacts
+(`println!`/`dbg!`/`TODO`/`FIXME`) in the touched modules;
+`authorize_view_teacher_load`'s self-or-School-Head semantics confirmed
+by five passing dedicated tests. This closes the debt for real — not a
+self-review substitute. Original self-review record retained below for
+the historical trail.
 
 `architecture-reviewer` was dispatched for a narrow cross-milestone
 question (does every command RBAC should gate, added after RBAC
@@ -2537,7 +2572,28 @@ scope per the directing instruction); `cargo fmt` normalization (~265
 diffs); no CI configuration exists yet; `gitleaks` secret scan remains
 unavailable in this environment.
 
-## Teacher Load / Class Schedule Foundation: Rust unverified by compiler, `security-reviewer` retrieval failure, two self-caught bugs (2026-08-25)
+## Teacher Load / Class Schedule Foundation: Rust unverified by compiler, `security-reviewer` retrieval failure — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02, both halves**: routed a fresh
+`security-reviewer` pass through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`). **Verdict:
+NOT BLOCKING**, zero should-fix. Both previously self-caught bugs
+re-verified against current code and confirmed not regressed: the
+cross-school `authorize_view_teacher_load` leak fix
+(`user_repo::is_member_of_school` check) is present, covered by a green
+test; `schedule_meeting::create`'s `INSERT OR IGNORE`→`ON CONFLICT ...
+DO NOTHING` fix plus the explicit Rust-side weekday range check are
+both present, covered by green tests. Conflict-detection logic
+(teacher/section/room double-booking) re-verified correct and
+school-scoped, no bypass path. **The "Rust unverified by compiler" half
+is also closed for real this pass**: `cargo test -p app --lib
+teaching_assignment` (18 passed), `cargo test -p app --lib
+schedule_meeting` (16 passed), and `cargo test -p app --lib
+authorize_view_teacher_load` (5 passed) all ran directly in this
+session — this milestone's first-ever real compiler/test confirmation,
+not inferred from source reading alone. This closes the debt for real —
+not a self-review substitute. Original self-review record retained
+below for the historical trail.
 
 `cargo check --lib` was attempted once against this milestone's new
 code (migration 18, `repository::teaching_assignment`,
@@ -2608,7 +2664,27 @@ debt remains open for this milestone — re-run `security-reviewer` once
 agent-resume behavior is confirmed reliably working in a future
 session.
 
-## RBAC Authorization Corrective Gate: `security-reviewer` retrieval failure, self-review substituted (2026-08-25)
+## RBAC Authorization Corrective Gate: `security-reviewer` retrieval failure — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: routed a fresh `security-reviewer` pass
+through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`), re-verifying
+all 10 adversarial questions below against the CURRENT code. **Verdict:
+NOT BLOCKING**, zero should-fix. Confirmed: `add_user_to_school` never
+reads/writes the caller's own role rows, only the target's; it grants
+only the hardcoded `role::TEACHER` constant, not a caller-suppliable
+role; the cross-school check runs correctly downstream of the
+capability check, both session-derived; the whole command holds one
+`Mutex<Connection>` guard with no TOCTOU window; and — newly
+cross-checked against this session's own `grant_school_role`/
+`revoke_school_role` (ADR-0064/0065) — no drift or privilege-tier
+mismatch exists between the "add a member" and "change a member's
+role" command families; the bootstrap self-escalation failure class
+this gate originally fixed does not recur (exactly two production
+callers of `role::grant`/`add_school_membership` exist, both correctly
+restricted). This closes the debt for real — not a self-review
+substitute. Original self-review record retained below for the
+historical trail.
 
 `security-reviewer` was dispatched for an adversarial pass on the
 `add_user_to_school` fix (see the entry below). It completed real work
@@ -2656,7 +2732,24 @@ agent-resume behavior is confirmed reliably working in a future session.
 `security-reviewer` review was successfully dispatched and retrieved
 against current code, covering this fix among others. Debt closed.
 
-## Curriculum / Key-Stage Versioning Foundation: `architecture-reviewer` retrieval failure, self-review substituted (2026-08-25)
+## Curriculum / Key-Stage Versioning Foundation: `architecture-reviewer` retrieval failure — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: routed a fresh `architecture-reviewer`
+pass through the file-based output workaround
+(`docs/adr/0062-file-based-review-output-workaround.md`), re-verifying
+against the CURRENT code. **Verdict: PASS.** Confirmed: `src/` (TS/UI)
+still has zero files referencing curriculum/key-stage concepts, so no
+frontend leakage is possible; `resolved_curriculum_version_id_in_school`
+is unchanged and structurally identical to
+`resolved_weight_policy_id_in_school` (single generic `COALESCE` +
+`is_default` JOIN, no name/id branching); `key_stages` still has no
+foreign key to `curriculum_versions`, deliberately independent grade
+banding; migration SQL constraints (CHECK, unique-default index) are
+correct and tested; no command exposes `curriculum_version_id` as a
+client-suppliable parameter; `node scripts/check-architecture.mjs`
+passes clean across the whole current tree. This closes the debt for
+real — not a self-review substitute. Original self-review record
+retained below for the historical trail.
 
 `architecture-reviewer` was dispatched to review the new curriculum
 schema/repository code for architecture leakage and data-integrity

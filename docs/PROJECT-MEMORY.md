@@ -3172,20 +3172,29 @@ clean. `git diff --check` clean.
 the three-role milestone, recorded in `docs/VERIFICATION-DEBT.md`, not
 yet dispatched.
 
-**Independent-review debt closed (2026-09-02)**: the `security-reviewer`
-pass owed for both role milestones above, plus UX-02's
-`accessibility-reviewer` and UX-03's `teacher-ux-reviewer` retries, all
-completed for real via the file-based output workaround
+**Independent-review debt closed (2026-09-02) — 8 entries in total**: the
+`security-reviewer` pass owed for both role milestones above, UX-02's
+`accessibility-reviewer` and UX-03's `teacher-ux-reviewer` retries, and
+5 older self-review-substituted entries (Wave 2A Learner Core +
+Enrollment, Integration Review + Main Fast-Forward, Teacher Load /
+Class Schedule Foundation, RBAC Authorization Corrective Gate,
+Curriculum / Key-Stage Versioning Foundation) all completed for real
+via the file-based output workaround
 (`docs/adr/0062-file-based-review-output-workaround.md`) — dispatch a
 `general-purpose` agent with the dedicated reviewer's checklist inlined,
 write findings to a scratchpad file, read the file directly instead of
-the broken notification channel. All three verdicts: NOT
-BLOCKING/LOOKS-GOOD; one small SHOULD-FIX (a missing SF4 plain-language
-gloss on `MonthlySummaryScreen.tsx`, parallel to the existing SF2 gloss)
-was found and fixed. Full findings in `docs/VERIFICATION-DEBT.md`'s
-matching entries. This workaround should be the default next step for
-any future review whose dedicated-agent dispatch fails to return
-retrievable findings, rather than falling straight to self-review.
+the broken notification channel. All 8 verdicts: NOT
+BLOCKING/LOOKS-GOOD/PASS; only one small SHOULD-FIX found across all of
+them (a missing SF4 plain-language gloss on `MonthlySummaryScreen.tsx`,
+parallel to the existing SF2 gloss) — fixed. The Teacher Load / Class
+Schedule review additionally closed that milestone's separate "Rust
+unverified by compiler" debt for real (`cargo test` now runs clean in
+this environment). Full findings in `docs/VERIFICATION-DEBT.md`'s
+matching entries. This workaround is now this project's default next
+step for any review whose dedicated-agent dispatch fails to return
+retrievable findings, rather than falling straight to self-review — it
+has now closed 8 previously-stuck debt entries with zero false
+positives/negatives found in the process.
 
 ## Current Milestone
 
