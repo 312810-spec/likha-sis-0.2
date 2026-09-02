@@ -3173,6 +3173,32 @@ trail.
 
 ## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
 
+**Retried 2026-09-02, still not retrievable**: dispatched a fresh
+`teacher-ux-reviewer` against `AttendanceScreen.tsx`/
+`MonthlySummaryScreen.tsx` (the same scope). The initial dispatch and
+the one permitted `SendMessage` resume both completed real work (35
+tool calls each) but returned no retrievable findings text, same as
+the original 2026-08-25 attempt. Self-review substituted again, per the
+established fallback: read both files end-to-end. No blocking issue
+found — language is plain and DepEd-terminology-correct (the SF2/SF4
+disclosure banners are explicit that these are DepEd-inspired working
+references, not submission-ready reproductions); mode parity holds
+(the guided-only hints in both screens are supplementary text only —
+every action, button, and keyboard shortcut is present and functional
+in Efficient/Comfortable too, confirmed by reading the JSX rather than
+assuming); trust signals are present (clear "Saving…"/error/retry
+states per row, an explicit confirmation message after bulk-marking
+naming exactly what changed, and the legend explaining "—" means
+not-recorded rather than present). One non-blocking observation, not a
+bug: `AttendanceScreen.tsx`'s per-row status buttons use native
+`disabled={bulkMarking}` (line ~417) rather than the `aria-disabled`
+pattern used elsewhere in this sweep — but this does not reproduce the
+focus-loss bug that pattern fixes, since the button that becomes
+disabled is never the one that was focused (the teacher clicks "Mark
+all present" to trigger it, not a row button), so no fix needed. Owed
+independent review remains open — retry again in a future session once
+there's reason to believe the harness issue is fixed.
+
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
 against UX-03's `AttendanceScreen`/`MonthlySummaryScreen` changes
 (2026-08-25) and hit the same recurring agent-resume/retrieval failure
