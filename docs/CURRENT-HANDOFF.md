@@ -1,5 +1,51 @@
 # CURRENT HANDOFF
 
+## Active Task (2026-09-02, this session — direct-verification attempt on DO 015/DO 009 s.2026: still egress-blocked, but findings substantially strengthened)
+
+User asked to "verify DO 015 s.2026 and DO 009 s.2026 directly."
+Re-tested `WebFetch` against `deped.gov.ph`, a non-deped mirror
+(`depedclub.com`), and two controls (`en.wikipedia.org`,
+`github.com`) — `github.com` succeeded, everything else failed
+identically as `EGRESS_BLOCKED`. This confirms the block from earlier
+this session is a persistent content-domain restriction (not
+transient, not deped-specific), so per the proxy's own "do not retry"
+guidance, no further direct-fetch attempts were made.
+
+Instead ran a second, more targeted `WebSearch` pass. Result:
+**both orders are now confirmed real and currently in effect**, with
+materially more specific, consistent detail across independent
+sources than the first pass — not just "reported to exist." New
+consolidated record: `docs/form-evidence/grading-2026-orders/README.md`
+(referenced from `sf5`/`sf6`/`sf9`'s own evidence files rather than
+duplicated).
+
+- **DO 015, s. 2026** — supersedes DO 8, s. 2015; descriptive/
+  non-numeric grading for Key Stage 1; a confirmed two-year transition
+  for Key Stages 2-4 (adjusted transmutation for SY 2026-2027, then
+  zero-based grading — Term Grade = Initial Grade, no transmutation,
+  75 minimum passing — from SY 2027-2028).
+- **DO 009, s. 2026** — three-term school calendar replacing
+  quarterly/semestral, effective **now** (SY 2026-2027), corroborated
+  by two independent Division dissemination memos naming it explicitly
+  (DM 267 s.2026, SDM 136 s.2026), with specific confirmed term dates:
+  Term 1 Jun 8–Sep 15, Term 2 Sep 16–Dec 18, Term 3 Jan 4–Apr 8 (201
+  class days total).
+
+**Still not a primary-source read** — `WebSearch`-only remains the
+ceiling in this session, so neither is promoted to
+`AuthoritativeSourceConfirmed`. But this is no longer a speculative
+lead: it's reasonably well-established that LIKHA-SIS's
+`grading`/`grading_computation` domain (built around a quarterly/
+semestral grading-period concept) needs review against a three-term
+calendar for the **current** school year, independent of the SF
+template provenance work. This is now the single most actionable
+finding from this session's form-evidence work — see the shared
+record for full detail and the recommended next step (review
+`src-tauri/src/repository/grading.rs`/`grading_computation.rs` against
+this model, with the project owner, before any grading-logic change).
+
+No code changed this session — evidence/documentation only.
+
 ## Active Task (2026-09-02, this session — authoritative-template form evidence: SF1/SF2/SF4/SF5/SF6/SF9/SF10/eSF7, all NOT CONFIRMABLE; two important new DepEd findings)
 
 User resumed the paused authoritative-template form-output work

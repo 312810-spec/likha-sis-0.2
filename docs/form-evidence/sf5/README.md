@@ -52,27 +52,18 @@ text, no learner data) — verified clean of PII.
   rule (≤2 failed learning areas → remedial; more → retained) that SF5
   computes and reports. Clarified by DO 29, s. 2015.
 
-## ⚠️ Important new finding: DepEd Order No. 015, s. 2026
+## ⚠️ Important finding: DepEd Order No. 015, s. 2026
 
 **Not previously on this project's radar, not cited by the candidate
-file, and directly relevant to SF5's core computation.** Search results
-describe a **DepEd Order No. 015, s. 2026** — "Revised Guidelines on
-Classroom Assessment, Grading System, and Awards and Recognition for
-the K to 12 Basic Education Program," reportedly effective **SY
-2026-2027** (the current school year as of this record) — as the
-successor to DO 8, s. 2015. Reported content (unread primary text):
-introduces a **Descriptive (non-numeric) Grading System for Key Stage 1
-(Kindergarten–Grade 3)**, while Key Stages 2-4 (Grades 4-12) retain
-numeric grading with revised component weights (reported: 20% Written/
-Oral Works, 50% Performance Tasks, 30% Examinations for core subjects).
-
-This was **not confirmed against primary source text** this session.
-If accurate, it means SF5's Key Stage 1 proficiency-band columns (which
-assume DO 8 s.2015's numeric bands) may already need a template
-revision this project has no visibility into. **This is flagged
-explicitly for the project owner, not just recorded as routine
-provenance debt** — see `docs/CURRENT-HANDOFF.md`'s entry for this
-session.
+file, and directly relevant to SF5's core computation.** Full research
+(now confirmed as real and in effect via multiple independent, detailed
+secondary sources, including specific transition-timeline detail) is
+in the shared record: `docs/form-evidence/grading-2026-orders/README.md`.
+Summary: DO 015, s. 2026 reportedly supersedes DO 8, s. 2015 (the order
+SF5's proficiency bands and promotion rule are built on), introduces
+descriptive/non-numeric grading for Key Stage 1, and a two-year
+transition to zero-based grading for Key Stages 2-4. **Flagged
+explicitly for the project owner** — see `docs/CURRENT-HANDOFF.md`.
 
 ## Official downloadability
 

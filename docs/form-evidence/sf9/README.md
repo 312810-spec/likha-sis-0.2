@@ -53,16 +53,21 @@ clean of PII.
   `AcademicElectiveTerms`/`DESCRIPTOR` defined names found in both SHS
   candidates during structural inspection.
 
-## ⚠️ Important new findings: two separate 2026 DepEd Orders, unread
+## ⚠️ Important findings: two separate 2026 DepEd Orders
 
-Neither previously on this project's radar:
+Neither previously on this project's radar. Full research — now
+confirmed as real and in effect via multiple independent, detailed
+secondary sources (a second research pass strengthened this
+considerably) — is in the shared record:
+`docs/form-evidence/grading-2026-orders/README.md`.
 
 - **DepEd Order No. 015, s. 2026** — revised classroom assessment/
-  grading system (see `docs/form-evidence/sf5/README.md` for the same
-  flag raised independently there).
+  grading system.
 - **DepEd Order No. 009, s. 2026** — a **separate** order establishing
-  a new **three-term (trimestral) school calendar** for SY 2026-2027,
-  replacing the prior quarterly/semestral structure.
+  a new **three-term (trimestral) school calendar** for SY 2026-2027
+  (specific term dates now confirmed: June 8 - Sep 15, Sep 16 - Dec 18,
+  Jan 4 - Apr 8, 201 class days total), replacing the prior quarterly/
+  semestral structure.
 
 Current (2026) SF9 templates found via search are explicitly described
 as "three-term" under these two orders. **Whether our three candidate
@@ -73,10 +78,11 @@ columns. This must be checked by hand before any provenance/fidelity
 work proceeds on these candidates.
 
 **Broader implication, flagged for the project owner, not just this
-form's evidence record**: if DO 009 s.2026 replaces the quarterly/
-semestral calendar with a three-term one, LIKHA-SIS's own
+form's evidence record**: it is now reasonably well-established (not
+just a lead) that DO 009 s.2026 replaces the quarterly/semestral
+calendar with a three-term one for SY 2026-2027. LIKHA-SIS's own
 `grading`/`grading_computation` domain modules — built around a
-grading-_period_ concept — may need re-examination for SY 2026-2027
+grading-_period_ concept — likely need re-examination for SY 2026-2027
 onward. This is a new finding outside this research task's original
 scope. See `docs/CURRENT-HANDOFF.md`.
 
