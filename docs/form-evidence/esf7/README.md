@@ -110,40 +110,24 @@ found there.
   submitted through an "InsightED" platform, in `.xlsb` format
   specifically — matching the candidate's own format exactly.
 
-## What "RSDO" means — still unresolved, now checked from inside the file too
+## What "RSDO" means — resolved (2026-09-02): a typo for "SDO"
 
-No source found (primary or secondary) explicitly defines "RSDO" in a
-DepEd context. **Checked further, 2026-09-02**: the string "RSDO" does
-not appear anywhere inside the workbook itself — not in any cell across
-any of the 7 sheets (full-text cell scan via `pyxlsb`), and not in the
-extracted OOXML-package XML parts (`docProps/core.xml`, `app.xml`, or
-any other part) either. This rules out "RSDO" being a built-in
-tool-internal label (e.g. a sheet name, a form title, an embedded
-region code) and is consistent with the existing theory: it is a
-filename-only tag, added when whoever redistributed this copy renamed
-it, not part of the tool's own content. It does not, however, identify
-_which_ Region/Division added it — the document metadata that might
-have (author/company fields) did not contain the string either (see the
-redaction note above; the metadata that did exist was unrelated to
-"RSDO" and has since been removed from the working copy regardless).
-
-The most plausible reading, from context only, remains "Region [and]
-Schools Division Office" — i.e. this specific file was relabeled by a
-Region/Division when redistributing the central-office tool, not an
-official central-office filename component. Two documented _official_
-filename patterns were found
-(`eSF7_SDO<Name>_SchoolID_SchoolName_SY25-26` and
-`ESF7_[SchoolCode]_2026`), and neither contains "RSDO." Divisions have
-a confirmed, documented practice of publishing their own "revised
-template" of eSF7 (e.g. a named Division Memorandum No. 65, s. 2025,
-"Revised Template of the Electronic School Form 7 (ESF7)") — so a
-region/division-labeled variant existing alongside the central tool is
-expected, not unusual, in this ecosystem. **This remains a genuinely
-open question, not one that further generic web search is likely to
-resolve** — the next step that could actually answer it is either a
-direct Region/Division-level source (e.g. searching a specific Region's
-own site for "RSDO" once one is guessed) or asking whoever originally
-supplied this file where they got it.
+**Resolved by the project owner directly**: "RSDO" in this candidate's
+filename is simply a typo for **"SDO"** (Schools Division Office) — an
+extra "R" character, not a distinct abbreviation. This matches one of
+the two documented official filename patterns already identified in
+this record, `eSF7_SDO<Name>_SchoolID_SchoolName_SY25-26`: this
+candidate's filename is that same pattern with a single-character typo
+in "SDO." Consistent with everything else found this session — the
+string does not appear anywhere inside the workbook's cells or XML
+parts (a typo introduced only when the file was renamed for
+redistribution/upload would not appear inside the file's own content
+either), and Division-level redistribution of the central eSF7 tool
+under a Division-labeled filename is already confirmed as a real,
+expected practice (DM 052 s.2023 para 9's own commercialization
+caution, and documented Division "revised template" memos). No
+remaining ambiguity — this was a typo, not evidence of an unofficial
+or region-specific tool variant.
 
 ## Classification
 
@@ -157,29 +141,29 @@ above). **DM-OUHROD-2024-3470 remains `CandidateUnverified`-adjacent**
 independent Divisions (not just one), but its own body text is still
 unread.
 
-**(c) This specific "UPDATED eSF7 RSDO" file**: **still not confirmable
-as the unmodified national central-office artifact**, but with a
-narrower, more specific gap than before: DM 052 s.2023's General
-Guidelines (now confirmed) describe the _process_ (who submits, when,
-in what format) in detail, but not the _tool's own field layout_ — so
-even with DM 052 s.2023 fully read, there is no primary field-by-field
+**(c) This specific "UPDATED eSF7 RSDO" file**: **filename question
+resolved (2026-09-02) — "RSDO" was a typo for "SDO,"** matching the
+already-documented official `eSF7_SDO<Name>_...` pattern. This removes
+the one filename-level anomaly that had been flagged. **Provenance
+itself is still not confirmable as the unmodified national
+central-office artifact**, for a narrower reason now: DM 052 s.2023's
+General Guidelines (confirmed) describe the submission _process_
+(who, when, what format) but not the tool's own field layout — so even
+with DM 052 s.2023 fully read, there is no primary field-by-field
 description of eSF7 to compare this candidate against, unlike DO 4
-s.2014's Enclosure 2 for SF1-SF7. "RSDO" still matches no documented
-official filename convention (see above), and Division-level
-customization of eSF7 is confirmed real practice by DM 052 s.2023's own
-para 9 (which exists specifically to discourage commercialized/
-unauthorized copies) — this file may be an accurate, faithful copy, or
-may carry Division-specific modifications; neither can be established
-from available sources this session.
+s.2014's Enclosure 2 for SF1-SF7. Division-level customization of eSF7
+is confirmed real practice by DM 052 s.2023's own para 9 (which exists
+specifically to discourage commercialized/unauthorized copies) — this
+file may be an accurate, faithful copy, or may carry Division-specific
+modifications; neither can be established from available sources this
+session.
 
 ## Next step
 
-Two things remain open, both narrower than before: (1) DM-OUHROD-
+The filename question is closed. Two things remain open: (1) DM-OUHROD-
 2024-3470's own primary text — what specifically changed in the
 "Revised" eSF7 Tool for SY 2024-2025, still unread; (2) resolving the
 `bit.ly/eSF7` link (now confirmed as the actual current official
 download location per DM 052 s.2023 para 7 itself, not just a search
 result) to get a genuine field-by-field comparison baseline, the way
-DO 4 s.2014's Enclosure 2 provided for SF1-SF7. "RSDO"'s specific
-Region/Division origin remains unidentified and is not expected to
-resolve from further generic search.
+DO 4 s.2014's Enclosure 2 provided for SF1-SF7.
