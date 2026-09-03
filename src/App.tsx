@@ -11,6 +11,7 @@ import {
   learnerScoreService,
   learnerService,
   onSessionExpired,
+  schoolAttendanceService,
   schoolMemberService,
   schoolService,
   sectionAdvisoryService,
@@ -194,6 +195,10 @@ function App() {
               learnerService={learnerService}
               sectionService={sectionService}
               sf1ImportService={sf1ImportService}
+              schoolAttendanceService={schoolAttendanceService}
+              sectionAdvisoryService={sectionAdvisoryService}
+              schoolMemberService={schoolMemberService}
+              teachingAssignmentService={teachingAssignmentService}
               onOpenAttendance={(sectionId) => {
                 setAttendanceSectionId(sectionId);
                 setActiveTab("attendance");

@@ -854,6 +854,45 @@ label {
   justify-content: space-between;
 }
 
+/* Plain teaching-load list (no chart library). The outlier row is
+   flagged with a visible "⚠ high" text marker as well as this style,
+   so colour is never the only signal. */
+.bars {
+  list-style: none;
+  margin: 0 0 var(--spacing-unit) 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.bars li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding: var(--spacing-unit);
+  flex-wrap: wrap;
+}
+
+.bars li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.bars li.warn {
+  border-left: 3px solid var(--color-warning);
+  font-weight: 600;
+}
+
+.bars-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.bars li.warn .bars-value {
+  color: var(--color-text);
+}
+
 .enrollment-history {
   margin-top: calc(var(--spacing-unit) * 0.75);
   padding: calc(var(--spacing-unit) * 0.75);

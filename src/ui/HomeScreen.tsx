@@ -3,8 +3,12 @@ import type { AttendanceApplicationService } from "../application/attendance-ser
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerApplicationService } from "../application/learner-service";
+import type { SchoolAttendanceApplicationService } from "../application/school-attendance-service";
+import type { SchoolMemberApplicationService } from "../application/school-member-service";
+import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SectionApplicationService } from "../application/section-service";
 import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
+import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { SchoolHeadHome } from "./home/SchoolHeadHome";
 import { TeacherWorkspaceScreen } from "./TeacherWorkspaceScreen";
 
@@ -18,6 +22,10 @@ interface HomeScreenProps {
   learnerService: LearnerApplicationService;
   sectionService: SectionApplicationService;
   sf1ImportService: Sf1ImportApplicationService;
+  schoolAttendanceService: SchoolAttendanceApplicationService;
+  sectionAdvisoryService: SectionAdvisoryApplicationService;
+  schoolMemberService: SchoolMemberApplicationService;
+  teachingAssignmentService: TeachingAssignmentApplicationService;
   onOpenAttendance: (sectionId: string) => void;
   onManageSections: () => void;
   onViewAuditLog: () => void;
@@ -40,6 +48,10 @@ export function HomeScreen({
   learnerService,
   sectionService,
   sf1ImportService,
+  schoolAttendanceService,
+  sectionAdvisoryService,
+  schoolMemberService,
+  teachingAssignmentService,
   onOpenAttendance,
   onManageSections,
   onViewAuditLog,
@@ -92,6 +104,10 @@ export function HomeScreen({
           sectionService={sectionService}
           learnerService={learnerService}
           sf1ImportService={sf1ImportService}
+          schoolAttendanceService={schoolAttendanceService}
+          sectionAdvisoryService={sectionAdvisoryService}
+          schoolMemberService={schoolMemberService}
+          teachingAssignmentService={teachingAssignmentService}
           onManageSections={onManageSections}
           onOpenSf1Import={onOpenSf1Import}
         />

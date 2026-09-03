@@ -5,8 +5,12 @@ import type { AttendanceApplicationService } from "../application/attendance-ser
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerApplicationService } from "../application/learner-service";
+import type { SchoolAttendanceApplicationService } from "../application/school-attendance-service";
+import type { SchoolMemberApplicationService } from "../application/school-member-service";
+import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SectionApplicationService } from "../application/section-service";
 import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
+import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { HomeScreen } from "./HomeScreen";
@@ -30,6 +34,24 @@ function makeServices() {
   const sf1ImportService = {
     listImportHistory: vi.fn(() => Promise.resolve([])),
   } as unknown as Sf1ImportApplicationService;
+  const schoolAttendanceService = {
+    dayTotals: vi.fn(() => Promise.resolve({ present: 0, absent: 0, tardy: 0 })),
+  } as unknown as SchoolAttendanceApplicationService;
+  const sectionAdvisoryService = {
+    currentAdviser: vi.fn(() => Promise.resolve(null)),
+  } as unknown as SectionAdvisoryApplicationService;
+  const schoolMemberService = {
+    listMembers: vi.fn(() => Promise.resolve([])),
+  } as unknown as SchoolMemberApplicationService;
+  const teachingAssignmentService = {
+    getLoad: vi.fn(() =>
+      Promise.resolve({
+        assignmentCount: 0,
+        distinctSubjectCount: 0,
+        weeklyInstructionalMinutes: 0,
+      }),
+    ),
+  } as unknown as TeachingAssignmentApplicationService;
   return {
     attendanceService,
     authService,
@@ -37,6 +59,10 @@ function makeServices() {
     learnerService,
     sectionService,
     sf1ImportService,
+    schoolAttendanceService,
+    sectionAdvisoryService,
+    schoolMemberService,
+    teachingAssignmentService,
   };
 }
 
