@@ -25,14 +25,23 @@ pricing pages, cited in `.planning/wave5-sync-target/findings.md`.
 
 **Not yet done**:
 
-- Independent `security-reviewer` pass on the isolation / device-
-  credential reasoning in ADR-0065 (owed per
-  `.claude/rules/security-privacy.md` — this ADR reasons about a sync
-  authorization boundary even though it ships no code).
-- Commit; push; open PR.
+- ~~Independent `security-reviewer` pass~~ **DONE** — verdict
+  **CHANGES-REQUIRED (non-blocking)**: no blocking findings for a
+  decision-only ADR; three must-fix doc edits (data-minimisation sync
+  allowlist so auth/session/credential tables never leave the device;
+  no plaintext learner PII in the cloud copy, as a requirement not a
+  preference; device-enrollment as a trusted-boundary ceremony —
+  same failure class as the ADR-0004 bootstrap self-grant) plus
+  should-fix items, **all folded into ADR-0065**. Findings archived at
+  `.planning/wave5-sync-target/security-review.md`.
+- Push; open PR (decision-only, no CI-relevant code).
 - **Do not implement.** The next milestone (one Worker, one D1, one real
   authenticated round trip behind a first-cut `SyncProvider` port) is
-  not to be started without a new instruction.
+  not to be started without a new instruction — and it must satisfy the
+  requirements ADR-0065 now pins (allowlist, PII encryption, enrollment
+  boundary, per-device revocable credential) plus confirm DepEd's own
+  data-governance rules do not forbid offshore processing (a
+  decision-invalidating dependency).
 
 **Blocked, separately**: actually standing up the Cloudflare account /
 Worker / D1 is still the paid-infra-style approval boundary — except the
