@@ -1512,3 +1512,59 @@ label {
 .kpi[data-tone="danger"] {
   border-left: 3px solid var(--color-danger);
 }
+
+/* Redesign primitives -- Card + BentoGrid (ADR-0057 Wave 2). */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--spacing-unit);
+}
+.card {
+  min-width: 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-large);
+  box-shadow: var(--elevation-1);
+  padding: calc(var(--spacing-unit) * 1.2);
+}
+.card[data-span="4"] {
+  grid-column: span 4;
+}
+.card[data-span="6"] {
+  grid-column: span 6;
+}
+.card[data-span="8"] {
+  grid-column: span 8;
+}
+.card[data-span="12"] {
+  grid-column: span 12;
+}
+.card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 0.9);
+}
+.card-header > :first-child {
+  margin: 0;
+  font-size: 1rem;
+}
+.card-actions {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-wrap: wrap;
+}
+@media (max-width: 1080px) {
+  .card[data-span] {
+    grid-column: span 12;
+  }
+  .card[data-keep-half] {
+    grid-column: span 6;
+  }
+}
+@media (max-width: 720px) {
+  .card[data-keep-half] {
+    grid-column: span 12;
+  }
+}
