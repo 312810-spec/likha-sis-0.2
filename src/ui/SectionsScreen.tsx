@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { SectionApplicationService } from "../application/section-service";
 import type { LearnerApplicationService } from "../application/learner-service";
 import { ValidationError } from "../domain/errors";
@@ -7,6 +7,7 @@ import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionsScreenProps {
@@ -42,7 +43,6 @@ export function SectionsScreen({
   onManageAdviser,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,10 +58,6 @@ export function SectionsScreen({
   const [enrollLearnerId, setEnrollLearnerId] = useState("");
   const [enrollStartsOn, setEnrollStartsOn] = useState(todayAsIsoDate);
   const [enrolling, setEnrolling] = useState(false);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,17 +121,17 @@ export function SectionsScreen({
   }
 
   return (
-    <section aria-label="Sections">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Sections
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Create a section (e.g. Grade 7 - Mabini, 2025-2026), then enroll each learner into it.
-          Attendance is recorded per section.
-        </p>
-      )}
-
+    <Page
+      title="Sections"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Create a section (e.g. Grade 7 - Mabini, 2025-2026), then enroll each learner into it.
+            Attendance is recorded per section.
+          </p>
+        ) : undefined
+      }
+    >
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
@@ -272,6 +268,6 @@ export function SectionsScreen({
           {enrolling ? "Enrolling…" : "Enroll learner"}
         </button>
       </form>
-    </section>
+    </Page>
   );
 }
