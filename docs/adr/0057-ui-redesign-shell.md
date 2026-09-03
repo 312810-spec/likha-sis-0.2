@@ -297,3 +297,83 @@ exercised by a `KpiStrip` test that iterates every tone value, so
 `npx knip` reports no new finding. The remaining ~12 unmigrated screens
 re-fit onto these primitives in **Wave 5+** batches, per spec §7 —
 same content and flow, only the presentational wrapper changes.
+
+## Wave 3 addendum — role-adaptive Home (2026-09-03)
+
+### 1. `roles` on the authenticated session (a small auth-touching change)
+
+`commands::auth::CurrentSession` gains `pub roles: Vec<String>`, populated
+in `to_dto` from a new `repository::role::list_roles(conn, user_id,
+school_id)` — a parameterised, `ORDER BY role` read of `user_school_roles`
+for the session's **own** user and school. `to_dto` is only ever reached
+after a session is validated (`current_session` still returns `Ok(None)`
+before it for a missing/expired/revoked session), so the field never
+creates a pre-auth information path. The frontend `CurrentSession`
+(`src/domain/session.ts`) gains the matching `roles: string[]`.
+
+**`roles` is display-only.** It selects which Home layout renders and
+nothing else. Every protected command stays gated server-side by its
+`authorize_*` / `Capability` check regardless of what the array says —
+`SchoolHeadHome` only issues reads any authenticated school member could
+make anyway, and a stricter server gate (e.g. `list_sf1_import_history`'s
+`ManageLearners`) simply fails closed to the screen's error state on a
+mid-session role change. This is stated in code comments at every
+consumer.
+
+### 2. `HomeScreen` — the role-adaptive Home tab
+
+`src/ui/HomeScreen.tsx` renders for the `workspace` tab (label already
+"Home" since Wave 1). `roles.includes("school_head")` picks the layout:
+
+- **not a school head** → `TeacherWorkspaceScreen` directly (unchanged —
+  this is the teacher's Home for now).
+- **school head** → a local, non-persisted view switch
+  (`role="group" aria-label="Home view"`, two `aria-pressed` buttons,
+  default "School overview") between `SchoolHeadHome` and that same
+  `TeacherWorkspaceScreen` (school heads commonly also teach).
+
+### 3. `SchoolHeadHome` — school-wide overview, existing reads only
+
+`src/ui/home/SchoolHeadHome.tsx`, built on the Wave 2 primitives
+(`Page` / `KpiStrip` / `BentoGrid` / `Card`): section and learner totals,
+the shared school year (or "—"), and the most recent SF1 imports — all
+from existing school-scoped reads (`listSections`, `listLearners`,
+`listImportHistory`). **No new backend read this wave.** The
+attendance-today rollup, "sections without an adviser", and per-teacher
+load are **Wave 4** (they need a new capability-gated aggregate read with
+its own security review). This is `KpiStrip`/`Card`/`BentoGrid`'s first
+real consumer.
+
+### 4. Deliberately deferred
+
+`TeacherWorkspaceScreen` is **not** deleted this wave — the teacher Home
+renders it as-is. Its visual redesign onto the primitives, and the file's
+removal, is a later slice, kept out of an auth-touching wave to hold the
+blast radius small.
+
+### 5. Verification (Wave 3, this session)
+
+`npm run quality:full` exit 0 — `harness:verify` 100/100 certified;
+typecheck / lint / format / architecture clean; Vitest **819** / 88
+files; `cargo fmt --check` clean; `cargo test` **606 lib** (+4: three
+`list_roles` tests + the `to_dto` role assertion; a fourth,
+`list_roles_does_not_leak_a_different_users_roles_in_the_same_school`,
+added after the security review) + every integration binary, 0 failed;
+`cargo clippy --all-targets -- -D warnings` clean. `npm run
+quality:security` exit 0 (no dependency). `npm run
+check:dev-preview-isolation` exit 0.
+
+### 6. Independent security review — PASS-WITH-MINORS
+
+A `security-reviewer` pass (mandatory for an auth-touching wave, per
+`.claude/rules/security-privacy.md`): **no Blocking, no Should-fix.**
+Confirmed `list_roles` is parameterised and scoped to the requested
+`(user_id, school_id)`; `to_dto` populates `roles` only for the
+authenticated session's own identity and adds no pre-auth path; no
+`authorize_*` gate, capability, or command behaviour changed; the
+frontend `roles` field gates only layout, never a mutation or a
+privileged read. The one Minor — the `list_roles` tests lacked a
+same-school different-user negative case — was **fixed this wave**
+(the leak test above). The Informational note (`list_sf1_import_history`
+is `ManageLearners`-gated, stricter than the screen's other reads, and
+fails closed) needs no action.

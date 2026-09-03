@@ -1,5 +1,45 @@
 # ACTIVE PLAN
 
+## Wave 3: role-adaptive Home (added 2026-09-03) — complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 3 addendum —
+role-adaptive Home (2026-09-03)" section; `docs/CURRENT-HANDOFF.md` top
+entry; `docs/PROJECT-MEMORY.md` Wave 3 entry.
+
+**Scope**: Wave 3 of the design session (`docs/superpowers/specs/
+2026-09-03-likha-ui-redesign-design.md` §5.1/§6.2/§8). Add the user's
+role set to the authenticated session (a small auth-touching Rust
+change) and make the Home tab role-adaptive. No new schema/migration, no
+`authorize_*`/capability change, no new backend read (School-Head data
+uses existing school-scoped reads only).
+
+**What shipped**: `repository::role::list_roles` (parameterised,
+school-scoped, `ORDER BY role`, empty-not-error) + 4 unit tests;
+`CurrentSession.roles: Vec<String>` populated in `to_dto` (post-auth,
+own user+school), documented display-only; frontend
+`CurrentSession.roles: string[]` + 11 fixture updates; `HomeScreen.tsx`
+(role switch: teacher → `TeacherWorkspaceScreen`; school head →
+view-switch to `SchoolHeadHome`); `home/SchoolHeadHome.tsx` (Page +
+KpiStrip + BentoGrid + Card; section/learner counts, shared school year,
+recent SF1 imports; requestRef guard; Loading/Alert+Retry/EmptyState);
+`App.tsx` renders `<HomeScreen>` for the Home tab.
+
+**Verification actually run this session**: `npm run quality:full` exit 0
+(harness 100/100; Vitest 819/88f; `cargo test` 606 lib + integration
+0-failed; fmt + clippy clean); `npm run quality:security` exit 0;
+`check:dev-preview-isolation` exit 0. Independent `security-reviewer`:
+PASS-WITH-MINORS (no blocking; the one Minor fixed in-wave).
+
+**Not done this milestone**: `quality:ui` Playwright smoke (browser
+binary absent — pre-existing debt); native NVDA/Narrator pass now also
+owes the Home screens; `TeacherWorkspaceScreen` visual redesign +
+deletion (later slice); School-Head attendance rollup / advisers-without
+/ teacher-load cards (Wave 4).
+
+**Next**: Wave 4 — the school-wide attendance-today rollup read (Rust,
+capability-gated, own security review) + `SchoolHeadHome` enrichment. Its
+own plan. Not started.
+
 ## Wave 2: layout primitives (added 2026-09-03) — complete
 
 Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 2 addendum —

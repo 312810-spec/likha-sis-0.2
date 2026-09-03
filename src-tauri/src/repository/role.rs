@@ -207,4 +207,21 @@ mod tests {
             Vec::<String>::new()
         );
     }
+
+    #[test]
+    fn list_roles_does_not_leak_a_different_users_roles_in_the_same_school() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        let other_user = user::create_user(&conn, "ben.cruz", "password", "Ben Cruz").unwrap();
+        user::add_school_membership(&conn, &other_user.id, &school_id).unwrap();
+        grant(&conn, &other_user.id, &school_id, SCHOOL_HEAD).unwrap();
+
+        // `user_id` holds no role; `other_user` in the same school holds
+        // one -- `list_roles` must be scoped to the requested user, not
+        // the school.
+        assert_eq!(
+            list_roles(&conn, &user_id, &school_id).unwrap(),
+            Vec::<String>::new()
+        );
+    }
 }

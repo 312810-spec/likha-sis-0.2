@@ -1,5 +1,58 @@
 # CURRENT HANDOFF
 
+## Wave 3: role-adaptive Home — complete (2026-09-03)
+
+Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on one
+branch through all waves). Commit range `b7c5c8b..HEAD` (Wave 3 plan →
+Tasks 1–5 `fa66705..ebb34bd` → Task 6: the security-review Minor fix +
+ADR-0057 Wave 3 addendum + this state-doc update). ADR-0057's "Wave 3
+addendum" is the durable record.
+
+**What shipped**: the authenticated `CurrentSession` DTO now carries
+`roles` (`Vec<String>` / `string[]`), from a new parameterised
+`repository::role::list_roles` scoped to the session's own user+school,
+reached only after the session is validated — **display-only**, never an
+authorization signal. `src/ui/HomeScreen.tsx` renders the Home tab and
+switches on `roles.includes("school_head")`: a plain teacher gets
+`TeacherWorkspaceScreen` unchanged; a school head gets a local,
+non-persisted view-switch (`role="group" aria-label="Home view"`) between
+`src/ui/home/SchoolHeadHome.tsx` (section/learner totals, shared school
+year, recent SF1 imports — existing reads only) and that same teaching
+workspace. First real consumer of the Wave 2 `KpiStrip`/`Card`/
+`BentoGrid` primitives. `TeacherWorkspaceScreen` is deliberately **not**
+deleted this wave.
+
+**Verification actually run**: `npm run quality:full` exit 0 —
+`harness:verify` 100/100 certified; typecheck/lint/format/architecture
+clean; Vitest **819** tests / 88 files; `cargo fmt --check` clean;
+`cargo test` **606 lib** tests (+4 for `list_roles` + the DTO assertion)
+
+- every integration binary, 0 failed; `cargo clippy --all-targets -- -D
+warnings` clean. `npm run quality:security` exit 0 (no dependency).
+  `npm run check:dev-preview-isolation` exit 0. `npm run quality:ui` still
+  blocked by the absent Playwright browser binary (pre-existing debt).
+
+**Independent security review** (mandatory — auth-touching):
+`security-reviewer` verdict **PASS-WITH-MINORS** — no Blocking, no
+Should-fix. `list_roles` parameterised + scoped to the requested
+`(user_id, school_id)`; `to_dto` adds no pre-auth path; no `authorize_*`
+gate or command behaviour changed; the frontend `roles` field gates only
+layout. The one Minor (the `list_roles` tests lacked a same-school
+different-user negative case) was **fixed this wave**
+(`list_roles_does_not_leak_a_different_users_roles_in_the_same_school`).
+The Informational note (`list_sf1_import_history` is `ManageLearners`-
+gated, stricter than the screen's other reads, fails closed) needs no
+action.
+
+**Exact next slice (do NOT start it)**: **Wave 4 — school-wide
+attendance rollup + `SchoolHeadHome` enrichment**. A new Rust read that
+aggregates attendance-today (school-wide % and by grade) for a date,
+capability-gated (`ManageLearners` or a School-Head capability),
+school-scoped, with its own mandatory `security-reviewer` pass; then wire
+it plus "sections without an adviser" (from the existing advisory reads)
+and per-teacher load (`get_teacher_load` + `list_school_members`) into
+`SchoolHeadHome` as bento cards. Its own implementation plan.
+
 ## Wave 2: layout primitives — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on

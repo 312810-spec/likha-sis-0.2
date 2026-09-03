@@ -2779,6 +2779,20 @@ BentoGrid+Card / DataTable added; DataTable's phone reflow is a prop
 Today's Classes and Sections migrated onto them as proof; KpiStrip/Card/
 BentoGrid first consumed in Wave 3.
 
+## Wave 3 — UI redesign role-adaptive Home (ADR-0057 addendum) (added 2026-09-03)
+
+Wave 3 (ADR-0057 addendum): the `CurrentSession` DTO gains
+`roles: Vec<String>` (frontend `roles: string[]`), populated from a new
+parameterised `repository::role::list_roles`, scoped to the session's own
+user+school, reached only post-auth — **display-only**, never an
+authorization signal. New `HomeScreen` renders the Home tab: a plain
+teacher gets `TeacherWorkspaceScreen` as-is; a `school_head` gets a local
+view-switch to a new `SchoolHeadHome` (section/learner totals + recent
+SF1 imports, existing reads only — attendance rollup / advisers-without /
+teacher-load are Wave 4). Independent `security-reviewer` pass:
+PASS-WITH-MINORS, no blocking, the one Minor fixed in-wave.
+`TeacherWorkspaceScreen` not yet deleted (later slice).
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
