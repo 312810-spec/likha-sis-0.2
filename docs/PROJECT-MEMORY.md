@@ -2793,6 +2793,20 @@ teacher-load are Wave 4). Independent `security-reviewer` pass:
 PASS-WITH-MINORS, no blocking, the one Minor fixed in-wave.
 `TeacherWorkspaceScreen` not yet deleted (later slice).
 
+## Wave 4 — UI redesign School-Head Home enrichment (ADR-0057 addendum) (added 2026-09-03)
+
+Wave 4 (ADR-0057 addendum): one new aggregate read —
+`attendance::school_day_totals(conn, school_id, date)` → `{present,
+absent, tardy}` counts only, `ManageLearners`-gated command with
+server-derived school scope. `SchoolHeadHome` gains an "Attendance
+today" KPI (% present, tone thresholds, raw-count foot), a "Sections
+without an adviser" card, and a "Teaching load" card with a
+
+> 1.5×-median outlier text flag — the last two composed client-side from
+> existing reads (`currentAdviser`, `listMembers` + `getLoad`).
+> Independent `security-reviewer`: **PASS** (no blocking, no should-fix).
+> Attendance-by-grade still deferred (needs a temporal membership join).
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

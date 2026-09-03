@@ -1,5 +1,47 @@
 # CURRENT HANDOFF
 
+## Wave 4: School-Head Home enrichment — complete (2026-09-03)
+
+Branch `claude/ui-redesign-wave-1-shell`. Commit range `e0cf96f..HEAD`
+(Wave 4 plan → Tasks 1-4 `9af6875..8ab6478`, Task 5 folded into Task 4 →
+Task 6: ADR-0057 Wave 4 addendum + this state-doc update). ADR-0057's
+"Wave 4 addendum" is the durable record.
+
+**What shipped**: `repository::attendance::school_day_totals` (one
+`GROUP BY status` count over the indexed `attendance_records`, returns
+`{present, absent, tardy}` aggregate counts only) + a
+`school_attendance_day_totals` command gated on
+`Capability::ManageLearners` with server-derived school scope; a narrow
+frontend `SchoolAttendance` port/adapter/service. `SchoolHeadHome` gained
+an "Attendance today" KPI (% present, 85/60 tone thresholds, raw-count
+foot), a "Sections without an adviser" card, and a "Teaching load" card
+(>1.5x-median outlier text flag) — the last two composed client-side from
+existing reads. `HomeScreen` / `App.tsx` thread the four services.
+
+**Verification**: `npm run quality:full` exit 0 — harness 100/100
+certified; typecheck/lint/format/architecture clean; Vitest **841** / 90
+files; `cargo test` **611 lib** + integration (`attendance_management`
+18, +3 boundary tests), 0 failed; `cargo clippy` clean. `npm run
+quality:security` exit 0 (no dependency). `check:dev-preview-isolation`
+exit 0. `quality:ui` still blocked (Playwright binary absent).
+
+**Independent security review** (mandatory — new persistence-reading
+command): `security-reviewer` verdict **PASS** — no blocking, no
+should-fix. `school_day_totals` parameterised + `(school_id, date)`-
+scoped (all 4 unit tests prove both); the command enforces
+`ManageLearners` and derives school scope server-side (a boundary test
+proves a teacher session is refused and a second school's records are
+excluded); the client-side adviser/load composition uses only reads the
+caller is already authorised for.
+
+**Exact next slice (do NOT start it)**: **Wave 5 — screen re-fit
+batches**. Migrate the remaining unmigrated screens onto
+`Page` / `DataTable` / `Card` in nav-cluster batches of ~3-5 (spec §7,
+same content and flow, presentational wrapper only), redesign the
+teacher Home onto the primitives and delete `TeacherWorkspaceScreen`,
+and add the deferred "attendance by grade" card (needs a
+`section_memberships` temporal join). Its own implementation plan(s).
+
 ## Wave 3: role-adaptive Home — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on one

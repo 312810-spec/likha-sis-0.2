@@ -377,3 +377,71 @@ same-school different-user negative case — was **fixed this wave**
 (the leak test above). The Informational note (`list_sf1_import_history`
 is `ManageLearners`-gated, stricter than the screen's other reads, and
 fails closed) needs no action.
+
+## Wave 4 addendum — School-Head Home enrichment (2026-09-03)
+
+### 1. One new aggregate read — `school_day_totals`
+
+`repository::attendance::school_day_totals(conn, school_id, date)` — a
+single `SELECT status, COUNT(*) … WHERE school_id = ?1 AND
+attendance_date = ?2 GROUP BY status` over the existing
+`idx_attendance_school_date` index. Returns `SchoolDayTotals { present,
+absent, tardy }` — **aggregate counts only, zero learner identity**.
+(The status domain is `present`/`absent`/`tardy` per migration 2, not the
+retired `late`/`excused` pair.) The `school_attendance_day_totals`
+command wrapping it is gated on `Capability::ManageLearners`
+(registrar / school head — the same gate `list_sf1_import_history` uses)
+and derives `school_id` server-side from the session; `date` is the only
+client argument, bound as a query parameter. Frontend: a narrow
+`SchoolAttendanceRepository` port → `TauriSchoolAttendanceRepository`
+adapter → `SchoolAttendanceApplicationService` (ISO-date validation,
+repo not called on a bad date) → consumed only by `SchoolHeadHome`.
+
+### 2. Three `SchoolHeadHome` surfaces, one new read + two client-side
+
+- **"Attendance today"** KPI — `present / (present + absent + tardy)` as
+  a percentage, with a foot that always states the raw counts (tone is
+  `success` ≥ 85 %, `warning` 60–84 %, `danger` < 60 %, `neutral` when
+  nothing is recorded — never the only signal).
+- **"Sections without an adviser"** card — one
+  `sectionAdvisoryService.currentAdviser(section.id, today)` per section
+  (existing read), listing the sections that resolved `null`.
+- **"Teaching load"** card — `schoolMemberService.listMembers()` filtered
+  to the `teacher` role, then `teachingAssignmentService.getLoad(id)` per
+  teacher (existing reads). The single highest-minutes teacher gets a
+  `⚠ high` **text** marker only when their weekly minutes exceed 1.5× the
+  median — a documented display hint to surface an uneven spread, not an
+  enforced cap.
+
+All four services load in one composite `Promise.all` under a single
+`requestRef` guard and a single `.catch` (no partial render).
+
+### 3. Deliberately still deferred
+
+**Attendance by grade level** needs a temporal join through
+`section_memberships` ("the section a learner was in on date D") — its
+own slice, not bundled into this simple counts read.
+
+### 4. Verification (Wave 4, this session)
+
+`npm run quality:full` exit 0 — `harness:verify` 100/100 certified;
+typecheck / lint / format / architecture clean; Vitest **841** / 90
+files; `cargo fmt --check` clean; `cargo test` **611 lib** (+ Task 1's 4
+`school_day_totals` unit tests) + every integration binary incl.
+`attendance_management` 18 (+3 boundary tests), 0 failed; `cargo clippy
+--all-targets -- -D warnings` clean. `npm run quality:security` exit 0
+(no dependency). `npm run check:dev-preview-isolation` exit 0.
+
+### 5. Independent security review — PASS
+
+A `security-reviewer` pass (mandatory — this wave adds a
+persistence-reading command): **verdict PASS, no blocking, no
+should-fix.** Confirmed `school_day_totals` is parameterised and scoped
+to `(school_id, date)` (all four unit tests prove both scopings); the
+command derives `school_id` server-side and enforces `ManageLearners`
+(a boundary test proves a teacher-only session is refused
+`AppError::Unauthorized`, and a second school's records are excluded);
+the `generate_handler!` edit is purely additive; the client-side
+adviser-gap and teaching-load composition calls only reads the caller is
+already authorised for (`getLoad` is itself `authorize_view_teacher_load`-
+gated); no PII in the response or the new tests.

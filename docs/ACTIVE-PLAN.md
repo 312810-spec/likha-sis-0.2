@@ -1,5 +1,40 @@
 # ACTIVE PLAN
 
+## Wave 4: School-Head Home enrichment (added 2026-09-03) — complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 4 addendum";
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 4
+entry.
+
+**Scope**: Wave 4 of the design session (spec S6.2 / S8). One new
+aggregate attendance read (counts only, capability-gated) + the three
+`SchoolHeadHome` cards deferred from Wave 3. No schema/migration, no
+`authorize_*`/capability change, no new dependency.
+
+**What shipped**: `attendance::school_day_totals` + 4 unit tests;
+`school_attendance_day_totals` command (`ManageLearners`, school-scoped)
+
+- 3 boundary tests; frontend `SchoolAttendance` port/adapter/service
+  (ISO-date validation); `SchoolHeadHome` "Attendance today" KPI +
+  "Sections without an adviser" + "Teaching load" cards (single composite
+  load, one guard, one catch); `HomeScreen`/`App.tsx` prop threading.
+
+**Verification actually run this session**: `npm run quality:full` exit
+0 (harness 100/100; Vitest 841/90f; `cargo test` 611 lib + integration
+0-failed; fmt+clippy clean); `npm run quality:security` exit 0;
+`check:dev-preview-isolation` exit 0. Independent `security-reviewer`:
+**PASS** (no blocking/should-fix).
+
+**Not done this milestone**: attendance-by-grade card (needs a temporal
+`section_memberships` join — its own slice); `quality:ui` Playwright
+smoke (browser binary absent — pre-existing debt); native NVDA/Narrator
+pass now also owes the enriched Home; `TeacherWorkspaceScreen` redesign
+
+- deletion (Wave 5).
+
+**Next**: Wave 5 — screen re-fit batches + teacher-Home redesign +
+attendance-by-grade. Its own plan(s). Not started.
+
 ## Wave 3: role-adaptive Home (added 2026-09-03) — complete
 
 Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 3 addendum —
