@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { GradingApplicationService } from "../application/grading-service";
 import { ValidationError } from "../domain/errors";
 import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domain/grading";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface GradingPeriodsScreenProps {
@@ -23,7 +24,6 @@ function currentSchoolYearGuess(): string {
 
 export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [schoolYear, setSchoolYear] = useState(currentSchoolYearGuess);
   const [policies, setPolicies] = useState<GradingPolicy[]>([]);
   const [policyId, setPolicyId] = useState("");
@@ -34,10 +34,6 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { startsOn: string; endsOn: string }>>({});
   const [savingPeriodId, setSavingPeriodId] = useState<string | null>(null);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,18 +133,17 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
   }
 
   return (
-    <section aria-label="Grading Periods">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Grading Periods
-      </h2>
-
-      {mode === "guided" && (
-        <p className="field-hint">
-          Pick a school year and grading policy, then enter the actual start/end date for each
-          period at your school.
-        </p>
-      )}
-
+    <Page
+      title="Grading Periods"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Pick a school year and grading policy, then enter the actual start/end date for each
+            period at your school.
+          </p>
+        ) : undefined
+      }
+    >
       {policies.length > 0 && (
         <p className="field-hint">
           DepEd's grading-period structure changes over time (see the selected policy's citation
@@ -261,6 +256,6 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
           </tbody>
         </table>
       )}
-    </section>
+    </Page>
   );
 }

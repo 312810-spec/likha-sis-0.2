@@ -7,6 +7,7 @@ import type { TeacherLoad } from "../domain/teacher-load";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TeacherLoadScreenProps {
@@ -50,7 +51,6 @@ export function TeacherLoadScreen({
   teacherUserId,
 }: TeacherLoadScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [members, setMembers] = useState<SchoolMember[]>([]);
   const [viewedTeacherId, setViewedTeacherId] = useState(teacherUserId);
@@ -60,10 +60,6 @@ export function TeacherLoadScreen({
   const [error, setError] = useState<string | null>(null);
 
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -106,18 +102,18 @@ export function TeacherLoadScreen({
   const viewedName = members.find((member) => member.id === viewedTeacherId)?.displayName;
 
   return (
-    <section aria-label="Teacher Load">
-      <h2 ref={headingRef} tabIndex={-1}>
-        {viewingSelf ? "My Teaching Load" : `${viewedName ?? "Teacher"}'s Teaching Load`}
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          These three numbers are tracked separately on purpose — a full class list doesn&rsquo;t
-          say how much time each class takes, and total minutes alone doesn&rsquo;t say how many
-          different subjects a teacher is preparing for.
-        </p>
-      )}
-
+    <Page
+      title={viewingSelf ? "My Teaching Load" : `${viewedName ?? "Teacher"}'s Teaching Load`}
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            These three numbers are tracked separately on purpose — a full class list doesn&rsquo;t
+            say how much time each class takes, and total minutes alone doesn&rsquo;t say how many
+            different subjects a teacher is preparing for.
+          </p>
+        ) : undefined
+      }
+    >
       {otherTeachers.length > 0 && (
         <div className="field">
           <label htmlFor="teacher-load-viewed">View</label>
@@ -178,6 +174,6 @@ export function TeacherLoadScreen({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }

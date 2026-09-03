@@ -5,6 +5,7 @@ import type { AdviserAttendanceOverview } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AdviserViewScreenProps {
@@ -25,7 +26,6 @@ function todayAsIsoDate(): string {
  * security boundary. */
 export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const sectionsRequestRef = useRef(0);
   const overviewRequestRef = useRef(0);
 
@@ -37,10 +37,6 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
   const [overview, setOverview] = useState<AdviserAttendanceOverview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -112,17 +108,18 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
   }, [subjectAttendanceService, sectionId, date]);
 
   return (
-    <section aria-label="Adviser View">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Adviser View
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Review subject-attendance patterns across your advisory class. These signals are for
-          follow-up only: you cannot edit a subject teacher&apos;s record here, and nothing on this
-          screen changes official attendance.
-        </p>
-      )}
+    <Page
+      title="Adviser View"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Review subject-attendance patterns across your advisory class. These signals are for
+            follow-up only: you cannot edit a subject teacher&apos;s record here, and nothing on
+            this screen changes official attendance.
+          </p>
+        ) : undefined
+      }
+    >
       <p className="field-hint">Subject attendance — not SF2.</p>
 
       <div className="form-row">
@@ -233,6 +230,6 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }

@@ -7,6 +7,7 @@ import type {
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SubjectMonitorScreenProps {
@@ -44,7 +45,6 @@ export function SubjectMonitorScreen({
   initialAssignmentId,
 }: SubjectMonitorScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [assignments, setAssignments] = useState<TeachingAssignmentSummary[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(true);
@@ -58,10 +58,6 @@ export function SubjectMonitorScreen({
 
   const assignmentsRequestRef = useRef(0);
   const monitorRequestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function loadAssignments() {
     const requestId = ++assignmentsRequestRef.current;
@@ -126,17 +122,18 @@ export function SubjectMonitorScreen({
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
 
   return (
-    <section aria-label="Subject Monitor">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Subject Monitor
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          A running total of each learner's marks for this class so far, plus how many sessions in a
-          row they've been marked absent. This is a monitoring tool for you — it never changes the
-          official attendance record.
-        </p>
-      )}
+    <Page
+      title="Subject Monitor"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            A running total of each learner's marks for this class so far, plus how many sessions in
+            a row they've been marked absent. This is a monitoring tool for you — it never changes
+            the official attendance record.
+          </p>
+        ) : undefined
+      }
+    >
       <p className="field-hint">Subject attendance — not SF2.</p>
 
       {assignmentsError && (
@@ -238,6 +235,6 @@ export function SubjectMonitorScreen({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }
