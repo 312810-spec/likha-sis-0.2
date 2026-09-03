@@ -9,6 +9,7 @@ import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
 import { SchoolApplicationService } from "./application/school-service";
+import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
 import { SchoolMemberApplicationService } from "./application/school-member-service";
 import { SectionApplicationService } from "./application/section-service";
 import { SectionAdvisoryApplicationService } from "./application/section-advisory-service";
@@ -30,6 +31,7 @@ import { TauriGradingRepository } from "./infrastructure/tauri/grading-repositor
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
+import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
 import { TauriSchoolMemberRepository } from "./infrastructure/tauri/school-member-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
 import { TauriSectionAdvisoryRepository } from "./infrastructure/tauri/section-advisory-repository";
@@ -86,6 +88,9 @@ export const teachingAssignmentService = new TeachingAssignmentApplicationServic
 );
 export const schoolMemberService = new SchoolMemberApplicationService(
   new TauriSchoolMemberRepository(),
+);
+export const schoolAttendanceService = new SchoolAttendanceApplicationService(
+  new TauriSchoolAttendanceRepository(),
 );
 export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new TauriSectionAdvisoryRepository(),

@@ -9,6 +9,19 @@ export type AttendanceStatus = "present" | "absent" | "tardy";
 
 export const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = ["present", "absent", "tardy"];
 
+/**
+ * School-wide attendance headcount for a single day — one number per
+ * DepEd per-day code (see {@link AttendanceStatus}). Mirrors the Rust
+ * `SchoolDayTotals` struct returned by the `school_attendance_day_totals`
+ * command (camelCase serde). There is deliberately no "excused" field:
+ * DepEd has no such code — see the note above.
+ */
+export interface SchoolDayAttendanceTotals {
+  present: number;
+  absent: number;
+  tardy: number;
+}
+
 export interface AttendanceRecord {
   id: string;
   schoolId: string;
