@@ -1,5 +1,43 @@
 # ACTIVE PLAN
 
+## Cloud Sync Target Decision — ADR-0065 (added 2026-09-03) — complete (decision-only)
+
+Full record: `docs/adr/0065-cloud-sync-target-decision.md`;
+`docs/PROJECT-MEMORY.md` "Cloud Sync Target ratified" entry;
+`docs/product/PRODUCT-CONTRACT.md` §12; `docs/CURRENT-HANDOFF.md` top
+entry. Branch `claude/wave5-sync-target-decision` (off the P1 security
+branch, per owner instruction; merge later).
+
+**Scope**: decision-only — no `SyncProvider` code, no Worker, no schema.
+Owner set the frame: run a **20-scenario** pass, select under a hard
+**zero-cost + no-payment-card-at-signup** gate, produce a **100-point
+metric**, deep-search current facts; and "a single database for each
+school ... focus only for our school" (one DB, one school, not
+multi-tenant).
+
+**What shipped**: the 100-point metric (PASS/FAIL card gate + seven
+weighted criteria), 20 scored scenarios with per-scenario reasoning, and
+the decision — **Recommended: Cloudflare Worker + one D1 database**;
+**Next Best: Cloudflare Worker + one SQLite Durable Object**; third
+fallback Turso single-DB. Supersedes the unmerged
+`origin/claude/cloudflare-likha-setup-a5oq5i` draft ("DO per school").
+
+**Verification actually run**: current (Sept 2026) provider facts
+gathered via `WebSearch`/`WebFetch` against primary pricing/platform
+pages, cited in `.planning/wave5-sync-target/findings.md`. No code, so
+no test/lint/build gate applies. Independent `security-reviewer` pass on
+the isolation/credential reasoning: **pending** (see CURRENT-HANDOFF).
+
+**Not done (deliberately — implementation milestone, own ADR + mandatory
+`security-reviewer`)**: sync unit, conflict policy, device-credential
+shape, end-to-end encryption of the cloud copy, Android client
+packaging, a separate backup strategy.
+
+**Next**: the sync proof-of-concept milestone — one Worker, one D1, one
+real authenticated round trip of a single record, behind a first-cut
+`SyncProvider` port — not started, not to be started without a new
+instruction.
+
 ## Wave 6: final review + merge (added 2026-09-03) - complete
 
 Full record: `docs/adr/0064-ui-redesign-shell.md` "Wave 6 addendum";
