@@ -1,5 +1,45 @@
 # CURRENT HANDOFF
 
+## Cloud Sync Target decided — ADR-0065 (2026-09-03), review + merge owed
+
+**Branch** `claude/wave5-sync-target-decision`, cut from the P1 security
+branch `claude/p1-roster-school-id-join-hardening` per the owner's
+instruction ("create a branch ... merge later"). Decision-only: no code,
+no schema, no `SyncProvider` implementation.
+
+**What shipped**: `docs/adr/0065-cloud-sync-target-decision.md` — a
+20-scenario weighted pass against a purpose-built **100-point metric**,
+under a hard **zero-cost + no-payment-card-at-signup** gate, with the
+owner's **single-database, single-school** scope. Plus updates to
+`PROJECT-MEMORY.md`, `PRODUCT-CONTRACT.md` §12, `ACTIVE-PLAN.md`.
+
+**Decision**: Recommended **Cloudflare Worker + one D1 database**; Next
+Best **Cloudflare Worker + one SQLite Durable Object**; third fallback
+**Turso single database**. This is a real change from the unmerged
+`origin/claude/cloudflare-likha-setup-a5oq5i` draft ("Durable Object per
+school") — the single-school scope removed the multi-tenant
+structural-isolation advantage that drove that pick and rewarded D1's
+simpler SQL-over-HTTP-from-Rust integration instead. Research: current
+(Sept 2026) provider facts via `WebSearch`/`WebFetch` against primary
+pricing pages, cited in `.planning/wave5-sync-target/findings.md`.
+
+**Not yet done**:
+
+- Independent `security-reviewer` pass on the isolation / device-
+  credential reasoning in ADR-0065 (owed per
+  `.claude/rules/security-privacy.md` — this ADR reasons about a sync
+  authorization boundary even though it ships no code).
+- Commit; push; open PR.
+- **Do not implement.** The next milestone (one Worker, one D1, one real
+  authenticated round trip behind a first-cut `SyncProvider` port) is
+  not to be started without a new instruction.
+
+**Blocked, separately**: actually standing up the Cloudflare account /
+Worker / D1 is still the paid-infra-style approval boundary — except the
+card gate is now satisfied by design (Cloudflare's standard free plan
+needs no card), so the remaining gate is just the owner saying "go build
+the PoC," not a billing decision.
+
 ## P1 security hardening: section-membership readers `l.school_id` JOIN predicate — implemented + independently reviewed, commit owed (2026-09-03)
 
 **Separate branch, not the UI-redesign line.** `claude/p1-roster-school-id-join-hardening`,

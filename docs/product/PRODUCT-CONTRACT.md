@@ -243,23 +243,30 @@ adoption decisions) before writing any adapter code. No learner PII
 should ever be required by a generation tool. Nothing in this area has
 been started.
 
-## 12. Cloud / sync / web access — HYPOTHESIS, no ADR yet
+## 12. Cloud / sync / web access — TARGET CHOSEN (ADR-0065), not implemented
 
-**Repository-truth correction**: no cloud/sync ADR or code exists today
-— `SyncProvider` is only the architecture-diagram placeholder in
-ADR-0001's layering statement, never implemented. The "Cloudflare Worker
+No cloud/sync code exists yet — `SyncProvider` is still only the
+architecture-diagram placeholder from ADR-0001's layering statement. The
+**target** is now decided: **ADR-0065** (20-scenario pass, zero-cost +
+no-payment-card gate, 100-point metric) selects a **Cloudflare Worker in
+front of one D1 database** for the school, with a Cloudflare Worker +
+single SQLite **Durable Object** as the next best fallback, and Turso
+single-database as the third fallback only if leaving Cloudflare. Scope
+for now (owner, 2026-09-03): **one database for one school**, not a
+multi-tenant platform and not one-DB-per-school-at-scale. The earlier
+"Durable Object per school" hypothesis is superseded — that pick was
+driven by multi-tenant structural isolation, which the single-school
+scope removed.
 
-- one SQLite-backed Durable Object per school (next-best: Worker + one
-  D1 database per school)" target stated in this reconciliation is
-  recorded here as the **current working hypothesis**, not a ratified
-  architecture decision — no prior ADR or scenario pass established it in
-  this repository. **Before real sync implementation begins, run this
-  project's own 10-scenario architecture-decision process** (per
-  `.claude/rules/autonomous-development.md`) to actually decide the cloud
-  target, rather than treating this hypothesis as pre-approved. Cloud is
-  never the teacher's working database; SQLite remains primary. Web/PWA
-  access (for iOS/macOS/stakeholders) must respect the same school/role
-  authorization boundaries as native — no separate, weaker web auth path.
+ADR-0065 is decision-only: no Worker, no schema change, no `SyncProvider`
+implementation. It explicitly does **not** decide the sync unit, the
+conflict policy, the cloud device-credential shape, or end-to-end
+encryption of the cloud copy — those belong to the implementation
+milestone, which gets its own ADR and a mandatory `security-reviewer`
+pass. Cloud is never the teacher's working database; SQLite remains
+primary; offline writes save locally first. Web/PWA access (for
+iOS/macOS/stakeholders) must respect the same school/role authorization
+boundaries as native — no separate, weaker web auth path.
 
 ## 13. Local session / auth hardening — BUILT (current), HYPOTHESIS (extension)
 

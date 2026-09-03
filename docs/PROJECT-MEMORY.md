@@ -3165,6 +3165,44 @@ Deliberately unrelated to the separate, still-evidence-blocked official
 this is the same disclosure-not-refusal CSV pattern SF2/SF4/SF5/SF6
 already ship. Full detail: `docs/adr/0063-sf10-permanent-record.md`.
 
+## Cloud Sync Target ratified — Cloudflare Worker + single D1 (added 2026-09-03)
+
+**ADR-0065** decides Wave 5's cloud sync target (decision-only — no
+Worker, no schema, no `SyncProvider` implementation). 20-scenario
+weighted pass against a purpose-built **100-point metric**, under a hard
+**zero-cost + no-payment-card-at-signup** gate the owner set. Scope
+(owner, 2026-09-03): **one database for one school** — not multi-tenant,
+not one-DB-per-school-at-scale — which removed the multi-tenant
+structural-isolation advantage that drove the earlier, unmerged
+"Durable Object per school" draft (branch
+`origin/claude/cloudflare-likha-setup-a5oq5i`, superseded, do not merge).
+
+- **Recommended: Cloudflare Worker + one D1 database.** D1 is SQLite
+  (41+ migrations carry over), the query API is SQL-over-HTTPS callable
+  from the Rust core with no JS SDK, one Worker + one binding is the
+  smallest secure surface, Cloudflare's standard free plan needs **no
+  card**, D1 is GA, and the free tier is perpetual with no inactivity
+  auto-pause.
+- **Next Best: Cloudflare Worker + one SQLite Durable Object** — first
+  fallback if D1's consistency model is awkward; keeps structural
+  per-school isolation in hand if the scope ever re-widens.
+- **Third (only if leaving Cloudflare): Turso single database over
+  HTTP** — best non-Cloudflare SQLite-native option, discounted only for
+  vendor-direction churn (Turso is publicly discontinuing edge replicas
+  for new users and steering off `libSQL sync()`).
+- **Disqualified on the card gate or the Rust-client requirement:** the
+  JS-first local-first engines (PowerSync, ElectricSQL, Triplit,
+  InstantDB, Jazz — no Rust client, would force sync into the frontend),
+  cr-sqlite self-hosted (no zero-card managed cloud), Supabase (7-day
+  inactivity auto-pause + standing "no Supabase" exclusion), Firestore /
+  Mongo (document-model reuse mismatch).
+
+Left for the implementation milestone (own ADR + mandatory
+`security-reviewer`): sync unit, conflict policy, the device credential
+shape, and end-to-end encryption of the cloud copy. The zero-cost +
+no-card gate is now a recorded constraint on any future infrastructure
+choice.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
