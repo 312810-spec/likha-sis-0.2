@@ -71,6 +71,21 @@ pub fn has_any_role(
     Ok(false)
 }
 
+/// Every role `user_id` holds within `school_id`, sorted for a stable
+/// result. Empty (not an error) when the user has no roles there. A
+/// fresh lookup, never cached -- same reasoning as `has_any_role`.
+pub fn list_roles(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT role FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2 ORDER BY role",
+    )?;
+    let rows = stmt.query_map((user_id, school_id), |row| row.get::<_, String>(0))?;
+    let mut roles = Vec::new();
+    for role in rows {
+        roles.push(role?);
+    }
+    Ok(roles)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +167,44 @@ mod tests {
         let result = grant(&conn, &user_id, &school_id, "principal");
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn list_roles_returns_empty_for_a_user_with_no_roles() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        assert_eq!(
+            list_roles(&conn, &user_id, &school_id).unwrap(),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn list_roles_returns_every_granted_role_sorted() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+        grant(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
+
+        assert_eq!(
+            list_roles(&conn, &user_id, &school_id).unwrap(),
+            vec!["school_head", "teacher"]
+        );
+    }
+
+    #[test]
+    fn list_roles_is_school_scoped() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        user::add_school_membership(&conn, &user_id, &other_school.id).unwrap();
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+
+        assert_eq!(
+            list_roles(&conn, &user_id, &other_school.id).unwrap(),
+            Vec::<String>::new()
+        );
     }
 }
