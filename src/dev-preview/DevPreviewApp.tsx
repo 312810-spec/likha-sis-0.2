@@ -12,7 +12,6 @@ import { SchoolMemberApplicationService } from "../application/school-member-ser
 import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
-import { AppShell } from "../ui/AppShell";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
@@ -21,8 +20,8 @@ import { LearnerListScreen } from "../ui/LearnerListScreen";
 import { SectionAdviserScreen } from "../ui/SectionAdviserScreen";
 import { SectionsScreen } from "../ui/SectionsScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
-import { WorkbenchNav } from "../ui/components/WorkbenchNav";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
+import { AppLayout } from "../ui/shell/AppLayout";
 import { ModeProvider } from "../ui/theme/ModeContext";
 import "../ui/theme/styles.css";
 import {
@@ -99,7 +98,12 @@ export function DevPreviewApp() {
 
   return (
     <ModeProvider>
-      <AppShell session={FIXTURE_SESSION} onLogout={() => {}}>
+      <AppLayout
+        session={FIXTURE_SESSION}
+        activeTab={activeTab}
+        onNavigate={setActiveTab}
+        onLogout={() => {}}
+      >
         <div className="alert alert-info" role="status">
           <p>
             <strong>Development preview — synthetic data, not the production app.</strong> No real
@@ -107,7 +111,6 @@ export function DevPreviewApp() {
             .
           </p>
         </div>
-        <WorkbenchNav activeTab={activeTab} onTabChange={setActiveTab} />
         {activeTab === "workspace" ? (
           <TeacherWorkspaceScreen
             displayName={FIXTURE_SESSION.displayName}
@@ -188,7 +191,7 @@ export function DevPreviewApp() {
             <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
           </div>
         )}
-      </AppShell>
+      </AppLayout>
     </ModeProvider>
   );
 }
