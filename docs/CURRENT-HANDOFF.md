@@ -28,8 +28,13 @@ integration binaries 0 failed; `cargo clippy -D warnings` clean;
 `cargo fmt --check` clean; `npm run quality` / `quality:security` — see
 below.
 
-**Not yet done**: independent `security-reviewer` pass; commit; push;
-open PR (targets `main`).
+**Independent `security-reviewer`: PASS** — no blocking, no should-fix;
+audit independently confirmed complete. Two Minor parity fixes folded in
+(`item_count` subquery `+ AND ai.school_id`; `dependent_records_stranded`
+grades subquery `+ AND gp.school_id`). Findings archived at
+`.planning/tenant-isolation-audit/security-review.md`.
+
+**Not yet done**: commit the parity fixes; push; open PR (targets `main`).
 
 ## Cloud Sync Target decided — ADR-0065 (2026-09-03), review + merge owed
 

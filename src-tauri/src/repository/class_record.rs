@@ -309,7 +309,8 @@ const DETAIL_SELECT_LIST: &str = "SELECT cr.id, cr.school_id, cr.section_id, sec
      cr.subject_id, sub.name, cr.grading_period_id, pp.label, \
      sec.school_year, COALESCE(cr.weight_policy_id, dwp.id), COALESCE(wp.name, dwp.name), \
      cr.created_at, \
-     (SELECT COUNT(*) FROM assessment_items ai WHERE ai.class_record_id = cr.id), \
+     (SELECT COUNT(*) FROM assessment_items ai \
+      WHERE ai.class_record_id = cr.id AND ai.school_id = cr.school_id), \
      (SELECT COUNT(*) FROM learner_scores ls \
       JOIN assessment_items ai2 ON ai2.id = ls.assessment_item_id \
       WHERE ai2.class_record_id = cr.id AND ls.school_id = cr.school_id) \

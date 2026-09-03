@@ -22,13 +22,14 @@ vs `None` / PS 92.5 vs 85.0 / `TeacherConflict` vs `Created`) then GREEN.
 `npm run quality` (no TS touched) + `npm run quality:security` — recorded
 in the branch handoff entry.
 
-**Independent `security-reviewer` — OWED.** Touches tenant-isolation SQL
-across 6 repository files; `.claude/rules/security-privacy.md` calls for
-an independent pass. A controller self-review confirmed each fix is a
-pure tightening (create paths validate FKs; `learners.school_id` /
-`sections.school_id` etc. are never updated post-create) and each new
-test mirrors the ADR-0042-addendum forged-row pattern. Retry the
-dedicated reviewer per the file-based workaround.
+**Independent `security-reviewer` — DONE, verdict PASS.** No blocking, no
+should-fix. Independently re-confirmed the audit is complete (also swept
+`commands/`, `import/`, `auth/`, `export/`, `formgen/` — no multi-table
+JOIN SQL). Two Minor parity fixes folded in: `class_record`
+`DETAIL_SELECT_LIST` `item_count` subquery `+ AND ai.school_id =
+cr.school_id`; `section_membership::dependent_records_stranded` grades
+subquery `+ AND gp.school_id = ?2`. Both availability-only, not leaks.
+Full findings: `.planning/tenant-isolation-audit/security-review.md`.
 
 **`section_membership::dependent_records_stranded`** got its
 `+ AND cr.school_id = ?2` with no dedicated test (NOT-EXISTS guard,

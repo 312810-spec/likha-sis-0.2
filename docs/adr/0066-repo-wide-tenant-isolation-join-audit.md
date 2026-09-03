@@ -67,16 +67,16 @@ constraint. `class_record` and `teaching_assignment` return joined
 **names** (section / subject / grading-period label) to the teacher UI
 and to `export::report_card`.
 
-| #   | Reader                                                                                                 | Fix                                                                                                                                                |
-| --- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `class_record::section_and_period_range_in_school`                                                     | `+ AND gp.school_id = ?2`                                                                                                                          |
-| 2   | `class_record::school_year_in_school`                                                                  | `+ AND gp.school_id = ?2`                                                                                                                          |
-| 3   | `class_record` `DETAIL_SELECT_LIST` (`list_by_school` / `find_detail_by_id_in_school`)                 | `+ AND sec.school_id = ?1 AND sub.school_id = ?1 AND gp.school_id = ?1`; `recorded_count` subquery `+ AND ls.school_id = cr.school_id`             |
-| 4   | `teaching_assignment` `DETAIL_SELECT` (`list_by_teacher_in_school` / `list_by_section_in_school`)      | `+ AND sec.school_id = ?1 AND sub.school_id = ?1`                                                                                                  |
-| 5   | `attendance::roster_for_section_date` — `LEFT JOIN attendance_records a`                               | `+ AND a.school_id = ?1` in the `ON` (matching `learner_score::roster_for_item`'s `ls.school_id` predicate)                                        |
-| 6   | `grading_computation::leaf_percentage_score`                                                           | gains a `school_id` parameter; `+ AND ai.school_id = ?4 AND ls.school_id = ?4`; both `compute_term_grade` call sites updated                       |
-| 7   | `schedule_meeting::has_teacher_conflict` / `has_section_conflict` / `total_weekly_minutes_for_teacher` | `+ AND sm.school_id = ?2` (`schedule_meetings` has its own `school_id`; `ta.school_id` was the only scope)                                         |
-| 8   | `section_membership::dependent_records_stranded` NOT-EXISTS subquery                                   | `+ AND cr.school_id = ?2` (no dedicated test — `ls.school_id` already constrained, `cr.section_id` scoped, covered by existing transfer/end tests) |
+| #   | Reader                                                                                                 | Fix                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `class_record::section_and_period_range_in_school`                                                     | `+ AND gp.school_id = ?2`                                                                                                                                                |
+| 2   | `class_record::school_year_in_school`                                                                  | `+ AND gp.school_id = ?2`                                                                                                                                                |
+| 3   | `class_record` `DETAIL_SELECT_LIST` (`list_by_school` / `find_detail_by_id_in_school`)                 | `+ AND sec.school_id = ?1 AND sub.school_id = ?1 AND gp.school_id = ?1`; both count subqueries `+ AND ai.school_id = cr.school_id` / `+ AND ls.school_id = cr.school_id` |
+| 4   | `teaching_assignment` `DETAIL_SELECT` (`list_by_teacher_in_school` / `list_by_section_in_school`)      | `+ AND sec.school_id = ?1 AND sub.school_id = ?1`                                                                                                                        |
+| 5   | `attendance::roster_for_section_date` — `LEFT JOIN attendance_records a`                               | `+ AND a.school_id = ?1` in the `ON` (matching `learner_score::roster_for_item`'s `ls.school_id` predicate)                                                              |
+| 6   | `grading_computation::leaf_percentage_score`                                                           | gains a `school_id` parameter; `+ AND ai.school_id = ?4 AND ls.school_id = ?4`; both `compute_term_grade` call sites updated                                             |
+| 7   | `schedule_meeting::has_teacher_conflict` / `has_section_conflict` / `total_weekly_minutes_for_teacher` | `+ AND sm.school_id = ?2` (`schedule_meetings` has its own `school_id`; `ta.school_id` was the only scope)                                                               |
+| 8   | `section_membership::dependent_records_stranded` NOT-EXISTS subquery                                   | `+ AND cr.school_id = ?2 AND gp.school_id = ?2` (no dedicated test — `ls.school_id` already constrained, `cr.section_id` scoped, covered by existing transfer/end tests) |
 
 ### Why these matter (the leak each closes)
 
@@ -124,7 +124,18 @@ with them in place.
 - `npm run quality` / `npm run quality:security` — see the branch handoff
   entry (no TS touched; no dependency change).
 
-Independent `security-reviewer` pass: see `docs/VERIFICATION-DEBT.md`.
+**Independent `security-reviewer` pass: verdict PASS** — no blocking, no
+should-fix; audit independently confirmed complete (also checked
+`commands/`, `import/`, `auth/`, `export/`, `formgen/` — no multi-table
+JOIN SQL; two further repo JOINs found, both onto global reference
+tables). Two Minor parity fixes were folded in on review:
+`class_record` `DETAIL_SELECT_LIST`'s `item_count` subquery gained
+`AND ai.school_id = cr.school_id` (matching the already-hardened
+`recorded_count` subquery); `section_membership::dependent_records_stranded`'s
+grades subquery gained `AND gp.school_id = ?2` (matching fixes #1/#2 on
+the same table). Both are availability-only, not leaks, and not
+reachable via `assessment_item::create` / `class_record::create`. Full
+findings: `.planning/tenant-isolation-audit/security-review.md`.
 
 ## Consequences
 
