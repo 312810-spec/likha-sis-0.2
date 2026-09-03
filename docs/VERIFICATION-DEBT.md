@@ -28,6 +28,66 @@ which only works while `TeacherWorkspaceScreen` keeps its
 `<section aria-label="Workspace">` — it will need updating when the
 accepted-backlog work deletes that screen and rebuilds Home on `Page`.
 
+## Section-membership readers `l.school_id` JOIN predicate — CLOSED, independently reviewed (2026-09-03)
+
+Branch `claude/p1-roster-school-id-join-hardening`, off `main` at
+`860cede`. Full record: `docs/adr/0042-*` "Addendum (post-Wave-3,
+2026-09-03): every section-membership reader independently constrains the
+learner to the school".
+
+**Closed.** Every reader that joins `learners` to `section_memberships`
+now independently constrains `l.school_id` (the conjunct `current_roster`
+/ `enrollable_learners` already had since Wave 2O):
+
+- `section_membership::roster_for_section` — `AND l.school_id = ?2`
+- `section_membership::roster_for_section_over_range` — `AND l.school_id = ?2`
+- `attendance::roster_for_section_date` — `AND l.school_id = ?1` (found
+  by the security review, not in the original debt wording)
+- `learner_score::roster_for_item` — `AND l.school_id = ?2` (same)
+- `section_membership::is_active_member` — `AND EXISTS (SELECT 1 FROM
+learners l WHERE l.id = ?3 AND l.school_id = ?2)` (bool, no PII; closes
+  the "forged row lets an attendance write hit a foreign learner_id"
+  integrity gap)
+
+A hand-forged `section_memberships` row pointing a foreign-school
+`learner_id` at a local section can no longer leak that learner's
+name/LRN/sex through SF1 formgen, the monthly attendance grid, SF2
+export, `import::commit`, the attendance roster, or the score roster.
+This supersedes the still-open JOIN-predicate items in the Wave 2O (item
+3), Wave 2P (item 3), Wave 2Q (item 4), and Wave 2T (item 6, the
+JOIN-predicate half only — the strict-zero-length half of that item is
+unrelated and stays open) entries below; kept for the historical record,
+not deleted.
+
+**Verification actually run:** TDD — six isolation tests (three new this
+round: `attendance::roster_for_section_date_join_...`,
+`learner_score::roster_for_item_join_...`,
+`section_membership::is_active_member_rejects_a_forged_...`), each
+watched to fail first (`left: 2, right: 1` / `true` where `false` was
+required) then pass. `cargo test` full lib suite + all integration
+binaries 0 failed; `cargo clippy --all-targets -- -D warnings` clean;
+`cargo fmt --check` clean; `npm run quality` all green (no TS touched);
+`npm run quality:security` 3 ok / 0 failed / 0 missing (gitleaks +
+cargo-deny + osv-scanner all present on this machine; 18 pre-existing
+filtered advisories only).
+
+**Independent review — DONE.** `security-reviewer` dispatched
+specifically for this change; direct return was empty (the known
+reviewer-harness retrieval failure), findings retrieved via the
+file-based workaround (`docs/PROJECT-MEMORY.md` "File-Based
+Independent-Review Workaround"). Verdict **PASS-WITH-MINORS**, no
+blocking, no should-fix on the change as-shipped. Confirmed: the
+predicate parameter bindings are correct with no off-by-one; the change
+is a pure tightening (all membership-creating paths bind the same
+`school_id` to both the in-school guard and the `INSERT`;
+`learners.school_id` is never updated; no CHECK/trigger ties
+`section_memberships.school_id` to the learner's school); the regression
+tests are genuine (forged `INSERT` satisfies all FKs, `.unwrap()` would
+panic on failure, fails without the production change). The review's one
+should-fix (two additional readers unhardened) and one doc-wording minor
+were both resolved by widening this slice to cover all five readers.
+Full findings file: session scratchpad `security-review-roster-join.md`.
+
 ## Wave 1 UI redesign shell (2026-09-03)
 
 The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),

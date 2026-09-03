@@ -1,5 +1,62 @@
 # CURRENT HANDOFF
 
+## P1 security hardening: section-membership readers `l.school_id` JOIN predicate — implemented + independently reviewed, commit owed (2026-09-03)
+
+**Separate branch, not the UI-redesign line.** `claude/p1-roster-school-id-join-hardening`,
+off `main` at `860cede` (verified `main` == `origin/main` == `860cede`
+before starting). Picked as the actionable P1 item from a repo-wide
+task/debt sweep — Product Roadmap Wave 5 (sync + cloud authorization) is
+the other P1 but is blocked on a paid-infra human approval gate, and the
+independent-review backlog is review work, not code.
+
+**What shipped.** Every reader that joins `learners` to
+`section_memberships` now independently constrains `l.school_id`, the
+conjunct `current_roster` / `enrollable_learners` already had since Wave
+2O: `section_membership::roster_for_section`,
+`section_membership::roster_for_section_over_range`,
+`attendance::roster_for_section_date`, `learner_score::roster_for_item`,
+and (as an `EXISTS` on `learners`) `section_membership::is_active_member`.
+A forged cross-school `section_memberships` row can no longer leak a
+learner's name/LRN/sex via SF1 formgen, the monthly attendance grid, SF2
+export, `import::commit`, the attendance roster, or the score roster (or
+make a foreign learner count as active for an attendance write).
+Behaviour-preserving for all correct data. Six TDD isolation tests,
+watched fail then pass. Durable record: `docs/adr/0042-*` "Addendum
+(post-Wave-3, 2026-09-03)"; debt closure: `docs/VERIFICATION-DEBT.md`
+top entry.
+
+The `roster_for_section*` half was long-carried debt (Wave 2O/2P/2Q/2T).
+The `attendance` / `learner_score` readers were found by this change's
+mandatory `security-reviewer` pass and folded into the same slice.
+
+**Verification actually run:** `cargo test` full lib + all integration
+binaries, 0 failed; `cargo clippy --all-targets -- -D warnings` clean;
+`cargo fmt --check` clean; `npm run quality` all green (no TS touched);
+`npm run quality:security` 3 ok / 0 failed / 0 missing.
+
+**Independent review — DONE.** `security-reviewer`, verdict
+**PASS-WITH-MINORS**, no blocking, no should-fix on the change as
+shipped (the two should-fix readers it flagged were folded in; the
+doc-wording minor is resolved). Direct return was empty (known
+reviewer-harness retrieval failure); findings retrieved via the
+file-based workaround — full findings in session scratchpad
+`security-review-roster-join.md`.
+
+**Committed + pushed + rebased.** Commits `3177446` (fix) + `779ee9c`
+(this note) on `claude/p1-roster-school-id-join-hardening`, rebased onto
+`origin/main` `3804f80` (which now includes PR #33, the `ui-smoke`
+redesigned-nav fix — the first push's Quality Gate red was that
+pre-existing `main` breakage on `npm run quality:ui`, not this Rust-only
+change). One trivial rebase conflict in `docs/VERIFICATION-DEBT.md` (both
+branches prepended a 2026-09-03 entry) resolved by keeping both.
+
+**CI:** first push — Security Gate ✅ `33752356272`, Quality Gate ❌
+`33752356333` (the inherited `ui-smoke` breakage, since fixed on `main`).
+Post-rebase re-run pending on the force-pushed branch.
+
+**Owed:** confirm the post-rebase Quality Gate is green (it should be now
+that `ui-smoke` is fixed on `main`), then open the PR (targets `main`).
+
 ## Wave 6: final review + merge — complete (2026-09-03)
 
 The UI redesign (Waves 1-6, branch `claude/ui-redesign-wave-1-shell`,

@@ -145,8 +145,11 @@ pub fn record(
 /// The roster for `section_id` on `attendance_date` — every learner with an
 /// active membership in that section on that date, paired with their
 /// attendance status for that date if one has been recorded. Isolation is
-/// enforced in the `WHERE` clause on `section_memberships.school_id`, not by
-/// joining every school's attendance and filtering afterward.
+/// enforced in the `WHERE` clause on `section_memberships.school_id` **and**
+/// independently on the joined `learners` row (`l.school_id = ?1`, matching
+/// `section_membership::roster_for_section*`), not by joining every school's
+/// attendance and filtering afterward — a forged cross-school membership row
+/// cannot leak a learner's name here.
 pub fn roster_for_section_date(
     conn: &Connection,
     school_id: &str,
@@ -159,7 +162,7 @@ pub fn roster_for_section_date(
          JOIN section_memberships sm ON sm.learner_id = l.id \
          LEFT JOIN attendance_records a \
            ON a.learner_id = l.id AND a.attendance_date = ?3 AND a.section_id = ?2 \
-         WHERE sm.section_id = ?2 AND sm.school_id = ?1 \
+         WHERE sm.section_id = ?2 AND sm.school_id = ?1 AND l.school_id = ?1 \
            AND sm.starts_on <= ?3 AND (sm.ends_on IS NULL OR ?3 < sm.ends_on) \
          ORDER BY l.family_name, l.given_name",
     )?;
@@ -616,6 +619,39 @@ mod tests {
             roster_for_section_date(&conn, &school_b.id, &section_a, "2026-08-24").unwrap();
 
         assert!(roster.is_empty());
+    }
+
+    #[test]
+    fn roster_for_section_date_join_independently_constrains_the_learner_to_the_same_school() {
+        // Defense in depth, matching
+        // `section_membership::roster_for_section*`: a hand-forged
+        // `section_memberships` row pointing a foreign-school learner at this
+        // section (something `enroll` refuses to create) must not leak that
+        // learner's name into the attendance roster, because the query
+        // constrains `l.school_id` too, not only `sm.school_id`.
+        let conn = open_test_db();
+        let (school_a, section_a, legit_learner) = setup_enrolled_learner(&conn);
+        let school_b = school::create(&conn, "School B").unwrap();
+        let foreign = learner::create(&conn, &school_b.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged-rfsd', ?1, ?2, ?3, '2026-08-01')",
+            (&school_a, &section_a, &foreign.id),
+        )
+        .unwrap();
+
+        let roster = roster_for_section_date(&conn, &school_a, &section_a, "2026-08-24").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            1,
+            "only the legitimately enrolled learner appears"
+        );
+        assert_eq!(roster[0].learner_id, legit_learner);
+        assert!(
+            roster.iter().all(|e| e.learner_id != foreign.id),
+            "a learner belonging to another school must never appear, even via a forged membership row"
+        );
     }
 
     #[test]

@@ -949,7 +949,11 @@ pub fn enrollable_learners(
 /// `as_of_date`. Scoped directly by `school_id` in the query (not merely
 /// implied by `section_id` belonging to that school) so a cross-school
 /// section reference cannot leak learners even if one were ever
-/// constructed incorrectly upstream.
+/// constructed incorrectly upstream. Like `current_roster`, the joined
+/// `learners` row is independently constrained to the same `school_id`
+/// (not only `sm.*`) so a hand-forged membership row pointing a
+/// foreign-school learner at this section cannot leak that learner —
+/// `formgen::sf1` and `import::commit` both compose this function.
 pub fn roster_for_section(
     conn: &Connection,
     school_id: &str,
@@ -960,7 +964,7 @@ pub fn roster_for_section(
         "SELECT l.id, l.given_name, l.family_name, l.lrn, l.sex \
          FROM learners l \
          JOIN section_memberships sm ON sm.learner_id = l.id \
-         WHERE sm.section_id = ?1 AND sm.school_id = ?2 \
+         WHERE sm.section_id = ?1 AND sm.school_id = ?2 AND l.school_id = ?2 \
            AND sm.starts_on <= ?3 \
            AND (sm.ends_on IS NULL OR ?3 < sm.ends_on) \
          ORDER BY l.family_name, l.given_name",
@@ -1030,7 +1034,12 @@ pub fn current_roster(
 /// still appear for the days they were enrolled. Overlap, not exact-date
 /// matching, so `roster_for_section(as_of)` stays the source of truth for
 /// "who is on the roster right now" and this is only for historical range
-/// queries.
+/// queries. School scope is constrained on both `section_memberships`
+/// (`school_id` AND `section_id` together) and independently on the joined
+/// `learners` row (`l.school_id = ?2`, not only `sm.*`) so a forged
+/// cross-school membership row cannot leak a learner into the monthly
+/// attendance grid, SF2 export, or class-record / learner-score
+/// eligibility, all of which compose this function.
 pub fn roster_for_section_over_range(
     conn: &Connection,
     school_id: &str,
@@ -1042,7 +1051,7 @@ pub fn roster_for_section_over_range(
         "SELECT DISTINCT l.id, l.given_name, l.family_name, l.lrn, l.sex \
          FROM learners l \
          JOIN section_memberships sm ON sm.learner_id = l.id \
-         WHERE sm.section_id = ?1 AND sm.school_id = ?2 \
+         WHERE sm.section_id = ?1 AND sm.school_id = ?2 AND l.school_id = ?2 \
            AND sm.starts_on <= ?4 AND (sm.ends_on IS NULL OR ?3 < sm.ends_on) \
          ORDER BY l.family_name, l.given_name",
     )?;
@@ -1061,7 +1070,11 @@ pub fn roster_for_section_over_range(
 /// True if `learner_id` has an active membership in `section_id` on
 /// `as_of_date`, scoped by `school_id`. Used to reject attendance for a
 /// learner who is not (or is no longer) on that section's roster for that
-/// date, without a second round trip through `roster_for_section`.
+/// date, without a second round trip through `roster_for_section`. The
+/// learner must also resolve within `school_id` (an `EXISTS` on `learners`,
+/// matching `roster_for_section*`'s independent `l.school_id` constraint) so
+/// a forged cross-school membership row cannot make a foreign learner look
+/// active here and let an attendance write be recorded against them.
 pub fn is_active_member(
     conn: &Connection,
     school_id: &str,
@@ -1070,9 +1083,10 @@ pub fn is_active_member(
     as_of_date: &str,
 ) -> AppResult<bool> {
     let count: i64 = conn.query_row(
-        "SELECT count(*) FROM section_memberships \
-         WHERE section_id = ?1 AND school_id = ?2 AND learner_id = ?3 \
-           AND starts_on <= ?4 AND (ends_on IS NULL OR ?4 < ends_on)",
+        "SELECT count(*) FROM section_memberships sm \
+         WHERE sm.section_id = ?1 AND sm.school_id = ?2 AND sm.learner_id = ?3 \
+           AND sm.starts_on <= ?4 AND (sm.ends_on IS NULL OR ?4 < sm.ends_on) \
+           AND EXISTS (SELECT 1 FROM learners l WHERE l.id = ?3 AND l.school_id = ?2)",
         (section_id, school_id, learner_id, as_of_date),
         |row| row.get(0),
     )?;
@@ -1403,6 +1417,98 @@ mod tests {
             roster.len(),
             0,
             "a learner belonging to another school must never appear, even via a forged membership row"
+        );
+    }
+
+    #[test]
+    fn roster_for_section_join_independently_constrains_the_learner_to_the_same_school() {
+        // Same defense-in-depth hardening as
+        // `current_roster_join_independently_constrains_the_learner_to_the_same_school`,
+        // applied to `roster_for_section` — which feeds SF1 formgen and the
+        // import-commit roster checks. A hand-crafted membership row pointing a
+        // foreign-school learner at this section (something `enroll` refuses to
+        // create) must not leak that learner's name/LRN/sex across the tenant
+        // boundary, because the query constrains `l.school_id` too, not only
+        // `sm.*`.
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let foreign = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged-rfs', ?1, ?2, ?3, '2025-08-01')",
+            (&school_id, &section_id, &foreign.id),
+        )
+        .unwrap();
+
+        let roster = roster_for_section(&conn, &school_id, &section_id, "2025-08-15").unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "a learner belonging to another school must never appear, even via a forged membership row"
+        );
+    }
+
+    #[test]
+    fn roster_for_section_over_range_join_independently_constrains_the_learner_to_the_same_school()
+    {
+        // Same defense-in-depth hardening applied to
+        // `roster_for_section_over_range` — which feeds the monthly attendance
+        // grid, SF2 export, and class-record / learner-score eligibility. A
+        // forged membership row pointing a foreign-school learner at this
+        // section must not leak that learner into a range roster.
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let foreign = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged-rfsor', ?1, ?2, ?3, '2025-08-01')",
+            (&school_id, &section_id, &foreign.id),
+        )
+        .unwrap();
+
+        let roster = roster_for_section_over_range(
+            &conn,
+            &school_id,
+            &section_id,
+            "2025-08-01",
+            "2025-08-31",
+        )
+        .unwrap();
+
+        assert_eq!(
+            roster.len(),
+            0,
+            "a learner belonging to another school must never appear in a range roster, even via a forged membership row"
+        );
+    }
+
+    #[test]
+    fn is_active_member_rejects_a_forged_membership_row_for_a_foreign_school_learner() {
+        // `is_active_member` gates whether an attendance write may be recorded
+        // for a learner in a section. A hand-forged `section_memberships` row
+        // pointing a foreign-school learner at a local section must not make
+        // that learner look active here — the check now also requires the
+        // learner to resolve within the same school.
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let foreign = learner::create(&conn, &other_school.id, "Ana", "Cruz", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged-iam', ?1, ?2, ?3, '2025-08-01')",
+            (&school_id, &section_id, &foreign.id),
+        )
+        .unwrap();
+
+        let active =
+            is_active_member(&conn, &school_id, &section_id, &foreign.id, "2025-08-15").unwrap();
+
+        assert!(
+            !active,
+            "a foreign-school learner must never count as an active member, even via a forged membership row"
         );
     }
 

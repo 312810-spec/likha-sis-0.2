@@ -1197,3 +1197,84 @@ wired," matching every other write method on that read-only fixture), so
 it has no local browser-rendered screenshot coverage this session --
 coverage of it is the jsdom + axe-core tests above, plus whatever the CI
 Ubuntu Quality job's own correctly-versioned Playwright install proves.
+
+## Addendum (post-Wave-3, 2026-09-03): every section-membership reader independently constrains the learner to the school
+
+**Debt closed, then widened by the security review.** The Wave 2O
+security review added an independent `l.school_id` predicate to
+`current_roster` (and `enrollable_learners` already had one) so a
+hand-forged `section_memberships` row pointing a foreign-school
+`learner_id` at a local section could not leak that learner. The two
+sibling readers `roster_for_section` and `roster_for_section_over_range`
+were left filtering only `sm.section_id` + `sm.school_id`; that gap was
+carried as retained debt through the Wave 2O/2P/2Q/2T entries in
+`docs/VERIFICATION-DEBT.md`. This change hardens those two — and the
+mandatory `security-reviewer` pass on it (verdict PASS-WITH-MINORS, no
+blocking) then found the identical gap in two more readers that the
+originally-worded debt items never named, so the slice was widened to
+cover all of them plus the one non-PII sibling:
+
+| reader                            | file                             | fix                                                                          |
+| --------------------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `roster_for_section`              | `repository::section_membership` | `AND l.school_id = ?2`                                                       |
+| `roster_for_section_over_range`   | `repository::section_membership` | `AND l.school_id = ?2`                                                       |
+| `roster_for_section_date`         | `repository::attendance`         | `AND l.school_id = ?1`                                                       |
+| `roster_for_item`                 | `repository::learner_score`      | `AND l.school_id = ?2`                                                       |
+| `is_active_member` (bool, no PII) | `repository::section_membership` | `AND EXISTS (SELECT 1 FROM learners l WHERE l.id = ?3 AND l.school_id = ?2)` |
+
+Each fix references the same bound `school_id` parameter the query
+already used for `sm.school_id`, so there is no parameter renumbering.
+Every change is behaviour-preserving for correct data — a legitimately
+enrolled learner always has `sm.school_id == l.school_id` (the
+`enroll` / `enroll_membership` / `transfer_membership` /
+`import::commit` paths all bind the same `school_id` to both the
+in-school guard and the `INSERT`, and `learners.school_id` is never
+updated), so the added conjunct can only drop a cross-school-corrupted
+row. `is_active_member` returns only a bool, but a forged row would
+otherwise let an attendance write be recorded against a foreign
+`learner_id` under the local school — an integrity gap, closed here for
+pattern consistency.
+
+**No new ADR** — this is the established Wave 2O defense-in-depth pattern
+applied uniformly across every reader that joins `learners` to
+`section_memberships`, not a new decision.
+
+**Composing callers** (all pass a session-derived `school_id`; none
+builds its own SQL): `roster_for_section` — `formgen::sf1`,
+`import::commit`; `roster_for_section_over_range` — the monthly
+attendance grid, SF2 export, `class_record` / `learner_score`
+eligibility, `assessment_item`; `roster_for_section_date` — the
+`attendance_roster_for_date` command; `roster_for_item` — the
+`learner_score_roster_for_item` command; `is_active_member` — attendance
+recording.
+
+### Verification (run this session, branch `claude/p1-roster-school-id-join-hardening`)
+
+TDD: six isolation tests — `roster_for_section*` and `current_roster` in
+`repository::section_membership::tests`,
+`roster_for_section_date_join_independently_constrains_the_learner_to_the_same_school`
+in `repository::attendance::tests`,
+`roster_for_item_join_independently_constrains_the_learner_to_the_same_school`
+in `repository::learner_score::tests`, and
+`is_active_member_rejects_a_forged_membership_row_for_a_foreign_school_learner`.
+Each forges a cross-school membership row via raw `INSERT` (bypassing
+`enroll`) and asserts the foreign learner does not appear / does not
+count as active; the PII-reader tests also assert the legitimately
+enrolled learner is still returned (the predicate does not over-filter).
+The three new-this-round tests were watched to fail first
+(`left: 2, right: 1` / a `true` where `false` was required), then pass.
+
+- `cargo test` — full lib suite + every integration binary, **0 failed**
+  (see the branch handoff entry for the exact counts run this session).
+- `cargo clippy --all-targets -- -D warnings` — clean.
+- `cargo fmt --check` — clean.
+- `npm run quality` — typecheck / eslint / `prettier --check` /
+  `check:architecture` / vitest all green (no TS touched).
+- `npm run quality:security` — 3 ok / 0 failed / 0 missing.
+
+**Independent review:** `security-reviewer` — verdict PASS-WITH-MINORS,
+no blocking, no should-fix on the original two-reader change; the
+"completeness" should-fix (the two additional readers) and the
+doc-wording minor are both resolved by this widened version. Full
+findings: session scratchpad `security-review-roster-join.md`, summarised
+in the `docs/VERIFICATION-DEBT.md` top entry.

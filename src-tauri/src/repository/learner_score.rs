@@ -166,7 +166,11 @@ pub fn record(
 /// (every learner with an active membership at any point in the item's
 /// class record's grading-period range), paired with their score if one
 /// has been recorded. Returns `Ok(None)` if `assessment_item_id` doesn't
-/// resolve within `school_id`.
+/// resolve within `school_id`. School scope is enforced on both
+/// `section_memberships` (`sm.school_id`) and independently on the joined
+/// `learners` row (`l.school_id = ?2`, matching
+/// `section_membership::roster_for_section*`) so a forged cross-school
+/// membership row cannot leak a learner's name.
 pub fn roster_for_item(
     conn: &Connection,
     school_id: &str,
@@ -188,7 +192,7 @@ pub fn roster_for_item(
          JOIN section_memberships sm ON sm.learner_id = l.id \
          LEFT JOIN learner_scores ls \
            ON ls.assessment_item_id = ?1 AND ls.learner_id = l.id AND ls.school_id = ?2 \
-         WHERE sm.section_id = ?3 AND sm.school_id = ?2 \
+         WHERE sm.section_id = ?3 AND sm.school_id = ?2 AND l.school_id = ?2 \
            AND sm.starts_on <= ?5 AND (sm.ends_on IS NULL OR ?4 < sm.ends_on) \
          ORDER BY l.family_name, l.given_name",
     )?;
@@ -522,5 +526,45 @@ mod tests {
         let result = roster_for_item(&conn, &school_b.id, &item_a).unwrap();
 
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn roster_for_item_join_independently_constrains_the_learner_to_the_same_school() {
+        // Defense in depth, matching
+        // `section_membership::roster_for_section*`: a hand-forged
+        // `section_memberships` row pointing a foreign-school learner at this
+        // section must not leak that learner's name into the score roster,
+        // because the query constrains `l.school_id` too, not only
+        // `sm.school_id`.
+        let conn = open_test_db();
+        let (school_a, item_a, legit_learner, _teacher) = setup(&conn);
+        let section_a: String = conn
+            .query_row(
+                "SELECT section_id FROM section_memberships WHERE learner_id = ?1",
+                [&legit_learner],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let school_b = school::create(&conn, "School B").unwrap();
+        let foreign = learner::create(&conn, &school_b.id, "Ben", "Reyes", None, None).unwrap();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES ('m-forged-rfi', ?1, ?2, ?3, '2026-06-08')",
+            (&school_a, &section_a, &foreign.id),
+        )
+        .unwrap();
+
+        let roster = roster_for_item(&conn, &school_a, &item_a).unwrap().unwrap();
+
+        assert_eq!(
+            roster.len(),
+            1,
+            "only the legitimately enrolled learner appears"
+        );
+        assert_eq!(roster[0].learner_id, legit_learner);
+        assert!(
+            roster.iter().all(|e| e.learner_id != foreign.id),
+            "a learner belonging to another school must never appear, even via a forged membership row"
+        );
     }
 }
