@@ -11,7 +11,7 @@
  * `extendSession`/`logout` on the fake auth repository deliberately
  * throw: this fixture never issues, forges, persists, or bypasses a
  * real session. The "signed in" state it renders is nothing more than a
- * plain `CurrentSession`-shaped object passed as a prop to `AppShell`
+ * plain `CurrentSession`-shaped object passed as a prop to `AppLayout`
  * for display purposes -- the exact same thing this app's own test
  * suite already does in every screen's `.test.tsx` file. No
  * `SessionManager`, no Rust `auth::login`, no persisted `sessions`
@@ -69,7 +69,7 @@ import type {
 } from "../domain/section-advisory";
 
 /** A plain data object, not a real session -- see this file's own doc
- * comment. Rendered only as a prop to `AppShell`/`TeacherWorkspaceScreen`
+ * comment. Rendered only as a prop to `AppLayout`/`TeacherWorkspaceScreen`
  * for display, never passed through any authentication code path. */
 export const FIXTURE_SESSION: CurrentSession = {
   userId: "fixture-user",

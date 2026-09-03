@@ -360,181 +360,6 @@ label {
   margin: 0 0 calc(var(--spacing-unit) * 0.35) 0;
 }
 
-.app-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-}
-
-.app-shell-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--spacing-unit);
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: var(--elevation-1);
-}
-
-.app-shell-title {
-  margin: 0;
-  font-size: var(--font-size-large);
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.app-shell-session {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-unit);
-}
-
-.app-shell-session-identity {
-  color: var(--color-text-muted);
-}
-
-.app-shell-main {
-  flex: 1;
-  padding: calc(var(--spacing-unit) * 1.5);
-  max-width: var(--content-width-wide);
-  width: 100%;
-  margin: 0 auto;
-}
-
-.mode-switcher {
-  display: flex;
-  gap: calc(var(--spacing-unit) * 0.5);
-}
-
-.mode-switcher button[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
-  font-weight: 700;
-}
-
-/* Non-color cue for the pressed mode, alongside the color change above —
-   WCAG 1.4.1 (Use of Color): sighted low-vision/colorblind users without
-   a screen reader still need a way to tell which mode is active. */
-.mode-switcher button[aria-pressed="true"]::before {
-  content: "✓ ";
-}
-
-/* Grouped teacher-workbench navigation (src/App.tsx's NAV_GROUPS,
-   src/ui/components/NavItem.tsx) -- replaces the flat 8-button
-   .section-switcher row with clusters matching a teacher's actual
-   daily rhythm (Daily Teaching / Learner Records / Grading /
-   Security). See docs/adr/0031-design-system-and-app-shell.md. */
-.workbench-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: calc(var(--spacing-unit) * 1.25);
-  margin-bottom: var(--spacing-unit);
-  padding-bottom: var(--spacing-unit);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.nav-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: calc(var(--spacing-unit) * 0.5);
-  padding-right: calc(var(--spacing-unit) * 1.25);
-  border-right: 1px solid var(--color-border);
-}
-
-.nav-group:last-child {
-  border-right: none;
-  padding-right: 0;
-}
-
-.nav-group-label {
-  /* Visible group context for sighted users, matching the ledger/
-     class-record rhythm the Calm Civic Classroom direction calls for
-     -- a small caption, not a competing heading. Marked aria-hidden
-     because each nav-group's own role="group" aria-label already
-     gives assistive tech the same text as its accessible name; a
-     visible duplicate would otherwise be announced twice. */
-  font-size: var(--font-size-small);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-right: calc(var(--spacing-unit) * 0.25);
-}
-
-.nav-item {
-  position: relative;
-}
-
-.nav-item[aria-pressed="true"] {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary);
-  font-weight: 700;
-}
-
-/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
-.nav-item[aria-pressed="true"]::before {
-  content: "✓ ";
-}
-
-/* The one "ledger continuity" motion treatment (DESIGN.md): a selection
-   rule beneath the active destination, drawn in from the center rather
-   than appearing instantly -- a restrained echo of underlining an entry
-   in a ledger, not a decorative flourish. Transform/opacity only (no
-   layout-driving property), so it stays cheap even on ordinary school
-   hardware, and collapses to an instant state change under
-   prefers-reduced-motion via --motion-duration-routine's own reduced-
-   motion override. */
-.nav-item::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-primary-text);
-  transform: scaleX(0);
-  opacity: 0;
-  transition:
-    transform var(--motion-duration-routine) var(--motion-easing-standard),
-    opacity var(--motion-duration-routine) var(--motion-easing-standard);
-}
-
-.nav-item[aria-pressed="true"]::after {
-  transform: scaleX(1);
-  opacity: 1;
-}
-
-@media (max-width: 640px) {
-  .workbench-nav {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-unit);
-  }
-
-  .nav-group {
-    flex-wrap: wrap;
-    border-right: none;
-    padding-right: 0;
-    padding-bottom: calc(var(--spacing-unit) * 0.5);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .nav-group:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .nav-item {
-    min-height: 44px;
-    flex: 1 1 auto;
-  }
-}
-
 /* Narrow-layout decision (recorded in ADR-0033): a horizontal scroll
    container with a persistent (sticky) learner-name column and sticky
    day-header row was chosen over re-flowing each learner into a stacked
@@ -615,7 +440,7 @@ label {
   font-weight: 700;
 }
 
-/* Same non-color cue as .mode-switcher — WCAG 1.4.1. */
+/* Same non-color cue as .app-sidebar-modes — WCAG 1.4.1. */
 .attendance-roster button[aria-pressed="true"]::before {
   content: "✓ ";
 }
@@ -1289,9 +1114,9 @@ label {
 }
 
 /* ============================================================
-   Redesign shell -- sidebar (ADR-0057). Replaces .workbench-nav /
-   .nav-group / .nav-item, which are removed once nothing references
-   them (see the ADR's Wave 1 task list).
+   Redesign shell -- sidebar (ADR-0057). Replaced the old .workbench-nav /
+   .nav-group / .nav-item rules, which were removed in Wave 1 once nothing
+   referenced them (see the ADR's Wave 1 task list).
    ============================================================ */
 .app-sidebar {
   display: flex;

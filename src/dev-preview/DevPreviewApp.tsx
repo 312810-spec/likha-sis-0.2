@@ -53,8 +53,9 @@ import {
  *   unconditionally -- there is no path from this file to real
  *   authentication, a real session, Tauri, or SQLite.
  *
- * Renders the exact same `AppShell`, `WorkbenchNav`, and screen
- * components production uses (reused, not duplicated). Wired
+ * Renders the exact same `AppLayout` shell (`src/ui/shell/`, with its
+ * `Sidebar`/`TopBar`/`BottomNav`) and screen components production uses
+ * (reused, not duplicated). Wired
  * destinations have grown with each milestone that needed real
  * browser-rendered verification (see each screen's own git history for
  * which wave added it) -- still a narrow verification tool, not a full

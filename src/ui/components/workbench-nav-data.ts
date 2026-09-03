@@ -60,9 +60,10 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
  * docs/adr/0031-design-system-and-app-shell.md. `section-roster`,
  * `teaching-assignments`, and `schedule-meetings` are deliberately
  * absent: each is only ever reached contextually, from the screen one
- * level up with its own selection already made. Kept in its own
- * data-only module (not `WorkbenchNav.tsx`) so that component file can
- * stay component-only for React Fast Refresh. */
+ * level up with its own selection already made. Kept as a data-only
+ * module, separate from the shell components that consume it
+ * (`src/ui/shell/Sidebar.tsx`, `BottomNav.tsx`), so those files stay
+ * component-only for React Fast Refresh. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
