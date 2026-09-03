@@ -23,6 +23,7 @@ const session: CurrentSession = {
   // would otherwise immediately treat every signed-in test as idle-
   // expired (see ADR-0026).
   idleExpiresAtUnixMs: Date.now() + 30 * 60_000,
+  roles: ["teacher"],
 };
 
 beforeEach(() => {

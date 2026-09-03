@@ -20,6 +20,13 @@ export interface CurrentSession {
    * session silently expires — see ADR-0026.
    */
   idleExpiresAtUnixMs: number;
+  /**
+   * Every role the signed-in user holds in this school (e.g.
+   * `["school_head", "teacher"]`), sorted. Display-only: the UI uses it
+   * only to choose which Home layout to show. It is NOT an authorization
+   * signal — every protected command is gated server-side regardless.
+   */
+  roles: string[];
 }
 
 /**

@@ -15,6 +15,7 @@ const session: CurrentSession = {
   schoolName: "Rizal Elementary",
   expiresAtUnixMs: 1_000_000,
   idleExpiresAtUnixMs: Date.now() + 30 * 60_000,
+  roles: ["teacher"],
 };
 
 function renderTopBar(over: Partial<ComponentProps<typeof TopBar>> = {}) {

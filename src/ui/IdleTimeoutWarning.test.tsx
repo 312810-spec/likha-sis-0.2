@@ -45,6 +45,7 @@ function aSession(idleExpiresAtUnixMs: number): CurrentSession {
     schoolName: "Rizal Elementary",
     expiresAtUnixMs: Date.now() + 8 * 60 * 60_000,
     idleExpiresAtUnixMs,
+    roles: ["teacher"],
   };
 }
 

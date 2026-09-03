@@ -32,6 +32,7 @@ class FakeSetupRepository implements SetupRepository {
       schoolName,
       expiresAtUnixMs: 1_000_000,
       idleExpiresAtUnixMs: 1_000_000,
+      roles: ["teacher"],
     };
   }
 }

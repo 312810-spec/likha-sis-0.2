@@ -79,6 +79,7 @@ export const FIXTURE_SESSION: CurrentSession = {
   schoolName: "Bagong Pag-Asa Elementary School (Synthetic)",
   expiresAtUnixMs: Date.now() + 8 * 60 * 60_000,
   idleExpiresAtUnixMs: Date.now() + 30 * 60_000,
+  roles: ["teacher"],
 };
 
 function todayAsIsoDate(): string {
