@@ -42,8 +42,20 @@ reviewer-harness retrieval failure); findings retrieved via the
 file-based workaround — full findings in session scratchpad
 `security-review-roster-join.md`.
 
-**Not yet done:** commit; push; CI. Branch is uncommitted in the working
-tree.
+**Committed + pushed + rebased.** Commits `3177446` (fix) + `779ee9c`
+(this note) on `claude/p1-roster-school-id-join-hardening`, rebased onto
+`origin/main` `3804f80` (which now includes PR #33, the `ui-smoke`
+redesigned-nav fix — the first push's Quality Gate red was that
+pre-existing `main` breakage on `npm run quality:ui`, not this Rust-only
+change). One trivial rebase conflict in `docs/VERIFICATION-DEBT.md` (both
+branches prepended a 2026-09-03 entry) resolved by keeping both.
+
+**CI:** first push — Security Gate ✅ `33752356272`, Quality Gate ❌
+`33752356333` (the inherited `ui-smoke` breakage, since fixed on `main`).
+Post-rebase re-run pending on the force-pushed branch.
+
+**Owed:** confirm the post-rebase Quality Gate is green (it should be now
+that `ui-smoke` is fixed on `main`), then open the PR (targets `main`).
 
 ## Wave 6: final review + merge — complete (2026-09-03)
 
