@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AssessmentApplicationService } from "../application/assessment-service";
 import type { ClassRecordApplicationService } from "../application/class-record-service";
 import type { ExportApplicationService } from "../application/export-service";
@@ -15,6 +15,7 @@ import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 /** A short "N items · X of Y recorded" readout for one class record's row
@@ -51,7 +52,6 @@ export function ClassRecordsScreen({
   exportService,
 }: ClassRecordsScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [selectedClassRecordId, setSelectedClassRecordId] = useState<string | null>(null);
   const [classRecords, setClassRecords] = useState<ClassRecordDetail[]>([]);
@@ -71,10 +71,6 @@ export function ClassRecordsScreen({
 
   const [newSubjectName, setNewSubjectName] = useState("");
   const [addingSubject, setAddingSubject] = useState(false);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,18 +211,17 @@ export function ClassRecordsScreen({
   }
 
   return (
-    <section aria-label="Class Records">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Class Records
-      </h2>
-
-      {mode === "guided" && (
-        <p className="field-hint">
-          A class record is the workspace for one section, one subject, and one grading period. Open
-          one here, then use it to record scores.
-        </p>
-      )}
-
+    <Page
+      title="Class Records"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            A class record is the workspace for one section, one subject, and one grading period.
+            Open one here, then use it to record scores.
+          </p>
+        ) : undefined
+      }
+    >
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
@@ -365,6 +360,6 @@ export function ClassRecordsScreen({
           </tbody>
         </table>
       )}
-    </section>
+    </Page>
   );
 }

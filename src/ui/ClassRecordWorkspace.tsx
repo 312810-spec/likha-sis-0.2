@@ -17,6 +17,7 @@ import type {
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { StatusChip } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -55,7 +56,6 @@ export function ClassRecordWorkspace({
   exportService,
 }: ClassRecordWorkspaceProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -125,10 +125,6 @@ export function ClassRecordWorkspace({
     if (!learnerId) return;
     scoreInputRefs.current[learnerId]?.focus();
   }
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -494,19 +490,18 @@ export function ClassRecordWorkspace({
   const remainingCount = roster.length - recordedCount;
 
   return (
-    <section aria-label="Class Record Workspace">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Class Record Workspace
-      </h2>
-
-      {mode === "guided" && (
-        <p className="field-hint">
-          Add assessment items (e.g. quizzes, tasks), then select one below to enter each learner's
-          score. In the score column, press Enter or the Down arrow to save and move to the next
-          learner, and Escape to undo an unsaved change.
-        </p>
-      )}
-
+    <Page
+      title="Class Record Workspace"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Add assessment items (e.g. quizzes, tasks), then select one below to enter each
+            learner's score. In the score column, press Enter or the Down arrow to save and move to
+            the next learner, and Escape to undo an unsaved change.
+          </p>
+        ) : undefined
+      }
+    >
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
@@ -953,6 +948,6 @@ export function ClassRecordWorkspace({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }

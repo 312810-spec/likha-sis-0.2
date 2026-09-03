@@ -9,6 +9,7 @@ import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface MonthlySummaryScreenProps {
@@ -70,7 +71,6 @@ export function MonthlySummaryScreen({
   initialYearMonth,
 }: MonthlySummaryScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [{ year, month }, setYearMonth] = useState(initialYearMonth ?? currentYearMonth());
   const [sections, setSections] = useState<Section[]>([]);
   const [sectionId, setSectionId] = useState("");
@@ -89,10 +89,6 @@ export function MonthlySummaryScreen({
   const sectionsRequestRef = useRef(0);
   const reportRequestRef = useRef(0);
   const exportRequestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -217,11 +213,16 @@ export function MonthlySummaryScreen({
   const selectedSection = sections.find((section) => section.id === sectionId) ?? null;
 
   return (
-    <section aria-label="Monthly attendance summary">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Monthly Attendance Summary
-      </h2>
-
+    <Page
+      title="Monthly Attendance Summary"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Pick a section and month to see every learner's attendance for that month.
+          </p>
+        ) : undefined
+      }
+    >
       <p className="field-hint">
         This is a monthly overview inspired by DepEd School Form 2 (SF2) — it is{" "}
         <strong>not</strong> a verified, submission-ready reproduction of the official form. This
@@ -235,12 +236,6 @@ export function MonthlySummaryScreen({
         <strong>—</strong> not recorded (no attendance mark was made for that day — this does not
         mean the learner was present).
       </p>
-
-      {mode === "guided" && (
-        <p className="field-hint">
-          Pick a section and month to see every learner's attendance for that month.
-        </p>
-      )}
 
       {sectionsError && (
         <Alert tone="error">
@@ -384,6 +379,6 @@ export function MonthlySummaryScreen({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }

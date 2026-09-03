@@ -8,6 +8,7 @@ import type { Section } from "../domain/section";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { StatusChip } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -57,7 +58,6 @@ export function AttendanceScreen({
   onViewMonthlySummary,
 }: AttendanceScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [date, setDate] = useState(todayAsIsoDate);
   const [sections, setSections] = useState<Section[]>([]);
   const [sectionId, setSectionId] = useState("");
@@ -85,10 +85,6 @@ export function AttendanceScreen({
   const sectionsRequestRef = useRef(0);
   const rosterRequestRef = useRef(0);
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -270,17 +266,17 @@ export function AttendanceScreen({
   const remainingCount = roster.length - markedCount;
 
   return (
-    <section aria-label="Attendance">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Attendance
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Pick a section and date, then mark each learner Present, Absent, or Tardy. You can change
-          a mark at any time on the same day.
-        </p>
-      )}
-
+    <Page
+      title="Attendance"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Pick a section and date, then mark each learner Present, Absent, or Tardy. You can
+            change a mark at any time on the same day.
+          </p>
+        ) : undefined
+      }
+    >
       {sectionsError && (
         <Alert tone="error">
           <p>{sectionsError}</p>
@@ -453,6 +449,6 @@ export function AttendanceScreen({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }
