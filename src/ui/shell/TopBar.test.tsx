@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TopBar } from "./TopBar";
 import { ModeProvider } from "../theme/ModeContext";
+import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
 
 const session: CurrentSession = {
@@ -61,6 +62,11 @@ describe("TopBar", () => {
     renderTopBar({ onOpenDrawer });
     await user.click(screen.getByRole("button", { name: "Open navigation" }));
     expect(onOpenDrawer).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no axe violations on a default render", async () => {
+    const { container } = renderTopBar();
+    await expectNoAccessibilityViolations(container);
   });
 
   it("keeps a working density-mode switcher", async () => {

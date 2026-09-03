@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { BottomNav } from "./BottomNav";
+import { expectNoAccessibilityViolations } from "../../test/a11y";
 
 function renderBottomNav(over: Partial<ComponentProps<typeof BottomNav>> = {}) {
   return render(
@@ -31,6 +32,11 @@ describe("BottomNav", () => {
     // section-roster normalizes to "sections", which is not one of the four
     // bottom-nav ids, so none is current -- and that is fine.
     expect(screen.queryByRole("button", { current: "page" })).toBeNull();
+  });
+
+  it("has no axe violations on a default render", async () => {
+    const { container } = renderBottomNav();
+    await expectNoAccessibilityViolations(container);
   });
 
   it("calls onNavigate / onOpenMore", async () => {

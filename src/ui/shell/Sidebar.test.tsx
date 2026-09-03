@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 import type { SignedInTab } from "../components/workbench-nav-data";
 import { ModeProvider } from "../theme/ModeContext";
+import { expectNoAccessibilityViolations } from "../../test/a11y";
 
 function renderSidebar(activeTab: SignedInTab = "attendance", onNavigate = vi.fn()) {
   return render(
@@ -66,6 +67,11 @@ describe("Sidebar", () => {
       "aria-expanded",
       "false",
     );
+  });
+
+  it("has no axe violations on a default render", async () => {
+    const { container } = renderSidebar();
+    await expectNoAccessibilityViolations(container);
   });
 
   it("survives unreadable localStorage by defaulting to all expanded", () => {

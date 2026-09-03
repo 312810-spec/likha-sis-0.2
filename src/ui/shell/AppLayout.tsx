@@ -16,9 +16,23 @@ interface AppLayoutProps {
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const PHONE_QUERY = "(max-width: 860px)";
+
 export function AppLayout({ session, activeTab, onNavigate, onLogout, children }: AppLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isPhone, setIsPhone] = useState(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia(PHONE_QUERY).matches;
+  });
   const sidebarWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(PHONE_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsPhone(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
@@ -65,13 +79,21 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [drawerOpen, closeDrawer]);
 
+  const sidebarInert = isPhone && !drawerOpen;
+  const mainInert = isPhone && drawerOpen;
+
   return (
     <div className="app-layout" data-drawer={drawerOpen ? "open" : "closed"}>
       <div className="app-layout-scrim" onClick={closeDrawer} aria-hidden="true" />
-      <div className="app-layout-sidebar" ref={sidebarWrapRef}>
+      <div
+        className="app-layout-sidebar"
+        ref={sidebarWrapRef}
+        inert={sidebarInert}
+        aria-hidden={sidebarInert || undefined}
+      >
         <Sidebar activeTab={activeTab} onNavigate={navigate} />
       </div>
-      <div className="app-layout-main">
+      <div className="app-layout-main" inert={mainInert} aria-hidden={mainInert || undefined}>
         <TopBar
           session={session}
           activeTab={activeTab}

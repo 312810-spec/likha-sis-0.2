@@ -1330,6 +1330,7 @@ label {
 .app-bottomnav button[aria-current="page"] {
   color: var(--color-primary);
   font-weight: 700;
+  box-shadow: inset 0 2px 0 var(--color-primary);
 }
 
 /* Redesign shell -- layout grid (ADR-0057). */
