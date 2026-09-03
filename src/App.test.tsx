@@ -75,6 +75,28 @@ describe("App", () => {
     expect(screen.getByText(/Rizal Elementary/)).toBeInTheDocument();
   });
 
+  it("shows the school-head Home view switch for a session that holds school_head", async () => {
+    const schoolHeadSession: CurrentSession = {
+      ...session,
+      roles: ["school_head", "teacher"],
+    };
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(schoolHeadSession);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_sf1_import_history") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+
+    render(<App />);
+
+    const group = await screen.findByRole("group", { name: "Home view" });
+    expect(within(group).getByRole("button", { name: "School overview" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "School overview" })).toBeInTheDocument();
+  });
+
   it("groups the navigation into named workbench clusters, preserving every destination", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });

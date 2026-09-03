@@ -28,6 +28,7 @@ import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
+import { HomeScreen } from "./ui/HomeScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
@@ -40,7 +41,6 @@ import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
-import { TeacherWorkspaceScreen } from "./ui/TeacherWorkspaceScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
 import { AppLayout } from "./ui/shell/AppLayout";
@@ -184,19 +184,23 @@ function App() {
         >
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
           {activeTab === "workspace" ? (
-            <TeacherWorkspaceScreen
+            <HomeScreen
+              roles={session.roles}
               displayName={session.displayName}
+              schoolName={session.schoolName}
               attendanceService={attendanceService}
               authService={authService}
               gradingService={gradingService}
               learnerService={learnerService}
               sectionService={sectionService}
+              sf1ImportService={sf1ImportService}
               onOpenAttendance={(sectionId) => {
                 setAttendanceSectionId(sectionId);
                 setActiveTab("attendance");
               }}
               onManageSections={() => setActiveTab("sections")}
               onViewAuditLog={() => setActiveTab("audit-log")}
+              onOpenSf1Import={() => setActiveTab("sf1-import")}
             />
           ) : activeTab === "learners" ? (
             <LearnerListScreen
