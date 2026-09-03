@@ -1,5 +1,62 @@
 # ACTIVE PLAN
 
+## Wave 1: UI redesign shell (added 2026-09-03) — complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md`;
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 1
+entry; `docs/VERIFICATION-DEBT.md` Wave 1 entry. Branch
+`claude/ui-redesign-wave-1-shell` from `main` at `6f15df7`; `main`
+untouched.
+
+**Scope**: Wave 1 of the approved UI redesign design session
+(`docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md`) — the
+outer shell only. Supersedes the app-shell/flat-nav parts of ADR-0031
+§4 and ADR-0030's programme (both stay Accepted for their token/design
+decisions). No layout primitives, no role-adaptive Home this wave. Zero
+Rust changes.
+
+**What shipped**: `src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`
+
+- tests; `src/ui/components/icons.tsx` (hand-written inline SVG set) +
+  test; `workbench-nav-data.ts` extended (`TAB_LABELS.workspace` →
+  "Home"; new `HOME_DESTINATION`, `BOTTOM_NAV`, `normalizeTab()`,
+  `groupLabelForTab()`) + test. Five additive contrast-verified tokens in
+  `tokens.css` (`--color-surface-2`, `--color-border-soft`,
+  `--color-primary-wash`, `--elevation-2`, `--sidebar-width`). `App.tsx`
+  mounts `<AppLayout>`; pre-auth renders outside it in `.app-boot`. Old
+  `AppShell`/`WorkbenchNav`/`NavItem` and their CSS removed;
+  `.app-layout*`/`.app-sidebar*`/`.app-topbar*`/`.app-bottomnav*`/
+  `.app-boot*` CSS added. Phone-width drawer has focus-move-in / trap /
+  Escape-close / focus-return and `inert`+`aria-hidden` gating via
+  `matchMedia("(max-width: 860px)")` so exactly one nav landmark is in the
+  a11y tree. Pinned Home still routes to Teacher Workspace (Wave 3
+  repoints it).
+
+**Verification actually run this session**: `npm run quality:full` exit
+0 — `harness:verify` 100/100; typecheck/lint/format/architecture clean;
+Vitest **763/763** (82 files, up from 735); `cargo fmt --check` clean;
+`cargo test` 602 lib + all integration binaries, 0 failed, unchanged;
+`cargo clippy --all-targets -- -D warnings` clean. `npm run
+quality:security` exit 0 (no new dependency). `npm run
+check:dev-preview-isolation` exit 0. `npm run build` clean — CSS gzip
+**4.83 kB**, JS gzip **101.83 kB**. `accessibility-reviewer` ran
+(CHANGES-REQUIRED); its two Important + one Minor finding are fixed;
+four Minors retained as debt.
+
+**Not done this milestone**: `npm run quality:ui` Playwright smoke —
+browser binary (`chromium_headless_shell-1237`) not installed here
+(pre-existing debt); jsdom + axe cover the shell, native
+NVDA/Narrator / compiled-binary pass owed. `teacher-ux-reviewer` and
+`architecture-reviewer` ran but findings could not be retrieved (known
+harness retrieval failure); controller self-review stood in, no
+blocking issue; debt retained. A final whole-branch code review is
+still to run.
+
+**Next**: Wave 2 — layout primitives (`Page`, `KpiStrip`/`Kpi`,
+`BentoGrid`/`Card`, `DataTable`) + migrate `SectionsScreen` and
+`TodaysClassesScreen` as proof. Gets its own implementation plan. Not
+started.
+
 ## Wave 3G: Section Adviser Management UI (added 2026-08-31) — complete
 
 Full record: `docs/PROJECT-MEMORY.md` Wave 3G entry;

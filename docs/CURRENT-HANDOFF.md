@@ -1,5 +1,68 @@
 # CURRENT HANDOFF
 
+## Wave 1: UI redesign shell — complete (2026-09-03)
+
+Branch `claude/ui-redesign-wave-1-shell`, from `main` at `6f15df7`.
+Commit range `789e4e5..HEAD` (design spec + implementation plan, then
+Wave 1 tasks 1–10, then Task 11: ADR-0057 + the accessibility fixes +
+this state-doc update). ADR-0057 is the durable record.
+
+**What shipped**: a persistent left sidebar with a pinned Home item and
+four collapsible groups (`localStorage`-persisted), replacing the flat
+single-row workbench nav; an `AppLayout` CSS-grid shell with a `<main>`
+landmark; an off-canvas drawer at phone width (focus-move-in, focus
+trap, Escape-to-close, focus-return, and `inert`/`aria-hidden` gating so
+exactly one nav landmark and one focus scope are reachable); a `TopBar`
+(breadcrumb, density-mode switcher, identity, sign-out, hamburger); a
+phone-only `BottomNav`; a hand-written inline SVG icon set; five
+additive contrast-verified tokens (`--color-surface-2`,
+`--color-border-soft`, `--color-primary-wash`, `--elevation-2`,
+`--sidebar-width`). Pre-auth screens render outside the shell in
+`.app-boot`. Old `AppShell`/`WorkbenchNav`/`NavItem` and their CSS are
+removed. Pinned Home still routes to the existing Teacher Workspace in
+Wave 1.
+
+**Verification actually run**: `npm run quality:full` exit 0 —
+`harness:verify` 100/100 certified; typecheck/lint/format/architecture
+clean; Vitest **763** tests pass (82 files, up from 735); `cargo fmt
+--check` clean; `cargo test` 602 lib tests + all integration binaries, 0
+failed, unchanged (no Rust touched); `cargo clippy --all-targets -- -D
+warnings` clean. `npm run quality:security` exit 0 (gitleaks clean,
+cargo-deny pre-existing warnings only, osv-scanner clean; no new
+dependency). `npm run check:dev-preview-isolation` exit 0. `npm run
+build` succeeds — CSS gzip **4.83 kB**, JS gzip **101.83 kB**.
+
+**Accessibility review**: `accessibility-reviewer` ran, returned full
+findings, verdict CHANGES-REQUIRED. **Fixed in Task 11**: the closed
+off-canvas drawer was still keyboard/AT-reachable at phone width (now
+`inert` + `aria-hidden` via `matchMedia("(max-width: 860px)")`); the
+shell tests had no axe assertions (now on all four components, drawer
+closed + open); BottomNav active state had no non-colour shape cue (now
+a `box-shadow` top indicator bar). **Retained as debt** for the final
+review / Wave 2: hamburger ~40px vs the 44px phone recommendation (still
+≥24px, WCAG 2.5.8 AA passes); `.app-sidebar overflow:hidden` may clip
+the 2px focus ring; focus not returned to the toggle on
+destination-select; focus-trap effect lacks a width guard.
+
+**teacher-ux + architecture reviews**: both agents ran but their
+findings could not be retrieved (known reviewer-harness retrieval
+failure). A controller self-review found no blocking issue
+(architecture-boundary check passes, no `composition.ts` import from
+shell, no SQL added, plain teacher language, mode parity intact).
+Independent-review debt for both is retained in
+`docs/VERIFICATION-DEBT.md`. A final whole-branch code review is still
+to run.
+
+**`quality:ui` blocked**: the Playwright browser binary
+(`chromium_headless_shell-1237`) is not installed here — the
+pre-existing issue in `docs/VERIFICATION-DEBT.md`. jsdom + axe cover the
+shell; a native NVDA/Narrator / compiled-binary pass is owed.
+
+**Exact next slice (do NOT start it)**: **Wave 2 — layout primitives**:
+build `Page`, `KpiStrip`/`Kpi`, `BentoGrid`/`Card`, and `DataTable`, and
+migrate `SectionsScreen` and `TodaysClassesScreen` onto them as the
+proof. It gets its own implementation plan.
+
 ## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)
 
 Continued directly after the Wave 3E/3F/3G review debt closure below,

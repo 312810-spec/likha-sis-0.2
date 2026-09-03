@@ -1,5 +1,44 @@
 # Verification Debt
 
+## Wave 1 UI redesign shell (2026-09-03)
+
+The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),
+its phone-width drawer focus-trap, and the phone bottom nav have **jsdom
+
+- axe (`expectNoAccessibilityViolations`) coverage only** so far. A
+  native NVDA/Narrator + compiled-binary visual pass is owed — is the
+  persistent sidebar readable and comfortable, does the drawer trap and
+  return focus correctly under a real screen reader, is the bottom-nav
+  active indicator perceivable.
+
+`npm run quality:ui` (Playwright smoke) **could not run** this session —
+the pinned browser binary (`chromium_headless_shell-1237`) is not
+installed in this environment (same pre-existing blocker recorded
+elsewhere in this file). The shell has no `src/dev-preview/` fixture
+wiring beyond the existing fixture render.
+
+`teacher-ux-reviewer` and `architecture-reviewer` were dispatched for
+this milestone but their findings **could not be retrieved** (known
+reviewer-harness retrieval failure). A controller self-review stood in
+and found no blocking issue; the independent-review debt for both
+reviewers is retained and should be retried in a later session.
+
+**Retained accessibility Minors** (from the `accessibility-reviewer`
+pass, verdict CHANGES-REQUIRED; its two Important + one Minor findings
+were fixed in Task 11):
+
+- the hamburger toggle is ~40px against the 44px phone target
+  recommendation — still ≥24px, so WCAG 2.5.8 AA passes;
+- `.app-sidebar { overflow: hidden }` may clip the 2px focus ring on
+  edge items;
+- focus is not returned to the drawer toggle when a destination is
+  selected (only on Escape / scrim close);
+- the focus-trap effect has no width guard, so it also runs at desktop
+  width where there is no drawer.
+
+A final whole-branch code review is still to run before this branch
+integrates.
+
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
 Real browser-rendered Playwright verification of the Section Adviser
@@ -2716,6 +2755,13 @@ UI. A human visual pass (does it look premium/comfortable, not just
 structurally valid?) and a real screen-reader pass (NVDA/Narrator) on the
 compiled app are still owed for every screen shipped so far
 (`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+
+**Update 2026-09-03**: `AppShell` no longer exists — Wave 1 of the UI
+redesign (ADR-0057) removed it and replaced it with
+`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`. The owed native
+visual / screen-reader pass now applies to those four shell components
+instead; see the Wave 1 entry at the top of this file for the current
+scope.
 
 ## Browser-pane dev-server port was misconfigured — fixed 2026-08-25 (closed)
 

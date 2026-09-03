@@ -2763,6 +2763,14 @@ new top entry.
 - Both Quality Gate and Security Gate confirmed green on `main`'s new
   head (`9c1514c`) after the fast-forward, not assumed.
 
+## Wave 1 — UI redesign shell (ADR-0057) (added 2026-09-03)
+
+Wave 1 UI redesign shell (ADR-0057): a persistent sidebar + adaptive
+drawer/bottom-nav replaces the flat workbench nav; Calm Civic Classroom
+palette unchanged, five additive contrast-verified tokens; pinned Home
+still routes to Teacher Workspace (role-adaptive Home is Wave 3). Old
+AppShell/WorkbenchNav/NavItem removed.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
