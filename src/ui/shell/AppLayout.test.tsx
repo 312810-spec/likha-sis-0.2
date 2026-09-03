@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./AppLayout";
@@ -30,6 +30,21 @@ function stubMatchMedia() {
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   }));
+}
+
+// Drive the `change` listeners AppLayout registered on its matchMedia
+// query -- the stub above records them via addEventListener but never
+// fires them on its own.
+function emitViewportChange(matches: boolean) {
+  matchMediaResult = matches;
+  const mockFn = window.matchMedia as unknown as ReturnType<typeof vi.fn>;
+  act(() => {
+    for (const result of mockFn.mock.results) {
+      for (const [event, handler] of result.value.addEventListener.mock.calls) {
+        if (event === "change") handler({ matches } as MediaQueryListEvent);
+      }
+    }
+  });
 }
 
 beforeEach(() => {
@@ -66,6 +81,7 @@ describe("AppLayout", () => {
   });
 
   it("opens the drawer from the hamburger and closes it on Escape, restoring focus", async () => {
+    matchMediaResult = true; // the drawer is a phone-width concern
     const user = userEvent.setup();
     const { container } = renderLayout();
     const hamburger = screen.getByRole("button", { name: "Open navigation" });
@@ -77,12 +93,13 @@ describe("AppLayout", () => {
   });
 
   it("closes the drawer when a navigation happens", async () => {
+    matchMediaResult = true; // the drawer is a phone-width concern
     const user = userEvent.setup();
     const onNavigate = vi.fn();
     const { container } = renderLayout({ onNavigate });
     await user.click(screen.getByRole("button", { name: "Open navigation" }));
-    // Both the sidebar and the bottom nav expose a "Learners" button, so
-    // scope to the sidebar landmark (aria-label "Primary", exact).
+    // With the drawer open at phone width the sidebar is the only live
+    // navigation landmark (aria-label "Primary", exact).
     const sidebar = screen.getByRole("navigation", { name: "Primary" });
     await user.click(within(sidebar).getByRole("button", { name: "Learners" }));
     expect(onNavigate).toHaveBeenCalledWith("learners");
@@ -90,6 +107,7 @@ describe("AppLayout", () => {
   });
 
   it("closes the drawer when the scrim is clicked", async () => {
+    matchMediaResult = true; // the drawer is a phone-width concern
     const user = userEvent.setup();
     const { container } = renderLayout();
     await user.click(screen.getByRole("button", { name: "Open navigation" }));
@@ -133,6 +151,42 @@ describe("AppLayout", () => {
       await user.click(screen.getByRole("button", { name: "Open navigation" }));
       expect(sidebarWrap).not.toHaveAttribute("aria-hidden");
       expect(mainWrap).not.toHaveAttribute("aria-hidden");
+    });
+  });
+
+  describe("single nav landmark at phone width", () => {
+    it("exposes exactly one navigation landmark with the drawer closed (the bottom nav)", () => {
+      matchMediaResult = true; // phone
+      renderLayout();
+      const navs = screen.queryAllByRole("navigation");
+      expect(navs).toHaveLength(1);
+      // The sidebar wrapper is aria-hidden; the live one is the bottom bar.
+      expect(navs[0]).toHaveAccessibleName("Primary — quick access");
+    });
+
+    it("exposes exactly one navigation landmark with the drawer open (the sidebar)", async () => {
+      matchMediaResult = true; // phone
+      const user = userEvent.setup();
+      renderLayout();
+      await user.click(screen.getByRole("button", { name: "Open navigation" }));
+      const navs = screen.queryAllByRole("navigation");
+      // The bottom nav now lives inside .app-layout-main, which is
+      // aria-hidden while the drawer is open -- so only the sidebar shows.
+      expect(navs).toHaveLength(1);
+      expect(navs[0]).toHaveAccessibleName("Primary");
+    });
+  });
+
+  describe("resize while the drawer is open", () => {
+    it("closes the drawer when the viewport leaves phone width", async () => {
+      matchMediaResult = true; // phone
+      const user = userEvent.setup();
+      const { container } = renderLayout();
+      await user.click(screen.getByRole("button", { name: "Open navigation" }));
+      expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "open");
+
+      emitViewportChange(false); // widen past 860px
+      expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "closed");
     });
   });
 

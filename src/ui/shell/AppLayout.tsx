@@ -29,7 +29,13 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const mql = window.matchMedia(PHONE_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsPhone(e.matches);
+    const onChange = (e: MediaQueryListEvent) => {
+      setIsPhone(e.matches);
+      // Leaving phone width turns the off-canvas drawer back into the
+      // normal grid sidebar; drop the open state so the focus trap and
+      // scrim can't outlive the drawer (WCAG 2.1.2).
+      if (!e.matches) setDrawerOpen(false);
+    };
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
@@ -50,7 +56,7 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
   );
 
   useEffect(() => {
-    if (!drawerOpen) return;
+    if (!drawerOpen || !isPhone) return;
     const wrap = sidebarWrapRef.current;
     const first = wrap?.querySelector<HTMLElement>(FOCUSABLE);
     first?.focus();
@@ -77,7 +83,7 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [drawerOpen, closeDrawer]);
+  }, [drawerOpen, isPhone, closeDrawer]);
 
   const sidebarInert = isPhone && !drawerOpen;
   const mainInert = isPhone && drawerOpen;
@@ -101,12 +107,12 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
           onOpenDrawer={() => setDrawerOpen(true)}
         />
         <main className="app-canvas">{children}</main>
+        <BottomNav
+          activeTab={activeTab}
+          onNavigate={navigate}
+          onOpenMore={() => setDrawerOpen(true)}
+        />
       </div>
-      <BottomNav
-        activeTab={activeTab}
-        onNavigate={navigate}
-        onOpenMore={() => setDrawerOpen(true)}
-      />
     </div>
   );
 }

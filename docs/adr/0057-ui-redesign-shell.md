@@ -35,9 +35,10 @@ admin-console framing. LIKHA stays a calm, teacher-first tool.
 exactly five tokens. All are additive; no existing token is redefined or
 removed.
 
-- `--color-surface-2` — `#ffffff` light / `#222932` dark. The raised
-  surface for cards, the sidebar, and the drawer, one step off the page
-  ground.
+- `--color-surface-2` — `#ffffff` light / `#222932` dark. The
+  raised/card surface, one step off the page ground — laid down now for
+  the Wave 2 layout primitives (`Card`) that will consume it. The
+  sidebar and top bar use `--color-surface`.
 - `--color-border-soft` — `#e4ddce` light / `#333c47` dark. **Hairline
   dividers and card outlines only.** It is never the sole cue that a
   control exists; real input and button borders keep `--color-border`.

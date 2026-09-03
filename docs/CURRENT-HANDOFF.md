@@ -38,11 +38,24 @@ off-canvas drawer was still keyboard/AT-reachable at phone width (now
 `inert` + `aria-hidden` via `matchMedia("(max-width: 860px)")`); the
 shell tests had no axe assertions (now on all four components, drawer
 closed + open); BottomNav active state had no non-colour shape cue (now
-a `box-shadow` top indicator bar). **Retained as debt** for the final
-review / Wave 2: hamburger ~40px vs the 44px phone recommendation (still
+a `box-shadow` top indicator bar). **Fixed in the final whole-branch
+review pass**: the phone bottom nav was a sibling of `.app-layout-main`
+so `mainInert` did not cover it (two live `navigation` landmarks with
+the drawer open) — `BottomNav` is now the last child of
+`.app-layout-main`; the focus-trap effect had no width guard, so it kept
+running after a resize to desktop while the drawer was open (WCAG 2.1.2
+keyboard trap) — it now early-returns unless `isPhone`, and the drawer
+auto-closes when the viewport leaves phone width. **Retained as debt**
+for Wave 2: hamburger ~40px vs the 44px phone recommendation (still
 ≥24px, WCAG 2.5.8 AA passes); `.app-sidebar overflow:hidden` may clip
-the 2px focus ring; focus not returned to the toggle on
-destination-select; focus-trap effect lacks a width guard.
+the 2px focus ring.
+
+**Deliberate behaviour, not debt**: focus is not returned to the drawer
+toggle when a destination is selected. All 18 signed-in screens move
+focus to their own heading on mount, so on a destination-select focus
+correctly lands on the new screen's title, not back on the (now
+irrelevant) hamburger. Escape/scrim close still return focus to the
+toggle, because no navigation happened.
 
 **teacher-ux + architecture reviews**: both agents ran but their
 findings could not be retrieved (known reviewer-harness retrieval
