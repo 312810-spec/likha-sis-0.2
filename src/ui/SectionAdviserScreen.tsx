@@ -7,6 +7,7 @@ import type { SectionAdvisory } from "../domain/section-advisory";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionAdviserScreenProps {
@@ -51,7 +52,6 @@ export function SectionAdviserScreen({
   onBack,
 }: SectionAdviserScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [adviser, setAdviser] = useState<SectionAdvisory | null>(null);
   const [members, setMembers] = useState<SchoolMember[]>([]);
@@ -67,10 +67,6 @@ export function SectionAdviserScreen({
   const [ending, setEnding] = useState(false);
 
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -159,20 +155,21 @@ export function SectionAdviserScreen({
   }
 
   return (
-    <section aria-label="Section Adviser">
+    <Page
+      title={`${sectionName} — adviser`}
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Assign one teacher as this section's adviser. To change advisers, end the current
+            advisory first, then assign the new teacher — this keeps a full history of who advised
+            this section and when.
+          </p>
+        ) : undefined
+      }
+    >
       <button type="button" className="section-roster-back" onClick={onBack}>
         <span aria-hidden="true">← </span>Back to sections
       </button>
-      <h2 ref={headingRef} tabIndex={-1}>
-        {sectionName} — adviser
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Assign one teacher as this section's adviser. To change advisers, end the current advisory
-          first, then assign the new teacher — this keeps a full history of who advised this section
-          and when.
-        </p>
-      )}
 
       {loadError && (
         <Alert tone="error">
@@ -256,6 +253,6 @@ export function SectionAdviserScreen({
           </form>
         </>
       )}
-    </section>
+    </Page>
   );
 }

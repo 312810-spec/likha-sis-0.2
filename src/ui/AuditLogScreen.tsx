@@ -4,7 +4,7 @@ import type { AuditEventType, AuditLogEntry } from "../domain/session";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
-import { PageHeader } from "./components/PageHeader";
+import { Page } from "./components/Page";
 import { StatusChip, type StatusChipTone } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -72,20 +72,17 @@ export function AuditLogScreen({ authService }: AuditLogScreenProps) {
   }, [authService]);
 
   return (
-    <section aria-label="Sign-in activity">
-      <PageHeader
-        title="Sign-in Activity"
-        hint={
-          mode === "guided" && (
-            <p className="field-hint">
-              This shows recent sign-in attempts for your school — who signed in, who signed out,
-              and any failed or locked-out attempts. It does not track what anyone did after signing
-              in.
-            </p>
-          )
-        }
-      />
-
+    <Page
+      title="Sign-in Activity"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            This shows recent sign-in attempts for your school — who signed in, who signed out, and
+            any failed or locked-out attempts. It does not track what anyone did after signing in.
+          </p>
+        ) : undefined
+      }
+    >
       {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
@@ -116,6 +113,6 @@ export function AuditLogScreen({ authService }: AuditLogScreenProps) {
           </tbody>
         </table>
       )}
-    </section>
+    </Page>
   );
 }

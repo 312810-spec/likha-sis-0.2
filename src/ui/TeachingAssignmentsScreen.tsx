@@ -9,6 +9,7 @@ import type { TeachingAssignmentDetail } from "../domain/teaching-assignment";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TeachingAssignmentsScreenProps {
@@ -53,7 +54,6 @@ export function TeachingAssignmentsScreen({
   onManageSchedule,
 }: TeachingAssignmentsScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [assignments, setAssignments] = useState<TeachingAssignmentDetail[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -69,10 +69,6 @@ export function TeachingAssignmentsScreen({
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -165,19 +161,20 @@ export function TeachingAssignmentsScreen({
   }
 
   return (
-    <section aria-label="Teaching Assignments">
+    <Page
+      title={`${sectionName} — teaching assignments`}
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Assign one teacher per subject for this section. To change who teaches a subject, remove
+            the current assignment first, then assign the new teacher.
+          </p>
+        ) : undefined
+      }
+    >
       <button type="button" className="section-roster-back" onClick={onBack}>
         <span aria-hidden="true">← </span>Back to sections
       </button>
-      <h2 ref={headingRef} tabIndex={-1}>
-        {sectionName} — teaching assignments
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Assign one teacher per subject for this section. To change who teaches a subject, remove
-          the current assignment first, then assign the new teacher.
-        </p>
-      )}
 
       {loadError && (
         <Alert tone="error">
@@ -289,6 +286,6 @@ export function TeachingAssignmentsScreen({
           </form>
         </>
       )}
-    </section>
+    </Page>
   );
 }

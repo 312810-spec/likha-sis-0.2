@@ -6,6 +6,7 @@ import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ScheduleMeetingsScreenProps {
@@ -44,7 +45,6 @@ export function ScheduleMeetingsScreen({
   onBack,
 }: ScheduleMeetingsScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const [meetings, setMeetings] = useState<ScheduleMeeting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,10 +60,6 @@ export function ScheduleMeetingsScreen({
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -140,19 +136,20 @@ export function ScheduleMeetingsScreen({
   }
 
   return (
-    <section aria-label="Class Schedule">
+    <Page
+      title={`${subjectName} — ${sectionName} — schedule`}
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Add each weekly meeting time for this class. A teacher, section, or room can&rsquo;t be
+            double-booked for overlapping times.
+          </p>
+        ) : undefined
+      }
+    >
       <button type="button" className="section-roster-back" onClick={onBack}>
         <span aria-hidden="true">← </span>Back to teaching assignments
       </button>
-      <h2 ref={headingRef} tabIndex={-1}>
-        {subjectName} — {sectionName} — schedule
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Add each weekly meeting time for this class. A teacher, section, or room can&rsquo;t be
-          double-booked for overlapping times.
-        </p>
-      )}
 
       {loadError && (
         <Alert tone="error">
@@ -258,6 +255,6 @@ export function ScheduleMeetingsScreen({
           </form>
         </>
       )}
-    </section>
+    </Page>
   );
 }
