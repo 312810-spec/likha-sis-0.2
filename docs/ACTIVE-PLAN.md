@@ -1,5 +1,33 @@
 # ACTIVE PLAN
 
+## Wave 6: final review + merge (added 2026-09-03) - complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md` "Wave 6 addendum";
+`docs/CURRENT-HANDOFF.md` top entry.
+
+**Scope**: no screen-migration tasks (the four remaining table screens'
+keyboard models made DataTable migration too risky for the session
+budget). Whole-branch review of Waves 1-5, fix its Important findings,
+merge to `main`.
+
+**What shipped**: independent Opus whole-branch review
+(SHIP-WITH-FOLLOWUPS, no Critical); three Important fixes in `7f1242c`
+(drawer focus post-inert; signed-in `<h1>`; explicit DataTable roles);
+ADR-0057 Wave 6 addendum + state docs; merge of
+`claude/ui-redesign-wave-1-shell` -> `main`.
+
+**Verification actually run this session**: `npm run quality:full` exit 0
+(harness 100/100; Vitest 843/90f; cargo 611 lib + integration 0-failed;
+clippy + fmt clean); `quality:security` clean; `check:dev-preview-isolation`
+exit 0.
+
+**Not done / accepted backlog**: DataTable adoption by the 4 table
+screens; teacher-Home rebuild + `TeacherWorkspaceScreen`/`PageHeader`
+deletion; Login/first-run restyle; attendance-by-grade card; six review
+minors; native screen-reader + `quality:ui` pass.
+
+**Next**: none pre-selected. The redesign is delivered.
+
 ## Wave 5: Page scaffold re-fit (added 2026-09-03) — complete
 
 Full record: `docs/adr/0057-ui-redesign-shell.md` "Wave 5 addendum";

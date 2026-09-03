@@ -500,3 +500,71 @@ files (one net-new: the `Page` `headingRef` test); `cargo` untouched
 green. `npm run quality:security` clean (no dependency). `npm run
 check:dev-preview-isolation` exit 0. `npx knip` — no new findings
 (`PageHeader` is still consumed by the un-refitted `TeacherWorkspaceScreen`).
+
+## Wave 6 addendum — final review + accepted backlog (2026-09-03)
+
+Wave 6 executed **no screen-migration tasks**. Reconnaissance found that
+all four remaining hand-rolled table screens (Attendance, Subject
+Attendance, Section Roster, Class Record Workspace) carry
+keyboard-interaction models (P/A/T + ↑/↓ on attendance; Enter/blur-save
+
+- `:focus-within` on score entry) whose `DataTable` migration risk was
+  judged disproportionate to the session's remaining budget. Waves 1–5
+  already deliver a complete, coherent, fully-green redesign — new shell,
+  layout primitives, role-adaptive Home with a real School-Head overview,
+  and every in-shell screen on the `Page` scaffold — so the branch went
+  straight to a whole-branch review and merge.
+
+### Whole-branch final review — SHIP-WITH-FOLLOWUPS
+
+An independent whole-branch review (Opus, 49 commits, `6f15df7..HEAD`):
+**no Critical.** Rust/auth **clean, no findings** — `role::list_roles`
+and `attendance::school_day_totals` are parameterised, scoped, and
+aggregate-only; both commands are capability-gated with server-derived
+scope; the `roles` DTO field is display-only in fact (its only consumer
+is `HomeScreen`'s layout branch). Architecture boundaries **clean**.
+Behaviour preservation across all 16 re-fitted screens **verified**.
+
+Three **Important** findings were **fixed in-wave** (commit that follows
+this addendum):
+
+1. **`AppLayout` drawer focus restore into an inert subtree** — the
+   hamburger lives inside `.app-layout-main`, which is `inert` while the
+   drawer is open, so the synchronous `.focus()` in `closeDrawer` was a
+   no-op in real browsers (jsdom does not enforce `inert`). Moved the
+   restore to a `useEffect` keyed on the `drawerOpen` `true→false`
+   transition, so it runs after the re-render that clears `inert`
+   (WCAG 2.4.3).
+2. **No `<h1>` in the signed-in app** — the deleted `AppShell` supplied
+   one; the new sidebar brand was a `<span>` and every screen title is
+   `Page`'s `<h2>`. The sidebar brand is now an `<h1>` (regression fixed).
+3. **`DataTable` phone reflow stripped table ARIA roles** — `display:
+block` on the table elements drops their implicit roles in real
+   browsers, contradicting the primitive's own contract. `DataTable`
+   now sets `role="table" | "rowgroup" | "row" | "columnheader" |
+"rowheader" | "cell"` explicitly so the semantics survive the reflow;
+   the doc comment is corrected.
+
+### Accepted backlog (not blocking; recorded for a follow-up)
+
+- **`DataTable` adoption** by Attendance, Subject Attendance, Section
+  Roster, Class Record Workspace (each needs care around its keyboard
+  model / inline panels).
+- **Teacher Home rebuild** — the teacher branch of `HomeScreen` still
+  renders `TeacherWorkspaceScreen` on `PageHeader` as-is (functional,
+  not on the primitives); it also gets no mount-focus, a focus-model
+  inconsistency vs. every `Page`-based screen. Rebuilding it on
+  `Page`/`KpiStrip`/`BentoGrid`/`Card` also lets `TeacherWorkspaceScreen`
+  and `PageHeader` be deleted.
+- **Login / First-run restyle** within `.app-boot`.
+- **`SchoolHeadHome` "attendance by grade"** card (needs a
+  `section_memberships` temporal join — its own security-reviewed read).
+- **Review minors**: `SchoolHeadHome` captures `todayIso` once (midnight
+  staleness); `Page` mount-focus re-runs on `headingRef` identity change
+  (stable-ref requirement undocumented); `DataTable` renders a bare
+  `": "` for an empty `data-label`; the `.page` class has no CSS rule;
+  `.app-topbar-menu` is 40×40 (WCAG 2.5.8 AA passes, 2.5.5 does not); no
+  skip-to-content link (also absent before this branch).
+- **Native NVDA/Narrator + `quality:ui` Playwright** pass across the whole
+  redesigned surface — still owed (`docs/VERIFICATION-DEBT.md`); the
+  browser binary is absent in this environment.

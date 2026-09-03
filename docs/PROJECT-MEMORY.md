@@ -2809,6 +2809,22 @@ without an adviser" card, and a "Teaching load" card with a
 
 ## Current Milestone
 
+## Wave 6 — UI redesign final review + merge (ADR-0057 addendum) (added 2026-09-03)
+
+Wave 6 (ADR-0057 addendum): no screen-migration tasks executed (the four
+remaining table screens' keyboard models made DataTable migration too
+risky for the session budget). Independent whole-branch review (Opus):
+SHIP-WITH-FOLLOWUPS, no Critical, Rust/auth + architecture + behaviour
+preservation all clean; three Important findings (drawer focus into an
+inert subtree; missing signed-in <h1>; DataTable reflow dropping table
+roles) fixed in-wave. Redesign (Waves 1-6) merged to `main`. Accepted
+backlog: DataTable adoption by the 4 table screens, teacher-Home rebuild
+
+- TeacherWorkspaceScreen/PageHeader deletion, Login/first-run restyle,
+  SchoolHeadHome attendance-by-grade, six review minors, native SR pass.
+
+## Current Milestone
+
 ## Wave 5 — UI redesign Page scaffold re-fit (ADR-0057 addendum) (added 2026-09-03)
 
 Wave 5 (ADR-0057 addendum): all 16 remaining in-shell screens moved onto

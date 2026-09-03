@@ -1,5 +1,39 @@
 # CURRENT HANDOFF
 
+## Wave 6: final review + merge — complete (2026-09-03)
+
+The UI redesign (Waves 1-6, branch `claude/ui-redesign-wave-1-shell`,
+49+ commits `6f15df7..HEAD`) has passed an independent whole-branch
+review and is **merged to `main`**. ADR-0057 (six wave addenda) is the
+durable record.
+
+**Whole-branch review** (Opus): SHIP-WITH-FOLLOWUPS, no Critical.
+Rust/auth clean, architecture clean, behaviour preserved across all 16
+re-fitted screens. Three Important findings fixed in commit `7f1242c`:
+(1) `AppLayout` restored drawer focus into an `inert` subtree -> moved to
+a post-render `useEffect`; (2) no `<h1>` in the signed-in app -> sidebar
+brand is now an `<h1>`; (3) `DataTable` phone reflow dropped table ARIA
+roles -> roles now explicit.
+
+**Verification at merge**: `npm run quality:full` exit 0 (harness
+100/100; Vitest 843/90f; `cargo test` 611 lib + integration 0-failed;
+clippy + fmt clean); `quality:security` clean; `check:dev-preview-isolation`
+exit 0.
+
+**Accepted backlog** (independently-shippable, no dependency on the
+merge): DataTable adoption by Attendance / Subject Attendance / Section
+Roster / Class Record Workspace; rebuild the teacher Home onto the
+primitives + delete `TeacherWorkspaceScreen` and `PageHeader`;
+Login / First-run restyle; `SchoolHeadHome` attendance-by-grade card
+(needs a temporal membership join + its own security review); six review
+minors (see ADR-0057 Wave 6 addendum); native NVDA/Narrator +
+`quality:ui` pass across the redesigned surface (browser binary absent
+here -- `docs/VERIFICATION-DEBT.md`).
+
+**Exact next slice**: none pre-selected -- the redesign is delivered.
+The backlog above is the candidate pool; pick per LIKHA's priority order
+when work resumes.
+
 ## Wave 5: Page scaffold re-fit — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell`. Commit range `88503f6..HEAD`
