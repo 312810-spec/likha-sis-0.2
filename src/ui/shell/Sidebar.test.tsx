@@ -21,6 +21,7 @@ describe("Sidebar", () => {
   it("renders the brand, a pinned Home, and the four groups", () => {
     renderSidebar();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "LIKHA-SIS" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
     for (const g of ["Daily Teaching", "Learner Records", "Grading", "Security"]) {
       expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "true");

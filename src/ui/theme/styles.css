@@ -1185,6 +1185,7 @@ label {
 }
 
 .app-sidebar-brand {
+  margin: 0;
   padding: calc(var(--spacing-unit) * 1.25);
   font-size: var(--font-size-large);
   font-weight: 700;

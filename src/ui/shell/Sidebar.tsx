@@ -80,7 +80,7 @@ export function Sidebar({ activeTab, onNavigate }: SidebarProps) {
 
   return (
     <nav aria-label="Primary" className="app-sidebar">
-      <span className="app-sidebar-brand">LIKHA-SIS</span>
+      <h1 className="app-sidebar-brand">LIKHA-SIS</h1>
 
       <div className="app-sidebar-scroll">
         <button

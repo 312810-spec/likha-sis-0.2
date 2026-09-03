@@ -90,6 +90,16 @@ describe("DataTable", () => {
     });
   });
 
+  it("keeps explicit table roles under reflowAt so display:block can't drop them", () => {
+    const { container } = render(
+      <DataTable caption="Attendance" columns={columns} rows={rows} reflowAt={640} />,
+    );
+    const table = container.querySelector("table.data-table")!;
+    expect(table).toHaveAttribute("role", "table");
+    const td = container.querySelector("tbody td")!;
+    expect(td).toHaveAttribute("role", "cell");
+  });
+
   it("omits data-reflow when reflowAt is not set", () => {
     const { container } = render(<DataTable caption="Attendance" columns={columns} rows={rows} />);
     expect(container.querySelector("table.data-table")!.hasAttribute("data-reflow")).toBe(false);

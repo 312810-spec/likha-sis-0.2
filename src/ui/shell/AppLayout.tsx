@@ -42,10 +42,20 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
-    // Return focus to whatever opened the drawer.
-    const toggle = document.querySelector<HTMLElement>("[data-drawer-toggle]");
-    toggle?.focus();
   }, []);
+
+  // Return focus to the drawer toggle only AFTER the re-render that
+  // clears `inert` from `.app-layout-main` -- a synchronous `.focus()`
+  // inside `closeDrawer` is a no-op while the hamburger is still inert
+  // (WCAG 2.4.3). The prev-ref guard skips the initial mount and any
+  // false -> false pass.
+  const prevDrawerOpen = useRef(drawerOpen);
+  useEffect(() => {
+    if (prevDrawerOpen.current && !drawerOpen) {
+      document.querySelector<HTMLElement>("[data-drawer-toggle]")?.focus();
+    }
+    prevDrawerOpen.current = drawerOpen;
+  }, [drawerOpen]);
 
   const navigate = useCallback(
     (tab: SignedInTab) => {

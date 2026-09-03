@@ -28,8 +28,11 @@ export interface DataTableProps {
 /**
  * Table-in-card primitive (ADR-0057 Wave 2). Real table semantics are kept
  * in every mode: the phone reflow is CSS-only (`display: block` driven by
- * the `data-reflow` attribute), never a swap to non-table roles. The caller
- * renders its own `EmptyState` when `rows` is empty.
+ * the `data-reflow` attribute). `display: block` would otherwise drop the
+ * implicit ARIA table roles in real browsers, so every role is set
+ * explicitly (`table` / `rowgroup` / `row` / `columnheader` / `rowheader` /
+ * `cell`) and survives the reflow -- never a swap to non-table roles. The
+ * caller renders its own `EmptyState` when `rows` is empty.
  */
 export function DataTable({
   caption,
@@ -40,13 +43,14 @@ export function DataTable({
 }: DataTableProps) {
   return (
     <div className="data-table-scroll">
-      <table className="data-table" data-reflow={reflowAt ? "" : undefined}>
+      <table role="table" className="data-table" data-reflow={reflowAt ? "" : undefined}>
         <caption className={captionVisible ? undefined : "visually-hidden"}>{caption}</caption>
-        <thead>
-          <tr>
+        <thead role="rowgroup">
+          <tr role="row">
             {columns.map((column) => (
               <th
                 key={column.key}
+                role="columnheader"
                 scope="col"
                 className={column.align === "end" ? "num" : undefined}
               >
@@ -55,14 +59,14 @@ export function DataTable({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           {rows.map((row) => (
-            <tr key={row.key}>
+            <tr key={row.key} role="row">
               {columns.map((column) => {
                 const content = row.cells[column.key];
                 if (column.key === row.rowHeader) {
                   return (
-                    <th key={column.key} scope="row">
+                    <th key={column.key} role="rowheader" scope="row">
                       {content}
                     </th>
                   );
@@ -72,6 +76,7 @@ export function DataTable({
                 return (
                   <td
                     key={column.key}
+                    role="cell"
                     className={column.align === "end" ? "num" : undefined}
                     data-label={labelText}
                   >
