@@ -235,7 +235,7 @@ pub fn section_and_period_range_in_school(
         "SELECT cr.section_id, gp.starts_on, gp.ends_on \
          FROM class_records cr \
          JOIN grading_periods gp ON gp.id = cr.grading_period_id \
-         WHERE cr.id = ?1 AND cr.school_id = ?2",
+         WHERE cr.id = ?1 AND cr.school_id = ?2 AND gp.school_id = ?2",
         (class_record_id, school_id),
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )
@@ -312,7 +312,7 @@ const DETAIL_SELECT_LIST: &str = "SELECT cr.id, cr.school_id, cr.section_id, sec
      (SELECT COUNT(*) FROM assessment_items ai WHERE ai.class_record_id = cr.id), \
      (SELECT COUNT(*) FROM learner_scores ls \
       JOIN assessment_items ai2 ON ai2.id = ls.assessment_item_id \
-      WHERE ai2.class_record_id = cr.id) \
+      WHERE ai2.class_record_id = cr.id AND ls.school_id = cr.school_id) \
      FROM class_records cr \
      JOIN sections sec ON sec.id = cr.section_id \
      JOIN subjects sub ON sub.id = cr.subject_id \
@@ -320,7 +320,8 @@ const DETAIL_SELECT_LIST: &str = "SELECT cr.id, cr.school_id, cr.section_id, sec
      JOIN grading_policy_periods pp ON pp.id = gp.policy_period_id \
      LEFT JOIN grading_weight_policies wp ON wp.id = cr.weight_policy_id \
      JOIN grading_weight_policies dwp ON dwp.is_default = 1 \
-     WHERE cr.school_id = ?1";
+     WHERE cr.school_id = ?1 \
+       AND sec.school_id = ?1 AND sub.school_id = ?1 AND gp.school_id = ?1";
 
 fn row_to_class_record_detail(row: &rusqlite::Row) -> rusqlite::Result<ClassRecordDetail> {
     Ok(ClassRecordDetail {
@@ -390,7 +391,7 @@ pub fn school_year_in_school(
         "SELECT gp.school_year \
          FROM class_records cr \
          JOIN grading_periods gp ON gp.id = cr.grading_period_id \
-         WHERE cr.id = ?1 AND cr.school_id = ?2",
+         WHERE cr.id = ?1 AND cr.school_id = ?2 AND gp.school_id = ?2",
         (class_record_id, school_id),
         |row| row.get(0),
     )
@@ -564,6 +565,78 @@ mod tests {
         .unwrap();
 
         assert_eq!(result, None);
+    }
+
+    /// Defense in depth (repo-wide tenant-isolation JOIN audit, matching
+    /// `section_membership::roster_for_section*`): `create` validates every
+    /// FK is in-school, so a `class_records` row with a cross-school
+    /// `section_id` / `subject_id` / `grading_period_id` cannot be made
+    /// through the app — but a hand-forged one must still not leak the
+    /// foreign section / subject / grading-period names or dates through
+    /// the detail readers, because each `JOIN` independently constrains
+    /// `school_id`.
+    fn forge_cross_school_class_record(conn: &Connection, school_id: &str) -> (String, String) {
+        let other = school::create(conn, "Other School").unwrap();
+        let other_sec =
+            section::create(conn, &other.id, "2026-2027", "9", "SecretSection").unwrap();
+        let other_sub = subject::create(conn, &other.id, "SecretSubject").unwrap();
+        let other_period = grading::create(
+            conn,
+            &other.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        conn.execute(
+            "INSERT INTO class_records \
+                 (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
+             VALUES ('cr-forged', ?1, ?2, ?3, ?4, ?5)",
+            (
+                school_id,
+                &other_sec.id,
+                &other_sub.id,
+                &other_period.id,
+                K10_POLICY,
+            ),
+        )
+        .unwrap();
+        (other_sec.id, other_period.id)
+    }
+
+    #[test]
+    fn detail_readers_do_not_leak_a_forged_cross_school_class_record() {
+        let conn = open_test_db();
+        let (school_id, ..) = setup(&conn);
+        forge_cross_school_class_record(&conn, &school_id);
+
+        assert!(
+            find_detail_by_id_in_school(&conn, &school_id, "cr-forged")
+                .unwrap()
+                .is_none(),
+            "a class record whose section/subject/period belong to another school must not resolve"
+        );
+        assert!(
+            list_by_school(&conn, &school_id)
+                .unwrap()
+                .iter()
+                .all(|d| d.id != "cr-forged"),
+            "the forged row must not appear in the school's class-record list"
+        );
+        assert!(
+            section_and_period_range_in_school(&conn, &school_id, "cr-forged")
+                .unwrap()
+                .is_none(),
+            "the foreign grading period's date range must not leak"
+        );
+        assert!(
+            school_year_in_school(&conn, &school_id, "cr-forged")
+                .unwrap()
+                .is_none(),
+            "the foreign grading period's school year must not leak"
+        );
     }
 
     #[test]

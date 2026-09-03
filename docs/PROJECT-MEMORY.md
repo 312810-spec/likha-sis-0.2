@@ -3203,6 +3203,34 @@ shape, and end-to-end encryption of the cloud copy. The zero-cost +
 no-card gate is now a recorded constraint on any future infrastructure
 choice.
 
+## Repo-wide tenant-isolation JOIN audit (added 2026-09-04)
+
+**ADR-0066** extends the ADR-0042-addendum `l.school_id` hardening
+(which covered only readers joining `learners` to `section_memberships`)
+to **every** `JOIN` across two+ tenant-scoped tables in
+`src-tauri/src/repository/**` (there are none in `export/**` /
+`formgen/**`). 8 readers gained an independent `school_id` constraint on
+each joined tenant table: `class_record` (`DETAIL_SELECT_LIST` +
+`section_and_period_range_in_school` + `school_year_in_school`),
+`teaching_assignment` (`DETAIL_SELECT`),
+`attendance::roster_for_section_date` (the `attendance_records`
+`LEFT JOIN`), `grading_computation::leaf_percentage_score` (took a new
+`school_id` param), `schedule_meeting` (`has_teacher_conflict` /
+`has_section_conflict` / `total_weekly_minutes_for_teacher`), and
+`section_membership::dependent_records_stranded`. All defense-in-depth —
+`class_record::create` / `teaching_assignment::create` /
+`schedule_meeting::create` already validate every FK is in-school, so
+cross-school FK rows cannot arise through the app; a hand-forged one is
+the threat model. The `grading_computation` fix is grade-correctness (a
+forged foreign `scored` row would be pooled into a DepEd term grade —
+regression test proves PS 85.0 vs 92.5). 5 new forged-row regression
+tests, each watched RED→GREEN. No schema/migration/command/`authorize_*`
+change. Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`.
+Confirmed already-safe (no change): global reference-data joins,
+`section_advisory` (`sec.school_id = sa.school_id` in the `ON`),
+`user::list_members_in_school` (`users` global), `subject_attendance`
+entries (no `school_id` column — child of its session).
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

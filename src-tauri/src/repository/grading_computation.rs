@@ -190,6 +190,7 @@ pub fn list_weight_policies(conn: &Connection) -> AppResult<Vec<GradingWeightPol
 /// item — see `compute_term_grade`'s doc comment.
 fn leaf_percentage_score(
     conn: &Connection,
+    school_id: &str,
     class_record_id: &str,
     category_id: &str,
     learner_id: &str,
@@ -199,8 +200,9 @@ fn leaf_percentage_score(
          FROM assessment_items ai \
          JOIN learner_scores ls ON ls.assessment_item_id = ai.id \
          WHERE ai.class_record_id = ?1 AND ai.category_id = ?2 \
-           AND ls.learner_id = ?3 AND ls.status = 'scored'",
-        (class_record_id, category_id, learner_id),
+           AND ls.learner_id = ?3 AND ls.status = 'scored' \
+           AND ai.school_id = ?4 AND ls.school_id = ?4",
+        (class_record_id, category_id, learner_id, school_id),
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
     if scored_count == 0 || max_sum <= 0.0 {
@@ -279,13 +281,24 @@ pub fn compute_term_grade(
             .collect();
 
         let ps = if children.is_empty() {
-            leaf_percentage_score(conn, class_record_id, &top.category_id, learner_id)?
+            leaf_percentage_score(
+                conn,
+                school_id,
+                class_record_id,
+                &top.category_id,
+                learner_id,
+            )?
         } else {
             let mut combined = 0.0;
             let mut all_defined = true;
             for child in &children {
-                match leaf_percentage_score(conn, class_record_id, &child.category_id, learner_id)?
-                {
+                match leaf_percentage_score(
+                    conn,
+                    school_id,
+                    class_record_id,
+                    &child.category_id,
+                    learner_id,
+                )? {
                     Some(child_ps) => combined += child_ps * (child.weight_percent / 100.0),
                     None => {
                         all_defined = false;
@@ -487,6 +500,49 @@ mod tests {
     /// TE 35/40 -> IG 85.8 -> TG 88 (transmuted, SY 2026-2027). This is the
     /// single strongest end-to-end proof this implementation matches the
     /// Order: every input and the expected output are the Order's own.
+    #[test]
+    fn leaf_percentage_score_ignores_a_forged_foreign_school_score() {
+        // Defense in depth (repo-wide tenant-isolation JOIN audit):
+        // `leaf_percentage_score` joins `learner_scores` with no school
+        // scope. A hand-forged `scored` row in another school, on a real
+        // in-scope assessment item for the target learner, must not be
+        // pooled into the DepEd percentage score.
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            17.0,
+        );
+        // A second WW item with no legitimate score, then a forged
+        // foreign-school "scored" row on it.
+        let extra = assessment_item::create(&conn, &school_id, &cr, WRITTEN_WORKS, "WW2", 20.0)
+            .unwrap()
+            .unwrap();
+        let other = school::create(&conn, "Other School").unwrap();
+        conn.execute(
+            "INSERT INTO learner_scores \
+                 (id, school_id, assessment_item_id, learner_id, status, score, recorded_by_user_id) \
+             VALUES ('ls-forged', ?1, ?2, ?3, 'scored', 20.0, ?4)",
+            (&other.id, &extra.id, &learner_id, &teacher_id),
+        )
+        .unwrap();
+
+        let ps = leaf_percentage_score(&conn, &school_id, &cr, WRITTEN_WORKS, &learner_id).unwrap();
+
+        assert_eq!(
+            ps,
+            Some(85.0),
+            "PS must pool only the one legitimate score (17/20 = 85.0), not the forged foreign one"
+        );
+    }
+
     #[test]
     fn compute_term_grade_reproduces_the_orders_own_science_ks2_worked_example() {
         let conn = open_test_db();

@@ -218,7 +218,8 @@ fn has_teacher_conflict(
         "SELECT EXISTS(\
              SELECT 1 FROM schedule_meetings sm \
              JOIN teaching_assignments ta ON ta.id = sm.teaching_assignment_id \
-             WHERE ta.teacher_user_id = ?1 AND ta.school_id = ?2 AND sm.weekday = ?3 \
+             WHERE ta.teacher_user_id = ?1 AND ta.school_id = ?2 AND sm.school_id = ?2 \
+               AND sm.weekday = ?3 \
                AND sm.starts_at < ?5 AND ?4 < sm.ends_at)",
         (teacher_user_id, school_id, weekday, starts_at, ends_at),
         |row| row.get(0),
@@ -238,7 +239,8 @@ fn has_section_conflict(
         "SELECT EXISTS(\
              SELECT 1 FROM schedule_meetings sm \
              JOIN teaching_assignments ta ON ta.id = sm.teaching_assignment_id \
-             WHERE ta.section_id = ?1 AND ta.school_id = ?2 AND sm.weekday = ?3 \
+             WHERE ta.section_id = ?1 AND ta.school_id = ?2 AND sm.school_id = ?2 \
+               AND sm.weekday = ?3 \
                AND sm.starts_at < ?5 AND ?4 < sm.ends_at)",
         (section_id, school_id, weekday, starts_at, ends_at),
         |row| row.get(0),
@@ -321,7 +323,7 @@ pub fn total_weekly_minutes_for_teacher(
     let mut stmt = conn.prepare(
         "SELECT sm.starts_at, sm.ends_at FROM schedule_meetings sm \
          JOIN teaching_assignments ta ON ta.id = sm.teaching_assignment_id \
-         WHERE ta.teacher_user_id = ?1 AND ta.school_id = ?2",
+         WHERE ta.teacher_user_id = ?1 AND ta.school_id = ?2 AND sm.school_id = ?2",
     )?;
     let rows = stmt.query_map((teacher_user_id, school_id), |row| {
         let starts_at: String = row.get(0)?;
@@ -496,6 +498,37 @@ mod tests {
         .unwrap();
 
         assert_eq!(outcome, CreateMeetingOutcome::TeacherConflict);
+    }
+
+    #[test]
+    fn conflict_checks_ignore_a_forged_foreign_school_meeting_on_an_in_scope_assignment() {
+        // Defense in depth (repo-wide tenant-isolation JOIN audit): the
+        // conflict-detection queries join `schedule_meetings` to
+        // `teaching_assignments` and constrain only `ta.school_id`. A
+        // hand-forged meeting row in another school, pointing at an
+        // in-scope teaching assignment, must not raise a false conflict —
+        // `schedule_meetings` has its own `school_id` and the query now
+        // constrains it too.
+        let conn = open_test_db();
+        let (school_id, _teacher_id, assignment_id) = setup(&conn);
+        let other = school::create(&conn, "Other School").unwrap();
+        // Overlapping but a different unique key (07:30-08:20 vs 08:00-08:50),
+        // so this isolates the school-scoped conflict check from the
+        // `UNIQUE (teaching_assignment_id, weekday, starts_at, ends_at)` index.
+        conn.execute(
+            "INSERT INTO schedule_meetings \
+                 (id, school_id, teaching_assignment_id, weekday, starts_at, ends_at) \
+             VALUES ('sm-forged', ?1, ?2, 0, '07:30', '08:20')",
+            (&other.id, &assignment_id),
+        )
+        .unwrap();
+
+        let outcome = create(&conn, &school_id, &assignment_id, 0, "08:00", "08:50", None).unwrap();
+
+        assert!(
+            matches!(outcome, CreateMeetingOutcome::Created(_)),
+            "a meeting in another school must not block scheduling here; got {outcome:?}"
+        );
     }
 
     #[test]
