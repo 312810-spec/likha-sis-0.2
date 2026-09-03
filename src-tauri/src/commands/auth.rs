@@ -10,7 +10,7 @@ use crate::auth::{self, Session, SessionManager, IDLE_TIMEOUT};
 use crate::commands::lock_db;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::{self, AuditLogEntry};
-use crate::repository::{school, user};
+use crate::repository::{role, school, user};
 
 /// A review/troubleshooting cap, not a pagination limit — this screen is
 /// "what happened recently," not a full historical export.
@@ -34,6 +34,12 @@ pub struct CurrentSession {
     /// side effect (this function never slides the window itself; only
     /// `SessionManager::require_active_session` does that). See ADR-0026.
     pub idle_expires_at_unix_ms: u64,
+    /// Every role the user holds in this school (sorted). **Display-only**
+    /// -- the frontend uses it purely to choose which Home layout to
+    /// render. It is never an authorization signal; every protected
+    /// command is gated server-side by `authorize_*` regardless of this
+    /// list.
+    pub roles: Vec<String>,
 }
 
 pub(crate) fn to_dto(conn: &Connection, session: &Session) -> AppResult<CurrentSession> {
@@ -48,6 +54,7 @@ pub(crate) fn to_dto(conn: &Connection, session: &Session) -> AppResult<CurrentS
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
+    let roles = role::list_roles(conn, &user.id, &session.school_id)?;
 
     Ok(CurrentSession {
         user_id: user.id,
@@ -57,6 +64,7 @@ pub(crate) fn to_dto(conn: &Connection, session: &Session) -> AppResult<CurrentS
         school_name: school.name,
         expires_at_unix_ms,
         idle_expires_at_unix_ms,
+        roles,
     })
 }
 
@@ -131,4 +139,43 @@ pub fn list_audit_log(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     audit_log::list_for_school(&conn, &school_id, AUDIT_LOG_LIST_LIMIT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::{bootstrap_installation, SessionManager};
+    use std::path::Path;
+
+    fn open_test_db() -> Connection {
+        crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
+    }
+
+    /// The `CurrentSession` DTO the frontend receives must carry the
+    /// authenticated user's full role set for this school, sorted, so the
+    /// Home screen can pick a layout. `to_dto` is only ever reached after
+    /// the session has been validated (login succeeded / a live session
+    /// was found), so this list is always the session's own user in the
+    /// session's own school -- never a pre-auth or cross-tenant read.
+    #[test]
+    fn current_session_dto_exposes_every_role_the_user_holds_sorted() {
+        let mut conn = open_test_db();
+        let sessions = SessionManager::new();
+        // First-run bootstrap grants the founding user all three starting
+        // roles (teacher, registrar, school_head).
+        let session = bootstrap_installation(
+            &mut conn,
+            &sessions,
+            "Rizal Elementary",
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
+
+        let dto = to_dto(&conn, &session).unwrap();
+
+        // `role::list_roles` does `ORDER BY role`, so the DTO order is stable.
+        assert_eq!(dto.roles, vec!["registrar", "school_head", "teacher"]);
+    }
 }
