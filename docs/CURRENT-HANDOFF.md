@@ -63,8 +63,28 @@ failure). A controller self-review found no blocking issue
 (architecture-boundary check passes, no `composition.ts` import from
 shell, no SQL added, plain teacher language, mode parity intact).
 Independent-review debt for both is retained in
-`docs/VERIFICATION-DEBT.md`. A final whole-branch code review is still
-to run.
+`docs/VERIFICATION-DEBT.md`.
+
+**Final whole-branch code review**: run (Opus). Verdict
+SHIP-WITH-FOLLOWUPS — no Critical; the two Important findings (phone
+bottom nav not covered by `mainInert`; focus-trap surviving a resize)
+were fixed in commit `64269d1` and controller-re-reviewed as addressed.
+Confirmed screen preservation is byte-equivalent across all 18
+`activeTab` branches vs `6f15df7`, architecture boundaries hold, and the
+Task-11 `inert` fixes are correct. Residual MINORs carried to Wave 2:
+the nav-data shape does not yet match spec §5.3's `{id,label,icon}`
+(icons live in component-local maps); the phone top-bar identity line is
+`display:none` and not relocated into the drawer (Log out stays
+visible); `closeDrawer` finds the toggle via `document.querySelector`
+rather than a ref.
+
+**Wave-boundary gate (final, at `64269d1`)**: `npm run quality:full`
+exit 0 — `harness:verify` 100/100 certified; typecheck/lint/format/
+architecture clean; Vitest **766** tests / 82 files; `cargo fmt --check`
+clean; `cargo test` 602 lib + all integration binaries, 0 failed
+(unchanged); `cargo clippy --all-targets -- -D warnings` clean. `npm run
+quality:security` exit 0 (no new dependency). `npx knip` no new findings
+(net −1 vs baseline — orphan `WorkbenchNav` gone).
 
 **`quality:ui` blocked**: the Playwright browser binary
 (`chromium_headless_shell-1237`) is not installed here — the
