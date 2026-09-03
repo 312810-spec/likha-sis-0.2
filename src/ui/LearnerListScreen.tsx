@@ -8,6 +8,7 @@ import type { LearnerRosterExportResult } from "../domain/export";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface LearnerListScreenProps {
@@ -56,7 +57,6 @@ export function LearnerListScreen({
   enrollmentHistoryService,
 }: LearnerListScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const editFirstFieldRef = useRef<HTMLInputElement>(null);
   const duplicateWarningRef = useRef<HTMLDivElement>(null);
   const [learners, setLearners] = useState<Learner[]>([]);
@@ -82,12 +82,6 @@ export function LearnerListScreen({
   const [openHistory, setOpenHistory] = useState<OpenHistory | null>(null);
   const historyRequestId = useRef(0);
   const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
-
-  useEffect(() => {
-    // See LoginScreen's equivalent effect — moves focus here whenever
-    // this screen mounts (e.g. right after signing in).
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     // Entering edit mode removes the row's "Edit" button from the DOM and
@@ -319,11 +313,7 @@ export function LearnerListScreen({
   }
 
   return (
-    <section aria-label="Learners">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Learners
-      </h2>
-
+    <Page title="Learners">
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
@@ -664,6 +654,6 @@ export function LearnerListScreen({
           </button>
         )}
       </form>
-    </section>
+    </Page>
   );
 }

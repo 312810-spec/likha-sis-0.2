@@ -12,7 +12,7 @@ import type {
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
-import { PageHeader } from "./components/PageHeader";
+import { Page } from "./components/Page";
 import { Sf1DuplicateReview } from "./components/Sf1DuplicateReview";
 import { StatusChip } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
@@ -224,19 +224,17 @@ export function Sf1ImportScreen({
       : -1;
 
   return (
-    <section aria-label="SF1: Enrollment">
-      <PageHeader
-        title="SF1: Enrollment"
-        hint={
-          mode === "guided" ? (
-            <p className="field-hint">
-              Import learners from an SF1 Excel workbook you already have, instead of typing each
-              one in by hand. LIKHA will show you exactly what it found before anything is saved.
-            </p>
-          ) : undefined
-        }
-      />
-
+    <Page
+      title="SF1: Enrollment"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Import learners from an SF1 Excel workbook you already have, instead of typing each one
+            in by hand. LIKHA will show you exactly what it found before anything is saved.
+          </p>
+        ) : undefined
+      }
+    >
       {error && <Alert tone="error">{error}</Alert>}
 
       {(phase === "setup" || phase === "parsing") && (
@@ -544,6 +542,6 @@ export function Sf1ImportScreen({
           </div>
         </>
       )}
-    </section>
+    </Page>
   );
 }
