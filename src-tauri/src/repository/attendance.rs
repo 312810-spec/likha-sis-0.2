@@ -375,6 +375,57 @@ fn day_of_week(year: i32, month: u32, day: u32) -> Option<u32> {
     Some(dow as u32)
 }
 
+/// School-wide attendance counts for a single date, one row per status.
+/// Aggregate counts only -- no learner identity in the result. Scoped to
+/// `school_id` (a required argument, never optional); `date` is an ISO
+/// `YYYY-MM-DD` string. Uses the existing `idx_attendance_school_date`
+/// index. Empty (all zero), not an error, when nothing was recorded.
+///
+/// The fields mirror DepEd's real three per-day categories
+/// (`present` / `absent` / `tardy`) exactly as `AttendanceStatus` and the
+/// `attendance_records.status` CHECK constraint define them -- there is no
+/// "late"/"excused" here (see migration 5 and
+/// `docs/adr/0008-section-foundation-and-attendance-semantics.md`). Any
+/// status the CHECK constraint would not permit is ignored rather than
+/// erroring, matching `AttendanceRecord`'s own tolerance for a somehow
+/// bypassed constraint.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SchoolDayTotals {
+    pub present: u32,
+    pub absent: u32,
+    pub tardy: u32,
+}
+
+pub fn school_day_totals(
+    conn: &Connection,
+    school_id: &str,
+    date: &str,
+) -> AppResult<SchoolDayTotals> {
+    let mut totals = SchoolDayTotals {
+        present: 0,
+        absent: 0,
+        tardy: 0,
+    };
+    let mut stmt = conn.prepare(
+        "SELECT status, COUNT(*) FROM attendance_records \
+         WHERE school_id = ?1 AND attendance_date = ?2 GROUP BY status",
+    )?;
+    let rows = stmt.query_map((school_id, date), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+    })?;
+    for row in rows {
+        let (status, count) = row?;
+        match status.as_str() {
+            "present" => totals.present = count,
+            "absent" => totals.absent = count,
+            "tardy" => totals.tardy = count,
+            _ => {}
+        }
+    }
+    Ok(totals)
+}
+
 fn row_to_record(row: &rusqlite::Row) -> rusqlite::Result<AttendanceRecord> {
     let status: String = row.get(5)?;
     Ok(AttendanceRecord {
@@ -750,6 +801,143 @@ mod tests {
         assert!(learner.days.iter().all(|d| d.is_none()));
         assert_eq!(learner.present_count, 0);
         assert_eq!(learner.absent_count, 0);
+    }
+
+    #[test]
+    fn school_day_totals_is_zero_when_nothing_recorded() {
+        let conn = open_test_db();
+        let (school_id, _section_id, _learner_id) = setup_enrolled_learner(&conn);
+
+        let totals = school_day_totals(&conn, &school_id, "2026-09-03").unwrap();
+
+        assert_eq!(
+            totals,
+            SchoolDayTotals {
+                present: 0,
+                absent: 0,
+                tardy: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn school_day_totals_counts_each_status_for_the_date() {
+        let conn = open_test_db();
+        let (school_id, section_id, first) = setup_enrolled_learner(&conn);
+
+        // first learner + two more marked present, one absent, one tardy,
+        // all on the same date.
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &first,
+            "2026-09-03",
+            AttendanceStatus::Present,
+        )
+        .unwrap();
+        for name in ["Ana", "Ben"] {
+            let l = learner::create(&conn, &school_id, name, "Present", None, None).unwrap();
+            section_membership::enroll(&conn, &school_id, &section_id, &l.id, "2026-08-01")
+                .unwrap();
+            record(
+                &conn,
+                &school_id,
+                &section_id,
+                &l.id,
+                "2026-09-03",
+                AttendanceStatus::Present,
+            )
+            .unwrap();
+        }
+        let absent = learner::create(&conn, &school_id, "Cora", "Absent", None, None).unwrap();
+        section_membership::enroll(&conn, &school_id, &section_id, &absent.id, "2026-08-01")
+            .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &absent.id,
+            "2026-09-03",
+            AttendanceStatus::Absent,
+        )
+        .unwrap();
+        let tardy = learner::create(&conn, &school_id, "Dan", "Tardy", None, None).unwrap();
+        section_membership::enroll(&conn, &school_id, &section_id, &tardy.id, "2026-08-01")
+            .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &tardy.id,
+            "2026-09-03",
+            AttendanceStatus::Tardy,
+        )
+        .unwrap();
+
+        let totals = school_day_totals(&conn, &school_id, "2026-09-03").unwrap();
+
+        assert_eq!(
+            totals,
+            SchoolDayTotals {
+                present: 3,
+                absent: 1,
+                tardy: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn school_day_totals_is_school_scoped() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-09-03",
+            AttendanceStatus::Present,
+        )
+        .unwrap();
+        let school_b = school::create(&conn, "School B").unwrap();
+
+        let totals = school_day_totals(&conn, &school_b.id, "2026-09-03").unwrap();
+
+        assert_eq!(
+            totals,
+            SchoolDayTotals {
+                present: 0,
+                absent: 0,
+                tardy: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn school_day_totals_is_date_scoped() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-09-03",
+            AttendanceStatus::Present,
+        )
+        .unwrap();
+
+        let totals = school_day_totals(&conn, &school_id, "2026-09-04").unwrap();
+
+        assert_eq!(
+            totals,
+            SchoolDayTotals {
+                present: 0,
+                absent: 0,
+                tardy: 0,
+            }
+        );
     }
 
     #[test]
