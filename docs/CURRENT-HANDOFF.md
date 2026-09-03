@@ -1,5 +1,78 @@
 # CURRENT HANDOFF
 
+## Wave 2: layout primitives — complete (2026-09-03)
+
+Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on
+one branch through all waves). Commit range `d62da06..HEAD` — the Wave 2
+implementation plan, then Tasks 1–6 (`0e171c4..07fcaff`: the four
+primitives + the two proof migrations), then Task 7 (`f931424` the knip
+test fix; this commit the ADR-0057 addendum + state docs). ADR-0057's
+"Wave 2 addendum — layout primitives (2026-09-03)" section is the
+durable record.
+
+**What shipped**: four presentational layout primitives in
+`src/ui/components/` — `Page` (`<section aria-label>` + folded-in
+`PageHeader`: focus-on-mount `<h2>` + optional Guided `hint` + optional
+`actions` slot), `KpiStrip`/`Kpi` (auto-fit stat grid; `KpiTone` tints a
+left border only, never the sole signal), `BentoGrid`/`Card` (12-col
+grid; `Card` has `data-span` 4/6/8/12, `keepHalf`, an optional titled
+header at level 2–4), and `DataTable` (table-in-card; always real
+`<table><th scope>` semantics; the phone one-block-per-row reflow is
+**CSS-only**, gated on a `data-reflow` attribute set from the
+`reflowAt={640}` prop — not a per-screen `@media` block). CSS appended
+to the single `src/ui/theme/styles.css`. **No token added or changed.**
+No Rust. `TodaysClassesScreen` migrated onto `Page` + `DataTable` (all 8
+existing screen tests passed unmodified); `SectionsScreen` migrated onto
+`Page` (test file unchanged). `KpiStrip`/`Card`/`BentoGrid` have no
+screen consumer yet — Wave 3's role-adaptive Home is their first.
+
+**Verification actually run (this session, Task 7)**:
+
+- `npm run quality:full` — **exit 0**. `harness:verify` **100/100
+  certified** (metadata age 6 days; no harness file touched);
+  typecheck / lint / format:check / architecture-boundary check clean;
+  Vitest **803 passed / 86 files** (up from Wave 1's 766 — the four
+  primitives' tests + the migration adjustments + Task 7's KpiTone
+  test); `cargo fmt --check` clean; `cargo test` **602 lib + 0
+  doctests + every integration binary, 0 failed** (unchanged — no
+  Rust); `cargo clippy --all-targets -- -D warnings` clean.
+- `npm run quality:security` — **exit 0** (gitleaks + `cargo deny` +
+  OSV-Scanner: 3 ok / 0 failed; 18 pre-existing filtered GTK/unic
+  advisories only; no new dependency).
+- `npm run build` — **exit 0**. `dist/assets/index-*.css` 28.77 kB /
+  **gzip 5.32 kB**; JS 376.39 kB / **gzip 102.38 kB** (both unchanged
+  vs the pre-Task-7 measurement — Task 7 ships only a test).
+- `npm run check:dev-preview-isolation` — **exit 0** (21 dist files
+  scanned, no fixture trace).
+- `npx knip` — no new finding vs baseline. Baseline holds: unlisted
+  dep `playwright`, 2 unlisted binaries (`gitleaks`, `osv-scanner`),
+  Unused exports (2) `userService` + `LEARNER_SCORE_STATUSES`, Unused
+  exported types (8). The new `KpiTone` finding Wave 2 briefly
+  introduced is cleared by a `KpiStrip` test that iterates every tone
+  value (no knip ignore entry added).
+- `npm run quality:ui` — **fails** (`browserType.launch: Executable
+doesn't exist at …chromium_headless_shell-1237…`). Pre-existing,
+  already in `docs/VERIFICATION-DEBT.md`; **not a Wave 2 regression**.
+  jsdom + axe cover every primitive; a native compiled-binary /
+  screen-reader pass is still owed.
+
+**Independent review**: not dispatched for Task 7 (docs + a one-line
+test only). The two proof-migration screens keep their existing test
+coverage unchanged/unweakened. Wave 1's retained independent-review
+debt (teacher-ux + architecture reviewers) still stands.
+
+**Exact next slice (do NOT start it): Wave 3 — role-adaptive Home.**
+Add `role` to the frontend `CurrentSession` projection
+(`src/domain/session.ts` + the auth service/adapter that builds it — the
+backend already has `user_school_roles` with `role IN
+('teacher','registrar','school_head')`). Then build `src/ui/HomeScreen.tsx`
+switching on `session.role` → `src/ui/home/TeacherHome.tsx` (absorbs
+`TeacherWorkspaceScreen`, then delete it) / `src/ui/home/SchoolHeadHome.tsx`
+(**without** the school-wide attendance-rollup card — that is Wave 4).
+Wire to existing data only. Make Home the default signed-in tab (repoint
+`HOME_DESTINATION`). Uses `Page` / `KpiStrip` / `BentoGrid` / `Card`.
+Gets its own implementation plan.
+
 ## Wave 1: UI redesign shell — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell`, from `main` at `6f15df7`.

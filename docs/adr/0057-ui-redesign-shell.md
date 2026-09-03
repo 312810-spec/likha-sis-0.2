@@ -208,3 +208,92 @@ check` pre-existing advisory warnings only; OSV-Scanner clean. No new
   reviewers is **retained**, recorded in `docs/VERIFICATION-DEBT.md`.
 - A **final whole-branch code review** is still to run before this
   branch integrates.
+
+## Wave 2 addendum — layout primitives (2026-09-03)
+
+Wave 2 of the same approved design session
+(`docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md`, §5.1 /
+§5.4 / §5.6 / §7 / §8) adds the four reusable layout primitives the
+shell was built to host, and migrates two screens onto them as proof.
+Same branch (`claude/ui-redesign-wave-1-shell`). No Rust. **No token was
+added or changed this wave** — the primitives size entirely from the
+Wave 1 token set (`--color-surface-2`, `--color-border-soft`,
+`--color-primary-wash`, `--elevation-1`, `--radius-large`,
+`--spacing-unit`, `--font-size-*`, `--control-height`, motion tokens),
+so Efficient/Comfortable/Guided keep parity with no per-mode code.
+
+### The four primitives (`src/ui/components/`)
+
+- **`Page`** — `<section aria-label={title}>` wrapping a folded-in
+  `PageHeader` (an `<h2>` that takes focus on mount via `tabIndex={-1}` +
+  a mount `useEffect`, plus an optional Guided-mode `hint` node the
+  screen supplies — `Page` never reads the mode itself) and an optional
+  right-aligned `actions` slot. Collapses the per-screen
+  `<section aria-label><h2 ref tabIndex>` + focus-effect boilerplate to
+  one `<Page title=…>`.
+- **`KpiStrip`** + **`Kpi`** — `KpiStrip` is an auto-fit grid
+  (`repeat(auto-fit, minmax(180px, 1fr))`, 2-up under 520px). `Kpi` is
+  one tile: `label` / `value` (string or number, rendered in a large
+  `tabular-nums` figure) / optional `foot` / optional `hint` / optional
+  `tone` (`KpiTone` = `neutral | productive | success | warning |
+danger`) that only tints a 3px left border — the `label`/`foot` text
+  always carries the meaning, tone is never the sole signal.
+- **`BentoGrid`** + **`Card`** — `BentoGrid` is a 12-column grid.
+  `Card` is a `--color-surface-2` panel (`--color-border-soft` hairline,
+  `--elevation-1`, `--radius-large`) with `data-span` (4/6/8/12,
+  default 12), an optional `keepHalf` that stays span-6 into the tablet
+  range, an optional titled `.card-header` at heading level 2–4
+  (default 3) with its own `actions` slot, and a `.card-body`. Spans
+  collapse to 12 at ≤1080px unless `keepHalf` is set.
+- **`DataTable`** — a table-in-card. It always renders real
+  `<table><thead><th scope>` semantics; the phone one-block-per-row
+  reflow is **CSS-only**, gated on a `data-reflow` attribute the
+  component sets from the `reflowAt={640}` prop, with each `<td>`
+  carrying a `data-label` from its column header. Props: `caption`
+  (+ `captionVisible`), `columns` (`key` / `header` / optional
+  `align: "start" | "end"` / optional `label`), `rows` (`key` /
+  `cells` / optional `rowHeader` naming the `<th scope="row">` column),
+  `reflowAt`. No sort, no selection this wave. An empty `rows` renders
+  an empty `<tbody>` — the caller shows its own `EmptyState`.
+
+### `DataTable` phone reflow is a prop, not a per-screen `@media` block
+
+The decision: the table→block reflow at phone width lives once, as a
+`@media (max-width: 640px)` rule keyed off `.data-table[data-reflow]`,
+switched on per screen by the `reflowAt` prop — **not** copied into each
+screen's stylesheet as a bespoke `@media` block the way
+`.score-entry` / `.attendance-roster` / `.section-roster` each carry
+today. Migrated screens shed their hand-written reflow block when they
+move onto `DataTable`: Today's Classes stopped using
+`.attendance-roster` (its `.attendance-roster` reflow rule stays in
+`styles.css` only because `AttendanceScreen` still consumes it — the
+rule is deleted once its last consumer migrates). The remaining
+per-screen reflow blocks are removed the same way, screen by screen.
+
+### The two proof migrations
+
+- **`TodaysClassesScreen` → `Page` + `DataTable`.** The hand-rolled
+  `<section>`/`<h2>`/`headingRef`/focus-`useEffect` became
+  `<Page title="Today's Classes" hint={…}>`; the
+  `<table className="attendance-roster">` became
+  `<DataTable reflowAt={640} …>` (Time / Class / Status / Action, Time
+  as the row header). `Alert`/`Loading`/`EmptyState`, the `load()`
+  logic, the request-identity ref, and `onCheckAttendance` are
+  unchanged. All 8 existing screen tests passed **unmodified**.
+- **`SectionsScreen` → `Page`.** The wrapper/heading/focus boilerplate
+  became `<Page title="Sections" hint={…}>`; the create-section form,
+  the sections list, and the enroll panel moved inside verbatim. No
+  `DataTable` — the sections list is a labelled list, not a data grid.
+  The test file was **unchanged** (region/heading accessible names did
+  not move).
+
+### First real consumers still ahead
+
+`KpiStrip`/`Kpi`, `BentoGrid`/`Card` have **no screen consumer in
+Wave 2** — they get their first real use in **Wave 3's role-adaptive
+Home** (`HomeScreen` → `TeacherHome` / `SchoolHeadHome`). They are
+covered this wave by their own unit + axe tests, and `KpiTone` is
+exercised by a `KpiStrip` test that iterates every tone value, so
+`npx knip` reports no new finding. The remaining ~12 unmigrated screens
+re-fit onto these primitives in **Wave 5+** batches, per spec §7 —
+same content and flow, only the presentational wrapper changes.

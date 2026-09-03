@@ -1,5 +1,69 @@
 # ACTIVE PLAN
 
+## Wave 2: layout primitives (added 2026-09-03) — complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 2 addendum —
+layout primitives (2026-09-03)" section; `docs/CURRENT-HANDOFF.md` top
+entry; `docs/PROJECT-MEMORY.md` Wave 2 entry. Same branch
+`claude/ui-redesign-wave-1-shell`; `main` untouched. Commit range
+`d62da06..HEAD`.
+
+**Scope**: Wave 2 of the approved UI redesign design session
+(`docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md` §5.1 /
+§5.4 / §5.6 / §7 / §8) — add the four reusable layout primitives and
+migrate two screens onto them as proof, with no change to either
+screen's data flow or behaviour. No new dependency, no Rust, no
+`*ApplicationService` / domain / command change. **No token added or
+changed** — the primitives size from the Wave 1 token set so
+Efficient/Comfortable/Guided keep parity with no per-mode code.
+
+**What shipped**: `src/ui/components/{Page,KpiStrip,Card,DataTable}.tsx`
+
+- their `*.test.tsx`; CSS appended to `src/ui/theme/styles.css`
+  (`.page-*`, `.kpi*`, `.bento`, `.card*`, `.data-table*` + the
+  `@media (max-width: 640px)` reflow keyed on `.data-table[data-reflow]`).
+  `Page` folds in `PageHeader` (focus-on-mount `<h2>`, optional Guided
+  `hint`, optional `actions`). `KpiStrip`/`Kpi` — auto-fit grid; `KpiTone`
+  (`neutral|productive|success|warning|danger`) tints a 3px left border
+  only. `BentoGrid`/`Card` — 12-col grid; `Card` carries `data-span`
+  (4/6/8/12, default 12), `keepHalf`, an optional titled `.card-header` at
+  level 2–4. `DataTable` — always real `<table><thead><th scope>`
+  semantics; the phone one-block-per-row reflow is CSS-only, switched on
+  per screen by the `reflowAt={640}` prop (sets `data-reflow`; each `<td>`
+  gets a `data-label`), replacing bespoke per-screen `@media` blocks as
+  screens migrate. `TodaysClassesScreen` → `Page` + `DataTable` (Time /
+  Class / Status / Action; all 8 existing tests passed unmodified);
+  `SectionsScreen` → `Page` (test file unchanged). `KpiStrip`/`Card`/
+  `BentoGrid` have no screen consumer yet — first used in Wave 3's Home.
+
+**Verification actually run this session**: `npm run quality:full` exit
+0 — `harness:verify` 100/100 certified (metadata age 6 days);
+typecheck/lint/format/architecture clean; Vitest **803/803** (86 files,
+up from Wave 1's 766); `cargo fmt --check` clean; `cargo test` 602 lib +
+0 doctests + all integration binaries, 0 failed, unchanged; `cargo
+clippy --all-targets -- -D warnings` clean. `npm run quality:security`
+exit 0 (3 ok / 0 failed; 18 pre-existing filtered advisories; no new
+dependency). `npm run build` exit 0 — CSS gzip **5.32 kB**, JS gzip
+**102.38 kB** (unchanged vs pre-Task-7). `npm run
+check:dev-preview-isolation` exit 0. `npx knip` — no new finding vs
+baseline (the transient `KpiTone` finding is cleared by a tone-iterating
+test, no ignore entry added).
+
+**Not done this milestone**: `npm run quality:ui` Playwright smoke —
+browser binary (`chromium_headless_shell-1237`) not installed here
+(pre-existing debt in `docs/VERIFICATION-DEBT.md`); jsdom + axe cover
+every primitive, native compiled-binary / screen-reader pass owed. No
+independent reviewer dispatched for Task 7 (docs + one-line test only);
+Wave 1's retained teacher-ux + architecture review debt still stands.
+
+**Next**: Wave 3 — role-adaptive Home. Expose `role` on the frontend
+`CurrentSession` projection, then build `HomeScreen` →
+`TeacherHome` (absorbs `TeacherWorkspaceScreen`) /
+`SchoolHeadHome` (without the school-wide attendance-rollup card — Wave
+4), wired to existing data, made the default signed-in tab (`HOME_DESTINATION`
+repointed). Consumes `Page`/`KpiStrip`/`BentoGrid`/`Card`. Gets its own
+implementation plan. Not started.
+
 ## Wave 1: UI redesign shell (added 2026-09-03) — complete
 
 Full record: `docs/adr/0057-ui-redesign-shell.md`;

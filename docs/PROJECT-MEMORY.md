@@ -2771,6 +2771,14 @@ palette unchanged, five additive contrast-verified tokens; pinned Home
 still routes to Teacher Workspace (role-adaptive Home is Wave 3). Old
 AppShell/WorkbenchNav/NavItem removed.
 
+## Wave 2 — UI redesign layout primitives (ADR-0057 addendum) (added 2026-09-03)
+
+Wave 2 (ADR-0057 addendum): layout primitives Page / KpiStrip+Kpi /
+BentoGrid+Card / DataTable added; DataTable's phone reflow is a prop
+(`reflowAt`) keyed to a `data-reflow` CSS block, not per-screen CSS;
+Today's Classes and Sections migrated onto them as proof; KpiStrip/Card/
+BentoGrid first consumed in Wave 3.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
