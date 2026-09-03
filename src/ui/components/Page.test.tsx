@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { createRef, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { Page } from "./Page";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
@@ -24,6 +24,18 @@ describe("Page", () => {
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 2, name: "Sections" })).toHaveFocus(),
     );
+  });
+
+  it("uses a caller-supplied headingRef for the h2 and still focuses it on mount", async () => {
+    const someRef = createRef<HTMLHeadingElement>();
+    render(
+      <Page title="X" headingRef={someRef}>
+        <p>body content</p>
+      </Page>,
+    );
+    const heading = screen.getByRole("heading", { level: 2, name: "X" });
+    expect(someRef.current).toBe(heading);
+    await waitFor(() => expect(heading).toHaveFocus());
   });
 
   it("renders a hint only when given", () => {

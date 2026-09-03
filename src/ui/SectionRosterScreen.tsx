@@ -15,6 +15,7 @@ import type {
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionRosterScreenProps {
@@ -217,10 +218,6 @@ export function SectionRosterScreen({
   const [sf9Error, setSf9Error] = useState<{ member: SectionRosterMember; message: string } | null>(
     null,
   );
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     if (activeAction) {
@@ -745,14 +742,27 @@ export function SectionRosterScreen({
       : "";
 
   return (
-    <section aria-label="Section roster">
+    <Page
+      title={section ? `${section.name} — roster` : "Section roster"}
+      headingRef={headingRef}
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint" id="section-roster-guided-note">
+            A learner who has transferred out, or whose enrollment starts on a later date, is not
+            shown — this is always your class as it stands today. &ldquo;Enrolled since&rdquo; is
+            the date each learner&rsquo;s current placement in this section began. &ldquo;LRN&rdquo;
+            is the 12-digit Learner Reference Number — add a missing one on the Learners screen. Use
+            &ldquo;Enroll learner&rdquo; to add an existing learner to this section,
+            &ldquo;Transfer&rdquo; to move a learner to another section, or &ldquo;End
+            enrollment&rdquo; when they leave — all keep the learner&rsquo;s history and take effect
+            from the date you choose.
+          </p>
+        ) : undefined
+      }
+    >
       <button type="button" className="section-roster-back" onClick={onBack}>
         <span aria-hidden="true">← </span>Back to sections
       </button>
-
-      <h2 ref={headingRef} tabIndex={-1}>
-        {section ? `${section.name} — roster` : "Section roster"}
-      </h2>
 
       {section && (
         <p className="section-roster-context">
@@ -793,18 +803,6 @@ export function SectionRosterScreen({
           <p className="section-roster-intro">
             The learners enrolled in this section as of {formatIsoDate(asOfDate)}.
           </p>
-          {mode === "guided" && (
-            <p className="field-hint" id="section-roster-guided-note">
-              A learner who has transferred out, or whose enrollment starts on a later date, is not
-              shown — this is always your class as it stands today. &ldquo;Enrolled since&rdquo; is
-              the date each learner&rsquo;s current placement in this section began.
-              &ldquo;LRN&rdquo; is the 12-digit Learner Reference Number — add a missing one on the
-              Learners screen. Use &ldquo;Enroll learner&rdquo; to add an existing learner to this
-              section, &ldquo;Transfer&rdquo; to move a learner to another section, or &ldquo;End
-              enrollment&rdquo; when they leave — all keep the learner&rsquo;s history and take
-              effect from the date you choose.
-            </p>
-          )}
 
           <div className="section-roster-enroll">
             {!enrollOpen && (
@@ -1359,7 +1357,7 @@ export function SectionRosterScreen({
           )}
         </>
       )}
-    </section>
+    </Page>
   );
 }
 
