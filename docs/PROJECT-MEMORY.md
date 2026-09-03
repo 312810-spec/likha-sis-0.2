@@ -3125,6 +3125,34 @@ one permitted resume) kept failing. Deliberately does **not** grant
 why that was ruled out. Use this pattern next time the failure recurs,
 after the one permitted resume, before falling back to self-review.
 
+## Section-membership readers cross-school JOIN hardening (added 2026-09-03)
+
+Every reader that joins `learners` to `section_memberships` now
+independently constrains `l.school_id` — the conjunct `current_roster` /
+`enrollable_learners` already had since the Wave 2O security review, now
+applied uniformly to `section_membership::roster_for_section`,
+`section_membership::roster_for_section_over_range`,
+`attendance::roster_for_section_date`, `learner_score::roster_for_item`,
+and (as an `EXISTS` on `learners`, since it returns only a bool)
+`section_membership::is_active_member`. Previously these scoped only
+`sm.school_id`, so a hand-forged `section_memberships` row pointing a
+foreign-school `learner_id` at a local section would leak that learner's
+name/LRN/sex through SF1 formgen, the monthly attendance grid, SF2
+export, `import::commit`, the attendance roster, and the score roster
+(and let an attendance write hit a foreign `learner_id` via
+`is_active_member`). Behaviour-preserving for all correct data (every
+membership-creating path binds the same `school_id` to both the
+in-school guard and the `INSERT`; `learners.school_id` is never
+updated). The `roster_for_section*` half was long-carried verification
+debt (Wave 2O/2P/2Q/2T "apply next time that area is touched"); the
+`attendance` / `learner_score` readers were found by this change's
+mandatory `security-reviewer` pass (verdict PASS-WITH-MINORS, no
+blocking — findings retrieved via the file-based workaround after the
+direct return came back empty). Six TDD isolation tests. No new ADR —
+the established defense-in-depth pattern applied uniformly; recorded as
+`docs/adr/0042-*` "Addendum (post-Wave-3, 2026-09-03)". Branch
+`claude/p1-roster-school-id-join-hardening` off `main` `860cede`.
+
 ## SF10 Permanent Record (added 2026-09-02)
 
 Content-based CSV export of a learner's cumulative academic history
