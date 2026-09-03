@@ -445,3 +445,58 @@ the `generate_handler!` edit is purely additive; the client-side
 adviser-gap and teaching-load composition calls only reads the caller is
 already authorised for (`getLoad` is itself `authorize_view_teacher_load`-
 gated); no PII in the response or the new tests.
+
+## Wave 5 addendum — Page scaffold re-fit (2026-09-03)
+
+Every remaining in-shell screen (16 of them) was moved onto the shared
+`Page` primitive (Wave 2), replacing each screen's hand-rolled
+`<section aria-label><h2 ref tabIndex>` + mount-focus `useEffect` +
+inline Guided-hint block with `<Page title={…} hint={…}>`:
+
+- **Batch 1** — Grading Periods, Subject Monitor, Adviser View, Teacher Load
+- **Batch 2** — Sign-in Activity, Section Adviser, Teaching Assignments, Class Schedule
+- **Batch 3** — Learner List, SF1 Import, Section Roster
+- **Batch 4** — Subject Attendance, Attendance, Class Records, Class Record Workspace, Monthly Summary
+
+**Wrapper only** — no data flow, behaviour, table markup, `@media`
+block, score-entry keyboard model, or Monthly Summary sticky-column grid
+was touched. Almost every screen's test file was **unchanged**; the only
+adjustments were one region-name casing alignment in Monthly Summary
+(`"Monthly attendance summary"` → `"Monthly Attendance Summary"`, which
+its own focus test already expected).
+
+### `Page` gained an optional `headingRef`
+
+`SectionRosterScreen` returns focus to its heading from six post-action
+handlers (after enroll / transfer / end / correct / refresh / retry),
+not only on mount. `Page` owned its heading via a private ref, so a
+wrapper-only re-fit was impossible. `Page` now accepts an optional
+`headingRef?: RefObject<HTMLHeadingElement | null>`: when supplied it is
+used for both the `<h2>` and the mount-focus effect (so the caller can
+also move focus there later); when omitted, behaviour is exactly as
+before for the other ~15 callers.
+
+### Recorded remaining slices (Wave 6)
+
+- **`DataTable` migration** of the table screens (Attendance, Subject
+  Attendance, Section Roster, Class Record Workspace) — shed their
+  per-screen `@media (max-width: 640px)` reflow blocks for `DataTable`'s
+  `reflowAt` prop.
+- **Teacher Home redesign** — rebuild `TeacherWorkspaceScreen`'s content
+  onto `Page` / `KpiStrip` / `BentoGrid` / `Card` inside `HomeScreen`'s
+  teacher branch, then delete `TeacherWorkspaceScreen` (and `PageHeader`,
+  its last consumer).
+- **Login / First-run restyle** — a light pass on the pre-auth screens
+  (they render outside the shell).
+- **Attendance by grade** card for `SchoolHeadHome` (needs a
+  `section_memberships` temporal join).
+
+### Verification (Wave 5, this session)
+
+`npm run quality:full` exit 0 — `harness:verify` 100/100 certified;
+typecheck / lint / format / architecture clean; Vitest **842** / 90
+files (one net-new: the `Page` `headingRef` test); `cargo` untouched
+(no Rust), `cargo test` / `cargo fmt --check` / `cargo clippy` still
+green. `npm run quality:security` clean (no dependency). `npm run
+check:dev-preview-isolation` exit 0. `npx knip` — no new findings
+(`PageHeader` is still consumed by the un-refitted `TeacherWorkspaceScreen`).

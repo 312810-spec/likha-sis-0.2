@@ -2809,5 +2809,18 @@ without an adviser" card, and a "Teaching load" card with a
 
 ## Current Milestone
 
+## Wave 5 — UI redesign Page scaffold re-fit (ADR-0057 addendum) (added 2026-09-03)
+
+Wave 5 (ADR-0057 addendum): all 16 remaining in-shell screens moved onto
+the shared `Page` primitive (wrapper only — no data/behaviour/table
+change; almost every test file unchanged). `Page` gained an optional
+`headingRef` prop so `SectionRosterScreen` (which returns focus to its
+heading from six action handlers) could re-fit. Remaining redesign
+slices (Wave 6): DataTable migration of the table screens, the teacher
+Home redesign + `TeacherWorkspaceScreen` deletion, Login/first-run
+restyle, and the attendance-by-grade card.
+
+## Current Milestone
+
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,
 non-feature milestone and does not change this pointer.)

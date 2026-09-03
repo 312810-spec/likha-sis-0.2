@@ -1,5 +1,42 @@
 # CURRENT HANDOFF
 
+## Wave 5: Page scaffold re-fit — complete (2026-09-03)
+
+Branch `claude/ui-redesign-wave-1-shell`. Commit range `88503f6..HEAD`
+(plan -> Tasks 1-4 `c46ff54..434a1b2` -> Task 5 docs). ADR-0057 "Wave 5
+addendum" is the durable record.
+
+**What shipped**: every remaining in-shell screen (16) is now on the
+`Page` scaffold — Grading Periods, Subject Monitor, Adviser View,
+Teacher Load, Sign-in Activity, Section Adviser, Teaching Assignments,
+Class Schedule, Learner List, SF1 Import, Section Roster, Subject
+Attendance, Attendance, Class Records, Class Record Workspace, Monthly
+Summary. Wrapper-only: no data flow, behaviour, table markup, `@media`
+block, score-entry keyboard model, or Monthly Summary grid was touched;
+almost every test file was unchanged. `Page` gained an optional
+`headingRef?: RefObject<HTMLHeadingElement | null>` prop (used by
+`SectionRosterScreen` for its six post-action focus-return calls;
+default behaviour unchanged for the other callers).
+
+**Verification**: `npm run quality:full` exit 0 -- harness 100/100
+certified; typecheck/lint/format/architecture clean; Vitest **842** / 90
+files; `cargo` untouched, still green. `npm run quality:security` clean.
+`check:dev-preview-isolation` exit 0. `npm run build` OK -- CSS gzip
+**5.38 kB**, JS gzip **103.92 kB**. `npx knip` no new findings.
+`quality:ui` still blocked (Playwright binary absent).
+
+**Exact next slice (do NOT start it)**: **Wave 6 -- redesign completion +
+merge**. (a) `DataTable` migration of the four table screens (Attendance,
+Subject Attendance, Section Roster, Class Record Workspace), shedding
+their per-screen `@media (max-width: 640px)` reflow for `DataTable`'s
+`reflowAt` prop; (b) rebuild the teacher Home onto `Page`/`KpiStrip`/
+`BentoGrid`/`Card` inside `HomeScreen`, then delete `TeacherWorkspaceScreen`
+and `PageHeader`; (c) light restyle of `LoginScreen` / `FirstRunSetupScreen`;
+(d) the `SchoolHeadHome` "attendance by grade" card (needs a
+`section_memberships` temporal join -- its own security-reviewed Rust
+read). Then a full whole-branch review and **merge to `main`**. Its own
+plan(s).
+
 ## Wave 4: School-Head Home enrichment — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell`. Commit range `e0cf96f..HEAD`

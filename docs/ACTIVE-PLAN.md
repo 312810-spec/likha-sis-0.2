@@ -1,5 +1,33 @@
 # ACTIVE PLAN
 
+## Wave 5: Page scaffold re-fit (added 2026-09-03) — complete
+
+Full record: `docs/adr/0057-ui-redesign-shell.md` "Wave 5 addendum";
+`docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 5 entry.
+
+**Scope**: spec S7 -- re-fit every remaining in-shell screen onto the
+`Page` primitive. Presentational wrapper only; no Rust, no dependency, no
+security trigger.
+
+**What shipped**: 16 screens re-fit across 4 batched commits
+(`c46ff54..434a1b2`); `Page` gained an optional `headingRef` prop for
+`SectionRosterScreen`'s post-action focus-return pattern (+1 Page test).
+
+**Verification actually run this session**: `npm run quality:full` exit 0
+(harness 100/100; Vitest 842/90f; cargo untouched + green); `npm run
+quality:security` clean; `check:dev-preview-isolation` exit 0; `npm run
+build` OK (CSS gzip 5.38 kB). knip no new findings.
+
+**Not done this milestone**: `DataTable` migration of the table screens;
+teacher-Home redesign + `TeacherWorkspaceScreen`/`PageHeader` deletion;
+Login/first-run restyle; attendance-by-grade card; `quality:ui`
+Playwright smoke (browser binary absent); native NVDA/Narrator pass now
+owes every re-fitted screen.
+
+**Next**: Wave 6 -- redesign completion (DataTable migration, teacher
+Home, pre-auth restyle, attendance-by-grade) then full-branch review and
+merge to `main`. Its own plan(s). Not started.
+
 ## Wave 4: School-Head Home enrichment (added 2026-09-03) — complete
 
 Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 4 addendum";
