@@ -14,6 +14,8 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type {
   ComputedTermGrade,
@@ -81,6 +83,7 @@ class FakeAssessmentRepository implements AssessmentRepository {
     maxScore: 10,
     createdAt: "now",
   };
+  pending = false;
 
   constructor(private items: AssessmentItemDetail[] = [ITEM]) {}
 
@@ -103,6 +106,7 @@ class FakeAssessmentRepository implements AssessmentRepository {
     maxScore: number,
   ): Promise<AssessmentItem | null> {
     this.createCalls.push({ classRecordId, categoryId, name, maxScore });
+    if (this.pending) return new Promise<AssessmentItem | null>(() => {});
     if (this.createResult) {
       this.items = [
         ...this.items,
@@ -127,6 +131,7 @@ class FakeAssessmentRepository implements AssessmentRepository {
   renameResult: AssessmentItem | null = null;
   async renameItem(id: string, name: string): Promise<AssessmentItem | null> {
     this.renameCalls.push({ id, name });
+    if (this.pending) return new Promise<AssessmentItem | null>(() => {});
     return this.renameResult;
   }
 
@@ -139,6 +144,7 @@ class FakeAssessmentRepository implements AssessmentRepository {
     maxScore: number,
   ): Promise<AssessmentItem | null> {
     this.updateCalls.push({ id, name, categoryId, maxScore });
+    if (this.pending) return new Promise<AssessmentItem | null>(() => {});
     return this.updateResult;
   }
 
@@ -146,6 +152,7 @@ class FakeAssessmentRepository implements AssessmentRepository {
   deleteResult = true;
   async deleteItem(id: string): Promise<boolean> {
     this.deleteCalls.push(id);
+    if (this.pending) return new Promise<boolean>(() => {});
     return this.deleteResult;
   }
 }
@@ -192,12 +199,14 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     wasTransmuted: true,
     wasFloored: false,
   };
+  computeTermGradePending = false;
 
   async computeTermGrade(
     classRecordId: string,
     learnerId: string,
   ): Promise<ComputedTermGrade | null> {
     this.computeTermGradeCalls.push({ classRecordId, learnerId });
+    if (this.computeTermGradePending) return new Promise<ComputedTermGrade | null>(() => {});
     return this.computeTermGradeResult;
   }
 }
@@ -216,13 +225,43 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  reportCardPending = false;
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     this.reportCardCalls.push({ classRecordId });
+    if (this.reportCardPending) return new Promise<ReportCardExportResult | null>(() => {});
     return this.reportCardResult;
   }
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
+  }
+
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
   }
 }
 
@@ -321,6 +360,7 @@ describe("ClassRecordWorkspace", () => {
       expect(assessmentRepo.renameCalls).toEqual([{ id: "ai-1", name: "Quiz 1 (Retake)" }]),
     );
     expect(assessmentRepo.updateCalls).toEqual([]);
+    await waitFor(() => expect(screen.getByText("Quiz 1 (Retake) updated.")).toBeInTheDocument());
   });
 
   it("fully edits an unscored item's name, category, and max score", async () => {
@@ -352,6 +392,7 @@ describe("ClassRecordWorkspace", () => {
         { id: "ai-1", name: "Quiz 1 (Revised)", categoryId: "cat-1", maxScore: 25 },
       ]),
     );
+    await waitFor(() => expect(screen.getByText("Quiz 1 (Revised) updated.")).toBeInTheDocument());
   });
 
   it("deletes an unscored item only after a second confirming click", async () => {
@@ -367,6 +408,7 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Confirm delete" }));
 
     await waitFor(() => expect(assessmentRepo.deleteCalls).toEqual(["ai-1"]));
+    await waitFor(() => expect(screen.getByText("Quiz 1 deleted.")).toBeInTheDocument());
   });
 
   it("does not offer to delete an item that already has recorded scores", async () => {
@@ -711,6 +753,26 @@ describe("ClassRecordWorkspace", () => {
     expect(screen.getByText("Qualitative Descriptor", { exact: false })).toBeInTheDocument();
   });
 
+  it("opens the folder for the exported report card when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+    await user.click(screen.getByRole("button", { name: "Export report card (CSV)" }));
+    await screen.findByText("ReportCard_Mabini_Science_1st_Term.csv", { exact: false });
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ReportCard_Mabini_Science_1st_Term.csv",
+      ]),
+    );
+  });
+
   it("never shows a previous assessment item's roster after switching to an item whose load fails", async () => {
     const user = userEvent.setup();
     const ITEM_2: AssessmentItemDetail = {
@@ -956,6 +1018,101 @@ describe("ClassRecordWorkspace", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(scoreRepo.computeTermGradeCalls).toEqual([]);
+  });
+
+  it("does not create a second item while the first creation is still in flight", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.pending = true;
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.type(screen.getByLabelText("Item name"), "Quiz 2");
+    const addButton = screen.getByRole("button", { name: "Add item" });
+    await user.click(addButton);
+    await waitFor(() => expect(assessmentRepo.createCalls.length).toBe(1));
+
+    expect(addButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(addButton);
+
+    expect(assessmentRepo.createCalls.length).toBe(1);
+  });
+
+  it("does not save a second edit while the first save is still in flight", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.updateResult = { ...ITEM, name: "Quiz 1 (Revised)" };
+    assessmentRepo.pending = true;
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    await user.click(saveButton);
+    await waitFor(() => expect(assessmentRepo.updateCalls.length).toBe(1));
+
+    expect(saveButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(saveButton);
+
+    expect(assessmentRepo.updateCalls.length).toBe(1);
+  });
+
+  it("does not delete an item twice while the first deletion is still in flight", async () => {
+    const user = userEvent.setup();
+    const assessmentRepo = new FakeAssessmentRepository([ITEM]);
+    assessmentRepo.pending = true;
+    renderScreen({ assessmentRepo });
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const confirmButton = screen.getByRole("button", { name: "Confirm delete" });
+    await user.click(confirmButton);
+    await waitFor(() => expect(assessmentRepo.deleteCalls.length).toBe(1));
+
+    expect(confirmButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(confirmButton);
+
+    expect(assessmentRepo.deleteCalls.length).toBe(1);
+  });
+
+  it("does not compute term grades a second time while the first computation is still in flight", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+    scoreRepo.computeTermGradePending = true;
+
+    const showButton = screen.getByRole("button", { name: "Show term grades" });
+    await user.click(showButton);
+    await waitFor(() => expect(scoreRepo.computeTermGradeCalls.length).toBe(1));
+
+    expect(showButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(showButton);
+
+    expect(scoreRepo.computeTermGradeCalls.length).toBe(1);
+  });
+
+  it("does not export the report card a second time while the first export is still in flight", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+    exportRepo.reportCardPending = true;
+
+    const exportButton = screen.getByRole("button", { name: "Export report card (CSV)" });
+    await user.click(exportButton);
+    await waitFor(() => expect(exportRepo.reportCardCalls.length).toBe(1));
+
+    expect(exportButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(exportButton);
+
+    expect(exportRepo.reportCardCalls.length).toBe(1);
   });
 
   it("moves focus to the heading on mount", async () => {

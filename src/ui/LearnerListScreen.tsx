@@ -4,7 +4,7 @@ import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerApplicationService } from "../application/learner-service";
 import type { EnrollmentHistoryEntry } from "../domain/enrollment-history";
 import { ValidationError } from "../domain/errors";
-import type { LearnerRosterExportResult } from "../domain/export";
+import type { LearnerRosterExportResult, Sf10ExportResult } from "../domain/export";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
@@ -79,8 +79,15 @@ export function LearnerListScreen({
   const [savingEdit, setSavingEdit] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<LearnerRosterExportResult | null>(null);
+  const [revealingRoster, setRevealingRoster] = useState(false);
+  const [revealRosterError, setRevealRosterError] = useState<string | null>(null);
   const [openHistory, setOpenHistory] = useState<OpenHistory | null>(null);
   const historyRequestId = useRef(0);
+  const [sf10ExportingId, setSf10ExportingId] = useState<string | null>(null);
+  const [sf10Results, setSf10Results] = useState<Record<string, Sf10ExportResult>>({});
+  const [sf10Errors, setSf10Errors] = useState<Record<string, string>>({});
+  const [revealingSf10Id, setRevealingSf10Id] = useState<string | null>(null);
+  const [revealSf10Errors, setRevealSf10Errors] = useState<Record<string, string>>({});
   const filteredLearners = learners.filter((learner) => matchesSearch(learner, searchQuery));
 
   useEffect(() => {
@@ -198,6 +205,7 @@ export function LearnerListScreen({
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
     setError(null);
     setConfirmation(null);
     setSubmitting(true);
@@ -223,6 +231,7 @@ export function LearnerListScreen({
    * `learner::create_with_duplicate_check`'s doc comment). Never used to
    * override an `lrnConflict`, which is not overridable at all. */
   async function handleConfirmCreateSeparate() {
+    if (submitting) return;
     setError(null);
     setConfirmation(null);
     setSubmitting(true);
@@ -264,9 +273,11 @@ export function LearnerListScreen({
   }
 
   async function handleExportRoster() {
+    if (exporting) return;
     setError(null);
     setConfirmation(null);
     setExportResult(null);
+    setRevealRosterError(null);
     setExporting(true);
     try {
       const result = await exportService.exportLearnerRoster();
@@ -282,9 +293,88 @@ export function LearnerListScreen({
     }
   }
 
+  async function handleRevealRoster() {
+    if (revealingRoster || !exportResult) return;
+    setRevealRosterError(null);
+    setRevealingRoster(true);
+    try {
+      await exportService.revealExportedFile(exportResult.filePath);
+    } catch {
+      setRevealRosterError("Could not open the folder for this file.");
+    } finally {
+      setRevealingRoster(false);
+    }
+  }
+
+  async function handleExportSf10(learner: Learner) {
+    if (sf10ExportingId) return;
+    setSf10Errors((current) => {
+      if (!(learner.id in current)) return current;
+      const next = { ...current };
+      delete next[learner.id];
+      return next;
+    });
+    setSf10Results((current) => {
+      if (!(learner.id in current)) return current;
+      const next = { ...current };
+      delete next[learner.id];
+      return next;
+    });
+    setRevealSf10Errors((current) => {
+      if (!(learner.id in current)) return current;
+      const next = { ...current };
+      delete next[learner.id];
+      return next;
+    });
+    setSf10ExportingId(learner.id);
+    try {
+      const result = await exportService.exportLearnerPermanentRecordSf10(learner.id);
+      if (result === null) {
+        setSf10Errors((current) => ({
+          ...current,
+          [learner.id]: "Could not export — this learner could not be found.",
+        }));
+      } else {
+        setSf10Results((current) => ({ ...current, [learner.id]: result }));
+      }
+    } catch (err) {
+      setSf10Errors((current) => ({
+        ...current,
+        [learner.id]:
+          err instanceof ValidationError
+            ? err.message
+            : "Could not export the permanent record — you may not have permission to generate it.",
+      }));
+    } finally {
+      setSf10ExportingId(null);
+    }
+  }
+
+  async function handleRevealSf10(learner: Learner) {
+    const result = sf10Results[learner.id];
+    if (revealingSf10Id || !result) return;
+    setRevealSf10Errors((current) => {
+      if (!(learner.id in current)) return current;
+      const next = { ...current };
+      delete next[learner.id];
+      return next;
+    });
+    setRevealingSf10Id(learner.id);
+    try {
+      await exportService.revealExportedFile(result.filePath);
+    } catch {
+      setRevealSf10Errors((current) => ({
+        ...current,
+        [learner.id]: "Could not open the folder for this file.",
+      }));
+    } finally {
+      setRevealingSf10Id(null);
+    }
+  }
+
   async function handleSaveEdit(event: FormEvent) {
     event.preventDefault();
-    if (!editingId) return;
+    if (!editingId || savingEdit) return;
     setError(null);
     setConfirmation(null);
     setSavingEdit(true);
@@ -331,7 +421,7 @@ export function LearnerListScreen({
             />
           </div>
 
-          <button type="button" disabled={exporting} onClick={handleExportRoster}>
+          <button type="button" aria-disabled={exporting} onClick={handleExportRoster}>
             {exporting ? "Exporting…" : "Export learner list (CSV)"}
           </button>
 
@@ -340,6 +430,10 @@ export function LearnerListScreen({
               <p>
                 Saved to <code>{exportResult.filePath}</code>.
               </p>
+              <button type="button" aria-disabled={revealingRoster} onClick={handleRevealRoster}>
+                {revealingRoster ? "Opening…" : "Open folder"}
+              </button>
+              {revealRosterError && <p role="alert">{revealRosterError}</p>}
               <p>This file is for your own records — it does not include:</p>
               <ul>
                 {exportResult.disclosure.omittedFields.map((omitted) => (
@@ -416,7 +510,7 @@ export function LearnerListScreen({
                       </select>
                     </div>
                   </div>
-                  <button type="submit" className="button-primary" disabled={savingEdit}>
+                  <button type="submit" className="button-primary" aria-disabled={savingEdit}>
                     {savingEdit ? "Saving…" : "Save"}
                   </button>
                   <button type="button" disabled={savingEdit} onClick={handleCancelEdit}>
@@ -452,8 +546,53 @@ export function LearnerListScreen({
                     >
                       Edit
                     </button>
+                    <button
+                      type="button"
+                      aria-disabled={editingId !== null || sf10ExportingId !== null}
+                      onClick={() => handleExportSf10(learner)}
+                      aria-label={`Export permanent record (SF10) for ${learner.givenName} ${learner.familyName}`}
+                    >
+                      {sf10ExportingId === learner.id
+                        ? "Exporting…"
+                        : "Export SF10 (Permanent Record)"}
+                    </button>
                   </span>
                 </div>
+
+                {sf10Errors[learner.id] && <Alert tone="error">{sf10Errors[learner.id]}</Alert>}
+                {(() => {
+                  const sf10Result = sf10Results[learner.id];
+                  if (!sf10Result) return null;
+                  return (
+                    <Alert tone="success">
+                      <p>
+                        Saved to <code>{sf10Result.filePath}</code>.
+                      </p>
+                      <button
+                        type="button"
+                        aria-disabled={revealingSf10Id === learner.id}
+                        onClick={() => handleRevealSf10(learner)}
+                      >
+                        {revealingSf10Id === learner.id ? "Opening…" : "Open folder"}
+                      </button>
+                      {revealSf10Errors[learner.id] && (
+                        <p role="alert">{revealSf10Errors[learner.id]}</p>
+                      )}
+                      <p>
+                        This file is a content-based summary of this learner&rsquo;s academic
+                        history across every school year on record — it is <strong>not</strong> the
+                        official DepEd SF10 template and does <strong>not</strong> include:
+                      </p>
+                      <ul>
+                        {sf10Result.disclosure.omittedFields.map((omitted) => (
+                          <li key={omitted.field}>
+                            <strong>{omitted.field}</strong> — {omitted.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </Alert>
+                  );
+                })()}
 
                 {openHistory?.learnerId === learner.id && (
                   <section
@@ -637,7 +776,7 @@ export function LearnerListScreen({
                 type="button"
                 className="button-primary"
                 onClick={handleConfirmCreateSeparate}
-                disabled={submitting}
+                aria-disabled={submitting}
               >
                 {submitting ? "Creating…" : "Create separate learner"}
               </button>
@@ -649,7 +788,7 @@ export function LearnerListScreen({
         )}
 
         {!duplicateCandidates && !lrnConflict && (
-          <button type="submit" className="button-primary" disabled={submitting}>
+          <button type="submit" className="button-primary" aria-disabled={submitting}>
             {submitting ? "Enrolling…" : "Enroll learner"}
           </button>
         )}

@@ -1242,6 +1242,48 @@ pub fn migrations() -> Migrations<'static> {
             ON section_advisories(section_id) WHERE ends_on IS NULL;
         "#,
         ),
+        M::up(
+            r#"
+        -- Admin-Assisted Password Reset (Wave 3I). Widens audit_log to
+        -- attribute an event to the acting user, not just its subject --
+        -- every event before this migration is self-caused (the subject
+        -- IS the actor: a login/logout/lockout is always about the same
+        -- person who triggered it), so `actor_user_id` was never needed
+        -- until now. SQLite cannot ALTER a CHECK constraint in place, so
+        -- this reuses the standard 12-step "create new table, copy data,
+        -- drop old, rename" pattern migration 5 already established for
+        -- attendance_records (and the same pattern `user_school_roles`'s
+        -- own comment already anticipated reusing for a widened CHECK).
+        -- audit_log has no incoming foreign keys from any other table,
+        -- so this is safe to do with foreign_keys enforcement on. Every
+        -- pre-existing row is preserved losslessly with
+        -- actor_user_id = NULL. See
+        -- docs/adr/0061-admin-assisted-password-reset.md.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new
+            (id, school_id, user_id, username, actor_user_id, event_type, created_at)
+        SELECT
+            id, school_id, user_id, username, NULL, event_type, created_at
+        FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
     ])
 }
 
@@ -3048,6 +3090,86 @@ mod tests {
         assert!(
             result.is_err(),
             "one learner + one session must resolve to exactly one entry"
+        );
+    }
+
+    /// Proves the migration-24 audit_log rebuild (Wave 3I) is a safe,
+    /// lossless widening: pre-existing rows survive with the same data
+    /// and a NULL `actor_user_id` (they predate the concept of an
+    /// attributable actor distinct from the event's subject), and the
+    /// new CHECK constraint accepts `password_reset_by_admin` while
+    /// still rejecting an unrecognized event type -- the same shape as
+    /// `migration_5_converts_legacy_attendance_data_without_loss`.
+    #[test]
+    fn migration_24_widens_audit_log_without_losing_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+
+        // Apply only migrations 1-23 (pre-widen schema) to reproduce the
+        // exact state this migration must convert.
+        migrations().to_version(&mut conn, 23).unwrap();
+
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'ana.cruz', 'hash', 'Ana Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al1', 's1', 'u1', 'ana.cruz', 'login_success')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM audit_log", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "no rows should be lost during the widening");
+
+        let actor: Option<String> = conn
+            .query_row(
+                "SELECT actor_user_id FROM audit_log WHERE id = 'al1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            actor, None,
+            "a pre-existing row predates attributable actors and must stay NULL, not backfilled"
+        );
+
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u2', 'bo.reyes', 'hash', 'Bo Reyes')",
+            [],
+        )
+        .unwrap();
+        let accepted = conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, actor_user_id, event_type) \
+             VALUES ('al2', 's1', 'u2', 'bo.reyes', 'u1', 'password_reset_by_admin')",
+            [],
+        );
+        assert!(
+            accepted.is_ok(),
+            "the new password_reset_by_admin event type must be accepted"
+        );
+
+        let rejected = conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al3', 's1', 'u1', 'ana.cruz', 'not_a_real_event')",
+            [],
+        );
+        assert!(
+            rejected.is_err(),
+            "an unrecognized event type must still be rejected by the widened CHECK constraint"
         );
     }
 }

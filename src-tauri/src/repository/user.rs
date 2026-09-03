@@ -188,6 +188,33 @@ fn reset_failed_login_attempts(conn: &Connection, user_id: &str) -> AppResult<()
     Ok(())
 }
 
+/// Overwrites `user_id`'s password hash and clears any lockout currently
+/// in effect on that account -- a locked-out account is very often
+/// exactly why an admin-assisted reset was requested, and without this a
+/// teacher would stay rejected by `is_locked` for up to
+/// `LOCKOUT_DURATION_SECS` more even with the brand-new correct
+/// password. Called only from `auth::admin_reset_teacher_password`,
+/// after that function has already re-verified the caller's capability
+/// and the target's school membership -- this function itself performs
+/// no authorization, matching every other `repository::user` write.
+pub fn set_password_and_clear_lockout(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+    new_password_hash: &str,
+) -> AppResult<bool> {
+    let updated = conn.execute(
+        "UPDATE users SET password_hash = ?2, failed_login_attempts = 0, locked_until = NULL \
+         WHERE id = ?1 \
+           AND EXISTS (SELECT 1 FROM user_school_memberships \
+                       WHERE user_id = ?1 AND school_id = ?3) \
+           AND NOT EXISTS (SELECT 1 FROM user_school_memberships \
+                           WHERE user_id = ?1 AND school_id <> ?3)",
+        (user_id, new_password_hash, school_id),
+    )?;
+    Ok(updated == 1)
+}
+
 pub fn add_school_membership(conn: &Connection, user_id: &str, school_id: &str) -> AppResult<()> {
     conn.execute(
         "INSERT INTO user_school_memberships (user_id, school_id) VALUES (?1, ?2)",
@@ -203,6 +230,26 @@ pub fn is_member_of_school(conn: &Connection, user_id: &str, school_id: &str) ->
         |row| row.get(0),
     )?;
     Ok(count > 0)
+}
+
+/// True only when `school_id` is `user_id`'s sole school membership.
+/// The password hash is global to the user identity, so an admin reset
+/// must fail closed for a target that can authenticate in another
+/// school's scope as well.
+pub fn is_exclusively_member_of_school(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+) -> AppResult<bool> {
+    let eligible: i64 = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM user_school_memberships \
+                        WHERE user_id = ?1 AND school_id = ?2) \
+                AND NOT EXISTS (SELECT 1 FROM user_school_memberships \
+                                WHERE user_id = ?1 AND school_id <> ?2)",
+        (user_id, school_id),
+        |row| row.get(0),
+    )?;
+    Ok(eligible != 0)
 }
 
 /// True once at least one user account exists. Used to gate the
@@ -481,6 +528,47 @@ mod tests {
         let result = verify_credentials(&conn, "ana.cruz", "correct horse battery staple");
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn set_password_and_clear_lockout_replaces_the_hash_so_the_new_password_verifies() {
+        let conn = open_test_db();
+        let user = create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        add_school_membership(&conn, &user.id, &school.id).unwrap();
+        let new_hash = auth::hash_password("new password").unwrap();
+
+        assert!(set_password_and_clear_lockout(&conn, &user.id, &school.id, &new_hash).unwrap());
+
+        assert!(matches!(
+            verify_credentials(&conn, "ana.cruz", "old password"),
+            Err(AppError::AuthenticationFailed)
+        ));
+        assert!(verify_credentials(&conn, "ana.cruz", "new password").is_ok());
+    }
+
+    #[test]
+    fn set_password_and_clear_lockout_unlocks_an_account_that_was_locked_out() {
+        let conn = open_test_db();
+        let user = create_user(&conn, "ana.cruz", "old password", "Ana Cruz").unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        add_school_membership(&conn, &user.id, &school.id).unwrap();
+        for _ in 0..MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = verify_credentials(&conn, "ana.cruz", "wrong password");
+        }
+        assert!(matches!(
+            verify_credentials(&conn, "ana.cruz", "old password"),
+            Err(AppError::AccountLocked)
+        ));
+        let new_hash = auth::hash_password("new password").unwrap();
+
+        assert!(set_password_and_clear_lockout(&conn, &user.id, &school.id, &new_hash).unwrap());
+
+        assert!(
+            verify_credentials(&conn, "ana.cruz", "new password").is_ok(),
+            "a reset must clear the lockout too -- otherwise the teacher stays rejected for \
+             up to 15 more minutes even with the correct new password"
+        );
     }
 
     #[test]

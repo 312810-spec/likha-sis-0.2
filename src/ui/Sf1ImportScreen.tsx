@@ -131,7 +131,7 @@ export function Sf1ImportScreen({
   }
 
   async function handleChooseFile() {
-    if (busy) return;
+    if (busy || sectionId.length === 0 || phase === "parsing") return;
     setError(null);
     setBusy(true);
     try {
@@ -283,7 +283,7 @@ export function Sf1ImportScreen({
             type="button"
             className="button-primary"
             onClick={handleChooseFile}
-            disabled={sectionId.length === 0 || busy || phase === "parsing"}
+            aria-disabled={sectionId.length === 0 || busy || phase === "parsing"}
           >
             {phase === "parsing" ? "Reading…" : "Choose Excel file"}
           </button>

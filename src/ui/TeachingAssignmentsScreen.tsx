@@ -109,6 +109,7 @@ export function TeachingAssignmentsScreen({
 
   async function handleAssign(event: FormEvent) {
     event.preventDefault();
+    if (assigning || subjects.length === 0 || teachers.length === 0) return;
     setError(null);
     setConfirmation(null);
     setAssigning(true);
@@ -140,6 +141,7 @@ export function TeachingAssignmentsScreen({
   }
 
   async function handleRemove(assignment: TeachingAssignmentDetail) {
+    if (removingId === assignment.id) return;
     setError(null);
     setConfirmation(null);
     setRemovingId(assignment.id);
@@ -217,7 +219,7 @@ export function TeachingAssignmentsScreen({
                       </button>{" "}
                       <button
                         type="button"
-                        disabled={removingId === assignment.id}
+                        aria-disabled={removingId === assignment.id}
                         onClick={() => handleRemove(assignment)}
                         aria-label={`Remove ${teacherName(assignment.teacherUserId)} from ${assignment.subjectName}`}
                       >
@@ -279,7 +281,7 @@ export function TeachingAssignmentsScreen({
             <button
               type="submit"
               className="button-primary"
-              disabled={assigning || subjects.length === 0 || teachers.length === 0}
+              aria-disabled={assigning || subjects.length === 0 || teachers.length === 0}
             >
               {assigning ? "Assigning…" : "Assign teacher"}
             </button>

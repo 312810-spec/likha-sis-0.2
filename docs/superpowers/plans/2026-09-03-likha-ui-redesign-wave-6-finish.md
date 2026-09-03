@@ -31,7 +31,7 @@
 - `src/ui/ClassRecordWorkspace.tsx` / `.test.tsx` — `.score-entry` table → `DataTable`, score `<input>`s in cells.
 - `src/ui/theme/styles.css` — remove the `@media (max-width: 640px)` blocks for `.attendance-roster`, `.section-roster`, `.score-entry` (keep any part covering non-table elements); the base `.attendance-roster` / `.section-roster` / `.score-entry` rules can stay or go (if fully unused after migration, remove — `grep` first).
 - `src/ui/LoginScreen.tsx`, `src/ui/FirstRunSetupScreen.tsx` — light restyle (see Task 4).
-- `docs/adr/0057-ui-redesign-shell.md` (Wave 6 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
+- `docs/adr/0064-ui-redesign-shell.md` (Wave 6 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
 
 ---
 
@@ -109,7 +109,7 @@ These render inside `App.tsx`'s `<div className="app-boot">` (Wave 1) which alre
 
 ## Task 5: ADR addendum + state docs + wave gate + whole-branch review
 
-- [ ] **Step 1: ADR-0057 Wave 6 addendum** — the four table migrations (which `@media` blocks were removed), the Section Roster action-panel move to a sibling block, and the pre-auth tidy. Note what remains as accepted redesign debt: the teacher Home is still `TeacherWorkspaceScreen` rendered as-is (functional but not rebuilt on the primitives) — a future cosmetic slice — and `PageHeader` survives as its last consumer; the `SchoolHeadHome` "attendance by grade" card is still deferred (temporal membership join).
+- [ ] **Step 1: ADR-0064 Wave 6 addendum** — the four table migrations (which `@media` blocks were removed), the Section Roster action-panel move to a sibling block, and the pre-auth tidy. Note what remains as accepted redesign debt: the teacher Home is still `TeacherWorkspaceScreen` rendered as-is (functional but not rebuilt on the primitives) — a future cosmetic slice — and `PageHeader` survives as its last consumer; the `SchoolHeadHome` "attendance by grade" card is still deferred (temporal membership join).
 - [ ] **Step 2: state docs** — `PROJECT-MEMORY.md` one line; `CURRENT-HANDOFF.md` top entry ("**Wave 6 complete — redesign branch ready for merge**"; commit range; `quality:full` result; the accepted debt list above; next action = **whole-branch review then merge `claude/ui-redesign-wave-1-shell` → `main`**); `ACTIVE-PLAN.md` "Wave 6 — complete" section; `VERIFICATION-DEBT.md` — the native NVDA/Narrator + `quality:ui` pass now owes the whole redesigned surface; DataTable's phone reflow verified structurally (jsdom) only.
 - [ ] **Step 3: gates** — `npm run quality:full` exit 0 (harness 100/100; typecheck/lint/format/architecture; vitest — count may dip slightly if a `.attendance-roster`-structural test line was removed, that's expected and reported; `cargo` untouched). `npm run quality:security` clean. `npm run build` — record gzip (CSS should _drop_ — three `@media` blocks removed). `npm run check:dev-preview-isolation` exit 0. `npx knip` — no new findings.
 - [ ] **Step 4: commit** `docs: record Wave 6 (DataTable migration + pre-auth tidy) — ADR addendum + state docs`.

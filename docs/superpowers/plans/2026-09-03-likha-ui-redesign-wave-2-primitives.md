@@ -48,7 +48,7 @@
 | `src/ui/TodaysClassesScreen.test.tsx`                                      | adjust selectors for the `DataTable` DOM (still a `table`/`row`/`columnheader`/`cell` tree — RTL `getByRole("table")`, `getByRole("row")` still work); the screen region is now `Page`'s `<section aria-label="Today's Classes">` — unchanged name.                                                                       |
 | `src/ui/SectionsScreen.tsx`                                                | replace the `<section aria-label><h2 ref tabIndex>` + Guided hint wrapper with `<Page title="Sections" hint={…}>`; the create-section form, the sections list, and the enroll panel move inside `<Page>` unchanged. (No `DataTable` here — the sections list is a labelled `<ul>`, not a data grid; leave it.)            |
 | `src/ui/SectionsScreen.test.tsx`                                           | adjust only if a selector depended on the old wrapper; the `region`/`heading` names are unchanged.                                                                                                                                                                                                                        |
-| `docs/adr/0057-ui-redesign-shell.md`                                       | append a "## Wave 2 addendum" recording the four primitives, the `DataTable` reflow-as-prop decision, and the two proof migrations.                                                                                                                                                                                       |
+| `docs/adr/0064-ui-redesign-shell.md`                                       | append a "## Wave 2 addendum" recording the four primitives, the `DataTable` reflow-as-prop decision, and the two proof migrations.                                                                                                                                                                                       |
 | `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md` | Wave 2 entries.                                                                                                                                                                                                                                                                                                           |
 
 ---
@@ -170,7 +170,7 @@ export function Page({ title, hint, actions, children }: PageProps) {
 - [ ] **Step 5: CSS** — append to `src/ui/theme/styles.css`:
 
 ```css
-/* Redesign primitives -- Page scaffold (ADR-0057 Wave 2). Reuses the
+/* Redesign primitives -- Page scaffold (ADR-0064 Wave 2). Reuses the
    existing .page-header heading styles; adds only the actions row. */
 .page-header {
   display: flex;
@@ -233,7 +233,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - [ ] **Step 5: CSS** — append:
 
 ```css
-/* Redesign primitives -- KPI strip (ADR-0057 Wave 2). */
+/* Redesign primitives -- KPI strip (ADR-0064 Wave 2). */
 .kpi-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -319,7 +319,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - [ ] **Step 5: CSS** — append:
 
 ```css
-/* Redesign primitives -- Card + BentoGrid (ADR-0057 Wave 2). */
+/* Redesign primitives -- Card + BentoGrid (ADR-0064 Wave 2). */
 .bento {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -418,7 +418,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - [ ] **Step 5: CSS** — append:
 
 ```css
-/* Redesign primitives -- DataTable (ADR-0057 Wave 2). Table-in-card:
+/* Redesign primitives -- DataTable (ADR-0064 Wave 2). Table-in-card:
    real table semantics always; the reflow is CSS-only. */
 .data-table-scroll {
   overflow-x: auto;
@@ -567,7 +567,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ## Task 7: ADR addendum + state docs + wave gate
 
-**Files:** `docs/adr/0057-ui-redesign-shell.md` (append "## Wave 2 addendum"), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`.
+**Files:** `docs/adr/0064-ui-redesign-shell.md` (append "## Wave 2 addendum"), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`.
 
 - [ ] **Step 1: ADR Wave 2 addendum** — the four primitives and their responsibilities; the decision that `DataTable`'s phone reflow is a **prop + CSS**, not per-screen `@media` (migrated screens shed their bespoke reflow blocks over time); the two proof migrations (Today's Classes → `Page` + `DataTable`; Sections → `Page`); note the remaining ~12 screens re-fit in Wave 5+ batches, and that `KpiStrip`/`Card`/`BentoGrid` get their first real use in Wave 3's Home.
 
@@ -575,7 +575,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 - [ ] **Step 3: `npm run quality:full`** — exit 0 required (harness 100/100 unchanged — no harness file touched; typecheck/lint/format/architecture; vitest count up by the new primitive + migration tests; `cargo` unchanged, no Rust). `npm run quality:security` clean (no dependency). `npm run build` — record CSS gzip. `npx knip` — no new findings (the primitives must all be consumed: `Page` by 2 screens; `KpiStrip`/`Card`/`BentoGrid`/`DataTable` — `DataTable` by Today's Classes; `KpiStrip`/`Card`/`BentoGrid` have **no consumer yet** and will trip `knip` as unused exports → add them to `knip`'s `ignore`/`ignoreExportsUsedInFile` with a comment, OR — preferred — hold Tasks 2 & 3 until Wave 3 consumes them. **Decision for the executor:** if `knip` flags `KpiStrip`/`Card`/`BentoGrid` as unused, add a one-line `knip.json` ignore entry referencing "consumed in Wave 3 (HomeScreen)"; do not delete the components.)
 
-- [ ] **Step 4: commit** (`docs: record Wave 2 (layout primitives) — ADR-0057 addendum + state docs`).
+- [ ] **Step 4: commit** (`docs: record Wave 2 (layout primitives) — ADR-0064 addendum + state docs`).
 
 ---
 

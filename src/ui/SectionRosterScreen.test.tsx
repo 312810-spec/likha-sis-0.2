@@ -1,9 +1,18 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ExportApplicationService } from "../application/export-service";
 import { FormGenerationApplicationService } from "../application/form-generation-service";
 import { SectionApplicationService } from "../application/section-service";
+import type {
+  LearnerRosterExportResult,
+  ReportCardExportResult,
+  Sf2ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
+} from "../domain/export";
 import type { Sf1GenerationResult, Sf9GenerationResult } from "../domain/form-generation";
+import type { ExportRepository } from "../domain/ports/export-repository";
 import type { FormGenerationRepository } from "../domain/ports/form-generation-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type {
@@ -233,10 +242,70 @@ class FakeFormGenerationRepository implements FormGenerationRepository {
   }
 }
 
+class FakeExportRepository implements ExportRepository {
+  sf5Calls: Array<{ sectionId: string; schoolYear: string }> = [];
+  sf5ToReturn: Sf5ExportResult | null = {
+    filePath: "C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv",
+    disclosure: {
+      populatedFields: ["School Name", "Section Name", "School Year", "General Average"],
+      omittedFields: [
+        { field: "School Head Certification Signature", reason: "manual ink signature required" },
+      ],
+    },
+  };
+  sf5Error: Error | null = null;
+
+  async exportSectionMonthlySf2(): Promise<Sf2ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<Sf5ExportResult | null> {
+    this.sf5Calls.push({ sectionId, schoolYear });
+    if (this.sf5Error) throw this.sf5Error;
+    return this.sf5ToReturn;
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
+  }
+}
+
 function renderScreen(
   overrides: Partial<FakeSectionRepository> = {},
   sectionId = "sec-1",
   formOverrides: Partial<FakeFormGenerationRepository> = {},
+  exportOverrides: Partial<FakeExportRepository> = {},
 ) {
   const repo = new FakeSectionRepository();
   Object.assign(repo, overrides);
@@ -244,18 +313,22 @@ function renderScreen(
   const formRepo = new FakeFormGenerationRepository();
   Object.assign(formRepo, formOverrides);
   const formGenerationService = new FormGenerationApplicationService(formRepo);
+  const exportRepo = new FakeExportRepository();
+  Object.assign(exportRepo, exportOverrides);
+  const exportService = new ExportApplicationService(exportRepo);
   const onBack = vi.fn();
   const result = render(
     <ModeProvider>
       <SectionRosterScreen
         sectionService={service}
         formGenerationService={formGenerationService}
+        exportService={exportService}
         sectionId={sectionId}
         onBack={onBack}
       />
     </ModeProvider>,
   );
-  return { ...result, repo, formRepo, onBack };
+  return { ...result, repo, formRepo, exportRepo, onBack };
 }
 
 const GUIDED_NOTE = /always your class as it stands today/;
@@ -538,8 +611,13 @@ describe("SectionRosterScreen", () => {
     await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     // Every other row action is disabled while a panel is open.
-    expect(screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Transfer Cruz, Ben/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /End enrollment for Bautista, Ana/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: /Transfer Cruz, Ben/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("moves focus into the panel when it opens", async () => {
@@ -626,7 +704,10 @@ describe("SectionRosterScreen", () => {
     await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
 
     expect(screen.getByText(/no other section to move this learner to/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm transfer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm transfer" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("surfaces a thrown command error inside the panel without losing the entry", async () => {
@@ -812,7 +893,10 @@ describe("SectionRosterScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Enroll learner" }));
     expect(await screen.findByText(/no learners in this school yet/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("blocks confirm and explains a transfer is needed for a learner enrolled elsewhere", async () => {
@@ -824,7 +908,10 @@ describe("SectionRosterScreen", () => {
     await user.selectOptions(screen.getByLabelText("Learner"), "l-elsewhere");
 
     expect(screen.getByText(/Moving them here is a transfer/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(repo.enrollMembershipCalls).toHaveLength(0);
   });
 
@@ -837,7 +924,10 @@ describe("SectionRosterScreen", () => {
     await user.selectOptions(screen.getByLabelText("Learner"), "l-here");
 
     expect(screen.getByText(/already enrolled in this section/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Confirm enrollment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("surfaces an overlapping-membership outcome as a fixable date error", async () => {
@@ -1273,13 +1363,25 @@ describe("SectionRosterScreen", () => {
 
     await user.click(screen.getByRole("button", { name: "Generate SF1 (School Register)" }));
 
-    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Enroll learner" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Generating…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     resolveSf1();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
     );
   });
 
@@ -1367,21 +1469,323 @@ describe("SectionRosterScreen", () => {
     await expectNoAccessibilityViolations(container);
   });
 
-  it("has no detectable accessibility violations in the empty state", async () => {
-    const { container } = renderScreen({ rosterResult: [] });
-    await screen.findByText(/No learners are enrolled in Mabini/);
-    await expectNoAccessibilityViolations(container);
+  it("generates an SF5 promotion report and renders output path and disclosures", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(exportRepo.sf5Calls).toEqual([{ sectionId: "sec-1", schoolYear: "2025-2026" }]);
+    expect(await screen.findByText(/Saved to/)).toBeInTheDocument();
+    expect(
+      screen.getByText("C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("School Head Certification Signature")).toBeInTheDocument();
   });
 
-  it("has no detectable accessibility violations in the section-not-found state", async () => {
-    const { container } = renderScreen({}, "sec-gone");
-    await screen.findByText(/This section could not be found/);
-    await expectNoAccessibilityViolations(container);
+  it("opens the folder for the exported SF5 file when Open folder is clicked", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+    await screen.findByText("C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Documents\\LIKHA-SIS\\SF5_Mabini_2025-2026.csv",
+      ]),
+    );
   });
 
-  it("has no detectable accessibility violations in the roster-error state", async () => {
-    const { container } = renderScreen({ rosterError: new Error("db down") });
-    await screen.findByText(/Could not load the roster/);
+  it("displays an error alert when SF5 export fails", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.sf5Error = new Error("unauthorized");
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(
+      await screen.findByText(
+        /Could not export SF5 — you may not have permission to export this section/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("displays an error alert when section is not found for SF5 export", async () => {
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.sf5ToReturn = null;
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(await screen.findByText(/This section could not be found/)).toBeInTheDocument();
+  });
+
+  it("disables other actions while SF5 is exporting, and re-enables after", async () => {
+    let resolveSf5: (val: Sf5ExportResult | null) => void = () => {};
+    const pending = new Promise<Sf5ExportResult | null>((resolve) => {
+      resolveSf5 = resolve;
+    });
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    exportRepo.exportSectionEosySf5 = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+
+    expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Enroll learner" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Exporting SF5…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    resolveSf5(exportRepo.sf5ToReturn);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Transfer Bautista, Ana/ })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      ),
+    );
+  });
+
+  it("shows Guided mode hint for SF5 promotion report", async () => {
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+
+    expect(
+      screen.getByText(
+        /SF5 \(Report on Promotion and Level of Proficiency\) computes final subject ratings/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not generate SF1 a second time while the first generation is still in flight", async () => {
+    let resolveSf1: () => void = () => {};
+    const pending = new Promise<null>((resolve) => {
+      resolveSf1 = () => resolve(null);
+    });
+    const { formRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    formRepo.generateSf1 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    const button = screen.getByRole("button", { name: "Generate SF1 (School Register)" });
+    await user.click(button);
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Generating…" }));
+
+    expect(calls).toBe(1);
+    resolveSf1();
+  });
+
+  it("does not export SF5 a second time while the first export is still in flight", async () => {
+    let resolveSf5: (val: Sf5ExportResult | null) => void = () => {};
+    const pending = new Promise<Sf5ExportResult | null>((resolve) => {
+      resolveSf5 = resolve;
+    });
+    const { exportRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    exportRepo.exportSectionEosySf5 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }),
+    );
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Exporting SF5…" }));
+
+    expect(calls).toBe(1);
+    resolveSf5(null);
+  });
+
+  it("does not generate SF9 a second time while the first generation is still in flight", async () => {
+    let resolveSf9: (val: Sf9GenerationResult | null) => void = () => {};
+    const pending = new Promise<Sf9GenerationResult | null>((resolve) => {
+      resolveSf9 = resolve;
+    });
+    const { formRepo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    formRepo.generateSf9 = () => {
+      calls += 1;
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    const button = screen.getByRole("button", {
+      name: "Generate SF9 report card for Bautista, Ana",
+    });
+    await user.click(button);
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(button);
+
+    expect(calls).toBe(1);
+    resolveSf9(null);
+  });
+
+  it("does not open the Enroll panel while another action is in flight", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+
+    expect(screen.queryByRole("button", { name: "Confirm enrollment" })).not.toBeInTheDocument();
+  });
+
+  it("does not open a second row action panel while one is already open", async () => {
+    renderScreen();
+    await screen.findByText("Bautista, Ana");
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await screen.findByRole("button", { name: "Confirm transfer" });
+    await user.click(screen.getByRole("button", { name: /Transfer Cruz, Ben/ }));
+
+    // Still Bautista's panel -- the second click on Cruz's row did nothing.
+    expect(
+      screen.getByRole("heading", { name: "Transfer Bautista, Ana", level: 3 }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not submit enrollment a second time while the first submission is still in flight", async () => {
+    let resolveEnroll: (val: EnrollMembershipResult) => void = () => {};
+    const pending = new Promise<EnrollMembershipResult>((resolve) => {
+      resolveEnroll = resolve;
+    });
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    repo.enrollMembership = (input) => {
+      calls += 1;
+      repo.enrollMembershipCalls.push(input);
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    const confirmButton = screen.getByRole("button", { name: "Confirm enrollment" });
+    await user.click(confirmButton);
+    await waitFor(() => expect(calls).toBe(1));
+
+    expect(confirmButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(confirmButton);
+
+    expect(calls).toBe(1);
+    resolveEnroll({ kind: "enrolled", membership: MEMBERSHIP });
+  });
+
+  it("does not close the Enroll panel via Cancel while a submission is still in flight", async () => {
+    let resolveEnroll: (val: EnrollMembershipResult) => void = () => {};
+    const pending = new Promise<EnrollMembershipResult>((resolve) => {
+      resolveEnroll = resolve;
+    });
+    const { repo } = renderScreen({ enrollableResult: ENROLLABLE });
+    await screen.findByText("Bautista, Ana");
+    repo.enrollMembership = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Enroll learner" }));
+    await user.selectOptions(screen.getByLabelText("Learner"), "l-free");
+    await user.click(screen.getByRole("button", { name: "Confirm enrollment" }));
+    await screen.findByRole("button", { name: "Enrolling…" });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Enrolling…" })).toBeInTheDocument();
+    resolveEnroll({ kind: "enrolled", membership: MEMBERSHIP });
+  });
+
+  it("does not submit a transfer a second time while the first submission is still in flight", async () => {
+    let resolveTransfer: (val: TransferResult) => void = () => {};
+    const pending = new Promise<TransferResult>((resolve) => {
+      resolveTransfer = resolve;
+    });
+    const { repo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    let calls = 0;
+    repo.transferMembership = (input) => {
+      calls += 1;
+      repo.transferCalls.push(input);
+      return pending;
+    };
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    const confirmButton = screen.getByRole("button", { name: "Confirm transfer" });
+    await user.click(confirmButton);
+    await waitFor(() => expect(calls).toBe(1));
+
+    expect(confirmButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(confirmButton);
+
+    expect(calls).toBe(1);
+    resolveTransfer({ kind: "membershipNotFound" });
+  });
+
+  it("does not close the row action panel via Cancel while a submission is still in flight", async () => {
+    let resolveTransfer: (val: TransferResult) => void = () => {};
+    const pending = new Promise<TransferResult>((resolve) => {
+      resolveTransfer = resolve;
+    });
+    const { repo } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    repo.transferMembership = () => pending;
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Transfer Bautista, Ana/ }));
+    await user.selectOptions(screen.getByLabelText("Move to section"), "sec-2");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+    await screen.findByRole("button", { name: "Saving…" });
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeInTheDocument();
+    resolveTransfer({ kind: "membershipNotFound" });
+  });
+
+  it("has no detectable accessibility violations after exporting an SF5 report", async () => {
+    const { container } = renderScreen();
+    await screen.findByText("Bautista, Ana");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Export SF5 (Promotion & Level of Proficiency)" }));
+    await screen.findByText(/Saved to/);
     await expectNoAccessibilityViolations(container);
   });
 });

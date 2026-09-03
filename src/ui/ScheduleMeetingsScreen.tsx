@@ -89,6 +89,7 @@ export function ScheduleMeetingsScreen({
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
+    if (creating) return;
     setError(null);
     setConfirmation(null);
     setCreating(true);
@@ -117,6 +118,7 @@ export function ScheduleMeetingsScreen({
   }
 
   async function handleRemove(meeting: ScheduleMeeting) {
+    if (removingId === meeting.id) return;
     setError(null);
     setConfirmation(null);
     setRemovingId(meeting.id);
@@ -189,7 +191,7 @@ export function ScheduleMeetingsScreen({
                     <td>
                       <button
                         type="button"
-                        disabled={removingId === meeting.id}
+                        aria-disabled={removingId === meeting.id}
                         onClick={() => handleRemove(meeting)}
                         aria-label={`Remove the ${WEEKDAY_LABELS[meeting.weekday]} ${meeting.startsAt} meeting`}
                       >
@@ -249,7 +251,7 @@ export function ScheduleMeetingsScreen({
                 />
               </div>
             </div>
-            <button type="submit" className="button-primary" disabled={creating}>
+            <button type="submit" className="button-primary" aria-disabled={creating}>
               {creating ? "Scheduling…" : "Schedule meeting"}
             </button>
           </form>

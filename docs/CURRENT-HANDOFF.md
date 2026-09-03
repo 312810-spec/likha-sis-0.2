@@ -4,7 +4,7 @@
 
 The UI redesign (Waves 1-6, branch `claude/ui-redesign-wave-1-shell`,
 49+ commits `6f15df7..HEAD`) has passed an independent whole-branch
-review and is **merged to `main`**. ADR-0057 (six wave addenda) is the
+review and is **merged to `main`**. ADR-0064 (six wave addenda) is the
 durable record.
 
 **Whole-branch review** (Opus): SHIP-WITH-FOLLOWUPS, no Critical.
@@ -26,7 +26,7 @@ Roster / Class Record Workspace; rebuild the teacher Home onto the
 primitives + delete `TeacherWorkspaceScreen` and `PageHeader`;
 Login / First-run restyle; `SchoolHeadHome` attendance-by-grade card
 (needs a temporal membership join + its own security review); six review
-minors (see ADR-0057 Wave 6 addendum); native NVDA/Narrator +
+minors (see ADR-0064 Wave 6 addendum); native NVDA/Narrator +
 `quality:ui` pass across the redesigned surface (browser binary absent
 here -- `docs/VERIFICATION-DEBT.md`).
 
@@ -37,7 +37,7 @@ when work resumes.
 ## Wave 5: Page scaffold re-fit — complete (2026-09-03)
 
 Branch `claude/ui-redesign-wave-1-shell`. Commit range `88503f6..HEAD`
-(plan -> Tasks 1-4 `c46ff54..434a1b2` -> Task 5 docs). ADR-0057 "Wave 5
+(plan -> Tasks 1-4 `c46ff54..434a1b2` -> Task 5 docs). ADR-0064 "Wave 5
 addendum" is the durable record.
 
 **What shipped**: every remaining in-shell screen (16) is now on the
@@ -75,7 +75,7 @@ plan(s).
 
 Branch `claude/ui-redesign-wave-1-shell`. Commit range `e0cf96f..HEAD`
 (Wave 4 plan → Tasks 1-4 `9af6875..8ab6478`, Task 5 folded into Task 4 →
-Task 6: ADR-0057 Wave 4 addendum + this state-doc update). ADR-0057's
+Task 6: ADR-0064 Wave 4 addendum + this state-doc update). ADR-0064's
 "Wave 4 addendum" is the durable record.
 
 **What shipped**: `repository::attendance::school_day_totals` (one
@@ -118,7 +118,7 @@ and add the deferred "attendance by grade" card (needs a
 Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on one
 branch through all waves). Commit range `b7c5c8b..HEAD` (Wave 3 plan →
 Tasks 1–5 `fa66705..ebb34bd` → Task 6: the security-review Minor fix +
-ADR-0057 Wave 3 addendum + this state-doc update). ADR-0057's "Wave 3
+ADR-0064 Wave 3 addendum + this state-doc update). ADR-0064's "Wave 3
 addendum" is the durable record.
 
 **What shipped**: the authenticated `CurrentSession` DTO now carries
@@ -172,7 +172,7 @@ Branch `claude/ui-redesign-wave-1-shell` (the redesign accumulates on
 one branch through all waves). Commit range `d62da06..HEAD` — the Wave 2
 implementation plan, then Tasks 1–6 (`0e171c4..07fcaff`: the four
 primitives + the two proof migrations), then Task 7 (`f931424` the knip
-test fix; this commit the ADR-0057 addendum + state docs). ADR-0057's
+test fix; this commit the ADR-0064 addendum + state docs). ADR-0064's
 "Wave 2 addendum — layout primitives (2026-09-03)" section is the
 durable record.
 
@@ -243,8 +243,8 @@ Gets its own implementation plan.
 
 Branch `claude/ui-redesign-wave-1-shell`, from `main` at `6f15df7`.
 Commit range `789e4e5..HEAD` (design spec + implementation plan, then
-Wave 1 tasks 1–10, then Task 11: ADR-0057 + the accessibility fixes +
-this state-doc update). ADR-0057 is the durable record.
+Wave 1 tasks 1–10, then Task 11: ADR-0064 + the accessibility fixes +
+this state-doc update). ADR-0064 is the durable record.
 
 **What shipped**: a persistent left sidebar with a pinned Home item and
 four collapsible groups (`localStorage`-persisted), replacing the flat
@@ -334,6 +334,896 @@ shell; a native NVDA/Narrator / compiled-binary pass is owed.
 build `Page`, `KpiStrip`/`Kpi`, `BentoGrid`/`Card`, and `DataTable`, and
 migrate `SectionsScreen` and `TodaysClassesScreen` onto them as the
 proof. It gets its own implementation plan.
+
+## Active Task (2026-09-02, this session — Wave: SF10 Permanent Record shipped, ADR-0063)
+
+User-directed continuation ("continue but do sf10, i will tell you if i am
+ready to work on the templates"). Built SF10 Permanent Record as a
+content-based CSV export (DepEd-content-faithful, not the official
+`.xlsx` template — that track, `formgen::template_version`, stays
+evidence-blocked per ADR-0053 and was not touched), following exactly
+the SF5/SF6 reuse pattern the prior handoff entry identified as the
+safest next slice. Full design/rationale in
+`docs/adr/0063-sf10-permanent-record.md`.
+
+**What shipped**: `src-tauri/src/export/sf10.rs` (new — reuses
+`PromotionStatus`/`Sf5SubjectGrade`/`Sf5LearnerRow::compute_status`
+from `sf5.rs` unchanged), a new
+`commands::export::export_learner_permanent_record_sf10` command
+(gated by `Capability::ManageLearners`, the same Registrar-or-School-
+Head gate as `create_learner`/`update_learner` — neither SF5's
+adviser-of-section gate nor SF6's plain session-scope gate fit a
+single learner's whole multi-year history), full frontend port/
+service/UI wiring, and a new per-learner-row "Export SF10 (Permanent
+Record)" button on `LearnerListScreen.tsx`. A same-school-year
+mid-year transfer collapses into one row (labeled with the latest
+section, subject grades aggregated across every section that year),
+not a duplicate. `export_learner_permanent_record_sf10` added to
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING`, matching
+`create_learner`'s convention for `ManageLearners`-gated commands.
+
+**Verified for real, not hand-verified**: this session's sandbox had a
+working `sudo apt-get` path (unlike most prior sessions) — installed
+the GTK/WebKit system libraries, ran `rustup update stable` (1.94.1 →
+1.98.0, required), then ran `cargo build`, `cargo test` (633 lib tests
+
+- all integration binaries, including 4 new `export::sf10` unit tests
+  and 7 new `tests/export.rs` integration tests — authorization gate,
+  cross-school isolation, unknown-learner-id, empty history, multi-year
+  ordering, mid-year-transfer collapsing, no-cross-school-leakage),
+  `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check` — all
+  clean, all directly confirmed. One real bug was caught by `cargo test`
+  during development (a CSV header label containing a comma caused the
+  label itself to get quoted, breaking a test's expected substring) and
+  fixed before commit — see the ADR for detail. `npm run quality` —
+  853/853 vitest (was 843), typecheck/lint/format/architecture clean; 10
+  new TS tests. `npm run build`, `npm run check:dev-preview-isolation`,
+  `npm run harness:verify` (100/100) all clean. No new dependency, no
+  migration, no change to `formgen/`.
+
+**Independent security review**: dispatched via the file-based
+workaround from ADR-0062 (this session's own earlier fix for the
+agent-resume/retrieval bug) — a real, retrievable review, not a self-
+review substitute. **Verdict: NO BLOCKING FINDINGS.** Checked and
+confirmed: authorization runs before any data read and `school_id` is
+never client-supplied; every downstream lookup (`learner`, `section`,
+`class_record`, `section_membership`) is independently tenant-scoped
+and cross-school-tested; every CSV row routes through the shared
+`csv::row`/`escape_field` formula-injection defense; every
+user-controlled filename component routes through
+`sanitize_filename_component`; no learner PII reaches a log or error
+string; neither of this project's two previously-shipped failure
+classes (unauthenticated self-grant; SELECT-then-act race) recurs.
+Full findings in `docs/adr/0063-sf10-permanent-record.md`.
+
+Next candidate: the authoritative-template form-output pipeline
+remains paused, per your instruction, until you say you're ready to
+continue supplying DepEd templates.
+
+## Active Task (2026-09-02, this session — UX-02/UX-03 CLOSED for real via a new file-based review workaround; ADR-0062)
+
+User-directed continuation ("continue working on verification debts",
+then "initiate solid workaround or replacement to the agent-resume/
+retrieval [failure]"). Direct dispatches of `accessibility-reviewer`
+(UX-02, `TeacherWorkspaceScreen.tsx`) and `teacher-ux-reviewer` (UX-03,
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`) — including the one
+permitted `SendMessage` resume each, and a third attempt using
+`run_in_background: false` to test whether forcing synchronous
+execution avoided the failure — all hit the same recurring
+agent-resume/retrieval failure (real work done, no findings text
+retrievable). Self-review substituted first (recorded, no blocking
+issue), then built and validated a real workaround instead of accepting
+another round of open debt.
+
+**Workaround** (`docs/adr/0062-file-based-review-output-workaround.md`):
+route review output through the filesystem instead of the broken
+notification channel. Adding `Write` access to the dedicated reviewer
+agents was considered and rejected — `architecture-reviewer.md` and
+`security-reviewer.md` both explicitly flag a reviewer with `Write`
+access as a harness defect, and weakening that to work around an
+unrelated bug would trade one real defect for another. Instead: dispatch
+via the already-`Write`-capable `general-purpose` agent, with the
+dedicated reviewer's own checklist inlined into the prompt, instructed
+to touch nothing in the repository except one findings file under the
+session scratchpad; then read that file directly, ignoring the (still
+broken) notification result text. Validated live against both UX-02 and
+UX-03 — both returned real, evidence-backed, retrievable findings
+(computed contrast ratios from actual hex values, line-cited mode-parity
+checks, etc.), both verdict **LOOKS-GOOD**. Full findings in
+`docs/VERIFICATION-DEBT.md`'s now-CLOSED UX-02 and UX-03 entries.
+
+Both debt entries are **CLOSED for real** — not self-review substitutes.
+No application code changes this session (both reviews found nothing to
+fix); `docs/adr/0062-*.md` (new), `docs/VERIFICATION-DEBT.md`, and this
+file were updated. `git status` clean after commit/push.
+
+**Verified**: no application code changed — review/documentation/ADR
+session only. No test suite run since nothing changed under `src/` or
+`src-tauri/`.
+
+**For future sessions**: when a dedicated reviewer agent (or any
+subagent whose result you need back) hits the agent-resume/retrieval
+failure again (empty/placeholder notification after real tool-call
+activity), after the one permitted `SendMessage` resume, use the
+file-based workaround from ADR-0062 next — don't fall straight to
+self-review, and don't grant `Write` to the dedicated reviewer agents.
+
+Next candidates: (1) product-shaped work — SF10 Permanent Record
+(safest immediately-implementable slice) or the authoritative-template
+form-output pipeline (higher value, currently paused pending more
+user-supplied DepEd
+templates).
+
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecordWorkspace/SectionRosterScreen, CLOSES the debt)
+
+User-directed continuation ("continue" / "focus on the debts and next
+wave"). Fifth and final batch of the self-disabling-button sweep:
+applied the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern to the last two, most complex screens —
+`ClassRecordWorkspace.tsx` (5 instances: "Add item", per-item "Save"/
+"Confirm delete", "Show term grades", "Export report card") and
+`SectionRosterScreen.tsx` (11 instances, most sharing one
+`anyActionInFlight` flag: "Enroll learner" trigger, "Confirm
+enrollment", enroll-panel "Cancel", "Generate SF1", "Export SF5",
+per-row "Transfer"/"End enrollment"/"Correct today's placement"/
+"Generate SF9", row-panel "Confirm transfer/end/correction", row-panel
+"Cancel"). This closes `docs/VERIFICATION-DEBT.md`'s self-disabling-
+button entry entirely — all 15 screens from the original sweep are
+now fixed.
+
+**Verified**: `npm run quality` 843/843 (16 new interaction tests,
+plus 7 existing `.toBeDisabled()`/`.toBeEnabled()` assertions updated
+to check `aria-disabled` instead), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`, `npm
+run harness:verify` (100/100), `git diff --check` — all clean. No Rust
+files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry is now
+CLOSED. No specific next candidate pre-selected from that debt entry
+since it's fully retired — the recorded next-wave candidates (from the
+earlier "what's next" discussion this session) are: (1) the two owed
+independent reviews (UX-02/UX-03 accessibility-reviewer/teacher-ux-
+reviewer, blocked on a recurring harness agent-resume issue, self-
+review substituted each time — see `docs/VERIFICATION-DEBT.md`), or
+(2) product-shaped work — SF10 Permanent Record (fully unbuilt, can
+reuse SF1's import/reconciliation architecture) is the safest
+immediately-implementable slice; authoritative-template form output
+(real DepEd `.xls` templates via a Tauri→sidecar→Apache POI/HSSF
+pipeline, vs. today's disclosed-CSV-only exports) is the higher-value
+but currently paused candidate — the user has begun supplying real
+DepEd SF9/SF10/SF1/SF2/SF4/SF5/SF6 templates for structural evidence,
+work is paused mid-way (one synthetic SF1 skeleton reviewed and
+approved; user asked to pause further form work until told to
+continue — see the session's own notes, not yet written to a
+dedicated doc since the work is mid-flight and paused).
+
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: Sections/Sf1Import/SubjectAttendance, complete)
+
+User-directed continuation ("continue"). Fourth batch of the
+self-disabling-button sweep: applied the proven `disabled=` →
+`aria-disabled=` + handler-guard pattern to `SectionsScreen.tsx`'s
+"Create section", "Enroll learner", and "Export SF6" submit buttons;
+`Sf1ImportScreen.tsx`'s "Choose Excel file" button; and
+`SubjectAttendanceScreen.tsx`'s "Check attendance", "No class today",
+"Mark all present", and the per-learner per-status roster buttons — 8
+instances across 3 screens. Deliberately left `Sf1ImportScreen.tsx`'s
+"Import learners" button as native `disabled` — confirmed by reading
+the code that it is not an instance of this bug: `handleCommit` sets
+`busy` and `phase: "committing"` together in one batched update, so the
+button unmounts (replaced by a loading state) before it could ever be
+observed disabled-but-focused.
+
+**Verified**: `npm run quality` 829/829 (12 new interaction tests, each
+proving the handler guard blocks a second submission while the first is
+still in flight, plus one proving a per-learner mark is blocked during a
+concurrent bulk mark-all-present), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` — all clean. No Rust files
+touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated: 27 of
+~45 total instances now fixed across 13 screens; ~10 remaining across
+`ClassRecordWorkspace.tsx` and `SectionRosterScreen.tsx` (both use a
+shared `anyActionInFlight` guard across several buttons — the next
+slice should read that guard's usage carefully before converting, since
+converting one button's condition without checking how it's shared
+could change another button's disabled behavior).
+
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: ClassRecords/SectionAdviser/LearnerList, complete)
+
+User-directed continuation ("continue working on the waves"). Third
+batch of the self-disabling-button sweep: applied the proven
+`disabled=` → `aria-disabled=` + handler-guard pattern to
+`ClassRecordsScreen.tsx`'s "Open class record" and "Add subject"
+buttons, `SectionAdviserScreen.tsx`'s "End advisory" and "Assign
+adviser" buttons, and `LearnerListScreen.tsx`'s "Export learner list
+(CSV)" button, per-row "Save" (edit) button, "Enroll learner" submit
+button, and "Create separate learner" duplicate-review button — 7
+instances across 3 screens. Deliberately left `LearnerListScreen.tsx`'s
+per-row "View history"/"Edit" buttons and the "Cancel" buttons as
+native `disabled` — confirmed by reading the code that neither is an
+instance of this bug (Edit's button is unmounted, not disabled, on
+click, and already has its own focus-management effect; Cancel is
+disabled by a sibling button's async state, not its own).
+
+**Verified**: `npm run quality` 821/821 (7 new interaction tests, each
+proving the handler guard blocks a second submission while the first is
+still in flight), typecheck/lint/format/architecture clean. `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated: 19 of
+~45 total instances now fixed across 10 screens; ~18 remaining across
+`ClassRecordWorkspace.tsx`, `SectionRosterScreen.tsx`,
+`SectionsScreen.tsx`, `Sf1ImportScreen.tsx`, and
+`SubjectAttendanceScreen.tsx`.
+
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: GradingPeriods/ScheduleMeetings/TeachingAssignments, complete)
+
+User-directed continuation ("continue working on the waves"). Continued
+the self-disabling-button sweep with a second batch, prepared while PR
+#27 (the first batch — auth/session screens) was still in CI: applied
+the same `disabled=` → `aria-disabled=` + handler-guard pattern to
+`GradingPeriodsScreen.tsx`'s per-row "Save" button,
+`ScheduleMeetingsScreen.tsx`'s "Schedule meeting" and per-row "Remove"
+button, and `TeachingAssignmentsScreen.tsx`'s "Assign teacher" and
+per-row "Remove" button — five instances across three screens that
+share a simple, consistent create-form-plus-removable-row shape. For
+the per-row buttons, the guard checks the specific row/id already in
+flight (e.g. `savingPeriodId === policyPeriodId`), not a blanket
+any-action-in-flight guard, preserving each screen's existing per-row
+disabling behavior exactly.
+
+**Verified**: `npm run quality` 810/810 (5 new interaction tests, each
+proving the handler guard blocks a second submission for the same
+row/form while the first is still in flight), typecheck/lint/format/
+architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated with
+this batch's specifics; remaining instances across
+`ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`LearnerListScreen.tsx`, `SectionAdviserScreen.tsx`,
+`SectionRosterScreen.tsx`, `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`,
+`SubjectAttendanceScreen.tsx` still open, pattern proven.
+
+## Active Task (2026-09-02, this session — Self-disabling-button sweep: auth/session-critical screens, complete)
+
+User-directed continuation ("continue"). Picked up the recorded next
+slice from the self-disabling-button debt: apply the proven `disabled=`
+→ `aria-disabled=` + handler-guard pattern (from the earlier 3-instance
+fix) to more screens. Scoped this slice to the four standalone
+auth/session-critical submit buttons — `LoginScreen.tsx` ("Sign in"),
+`FirstRunSetupScreen.tsx` ("Finish setup"), `AdminPasswordResetScreen.tsx`
+("Reset password"), `IdleTimeoutWarning.tsx` ("Stay signed in") —
+deliberately not the full ~40-instance sweep across ~15 files, to keep
+this change reviewable. Each screen has exactly one self-contained
+submit button and is among the first things every teacher touches.
+
+Each fix proven with a real interaction test (not just an attribute
+assertion): the underlying repository call is made to hang via an
+unresolved `Promise`, the button is clicked once, `aria-disabled="true"`
+is asserted, clicked again, and the repository call count is asserted
+unchanged — proving the handler-level guard actually blocks the second
+submission, not just that the button looks disabled.
+
+**Verified**: `npm run quality` 809/809 (4 new tests), typecheck/lint/
+format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s self-disabling-button entry updated:
+7 of ~45 total instances now fixed; the remaining ~30+ across
+`ClassRecordWorkspace.tsx`, `ClassRecordsScreen.tsx`,
+`GradingPeriodsScreen.tsx`, `LearnerListScreen.tsx`,
+`ScheduleMeetingsScreen.tsx`, `SectionAdviserScreen.tsx`,
+`SectionRosterScreen.tsx`, `SectionsScreen.tsx`, `Sf1ImportScreen.tsx`,
+`SubjectAttendanceScreen.tsx`, `TeachingAssignmentsScreen.tsx` remain
+open, pattern proven and mechanical to apply in further slices.
+
+## Active Task (2026-09-02, this session — Reveal-in-folder: SF5/SF6/report card/roster, complete)
+
+User-directed continuation ("continue"). Picked up the recorded exact
+next slice from the reveal-exported-file feature (PR #24): extend the
+"Open folder" button already proven on SF2/SF4 in
+`MonthlySummaryScreen.tsx` to the remaining four export surfaces —
+SF5 (`SectionRosterScreen.tsx`), SF6 (`SectionsScreen.tsx`), the
+class-record report card (`ClassRecordWorkspace.tsx`), and the learner
+roster (`LearnerListScreen.tsx`). No new backend/plumbing work — the
+`revealExportedFile` port/adapter/service/fixture wiring already existed
+at every layer from PR #24; this was UI-only, mirroring the same
+button + loading/error-state pattern already established. This closes
+the "reveal-affordance" verification debt completely (see
+`docs/VERIFICATION-DEBT.md`).
+
+**Verified**: `npm run quality` 805/805 (4 new interaction tests, one
+per screen, each proving the underlying `revealExportedFile` call fires
+with the exact saved path — not just that a button renders),
+typecheck/lint/format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+## Active Task (2026-09-01, this session — Verification debt sweep: Wave 3I security review retry + native visual pass, complete)
+
+User asked to "work on verification debts." Picked the two highest-
+priority actionable items per project priority order (security first).
+
+**Wave 3I independent security review, retried and closed**: the
+`security-reviewer` harness's agent-resume/retrieval failure had blocked
+this twice before (self-review substituted at the time). Retried this
+session — succeeded. Verdict: 0 BLOCKING, 1 SHOULD-FIX (no Rust-side
+minimum-password-length enforcement in `admin_reset_teacher_password`,
+matching the same disclosed, deliberate convention already documented
+for `register_user`/`bootstrap_installation` in
+`src/domain/password-policy.ts` — not fixed inline, since doing so only
+for this one path would create an undocumented asymmetry; recorded as a
+project-wide follow-up instead). Full record:
+`docs/VERIFICATION-DEBT.md`'s Wave 3I entry.
+
+**Native visual pass, closed for the 4 outstanding M0–M6 screens**:
+using the documented `playwright-cli` browser-mismatch workaround
+(`chromium.launch({ executablePath: "/opt/pw-browsers/chromium" })`),
+screenshotted `LoginScreen` (direct, real `vite dev`), `FirstRunSetupScreen`
+(needed a one-off `window.__TAURI_INTERNALS__.invoke` mock — a throwaway
+probe, not a new fixture), and `AppShell`/`LearnerListScreen` (via the
+existing dev-preview fixture) — 2 viewports × 2 color schemes each, 16
+screenshots total. **Found and fixed a real layout bug**: `WorkbenchNav`'s
+nav-group divider used `border-right`, which only reads correctly when
+every group shares one row — once a later group wraps to its own row
+(confirmed happening even at the primary 1366px desktop width once
+"Daily Teaching" grows past one internal row), the earlier group's
+`border-right` became an orphaned floating line. Fixed in
+`src/ui/theme/styles.css`: unconditional `border-bottom` divider,
+removing the narrow-viewport-only special case — verified correct at
+850px, 1024px, and 1366px. Screen-reader pass (NVDA/Narrator) stays open
+— no Windows screen reader available in this sandbox. Full record:
+`docs/VERIFICATION-DEBT.md`'s Native visual/screen-reader entry.
+
+**Verified**: `npm run quality` 801/801 (no regressions), `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. Only `src/ui/theme/styles.css`
+changed; no Rust touched, no cargo checks needed.
+
+## Active Task (2026-09-01, this session — Reveal-exported-file ("Open folder") feature, complete)
+
+User-directed continuation ("continue"). Picked up the second app-wide
+debt flagged by the UX-03 teacher-ux review retry (previous entry
+below): export results show only a raw OS file path with no way to jump
+to the saved file. Scoped to SF2/SF4 in `MonthlySummaryScreen.tsx` only
+— the same "prove the pattern on a small, reviewable slice; defer the
+full sweep" discipline as the self-disabling-button fix. Remaining
+export surfaces (SF5, SF6, report card export, learner roster export)
+stay open debt with the pattern now proven to follow.
+
+**Backend**: added `tauri-plugin-opener` v2.5.5 (Rust) /
+`@tauri-apps/plugin-opener` v2.5.5 (npm) — official first-party Tauri 2
+plugin, `revealItemInDir()` opens the OS file manager at a path. Fixed
+CVE-2025-31477 in its `open`-family APIs (untrusted-input path/URL-scope
+validation), patched upstream at 2.2.1+, this project pins 2.5.5.
+Registered in `src-tauri/src/lib.rs`; capability
+`opener:allow-reveal-item-in-dir` granted narrowly in
+`src-tauri/capabilities/default.json`. See
+`docs/SOURCE-REGISTRY.md`'s new entry for the full dependency writeup.
+
+**Plumbing**: `revealExportedFile(filePath)` added end-to-end —
+`ExportRepository` port → `TauriExportRepository` (calls the plugin,
+doc-commented with the untrusted-path discipline: only ever call with a
+path this app itself just returned from an export, never a user-typed
+string) → `ExportApplicationService` (trims, rejects empty) →
+`FixtureExportRepository` (genuine no-op for the browser-hosted
+dev-preview tool, not a throw — this really is unavailable there, not a
+bug to surface).
+
+**UI**: `MonthlySummaryScreen.tsx` — added an "Open folder" button next
+to each of the SF2 and SF4 "Saved to `<path>`" result blocks, each with
+its own loading/error state (`revealingSf2`/`revealSf2Error`,
+`revealingSf4`/`revealSf4Error`), reset on section/month change like the
+existing export state. Failure shows a plain-language inline error
+rather than throwing.
+
+**Verified this wave**: `npm run quality` — 801/801 tests (9 new: 3 new
+`MonthlySummaryScreen` interaction tests, 2 new
+`ExportApplicationService` unit tests, plus a `revealExportedFile` stub
+added to every other `FakeExportRepository`/`SlowExportRepository` test
+double the interface change touched), typecheck/lint/format/architecture
+clean. `npm run build`, `npm run check:dev-preview-isolation`,
+`npm run harness:verify` (100/100), `git diff --check` — all clean.
+Rust touched (`lib.rs`, `Cargo.toml`, `capabilities/default.json`):
+`cargo build` clean; `cargo test` (all suites, including every
+integration test file) 0 failures; `cargo clippy --all-targets -- -D
+warnings` 0 warnings; `cargo fmt --check` clean.
+
+`docs/VERIFICATION-DEBT.md`'s reveal-affordance entry updated: SF2/SF4
+in `MonthlySummaryScreen` closed; SF5/SF6/report-card/roster exports
+remain open, pattern proven.
+
+## Active Task (2026-09-01, this session — Self-disabling-button focus-loss fix, complete)
+
+User-directed continuation. Picked up the app-wide debt flagged by the
+UX-03 accessibility review retry (`docs/VERIFICATION-DEBT.md`):
+buttons that use the native `disabled` attribute to block
+double-submission blur to `<body>` the instant they're clicked, since
+the focused element itself becomes unfocusable mid-interaction.
+
+**Scoped deliberately, not a mechanical app-wide sweep**: fixed the
+three specific instances the reviews this session actually re-confirmed
+present — `AttendanceScreen.tsx`'s "Mark all present" button and
+`MonthlySummaryScreen.tsx`'s "Export SF2"/"Export SF4" buttons.
+Pattern: `disabled={cond}` → `aria-disabled={cond}` (keeps the button
+focusable/tabbable) + an early-return guard for the same condition
+inside the handler itself (`aria-disabled` doesn't block clicks at the
+DOM level, so the handler has to). Added a matching
+`button[aria-disabled="true"]` CSS rule mirroring the existing
+`button:disabled` visual treatment (cursor + opacity), so nothing looks
+different to a sighted user. Other screens sharing this same
+`disabled={...}` pattern (`LearnerListScreen`, `SubjectAttendanceScreen`,
+etc.) are **not** touched — that's a much larger sweep, left as its own
+future slice, not expanded into here.
+
+Two existing tests that asserted `.toBeDisabled()` on the changed
+buttons were updated to assert `aria-disabled="true"` instead. Two new
+tests added — one per changed screen — that actually click the
+aria-disabled button and assert the underlying repository call did
+**not** fire, proving the handler-level guard works, not just that the
+button looks disabled.
+
+**Verified this wave**: `npm run quality` — 796/796 tests (2 new),
+typecheck/lint/format/architecture clean. `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s app-wide self-disabling-button entry
+updated: these three instances closed; the broader app-wide sweep
+(remaining screens) stays open, now with the concrete pattern already
+proven here to follow.
+
+## Active Task (2026-09-01, this session — UX-02/UX-03 independent review retry, complete)
+
+Dispatched fresh reviews against the two remaining long-open
+independent-review debts: `accessibility-reviewer` for UX-02
+(`TeacherWorkspaceScreen.tsx`), and both `teacher-ux-reviewer` +
+`accessibility-reviewer` for UX-03 (`AttendanceScreen.tsx`/
+`MonthlySummaryScreen.tsx`). All three retrievals succeeded (the 4th,
+5th, and 6th successful review retries today).
+
+**UX-02 accessibility: LOOKS-GOOD**, no findings — closed clean.
+
+**UX-03 teacher-ux findings, fixed**: (1) Medium — "resolved" jargon in
+the SF4 export error (`MonthlySummaryScreen.tsx`), inconsistent with
+the plainer SF2 sibling message — this was this session's own wording
+from the earlier SF4 PR, not inherited debt; changed to match SF2's
+"could not be found" phrasing. (2) Low — raw file path shown with no
+open/reveal affordance — an existing, systemic pattern shared by every
+export result across the app (SF2/4/5/6, report card, roster); **not
+fixed here** — a real UI feature (reveal-in-folder), out of scope for a
+review-fix PR, would need its own scoped slice. (3) Low — AttendanceScreen's
+per-row "Retry" buttons shared one accessible name across the whole
+roster — fixed with a learner-specific `aria-label`, same pattern as
+UX-04's Edit/Delete fix.
+
+**UX-03 accessibility findings, fixed**: (1) Moderate — the monthly
+summary table's scrollable container had no `tabIndex`/accessible name
+(WCAG 2.1.1, axe's `scrollable-region-focusable` rule — invisible to
+`jsdom`-based `expectNoAccessibilityViolations`, since jsdom doesn't
+compute real scroll dimensions) — fixed with `tabIndex={0}` +
+`aria-label`. (2) Low — self-disabling buttons (native `disabled`)
+lose focus to `<body>` on click — confirmed **pre-existing, shared
+across `LearnerListScreen`/`SubjectAttendanceScreen`/etc., not new to
+UX-03** — recorded as debt, not fixed here (a real app-wide pattern
+change, out of scope for a targeted review-fix). (3) Minor — some
+`field-hint` instructional text isn't `aria-describedby`-linked to its
+control — non-blocking, left as-is per the reviewer's own
+"worth tightening only if revisited" call.
+
+**Verified this wave**: `npm run quality` — 794/794 tests (existing
+tests extended), typecheck/lint/format/architecture clean. `npm run
+build`, `npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s UX-02 and UX-03 entries updated to
+CLOSED. A new debt entry records the app-wide self-disabling-button
+focus-loss pattern (not this wave's to fix) and the
+export-result-no-reveal-affordance pattern.
+
+## Active Task (2026-09-01, this session — UX-04 independent review retry, complete)
+
+Dispatched fresh `teacher-ux-reviewer` and `accessibility-reviewer` runs
+against `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx` — the
+long-open UX-04 independent-review debt (`docs/VERIFICATION-DEBT.md`,
+recorded 2026-08-25, both reviewers previously hit the agent-resume/
+retrieval failure twice each). **Both retrievals succeeded this time**
+(the third successful review retry today, after the earlier SF5
+security review) — the harness issue appears to be intermittent rather
+than permanent, at least in this session.
+
+**Findings, both NEEDS-ATTENTION (minor), all fixed**:
+
+- Teacher-UX: (1) Medium — deleting an assessment item gave no success
+  confirmation, inconsistent with this file's own create-item and
+  `ScheduleMeetingsScreen`'s delete-confirmation precedent; (2) Low —
+  editing/renaming an item had the same gap; (3) Low — the
+  weighting-name fallback text read as "unknown" (alarming) rather than
+  a benign gap; (4) Low — the DepEd weighting-coverage caveat sat below
+  the export button, not above it, so a top-to-bottom reader could hit
+  "Export" before the caveat.
+- Accessibility: (1) Medium — the selected-assessment-item button set
+  `aria-pressed` but had no matching CSS rule, so it carried zero visual
+  cue for which item was selected (`.attendance-roster` already has this
+  exact pattern — `.assessment-item-list` didn't). Verified the
+  previously-fixed Edit/Delete accessible-name collision (`role="group"`)
+  remains correctly in place, not regressed.
+
+**Fixed**: added `setConfirmation` calls to delete/edit success paths;
+changed `"unknown"` → `"not shown"` fallback text (both occurrences);
+moved the DepEd caveat paragraph above the export button; added a
+`.assessment-item-list button[aria-pressed="true"]` CSS rule mirroring
+`.attendance-roster`'s (background/color change + non-color `✓` cue,
+WCAG 1.4.1). Extended the 3 affected existing tests with assertions for
+the new confirmation text; CSS-only fix has no direct unit-test
+coverage (matches how `.attendance-roster`'s identical rule is
+verified — visually/structurally, not via a CSS-in-jsdom assertion).
+
+**Verified this wave**: `npm run quality` — 794/794 tests (existing
+tests extended, no new `it` blocks, so count unchanged), typecheck/
+lint/format/architecture clean. `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean. No Rust files touched.
+
+`docs/VERIFICATION-DEBT.md`'s UX-04 entry updated to CLOSED — both
+reviews actually completed and returned findings this time, and every
+finding from both is now fixed.
+
+## Active Task (2026-09-01, this session — SF5 export as_of_date bug fix + dev-preview SF5/SF6 wiring, complete)
+
+Follow-up to Wave 3J below. Dispatched an independent `security-reviewer`
+against the three Wave 3m export commands (SF4/SF5/SF6) — **this attempt
+actually retrieved findings**, unlike the two prior agent-resume/
+retrieval failures recorded in `docs/VERIFICATION-DEBT.md` for this
+same review. Verdict: **NOT BLOCKING**, one **SHOULD-FIX**.
+
+**Real bug found and fixed**: `commands::export::export_section_eosy_sf5`
+(`src-tauri/src/commands/export.rs`) queried
+`grading::list_by_school_year(&conn, "", &school_year)` — a hardcoded
+**empty-string** `school_id` — purely to compute the `as_of_date`
+fallback used by the `authorize_adviser_of_section` check. That
+repository function's exact-match `WHERE school_id = ?1` clause can
+never match an empty string (school ids are always non-empty UUIDv7s),
+so this call silently, always returned zero rows — `as_of_date` always
+took the year-boundary fallback (e.g. `"2027-06-30"`) rather than the
+real last grading period's end date. Concretely: an adviser whose
+advisory ended between the real last grading period's end and the
+year-boundary fallback was wrongly evaluated as "not the current
+adviser" at that wrong date and denied — not because they actually
+aren't the adviser, just because the wrong date was asked about. Not
+exploitable as a tenant-isolation bug (confirmed: it never returns
+cross-school data, just always-empty), but a real **correctness/
+availability** bug for advisers near a school year's actual end.
+
+**Fix**: derive the school*id from the session first
+(`sessions.require_active_school_scope`, this file's own established
+pattern, used elsewhere in the same function seconds later anyway) and
+use \_that* for the `as_of_date` lookup, before calling
+`authorize_adviser_of_section` (which independently re-derives and
+re-verifies school_id/section ownership — no authorization logic
+changed, only the date the question is asked about). Fixed identically
+in the integration test file's parallel "standing in for the command"
+helper (`src-tauri/tests/export.rs`), which had copied the same bug.
+
+**New regression test**:
+`sf5_export_authorization_uses_the_real_last_grading_periods_end_date_not_a_year_end_fallback`
+— constructs exactly the window where the bug and the fix disagree
+(adviser's advisory ends after the real last grading period but before
+the year-boundary fallback), and **proves** the regression: verified it
+actually fails with `Unauthorized` against the pre-fix code (temporarily
+reverted, ran red, then reapplied the fix and reran green) before
+committing — not just written and assumed correct.
+
+**Also fixed while here**: the dev-preview fixture's `exportSectionEosySf5`/
+`exportSchoolEosySf6` stubs were unwired "throw" placeholders — and
+`SectionsScreen.tsx` (which calls `exportSchoolEosySf6`) **is** wired
+into `DevPreviewApp.tsx`, so that throw was a live bug in the
+dev-preview tool itself (clicking "Export SF6" there would have thrown
+an unhandled error). Wired both with real synthetic results, matching
+the existing SF2/SF4 fixture convention.
+
+**Verified this wave**: `cargo build`/`cargo test` (629 lib tests + all
+integration files, 0 failures, including the new regression test) /
+`cargo clippy --all-targets -- -D warnings` (0 warnings) / `cargo fmt
+--check` all clean. `npm run quality` (794/794 tests, typecheck/lint/
+format/architecture clean), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` — all clean.
+
+## Active Task (2026-09-01, this session — Wave 3J: SF4 Export UI Trigger, complete)
+
+User-directed continuation, following the merges below. Full scope:
+the recommended next slice from the Wave 3m reconciliation entry —
+wire an "Export SF4" trigger into `MonthlySummaryScreen.tsx`, the same
+school-wide, month-scoped screen that already triggers the SF2 export.
+
+**What shipped**: a second export button, "Export SF4 (CSV, whole
+school)", next to the existing "Export SF2 (CSV)" one in
+`MonthlySummaryScreen.tsx`. Calls the already-existing
+`exportService.exportSchoolMonthlyAttendanceSf4(year, month)` (backend
+shipped in Wave 3m with no UI trigger, deliberately, per ADR-0059).
+Deliberately **not** gated on the currently-selected section or its
+report data — SF4 is school-wide, unlike SF2's section scope — so it's
+enabled whenever a valid month is selected, independent of which
+section the teacher happens to have picked. Gets its own request-
+invalidation ref (`exportSf4RequestRef`), invalidated on month change
+but not section change, mirroring the existing SF2 pattern's
+stale-response guard. Also wired `FixtureExportRepository.exportSchoolMonthlyAttendanceSf4`
+in `src/dev-preview/fixtures.ts` (previously an unwired "not wired"
+throw stub) with a real synthetic result, so the dev-preview screen
+actually demonstrates the new button end-to-end — matching the
+fixture's existing SF2 convention.
+
+**Self-correction, same session**: PR #19's own body (and this entry,
+before this edit) incorrectly claimed "SF5/SF6 UI triggers remain
+deliberately unwired... matching ADR-0059's zero-UI-first precedent for
+those two forms." **That was wrong** — checked only the dev-preview
+fixture's stub methods, not the real product screens. ADR-0059's "no
+UI trigger" claim was **only ever about SF4**; ADR-0057/0058's own
+"Addendum" sections record that SF5 (`SectionRosterScreen.tsx`,
+"Export SF5 (Promotion & Level of Proficiency)") and SF6
+(`SectionsScreen.tsx`, "Export SF6 (Promotion & Proficiency Summary)")
+already shipped real UI triggers during the Wave 3m reconciliation
+itself — confirmed by direct grep of both files on `main` after
+merging PR #19. SF4 (this PR) was the only one of the three actually
+missing a trigger. Corrected here so a future session doesn't inherit
+the false claim; PR #19 is already merged, so its body can't be
+edited, but this is the durable-memory correction.
+
+**Verified this wave**: `npm run quality` — typecheck, eslint,
+`prettier --check`, `check:architecture`, `vitest run` all clean,
+**794/794 tests passing** (3 new: successful SF4 export, school-not-
+resolved error path, and the button not being gated on section-report
+data). `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), and `git diff --check` all also clean. No
+Rust files touched — this was a pure TS/UI change against an
+already-shipped, already-CI-verified Rust command.
+
+**Not done**: SF5/SF6 in the dev-preview fixture still throw
+"not wired" stubs (their real product-screen UI is already shipped —
+see the self-correction above; only the _dev-preview demo_ fixture for
+those two lags). No other product-code change beyond the two files
+above plus the dev-preview fixture.
+
+## Active Task (2026-09-01, this session — Merge PR #18 and PR #11, real Rust verification, complete)
+
+User-directed: merge both green PRs, resolve any conflicts, continue
+waves after. **PR #18 merged clean** (no conflicts). **PR #11 hit a
+real merge conflict** against the new `main` (both branches had prepended
+entries to the same four project-state docs): resolved by hand,
+preserving both PRs' entries in chronological order (newest first) in
+`CURRENT-HANDOFF.md`, `ACTIVE-PLAN.md`, `PROJECT-MEMORY.md`,
+`VERIFICATION-DEBT.md` — nothing dropped. Also found and fixed a real
+**ADR-number collision**: PR #11's `docs/adr/0057-admin-assisted-password-reset.md`
+collided with PR #18's already-merged `docs/adr/0057-sf5-promotion-foundation.md`.
+Renamed PR #11's ADR to `0061-admin-assisted-password-reset.md` and
+updated every reference to it (`src-tauri/src/{auth/mod.rs,db/migrations.rs}`,
+`src/{domain/session.ts,domain/ports/school-member-repository.ts,
+application/school-member-service.ts,infrastructure/tauri/school-member-repository.ts,
+ui/AdminPasswordResetScreen.tsx}`, and the three docs above).
+
+**Real Rust verification finally ran, for the first time this
+project's history** — this sandbox unexpectedly had a working
+`sudo -n apt-get install` path (no interactive prompt, unlike every
+prior session): installed the GTK/WebKit system packages, ran `rustup
+update stable` (1.94.1 → 1.98.0, the workspace needs 1.95+), then
+directly ran `cargo build` (clean), `cargo test` (629 lib tests + every
+integration test file, **0 failures**), `cargo clippy --all-targets --
+-D warnings` (**0 warnings**), `cargo fmt --check` (clean) against the
+fully-merged tree (Wave 3m reconciliation + Wave 3I password reset
+together). This closes the `docs/VERIFICATION-DEBT.md` entries both
+PRs had recorded for "no local Rust build" — see the updated entries
+there. `npm run quality` (791 tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), and `git diff --check` all also re-ran clean on the merged
+tree.
+
+Pushed the conflict-resolution commit to `claude/issue-9-20260831-1305`
+(PR #11's branch); next action is merging PR #11 once GitHub's own CI
+re-confirms green on the new head, then continuing autonomous wave
+development per the user's standing instruction.
+
+## Active Task (2026-09-01, this session — Wave 3m Reconciliation, complete)
+
+From GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full
+record: `docs/adr/0060-wave-3m-reconciliation.md`.
+
+**Repository truth at trigger time**: `main` at `fd437e5` (Wave 3H +
+the ChatGPT/Codex-automation-switch-and-restore saga, `41e1af9`/
+`fd437e5`); `antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation`
+(a different coding agent's independent lineage) at `35ed7f0`, 12
+commits ahead of and 21 commits behind `main`, both diverged from the
+same Wave 3E checkpoint (`4de3973`).
+
+**What happened**: both lineages had independently rebuilt Adviser View
+(Wave 3F) and Section Adviser Management UI (Wave 3G) from that same
+starting point, then diverged — `main` into harness restoration, Wave
+3m into SF2 class-adviser-byline integration → SF5 (School Form 5,
+Report on Promotion and Level of Proficiency) → SF6 (School Form 6,
+Summarized Promotion Report) → SF4 (School Form 4, Monthly Attendance
+Consolidation). A blind merge was rejected (the two lineages' Adviser
+View reimplementations conflict at the content level, not just the
+line level). Instead, every changed file was classified and
+reconciled by hand — see the ADR for the full file-by-file record.
+
+**Decision**: kept `main`'s own Adviser View/Section Adviser
+Management implementation (already reviewed, already Playwright-
+verified, and free of a real regression Wave 3m's parallel version
+still carries — see the ADR's "Investigation"/"Decision" sections for
+the concrete evidence). Brought forward everything Wave 3m built that
+`main` didn't already have: the SF2/report-card adviser byline, SF5
+(ADR-0057), SF6 (ADR-0058), and SF4 (ADR-0059) — all layered onto
+`main`'s existing, unmodified Section Advisory foundation (ADR-0056),
+not a parallel copy of it.
+
+**Verification actually run this session**: `npm run quality` —
+typecheck/lint/format/`check:architecture`/vitest all clean, **777/777
+tests passing**. `cargo fmt --check` clean (one pure-whitespace `cargo
+fmt` pass reconciled the two lineages' formatting). `git diff --check`
+clean. `cargo build`/`cargo test`/`cargo clippy` **could not run** —
+this sandbox is missing the Tauri/GTK system libraries
+(`glib-2.0`) `docs/adr/0041-minimal-ci-foundation.md`'s own CI job
+installs via `sudo apt-get`, and installing them here needed
+interactive approval unavailable in this unattended session. Every
+non-trivial Rust type/function signature the ported code depends on
+was instead hand-verified against this repository's actual current
+source (not the source branch's possibly-stale version) — see the ADR
+for the full list checked. This is real, disclosed verification debt
+(`docs/VERIFICATION-DEBT.md`), not a claimed pass.
+
+**Gate decision**: reconciliation is complete and locally green on
+every check this sandbox can run. Merged as PR #18 (2026-09-01) after
+Quality Gate and Security Gate both confirmed green on the exact head
+SHA, with zero open review threads.
+
+**Recommended next slice (not started)**: SF4 shipped with no UI
+trigger (deliberately, matching this project's zero-UI-first
+precedent — see ADR-0059). The natural next slice is wiring an
+"Export SF4" action into `MonthlySummaryScreen.tsx` (the same
+school-wide, month-scoped screen that already triggers the SF2
+export), giving School Heads a School Form 4 button next to the
+section-level SF2 one. Runner-up: closing the still-open Wave
+2Z-3H-era review/verification debt items already recorded further down
+this file, none of which this reconciliation touched.
+
+## Active Task (2026-08-31, this session — Wave 3I: Admin-Assisted Password Reset, complete)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact — that run's uncommitted work was independently reconstructed
+and re-verified from scratch here, not merely re-pushed). Branch
+`claude/issue-9-20260831-1305`, starting `HEAD` `fa8d21c` (confirmed
+exactly the issue's expected checkpoint). `main` not fetched/switched/
+merged/modified. Full scope contract: `docs/product/WAVE-3H-DECISION.md`'s
+Wave 3I section. Full decision record: `docs/adr/0061-admin-assisted-password-reset.md`.
+
+**What shipped**: `admin_reset_teacher_password` (Rust command,
+`src-tauri/src/commands/user.rs`) lets a School Head set a new password
+directly for a colleague in their own school, effective immediately —
+the Recommended mechanism from ADR-0061's 10-scenario decision process
+(Next Best, explicitly deferred not rejected: a system-generated
+temporary password with forced change at next login). Gated by the
+existing `Capability::ManageSchoolMembership` (no new capability
+variant — reuses the same authority tier as onboarding a member).
+Target school membership is re-verified server-side on every call; an
+unknown target and a target in a different school collapse to an
+identical `Ok(false)` with no audit write, so neither can be used to
+enumerate accounts in another school. Reuses the existing Argon2id
+hashing path unchanged; the raw password is zeroized in the command
+layer. A successful reset also clears any lockout in effect on the
+target account (`repository::user::set_password_and_clear_lockout`) —
+a locked-out account is very often exactly why the reset was requested.
+Migration 24 widens `audit_log` (the same 12-step recreate-table
+pattern migration 5 established, since SQLite cannot `ALTER` a `CHECK`
+constraint in place) with a nullable `actor_user_id` column and a new
+`password_reset_by_admin` event type; every pre-existing row is
+preserved losslessly with `actor_user_id = NULL`.
+`admin_reset_teacher_password` was added to `invoke.ts`'s session-
+expiry exemption set in the same commit (Wave 3B's own recorded debt:
+every new capability-gated command must be added by hand). A new
+`AdminPasswordResetScreen` (reached from the "Security" nav group)
+shows the same form to every authenticated school member, following
+`SectionAdviserScreen`'s established generic-error/no-client-side-
+enforcement convention.
+
+**Verified this wave**: `npm run quality` 770/770 (typecheck, lint,
+format, architecture, vitest all clean); `npm run build` clean; `npm
+run check:dev-preview-isolation` clean; `npm run harness:verify`
+100/100; `cargo fmt --check` clean; `git diff --check` clean. New Rust
+command-boundary tests cover same-school authorized success,
+cross-school denial (returns `false`, not an error, with no audit
+write), non-School-Head denial (`Unauthorized`), no-session denial,
+an unknown-target vs. cross-school-target indistinguishability
+assertion, lockout clearing on reset, and audit actor/target
+attribution. New TS tests cover the application-service validation
+layer, the Tauri adapter's exact `invoke` call shape, the UI screen's
+success/generic-failure/validation paths, and accessibility.
+**`cargo test`/`cargo clippy` could not run in this session's sandbox**
+(no `libglib2.0-dev`/`libgtk-3-dev`/`libwebkit2gtk-4.1-dev` — the exact
+packages `.github/workflows/quality.yml` installs for CI — and
+`apt-get install` requires interactive approval unavailable in this
+unattended run) — mitigated with careful manual review of every
+changed `.rs` file and an independent security review (see below);
+retained as debt in `docs/VERIFICATION-DEBT.md`; GitHub CI is
+authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent, scoped to authorization correctness,
+cross-school isolation, enumeration safety, password handling, the
+lockout side effect, audit correctness, the `invoke.ts` exemption
+change, and the frontend's UI-hiding-is-not-security posture — see this
+session's own final report for the actual outcome (recorded honestly,
+including if the known agent-retrieval failure recurred).
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+_policy_ (ADR-0019) or idle-timeout behavior (ADR-0020) — only one
+already-authorized write path's side effect on one specific account; no
+Sync/cloud/billing/backup work; synthetic fixtures only.
+
+**Gate decision: WAVE 3I COMPLETE.** Persisted durably to the
+issue-managed branch (commit SHA and PR link in this session's own
+final report — not duplicated here to avoid drift). Next planned slice
+(not started, from `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current by this session): Wave 3J —
+Adviser View dev-preview/Playwright verification debt closure. Stopping
+here per the wave contract.
+
+## Active Task (2026-08-31, this session — Wave 3H: Fresh Roadmap Survey, complete)
+
+Planning-only wave, run from GitHub issue #6, on branch
+`claude/issue-6-20260831-1042` at `HEAD` `9ff7c09` (confirmed exactly the
+issue's expected checkpoint — not merely an ancestor). No product source,
+Rust source, tests, dependencies, migrations, workflows, or harness
+metadata touched. `main` not fetched/switched/merged.
+
+Full record: `docs/product/WAVE-3H-DECISION.md`. Surveyed
+`CLAUDE.md`/`.claude/rules/`, `docs/CURRENT-HANDOFF.md`,
+`docs/ACTIVE-PLAN.md`, `docs/PROJECT-MEMORY.md`, `docs/PROGRESS-MAP.md`,
+`docs/product/PRODUCT-CONTRACT.md`, `docs/VERIFICATION-DEBT.md`, ADR-0035
+(the authoritative Wave 0-7 roadmap), and a direct source-code grep of
+`src-tauri/src` to confirm current state rather than trust doc summaries.
+Evaluated 11 candidates (the 10 the issue named plus one this survey
+surfaced).
+
+**Selected via LIKHA's priority order and the project's evidence-first
+discipline**: the "password reset" candidate was previously scored low
+(4.20, 2026-08-25) specifically because a safe admin-reset flow "needs
+the deferred Roles & Permissions decision" — RBAC has since shipped
+(ADR-0036), and a fresh grep confirms zero password-reset/change command
+exists anywhere in the codebase today. The original blocker no longer
+holds and the roadmap was never revisited to reflect it — exactly the
+"newly discovered evidence changes the best sequence" case
+`.claude/rules/autonomous-development.md` calls out.
+
+**Recommended next slice (Wave 3I, not started)**: Admin-Assisted
+Password Reset — a School Head resets a colleague's LIKHA login password
+within their own school, reusing the existing `Capability::ManageSchoolMembership`
+gate, Argon2id hashing, school-scoping, and audit-log patterns unchanged.
+**Runner-up**: close the Adviser View dev-preview/Playwright verification
+debt named in this file's prior entry below. Both Wave 5 Sync's
+10-scenario decision and the raw-database backup/recovery design question
+were evaluated and deliberately not selected — both are decision-shaped,
+not narrow-implementation-shaped, and each needs its own dedicated
+scenario-process wave first (same reasoning already applied to Sync).
+Full scope/non-goals/risks/acceptance-checks for Wave 3I, current
+completion-percentage and mock-pilot-readiness estimates, and the exact
+recommended Wave 3I prompt are all in `docs/product/WAVE-3H-DECISION.md`
+— not duplicated here.
+
+**Verification this wave**: doc-only change; `npm run harness:verify`,
+`npm run quality`, and `git diff --check` run as this wave's own gate
+(see the session's final report for actual results); a changed-path
+review confirms only planning/brain documents changed.
+
+**Gate decision: WAVE 3H COMPLETE.** Per the issue's explicit
+instruction, Wave 3I is not implemented here. Stopping and waiting for
+the next continuation instruction.
 
 ## Active Task (2026-08-31, this session — Section Adviser Browser-Rendered Verification, complete)
 

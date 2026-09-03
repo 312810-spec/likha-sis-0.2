@@ -408,6 +408,47 @@ export class FixtureExportRepository implements ExportRepository {
     };
   }
 
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<import("../domain/export").Sf4ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_${year}-${String(month).padStart(2, "0")}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Present/Absent/Tardy per day, whole school"],
+        omittedFields: [
+          { field: "School ID (EBEIS)", reason: "not tracked by this app" },
+          { field: "Enrollment/dropout/transfer statistics", reason: "not tracked by this app" },
+        ],
+      },
+    };
+  }
+
+  async exportSectionEosySf5(
+    sectionId: string,
+    schoolYear: string,
+  ): Promise<import("../domain/export").Sf5ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF5_${sectionId}_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "Final grades and promotion decisions"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+      },
+    };
+  }
+
+  async exportSchoolEosySf6(
+    schoolYear: string,
+  ): Promise<import("../domain/export").Sf6ExportResult | null> {
+    return {
+      filePath: `C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF6_${schoolYear}.csv (synthetic)`,
+      disclosure: {
+        populatedFields: ["School Name", "School-wide promotion summary"],
+        omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+      },
+    };
+  }
+
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
     throw new Error(
       "dev-preview fixture: exportClassRecordReportCard() is not wired -- read-only fixture",
@@ -416,6 +457,21 @@ export class FixtureExportRepository implements ExportRepository {
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("dev-preview fixture: exportLearnerRoster() is not wired -- read-only fixture");
+  }
+
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error(
+      "dev-preview fixture: exportLearnerPermanentRecordSf10() is not wired -- read-only fixture",
+    );
+  }
+
+  async revealExportedFile(): Promise<void> {
+    // No real OS file manager in a browser-hosted dev-preview -- a no-op
+    // is the honest fixture behavior here, not a throw (unlike the other
+    // unwired methods above, clicking "Open folder" in dev-preview isn't
+    // a bug to surface, it's simply unavailable in this environment).
   }
 }
 
@@ -1047,6 +1103,10 @@ const FIXTURE_SCHOOL_MEMBERS: SchoolMember[] = [
 export class FixtureSchoolMemberRepository implements SchoolMemberRepository {
   async listMembers(): Promise<SchoolMember[]> {
     return FIXTURE_SCHOOL_MEMBERS;
+  }
+
+  async resetPassword(targetUserId: string): Promise<boolean> {
+    return FIXTURE_SCHOOL_MEMBERS.some((member) => member.id === targetUserId);
   }
 }
 

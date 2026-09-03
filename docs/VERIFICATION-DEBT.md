@@ -39,6 +39,260 @@ were fixed in Task 11):
 A final whole-branch code review is still to run before this branch
 integrates.
 
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure — CLOSED (2026-09-01, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `security-reviewer` dispatch
+against the same three export commands (SF4/SF5/SF6) **actually
+retrieved findings this time** — the agent-resume/retrieval failure did
+not recur. Verdict: **NOT BLOCKING**, one **SHOULD-FIX** (a real
+correctness bug, not a security/tenant-isolation defect): SF5's
+`as_of_date` computation used a hardcoded empty-string `school_id`
+that could never match any real school, silently always falling back
+to the year-boundary date instead of the real last grading period's
+end — wrongly denying an adviser whose advisory ended in that window.
+Fixed and covered by a new regression test (verified red-then-green
+against the actual bug, not just written); see this file's own
+`CURRENT-HANDOFF.md`-mirrored entry and the git history for
+`src-tauri/src/commands/export.rs`. Every other check this self-review
+below already covered (tenant isolation, CSV/formula-injection defense,
+filename sanitization, authorization-gate parity) was independently
+re-confirmed by the fresh review too. Original self-review record
+retained below for the historical trail, not because the debt is still
+open.
+
+## Wave 3m reconciliation — security-reviewer agent-resume/retrieval failure (2026-09-01)
+
+A `security-reviewer` was dispatched against the reconciliation diff
+(multi-tenant isolation of the three new export commands, CSV/formula-
+injection defense, filename sanitization, and the
+`COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` categorization decision —
+see `docs/adr/0060-wave-3m-reconciliation.md`). It completed real work
+but its structured findings could not be retrieved from the tool
+result; a `SendMessage` resume of the same agent (the one permitted
+retry, per `.claude/rules/autonomous-development.md`'s established
+rule for this recurring harness issue) also returned no retrievable
+content. This is the same class of failure recorded repeatedly
+elsewhere in this project's history (see `docs/PROJECT-MEMORY.md`'s
+M7-M20-era entries).
+
+**Self-review performed instead, per the established fallback**: direct
+inspection confirmed (1) every teacher/school-entered field in
+`export/{sf4,sf5,sf6}.rs` is written through the shared `csv::row()`
+helper (`export/csv.rs`), which neutralizes a leading `=`/`+`/`-`/`@`/
+tab and RFC-4180-quotes commas/quotes/newlines per field — no `format!`
+bypasses it; (2) every filename built by the six export commands in
+`commands/export.rs` (including the three new ones) routes through
+`sanitize_filename_component`; (3) `export_school_monthly_attendance_sf4`
+and `export_school_eosy_sf6` take no client-supplied section/school id
+at all — `school_id` comes only from
+`sessions.require_active_school_scope(&conn)` — and
+`export_section_eosy_sf5` is gated by the existing, already-reviewed
+`auth::authorize_adviser_of_section` before any data access. No
+BLOCKING issue found by this self-review.
+
+**Retained as independent-review debt, not closed**: a real
+non-self-review of this diff is still owed. Retry in a future session
+once the agent-resume/retrieval mechanism is confirmed reliably
+working again, per the project's standing instruction not to keep
+spending large amounts of context chasing a known-broken retrieval
+path.
+
+## Wave 3m reconciliation — no local Rust build/test/clippy — CLOSED (2026-09-01)
+
+**Closed for real this session** (not the GitHub-CI-will-confirm-it
+deferral originally recorded below): after merging PR #18 and #11, this
+session's sandbox unexpectedly had `pkg-config`-visible `glib-2.0` and a
+working `sudo -n apt-get install` path (no interactive prompt needed,
+unlike every prior session that hit this same blocker). Installed
+`libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev
+libssl-dev libayatana-appindicator3-dev librsvg2-dev` successfully,
+updated the toolchain via `rustup update stable` (1.94.1 → 1.98.0 — the
+workspace requires 1.95+), then ran, directly, on the merged code: `cargo
+build` (clean), `cargo test` (**629 lib tests + every integration test
+file, 0 failures**), `cargo clippy --all-targets -- -D warnings`
+(clean, zero warnings), `cargo fmt --check` (clean). This is a real,
+first-ever-in-this-project direct confirmation, not the hand-verification
+fallback used previously.
+
+Full context on the original blocker: `docs/adr/0060-wave-3m-reconciliation.md`. This session's
+sandbox is missing the Tauri/GTK system libraries (`glib-2.0`, surfaced
+via `pkg-config` when `cargo build` runs) that
+`docs/adr/0041-minimal-ci-foundation.md`'s own Ubuntu CI job installs
+via `sudo apt-get install libwebkit2gtk-4.1-dev build-essential curl
+wget file libxdo-dev libssl-dev libayatana-appindicator3-dev
+librsvg2-dev`. That install needed interactive approval this
+unattended session could not obtain, so `cargo build`/`cargo test`/
+`cargo clippy --all-targets -- -D warnings`/`cargo fmt --check` (the
+last one alone succeeded, since it needs no compilation) could not be
+run against the reconciled Rust code (the new `export/{sf4,sf5,sf6}.rs`
+modules, the extended `commands/export.rs`, and `lib.rs`'s command
+registration).
+
+**Mitigation actually performed, not a substitute**: every non-trivial
+public type and function signature the ported Rust code calls
+(`repository::{attendance,school,section,section_advisory,
+section_membership,class_record,grading,grading_computation,role}`'s
+structs/functions, `auth::authorize_adviser_of_section`) was
+cross-checked by hand, field-by-field, against this repository's actual
+current source via direct `grep`/`Read` — not assumed correct from the
+source branch's own (differently-verified) claims.
+
+**Not yet done**: an actual `cargo build`/`cargo test`/`cargo clippy`
+run. Closed once either (a) the reconciliation PR's GitHub Actions
+Quality Gate (Ubuntu, GTK packages present) runs green, or (b) a future
+session with a working Rust toolchain runs the full `quality:full` gate
+and confirms it directly — whichever comes first. Do not claim this
+closed without one of those two actually happening. PR #18 merged
+2026-09-01 with Quality Gate and Security Gate both green on the exact
+head SHA — closing item (a): GitHub CI (Ubuntu, GTK packages present)
+confirmed the Rust build/test/clippy path for real.
+
+## Wave 3I: native Rust compile/test/clippy — CLOSED (2026-08-31, closed 2026-09-01)
+
+**Closed for real 2026-09-01**, after merging this PR: see the Wave 3m
+reconciliation entry above — the same session's direct `cargo
+build`/`cargo test`/`cargo clippy --all-targets -- -D warnings` run
+covered this wave's `auth::admin_reset_teacher_password` and migration
+24 code too (part of the same merged tree), all clean, 0 failures.
+
+Original blocker, for context: `cargo test`/`cargo clippy` could not run in this session's sandbox: no
+`sudo`/interactive-approval path to `apt-get install
+libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.1-dev` (the exact packages
+`.github/workflows/quality.yml` installs for CI), and `cargo build`
+fails at `glib-sys`'s build script (`pkg-config` cannot find
+`glib-2.0`) before reaching this wave's own code. `cargo fmt --check`
+does not need these system libraries and ran clean. Mitigated with
+careful manual review of every changed `.rs` file (syntax, borrow
+shapes, return types matching sibling functions, migration SQL mirrored
+exactly against migration 5's already-proven 12-step recreate-table
+pattern) and an independent security review (see the entry below).
+**GitHub CI is authoritative for this check** — treat any real CI
+compile failure as a genuine defect, not a flaky retry. Revisit whenever
+a session's sandbox has these packages available or root access to
+install them.
+
+## Wave 3I: independent security review owed — CLOSED (2026-08-31, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `security-reviewer` dispatch
+against the same scope (authorization gate placement, cross-school
+isolation, enumeration safety, password handling/zeroization, the
+lockout-clearing side effect's scope, audit-log column alignment, and
+whether the frontend relies on any client-side check) actually retrieved
+findings this time — the agent-resume/retrieval failure did not recur.
+**Verdict: 0 BLOCKING, 1 SHOULD-FIX.** Six of the seven reviewed items
+independently confirmed no issue, each with its own file/line evidence,
+matching this file's self-review below. The one SHOULD-FIX: no Rust-side
+minimum-password-length enforcement in
+`auth::admin_reset_teacher_password` — the floor exists only in
+`src/application/school-member-service.ts:24-26`
+(`MIN_PASSWORD_LENGTH`).
+
+**Not fixed inline, by design, not oversight**: this is the same
+disclosed, deliberate convention `src/domain/password-policy.ts`'s own
+doc comment already states for every other account-credential path in
+this codebase (`register_user`, `bootstrap_installation`) — a client-
+side UX convenience only, with Argon2id hashing on the Rust side stated
+as "the real security property." Adding server-side length enforcement
+to only this one path would create an undocumented asymmetry with the
+other two paths rather than fix a genuine gap unique to this feature.
+Retained as a **project-wide** (not admin-reset-specific) follow-up:
+if this convention is ever revisited, apply it to `register_user`,
+`bootstrap_installation`, and `admin_reset_teacher_password` together,
+not to this one path in isolation.
+
+## Wave 3I: independent security review owed — reviewer harness failed twice, self-review substituted (2026-08-31)
+
+An independent `security-reviewer` agent was dispatched before this
+milestone was marked complete (auth-touching, per
+`.claude/rules/security-privacy.md`), scoped to authorization
+correctness, cross-school isolation, enumeration safety, password
+handling, the lockout side effect, audit correctness, the `invoke.ts`
+exemption change, and the frontend's UI-hiding-is-not-security posture.
+**The established agent-resume/retrieval failure recurred**: the agent
+did real work both times (38 tool uses / ~100k tokens on the initial
+dispatch; 38 tool uses / ~106k tokens on the one permitted retry via
+`SendMessage`), but no findings text was retrievable either time.
+
+Per `.claude/rules/autonomous-development.md`'s established protocol, a
+rigorous **self-review** substituted across the same 8 dimensions
+listed above. Findings, confirmed by direct source reading (not
+assumed from the design doc alone):
+
+- Authorization: `set_password_and_clear_lockout` and
+  `record_admin_action` are called from exactly one production call
+  site (`auth::admin_reset_teacher_password`), which itself calls
+  `authorize_capability_with_actor(.., Capability::ManageSchoolMembership)`
+  as its first statement, before any read or write of the target —
+  confirmed by grep, no second path exists.
+- Cross-school isolation: `school_id` passed to
+  `user_repo::is_member_of_school` comes only from the session-derived
+  return of `authorize_capability_with_actor`, never from
+  `target_user_id` (client-supplied) or any other parameter.
+- Enumeration safety: both the "target doesn't exist" and "target in a
+  different school" branches `return Ok(false)` before `hash_password`,
+  the `set_password_and_clear_lockout` write, or the audit write —
+  confirmed by the dedicated indistinguishability test.
+- Password handling: `hash_password` (existing Argon2id path) is
+  reused unchanged; `commands::user::admin_reset_teacher_password`
+  zeroizes the owned `new_password` `String` after use, mirroring
+  `register_user`'s established convention; no `log::` call anywhere on
+  this path references the raw password.
+- Lockout clearing: only reachable through the same capability-gated
+  function; does not alter ADR-0019's lockout policy/thresholds, only
+  one already-authorized write path's side effect on one row.
+- Audit correctness: `record_admin_action`'s INSERT column list
+  (`id, school_id, user_id, username, actor_user_id, event_type`) and
+  its value tuple (`&id, school_id, target_user_id, target_username,
+actor_user_id, event_type.as_db_str()`) align positionally by hand
+  verification; `list_for_school`'s `row.get(N)` indices were checked
+  one-by-one against its `SELECT` column order.
+- `invoke.ts`: the exemption-set addition is a pure frontend
+  reclassification of an already-correct backend `Unauthorized`; no
+  Rust-side authorization logic changed in the same commit.
+- Frontend: `AdminPasswordResetScreen.tsx` has no role/capability check
+  gating which UI renders — confirmed by reading the full file; the
+  backend alone decides success/failure.
+
+**No blocking issue found.** One pre-existing, unchanged posture noted
+for completeness, not a regression: like `register_user`/
+`bootstrap_installation` before it, the backend itself enforces no
+minimum password length — `MIN_PASSWORD_LENGTH` is a client-side
+(`SchoolMemberApplicationService`) convenience only, the same disclosed
+convention `src/domain/password-policy.ts`'s own doc comment already
+states for every other account-credential path in this codebase.
+
+**A real, non-self independent security review remains owed** —
+retained as debt here, not dropped. Retry opportunistically in a future
+session when the reviewer harness appears healthy; do not spend large
+context repeatedly trying to recover this specific attempt.
+
+## Scheduled-wakeup harness reliability — open, observed by user (2026-08-31)
+
+The user reported (not this session's own finding — no reproduction
+attempted) that a session sometimes does not wake back up after a
+long-running check (e.g. `npm run quality`/`cargo test`) even when a
+wakeup was explicitly scheduled for it. This is a distinct issue from
+the well-documented "agent-resume/retrieval failure" pattern tracked
+throughout this file (that one is about dispatched subagent findings
+not coming back); this one is about the session's own scheduled-wakeup
+mechanism (`ScheduleWakeup`/`send_later`-style timers) not reliably
+firing or resuming the session.
+
+**Working mitigation, not a fix**: prefer the Bash tool's
+`run_in_background: true` plus the harness's automatic
+completion-notification for anything gated on a specific process
+finishing (quality gates, `cargo test`, CI polling) — that path does
+not depend on a manually-scheduled timer. Reserve `ScheduleWakeup`/
+`send_later` for genuinely open-ended waits with no process to attach
+to, where an occasional missed wake is lower-stakes.
+
+**Not yet done**: no root-cause investigation, no reproduction, no fix
+— this is a platform/harness-level mechanism outside this repository's
+own code. Revisit if it recurs with enough detail (which command, how
+long it ran, whether `run_in_background` or a manual `ScheduleWakeup`
+was used) to file upstream, or if it starts blocking a wave's
+verification step.
+
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
 Real browser-rendered Playwright verification of the Section Adviser
@@ -2501,9 +2755,26 @@ NOTHING`. Not yet re-verified by an actual `cargo test` run — `cargo`
    `security-reviewer` dispatched for an adversarial pass. Still not
    reachable from any UI (unchanged).
 
-## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+## UX-04 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
 
-Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
+**Closed for real 2026-09-01**: fresh `teacher-ux-reviewer` and
+`accessibility-reviewer` dispatches against the same two files **both
+actually retrieved findings this time** — the agent-resume/retrieval
+failure did not recur (the third successful independent-review retry
+in this same session, after an earlier SF4/SF5/SF6 security review).
+Teacher-UX found one Medium (no delete confirmation) and three Low
+findings (no edit confirmation; alarming "unknown" fallback text;
+DepEd caveat placed after, not before, the export button).
+Accessibility found one Medium finding (selected-item button had
+`aria-pressed` but no matching CSS, so no visual selection cue) and
+confirmed the previously-fixed Edit/Delete accessible-name collision
+remains correctly fixed, not regressed. **All five findings fixed** —
+see `docs/CURRENT-HANDOFF.md`'s matching entry and the git history for
+`src/ui/ClassRecordWorkspace.tsx`/`src/ui/theme/styles.css`. Original
+self-review record retained below for the historical trail.
+
+Original entry, retained for context: both `teacher-ux-reviewer` and
+`accessibility-reviewer` were dispatched
 against UX-04's `ClassRecordWorkspace.tsx`/`ClassRecordsScreen.tsx`
 changes (2026-08-25) and hit the same recurring agent-resume/retrieval
 failure documented since M7 (see `docs/adr/0027-audit-timestamp-readability-fix.md`,
@@ -2703,7 +2974,298 @@ tests could not. Future sessions hitting the same `playwright-cli`
 failure should use this workaround rather than concluding no
 browser-rendered verification is possible.
 
+## App-wide: self-disabling buttons lose focus to `<body>` on click — CLOSED, all 15 screens fixed (2026-09-01, closed 2026-09-02)
+
+**Closed 2026-09-02 (batch 5)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to the last two, most
+complex screens: `ClassRecordWorkspace.tsx` (5 instances — "Add
+item", per-item "Save"/"Confirm delete", "Show term grades", "Export
+report card") and `SectionRosterScreen.tsx` (11 instances — the
+"Enroll learner" trigger and its form's "Confirm enrollment"/"Cancel",
+"Generate SF1", "Export SF5", each row's "Transfer"/"End
+enrollment"/"Correct today's placement"/"Generate SF9", and the row
+action panel's "Confirm transfer/end/correction"/"Cancel").
+`SectionRosterScreen.tsx` shares one `anyActionInFlight` flag across
+most of its buttons (by design, so only one write can ever be in
+flight at a time) — each handler's guard now checks that same flag
+rather than inventing a per-button one, preserving the existing
+"every other action disables while one is in flight" behavior
+exactly; the two "Cancel" buttons (enroll panel, row action panel)
+needed an inline guard in their `onClick` since `closeEnroll`/
+`closeAction` are shared, synchronous functions also called from
+non-button code paths. Each fix proven with a real interaction test:
+hang the underlying repository call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase; plus two tests proving the openAction/openEnroll guards
+block opening a second panel while one is already open, and two
+proving the Cancel buttons stay blocked mid-submission. Existing
+tests that asserted native `.toBeDisabled()`/`.toBeEnabled()` on the
+now-`aria-disabled` buttons were updated to
+`toHaveAttribute("aria-disabled", "true")` /
+`not.toHaveAttribute("aria-disabled", "true")`.
+
+**Verified**: `npm run quality` 843/843 (16 new interaction tests, 7
+existing assertions updated for the `aria-disabled` migration),
+typecheck/lint/format/architecture clean. `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` — all clean. No Rust files touched.
+
+This closes the self-disabling-button-focus-loss debt across all 15
+screens identified in the original sweep (auth/session screens →
+GradingPeriods/ScheduleMeetings/TeachingAssignments →
+ClassRecords/SectionAdviser/LearnerList → Sections/Sf1Import/
+SubjectAttendance → ClassRecordWorkspace/SectionRosterScreen). No
+further instances of this bug are known to remain in the app.
+
+**Extended 2026-09-02 (batch 4)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to eight more instances across
+three screens: `SectionsScreen.tsx`'s "Create section", "Enroll
+learner", and "Export SF6" submit buttons; `Sf1ImportScreen.tsx`'s
+"Choose Excel file" button; and `SubjectAttendanceScreen.tsx`'s "Check
+attendance", "No class today", "Mark all present", and the per-learner
+per-status roster buttons (guarded against both re-entrancy and a
+concurrent bulk mark-all-present). `Sf1ImportScreen.tsx`'s "Import
+learners" button was deliberately left as native `disabled` — reading
+the code confirmed it is not an instance of this bug: `handleCommit`
+sets `busy` and `phase: "committing"` in the same batched update, so the
+button unmounts (replaced by a loading state) in the same render where
+it would have gone disabled, and is never observably disabled-but-
+focused. Each genuine fix proven with a real interaction test: hang the
+underlying repository/file-picker call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase (plus one test proving a per-learner mark is blocked while a
+bulk mark-all-present is in flight). `npm run quality` 829/829 (12 new
+tests), typecheck/lint/format/architecture clean; `npm run build`, `npm
+run check:dev-preview-isolation`, `npm run harness:verify` (100/100),
+`git diff --check` all clean; no Rust touched.
+
+**Extended 2026-09-02 (batch 3)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to seven more instances:
+`ClassRecordsScreen.tsx`'s "Open class record" and "Add subject"
+buttons, `SectionAdviserScreen.tsx`'s "End advisory" and "Assign
+adviser" buttons, and `LearnerListScreen.tsx`'s "Export learner list
+(CSV)" button, per-row "Save" (edit) button, and "Enroll learner"
+submit button (plus its "Create separate learner" duplicate-review
+button). `LearnerListScreen.tsx`'s per-row "View history"/"Edit"
+buttons (disabled only while a _different_ row is being edited) and the
+"Cancel" buttons next to the fixed ones were deliberately left as
+native `disabled` — they are not instances of this bug, since the
+element that actually receives the click either gets unmounted (Edit
+swaps to an inline form, handled by this screen's own existing
+`editFirstFieldRef` focus-management effect) or is a different element
+than the one whose own click handler disables it. Each proven with a
+real interaction test: hang the underlying repository call, click once,
+assert `aria-disabled="true"`, click again, assert the call count did
+not increase. `npm run quality` 821/821 (7 new tests), typecheck/lint/
+format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Extended 2026-09-02 (batch 2)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to five more instances:
+`GradingPeriodsScreen.tsx`'s per-row "Save" button,
+`ScheduleMeetingsScreen.tsx`'s "Schedule meeting" and per-row "Remove"
+button, and `TeachingAssignmentsScreen.tsx`'s "Assign teacher" and
+per-row "Remove" button. Chosen next because these three screens share
+a simple, consistent shape (one create-form submit button plus a
+per-row remove/save button keyed by id), making the sweep mechanical
+and low-risk. For the per-row buttons, the handler guard checks the
+specific row/id already being saved or removed
+(`savingPeriodId === policyPeriodId`, `removingId === meeting.id`, etc.)
+rather than a blanket "any action in flight" guard — preserving the
+screens' existing behavior of only disabling the one row currently in
+flight, not the whole list. Each proven with a real interaction test:
+hang the underlying repository call, click once, assert
+`aria-disabled="true"`, click again, assert the call count did not
+increase. `npm run quality` 810/810 (5 new tests), typecheck/lint/
+format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Extended 2026-09-02 (batch 1)**: applied the same `disabled=` →
+`aria-disabled=` + handler-guard pattern to the four standalone
+auth/session-critical submit buttons — `LoginScreen.tsx`'s "Sign in",
+`FirstRunSetupScreen.tsx`'s "Finish setup", `AdminPasswordResetScreen.tsx`'s
+"Reset password", and `IdleTimeoutWarning.tsx`'s "Stay signed in".
+Chosen first among the remaining ~40 instances across ~15 files because
+these are the screens every teacher touches before anything else
+(sign-in, first-run setup, the session-expiry warning) and each has
+exactly one self-contained submit button, keeping this slice small and
+reviewable rather than one large mechanical sweep. Each proven with a
+real interaction test: make the underlying repository call hang (an
+unresolved `Promise`), click the button once, assert
+`aria-disabled="true"`, click again, assert the repository call count
+did not increase. `npm run quality` 809/809 (4 new tests), typecheck/
+lint/format/architecture clean; `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Still open**: every other "disable while saving/removing/creating"
+button across `ClassRecordWorkspace.tsx` and `SectionRosterScreen.tsx`
+— roughly 10 remaining button instances (both screens use a shared
+`anyActionInFlight` guard across several buttons plus some per-row
+guards; `SectionRosterScreen.tsx`'s enroll-form submit already has a
+partial guard condition worth reading carefully before converting). The
+pattern is fully proven and mechanical to apply; revisit as a further
+scoped slice, per this project's established "prove the pattern, defer
+the full sweep" discipline.
+
+## App-wide: self-disabling buttons lose focus to `<body>` on click — 3 of many instances fixed (2026-09-01)
+
+Found by the UX-03 `accessibility-reviewer` retry (2026-09-01): buttons
+that use the native `disabled` attribute to prevent double-submission
+synchronously blur to `<body>` the instant they're clicked, since the
+element with focus is disabled mid-interaction.
+
+**Fixed this session**: `AttendanceScreen.tsx`'s "Mark all present"
+button and `MonthlySummaryScreen.tsx`'s "Export SF2"/"Export SF4"
+buttons — the three instances the review actually re-confirmed
+present. Pattern used (now the reference for the rest): `disabled=` →
+`aria-disabled=` (keeps the button focusable) + an early-return guard
+for the same condition inside the handler (aria-disabled doesn't block
+clicks at the DOM level). Matching CSS
+(`button[aria-disabled="true"]`) mirrors `button:disabled`'s visual
+treatment. Proven with a real interaction test per screen — clicking
+the aria-disabled button and asserting the underlying call did not
+fire — not just a static attribute assertion.
+
+**Still open, deliberately not swept in this same pass**: confirmed
+**shared across `LearnerListScreen.tsx`, `SubjectAttendanceScreen.tsx`,
+and likely every other "disable while saving" button in this
+codebase**. Applying the now-proven pattern to the remaining screens is
+its own scoped slice — a mechanical sweep across many files, not a
+one-file tweak — deliberately not done in the same pass as the first
+three instances to keep this change reviewable. Low severity, not
+blocking. Revisit as its own slice; the fix shape is settled, just not
+yet applied everywhere.
+
+## App-wide: export results show a raw file path with no reveal/open affordance — CLOSED (2026-09-01, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: extended the "Open folder" pattern
+(proven on SF2/SF4 in `MonthlySummaryScreen.tsx`, see below) to every
+remaining export result — SF5 (`SectionRosterScreen.tsx`), SF6
+(`SectionsScreen.tsx`), the class-record report card
+(`ClassRecordWorkspace.tsx`), and the learner roster
+(`LearnerListScreen.tsx`). No new backend work was needed — the
+`revealExportedFile` plumbing (port → `TauriExportRepository` →
+`ExportApplicationService` → `FixtureExportRepository`'s no-op) already
+existed at every layer; this was UI wiring only, mirroring the exact
+button/loading/error-state pattern from the earlier two screens. Every
+new button proven with a real interaction test (click "Open folder",
+assert the repository call fires with the exact saved path) plus an
+error-path test for the reveal call itself failing. `npm run quality`
+805/805 (4 new tests), typecheck/lint/format/architecture clean; `npm
+run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` all clean; no Rust
+touched.
+
+## App-wide: export results show a raw file path with no reveal/open affordance — PARTIALLY CLOSED (2026-09-01, SF2/SF4 in MonthlySummaryScreen)
+
+Found by the UX-03 `teacher-ux-reviewer` retry (2026-09-01):
+`MonthlySummaryScreen.tsx`'s export-result alerts (and every other
+export result across the app — SF2/SF4/SF5/SF6, report card, learner
+roster) show the saved file's path as plain `<code>` text with no way
+to open it or reveal it in the OS file browser. Low severity (the path
+is still visible, teachers can navigate there manually), but a real
+missing convenience.
+
+**SF2/SF4 in `MonthlySummaryScreen.tsx` closed 2026-09-01**: added
+`tauri-plugin-opener` v2.5.5 (official first-party Tauri 2 plugin,
+`revealItemInDir`), wired end-to-end through `ExportRepository` →
+`TauriExportRepository` → `ExportApplicationService` →
+`revealExportedFile`, with an "Open folder" button next to each SF2/SF4
+result. See `docs/CURRENT-HANDOFF.md`'s matching entry and
+`docs/SOURCE-REGISTRY.md` for the dependency writeup (including the
+fixed CVE-2025-31477 and the untrusted-path discipline this feature
+depends on). **Remains open for SF5, SF6, report card export, and
+learner roster export** — the same plumbing pattern now exists on every
+layer (`FixtureExportRepository.revealExportedFile` is already wired as
+a genuine no-op for all export kinds), so extending it to the remaining
+screens is UI wiring only, not a new backend feature. Revisit as its own
+scoped slice.
+
+## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: a fresh `accessibility-reviewer`
+dispatch against `TeacherWorkspaceScreen.tsx` actually retrieved
+findings this time. **Verdict: LOOKS-GOOD** — contrast, color-only
+state, target size, labels, focus management, and structural test
+coverage all independently verified and passed (one minor evidence-
+quality correction noted and self-corrected by the reviewer: initial
+border-contrast figures were computed against pure white/black rather
+than this app's actual `--color-bg`/`--color-surface` tokens; recomputed
+against the real tokens, still comfortably passing). No findings to fix.
+Original self-review record retained below for the historical trail.
+
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-01)
+
+**Closed for real 2026-09-01**: fresh `teacher-ux-reviewer` and
+`accessibility-reviewer` dispatches against
+`AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx` both actually
+retrieved findings this time. Findings and fixes recorded in
+`docs/CURRENT-HANDOFF.md`'s matching entry; two findings deferred as
+their own separate app-wide debt entries above (self-disabling-button
+focus loss; export-result reveal affordance) rather than fixed inline,
+since both are pre-existing patterns spanning many files, not specific
+to UX-03. Original self-review record retained below for the historical
+trail.
+
+## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: two direct `teacher-ux-reviewer`
+dispatches against `AttendanceScreen.tsx`/`MonthlySummaryScreen.tsx`
+(the original 2026-08-25 attempt and a same-day 2026-09-02 retry, each
+including the one permitted `SendMessage` resume) all hit the same
+agent-resume/retrieval failure — real work done, no findings text
+retrievable. Rather than retry the same broken channel again, routed the
+review through a file-based output workaround instead (see
+`docs/adr/0062-file-based-review-output-workaround.md`): dispatched via
+the `general-purpose` agent with the `teacher-ux-reviewer` checklist
+inlined into the prompt, instructed to touch nothing in the repository
+except one findings file under the session scratchpad, then read that
+file directly rather than relying on the notification channel. This
+worked — a real, evidence-backed, retrievable review came back.
+**Verdict: LOOKS-GOOD.** Checked and confirmed: no jargon in visible
+copy; full functional parity across Efficient/Comfortable/Guided for
+every `mode === "guided"` conditional in both files (each renders only
+supplementary hint text, never gates a control or a piece of
+information); every failure message is outcome-oriented with no leaked
+internal detail; every async action has its own loading/confirmation
+state, including an honest "nothing changed" case for
+"Mark all present"; `Alert` role usage is consistent with the rest of the
+app; the SF2/SF4 disclosure banners are candid about what's omitted and
+match the same `disclosure.omittedFields` pattern used consistently
+across every other DepEd-form export in the app. This closes the debt
+for real — not a self-review substitute. Original self-review record
+retained below for the historical trail.
+
 ## UX-03 teacher-ux-reviewer / accessibility-reviewer independent review not retrievable (open)
+
+**Retried 2026-09-02, still not retrievable**: dispatched a fresh
+`teacher-ux-reviewer` against `AttendanceScreen.tsx`/
+`MonthlySummaryScreen.tsx` (the same scope). The initial dispatch and
+the one permitted `SendMessage` resume both completed real work (35
+tool calls each) but returned no retrievable findings text, same as
+the original 2026-08-25 attempt. Self-review substituted again, per the
+established fallback: read both files end-to-end. No blocking issue
+found — language is plain and DepEd-terminology-correct (the SF2/SF4
+disclosure banners are explicit that these are DepEd-inspired working
+references, not submission-ready reproductions); mode parity holds
+(the guided-only hints in both screens are supplementary text only —
+every action, button, and keyboard shortcut is present and functional
+in Efficient/Comfortable too, confirmed by reading the JSX rather than
+assuming); trust signals are present (clear "Saving…"/error/retry
+states per row, an explicit confirmation message after bulk-marking
+naming exactly what changed, and the legend explaining "—" means
+not-recorded rather than present). One non-blocking observation, not a
+bug: `AttendanceScreen.tsx`'s per-row status buttons use native
+`disabled={bulkMarking}` (line ~417) rather than the `aria-disabled`
+pattern used elsewhere in this sweep — but this does not reproduce the
+focus-loss bug that pattern fixes, since the button that becomes
+disabled is never the one that was focused (the teacher clicks "Mark
+all present" to trigger it, not a row button), so no fix needed. Owed
+independent review remains open — retry again in a future session once
+there's reason to believe the harness issue is fixed.
 
 Both `teacher-ux-reviewer` and `accessibility-reviewer` were dispatched
 against UX-03's `AttendanceScreen`/`MonthlySummaryScreen` changes
@@ -2729,7 +3291,65 @@ or hardware. This is **not** a bug backlog; move an item here only when
 the underlying work is otherwise done and reviewed, and remove it once
 the missing verification actually happens (record what ran and when).
 
+## UX-02 accessibility-reviewer independent review not retrievable — CLOSED (2026-08-25, closed 2026-09-02)
+
+**Closed for real 2026-09-02**: two direct `accessibility-reviewer`
+dispatches against `TeacherWorkspaceScreen.tsx` (the original 2026-08-25
+attempt and a same-day 2026-09-02 retry, each including the one
+permitted `SendMessage` resume, plus a third attempt this session that
+tried `run_in_background: false` specifically to test whether forcing
+synchronous execution avoided the failure — it didn't) all hit the same
+agent-resume/retrieval failure. Routed the review through a file-based
+output workaround instead (see
+`docs/adr/0062-file-based-review-output-workaround.md`): dispatched via
+the `general-purpose` agent with the `accessibility-reviewer` checklist
+inlined into the prompt, instructed to touch nothing in the repository
+except one findings file under the session scratchpad, then read that
+file directly. This worked. **Verdict: LOOKS-GOOD.** Checked and
+confirmed with real computed evidence: WCAG contrast ratios recomputed
+from the actual `--color-*` hex values in both the light and dark
+`styles.css` blocks (lowest relevant ratio 4.61:1, still clearing the
+4.5:1 text bar); `StatusChip` state is always paired with a distinct
+text label, never color alone; `PageHeader`'s mount-focus behavior
+doesn't get re-triggered by sibling loading/error state changes and
+never drops focus to `<body>`; target size clears WCAG 2.2 SC 2.5.8's
+24px floor in every teacher mode, including Efficient's 34px
+`--control-height` (checkbox/radio inputs are explicitly floored via a
+`max(24px, ...)` clamp); every button's accessible name comes from
+visible text; `Loading`/`Alert` role usage matches WCAG 4.1.3 guidance
+for polite vs. assertive live regions; heading hierarchy has no skipped
+level; `TeacherWorkspaceScreen.test.tsx` calls
+`expectNoAccessibilityViolations`. This closes the debt for real — not a
+self-review substitute. Original self-review record retained below for
+the historical trail.
+
 ## UX-02 accessibility-reviewer independent review not retrievable (open)
+
+**Retried 2026-09-02, still not retrievable**: dispatched a fresh
+`accessibility-reviewer` against `TeacherWorkspaceScreen.tsx`. The
+initial dispatch and the one permitted `SendMessage` resume both
+completed real work (32-34 tool calls) but returned no retrievable
+findings text, same as the original 2026-08-25 attempt. Self-review
+substituted again: read the screen end-to-end plus `StatusChip.tsx`,
+`PageHeader.tsx`, `Loading.tsx`, `Alert.tsx`, and the relevant
+`styles.css` tokens/rules. No blocking issue found. `StatusChip` labels
+carry the state in text, never color alone (each of the four
+attendance states has a distinct label string, not just a tone).
+`PageHeader` moves focus to the `<h2>` on mount, same as every other
+screen. `Loading` uses `role="status"`, `Alert` uses `role="alert"` for
+error/warning and `role="status"` for success/info — matching the
+existing app-wide pattern. Heading hierarchy is correct (`h2` then two
+`h3`s). Every interactive element is a native `<button>`. Target size:
+`--control-height` is 34px in Efficient mode, 40px Comfortable, 48px
+Guided — all above WCAG 2.2's 24px AA minimum — and
+`.workspace-priority-item > button` gets an explicit 44px min-height
+under the narrow-viewport (`max-width: 640px`) media query. Contrast
+against this app's actual `--color-*` tokens was already computed and
+passed by the 2026-09-01 successful `accessibility-reviewer` dispatch
+against this same file (see the CLOSED entry below); the file has not
+materially changed since, so that result was not recomputed here.
+Owed independent review remains open — retry again in a future session
+once there's reason to believe the harness issue is fixed.
 
 `accessibility-reviewer` was dispatched against UX-02's rewritten
 `TeacherWorkspaceScreen.tsx` (2026-08-25) and hit the same recurring
@@ -2745,7 +3365,7 @@ open debt. Retry in a future session once there's reason to believe the
 harness issue is fixed; remove this entry once a real review actually
 completes and its findings are recorded.
 
-## Native visual / screen-reader inspection (open)
+## Native visual / screen-reader inspection — visual pass closed for the 4 M0–M6 screens (2026-09-01), screen-reader pass still open
 
 No browser/screenshot/rendering tool was available in the sessions that
 built M0–M6. Structural/accessibility correctness was verified via React
@@ -2753,11 +3373,49 @@ Testing Library + `axe-core` (see `src/test/a11y.ts`) and computed WCAG
 contrast ratios from actual hex values — not by looking at the rendered
 UI. A human visual pass (does it look premium/comfortable, not just
 structurally valid?) and a real screen-reader pass (NVDA/Narrator) on the
-compiled app are still owed for every screen shipped so far
-(`LoginScreen`, `LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+compiled app were owed for every screen shipped so far (`LoginScreen`,
+`LearnerListScreen`, `FirstRunSetupScreen`, `AppShell`).
+
+**Visual pass closed 2026-09-01** using the `playwright-cli` browser-
+mismatch workaround (drive `playwright` directly with `chromium.launch({
+executablePath: "/opt/pw-browsers/chromium" })` — see this file's own
+entry on that workaround). `LoginScreen` is reachable directly from real
+`vite dev` (it already degrades gracefully — "Could not load the list of
+schools" — when the Tauri IPC bridge is absent, rather than crashing).
+`FirstRunSetupScreen` needed a one-off mock of
+`window.__TAURI_INTERNALS__.invoke` for `installation_status`/
+`current_session` only (a throwaway probe script, not a new fixture — the
+dev-preview architecture remains the project's real answer for
+authenticated screens). `AppShell` and `LearnerListScreen` were verified
+through the existing dev-preview fixture. All four screenshotted at two
+viewports (1366×900, 768×900) × two color schemes (light/dark) × the
+default Comfortable teacher mode; no console errors beyond the two
+already-expected, already-disclosed `invoke` failures on the real (non-
+mocked) `LoginScreen` path.
+
+**One real layout bug found and fixed by this pass**: `WorkbenchNav`'s
+nav-group divider used `border-right` (a same-row separator) — correct
+only when every group shares one row. Once `.workbench-nav`'s own
+flex-wrap pushed a later group onto its own row, which turns out to
+happen at ordinary desktop widths too (confirmed at 850px, 1024px, and
+even the primary 1366px desktop width, once "Daily Teaching" grows to
+two internal rows), an earlier group's `border-right` became an orphaned
+vertical line with nothing beside it. Fixed in
+`src/ui/theme/styles.css` by making the group divider an unconditional
+`border-bottom` (removing the narrow-viewport-only special case that
+previously used it) — this degrades correctly regardless of how
+`.workbench-nav` wraps, so it isn't just pushing the same bug to a
+different breakpoint. Re-screenshotted at 850/1024/1366px to confirm.
+`npm run quality` (801/801, no regressions), `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean; no Rust touched.
+
+**Screen-reader pass (NVDA/Narrator) remains open** — this sandbox has
+no Windows screen reader available; a real screen-reader pass on the
+compiled Windows binary is still owed.
 
 **Update 2026-09-03**: `AppShell` no longer exists — Wave 1 of the UI
-redesign (ADR-0057) removed it and replaced it with
+redesign (ADR-0064) removed it and replaced it with
 `src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`. The owed native
 visual / screen-reader pass now applies to those four shell components
 instead; see the Wave 1 entry at the top of this file for the current

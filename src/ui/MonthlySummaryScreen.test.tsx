@@ -14,6 +14,9 @@ import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../domain/export";
 import type { AttendanceRepository } from "../domain/ports/attendance-repository";
 import type { ExportRepository } from "../domain/ports/export-repository";
@@ -103,6 +106,14 @@ class FakeExportRepository implements ExportRepository {
       omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
     },
   };
+  sf4Calls: Array<{ year: number; month: number }> = [];
+  sf4ResultToReturn: Sf4ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv",
+    disclosure: {
+      populatedFields: ["School Name"],
+      omittedFields: [{ field: "School ID (EBEIS)", reason: "not tracked by this app" }],
+    },
+  };
 
   async exportSectionMonthlySf2(
     sectionId: string,
@@ -113,12 +124,44 @@ class FakeExportRepository implements ExportRepository {
     return this.resultToReturn;
   }
 
+  async exportSchoolMonthlyAttendanceSf4(
+    year: number,
+    month: number,
+  ): Promise<Sf4ExportResult | null> {
+    this.sf4Calls.push({ year, month });
+    return this.sf4ResultToReturn;
+  }
+
+  async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
+  async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+
   async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
     throw new Error("not used in this test");
   }
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
+  }
+
+  async exportLearnerPermanentRecordSf10(): Promise<
+    import("../domain/export").Sf10ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) {
+      throw new Error("could not open folder");
+    }
   }
 }
 
@@ -275,6 +318,37 @@ describe("MonthlySummaryScreen", () => {
     expect(exportRepo.calls).toEqual([{ sectionId: "sec-1", year: 2026, month: 8 }]);
   });
 
+  it("opens the folder for the exported SF2 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv",
+      ]),
+    );
+  });
+
+  it("shows an error when the SF2 export folder could not be opened", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    exportRepo.revealShouldThrow = true;
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Could not open the folder for this file.")).toBeInTheDocument(),
+    );
+  });
+
   it("shows an error when the section could not be resolved for export", async () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen(reportWith("present"));
@@ -284,6 +358,55 @@ describe("MonthlySummaryScreen", () => {
     await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
 
     await waitFor(() => expect(screen.getByText(/could not export/i)).toBeInTheDocument());
+  });
+
+  it("exports SF4 for the whole school and shows the saved path plus disclosure", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv"),
+      ).toBeInTheDocument(),
+    );
+    expect(exportRepo.sf4Calls).toEqual([{ year: 2026, month: 8 }]);
+  });
+
+  it("opens the folder for the exported SF4 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+    await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv",
+      ]),
+    );
+  });
+
+  it("shows an error when the school could not be found for the SF4 export", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen(reportWith("present"));
+    exportRepo.sf4ResultToReturn = null;
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+
+    await waitFor(() => expect(screen.getByText(/school could not be found/i)).toBeInTheDocument());
+  });
+
+  it("does not gate the SF4 export button on the section report having learners", async () => {
+    renderScreen();
+    await screen.findByText("No learners enrolled in this section yet.");
+
+    expect(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" })).toBeEnabled();
   });
 
   it("opens with the supplied initial section and year/month when the section still exists", async () => {
@@ -346,7 +469,24 @@ describe("MonthlySummaryScreen", () => {
     renderScreen();
     await screen.findByText("No learners enrolled in this section yet.");
 
-    expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("does not export when clicking Export SF2 while it is aria-disabled", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    await screen.findByText("No learners enrolled in this section yet.");
+
+    // aria-disabled (not the native disabled attribute) keeps the button
+    // clickable at the DOM level -- the guard inside the handler is what
+    // actually blocks the export. This proves that guard works, not just
+    // that the button looks disabled.
+    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+
+    expect(exportRepo.calls).toEqual([]);
   });
 
   it("never shows a previous section's report after switching to a section whose load fails", async () => {
@@ -423,10 +563,29 @@ describe("MonthlySummaryScreen", () => {
           this.resolveExport = resolve;
         });
       }
+      async exportSchoolMonthlyAttendanceSf4(): Promise<
+        import("../domain/export").Sf4ExportResult | null
+      > {
+        throw new Error("not used in this test");
+      }
+      async exportSectionEosySf5(): Promise<Sf5ExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async exportSchoolEosySf6(): Promise<Sf6ExportResult | null> {
+        throw new Error("not used in this test");
+      }
       async exportClassRecordReportCard(): Promise<ReportCardExportResult | null> {
         throw new Error("not used in this test");
       }
       async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
+        throw new Error("not used in this test");
+      }
+      async exportLearnerPermanentRecordSf10(): Promise<
+        import("../domain/export").Sf10ExportResult | null
+      > {
+        throw new Error("not used in this test");
+      }
+      async revealExportedFile(): Promise<void> {
         throw new Error("not used in this test");
       }
     }

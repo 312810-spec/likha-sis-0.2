@@ -27,6 +27,15 @@ pub fn run() {
             // (Wave 2C) -- the official first-party Tauri plugin, not a
             // free-text path the frontend invents on its own.
             app.handle().plugin(tauri_plugin_dialog::init())?;
+            // "Reveal in file manager" for exported files -- official
+            // first-party Tauri plugin. Only ever called with a path this
+            // app itself just wrote (an export's own returned filePath),
+            // never a user-typed or otherwise untrusted string -- see
+            // CVE-2025-31477 (fixed upstream in 2.2.1+, we pin 2.5.5) for
+            // why that discipline matters for this plugin's open-family
+            // APIs. Unsupported on Android/iOS; this app is Windows-first,
+            // Android later, so that's a future feature-gate, not a bug now.
+            app.handle().plugin(tauri_plugin_opener::init())?;
 
             let conn = db::open_app_db(app.handle())?;
             app.manage(Mutex::new(conn));
@@ -46,6 +55,7 @@ pub fn run() {
             commands::user::register_user,
             commands::user::add_user_to_school,
             commands::user::list_school_members,
+            commands::user::admin_reset_teacher_password,
             commands::setup::installation_status,
             commands::setup::bootstrap_installation,
             commands::auth::login,
@@ -70,6 +80,10 @@ pub fn run() {
             commands::section::list_learner_enrollment_history,
             commands::section::get_current_enrollment,
             commands::export::export_section_monthly_sf2,
+            commands::export::export_school_monthly_attendance_sf4,
+            commands::export::export_section_eosy_sf5,
+            commands::export::export_school_eosy_sf6,
+            commands::export::export_learner_permanent_record_sf10,
             commands::export::export_class_record_report_card,
             commands::export::export_learner_roster,
             commands::grading::list_grading_policies,

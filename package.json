@@ -22,12 +22,14 @@
     "quality:security": "node scripts/check-security.mjs",
     "quality:ui": "node scripts/ui-smoke.mjs",
     "harness:verify": "node scripts/harness/verify.mjs",
+    "relay:wave-report": "node scripts/relay-wave-report.mjs",
     "quality:full": "npm run harness:verify && npm run quality && cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings"
   },
   "dependencies": {
     "@fontsource/public-sans": "5.3.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.5.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

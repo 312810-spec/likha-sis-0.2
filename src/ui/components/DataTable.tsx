@@ -26,7 +26,7 @@ export interface DataTableProps {
 }
 
 /**
- * Table-in-card primitive (ADR-0057 Wave 2). Real table semantics are kept
+ * Table-in-card primitive (ADR-0064 Wave 2). Real table semantics are kept
  * in every mode: the phone reflow is CSS-only (`display: block` driven by
  * the `data-reflow` attribute). `display: block` would otherwise drop the
  * implicit ARIA table roles in real browsers, so every role is set

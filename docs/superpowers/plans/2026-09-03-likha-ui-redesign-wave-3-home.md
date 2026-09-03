@@ -38,7 +38,7 @@
 - `src/domain/session.ts` — `CurrentSession` gains `roles: string[]` (documented display-only).
 - `src/infrastructure/tauri/auth-repository.test.ts`, `src/App.test.tsx`, and any other TS test with a `CurrentSession` fixture — add `roles: [...]` (grep `idleExpiresAtUnixMs` to find them all).
 - `src/App.tsx` — the `activeTab === "workspace"` branch renders `<HomeScreen …>` instead of `<TeacherWorkspaceScreen …>`, passing `roles={session.roles}` + the same services + the same `onOpen*` handlers.
-- `docs/adr/0057-ui-redesign-shell.md` (Wave 3 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
+- `docs/adr/0064-ui-redesign-shell.md` (Wave 3 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
 
 ---
 
@@ -233,7 +233,7 @@ Import `HomeScreen` from `./ui/HomeScreen`. `TeacherWorkspaceScreen` stays impor
 
 ## Task 6: ADR addendum + docs + gate + security review
 
-**Files:** `docs/adr/0057-ui-redesign-shell.md` (Wave 3 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
+**Files:** `docs/adr/0064-ui-redesign-shell.md` (Wave 3 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
 
 - [ ] **Step 1: ADR Wave 3 addendum** — the `roles` DTO field (display-only, not an authz signal); `role::list_roles` (school-scoped, sorted); `HomeScreen` role switch (teacher → Workspace; school-head → overview + view-switch); `SchoolHeadHome` scope (existing counts + SF1 history only; attendance rollup / advisers-without / teacher-load aggregate deferred to Wave 4); `TeacherWorkspaceScreen` deliberately retained (visual redesign + deletion is a later slice).
 

@@ -11,6 +11,10 @@ class FakeAuthRepository implements AuthRepository {
   extendedSessionToReturn: CurrentSession | null = null;
   extendSessionCalls = 0;
   extendSessionShouldFail = false;
+  /** When set, `extendSession` never resolves on its own -- the test
+   * controls completion. Used to prove the in-flight guard blocks a
+   * second click while the first extension is still pending. */
+  pending = false;
 
   async login(): Promise<CurrentSession> {
     throw new Error("not used in this test");
@@ -24,6 +28,9 @@ class FakeAuthRepository implements AuthRepository {
 
   async extendSession(): Promise<CurrentSession> {
     this.extendSessionCalls += 1;
+    if (this.pending) {
+      return new Promise(() => {});
+    }
     if (this.extendSessionShouldFail) {
       throw new Error("unauthorized");
     }
@@ -104,6 +111,30 @@ describe("IdleTimeoutWarning", () => {
     expect(repo.extendSessionCalls).toBe(1);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it("does not extend a second time while the first extension is still in flight", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+    const repo = new FakeAuthRepository();
+    repo.sessionToReturn = aSession(Date.now() + 60_000);
+    repo.pending = true;
+    const onExpired = vi.fn();
+
+    render(
+      <IdleTimeoutWarning authService={new AuthApplicationService(repo)} onExpired={onExpired} />,
+    );
+    await screen.findByRole("alert");
+
+    const stayButton = screen.getByRole("button", { name: "Stay signed in" });
+    await user.click(stayButton);
+    await vi.waitFor(() => expect(repo.extendSessionCalls).toBe(1));
+
+    expect(stayButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(stayButton);
+
+    expect(repo.extendSessionCalls).toBe(1);
   });
 
   it("calls onExpired when a poll finds the session already gone", async () => {

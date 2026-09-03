@@ -29,7 +29,7 @@
 | **Task 2**   | `AuditLogScreen`, `SectionAdviserScreen`, `TeachingAssignmentsScreen`, `ScheduleMeetingsScreen`                     |
 | **Task 3**   | `SectionRosterScreen`, `LearnerListScreen`, `Sf1ImportScreen`                                                       |
 | **Task 4**   | `SubjectAttendanceScreen`, `AttendanceScreen`, `ClassRecordsScreen`, `ClassRecordWorkspace`, `MonthlySummaryScreen` |
-| **Task 5**   | ADR-0057 Wave 5 addendum + state docs + wave gate                                                                   |
+| **Task 5**   | ADR-0064 Wave 5 addendum + state docs + wave gate                                                                   |
 
 Not in this wave: `LoginScreen` / `FirstRunSetupScreen` (pre-auth, outside the shell — a small restyle is a later slice), `TeacherWorkspaceScreen` (its redesign + deletion is a later slice), `IdleTimeoutWarning` (overlay, no heading), `HomeScreen` (a router, not a Page).
 
@@ -81,7 +81,7 @@ Same procedure. **Do not touch** any `.attendance-roster` / `.score-entry` / `.m
 
 ## Task 5: ADR addendum + state docs + wave gate
 
-**Files:** `docs/adr/0057-ui-redesign-shell.md` (Wave 5 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
+**Files:** `docs/adr/0064-ui-redesign-shell.md` (Wave 5 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
 
 - [ ] **Step 1: ADR Wave 5 addendum** — every remaining in-shell screen is now on the `Page` scaffold (list them by batch); wrapper-only, no behaviour/table change; `DataTable` migration of the table screens, the `TeacherWorkspaceScreen` → teacher-Home redesign + deletion, the Login/First-run restyle, and the attendance-by-grade card are the recorded remaining slices.
 - [ ] **Step 2: state docs** — `PROJECT-MEMORY.md` one durable line; `CURRENT-HANDOFF.md` top entry (commit range, `quality:full` result, **exact next slice = Wave 6: DataTable migration for the highest-value table screens (Attendance, Subject Attendance, Section Roster, Class Record Workspace) shedding their per-screen `@media` reflow; the teacher-Home redesign onto the primitives + `TeacherWorkspaceScreen` deletion; then a full-branch review and merge to `main`**); `ACTIVE-PLAN.md` "Wave 5 — complete" section; `VERIFICATION-DEBT.md` note that the native pass now owes every re-fitted screen.

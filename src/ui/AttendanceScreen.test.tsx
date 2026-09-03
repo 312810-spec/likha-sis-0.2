@@ -335,7 +335,32 @@ describe("AttendanceScreen", () => {
     ]);
     await screen.findByText("Ana Santos");
 
-    expect(screen.getByRole("button", { name: "Mark all present" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mark all present" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("does not call bulkMarkPresent when clicking Mark all present while it is aria-disabled", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        learnerId: "l1",
+        givenName: "Ana",
+        familyName: "Santos",
+        status: "present",
+        recordedAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+
+    // aria-disabled (not the native disabled attribute) keeps the button
+    // focusable/clickable at the DOM level -- the guard inside the handler
+    // is what actually blocks the action. This proves that guard works,
+    // not just that the button looks disabled.
+    await user.click(screen.getByRole("button", { name: "Mark all present" }));
+
+    expect(repo.bulkMarkPresentCalls).toEqual([]);
   });
 
   it("moves focus to the heading on mount", async () => {

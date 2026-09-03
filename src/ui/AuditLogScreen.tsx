@@ -17,6 +17,7 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   login_failed: "Failed sign-in attempt",
   account_locked: "Account temporarily locked",
   logout: "Signed out",
+  password_reset_by_admin: "Password reset by an administrator",
 };
 
 const EVENT_TONES: Record<AuditEventType, StatusChipTone> = {
@@ -24,7 +25,21 @@ const EVENT_TONES: Record<AuditEventType, StatusChipTone> = {
   login_failed: "warning",
   account_locked: "danger",
   logout: "neutral",
+  password_reset_by_admin: "productive",
 };
+
+/** `password_reset_by_admin` is the only event type where the acting
+ * user genuinely differs from the row's own subject -- every other
+ * event already names its subject via `username` alone. Falls back to
+ * the generic label when `actorUsername` isn't resolvable (should not
+ * happen in practice, but the account row it would have joined against
+ * could in principle be gone). */
+function eventLabel(entry: AuditLogEntry): string {
+  if (entry.eventType === "password_reset_by_admin" && entry.actorUsername) {
+    return `Password reset by ${entry.actorUsername}`;
+  }
+  return EVENT_LABELS[entry.eventType];
+}
 
 /** Formats an ISO timestamp as a readable local date and time, e.g. "Aug
  * 25, 2026, 5:10 AM" -- raw `created_at` values are ISO strings
@@ -104,9 +119,7 @@ export function AuditLogScreen({ authService }: AuditLogScreenProps) {
                 <td>{formatWhen(entry.createdAt)}</td>
                 <td>{entry.username}</td>
                 <td>
-                  <StatusChip tone={EVENT_TONES[entry.eventType]}>
-                    {EVENT_LABELS[entry.eventType]}
-                  </StatusChip>
+                  <StatusChip tone={EVENT_TONES[entry.eventType]}>{eventLabel(entry)}</StatusChip>
                 </td>
               </tr>
             ))}

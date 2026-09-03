@@ -1,8 +1,13 @@
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "./invoke";
 import type {
   LearnerRosterExportResult,
   ReportCardExportResult,
+  Sf10ExportResult,
   Sf2ExportResult,
+  Sf4ExportResult,
+  Sf5ExportResult,
+  Sf6ExportResult,
 } from "../../domain/export";
 import type { ExportRepository } from "../../domain/ports/export-repository";
 
@@ -20,6 +25,26 @@ export class TauriExportRepository implements ExportRepository {
     });
   }
 
+  exportSchoolMonthlyAttendanceSf4(year: number, month: number): Promise<Sf4ExportResult | null> {
+    return invoke<Sf4ExportResult | null>("export_school_monthly_attendance_sf4", {
+      year,
+      month,
+    });
+  }
+
+  exportSectionEosySf5(sectionId: string, schoolYear: string): Promise<Sf5ExportResult | null> {
+    return invoke<Sf5ExportResult | null>("export_section_eosy_sf5", {
+      sectionId,
+      schoolYear,
+    });
+  }
+
+  exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null> {
+    return invoke<Sf6ExportResult | null>("export_school_eosy_sf6", {
+      schoolYear,
+    });
+  }
+
   exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     return invoke<ReportCardExportResult | null>("export_class_record_report_card", {
       classRecordId,
@@ -28,5 +53,24 @@ export class TauriExportRepository implements ExportRepository {
 
   exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     return invoke<LearnerRosterExportResult | null>("export_learner_roster");
+  }
+
+  exportLearnerPermanentRecordSf10(learnerId: string): Promise<Sf10ExportResult | null> {
+    return invoke<Sf10ExportResult | null>("export_learner_permanent_record_sf10", {
+      learnerId,
+    });
+  }
+
+  /** Uses the official `@tauri-apps/plugin-opener` plugin, not a raw
+   * shell/protocol open -- `revealItemInDir` only opens the OS file
+   * manager at a location, it doesn't dispatch through a URL-scheme
+   * handler. Still, only ever call this with `filePath` from this
+   * repository's own export methods' results -- never a user-typed or
+   * otherwise untrusted string. See CVE-2025-31477 (fixed upstream in
+   * this plugin's 2.2.1+, this project pins 2.5.5): the same plugin
+   * family's `open`-style APIs have had real path/URL-scope validation
+   * bugs when fed untrusted input. */
+  revealExportedFile(filePath: string): Promise<void> {
+    return revealItemInDir(filePath);
   }
 }

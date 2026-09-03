@@ -2,7 +2,7 @@
 
 ## Wave 6: final review + merge (added 2026-09-03) - complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md` "Wave 6 addendum";
+Full record: `docs/adr/0064-ui-redesign-shell.md` "Wave 6 addendum";
 `docs/CURRENT-HANDOFF.md` top entry.
 
 **Scope**: no screen-migration tasks (the four remaining table screens'
@@ -13,7 +13,7 @@ merge to `main`.
 **What shipped**: independent Opus whole-branch review
 (SHIP-WITH-FOLLOWUPS, no Critical); three Important fixes in `7f1242c`
 (drawer focus post-inert; signed-in `<h1>`; explicit DataTable roles);
-ADR-0057 Wave 6 addendum + state docs; merge of
+ADR-0064 Wave 6 addendum + state docs; merge of
 `claude/ui-redesign-wave-1-shell` -> `main`.
 
 **Verification actually run this session**: `npm run quality:full` exit 0
@@ -30,7 +30,7 @@ minors; native screen-reader + `quality:ui` pass.
 
 ## Wave 5: Page scaffold re-fit (added 2026-09-03) — complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md` "Wave 5 addendum";
+Full record: `docs/adr/0064-ui-redesign-shell.md` "Wave 5 addendum";
 `docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 5 entry.
 
 **Scope**: spec S7 -- re-fit every remaining in-shell screen onto the
@@ -58,7 +58,7 @@ merge to `main`. Its own plan(s). Not started.
 
 ## Wave 4: School-Head Home enrichment (added 2026-09-03) — complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 4 addendum";
+Full record: `docs/adr/0064-ui-redesign-shell.md`'s "Wave 4 addendum";
 `docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 4
 entry.
 
@@ -93,7 +93,7 @@ attendance-by-grade. Its own plan(s). Not started.
 
 ## Wave 3: role-adaptive Home (added 2026-09-03) — complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 3 addendum —
+Full record: `docs/adr/0064-ui-redesign-shell.md`'s "Wave 3 addendum —
 role-adaptive Home (2026-09-03)" section; `docs/CURRENT-HANDOFF.md` top
 entry; `docs/PROJECT-MEMORY.md` Wave 3 entry.
 
@@ -133,7 +133,7 @@ own plan. Not started.
 
 ## Wave 2: layout primitives (added 2026-09-03) — complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md`'s "Wave 2 addendum —
+Full record: `docs/adr/0064-ui-redesign-shell.md`'s "Wave 2 addendum —
 layout primitives (2026-09-03)" section; `docs/CURRENT-HANDOFF.md` top
 entry; `docs/PROJECT-MEMORY.md` Wave 2 entry. Same branch
 `claude/ui-redesign-wave-1-shell`; `main` untouched. Commit range
@@ -197,7 +197,7 @@ implementation plan. Not started.
 
 ## Wave 1: UI redesign shell (added 2026-09-03) — complete
 
-Full record: `docs/adr/0057-ui-redesign-shell.md`;
+Full record: `docs/adr/0064-ui-redesign-shell.md`;
 `docs/CURRENT-HANDOFF.md` top entry; `docs/PROJECT-MEMORY.md` Wave 1
 entry; `docs/VERIFICATION-DEBT.md` Wave 1 entry. Branch
 `claude/ui-redesign-wave-1-shell` from `main` at `6f15df7`; `main`
@@ -251,6 +251,187 @@ still to run.
 `BentoGrid`/`Card`, `DataTable`) + migrate `SectionsScreen` and
 `TodaysClassesScreen` as proof. Gets its own implementation plan. Not
 started.
+
+## Wave 3J: SF4 Export UI Trigger (added 2026-09-01) — complete
+
+The recommended next slice from the Wave 3m reconciliation below: wire
+an "Export SF4" trigger into `MonthlySummaryScreen.tsx`. Full record:
+`docs/CURRENT-HANDOFF.md`'s top entry.
+
+**Shipped**: a second export button ("Export SF4 (CSV, whole school)")
+in `MonthlySummaryScreen.tsx`, calling the already-shipped
+`exportService.exportSchoolMonthlyAttendanceSf4(year, month)`. Not
+gated on the selected section's report data (SF4 is school-wide, not
+section-scoped) — only on a valid month being selected. Own
+request-invalidation ref, cleared on month change only. Wired the
+dev-preview fixture's SF4 stub with a real synthetic result to match
+SF2's existing fixture convention.
+
+**Verification actually run**: `npm run quality` (794/794 tests, 3
+new), `npm run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` (100/100), `git diff --check` — all clean. No Rust
+files touched.
+
+**Self-correction, same session**: this entry and PR #19's body
+originally claimed SF5/SF6 UI triggers were "deliberately unwired,
+matching ADR-0059's zero-UI-first precedent" — **wrong**. ADR-0059's
+"no UI trigger" claim was only ever about SF4. SF5
+(`SectionRosterScreen.tsx`) and SF6 (`SectionsScreen.tsx`) already
+shipped real product UI during the Wave 3m reconciliation itself (see
+ADR-0057/0058's own "Addendum" sections) — only their _dev-preview
+fixture_ demo stub is still unwired, unrelated to product correctness.
+See `docs/CURRENT-HANDOFF.md`'s top entry for the full correction.
+
+## Wave 3m Reconciliation (added 2026-09-01) — complete
+
+GitHub issue #16, branch `claude/issue-16-20260901-1208`. Full record:
+`docs/adr/0060-wave-3m-reconciliation.md`; per-form ADRs
+`docs/adr/0057-sf5-promotion-foundation.md`,
+`docs/adr/0058-sf6-school-promotion-summary.md`,
+`docs/adr/0059-sf4-monthly-attendance-consolidation.md`.
+
+**Scope**: reconcile `main` (restored Claude Code harness +
+independently-built Adviser View/Section Adviser Management, through
+Wave 3H) against the separately-developed
+`antigravity/likha-sis-wave3m-sf4-monthly-attendance-foundation`
+lineage (SF2 adviser-byline integration, SF5, SF6, SF4), both diverged
+from the same Wave 3E checkpoint. Not a blind merge — every changed
+file classified and reconciled by hand; see the ADR for the full
+file-by-file record and the reasoning for keeping `main`'s own Adviser
+View implementation over Wave 3m's parallel one.
+
+**Files touched this wave**: new —
+`src-tauri/src/export/{sf4,sf5,sf6}.rs`; extended —
+`src-tauri/src/{lib.rs,commands/export.rs}`,
+`src-tauri/tests/export.rs`, `src/{App.tsx,domain/export.ts,
+domain/ports/export-repository.ts,application/export-service.ts(.test),
+infrastructure/tauri/{export-repository.ts(.test),invoke.ts},
+ui/{SectionsScreen.tsx(.test),SectionRosterScreen.tsx(.test),
+ClassRecordWorkspace.test.tsx,ClassRecordsScreen.test.tsx,
+LearnerListScreen.test.tsx,MonthlySummaryScreen.test.tsx},
+dev-preview/{DevPreviewApp.tsx,fixtures.ts}}`; new ADRs
+`docs/adr/{0057,0058,0059,0060}-*.md`.
+
+**Verification actually run**: `npm run quality` (typecheck, eslint,
+`prettier --check`, `check:architecture`, `vitest run`) — all clean,
+**777/777 tests passing**. `cargo fmt --check` clean (one `cargo fmt`
+pass first, reconciling pure whitespace drift between the two
+lineages' formatting — no semantic change). `git diff --check` clean.
+Every non-trivial Rust type/function signature the ported code calls
+was hand-verified against the actual current repository source (see
+ADR-0060's "Verification" section for the full list) since `cargo
+build`/`cargo test`/`cargo clippy` could not run in this sandbox
+(missing Tauri/GTK system libraries, `sudo apt-get` install needed
+interactive approval unavailable here) — recorded as verification debt
+in `docs/VERIFICATION-DEBT.md`, closed once the GitHub Actions Quality
+Gate (which has the GTK packages, per ADR-0041) confirms it, or a
+future session with working Rust tooling does.
+
+**Not done this wave, deliberately**: SF4 has no UI trigger yet (see
+ADR-0059 — matches this project's zero-UI-first precedent for new
+exports); the reconciliation PR's GitHub Actions gates had not yet been
+dispatched/confirmed at the point this entry was written (see
+`docs/CURRENT-HANDOFF.md` for the exact next action once they are).
+
+**Gate decision**: WAVE 3m RECONCILIATION COMPLETE. Merged as PR #18
+(2026-09-01) after Quality Gate and Security Gate both confirmed green
+on the exact head SHA, with zero open review threads. Recommended next
+product slice after merge: wire an "Export SF4" trigger into
+`MonthlySummaryScreen.tsx` (see `docs/CURRENT-HANDOFF.md`).
+
+## Wave 3I: Admin-Assisted Password Reset (added 2026-08-31) — complete
+
+Implementation wave (GitHub issue #9, a delivery-retry of an earlier
+same-issue run whose ephemeral session produced no durable artifact —
+independently reconstructed and re-verified here, not re-pushed).
+Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c` (verified
+exactly the issue's expected checkpoint). Full scope contract:
+`docs/product/WAVE-3H-DECISION.md`'s Wave 3I section. Full decision
+record: `docs/adr/0061-admin-assisted-password-reset.md`.
+
+**Shipped**:
+
+- `admin_reset_teacher_password` Rust command
+  (`src-tauri/src/commands/user.rs` → `auth::admin_reset_teacher_password`),
+  gated by the existing `Capability::ManageSchoolMembership` (no new
+  capability variant).
+- Server-side same-school target re-verification on every call; an
+  unknown target and a cross-school target collapse to an identical
+  `Ok(false)` with no audit write (enumeration safety).
+- Existing Argon2id hashing path reused unchanged; raw password
+  zeroized in the command layer.
+- `repository::user::set_password_and_clear_lockout` — a successful
+  reset also clears the target account's lockout state.
+- Migration 24: widens `audit_log` (nullable `actor_user_id`, new
+  `password_reset_by_admin` event type) via the same 12-step
+  recreate-table pattern migration 5 established; every pre-existing
+  row preserved losslessly.
+- `repository::audit_log::record_admin_action` — actor/target
+  attribution for the new event type; `list_for_school` resolves
+  `actor_username` via a join for display.
+- `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` gained
+  the new command in the same commit (Wave 3B's own recorded debt).
+- `AdminPasswordResetScreen.tsx` (new School Head UI, reached from the
+  "Security" nav group), following `SectionAdviserScreen`'s established
+  generic-error/no-client-side-enforcement convention.
+- Command-boundary tests (same-school success, cross-school denial,
+  non-School-Head denial, no-session denial, unknown-target vs.
+  cross-school-target indistinguishability, lockout clearing, audit
+  actor/target attribution) and UI/application tests (validation,
+  success/failure paths, accessibility).
+
+**Verification actually run**: `npm run quality` 770/770 (typecheck,
+lint, format, architecture, vitest); `npm run build`; `npm run
+check:dev-preview-isolation`; `npm run harness:verify` 100/100; `cargo
+fmt --check`; `git diff --check` — all clean. `cargo test`/`cargo
+clippy` could not run (missing Linux GTK/WebKit system libraries in
+this sandbox; `apt-get install` requires interactive approval
+unavailable in this unattended session) — mitigated with careful manual
+review of every changed `.rs` file; retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for this check.
+
+**Independent security review**: dispatched to a fresh
+`security-reviewer` agent before completion (auth-touching milestone
+per `.claude/rules/security-privacy.md`) — see this session's own final
+report for the actual outcome.
+
+**Non-goals respected**: no self-service forgot-password flow; no
+DPAPI/SQLCipher/database-key changes; no change to account-lockout
+policy or idle-timeout behavior; no Sync/cloud/billing/backup work;
+synthetic fixtures only throughout.
+
+**Next**: Wave 3J (Adviser View dev-preview/Playwright verification
+debt closure) — `docs/product/WAVE-3H-DECISION.md`'s own recorded
+runner-up, re-confirmed still current — deliberately not started here.
+
+## Wave 3H: Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31) — complete
+
+Planning-only wave (GitHub issue #6), branch
+`claude/issue-6-20260831-1042`, `HEAD` `9ff7c09` (verified exactly the
+issue's expected checkpoint). No product/Rust/test/dependency/migration/
+workflow/harness-metadata file touched.
+
+**Full record**: `docs/product/WAVE-3H-DECISION.md` — 11 candidates
+evaluated against the live repository (not assumed from memory),
+scored against LIKHA's priority order, recommended slice + runner-up +
+exact Wave 3I scope/non-goals/risks/acceptance-checks, completion-
+percentage and mock-pilot-readiness estimates, and a copy-ready Wave 3I
+prompt.
+
+**Recommended next slice**: Admin-Assisted Password Reset (School Head
+resets a colleague's LIKHA password within their own school) — newly
+unblocked because RBAC (ADR-0036) has shipped since this candidate was
+last scored low for lacking exactly that. **Runner-up**: the Adviser
+View dev-preview/Playwright verification-debt closure already named as
+this project's own prior "recommended next slice."
+
+**Verification**: doc-only wave; `npm run harness:verify`, `npm run
+quality`, `git diff --check` run as this wave's gate (see
+`docs/CURRENT-HANDOFF.md`'s top entry and this session's final report
+for actual results).
+
+**Next**: Wave 3I (Admin-Assisted Password Reset), per the issue's
+explicit instruction, deliberately not started in this wave.
 
 ## Wave 3G: Section Adviser Management UI (added 2026-08-31) — complete
 

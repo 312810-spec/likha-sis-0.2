@@ -20,12 +20,32 @@ export interface Sf2ExportResult {
   disclosure: FieldDisclosure;
 }
 
+export interface Sf4ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
 export interface ReportCardExportResult {
   filePath: string;
   disclosure: FieldDisclosure;
 }
 
+export interface Sf5ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
+export interface Sf6ExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
 export interface LearnerRosterExportResult {
+  filePath: string;
+  disclosure: FieldDisclosure;
+}
+
+export interface Sf10ExportResult {
   filePath: string;
   disclosure: FieldDisclosure;
 }

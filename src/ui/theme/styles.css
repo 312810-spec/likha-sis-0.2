@@ -197,6 +197,19 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Same visual treatment as :disabled, for buttons that use aria-disabled
+   instead of the native disabled attribute -- native disabled blurs the
+   button to <body> the instant it's clicked (since the focused element
+   itself becomes unfocusable mid-interaction), which is disorienting for
+   keyboard/screen-reader users on a "disable while saving" action.
+   aria-disabled keeps the button focusable and reachable by Tab; the
+   click itself is guarded in the handler instead. See
+   docs/VERIFICATION-DEBT.md's self-disabling-button entry. */
+button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -804,6 +817,22 @@ label {
     min-height: 44px;
     flex: 1;
   }
+}
+
+/* Same treatment as .attendance-roster's selected-toggle button --
+   without this, the currently-selected assessment item had no visual
+   cue at all beyond the heading appearing below it (WCAG 1.4.1: not
+   color alone, so a non-color ✓ cue too, same as .attendance-roster
+   and .mode-switcher use). */
+.assessment-item-list button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+.assessment-item-list button[aria-pressed="true"]::before {
+  content: "✓ ";
 }
 
 /* Narrow (phone-width): each assessment item's own action row (select

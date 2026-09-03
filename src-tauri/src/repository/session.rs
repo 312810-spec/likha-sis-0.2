@@ -32,6 +32,20 @@ pub fn revoke(conn: &Connection, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Revokes every still-active persisted session for `user_id` across
+/// all school scopes. Authorization re-checks persisted revocation on
+/// every protected command, so this also invalidates sessions held by
+/// other running application instances.
+pub fn revoke_all_for_user(conn: &Connection, user_id: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE sessions \
+         SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+         WHERE user_id = ?1 AND revoked_at IS NULL",
+        [user_id],
+    )?;
+    Ok(())
+}
+
 /// True if the session row has been revoked (or does not exist at all —
 /// fail closed rather than treat an unknown session id as valid).
 /// `auth::SessionManager::require_active_school_scope` checks this on
@@ -118,5 +132,22 @@ mod tests {
         let conn = open_test_db();
 
         assert!(is_revoked(&conn, "does-not-exist").unwrap());
+    }
+
+    #[test]
+    fn revoke_all_for_user_revokes_only_that_users_active_sessions() {
+        let conn = open_test_db();
+        let target = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        let other = user::create_user(&conn, "ben.santos", "password", "Ben Santos").unwrap();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let target_a = insert(&conn, &target.id, &s.id, "+8 hours").unwrap();
+        let target_b = insert(&conn, &target.id, &s.id, "+8 hours").unwrap();
+        let other_session = insert(&conn, &other.id, &s.id, "+8 hours").unwrap();
+
+        revoke_all_for_user(&conn, &target.id).unwrap();
+
+        assert!(is_revoked(&conn, &target_a).unwrap());
+        assert!(is_revoked(&conn, &target_b).unwrap());
+        assert!(!is_revoked(&conn, &other_session).unwrap());
     }
 }

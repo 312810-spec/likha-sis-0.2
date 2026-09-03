@@ -105,6 +105,7 @@ export function SectionAdviserScreen({
 
   async function handleAssign(event: FormEvent) {
     event.preventDefault();
+    if (assigning || teachers.length === 0) return;
     setError(null);
     setConfirmation(null);
     setAssigning(true);
@@ -135,7 +136,7 @@ export function SectionAdviserScreen({
 
   async function handleEnd(event: FormEvent) {
     event.preventDefault();
-    if (!adviser) return;
+    if (!adviser || ending) return;
     setError(null);
     setConfirmation(null);
     setEnding(true);
@@ -200,7 +201,7 @@ export function SectionAdviserScreen({
               required
             />
           </div>
-          <button type="submit" className="button-primary" disabled={ending}>
+          <button type="submit" className="button-primary" aria-disabled={ending}>
             {ending ? "Ending…" : "End advisory"}
           </button>
         </form>
@@ -246,7 +247,7 @@ export function SectionAdviserScreen({
             <button
               type="submit"
               className="button-primary"
-              disabled={assigning || teachers.length === 0}
+              aria-disabled={assigning || teachers.length === 0}
             >
               {assigning ? "Assigning…" : "Assign adviser"}
             </button>

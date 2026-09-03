@@ -110,7 +110,7 @@ Expected: `text / surface-2` ≥ 10, `muted / surface-2` ≥ 4.5, `text / primar
 In `src/ui/theme/styles.css`, inside the bare `:root { … }` block, immediately after the `--color-surface: #f3eee3;` line, add:
 
 ```css
-/* Redesign shell tokens (ADR-0057). Contrast computed, not eyeballed --
+/* Redesign shell tokens (ADR-0064). Contrast computed, not eyeballed --
      see the ADR for the node snippet and the numbers below. */
 --color-surface-2: #ffffff; /* card / raised surface fill */
 /* Hairline dividers and card outlines ONLY -- never the sole cue that a
@@ -749,7 +749,7 @@ Append to `src/ui/theme/styles.css`:
 
 ```css
 /* ============================================================
-   Redesign shell -- sidebar (ADR-0057). Replaces .workbench-nav /
+   Redesign shell -- sidebar (ADR-0064). Replaces .workbench-nav /
    .nav-group / .nav-item, which are removed once nothing references
    them (see the ADR's Wave 1 task list).
    ============================================================ */
@@ -1077,7 +1077,7 @@ Expected: PASS.
 Append to `src/ui/theme/styles.css`:
 
 ```css
-/* Redesign shell -- top bar (ADR-0057). */
+/* Redesign shell -- top bar (ADR-0064). */
 .app-topbar {
   display: flex;
   align-items: center;
@@ -1283,7 +1283,7 @@ Expected: PASS.
 Append to `src/ui/theme/styles.css`:
 
 ```css
-/* Redesign shell -- phone bottom tab bar (ADR-0057). Hidden until the
+/* Redesign shell -- phone bottom tab bar (ADR-0064). Hidden until the
    phone breakpoint (see the shell responsive block in Task 7 Step 5). */
 .app-bottomnav {
   display: none;
@@ -1537,7 +1537,7 @@ Expected: PASS.
 Append to `src/ui/theme/styles.css`:
 
 ```css
-/* Redesign shell -- layout grid (ADR-0057). */
+/* Redesign shell -- layout grid (ADR-0064). */
 .app-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
@@ -2149,7 +2149,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 **Files:**
 
-- Create: `docs/adr/0057-ui-redesign-shell.md`
+- Create: `docs/adr/0064-ui-redesign-shell.md`
 - Modify: `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`
 - Modify: `docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md` (tick §10's "ADR to write (Wave 1)" item)
 
@@ -2158,9 +2158,9 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 - Consumes: the contrast numbers from Task 1, the CSS size deltas from Tasks 1 & 10, the test counts from the final `npm run quality`.
 - Produces: durable record; no code.
 
-- [ ] **Step 1: Write ADR-0057**
+- [ ] **Step 1: Write ADR-0064**
 
-Create `docs/adr/0057-ui-redesign-shell.md` following the house ADR shape (see `0056-section-advisory-foundation.md` for structure). It must record, concretely:
+Create `docs/adr/0064-ui-redesign-shell.md` following the house ADR shape (see `0056-section-advisory-foundation.md` for structure). It must record, concretely:
 
 - Context: implements Wave 1 of `docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md`; supersedes the app-shell/navigation parts of ADR-0031 §4 and the flat-nav parts of ADR-0030's programme (those ADRs stay Accepted for their token/design-system decisions).
 - Decision 1 — the five additive tokens, with the **actual computed contrast ratios** for light and dark (paste the Task 1 output), and the rule that `--color-border-soft` is decorative-only.
@@ -2174,7 +2174,7 @@ Create `docs/adr/0057-ui-redesign-shell.md` following the house ADR shape (see `
 
 - [ ] **Step 2: Update the state docs**
 
-- `docs/PROJECT-MEMORY.md`: one durable-fact entry — "UI shell redesigned (ADR-0057): persistent sidebar + adaptive drawer/bottom-nav replace the flat workbench nav; Calm Civic Classroom palette unchanged, five additive contrast-verified tokens; role-adaptive Home is Wave 3, not yet built."
+- `docs/PROJECT-MEMORY.md`: one durable-fact entry — "UI shell redesigned (ADR-0064): persistent sidebar + adaptive drawer/bottom-nav replace the flat workbench nav; Calm Civic Classroom palette unchanged, five additive contrast-verified tokens; role-adaptive Home is Wave 3, not yet built."
 - `docs/CURRENT-HANDOFF.md`: new top entry — Wave 1 complete, the exact commits, the CI run ids once green, and the **exact next slice = Wave 2 (layout primitives: `Page`, `KpiStrip`/`Kpi`, `BentoGrid`/`Card`, `DataTable` + migrate `SectionsScreen` and `TodaysClassesScreen` as proof)**.
 - `docs/ACTIVE-PLAN.md`: add a "Wave 1 — UI redesign shell — complete" section with the verification record.
 - `docs/VERIFICATION-DEBT.md`: extend the existing native-NVDA/Narrator entry to explicitly include the new shell (sidebar, drawer focus-trap, bottom nav) as owed on a real screen reader; add any reviewer-harness debt from Step 1.
@@ -2194,8 +2194,8 @@ Expected: run it; if the pre-existing Playwright browser-version mismatch docume
 - [ ] **Step 5: Commit the docs**
 
 ```bash
-git add docs/adr/0057-ui-redesign-shell.md docs/PROJECT-MEMORY.md docs/CURRENT-HANDOFF.md docs/ACTIVE-PLAN.md docs/VERIFICATION-DEBT.md docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md
-git commit -m "docs: record Wave 1 (UI redesign shell) — ADR-0057 + state docs
+git add docs/adr/0064-ui-redesign-shell.md docs/PROJECT-MEMORY.md docs/CURRENT-HANDOFF.md docs/ACTIVE-PLAN.md docs/VERIFICATION-DEBT.md docs/superpowers/specs/2026-09-03-likha-ui-redesign-design.md
+git commit -m "docs: record Wave 1 (UI redesign shell) — ADR-0064 + state docs
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```

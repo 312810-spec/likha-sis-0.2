@@ -10,25 +10,32 @@ on:
   pull_request_review:
     types: [submitted]
 
+concurrency:
+  group: likha-claude-wave
+  cancel-in-progress: false
+
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      github.actor == '312810-spec' &&
+      (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code
         id: claude
@@ -36,14 +43,12 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # This is an optional setting that allows Claude to read CI results on PRs
+          # Allow the owner-gated automation to dispatch and inspect required CI workflows
           additional_permissions: |
-            actions: read
+            actions: write
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Owner-authorized autonomous delivery: verify locally, commit and push only
+          # the action-managed branch, open a PR, inspect/dispatch CI, and merge only
+          # after the exact checkpoint's required Quality and Security gates are green.
+          claude_args: |
+            --allowedTools "Edit,Read,Write,Bash(npm:*),Bash(npx:*),Bash(cargo:*),Bash(rg:*),Bash(git status:*),Bash(git diff:*),Bash(git rev-parse:*),Bash(git log:*),Bash(git show:*),Bash(git branch --show-current),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git diff-tree:*),Bash(git grep:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git restore package-lock.json),Bash(gh run:*),Bash(gh workflow run:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh pr merge:*),Bash(gh issue comment:*)"

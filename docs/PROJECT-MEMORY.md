@@ -2763,25 +2763,25 @@ new top entry.
 - Both Quality Gate and Security Gate confirmed green on `main`'s new
   head (`9c1514c`) after the fast-forward, not assumed.
 
-## Wave 1 — UI redesign shell (ADR-0057) (added 2026-09-03)
+## Wave 1 — UI redesign shell (ADR-0064) (added 2026-09-03)
 
-Wave 1 UI redesign shell (ADR-0057): a persistent sidebar + adaptive
+Wave 1 UI redesign shell (ADR-0064): a persistent sidebar + adaptive
 drawer/bottom-nav replaces the flat workbench nav; Calm Civic Classroom
 palette unchanged, five additive contrast-verified tokens; pinned Home
 still routes to Teacher Workspace (role-adaptive Home is Wave 3). Old
 AppShell/WorkbenchNav/NavItem removed.
 
-## Wave 2 — UI redesign layout primitives (ADR-0057 addendum) (added 2026-09-03)
+## Wave 2 — UI redesign layout primitives (ADR-0064 addendum) (added 2026-09-03)
 
-Wave 2 (ADR-0057 addendum): layout primitives Page / KpiStrip+Kpi /
+Wave 2 (ADR-0064 addendum): layout primitives Page / KpiStrip+Kpi /
 BentoGrid+Card / DataTable added; DataTable's phone reflow is a prop
 (`reflowAt`) keyed to a `data-reflow` CSS block, not per-screen CSS;
 Today's Classes and Sections migrated onto them as proof; KpiStrip/Card/
 BentoGrid first consumed in Wave 3.
 
-## Wave 3 — UI redesign role-adaptive Home (ADR-0057 addendum) (added 2026-09-03)
+## Wave 3 — UI redesign role-adaptive Home (ADR-0064 addendum) (added 2026-09-03)
 
-Wave 3 (ADR-0057 addendum): the `CurrentSession` DTO gains
+Wave 3 (ADR-0064 addendum): the `CurrentSession` DTO gains
 `roles: Vec<String>` (frontend `roles: string[]`), populated from a new
 parameterised `repository::role::list_roles`, scoped to the session's own
 user+school, reached only post-auth — **display-only**, never an
@@ -2793,9 +2793,9 @@ teacher-load are Wave 4). Independent `security-reviewer` pass:
 PASS-WITH-MINORS, no blocking, the one Minor fixed in-wave.
 `TeacherWorkspaceScreen` not yet deleted (later slice).
 
-## Wave 4 — UI redesign School-Head Home enrichment (ADR-0057 addendum) (added 2026-09-03)
+## Wave 4 — UI redesign School-Head Home enrichment (ADR-0064 addendum) (added 2026-09-03)
 
-Wave 4 (ADR-0057 addendum): one new aggregate read —
+Wave 4 (ADR-0064 addendum): one new aggregate read —
 `attendance::school_day_totals(conn, school_id, date)` → `{present,
 absent, tardy}` counts only, `ManageLearners`-gated command with
 server-derived school scope. `SchoolHeadHome` gains an "Attendance
@@ -2809,9 +2809,9 @@ without an adviser" card, and a "Teaching load" card with a
 
 ## Current Milestone
 
-## Wave 6 — UI redesign final review + merge (ADR-0057 addendum) (added 2026-09-03)
+## Wave 6 — UI redesign final review + merge (ADR-0064 addendum) (added 2026-09-03)
 
-Wave 6 (ADR-0057 addendum): no screen-migration tasks executed (the four
+Wave 6 (ADR-0064 addendum): no screen-migration tasks executed (the four
 remaining table screens' keyboard models made DataTable migration too
 risky for the session budget). Independent whole-branch review (Opus):
 SHIP-WITH-FOLLOWUPS, no Critical, Rust/auth + architecture + behaviour
@@ -2825,9 +2825,9 @@ backlog: DataTable adoption by the 4 table screens, teacher-Home rebuild
 
 ## Current Milestone
 
-## Wave 5 — UI redesign Page scaffold re-fit (ADR-0057 addendum) (added 2026-09-03)
+## Wave 5 — UI redesign Page scaffold re-fit (ADR-0064 addendum) (added 2026-09-03)
 
-Wave 5 (ADR-0057 addendum): all 16 remaining in-shell screens moved onto
+Wave 5 (ADR-0064 addendum): all 16 remaining in-shell screens moved onto
 the shared `Page` primitive (wrapper only — no data/behaviour/table
 change; almost every test file unchanged). `Page` gained an optional
 `headingRef` prop so `SectionRosterScreen` (which returns focus to its
@@ -2835,6 +2835,307 @@ heading from six action handlers) could re-fit. Remaining redesign
 slices (Wave 6): DataTable migration of the table screens, the teacher
 Home redesign + `TeacherWorkspaceScreen` deletion, Login/first-run
 restyle, and the attendance-by-grade card.
+
+## Wave 3H — Fresh Roadmap Survey and Next-Slice Selection (added 2026-08-31)
+
+Planning-only wave, run from GitHub issue #6 on branch
+`claude/issue-6-20260831-1042`, `HEAD` `9ff7c09` (confirmed exactly the
+issue's expected checkpoint, not merely an ancestor). Full record:
+`docs/product/WAVE-3H-DECISION.md`; `docs/CURRENT-HANDOFF.md` top entry;
+`docs/ACTIVE-PLAN.md`'s new top section.
+
+Surveyed every required authority doc plus ADR-0035's Wave 0-7 roadmap
+and evaluated 11 next-slice candidates (the 10 the issue named plus one
+this survey surfaced) directly against current repository state,
+including a source grep confirming no password-reset/change command
+exists anywhere in `src-tauri/src` today.
+
+**Durable finding**: "password reset/account recovery" was previously
+scored low (4.20, 2026-08-25 reassessment) specifically because a safe
+admin-reset flow needed the then-deferred Roles & Permissions decision.
+RBAC shipped since (ADR-0036, Wave 1) and this candidate was never
+re-scored — the original blocker is gone. Recorded here so a future
+session doesn't re-read the stale 4.20 score without this correction.
+
+**Recommended (Wave 3I, not started)**: Admin-Assisted Password Reset —
+a School Head resets a colleague's LIKHA password within their own
+school, reusing `Capability::ManageSchoolMembership`, existing Argon2id
+hashing, school-scoping, and the audit-log table unchanged. Deliberately
+unrelated to the separate, still-unresolved Windows-DPAPI/SQLCipher
+key-recovery question (ADR-0044) — LIKHA's own app-level credentials are
+independent of that. **Runner-up**: close the Adviser View dev-preview/
+Playwright verification debt already on record. Wave 5 Sync's
+10-scenario decision and the raw-database backup/recovery design
+question were both evaluated and deliberately not selected — each is
+decision-shaped, not implementation-shaped, and needs its own dedicated
+scenario-process wave first.
+
+**Completion estimates recorded** (both explicitly disclosed as coarse,
+evidence-derived, not precise): roughly 44% of the originally-planned
+ADR-0035 Wave 0-7 roadmap (Subject Attendance/Section Advisory, a full
+additional owner-supplied feature line, delivered outside that plan and
+not counted in the denominator); roughly 55-65% ready for a Windows-only
+synthetic-data facilitator-guided mock pilot, roughly 20-25% ready for
+production use with real learner PII.
+
+**Verification**: doc-only wave; no product/Rust/test/dependency/
+migration/workflow/harness-metadata file touched — see
+`docs/CURRENT-HANDOFF.md`'s top entry for the actual verification run.
+
+## Wave 3J: SF4 Export UI Trigger (added 2026-09-01)
+
+Full record: `docs/CURRENT-HANDOFF.md`'s top entry. Recommended next
+slice from the Wave 3m reconciliation below, now shipped: a second
+export button in `MonthlySummaryScreen.tsx` calling the already-shipped
+`exportSchoolMonthlyAttendanceSf4`, enabled independent of the selected
+section's report (SF4 is school-wide, not section-scoped) — only a
+valid month gates it. `npm run quality` 794/794 (3 new tests), build,
+`check:dev-preview-isolation`, `harness:verify` 100/100, `git diff
+--check` all clean. No Rust files touched — pure TS/UI change against
+an already-CI-verified Rust command. **Self-correction, same session**:
+this entry originally (and PR #19's body) wrongly claimed SF5/SF6 UI
+triggers were "deliberately unwired" per ADR-0059 — that ADR's "no UI"
+claim was only ever about SF4. SF5 (`SectionRosterScreen.tsx`) and SF6
+(`SectionsScreen.tsx`) already shipped real UI during the Wave 3m
+reconciliation (ADR-0057/0058's own "Addendum" sections); only their
+dev-preview fixture demo stub was unwired. See
+`docs/CURRENT-HANDOFF.md`'s top entry for the full correction.
+
+## Wave 3m Reconciliation (added 2026-09-01)
+
+Full record: `docs/adr/0060-wave-3m-reconciliation.md`. Two independent
+delivery lineages (`main`'s own harness-restoration line and a
+different coding agent's `antigravity/likha-sis-wave3m-*` product line)
+diverged from the same Wave 3E checkpoint and were reconciled by hand
+(not a blind merge — their independent Adviser View reimplementations
+conflict at the content level). **`main` kept its own Adviser View/
+Section Adviser Management implementation** (already reviewed,
+Playwright-verified, and free of a real `session_date <= as_of_date`
+regression the parallel Wave 3m version still carries) and **adopted
+Wave 3m's genuinely new work on top of it**: SF2/report-card class-
+adviser byline, School Form 5 Section Promotion (ADR-0057), School Form
+6 School Promotion Summary (ADR-0058), School Form 4 Monthly Attendance
+Consolidation (ADR-0059, backend/port-layer only — deliberately no UI
+trigger yet). `npm run quality` 777/777 vitest, typecheck/lint/format/
+architecture clean. `cargo build`/`cargo test`/`cargo clippy` could not
+run locally this session (missing Tauri/GTK system libraries,
+`sudo apt-get` install needed unavailable interactive approval) — every
+dependent Rust signature was instead hand-verified against the actual
+current repository source; this is disclosed verification debt
+(`docs/VERIFICATION-DEBT.md`), pending GitHub Actions CI confirmation.
+Merged as PR #18 (2026-09-01) after Quality Gate and Security Gate both
+confirmed green on the exact head SHA, zero open review threads.
+
+## Wave 3I — Admin-Assisted Password Reset (added 2026-08-31)
+
+Implementation wave, run from GitHub issue #9 (a delivery-retry of an
+earlier same-issue run whose ephemeral session produced no durable
+artifact). Branch `claude/issue-9-20260831-1305`, `HEAD` `fa8d21c`
+(confirmed exactly the issue's expected checkpoint). Full record:
+`docs/adr/0061-admin-assisted-password-reset.md`;
+`docs/CURRENT-HANDOFF.md`'s new top entry.
+
+Closes the gap Wave 3H's survey identified: a teacher who forgets their
+LIKHA password (distinct from the existing 15-minute lockout, which
+already self-clears) previously had no legitimate in-app recovery path
+at all. Ran the project's 10-scenario decision process; selected
+**School Head sets a new password directly, effective immediately**
+(reuses `Capability::ManageSchoolMembership`, the existing Argon2id
+path, and the existing `audit_log` table, widened not replaced).
+Recorded **Next Best, explicitly deferred not rejected**: a
+system-generated temporary password with forced change at next login —
+would need a new `users` schema flag and a new login-flow interception
+point this codebase doesn't have yet; the switch condition is a future
+finding that School-Head-durably-knows-the-password is unacceptable for
+this deployment model, not effort alone.
+
+**Durable facts for future sessions**: `admin_reset_teacher_password`
+is the first `audit_log` event type where the acting user
+(`actor_user_id`) genuinely differs from the event's subject
+(`user_id`/`username`) — migration 24 widened the table for this,
+preserving every pre-existing row losslessly with `actor_user_id =
+NULL`. A successful reset also clears the target account's lockout
+state as a deliberate, in-scope side effect (not a change to ADR-0019's
+lockout policy itself). An unknown target and a target in a different
+school are indistinguishable (`Ok(false)`, no audit write) —
+enumeration-safety by construction, not code-review vigilance.
+
+**Verification**: `npm run quality` 770/770; `npm run build`; `npm run
+harness:verify` 100/100; `cargo fmt --check`; `git diff --check`; all
+clean. `cargo test`/`cargo clippy` could not run in-session (missing
+Linux GTK/WebKit system libraries, `apt-get install` needs interactive
+approval unavailable here) — retained as debt in
+`docs/VERIFICATION-DEBT.md`; GitHub CI is authoritative for that check.
+Independent security review dispatched — see this wave's own final
+report and `docs/VERIFICATION-DEBT.md` for the actual outcome.
+
+## Reveal-Exported-File ("Open folder") Feature (added 2026-09-01)
+
+User-directed continuation. Second of two app-wide debts the UX-03
+teacher-ux review retry flagged (the first, self-disabling buttons, was
+already fixed). Scoped to SF2/SF4 in `MonthlySummaryScreen.tsx` only —
+remaining export surfaces (SF5, SF6, report card, learner roster) stay
+open debt, pattern proven.
+
+Added `tauri-plugin-opener` v2.5.5 (Rust) / `@tauri-apps/plugin-opener`
+v2.5.5 (npm) — official first-party Tauri 2 plugin, `revealItemInDir()`
+opens the OS file manager at a path. Registered in `src-tauri/src/lib.rs`;
+capability `opener:allow-reveal-item-in-dir` granted narrowly. Has a
+real, fixed CVE (CVE-2025-31477) in its `open`-family APIs' untrusted-
+input path/URL-scope validation, patched upstream at 2.2.1+, this
+project pins 2.5.5 — the standing discipline (enforced in doc comments
+at every layer) is to only ever call `revealExportedFile` with a path
+this app itself just returned from a successful export, never a
+user-typed or otherwise untrusted string. See `docs/SOURCE-REGISTRY.md`.
+
+Plumbing: `revealExportedFile(filePath)` added to `ExportRepository` →
+`TauriExportRepository` → `ExportApplicationService` (trims, rejects
+empty) → `FixtureExportRepository` (genuine no-op, dev-preview has no OS
+file manager to open). UI: an "Open folder" button next to each of the
+SF2/SF4 result blocks in `MonthlySummaryScreen.tsx`, with its own
+loading/error state, reset on section/month change.
+
+**Verified**: `npm run quality` 801/801 (9 new tests, plus a
+`revealExportedFile` stub added to every existing `FakeExportRepository`/
+`SlowExportRepository` test double the interface change touched), `npm
+run build`, `npm run check:dev-preview-isolation`, `npm run
+harness:verify` 100/100, `git diff --check` — all clean. Rust touched
+(`lib.rs`, `Cargo.toml`, `capabilities/default.json`): `cargo build`
+clean; `cargo test`/`cargo clippy --all-targets -- -D warnings`/`cargo
+fmt --check` run this wave — see `docs/CURRENT-HANDOFF.md`'s top entry
+for the confirmed outcome.
+
+## Verification Debt Sweep: Wave 3I Security Review Retry + Native Visual Pass (added 2026-09-01)
+
+User-directed ("work on verification debts"). Retried the previously
+agent-resume-blocked Wave 3I `security-reviewer` — succeeded this time.
+0 BLOCKING, 1 SHOULD-FIX (missing Rust-side minimum password length in
+`admin_reset_teacher_password`; deliberately not fixed inline, since it
+matches an already-disclosed, deliberate codebase-wide convention
+documented in `src/domain/password-policy.ts` — fixing only this one
+path would create an undocumented asymmetry with `register_user`/
+`bootstrap_installation`; recorded as a project-wide follow-up).
+
+Closed the visual half of the long-open "Native visual / screen-reader
+inspection" debt for the four M0–M6 screens (`LoginScreen`,
+`FirstRunSetupScreen`, `AppShell`, `LearnerListScreen`) using the
+documented `playwright-cli` workaround (`chromium.launch({
+executablePath: "/opt/pw-browsers/chromium" })`). Found and fixed a real
+layout bug in the process: `WorkbenchNav`'s CSS used a `border-right`
+divider between nav groups, correct only when every group shares one
+row — once `.workbench-nav`'s flex-wrap pushes a later group onto its
+own row (which happens at ordinary desktop widths too, not just narrow
+ones, confirmed even at the primary 1366px width), an earlier group's
+divider became an orphaned floating line. Fixed by making the divider an
+unconditional `border-bottom` in `src/ui/theme/styles.css`, which
+degrades correctly under any wrap configuration — this is the kind of
+finding jsdom-based structural tests structurally cannot catch, which is
+exactly why this debt category exists. Screen-reader pass (NVDA/Narrator)
+remains open — no Windows screen reader available in this sandbox.
+
+`npm run quality` 801/801 (no regressions), `npm run build`, `npm run
+check:dev-preview-isolation`, `npm run harness:verify` (100/100), `git
+diff --check` all clean. Only `src/ui/theme/styles.css` changed.
+
+## Reveal-in-Folder: SF5/SF6/Report Card/Roster (added 2026-09-02)
+
+Extended the "Open folder" reveal affordance (proven on SF2/SF4 in Wave
+"Reveal-Exported-File", PR #24) to the four remaining export surfaces:
+SF5 (`SectionRosterScreen.tsx`), SF6 (`SectionsScreen.tsx`), report
+card export (`ClassRecordWorkspace.tsx`), learner roster export
+(`LearnerListScreen.tsx`). Pure UI wiring — the `revealExportedFile`
+plumbing already existed at every layer (port, `TauriExportRepository`,
+`ExportApplicationService`, `FixtureExportRepository`'s no-op) from
+PR #24, so no backend change was needed. This closes the app-wide
+"raw file path, no reveal affordance" verification debt completely.
+
+`npm run quality` 805/805 (4 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
+## Self-Disabling-Button Sweep: GradingPeriods/ScheduleMeetings/TeachingAssignments (added 2026-09-02)
+
+Second batch of the self-disabling-button sweep, prepared in parallel
+with PR #27's first batch (auth/session screens) while its CI ran.
+Applied the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern to `GradingPeriodsScreen.tsx` (per-row "Save"),
+`ScheduleMeetingsScreen.tsx` ("Schedule meeting" + per-row "Remove"),
+and `TeachingAssignmentsScreen.tsx` ("Assign teacher" + per-row
+"Remove") — five instances across three screens sharing a simple
+create-form-plus-removable-row shape. Per-row guards check the specific
+row/id already in flight, preserving each screen's existing per-row
+(not whole-list) disabling behavior.
+
+`npm run quality` 810/810 (5 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
+## Self-Disabling-Button Sweep: Auth/Session-Critical Screens (added 2026-09-02)
+
+Extended the proven `disabled=` → `aria-disabled=` + handler-guard
+pattern (first fixed for 3 instances in Wave "Self-disabling-button
+focus loss") to four more: `LoginScreen.tsx` ("Sign in"),
+`FirstRunSetupScreen.tsx` ("Finish setup"),
+`AdminPasswordResetScreen.tsx` ("Reset password"), and
+`IdleTimeoutWarning.tsx` ("Stay signed in") — the standalone
+auth/session-critical screens with exactly one self-contained submit
+button each. Deliberately scoped, not the full ~40-instance sweep across
+~15 files, to keep the change reviewable; the remaining instances stay
+open debt with the pattern fully proven (see
+`docs/VERIFICATION-DEBT.md`).
+
+`npm run quality` 809/809 (4 new interaction tests, each proving the
+handler guard blocks a second submission while the first is still in
+flight, not just that the button looks disabled), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched.
+
+## Self-Disabling-Button Sweep: ClassRecords/SectionAdviser/LearnerList (added 2026-09-02)
+
+Third batch of the self-disabling-button sweep. Applied the proven
+`disabled=` → `aria-disabled=` + handler-guard pattern to
+`ClassRecordsScreen.tsx` ("Open class record", "Add subject"),
+`SectionAdviserScreen.tsx` ("End advisory", "Assign adviser"), and
+`LearnerListScreen.tsx` ("Export learner list", per-row "Save",
+"Enroll learner", "Create separate learner") — 7 instances across 3
+screens. `LearnerListScreen.tsx`'s per-row "View history"/"Edit" and
+"Cancel" buttons were deliberately left native `disabled` after
+confirming by reading the code that neither is an instance of this bug.
+
+`npm run quality` 821/821 (7 new interaction tests), `npm run build`,
+`npm run check:dev-preview-isolation`, `npm run harness:verify`
+(100/100), `git diff --check` all clean. No Rust touched. 19 of ~45
+total instances now fixed across 10 screens.
+
+## File-Based Independent-Review Workaround (added 2026-09-02)
+
+The recurring agent-resume/retrieval failure (dispatched reviewer
+subagents complete real work but their findings text never comes back
+to the orchestrating session — documented since M7) now has a real
+workaround, not just a self-review fallback: dispatch via the
+`general-purpose` agent instead of a dedicated reviewer agent, with
+the dedicated reviewer's own checklist inlined into the prompt,
+restricted to writing exactly one findings file to the session
+scratchpad (no repository edits), then read that file directly instead
+of relying on the notification channel. Validated live: UX-02, UX-03,
+and the SF10 security review all returned real, retrievable,
+evidence-backed findings this way after direct dispatches (plus the
+one permitted resume) kept failing. Deliberately does **not** grant
+`Write` to the dedicated reviewer agents themselves — see ADR-0062 for
+why that was ruled out. Use this pattern next time the failure recurs,
+after the one permitted resume, before falling back to self-review.
+
+## SF10 Permanent Record (added 2026-09-02)
+
+Content-based CSV export of a learner's cumulative academic history
+(grades/promotion status per school year, across every school year
+ever enrolled) — `export::sf10` + `export_learner_permanent_record_sf10`,
+gated by `Capability::ManageLearners` (Registrar/School Head only,
+unlike SF5's adviser-of-section or SF6's plain session-scope gates).
+Deliberately unrelated to the separate, still-evidence-blocked official
+`.xlsx` SF10 template track (`formgen::template_version`, ADR-0053) —
+this is the same disclosure-not-refusal CSV pattern SF2/SF4/SF5/SF6
+already ship. Full detail: `docs/adr/0063-sf10-permanent-record.md`.
 
 ## Current Milestone
 

@@ -29,6 +29,9 @@ class FakeLearnerRepository implements LearnerRepository {
     sex?: "M" | "F";
     confirmed: boolean;
   }> = [];
+  pendingCreateWithDuplicateCheck = false;
+  pendingUpdateProfile = false;
+  updateProfileCalls = 0;
 
   constructor(public learners: Learner[] = []) {}
 
@@ -64,6 +67,7 @@ class FakeLearnerRepository implements LearnerRepository {
     confirmed = false,
   ): Promise<CreateLearnerResult> {
     this.createWithDuplicateCheckCalls.push({ givenName, familyName, lrn, sex, confirmed });
+    if (this.pendingCreateWithDuplicateCheck) return new Promise<CreateLearnerResult>(() => {});
     const trimmedGiven = givenName.trim().toLowerCase();
     const trimmedFamily = familyName.trim().toLowerCase();
     const candidates = this.learners.filter(
@@ -92,6 +96,8 @@ class FakeLearnerRepository implements LearnerRepository {
     lrn?: string,
     sex?: "M" | "F",
   ): Promise<Learner | null> {
+    this.updateProfileCalls += 1;
+    if (this.pendingUpdateProfile) return new Promise<Learner | null>(() => {});
     const existing = this.learners.find((l) => l.id === learnerId);
     if (!existing) return null;
     existing.givenName = givenName;
@@ -115,14 +121,58 @@ class FakeExportRepository implements ExportRepository {
   async exportSectionMonthlySf2(): Promise<import("../domain/export").Sf2ExportResult | null> {
     throw new Error("not used in this test");
   }
+  async exportSchoolMonthlyAttendanceSf4(): Promise<
+    import("../domain/export").Sf4ExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+  async exportSectionEosySf5(): Promise<import("../domain/export").Sf5ExportResult | null> {
+    throw new Error("not used in this test");
+  }
+  async exportSchoolEosySf6(): Promise<import("../domain/export").Sf6ExportResult | null> {
+    throw new Error("not used in this test");
+  }
   async exportClassRecordReportCard(): Promise<
     import("../domain/export").ReportCardExportResult | null
   > {
     throw new Error("not used in this test");
   }
+  pendingExport = false;
+
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     this.exportLearnerRosterCalls += 1;
+    if (this.pendingExport) return new Promise<LearnerRosterExportResult | null>(() => {});
     return this.resultToReturn;
+  }
+
+  revealCalls: string[] = [];
+  revealShouldThrow = false;
+
+  async revealExportedFile(filePath: string): Promise<void> {
+    this.revealCalls.push(filePath);
+    if (this.revealShouldThrow) throw new Error("could not open folder");
+  }
+
+  exportSf10Calls: string[] = [];
+  sf10PendingLearnerId: string | null = null;
+  sf10ShouldThrow = false;
+  sf10ResultToReturn: import("../domain/export").Sf10ExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF10_Dela_Cruz_Juan_123456789012.csv",
+    disclosure: {
+      populatedFields: [],
+      omittedFields: [{ field: "Official DepEd SF10 template", reason: "content-only export" }],
+    },
+  };
+
+  async exportLearnerPermanentRecordSf10(
+    learnerId: string,
+  ): Promise<import("../domain/export").Sf10ExportResult | null> {
+    this.exportSf10Calls.push(learnerId);
+    if (this.sf10PendingLearnerId === learnerId) {
+      return new Promise<import("../domain/export").Sf10ExportResult | null>(() => {});
+    }
+    if (this.sf10ShouldThrow) throw new Error("not authorized");
+    return this.sf10ResultToReturn;
   }
 }
 
@@ -271,6 +321,58 @@ describe("LearnerListScreen", () => {
     expect(screen.getByText("Birthdate")).toBeInTheDocument();
   });
 
+  it("opens the folder for the exported roster file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Ana Santos");
+    await user.click(screen.getByRole("button", { name: "Export learner list (CSV)" }));
+    await screen.findByRole("status");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\LearnerRoster_Rizal_Elementary.csv",
+      ]),
+    );
+  });
+
+  it("does not submit a second export while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.pendingExport = true;
+    await screen.findByText("Ana Santos");
+
+    const exportButton = screen.getByRole("button", { name: "Export learner list (CSV)" });
+    await user.click(exportButton);
+    await waitFor(() => expect(exportRepo.exportLearnerRosterCalls).toBe(1));
+
+    expect(exportButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(exportButton);
+
+    expect(exportRepo.exportLearnerRosterCalls).toBe(1);
+  });
+
   it("shows an error banner when the export fails to resolve a school", async () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen([
@@ -288,6 +390,134 @@ describe("LearnerListScreen", () => {
     await screen.findByText("Ana Santos");
 
     await user.click(screen.getByRole("button", { name: "Export learner list (CSV)" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be found/i);
+  });
+
+  it("exports a learner's SF10 permanent record and shows where it was saved", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Juan",
+        familyName: "Dela Cruz",
+        lrn: "123456789012",
+        sex: "M",
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Juan Dela Cruz");
+
+    await user.click(
+      screen.getByRole("button", { name: "Export permanent record (SF10) for Juan Dela Cruz" }),
+    );
+
+    expect(exportRepo.exportSf10Calls).toEqual(["l1"]);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "SF10_Dela_Cruz_Juan_123456789012.csv",
+    );
+    expect(screen.getByText("Official DepEd SF10 template")).toBeInTheDocument();
+  });
+
+  it("opens the folder for the exported SF10 file when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Juan",
+        familyName: "Dela Cruz",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    await screen.findByText("Juan Dela Cruz");
+    await user.click(
+      screen.getByRole("button", { name: "Export permanent record (SF10) for Juan Dela Cruz" }),
+    );
+    await screen.findByRole("status");
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF10_Dela_Cruz_Juan_123456789012.csv",
+      ]),
+    );
+  });
+
+  it("does not submit a second SF10 export for the same learner while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Juan",
+        familyName: "Dela Cruz",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.sf10PendingLearnerId = "l1";
+    await screen.findByText("Juan Dela Cruz");
+
+    const exportButton = screen.getByRole("button", {
+      name: "Export permanent record (SF10) for Juan Dela Cruz",
+    });
+    await user.click(exportButton);
+    await waitFor(() => expect(exportRepo.exportSf10Calls).toEqual(["l1"]));
+
+    expect(exportButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(exportButton);
+
+    expect(exportRepo.exportSf10Calls).toEqual(["l1"]);
+  });
+
+  it("shows a permission error banner when the SF10 export is not authorized", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Juan",
+        familyName: "Dela Cruz",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.sf10ShouldThrow = true;
+    await screen.findByText("Juan Dela Cruz");
+
+    await user.click(
+      screen.getByRole("button", { name: "Export permanent record (SF10) for Juan Dela Cruz" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/may not have permission/i);
+  });
+
+  it("shows a not-found error banner when the SF10 export resolves to null", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Juan",
+        familyName: "Dela Cruz",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    exportRepo.sf10ResultToReturn = null;
+    await screen.findByText("Juan Dela Cruz");
+
+    await user.click(
+      screen.getByRole("button", { name: "Export permanent record (SF10) for Juan Dela Cruz" }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not be found/i);
   });
@@ -417,6 +647,34 @@ describe("LearnerListScreen", () => {
       "Ana Santos's profile was updated.",
     );
     expect(repo.learners[0]).toMatchObject({ lrn: "123456789012", sex: "F" });
+  });
+
+  it("does not save a second time while the first save is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([
+      {
+        id: "l1",
+        schoolId: "s1",
+        givenName: "Ana",
+        familyName: "Santos",
+        lrn: null,
+        sex: null,
+        createdAt: "now",
+      },
+    ]);
+    repo.pendingUpdateProfile = true;
+    await screen.findByText("Ana Santos");
+
+    await user.click(screen.getByRole("button", { name: "Edit Ana Santos" }));
+    const editForm = screen.getByRole("form", { name: "Edit Ana Santos" });
+    const saveButton = within(editForm).getByRole("button", { name: "Save" });
+    await user.click(saveButton);
+    await waitFor(() => expect(repo.updateProfileCalls).toBe(1));
+
+    expect(saveButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(saveButton);
+
+    expect(repo.updateProfileCalls).toBe(1);
   });
 
   it("cancel discards edits and leaves the learner unchanged", async () => {
@@ -635,6 +893,24 @@ describe("LearnerListScreen", () => {
     expect(repo.createCalls).toEqual([
       { givenName: "Ben", familyName: "Reyes", lrn: undefined, sex: undefined },
     ]);
+  });
+
+  it("does not submit a second enrollment while the first is still in flight", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen([]);
+    repo.pendingCreateWithDuplicateCheck = true;
+    await screen.findByText("No learners enrolled yet.");
+
+    await user.type(screen.getByLabelText("Given name"), "Ben");
+    await user.type(screen.getByLabelText("Family name"), "Reyes");
+    const enrollButton = screen.getByRole("button", { name: "Enroll learner" });
+    await user.click(enrollButton);
+    await waitFor(() => expect(repo.createWithDuplicateCheckCalls).toHaveLength(1));
+
+    expect(enrollButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(enrollButton);
+
+    expect(repo.createWithDuplicateCheckCalls).toHaveLength(1);
   });
 
   it("shows a validation message and does not call the repository for an empty name", async () => {

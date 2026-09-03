@@ -77,6 +77,7 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
   }, [authService]);
 
   async function handleStaySignedIn() {
+    if (extending) return;
     setExtending(true);
     try {
       await authService.extendSession();
@@ -99,7 +100,7 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
       <button
         type="button"
         className="button-primary"
-        disabled={extending}
+        aria-disabled={extending}
         onClick={handleStaySignedIn}
       >
         {extending ? "Staying signed in…" : "Stay signed in"}

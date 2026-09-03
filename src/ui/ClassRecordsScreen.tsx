@@ -142,6 +142,7 @@ export function ClassRecordsScreen({
   }
 
   async function handleAddSubject() {
+    if (addingSubject || newSubjectName.trim().length === 0) return;
     setError(null);
     setConfirmation(null);
     setAddingSubject(true);
@@ -159,6 +160,7 @@ export function ClassRecordsScreen({
   }
 
   async function handleCreateClassRecord() {
+    if (creating || !sectionId || !subjectId || !gradingPeriodId || !weightPolicyId) return;
     setError(null);
     setConfirmation(null);
     setCreating(true);
@@ -296,7 +298,7 @@ export function ClassRecordsScreen({
 
       <button
         type="button"
-        disabled={creating || !sectionId || !subjectId || !gradingPeriodId || !weightPolicyId}
+        aria-disabled={creating || !sectionId || !subjectId || !gradingPeriodId || !weightPolicyId}
         onClick={handleCreateClassRecord}
       >
         {creating ? "Opening…" : "Open class record"}
@@ -315,7 +317,7 @@ export function ClassRecordsScreen({
         </div>
         <button
           type="button"
-          disabled={addingSubject || newSubjectName.trim().length === 0}
+          aria-disabled={addingSubject || newSubjectName.trim().length === 0}
           onClick={handleAddSubject}
         >
           {addingSubject ? "Adding…" : "Add subject"}

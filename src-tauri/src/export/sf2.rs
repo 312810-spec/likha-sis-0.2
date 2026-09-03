@@ -59,6 +59,7 @@ fn disclosure() -> FieldDisclosure {
             "Section".to_string(),
             "Grade Level".to_string(),
             "School Year".to_string(),
+            "Class Adviser (if assigned)".to_string(),
             "Report Month".to_string(),
             "Learner Name".to_string(),
             "LRN".to_string(),
@@ -71,6 +72,10 @@ fn disclosure() -> FieldDisclosure {
             OmittedField {
                 field: "School ID (EBEIS)".to_string(),
                 reason: "LIKHA-SIS does not currently store a School ID / EBEIS registration number.".to_string(),
+            },
+            OmittedField {
+                field: "Class Adviser for a section without an active advisory assignment".to_string(),
+                reason: "LIKHA-SIS allows sections without an assigned class adviser -- when none is active, the Class Adviser header field renders blank rather than a fabricated placeholder.".to_string(),
             },
             OmittedField {
                 field: "LRN or Sex for a learner who does not yet have one recorded".to_string(),
@@ -102,7 +107,7 @@ fn disclosure() -> FieldDisclosure {
             },
             OmittedField {
                 field: "Signature of Teacher / Signature of School Head".to_string(),
-                reason: "The certification block is a physical/manual step, intentionally left for the teacher to complete after printing.".to_string(),
+                reason: "The certification block is a physical/manual step, intentionally left for the teacher/adviser and School Head to sign after printing.".to_string(),
             },
         ],
     }
@@ -117,6 +122,7 @@ fn disclosure() -> FieldDisclosure {
 pub fn build_sf2_export(
     school: &School,
     section: &Section,
+    adviser_name: Option<&str>,
     report: &MonthlyAttendanceReport,
 ) -> Sf2Export {
     let disclosure = disclosure();
@@ -130,6 +136,10 @@ pub fn build_sf2_export(
         csv::row(&["Section".to_string(), section.name.clone()]),
         csv::row(&["Grade Level".to_string(), section.grade_level.clone()]),
         csv::row(&["School Year".to_string(), section.school_year.clone()]),
+        csv::row(&[
+            "Class Adviser".to_string(),
+            adviser_name.unwrap_or("").to_string(),
+        ]),
         csv::row(&[
             "Report for the Month of".to_string(),
             format!("{month_name} {}", report.year),
@@ -221,18 +231,26 @@ mod tests {
 
     #[test]
     fn header_rows_carry_school_section_grade_year_and_month() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), Some("Maria Clara"), &a_report());
 
         assert!(export.csv.contains("School Name,Rizal Elementary"));
         assert!(export.csv.contains("Section,Mabini"));
         assert!(export.csv.contains("Grade Level,7"));
         assert!(export.csv.contains("School Year,2025-2026"));
+        assert!(export.csv.contains("Class Adviser,Maria Clara"));
         assert!(export.csv.contains("Report for the Month of,August 2026"));
     }
 
     #[test]
+    fn unassigned_adviser_renders_blank_header() {
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
+
+        assert!(export.csv.contains("Class Adviser,"));
+    }
+
+    #[test]
     fn per_day_codes_render_blank_present_x_absent_t_tardy() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         // Present(3) -> blank, Absent(4) -> X, Tardy(5) -> T
         assert!(export.csv.contains("\"Cruz, Ana\",123456789012,F,,X,T,1,1"));
@@ -245,7 +263,7 @@ mod tests {
         report.learners[0].present_count = 0;
         report.learners[0].absent_count = 0;
         report.learners[0].tardy_count = 0;
-        let export = build_sf2_export(&a_school(), &a_section(), &report);
+        let export = build_sf2_export(&a_school(), &a_section(), None, &report);
 
         assert!(export.csv.contains("\"Cruz, Ana\",123456789012,F,,,,0,0"));
     }
@@ -255,14 +273,14 @@ mod tests {
         let mut report = a_report();
         report.learners[0].lrn = None;
         report.learners[0].sex = None;
-        let export = build_sf2_export(&a_school(), &a_section(), &report);
+        let export = build_sf2_export(&a_school(), &a_section(), None, &report);
 
         assert!(export.csv.contains("\"Cruz, Ana\",,,,X,T,1,1"));
     }
 
     #[test]
     fn the_day_header_row_lists_only_school_days_in_order() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         assert!(export
             .csv
@@ -271,7 +289,7 @@ mod tests {
 
     #[test]
     fn totals_come_from_the_report_not_recomputed() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         let line = export
             .csv
@@ -283,7 +301,7 @@ mod tests {
 
     #[test]
     fn no_enrollment_dropout_transfer_or_gender_field_appears_anywhere_in_the_csv() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         for forbidden in [
             "Drop out",
@@ -303,7 +321,7 @@ mod tests {
 
     #[test]
     fn the_disclosure_lists_every_field_actually_omitted_from_the_csv_body() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         assert!(!export.disclosure.omitted_fields.is_empty());
         for omitted in &export.disclosure.omitted_fields {
@@ -313,7 +331,7 @@ mod tests {
 
     #[test]
     fn school_id_field_is_never_fabricated() {
-        let export = build_sf2_export(&a_school(), &a_section(), &a_report());
+        let export = build_sf2_export(&a_school(), &a_section(), None, &a_report());
 
         assert!(!export
             .csv

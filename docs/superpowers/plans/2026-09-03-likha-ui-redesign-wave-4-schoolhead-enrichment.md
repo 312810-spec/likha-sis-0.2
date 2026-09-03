@@ -41,7 +41,7 @@
 - `src/ui/home/SchoolHeadHome.tsx` / `.test.tsx` — add the three cards; take the new service + `sectionAdvisoryService` + `schoolMemberService` + `teachingAssignmentService` as props.
 - `src/App.tsx` — pass the new prop(s) through `HomeScreen` → `SchoolHeadHome`.
 - `src/ui/HomeScreen.tsx` / `.test.tsx` — thread the new prop(s).
-- `docs/adr/0057-ui-redesign-shell.md` (Wave 4 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
+- `docs/adr/0064-ui-redesign-shell.md` (Wave 4 addendum), `docs/PROJECT-MEMORY.md`, `docs/CURRENT-HANDOFF.md`, `docs/ACTIVE-PLAN.md`, `docs/VERIFICATION-DEBT.md`.
 
 ---
 
@@ -165,7 +165,7 @@ Loading/error/empty via the existing `Alert`/`Loading`/`EmptyState`; a single re
 
 ## Task 6: ADR addendum + docs + gate + security review
 
-- [ ] **Step 1: ADR-0057 Wave 4 addendum** — `school_day_totals` (aggregate counts only, `ManageLearners`-gated, school-scoped, `date` the only client arg); the three `SchoolHeadHome` cards and that adviser-gap + teacher-load are client-side over existing reads; "attendance by grade level" still deferred (needs a `section_memberships` temporal join — its own slice).
+- [ ] **Step 1: ADR-0064 Wave 4 addendum** — `school_day_totals` (aggregate counts only, `ManageLearners`-gated, school-scoped, `date` the only client arg); the three `SchoolHeadHome` cards and that adviser-gap + teacher-load are client-side over existing reads; "attendance by grade level" still deferred (needs a `section_memberships` temporal join — its own slice).
 
 - [ ] **Step 2: state docs** — `PROJECT-MEMORY.md` one line; `CURRENT-HANDOFF.md` top entry (commit range, `quality:full` result, security-review outcome, **exact next slice = Wave 5: screen re-fit batches — migrate the remaining unmigrated screens onto `Page`/`DataTable`/`Card` in nav-cluster batches of ~4, plus redesign `TeacherHome` onto the primitives and delete `TeacherWorkspaceScreen`; its own plan**); `ACTIVE-PLAN.md` "Wave 4 — complete" section; `VERIFICATION-DEBT.md` note.
 

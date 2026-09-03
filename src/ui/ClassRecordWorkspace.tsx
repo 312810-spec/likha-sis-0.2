@@ -114,6 +114,8 @@ export function ClassRecordWorkspace({
   const updateFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportCardResult, setReportCardResult] = useState<ReportCardExportResult | null>(null);
   const [exportingReportCard, setExportingReportCard] = useState(false);
+  const [revealingReportCard, setRevealingReportCard] = useState(false);
+  const [revealReportCardError, setRevealReportCardError] = useState<string | null>(null);
 
   const rosterOrder = useMemo(() => roster.map((r) => r.learnerId), [roster]);
   function neighborLearnerId(learnerId: string, direction: 1 | -1): string | undefined {
@@ -207,6 +209,7 @@ export function ClassRecordWorkspace({
   }, [learnerScoreService, selectedItemId]);
 
   async function handleCreateItem() {
+    if (creatingItem || itemName.trim().length === 0 || !categoryId) return;
     setError(null);
     setConfirmation(null);
     setCreatingItem(true);
@@ -249,6 +252,7 @@ export function ClassRecordWorkspace({
    * which the Rust layer itself re-verifies is still unscored and
    * resolves to a valid leaf category before accepting the change. */
   async function handleSaveEdit(item: AssessmentItemDetail) {
+    if (savingEdit || editName.trim().length === 0) return;
     const isScored = item.recordedCount > 0;
     setSavingEdit(true);
     setItemActionError(null);
@@ -271,6 +275,7 @@ export function ClassRecordWorkspace({
         const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
         setItems(refreshed);
         setEditingItemId(null);
+        setConfirmation(`${updated.name} updated.`);
       }
     } catch (err) {
       setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
@@ -283,6 +288,7 @@ export function ClassRecordWorkspace({
    * armed for this item's id. Only ever reachable for an unscored item --
    * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
+    if (deletingItemId === item.id) return;
     setDeletingItemId(item.id);
     setItemActionError(null);
     try {
@@ -295,6 +301,7 @@ export function ClassRecordWorkspace({
         setItems(refreshed);
         if (selectedItemId === item.id) setSelectedItemId(null);
         setConfirmingDeleteItemId(null);
+        setConfirmation(`${item.name} deleted.`);
       }
     } catch (err) {
       setItemActionError(
@@ -452,6 +459,7 @@ export function ClassRecordWorkspace({
    * Once shown, an individual score change afterward keeps just that one
    * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
+    if (termGradesLoading) return;
     setTermGradesLoading(true);
     try {
       const entries = await Promise.all(
@@ -469,7 +477,9 @@ export function ClassRecordWorkspace({
   }
 
   async function handleExportReportCard() {
+    if (exportingReportCard) return;
     setError(null);
+    setRevealReportCardError(null);
     setExportingReportCard(true);
     try {
       const result = await exportService.exportClassRecordReportCard(classRecordId);
@@ -482,6 +492,19 @@ export function ClassRecordWorkspace({
       setError(err instanceof ValidationError ? err.message : "Could not export the report card.");
     } finally {
       setExportingReportCard(false);
+    }
+  }
+
+  async function handleRevealReportCard() {
+    if (revealingReportCard || !reportCardResult) return;
+    setRevealReportCardError(null);
+    setRevealingReportCard(true);
+    try {
+      await exportService.revealExportedFile(reportCardResult.filePath);
+    } catch {
+      setRevealReportCardError("Could not open the folder for this file.");
+    } finally {
+      setRevealingReportCard(false);
     }
   }
 
@@ -558,7 +581,7 @@ export function ClassRecordWorkspace({
       </div>
       <button
         type="button"
-        disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
+        aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
         onClick={handleCreateItem}
       >
         {creatingItem ? "Adding…" : "Add item"}
@@ -631,7 +654,7 @@ export function ClassRecordWorkspace({
                     </div>
                     <button
                       type="button"
-                      disabled={savingEdit || editName.trim().length === 0}
+                      aria-disabled={savingEdit || editName.trim().length === 0}
                       onClick={() => void handleSaveEdit(item)}
                     >
                       {savingEdit ? "Saving…" : "Save"}
@@ -669,7 +692,7 @@ export function ClassRecordWorkspace({
                           </span>
                           <button
                             type="button"
-                            disabled={deletingItemId === item.id}
+                            aria-disabled={deletingItemId === item.id}
                             onClick={() => void handleDeleteItem(item)}
                           >
                             {deletingItemId === item.id ? "Deleting…" : "Confirm delete"}
@@ -852,9 +875,13 @@ export function ClassRecordWorkspace({
           {roster.length > 0 && (
             <div className="term-grades">
               <p className="field-hint">
-                Grading weighting: <strong>{weightPolicyName ?? "unknown"}</strong>
+                Grading weighting: <strong>{weightPolicyName ?? "not shown"}</strong>
               </p>
-              <button type="button" disabled={termGradesLoading} onClick={handleShowTermGrades}>
+              <button
+                type="button"
+                aria-disabled={termGradesLoading}
+                onClick={handleShowTermGrades}
+              >
                 {termGradesLoading ? "Computing…" : "Show term grades"}
               </button>
               {mode === "guided" && (
@@ -910,26 +937,34 @@ export function ClassRecordWorkspace({
                 </table>
               )}
 
-              <button
-                type="button"
-                className="button-primary"
-                disabled={exportingReportCard}
-                onClick={handleExportReportCard}
-              >
-                {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
-              </button>
               <p className="field-hint">
-                This export uses the <strong>{weightPolicyName ?? "unknown"}</strong> weighting
+                This export uses the <strong>{weightPolicyName ?? "not shown"}</strong> weighting
                 chosen for this class record. Only two DepEd weighting groups are available so far —
                 if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is
                 DepEd-compliant for it yet.
               </p>
+              <button
+                type="button"
+                className="button-primary"
+                aria-disabled={exportingReportCard}
+                onClick={handleExportReportCard}
+              >
+                {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
+              </button>
 
               {reportCardResult && (
                 <Alert tone="success">
                   <p>
                     Saved to <code>{reportCardResult.filePath}</code>.
                   </p>
+                  <button
+                    type="button"
+                    aria-disabled={revealingReportCard}
+                    onClick={handleRevealReportCard}
+                  >
+                    {revealingReportCard ? "Opening…" : "Open folder"}
+                  </button>
+                  {revealReportCardError && <p role="alert">{revealReportCardError}</p>}
                   <p>
                     This report card is inspired by DepEd's grade computation rules, not a
                     submission-ready official-form reproduction. It does <strong>not</strong>{" "}
