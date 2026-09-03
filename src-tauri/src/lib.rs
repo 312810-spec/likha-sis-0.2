@@ -57,6 +57,7 @@ pub fn run() {
             commands::attendance::record_attendance,
             commands::attendance::bulk_mark_attendance_present,
             commands::attendance::monthly_attendance_summary,
+            commands::attendance::school_attendance_day_totals,
             commands::section::list_sections_by_school,
             commands::section::create_section,
             commands::section::enroll_learner_in_section,

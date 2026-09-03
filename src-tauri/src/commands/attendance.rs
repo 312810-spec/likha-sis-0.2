@@ -3,11 +3,12 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 use tauri::State;
 
-use crate::auth::SessionManager;
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
 use crate::repository::attendance::{
     self, AttendanceRecord, AttendanceRosterEntry, AttendanceStatus, MonthlyAttendanceReport,
+    SchoolDayTotals,
 };
 
 /// `school_id` is derived from the session, never a parameter — see
@@ -93,4 +94,19 @@ pub fn monthly_attendance_summary(
     let conn = lock_db(&db);
     let school_id = sessions.require_active_school_scope(&conn)?;
     attendance::monthly_grid_for_section(&conn, &school_id, &section_id, year, month)
+}
+
+/// School-wide attendance counts for one date. Aggregate counts only --
+/// no learner identity in the response. Gated on `Capability::ManageLearners`
+/// (registrar / school head) and scoped to the caller's own school, both
+/// derived server-side; `date` (ISO YYYY-MM-DD) is the only client input.
+#[tauri::command]
+pub fn school_attendance_day_totals(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    date: String,
+) -> AppResult<SchoolDayTotals> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    attendance::school_day_totals(&conn, &school_id, &date)
 }

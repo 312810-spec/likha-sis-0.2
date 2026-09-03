@@ -7,7 +7,7 @@ use std::path::Path;
 use app_lib::auth::{self, SessionManager};
 use app_lib::error::AppError;
 use app_lib::repository::attendance::{self, AttendanceStatus};
-use app_lib::repository::{learner, school, section, section_membership, user};
+use app_lib::repository::{learner, role, school, section, section_membership, user};
 
 fn open_test_db() -> rusqlite::Connection {
     app_lib::db::open(Path::new(":memory:"), &app_lib::crypto::generate_key()).unwrap()
@@ -422,4 +422,149 @@ fn enrolling_a_learner_from_another_school_is_rejected_even_with_a_valid_session
             .unwrap();
 
     assert_eq!(result, None);
+}
+
+// --- Wave 4 Task 2: `school_attendance_day_totals` command boundary ---------
+
+/// Grants the same `ManageLearners` capability (Registrar / School Head, see
+/// `auth::Capability::allowed_roles`) that `school_attendance_day_totals`
+/// requires — a plain `login_as_a_teacher_at` session is deliberately not
+/// enough. Mirrors `tests/learner_management.rs::login_as_a_registrar_at`.
+fn login_as_a_registrar_at(
+    conn: &rusqlite::Connection,
+    school_id: &str,
+    username: &str,
+) -> SessionManager {
+    let registrar = user::create_user(conn, username, "password", "A Registrar").unwrap();
+    user::add_school_membership(conn, &registrar.id, school_id).unwrap();
+    role::grant(conn, &registrar.id, school_id, role::REGISTRAR).unwrap();
+    let sessions = SessionManager::new();
+    auth::login(conn, &sessions, username, "password", school_id).unwrap();
+    sessions
+}
+
+/// Standing in for `commands::attendance::school_attendance_day_totals` —
+/// capability-gated on `ManageLearners`, school scope derived server-side.
+fn school_attendance_day_totals_as_current_session(
+    conn: &rusqlite::Connection,
+    sessions: &SessionManager,
+    date: &str,
+) -> app_lib::error::AppResult<attendance::SchoolDayTotals> {
+    let school_id = auth::authorize_capability(conn, sessions, auth::Capability::ManageLearners)?;
+    attendance::school_day_totals(conn, &school_id, date)
+}
+
+#[test]
+fn a_registrar_can_read_school_wide_attendance_day_totals_for_their_own_school() {
+    let conn = open_test_db();
+    let (school_id, section_id, first_learner, teacher_sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let registrar_sessions = login_as_a_registrar_at(&conn, &school_id, "registrar.a");
+
+    // Seed: 2 present, 1 absent, 1 tardy on 2026-09-03.
+    record_attendance_as_current_session(
+        &conn,
+        &teacher_sessions,
+        &section_id,
+        &first_learner,
+        "2026-09-03",
+        AttendanceStatus::Present,
+    )
+    .unwrap();
+    for (name, status) in [
+        ("Ben", AttendanceStatus::Present),
+        ("Cora", AttendanceStatus::Absent),
+        ("Dan", AttendanceStatus::Tardy),
+    ] {
+        let l = learner::create(&conn, &school_id, name, "Learner", None, None).unwrap();
+        enroll_as_current_session(&conn, &teacher_sessions, &section_id, &l.id, "2026-08-01")
+            .unwrap()
+            .unwrap();
+        record_attendance_as_current_session(
+            &conn,
+            &teacher_sessions,
+            &section_id,
+            &l.id,
+            "2026-09-03",
+            status,
+        )
+        .unwrap();
+    }
+
+    let totals =
+        school_attendance_day_totals_as_current_session(&conn, &registrar_sessions, "2026-09-03")
+            .unwrap();
+
+    assert_eq!(
+        totals,
+        attendance::SchoolDayTotals {
+            present: 2,
+            absent: 1,
+            tardy: 1,
+        }
+    );
+}
+
+#[test]
+fn a_teacher_cannot_read_school_wide_attendance_day_totals() {
+    let conn = open_test_db();
+    let (_school_id, _section_id, _learner_id, teacher_sessions) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+
+    let result =
+        school_attendance_day_totals_as_current_session(&conn, &teacher_sessions, "2026-09-03");
+
+    assert!(matches!(result, Err(AppError::Unauthorized)));
+}
+
+#[test]
+fn school_wide_attendance_day_totals_never_counts_another_schools_records() {
+    let conn = open_test_db();
+    let (school_a, section_a, learner_a, teacher_a) =
+        setup_enrolled_learner_with_session(&conn, "teacher.a");
+    let registrar_a = login_as_a_registrar_at(&conn, &school_a, "registrar.a");
+    record_attendance_as_current_session(
+        &conn,
+        &teacher_a,
+        &section_a,
+        &learner_a,
+        "2026-09-03",
+        AttendanceStatus::Present,
+    )
+    .unwrap();
+
+    // A second school with its own marked learner on the SAME date.
+    let school_b = school::create(&conn, "School B").unwrap();
+    let section_b = section::create(&conn, &school_b.id, "2025-2026", "7", "Rizal").unwrap();
+    let learner_b = learner::create(&conn, &school_b.id, "Ana", "Santos", None, None).unwrap();
+    section_membership::enroll(
+        &conn,
+        &school_b.id,
+        &section_b.id,
+        &learner_b.id,
+        "2026-08-01",
+    )
+    .unwrap();
+    attendance::record(
+        &conn,
+        &school_b.id,
+        &section_b.id,
+        &learner_b.id,
+        "2026-09-03",
+        AttendanceStatus::Present,
+    )
+    .unwrap();
+
+    let totals =
+        school_attendance_day_totals_as_current_session(&conn, &registrar_a, "2026-09-03").unwrap();
+
+    assert_eq!(
+        totals,
+        attendance::SchoolDayTotals {
+            present: 1,
+            absent: 0,
+            tardy: 0,
+        },
+        "only the caller's own school's records are counted"
+    );
 }
