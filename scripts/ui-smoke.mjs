@@ -46,7 +46,7 @@ try {
   if ((await page.getByLabel("Section").inputValue()) !== "sec-not-started")
     throw new Error("workspace-to-attendance context was not preserved");
   await page.getByText("0 of 2 marked").waitFor();
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: "Learners", exact: true }).click();
   await page.getByRole("heading", { name: "Learners", exact: true }).waitFor();
   await page.getByRole("button", { name: "View enrollment history for Ana Santos" }).click();
@@ -58,7 +58,7 @@ try {
   );
   if (hasHorizontalOverflow) throw new Error("learner enrollment history overflows at phone width");
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: "View all sign-in activity" }).click();
   await page
     .getByText(/Sign-in Activity/i)

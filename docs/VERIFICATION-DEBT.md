@@ -1,5 +1,33 @@
 # Verification Debt
 
+## `quality:ui` smoke green again after the UI-redesign merge — CLOSED (2026-09-03)
+
+Branch `claude/fix-ui-smoke-redesigned-nav` off `main` at `860cede`.
+
+The UI redesign (Waves 1-6) merged to `main` with a stale
+`scripts/ui-smoke.mjs` that still drove the removed flat-nav
+`getByRole("button", { name: "Workspace" })`. `main`'s own Quality Gate
+went red at the merge commit (`33747523958`) and stayed red for every
+branch cut from it. Fixed: the two nav clicks now target the redesigned
+sidebar's pinned `{ name: "Home" }` item (`HOME_DESTINATION.label`,
+`src/ui/components/workbench-nav-data.ts`). Two-line change, no app code.
+
+**Verified locally** (`chromium_headless_shell-1237` installed this
+session — the blocker recorded in the Wave 1 entry below was
+environmental, not permanent): `npm run quality:ui` → **PASS —
+workflow, enrollment history, phone reflow, context handoff, axe WCAG
+A/AA, 0 non-blocking findings**. This is the first end-to-end run of the
+smoke walk against the redesigned shell (lines 50-54, the Learners
+flow, had never been reached post-redesign because the earlier line
+timed out first) — it passes clean.
+
+**Still owed** (unchanged): the native NVDA/Narrator + compiled-binary
+pass across the redesigned surface (Wave 1 entry below); and
+`ui-smoke.mjs` line 42 still waits on `region { name: "Workspace" }`,
+which only works while `TeacherWorkspaceScreen` keeps its
+`<section aria-label="Workspace">` — it will need updating when the
+accepted-backlog work deletes that screen and rebuilds Home on `Page`.
+
 ## Wave 1 UI redesign shell (2026-09-03)
 
 The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),
