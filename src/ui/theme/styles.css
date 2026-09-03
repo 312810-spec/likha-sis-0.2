@@ -360,6 +360,21 @@ label {
   margin: 0 0 calc(var(--spacing-unit) * 0.35) 0;
 }
 
+/* Redesign primitives -- Page scaffold (ADR-0057 Wave 2). Reuses the
+   existing .page-header heading styles; adds only the actions row. */
+.page-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
+}
+.page-actions {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-wrap: wrap;
+}
+
 /* Narrow-layout decision (recorded in ADR-0033): a horizontal scroll
    container with a persistent (sticky) learner-name column and sticky
    day-header row was chosen over re-flowing each learner into a stacked
