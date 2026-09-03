@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Kpi, KpiStrip } from "./KpiStrip";
+import { Kpi, KpiStrip, type KpiTone } from "./KpiStrip";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 
 describe("KpiStrip", () => {
@@ -54,6 +54,15 @@ describe("Kpi", () => {
   it("reflects the tone prop in data-tone", () => {
     const { container } = render(<Kpi label="Missing grades" value={5} tone="warning" />);
     expect(container.querySelector(".kpi")?.getAttribute("data-tone")).toBe("warning");
+  });
+
+  it("applies every KpiTone value as data-tone", () => {
+    const tones: KpiTone[] = ["neutral", "productive", "success", "warning", "danger"];
+    for (const tone of tones) {
+      const { container, unmount } = render(<Kpi label="X" value={1} tone={tone} />);
+      expect(container.querySelector(".kpi")).toHaveAttribute("data-tone", tone);
+      unmount();
+    }
   });
 
   it("accepts value as a number and as a string", () => {
