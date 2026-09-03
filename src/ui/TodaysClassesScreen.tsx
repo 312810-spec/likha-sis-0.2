@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
+import { DataTable } from "./components/DataTable";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TodaysClassesScreenProps {
@@ -48,15 +50,10 @@ export function TodaysClassesScreen({
   onCheckAttendance,
 }: TodaysClassesScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [occurrences, setOccurrences] = useState<TodaysClassOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -112,17 +109,17 @@ export function TodaysClassesScreen({
   }, [subjectAttendanceService, teacherUserId]);
 
   return (
-    <section aria-label="Today's Classes">
-      <h2 ref={headingRef} tabIndex={-1}>
-        Today&rsquo;s Classes
-      </h2>
-      {mode === "guided" && (
-        <p className="field-hint">
-          Every class you teach today, in the order they meet. Select &ldquo;Check attendance&rdquo;
-          to open one.
-        </p>
-      )}
-
+    <Page
+      title="Today's Classes"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Every class you teach today, in the order they meet. Select &ldquo;Check
+            attendance&rdquo; to open one.
+          </p>
+        ) : undefined
+      }
+    >
       {error && (
         <Alert tone="error">
           <p>{error}</p>
@@ -137,36 +134,33 @@ export function TodaysClassesScreen({
       ) : error ? null : occurrences.length === 0 ? (
         <EmptyState>No classes scheduled for you today.</EmptyState>
       ) : (
-        <table className="attendance-roster">
-          <thead>
-            <tr>
-              <th scope="col">Time</th>
-              <th scope="col">Class</th>
-              <th scope="col">Status</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {occurrences.map((occurrence, index) => (
-              <tr key={`${occurrence.assignment.id}-${occurrence.startsAt}-${index}`}>
-                <th scope="row">
-                  {occurrence.startsAt}–{occurrence.endsAt}
-                  {occurrence.room ? ` · ${occurrence.room}` : ""}
-                </th>
-                <td>
-                  {occurrence.assignment.subjectName} — {occurrence.assignment.sectionName}
-                </td>
-                <td>{STATUS_LABELS[occurrence.status]}</td>
-                <td>
-                  <button type="button" onClick={() => onCheckAttendance(occurrence.assignment.id)}>
-                    Check attendance
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          caption="Today's classes"
+          reflowAt={640}
+          columns={[
+            { key: "time", header: "Time" },
+            { key: "class", header: "Class" },
+            { key: "status", header: "Status" },
+            { key: "action", header: "Action" },
+          ]}
+          rows={occurrences.map((occurrence, index) => ({
+            key: `${occurrence.assignment.id}-${occurrence.startsAt}-${index}`,
+            rowHeader: "time",
+            cells: {
+              time: `${occurrence.startsAt}–${occurrence.endsAt}${
+                occurrence.room ? ` · ${occurrence.room}` : ""
+              }`,
+              class: `${occurrence.assignment.subjectName} — ${occurrence.assignment.sectionName}`,
+              status: STATUS_LABELS[occurrence.status],
+              action: (
+                <button type="button" onClick={() => onCheckAttendance(occurrence.assignment.id)}>
+                  Check attendance
+                </button>
+              ),
+            },
+          }))}
+        />
       )}
-    </section>
+    </Page>
   );
 }
