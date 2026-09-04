@@ -24,6 +24,20 @@ Next: atomic local outbox persistence and tests, then hub persistence and
 device enrollment. Do not enter real learner data until ADR-0067's operations,
 native verification, backup/restore, and school-head/DPO sign-off gates pass.
 
+### Local outbox continuation
+
+Migration 25 and `repository::sync_outbox` now provide the encrypted queue.
+Enqueue uses `change_id` as a replay/idempotency key; batches are oldest-first
+and capped at 100; reads, retry updates, and acknowledgements include the
+trusted school predicate. Retry errors use a fixed code enum so exception text
+or learner data cannot be persisted accidentally. A transaction rollback test
+proves a domain write and its outbox write can be atomic. No existing domain
+write is wired to emit changes yet.
+
+Available verification after this slice: `npm run quality` passed again (92
+files / 965 tests) and `git diff --check` passed. Rust checks remain owed on a
+Rust-capable runner.
+
 ## P1 batch: UI-redesign reviews closed + Wave 5 PoC blocked (2026-09-04)
 
 Branch `claude/redesign-review-followups`, off `main`. Discharges the

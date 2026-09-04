@@ -15,8 +15,14 @@ push/pull adapters; conflict-review UI; sync status UI; laptop hardening;
 encrypted backup and witnessed restore drill; native Windows verification;
 school-head/DepEd-DPO written approval. No real learner data before these gates.
 
-**Exact next implementation slice:** local outbox schema and repository with
-atomic domain-write capture, idempotency tests, and school-scope tests.
+**Completed next slice:** migration 25 and `repository::sync_outbox` add the
+encrypted local queue, bounded batches, idempotent enqueue, fixed retry codes,
+school-scoped retry/acknowledgement, and rollback proof. No domain repository
+emits changes yet, so ordinary application writes are unchanged.
+
+**Exact next implementation slice:** authoritative hub change-log schema and
+repository with device-derived school scope, replay-safe acceptance, monotonic
+cursor assignment, and conflict staging tests.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

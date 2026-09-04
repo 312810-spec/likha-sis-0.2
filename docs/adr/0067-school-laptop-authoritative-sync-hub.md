@@ -76,10 +76,12 @@ a confirmed non-CGNAT connection.
 7. Deletions are tombstones until every enrolled device has advanced beyond
    the retention checkpoint; physical deletion is a later controlled process.
 
-The first code slice introduces only provider-neutral types, limits, the
-`SyncProvider` port, and conflict classification. It deliberately does not
-pretend that a production network server, key ceremony, or persistent outbox
-exists yet.
+The first code slice introduced provider-neutral types, limits, the
+`SyncProvider` port, and conflict classification. The next slice added an
+encrypted local outbox with idempotent enqueue, bounded school-scoped batches,
+fixed retry codes, acknowledgement, and transaction-rollback coverage. No
+domain write emits changes yet, and no production network server, key ceremony,
+hub log, or device enrollment exists.
 
 ## Authentication and keys
 
