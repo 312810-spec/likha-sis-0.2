@@ -49,10 +49,10 @@ pub fn enqueue(
             school_id,
             change.device_id.to_string(),
             change.actor_user_id.to_string(),
-            entity_kind_str(change.entity_kind),
+            change.entity_kind.as_db_str(),
             change.entity_id.to_string(),
             change.base_version as i64,
-            operation_str(change.operation),
+            change.operation.as_db_str(),
             &change.encrypted_payload,
         ),
     )?;
@@ -133,12 +133,24 @@ fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<OutboxEntry> {
             change_id: parse_uuid(change_id, 1)?,
             device_id: parse_uuid(device_id, 2)?,
             actor_user_id: parse_uuid(actor_user_id, 3)?,
-            entity_kind: parse_entity_kind(&entity_kind, 4)?,
+            entity_kind: EntityKind::from_db_str(&entity_kind).ok_or_else(|| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    4,
+                    Type::Text,
+                    format!("unknown sync entity kind: {entity_kind}").into(),
+                )
+            })?,
             entity_id: parse_uuid(entity_id, 5)?,
             base_version: u64::try_from(base_version).map_err(|error| {
                 rusqlite::Error::FromSqlConversionFailure(6, Type::Integer, Box::new(error))
             })?,
-            operation: parse_operation(&operation, 7)?,
+            operation: ChangeOperation::from_db_str(&operation).ok_or_else(|| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    7,
+                    Type::Text,
+                    format!("unknown sync operation: {operation}").into(),
+                )
+            })?,
             encrypted_payload: row.get(8)?,
         },
         attempt_count: row.get(9)?,
@@ -155,60 +167,6 @@ fn parse_uuid(value: String, column: usize) -> rusqlite::Result<uuid::Uuid> {
 fn contract_error_as_sqlite(error: SyncContractError) -> crate::error::AppError {
     rusqlite::Error::InvalidParameterName(format!("invalid encrypted sync payload: {error:?}"))
         .into()
-}
-
-fn entity_kind_str(kind: EntityKind) -> &'static str {
-    match kind {
-        EntityKind::Learner => "learner",
-        EntityKind::Section => "section",
-        EntityKind::SectionMembership => "section_membership",
-        EntityKind::Attendance => "attendance",
-        EntityKind::SubjectAttendance => "subject_attendance",
-        EntityKind::AssessmentItem => "assessment_item",
-        EntityKind::LearnerScore => "learner_score",
-        EntityKind::GradingPeriod => "grading_period",
-        EntityKind::Subject => "subject",
-        EntityKind::TeachingAssignment => "teaching_assignment",
-    }
-}
-
-fn parse_entity_kind(value: &str, column: usize) -> rusqlite::Result<EntityKind> {
-    match value {
-        "learner" => Ok(EntityKind::Learner),
-        "section" => Ok(EntityKind::Section),
-        "section_membership" => Ok(EntityKind::SectionMembership),
-        "attendance" => Ok(EntityKind::Attendance),
-        "subject_attendance" => Ok(EntityKind::SubjectAttendance),
-        "assessment_item" => Ok(EntityKind::AssessmentItem),
-        "learner_score" => Ok(EntityKind::LearnerScore),
-        "grading_period" => Ok(EntityKind::GradingPeriod),
-        "subject" => Ok(EntityKind::Subject),
-        "teaching_assignment" => Ok(EntityKind::TeachingAssignment),
-        other => Err(rusqlite::Error::FromSqlConversionFailure(
-            column,
-            Type::Text,
-            format!("unknown sync entity kind: {other}").into(),
-        )),
-    }
-}
-
-fn operation_str(operation: ChangeOperation) -> &'static str {
-    match operation {
-        ChangeOperation::Upsert => "upsert",
-        ChangeOperation::Delete => "delete",
-    }
-}
-
-fn parse_operation(value: &str, column: usize) -> rusqlite::Result<ChangeOperation> {
-    match value {
-        "upsert" => Ok(ChangeOperation::Upsert),
-        "delete" => Ok(ChangeOperation::Delete),
-        other => Err(rusqlite::Error::FromSqlConversionFailure(
-            column,
-            Type::Text,
-            format!("unknown sync operation: {other}").into(),
-        )),
-    }
 }
 
 #[cfg(test)]

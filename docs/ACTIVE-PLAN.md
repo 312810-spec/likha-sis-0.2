@@ -37,11 +37,36 @@ all clean. Not yet wired to any Tauri command or network listener — this is
 the persistence/authorization foundation only, matching this project's own
 zero-UI-first precedent.
 
-**Exact next implementation slice:** authoritative hub change-log schema and
-repository (the actual `push`/`pull` receiver): device-derived school scope
-via the new device credential, replay-safe acceptance, monotonic cursor
-assignment, and conflict staging tests. The network listener/transport itself
-remains a separate, later slice (ADR-0067 "What this ADR does NOT decide").
+**Completed next slice (2026-09-04, this session):** migrations 28
+(`sync_hub_log`) and 29 (`sync_conflict_review`); `repository::sync_hub`
+(`push_change`/`push_batch`/`pull_since`). A push is validated
+(`sync::validate_change`), cross-checked against the caller's already-verified
+`device_credential::VerifiedDevice` (a change claiming a different device or
+actor than the authenticated credential is rejected — the client never gets
+to assert its own identity), then either accepted at a new per-entity version
+with a monotonic hub cursor, replayed idempotently (same `change_id` twice
+returns the same cursor, no duplicate row), or staged in
+`sync_conflict_review` when `base_version` doesn't match the entity's current
+hub version (never silent last-write-wins, per the ADR's protocol contract
+point 6). `pull_since` returns accepted changes after a cursor, school-scoped.
+As part of this slice, `EntityKind`/`ChangeOperation`'s db-string conversions
+were promoted from a private duplicate in `sync_outbox` into shared,
+`rusqlite`-free methods on the types themselves (`crate::sync` stays
+provider/database-agnostic by design), and `sync_outbox` was updated to use
+them — a small DRY cleanup enabling this slice, not a speculative refactor.
+17 new tests (13 `sync_hub`, 4 migration contract). `cargo test` 704 lib
+tests + all integration binaries, 0 failed. `cargo clippy -D warnings` and
+`cargo fmt --check` clean. Still not wired to a network listener — this
+receiver is called directly by tests today; the actual LAN/Tailscale
+transport adapter is the next slice after this one.
+
+**Exact next implementation slice:** the network listener/transport adapter
+(ADR-0067 D1: LAN discovery + optional Tailscale) that actually calls
+`device_credential::verify` then `sync_hub::push_batch`/`pull_since` over the
+wire, plus wiring at least one domain write (e.g. `learner` upsert) to emit a
+`PendingChange` into the existing local `sync_outbox` so there is an
+end-to-end path to exercise. Conflict-review UI/resolution workflow and the
+Android client remain separate, later slices.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

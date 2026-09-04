@@ -21,6 +21,7 @@ pub mod session;
 pub mod sf1_import_history;
 pub mod subject;
 pub mod subject_attendance;
+pub mod sync_hub;
 pub mod sync_outbox;
 pub mod teaching_assignment;
 pub mod user;

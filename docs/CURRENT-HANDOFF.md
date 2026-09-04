@@ -1,6 +1,46 @@
 # CURRENT HANDOFF
 
-## ADR-0067 device sync enrollment/credential foundation (2026-09-04), commit + PR owed
+## ADR-0067 hub push/pull receiver (2026-09-04), commit + PR owed
+
+Branch `claude/wave5-adr-0067-local-host-sync`, continuing directly on top of
+the merged device-credential slice below (PR #41, merged as `d8ef0f5`).
+
+**What shipped:** migration 28 (`sync_hub_log` — the hub's own ordered,
+accepted-change record; `cursor` is an `INTEGER PRIMARY KEY AUTOINCREMENT`
+devices pull from, `version` is the new per-entity version a later push's
+`base_version` must match) and migration 29 (`sync_conflict_review` — a
+pushed change staged here instead, when its `base_version` didn't match).
+`repository::sync_hub::push_change`/`push_batch`/`pull_since`: a push is
+contract-validated, then cross-checked against the caller's already-verified
+`device_credential::VerifiedDevice` (a change claiming a different device or
+actor than the authenticated credential is `Unauthorized` — the client never
+gets to assert its own identity over the wire), then accepted at a new
+version with a monotonic cursor, replayed idempotently (the same `change_id`
+twice returns the same cursor, never a second row), or conflict-staged
+(never silent last-write-wins, ADR-0067 protocol contract point 6). One
+entity's conflict does not roll back another accepted change in the same
+batch. As a small DRY step enabling this (not a speculative refactor),
+`EntityKind`/`ChangeOperation`'s db-string conversions moved from a private
+duplicate in `sync_outbox` into shared, `rusqlite`-free methods on the types
+in `crate::sync` (which deliberately stays database-agnostic), and
+`sync_outbox` was updated to use them.
+
+**Verification:** 17 new tests (13 `sync_hub`, 4 migration contract). `cargo
+test` 704 lib tests + all integration binaries, 0 failed. `cargo clippy
+--all-targets -- -D warnings` clean. `cargo fmt --check` clean. `npm run
+quality` (frontend gate; no TS touched by this slice) — typecheck, ESLint,
+Prettier, architecture check, 92 files / 965 tests, all green (checked
+directly against the command's own output, not just its reported exit code).
+
+**Not yet wired to a network listener.** `push_change`/`pull_since` are
+called directly by tests today; the actual LAN/Tailscale transport adapter
+(ADR-0067 D1) is the next slice, along with wiring at least one domain write
+to actually emit a `PendingChange` into `sync_outbox` so there is an
+end-to-end path to exercise.
+
+**Not yet done:** commit; push; PR (targets `main`).
+
+## ADR-0067 device sync enrollment/credential foundation (2026-09-04), merged as PR #41
 
 Branch `claude/wave5-adr-0067-local-host-sync`. Follows PR #40 (merged, from
 the Codex delegation harness) landing ADR-0067's decision plus the
@@ -47,10 +87,11 @@ persistence/authorization foundation only, matching this project's own
 zero-UI-first precedent (RBAC, Curriculum, Teacher Load, Section Advisory
 all shipped their first increment the same way). The actual hub `push`/
 `pull` receiver (device-derived school scope via this credential,
-replay-safe acceptance, monotonic cursor, conflict staging) is the next
-slice — see `docs/ACTIVE-PLAN.md`'s top entry.
+replay-safe acceptance, monotonic cursor, conflict staging) followed
+directly as the next slice — see the entry above.
 
-**Not yet done:** commit; push; PR (targets `main`).
+**Merged 2026-09-04 as PR #41** (`d8ef0f5`), together with the ADR-0065
+pointer fix from the same branch.
 
 ## ADR-0067 school-laptop sync direction + first contract slice (2026-09-04)
 
