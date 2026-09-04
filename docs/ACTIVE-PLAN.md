@@ -92,32 +92,39 @@ instead of a caller-invented placeholder string. 4 new tests. `cargo test`
 708 lib tests + all integration binaries, 0 failed; `cargo clippy -D
 warnings` and `cargo fmt --check` clean.
 
-**Genuinely blocked, not just not-yet-started:** wiring an actual domain
-write (e.g. `learner` upsert) to emit a `PendingChange` into `sync_outbox`
-requires payloads to already be encrypted before they reach that table —
-`sync::PendingChange`'s own doc comment says so, and `sync_outbox`'s
-`encrypted_payload` column name assumes it. ADR-0067's "Authentication and
-keys" section calls for a **separate sync-payload key wrapped per enrolled
-device** (distinct from each device's own SQLCipher key), but the actual
-encryption scheme and key-wrapping mechanism have **not been decided** —
-this is one of the still-required items listed at the top of this file
-("payload key ceremony"). Implementing outbox wiring with an improvised
-scheme instead of a real decision would be exactly the kind of
-security-critical shortcut this project's own rules (TDD + independent
-review for persistence/security logic; no guessed crypto) exist to prevent.
-**This needs its own design pass before code** — likely a short ADR
-addendum choosing the scheme (e.g. AES-256-GCM with a per-school payload
-key, wrapped for each device's public key established at enrollment, vs.
-a simpler shared-symmetric-key-per-school model) and how the key survives
-device loss/rotation. Recommend treating this as the next slice's first
-step, before either outbox wiring or the network listener.
+**Completed next slice (2026-09-04/05, ADR-0069, PR #46):** the sync
+payload key ceremony this section previously flagged as genuinely
+blocking. The hub mints one school sync-payload key (SSPK) and wraps a
+copy for each device at enrollment, deriving each device's wrap key via
+HKDF-SHA256 over the same enrollment secret `device_credential::enroll`
+already generates — reusing 100% of the existing enrollment trust
+boundary rather than inventing a new pairing/key-exchange ceremony. Full
+decision record, including the alternatives considered and why an
+asymmetric per-device keypair scheme was rejected:
+`docs/adr/0069-sync-payload-key-ceremony.md`. `crypto::payload_key`
+(generate/derive/wrap/unwrap, 10 tests) + `repository::sync_payload_key`
+(`wrap_for_credential`/`unwrap_for_credential`, 7 tests) + migration 32
+(1 contract test). See `docs/CURRENT-HANDOFF.md` for the disclosed
+irregularity in how this landed (a usage-limit-gap direct-to-main commit,
+fixed via PR #46 through the normal branch/PR/CI flow) and full
+verification counts.
 
-**Exact next implementation slice:** (1) decide and document the sync
-payload encryption/key-wrapping scheme (ADR-0067 addendum), (2) wire it
-into `sync_outbox` enqueue so a domain write (e.g. `learner` upsert) can
-emit a real encrypted `PendingChange` end-to-end, (3) the network
-listener/transport adapter (ADR-0067 D1: LAN discovery + optional
-Tailscale) that calls `device_credential::verify` then
+**Still not decided/built** (ADR-0069's own "Not yet decided" section):
+client-side local persistence of the unwrapped SSPK for offline use (the
+natural answer is the same DPAPI-protected local key-file pattern
+`crypto::dpapi`/`db::open_app_db` already use for the SQLCipher key, a
+second separately-named file) — needed before `sync_outbox` enqueue can
+actually encrypt a domain write's `PendingChange`, since that must work
+offline without hub contact. Key rotation remains deferred to a
+documented custodian procedure, unchanged from ADR-0067's own scope.
+
+**Exact next implementation slice:** (1) decide and implement the
+client-side local-persistence format for the unwrapped SSPK, wiring
+`auth::enroll_device_sync_credential` to fetch/unwrap it via a new Tauri
+command, (2) wire it into `sync_outbox` enqueue so a domain write (e.g.
+`learner` upsert) can emit a real encrypted `PendingChange` end-to-end,
+(3) the network listener/transport adapter (ADR-0067 D1: LAN discovery +
+optional Tailscale) that calls `device_credential::verify` then
 `sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
 UI/resolution workflow and the Android client remain separate, later
 slices.

@@ -1,5 +1,42 @@
 # CURRENT HANDOFF
 
+## ADR-0069 sync payload key ceremony (2026-09-04/05) — foundation shipped, PR #46 owed CI
+
+**What shipped**: the mechanism ADR-0067 left undecided — see
+`docs/adr/0069-sync-payload-key-ceremony.md` for the full decision record
+(the hub mints one school sync-payload key and wraps a copy for each
+device at enrollment, reusing the existing enrollment-secret trust
+boundary; HKDF-SHA256 wrap-key derivation, AES-256-GCM wrap/unwrap).
+`crypto::payload_key` (generate/derive/wrap/unwrap, 10 tests) and
+`repository::sync_payload_key` (`wrap_for_credential`/`unwrap_for_credential`,
+7 tests) plus migration 32 (`sync_payload_key_wraps`, 1 contract test).
+New dependencies `aes-gcm`/`hkdf` (RustCrypto, same family as this
+project's existing `sha2`/`argon2`/`password-hash`/`zeroize`); `sha2`
+bumped 0.10→0.11 to unify with hkdf's own dependency resolution (was
+resolving two incompatible `sha2` versions in the tree otherwise).
+**Not yet wired** to `sync_outbox` enqueue, any Tauri command, or
+client-side local persistence of the unwrapped key — see the ADR's own
+"Not yet decided" section. `cargo test -p app` (lib + all integration
+binaries): 728 lib tests + all integration suites, 0 failed; `cargo
+clippy --all-targets -D warnings` and `cargo fmt --check` clean;
+`npm run quality` clean (93 files / 967 tests) — all directly run and
+confirmed, not assumed.
+
+**Irregularity, disclosed rather than silently absorbed**: this
+milestone's implementation commit (`76c7fd6`) landed directly on `main`
+during a usage-limit gap mid-session, outside this project's normal
+branch→PR→CI flow, missing one line (`pub mod sync_payload_key;` in
+`repository/mod.rs` — Rust silently excludes an undeclared file from the
+build, so the module and its tests were not actually part of any `main`
+build until fixed). An unrelated commit (`6c30981`, playwright/skillspector
+housekeeping) landed on `main` at the same moment. The exact mechanism
+was not fully identified (consistent with a harness auto-checkpoint
+during the gap, not confirmed) — flagged to the user directly rather
+than silently worked around. Fixed via **PR #46** (`fix/wire-sync-payload-key-module-v2`),
+following the normal branch/PR/CI process per the user's explicit choice
+when asked. Full local verification (above) was re-run after the fix on
+a clean branch state before pushing.
+
 ## PRODUCT-CONTRACT.md reconciliation (2026-09-04)
 
 Per the non-CC repository audit's P1 finding: `docs/product/PRODUCT-CONTRACT.md`
