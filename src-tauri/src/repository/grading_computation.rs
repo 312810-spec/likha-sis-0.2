@@ -427,8 +427,7 @@ mod tests {
     const LEGACY_WRITTEN_WORK: &str = "00000000-0000-7000-8000-000000000321";
     const LEGACY_PERFORMANCE_TASK: &str = "00000000-0000-7000-8000-000000000322";
     const LEGACY_QUARTERLY_ASSESSMENT: &str = "00000000-0000-7000-8000-000000000323";
-    const GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY: &str =
-        "00000000-0000-7000-8000-000000000052";
+    const GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY: &str = "00000000-0000-7000-8000-000000000052";
 
     /// A school with a class record (pinned to the K-10 core weight
     /// policy) for SY `school_year`, one learner enrolled from the
@@ -1518,11 +1517,8 @@ mod tests {
     #[test]
     fn compute_term_grade_applies_grade12_do8_weights_with_adjusted_transmutation() {
         let conn = open_test_db();
-        let (school_id, cr, learner_id, teacher_id) = setup_with_policy(
-            &conn,
-            "2026-2027",
-            GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY,
-        );
+        let (school_id, cr, learner_id, teacher_id) =
+            setup_with_policy(&conn, "2026-2027", GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY);
 
         add_item_and_score(
             &conn,

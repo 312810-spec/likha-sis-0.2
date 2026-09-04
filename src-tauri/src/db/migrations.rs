@@ -3730,7 +3730,11 @@ mod tests {
             .collect::<Result<_, _>>()
             .unwrap();
 
-        assert_eq!(rows.len(), 2, "both applicability groups must remain selectable");
+        assert_eq!(
+            rows.len(),
+            2,
+            "both applicability groups must remain selectable"
+        );
         assert!(rows[0].0.contains("Other Subjects"));
         assert!(rows[1].0.contains("Immersion/Research/Exhibit/Performance"));
         assert_eq!(rows[0].1, "20/60/20");
