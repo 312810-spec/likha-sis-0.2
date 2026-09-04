@@ -1,0 +1,118 @@
+# SkillSpector baseline — findings listed here are suppressed on future scans.
+# Edit 'reason' fields and add glob 'rules' as needed. See docs/SUPPRESSION.md.
+version: 2
+scanner_version: 2.11.0
+rules: []
+fingerprints:
+  - hash: sha256:42ce070030b5718c6b7447423e479314412b00f9c2d4dccdd0ddd62cfd7ff086
+    rule_id: MP3
+    file: impeccable/reference/colorize.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:d531424f51143f78a17d5f1267b6e99dd85e2ebe6e41428017a611bd07d8f72c
+    rule_id: AR2
+    file: impeccable/reference/critique.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:8ba5ad6bd9f11884f9a097adc02dba25235a359c211e4cd508ad11d63be243da
+    rule_id: AR2
+    file: impeccable/reference/degraded/documenter.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:17368c4dee99b426115f49034782ffd157997d0d57621df9a6a670d08d5eb5a5
+    rule_id: P2
+    file: impeccable/reference/live.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:e278b01c38b2270fb38f6fefb4ceef939001b88b8bd1208de4f9e0c40c93855f
+    rule_id: P9
+    file: impeccable/SKILL.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:6d8385de7bbcdaaf3516bbe8280fd7cf9fc41420f73996cb7ee9a6b1ffc5d3af
+    rule_id: EA2
+    file: impeccable/reference/audit.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:6af2d5d59a9bea194f83e13d2ea84e75022656144a15bc401efb7d23c0059a84
+    rule_id: EA2
+    file: impeccable/reference/critique.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:9216d796b8c558a0b0f9a08ee4b73071f371d6470546599abf1dcf04de1017f7
+    rule_id: EA2
+    file: impeccable/reference/degraded/finish-reviewer.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:b6ca950bb2a77213a6e8f22e157bf51fd9490f9b580dd5ca5738154633cc0e01
+    rule_id: EA2
+    file: impeccable/reference/degraded/finish-reviewer.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:e99f1aa021046fe721abc3d81e0af146aaa30f663cf5f261738128b6436a77b3
+    rule_id: EA2
+    file: impeccable/reference/delight.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:91ecd80923021b48ef8ced69260b0df5a6357a475334ce8d15343c62f1fff272
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:61d184cbfb66346808a2de164468498aa28e5443a69d8f4a72b419a8456fedbb
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:f8225876cdecf7a7b86b012453c93434849b10ad8345b733921ccf487c02e9e1
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:847433712b7e7c6fc03215d6c1707bbffc0d2d33f2ffe7592928bd3ecc5e3d26
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:fc85f726a586d3fba3756ef79d17d445ee8367137fa32b0daf323c42e7405725
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:09c584f8dbde26561c359bb48f791c389a697daf213313d3f14b3072480c2b15
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:ab61e3d0066847d83c0f0d9650f04c52a418f8420f7a49d1d7b6eb90626b9c88
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:2d2749c5504273bd15b2ab6fba583a03904dfe87407483e279799e011b53121e
+    rule_id: P9
+    file: impeccable/reference/hooks.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:dbcf35abf81974d784e47367f02ceffcb6a1d083e818282f80321b3c9359f189
+    rule_id: EA2
+    file: impeccable/reference/init.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:8f140349fc6a8ae08cadbbdf3eebd4d0e56716863e399224d35345fa51f6d728
+    rule_id: EA2
+    file: impeccable/reference/live.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:0dee5caff129a95cf281265c69c526c22f20629f1c552ccae2fac631f3ca9476
+    rule_id: AS3
+    file: impeccable/reference/live.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:819d27af2220c03caaee2e4b4cc3fdae2a7e6e0b7129f3247856604fb0b35bb2
+    rule_id: EA2
+    file: impeccable/reference/visualize.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:85aee2e7adace2de23b1834acd9ad58a5b84a949583457714a36105d9f00e1c6
+    rule_id: RP1
+    file: impeccable/scripts/context-signals.mjs
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:8dc62e91624e715fb0227714506cc3dfc16c40d21d01dfed72e7a71beb97bce7
+    rule_id: E1
+    file: impeccable/scripts/generate-image.mjs
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:5cc7880b984c7cce006872cc936364942478f999c87281b5bc30a9109b05f477
+    rule_id: E1
+    file: impeccable/scripts/generate-image.mjs
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:4249c3fa64804c5d274527322b6a15584b3de4bc66ea9918de9566f7c0a27b5a
+    rule_id: E1
+    file: impeccable/scripts/generate-image.mjs
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:4778ac4a6f52cbd3882fd2e08fed3f9af02702ef7a05f38b73666731f624f7b3
+    rule_id: E1
+    file: playwright-cli/SKILL.md
+    reason: Accepted finding (auto-generated baseline)
+  - hash: sha256:dd7975bba8fd968ee27c70120a83e88704845073aa4a251914d85283977e82fc
+    rule_id: EA3
+    file: impeccable/scripts/context-signals.mjs
+    reason: Accepted finding (auto-generated baseline)

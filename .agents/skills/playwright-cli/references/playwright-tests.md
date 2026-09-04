@@ -1,10 +1,10 @@
 # Running Playwright Tests
 
-To run Playwright tests, use the `npx playwright test` command, or a package manager script. To avoid opening the interactive html report, use `PLAYWRIGHT_HTML_OPEN=never` environment variable.
+To run Playwright tests, use the `npx playwright@1.49.0 test` command, or a package manager script. To avoid opening the interactive html report, use `PLAYWRIGHT_HTML_OPEN=never` environment variable.
 
 ```bash
 # Run all tests
-PLAYWRIGHT_HTML_OPEN=never npx playwright test
+PLAYWRIGHT_HTML_OPEN=never npx playwright@1.49.0 test
 
 # Run all tests through a custom npm script
 PLAYWRIGHT_HTML_OPEN=never npm run special-test-command
@@ -20,7 +20,7 @@ Once instructions containing a session name are printed, use `playwright-cli` to
 
 ```bash
 # Run the test
-PLAYWRIGHT_HTML_OPEN=never npx playwright test --debug=cli
+PLAYWRIGHT_HTML_OPEN=never npx playwright@1.49.0 test --debug=cli
 # ...
 # ... debugging instructions for "tw-abcdef" session ...
 # ...
