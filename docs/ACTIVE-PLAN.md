@@ -1,5 +1,19 @@
 # ACTIVE PLAN
 
+## Grade 12 DO 8 weighting carryover — ADR-0068 (2026-09-04) — implemented, native verification pending
+
+The six Strengthened-SHS policies were already complete in migration 12; the
+actual remaining P0 grading gap was Grade 12's DO 8, s. 2015 transition rule.
+Migration 30 adds all five legacy SHS applicability groups against the
+existing legacy category set. Tests cover seed completeness, 100% totals,
+category-set isolation, separate equal-weight track groups, and an end-to-end
+35/40/25 computation using DO 015's adjusted SY 2026-2027 transmutation.
+
+Branch `codex/grade12-do8-carryover` is stacked on the active ADR-0067 branch
+because that branch already owns migrations 28-29. Rust verification and an
+independent compliance/correctness review are owed before merge. SF1/SF9/SF10
+template verification remains with the separate Claude Code workstream.
+
 ## School-laptop authoritative sync hub — ADR-0067 (added 2026-09-04) — foundation in progress
 
 The owner selected one supervised, always-on computer-lab laptop as the

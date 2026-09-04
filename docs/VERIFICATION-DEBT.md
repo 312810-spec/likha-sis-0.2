@@ -1,5 +1,17 @@
 # Verification Debt
 
+## Grade 12 DO 8 carryover grading policies (2026-09-04) — OPEN
+
+Migration 30 and repository tests now cover the five Grade 12 legacy-SHS
+applicability groups required by DO 15, s. 2026 Annex D paragraph 49, using
+the DO 8, s. 2015 Table 5 weights and the already-active adjusted
+transmutation table for SY 2026-2027. TypeScript quality gates passed, but
+this runner has no Rust toolchain, so `cargo fmt --check`, `cargo clippy
+--all-targets -- -D warnings`, and the Rust test suite remain owed. The
+official DepEd DO 8 landing page was verified; its linked PDF returned 403
+from this environment, so the exact Table 5 transcription was
+cross-checked against DepEd Caraga's official Classroom Assessment handbook.
+
 ## ADR-0067 school-laptop sync hub (2026-09-04) — OPEN
 
 The provider-neutral contract and local outbox have authored unit coverage, but

@@ -1,5 +1,23 @@
 # Source Registry
 
+## Grade 12 legacy SHS grading carryover — 2026-09-04
+
+- **DepEd Central Office — DO 8, s. 2015 issuance page**
+  - URL: `https://www.deped.gov.ph/2015/04/01/do-8-s-2015-policy-guidelines-on-classroom-assessment-for-the-k-to-12-basic-education-program/`
+  - Authority: primary issuer page; identifies the Order, effective school
+    year, scope, and official PDF enclosure.
+  - Access result: HTML verified; linked PDF returned HTTP 403 in this
+    environment and was not falsely recorded as downloaded.
+- **DepEd Caraga — Unified Student School Handbook**
+  - URL: `https://caraga.deped.gov.ph/public-files/4670`
+  - Authority: official DepEd regional-hosted implementation material.
+  - Relevant evidence: reproduces DO 8 Table 5's five Senior High School
+    applicability groups and component weights.
+- Current applicability authority remains DepEd Order No. 015, s. 2026,
+  Annex D paragraph 49, already recorded under ADR-0013: Grade 12 transition
+  cohorts use DO 8 weights with the adjusted transmutation table.
+- Implementation record: ADR-0068; migration 30.
+
 ## ADR-0067 — school-laptop sync transport (added 2026-09-04)
 
 | Source                                                                                          | Purpose                                                                           | Status                                                  | Notes                                                                                                                                                                                                                                                                |

@@ -2,6 +2,10 @@
   "name": "likha-sis",
   "version": "0.2.0",
   "description": "LIKHA-SIS 0.2 - native-first, local-first, offline-capable SIS for Philippine DepEd schools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/312810-spec/likha-sis-0.2.git"
+  },
   "private": true,
   "type": "module",
   "scripts": {

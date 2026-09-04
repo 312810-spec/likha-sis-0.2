@@ -424,6 +424,10 @@ mod tests {
     const EPP_TLE_MAPEH_POLICY: &str = "00000000-0000-7000-8000-000000000043";
     const SHS_FIELD_EXPOSURE_POLICY: &str = "00000000-0000-7000-8000-000000000045";
     const SHS_WORK_IMMERSION_POLICY: &str = "00000000-0000-7000-8000-000000000049";
+    const LEGACY_WRITTEN_WORK: &str = "00000000-0000-7000-8000-000000000321";
+    const LEGACY_PERFORMANCE_TASK: &str = "00000000-0000-7000-8000-000000000322";
+    const LEGACY_QUARTERLY_ASSESSMENT: &str = "00000000-0000-7000-8000-000000000323";
+    const GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY: &str = "00000000-0000-7000-8000-000000000052";
 
     /// A school with a class record (pinned to the K-10 core weight
     /// policy) for SY `school_year`, one learner enrolled from the
@@ -1199,8 +1203,9 @@ mod tests {
 
         let policies = list_weight_policies(&conn).unwrap();
 
-        // K-10 core + EPP/TLE & MAPEH (M15) + six SHS groups (M16) = 8.
-        assert_eq!(policies.len(), 8);
+        // K-10 core + EPP/TLE & MAPEH (M15) + six Strengthened-SHS groups
+        // (M16) + five Grade 12 DO 8 carryover groups (M30) = 13.
+        assert_eq!(policies.len(), 13);
         let default_count = policies.iter().filter(|p| p.is_default).count();
         assert_eq!(
             default_count, 1,
@@ -1214,6 +1219,13 @@ mod tests {
         assert!(policies
             .iter()
             .any(|p| p.name == "DepEd EPP/TLE & MAPEH Weighting (DO 015, s. 2026)"));
+        assert_eq!(
+            policies
+                .iter()
+                .filter(|p| p.name.starts_with("DepEd Grade 12 Legacy SHS"))
+                .count(),
+            5
+        );
         assert!(
             policies
                 .iter()
@@ -1496,6 +1508,61 @@ mod tests {
             "got {}",
             result.initial_grade
         );
+    }
+
+    /// Grade 12's SY 2026-2027 carryover uses DO 8's legacy assessment
+    /// categories and weights, but DO 015's adjusted transmutation table.
+    /// This exercises that mixed transition rule end to end rather than
+    /// merely asserting seed rows exist.
+    #[test]
+    fn compute_term_grade_applies_grade12_do8_weights_with_adjusted_transmutation() {
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) =
+            setup_with_policy(&conn, "2026-2027", GRADE12_LEGACY_ACADEMIC_SPECIAL_POLICY);
+
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            LEGACY_WRITTEN_WORK,
+            &learner_id,
+            &teacher_id,
+            "Written Work",
+            20.0,
+            10.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            LEGACY_PERFORMANCE_TASK,
+            &learner_id,
+            &teacher_id,
+            "Performance Task",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            LEGACY_QUARTERLY_ASSESSMENT,
+            &learner_id,
+            &teacher_id,
+            "Quarterly Assessment",
+            20.0,
+            0.0,
+        );
+
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        // DO 8 Academic special group: WW 35%, PT 40%, QA 25%.
+        // IG = 50*0.35 + 100*0.40 + 0*0.25 = 57.5.
+        assert!((result.initial_grade - 57.5).abs() < 0.01);
+        assert_eq!(result.term_grade, 72);
+        assert!(result.was_transmuted);
     }
 
     /// SHS Field Exposure/Arts Apprenticeship/Creative Production weights

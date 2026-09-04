@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "likha-sis",
+  "productName": "LIKHA-SIS",
   "version": "0.2.0",
   "identifier": "org.likhasis.app",
   "build": {
