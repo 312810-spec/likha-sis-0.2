@@ -97,6 +97,52 @@ pub fn unwrap_payload_key(
     })
 }
 
+/// Encrypts an arbitrary-length plaintext payload directly under the SSPK
+/// (not a wrap-a-key operation like `wrap_payload_key` -- this is for the
+/// actual outbox/hub-log payload bytes ADR-0069's "not yet consumed by
+/// `sync_outbox`" gap refers to). Returns `nonce || ciphertext`
+/// concatenated into one blob, since the storage columns this feeds
+/// (`sync_outbox.encrypted_payload`, `sync_hub_log.encrypted_payload`) are
+/// a single `Vec<u8>`, unlike `sync_payload_key_wraps`' separate
+/// `nonce`/`wrapped_key` columns.
+pub fn encrypt_payload(sspk: &[u8; PAYLOAD_KEY_LEN], plaintext: &[u8]) -> AppResult<Vec<u8>> {
+    let cipher = Aes256Gcm::new_from_slice(sspk)
+        .map_err(|e| AppError::key_store(format!("could not initialize payload cipher: {e}")))?;
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    rand::fill(&mut nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(&nonce, plaintext)
+        .map_err(|_| AppError::key_store("failed to encrypt sync payload".to_string()))?;
+
+    let mut blob = Vec::with_capacity(NONCE_LEN + ciphertext.len());
+    blob.extend_from_slice(&nonce_bytes);
+    blob.extend_from_slice(&ciphertext);
+    Ok(blob)
+}
+
+/// Decrypts a blob `encrypt_payload` produced. Fails closed on a blob too
+/// short to contain a nonce, a wrong key, or tampered data -- the same
+/// discipline as `unwrap_payload_key`.
+pub fn decrypt_payload(sspk: &[u8; PAYLOAD_KEY_LEN], blob: &[u8]) -> AppResult<Vec<u8>> {
+    if blob.len() < NONCE_LEN {
+        return Err(AppError::key_store(
+            "encrypted sync payload is too short to contain a nonce".to_string(),
+        ));
+    }
+    let (nonce_bytes, ciphertext) = blob.split_at(NONCE_LEN);
+    let cipher = Aes256Gcm::new_from_slice(sspk)
+        .map_err(|e| AppError::key_store(format!("could not initialize payload cipher: {e}")))?;
+    let nonce = Nonce::try_from(nonce_bytes).map_err(|_| {
+        AppError::key_store("invalid nonce length for sync payload decrypt".to_string())
+    })?;
+    cipher.decrypt(&nonce, ciphertext).map_err(|_| {
+        AppError::key_store(
+            "failed to decrypt sync payload (wrong key or tampered data)".to_string(),
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,5 +245,78 @@ mod tests {
 
         assert_ne!(first.nonce, second.nonce);
         assert_ne!(first.ciphertext, second.ciphertext);
+    }
+
+    #[test]
+    fn encrypt_then_decrypt_payload_round_trips_arbitrary_length_data() {
+        let sspk = generate_payload_key();
+        let plaintext = b"a synthetic learner upsert payload, longer than 32 bytes on purpose";
+
+        let blob = encrypt_payload(&sspk, plaintext).unwrap();
+        let recovered = decrypt_payload(&sspk, &blob).unwrap();
+
+        assert_eq!(recovered, plaintext);
+    }
+
+    #[test]
+    fn encrypt_payload_never_stores_the_plaintext_verbatim() {
+        let sspk = generate_payload_key();
+        let plaintext = b"plaintext learner data that must never appear as-is";
+
+        let blob = encrypt_payload(&sspk, plaintext).unwrap();
+
+        assert!(!blob
+            .windows(plaintext.len())
+            .any(|window| window == plaintext.as_slice()));
+    }
+
+    #[test]
+    fn decrypt_payload_rejects_the_wrong_key() {
+        let sspk = generate_payload_key();
+        let wrong_sspk = generate_payload_key();
+        let blob = encrypt_payload(&sspk, b"some payload").unwrap();
+
+        assert!(decrypt_payload(&wrong_sspk, &blob).is_err());
+    }
+
+    #[test]
+    fn decrypt_payload_rejects_tampered_ciphertext() {
+        let sspk = generate_payload_key();
+        let mut blob = encrypt_payload(&sspk, b"some payload").unwrap();
+        let last = blob.len() - 1;
+        blob[last] ^= 0xFF;
+
+        assert!(decrypt_payload(&sspk, &blob).is_err());
+    }
+
+    #[test]
+    fn decrypt_payload_rejects_a_blob_too_short_to_contain_a_nonce() {
+        let sspk = generate_payload_key();
+
+        assert!(decrypt_payload(&sspk, &[0u8; 4]).is_err());
+    }
+
+    #[test]
+    fn two_encryptions_of_the_same_plaintext_use_different_nonces_and_ciphertexts() {
+        let sspk = generate_payload_key();
+        let plaintext = b"same plaintext both times";
+
+        let first = encrypt_payload(&sspk, plaintext).unwrap();
+        let second = encrypt_payload(&sspk, plaintext).unwrap();
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn encrypt_payload_round_trips_an_empty_plaintext() {
+        // Not expected in practice (sync_outbox's own CHECK constraint
+        // rejects an empty encrypted_payload), but the cipher primitive
+        // itself must not special-case or panic on empty input.
+        let sspk = generate_payload_key();
+
+        let blob = encrypt_payload(&sspk, b"").unwrap();
+        let recovered = decrypt_payload(&sspk, &blob).unwrap();
+
+        assert_eq!(recovered, b"");
     }
 }

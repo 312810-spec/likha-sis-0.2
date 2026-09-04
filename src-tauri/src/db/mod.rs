@@ -15,6 +15,11 @@ use crate::error::AppResult;
 
 pub const DB_FILE_NAME: &str = "likha-sis.db";
 pub const KEY_FILE_NAME: &str = "likha-sis.key";
+/// ADR-0069's school sync-payload key (SSPK), persisted the same way as
+/// the SQLCipher key (`KEY_FILE_NAME`) but in a SEPARATE DPAPI-protected
+/// file -- the two key types must never share a file or a value. See
+/// `load_or_mint_sspk`.
+pub const SSPK_KEY_FILE_NAME: &str = "likha-sis-sspk.key";
 
 /// Opens (creating if needed) a SQLite database at `path`, keyed with
 /// `key` (SQLCipher encryption-at-rest — see ADR-0003), applies pragmas
@@ -89,6 +94,41 @@ pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
 /// downgraded.
 #[cfg(not(windows))]
 pub fn open_app_db(_app: &AppHandle) -> AppResult<Connection> {
+    Err(crate::error::AppError::key_store(
+        "no encryption key store is implemented for this platform; \
+         LIKHA-SIS currently ships on Windows only",
+    ))
+}
+
+/// Resolves (creating if needed) this installation's local copy of the
+/// school sync-payload key (ADR-0069). Reuses `DpapiKeyStore` exactly like
+/// the SQLCipher key, only under a different filename
+/// (`SSPK_KEY_FILE_NAME`) -- never the same file, never the same value.
+///
+/// On a fresh installation with no existing SSPK file, this MINTS a brand
+/// new key: this process is the party performing this school's very first
+/// device enrollment (ADR-0069 mechanism, point 1 -- "generated lazily...
+/// the first time a school has zero existing wraps"). On every later call
+/// (a second enrollment, or a future domain write encrypting an outbox
+/// entry), `DpapiKeyStore::load_or_create_key` transparently reloads the
+/// SAME already-persisted value instead of minting a new one -- exactly
+/// the "mint once per school, reuse forever" semantics the SSPK requires,
+/// and the piece ADR-0069 left as "not yet decided" (client-side local
+/// persistence) for this single-installation architecture.
+#[cfg(windows)]
+pub fn load_or_mint_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    std::fs::create_dir_all(&dir)?;
+    DpapiKeyStore.load_or_create_key(&dir.join(SSPK_KEY_FILE_NAME))
+}
+
+/// See `open_app_db`'s non-Windows counterpart -- same fail-closed
+/// reasoning applies to the SSPK key store.
+#[cfg(not(windows))]
+pub fn load_or_mint_sspk(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
     Err(crate::error::AppError::key_store(
         "no encryption key store is implemented for this platform; \
          LIKHA-SIS currently ships on Windows only",
