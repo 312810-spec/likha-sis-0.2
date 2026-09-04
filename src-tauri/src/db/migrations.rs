@@ -1454,6 +1454,70 @@ pub fn migrations() -> Migrations<'static> {
             ON sync_conflict_review(school_id, resolved_at);
         "#,
         ),
+        M::up(
+            r#"
+        -- M30: Grade 12 legacy-SHS weighting carryover for SY 2026-2027.
+        -- DepEd Order No. 015, s. 2026, Annex D paragraph 49 keeps Grade
+        -- 12 (which has not yet adopted the Strengthened SHS Curriculum)
+        -- on the component weights from DepEd Order No. 8, s. 2015 while
+        -- applying DO 015's adjusted transmutation table. The DO 8
+        -- structure is already present as migration 9's legacy category
+        -- set: Written Work, Performance Task, Quarterly Assessment.
+        --
+        -- Table 5 of DO 8 defines five applicability groups but only four
+        -- distinct numeric triples: the two TVL/Sports/Arts and Design
+        -- groups both use 20/60/20. They remain separate policy rows so a
+        -- teacher's selection records the actual DepEd applicability group
+        -- rather than collapsing two semantically different groups merely
+        -- because their percentages happen to match.
+        --
+        -- Evidence: the official DepEd Central Office issuance page links
+        -- DO_s2015_08.pdf; an official DepEd Caraga school-policy handbook
+        -- reproduces Table 5 and all five columns. DO 015 paragraph 49 is
+        -- the current authority for using these legacy weights for Grade
+        -- 12 in SY 2026-2027. All policies are non-default and explicitly
+        -- named Grade 12 carryover so they cannot be mistaken for current
+        -- Grade 11 Strengthened-SHS policies.
+        INSERT INTO grading_weight_policies (id, name, source_citation, is_default) VALUES
+            ('00000000-0000-7000-8000-000000000050',
+             'DepEd Grade 12 Legacy SHS Core Subjects (DO 8, s. 2015 carryover)',
+             'DepEd Order No. 015, s. 2026, Annex D paragraph 49: Grade 12 under the prior SHS curriculum in SY 2026-2027 uses DepEd Order No. 8, s. 2015 weights with the adjusted transmutation table. DO 8 Table 5, Core Subjects: Written Work 25%, Performance Tasks 50%, Quarterly Assessment 25%. Official issuance: deped.gov.ph/2015/04/01/do-8-s-2015-policy-guidelines-on-classroom-assessment-for-the-k-to-12-basic-education-program/.',
+             0),
+            ('00000000-0000-7000-8000-000000000051',
+             'DepEd Grade 12 Legacy SHS Academic — Other Subjects (DO 8, s. 2015 carryover)',
+             'DepEd Order No. 015, s. 2026, Annex D paragraph 49 Grade 12 carryover; DepEd Order No. 8, s. 2015 Table 5, Academic Track — All Other Subjects: Written Work 25%, Performance Tasks 45%, Quarterly Assessment 30%.',
+             0),
+            ('00000000-0000-7000-8000-000000000052',
+             'DepEd Grade 12 Legacy SHS Academic — Immersion/Research/Enterprise/Exhibit/Performance (DO 8, s. 2015 carryover)',
+             'DepEd Order No. 015, s. 2026, Annex D paragraph 49 Grade 12 carryover; DepEd Order No. 8, s. 2015 Table 5, Academic Track — Work Immersion/Research/Business Enterprise Simulation/Exhibit/Performance: Written Work 35%, Performance Tasks 40%, Quarterly Assessment 25%.',
+             0),
+            ('00000000-0000-7000-8000-000000000053',
+             'DepEd Grade 12 Legacy SHS TVL/Sports/Arts — Other Subjects (DO 8, s. 2015 carryover)',
+             'DepEd Order No. 015, s. 2026, Annex D paragraph 49 Grade 12 carryover; DepEd Order No. 8, s. 2015 Table 5, TVL/Sports/Arts and Design Tracks — All Other Subjects: Written Work 20%, Performance Tasks 60%, Quarterly Assessment 20%.',
+             0),
+            ('00000000-0000-7000-8000-000000000054',
+             'DepEd Grade 12 Legacy SHS TVL/Sports/Arts — Immersion/Research/Exhibit/Performance (DO 8, s. 2015 carryover)',
+             'DepEd Order No. 015, s. 2026, Annex D paragraph 49 Grade 12 carryover; DepEd Order No. 8, s. 2015 Table 5, TVL/Sports/Arts and Design Tracks — Work Immersion/Research/Exhibit/Performance: Written Work 20%, Performance Tasks 60%, Quarterly Assessment 20%.',
+             0);
+
+        INSERT INTO grading_weight_components (id, policy_id, category_id, weight_percent) VALUES
+            ('00000000-0000-7000-8000-000000000501', '00000000-0000-7000-8000-000000000050', '00000000-0000-7000-8000-000000000321', 25.0),
+            ('00000000-0000-7000-8000-000000000502', '00000000-0000-7000-8000-000000000050', '00000000-0000-7000-8000-000000000322', 50.0),
+            ('00000000-0000-7000-8000-000000000503', '00000000-0000-7000-8000-000000000050', '00000000-0000-7000-8000-000000000323', 25.0),
+            ('00000000-0000-7000-8000-000000000511', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000321', 25.0),
+            ('00000000-0000-7000-8000-000000000512', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000322', 45.0),
+            ('00000000-0000-7000-8000-000000000513', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000323', 30.0),
+            ('00000000-0000-7000-8000-000000000521', '00000000-0000-7000-8000-000000000052', '00000000-0000-7000-8000-000000000321', 35.0),
+            ('00000000-0000-7000-8000-000000000522', '00000000-0000-7000-8000-000000000052', '00000000-0000-7000-8000-000000000322', 40.0),
+            ('00000000-0000-7000-8000-000000000523', '00000000-0000-7000-8000-000000000052', '00000000-0000-7000-8000-000000000323', 25.0),
+            ('00000000-0000-7000-8000-000000000531', '00000000-0000-7000-8000-000000000053', '00000000-0000-7000-8000-000000000321', 20.0),
+            ('00000000-0000-7000-8000-000000000532', '00000000-0000-7000-8000-000000000053', '00000000-0000-7000-8000-000000000322', 60.0),
+            ('00000000-0000-7000-8000-000000000533', '00000000-0000-7000-8000-000000000053', '00000000-0000-7000-8000-000000000323', 20.0),
+            ('00000000-0000-7000-8000-000000000541', '00000000-0000-7000-8000-000000000054', '00000000-0000-7000-8000-000000000321', 20.0),
+            ('00000000-0000-7000-8000-000000000542', '00000000-0000-7000-8000-000000000054', '00000000-0000-7000-8000-000000000322', 60.0),
+            ('00000000-0000-7000-8000-000000000543', '00000000-0000-7000-8000-000000000054', '00000000-0000-7000-8000-000000000323', 20.0);
+        "#,
+        ),
     ])
 }
 
@@ -3591,5 +3655,85 @@ mod tests {
             duplicate_change_id.is_err(),
             "change_id must be unique here too, matching sync_hub_log's idempotency key"
         );
+    }
+
+    #[test]
+    fn migration_30_seeds_all_five_grade12_do8_carryover_groups() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let policies: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM grading_weight_policies \
+                 WHERE name LIKE 'DepEd Grade 12 Legacy SHS%'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(policies, 5);
+
+        let invalid_total: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM (\
+                    SELECT p.id, SUM(c.weight_percent) AS total \
+                    FROM grading_weight_policies p \
+                    JOIN grading_weight_components c ON c.policy_id = p.id \
+                    WHERE p.name LIKE 'DepEd Grade 12 Legacy SHS%' \
+                    GROUP BY p.id HAVING ABS(total - 100.0) > 0.001\
+                 )",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(invalid_total, 0, "every legacy policy must total 100%");
+
+        let non_legacy_category_count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM grading_weight_components c \
+                 JOIN grading_weight_policies p ON p.id = c.policy_id \
+                 JOIN assessment_categories ac ON ac.id = c.category_id \
+                 WHERE p.name LIKE 'DepEd Grade 12 Legacy SHS%' \
+                   AND ac.set_id <> '00000000-0000-7000-8000-000000000032'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            non_legacy_category_count, 0,
+            "DO 8 policies must use Written Work / Performance Task / Quarterly Assessment, not DO 015 categories"
+        );
+    }
+
+    #[test]
+    fn migration_30_preserves_the_two_distinct_legacy_track_groups_with_matching_weights() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT p.name, group_concat(CAST(c.weight_percent AS INTEGER), '/') \
+                 FROM grading_weight_policies p \
+                 JOIN grading_weight_components c ON c.policy_id = p.id \
+                 JOIN assessment_categories ac ON ac.id = c.category_id \
+                 WHERE p.id IN (\
+                    '00000000-0000-7000-8000-000000000053',\
+                    '00000000-0000-7000-8000-000000000054'\
+                 ) \
+                 GROUP BY p.id ORDER BY p.id",
+            )
+            .unwrap();
+        let rows: Vec<(String, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+
+        assert_eq!(rows.len(), 2, "both applicability groups must remain selectable");
+        assert!(rows[0].0.contains("Other Subjects"));
+        assert!(rows[1].0.contains("Immersion/Research/Exhibit/Performance"));
+        assert_eq!(rows[0].1, "20/60/20");
+        assert_eq!(rows[1].1, "20/60/20");
     }
 }
