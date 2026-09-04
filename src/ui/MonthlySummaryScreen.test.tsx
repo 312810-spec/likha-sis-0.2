@@ -306,7 +306,7 @@ describe("MonthlySummaryScreen", () => {
     const { exportRepo } = renderScreen(reportWith("present"));
     await screen.findByText("Ana Santos");
 
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
 
     await waitFor(() =>
       expect(
@@ -322,7 +322,7 @@ describe("MonthlySummaryScreen", () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen(reportWith("present"));
     await screen.findByText("Ana Santos");
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
     await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
 
     await user.click(screen.getByRole("button", { name: "Open folder" }));
@@ -339,7 +339,7 @@ describe("MonthlySummaryScreen", () => {
     const { exportRepo } = renderScreen(reportWith("present"));
     exportRepo.revealShouldThrow = true;
     await screen.findByText("Ana Santos");
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
     await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF2_Mabini_2026-08.csv");
 
     await user.click(screen.getByRole("button", { name: "Open folder" }));
@@ -355,7 +355,7 @@ describe("MonthlySummaryScreen", () => {
     exportRepo.resultToReturn = null;
     await screen.findByText("Ana Santos");
 
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
 
     await waitFor(() => expect(screen.getByText(/could not export/i)).toBeInTheDocument());
   });
@@ -365,7 +365,9 @@ describe("MonthlySummaryScreen", () => {
     const { exportRepo } = renderScreen(reportWith("present"));
     await screen.findByText("Ana Santos");
 
-    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+    await user.click(
+      screen.getByRole("button", { name: "Export SF4 (School attendance summary, CSV)" }),
+    );
 
     await waitFor(() =>
       expect(
@@ -379,7 +381,9 @@ describe("MonthlySummaryScreen", () => {
     const user = userEvent.setup();
     const { exportRepo } = renderScreen(reportWith("present"));
     await screen.findByText("Ana Santos");
-    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+    await user.click(
+      screen.getByRole("button", { name: "Export SF4 (School attendance summary, CSV)" }),
+    );
     await screen.findByText("C:\\Users\\teacher\\Documents\\LIKHA-SIS\\SF4_2026-08.csv");
 
     await user.click(screen.getByRole("button", { name: "Open folder" }));
@@ -397,7 +401,9 @@ describe("MonthlySummaryScreen", () => {
     exportRepo.sf4ResultToReturn = null;
     await screen.findByText("Ana Santos");
 
-    await user.click(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" }));
+    await user.click(
+      screen.getByRole("button", { name: "Export SF4 (School attendance summary, CSV)" }),
+    );
 
     await waitFor(() => expect(screen.getByText(/school could not be found/i)).toBeInTheDocument());
   });
@@ -406,7 +412,9 @@ describe("MonthlySummaryScreen", () => {
     renderScreen();
     await screen.findByText("No learners enrolled in this section yet.");
 
-    expect(screen.getByRole("button", { name: "Export SF4 (CSV, whole school)" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Export SF4 (School attendance summary, CSV)" }),
+    ).toBeEnabled();
   });
 
   it("opens with the supplied initial section and year/month when the section still exists", async () => {
@@ -469,10 +477,9 @@ describe("MonthlySummaryScreen", () => {
     renderScreen();
     await screen.findByText("No learners enrolled in this section yet.");
 
-    expect(screen.getByRole("button", { name: "Export SF2 (CSV)" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 
   it("does not export when clicking Export SF2 while it is aria-disabled", async () => {
@@ -484,7 +491,7 @@ describe("MonthlySummaryScreen", () => {
     // clickable at the DOM level -- the guard inside the handler is what
     // actually blocks the export. This proves that guard works, not just
     // that the button looks disabled.
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
 
     expect(exportRepo.calls).toEqual([]);
   });
@@ -610,7 +617,7 @@ describe("MonthlySummaryScreen", () => {
     );
     await screen.findByText("Ana Santos");
 
-    await user.click(screen.getByRole("button", { name: "Export SF2 (CSV)" }));
+    await user.click(screen.getByRole("button", { name: "Export SF2 (Monthly attendance, CSV)" }));
     expect(exportRepo.calls).toEqual([{ sectionId: "sec-1", year: 2026, month: 8 }]);
 
     // The teacher changes month before the export settles.

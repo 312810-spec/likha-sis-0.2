@@ -7,6 +7,7 @@ import { ValidationError } from "../domain/errors";
 import type { LearnerRosterExportResult, Sf10ExportResult } from "../domain/export";
 import type { CreateLearnerResult, Learner } from "../domain/learner";
 import { Alert } from "./components/Alert";
+import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
@@ -450,9 +451,9 @@ export function LearnerListScreen({
       {loading ? (
         <Loading label="Loading learners…" />
       ) : learners.length === 0 ? (
-        <p>No learners enrolled yet.</p>
+        <EmptyState>No learners enrolled yet.</EmptyState>
       ) : filteredLearners.length === 0 ? (
-        <p>No learners match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+        <EmptyState>No learners match &ldquo;{searchQuery.trim()}&rdquo;.</EmptyState>
       ) : (
         <ul className="learner-list">
           {filteredLearners.map((learner) =>

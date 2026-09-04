@@ -81,6 +81,11 @@ function sharedSchoolYear(sections: Section[]): string {
   return years.size === 1 ? ([...years][0] ?? "—") : "—";
 }
 
+function sharedSchoolYearFoot(sections: Section[]): string | undefined {
+  const years = new Set(sections.map((section) => section.schoolYear));
+  return years.size > 1 ? "Sections span more than one school year." : undefined;
+}
+
 function formatMinutes(minutes: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
@@ -256,7 +261,11 @@ export function SchoolHeadHome({
           <KpiStrip>
             <Kpi label="Sections" value={sections.length} />
             <Kpi label="Learners" value={learners.length} tone="productive" />
-            <Kpi label="School year" value={sharedSchoolYear(sections)} />
+            <Kpi
+              label="School year"
+              value={sharedSchoolYear(sections)}
+              foot={sharedSchoolYearFoot(sections)}
+            />
             <Kpi
               label="Attendance today"
               value={attendanceValue}
@@ -292,12 +301,15 @@ export function SchoolHeadHome({
             </Card>
 
             <Card title="Manage" span={6} keepHalf>
-              <button type="button" onClick={onManageSections}>
-                Manage sections
-              </button>{" "}
-              <button type="button" onClick={onOpenSf1Import}>
-                SF1 import
-              </button>
+              <p className="field-hint">Open the two most common school-record setup tasks.</p>
+              <div className="card-actions">
+                <button type="button" onClick={onManageSections}>
+                  Manage sections
+                </button>
+                <button type="button" onClick={onOpenSf1Import}>
+                  Import learners (SF1)
+                </button>
+              </div>
             </Card>
 
             <Card

@@ -13,6 +13,12 @@ describe("workbench-nav-data", () => {
     expect(TAB_LABELS.workspace).toBe("Home");
   });
 
+  it("uses plain-language labels for specialist teacher views", () => {
+    expect(TAB_LABELS["subject-monitor"]).toBe("My Subject Attendance");
+    expect(TAB_LABELS["adviser-view"]).toBe("My Advisory Overview");
+    expect(TAB_LABELS["sf1-import"]).toBe("Import Learners (SF1)");
+  });
+
   it("pins Home outside the groups", () => {
     expect(HOME_DESTINATION).toEqual({ id: "workspace", label: "Home" });
     const inAnyGroup = NAV_GROUPS.some((g) => g.tabs.some((t) => t.id === "workspace"));
@@ -43,6 +49,7 @@ describe("workbench-nav-data", () => {
 
   it("resolves the group label for a tab, contextual tabs included", () => {
     expect(groupLabelForTab("attendance")).toBe("Daily Teaching");
+    expect(groupLabelForTab("teacher-load")).toBe("Class Overview");
     expect(groupLabelForTab("section-roster")).toBe("Learner Records");
     expect(groupLabelForTab("workspace")).toBeNull();
   });

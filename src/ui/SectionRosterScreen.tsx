@@ -45,6 +45,8 @@ interface SectionRosterScreenProps {
    * empty-roster call to action both use this). Section context is the
    * caller's to restore. */
   onBack: () => void;
+  /** Opens daily attendance with this roster's section preselected. */
+  onOpenAttendance: (sectionId: string) => void;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -148,6 +150,7 @@ export function SectionRosterScreen({
   exportService,
   sectionId,
   onBack,
+  onOpenAttendance,
 }: SectionRosterScreenProps) {
   const { mode } = useTeacherMode();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -836,9 +839,18 @@ export function SectionRosterScreen({
       </button>
 
       {section && (
-        <p className="section-roster-context">
-          Grade {section.gradeLevel} · {section.schoolYear}
-        </p>
+        <>
+          <p className="section-roster-context">
+            Grade {section.gradeLevel} · {section.schoolYear}
+          </p>
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => onOpenAttendance(section.id)}
+          >
+            Take attendance for this section
+          </button>
+        </>
       )}
 
       {/* Announced to assistive tech when the roster settles; visually the

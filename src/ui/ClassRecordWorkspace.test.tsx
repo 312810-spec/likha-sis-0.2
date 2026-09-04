@@ -294,6 +294,17 @@ beforeEach(() => {
 });
 
 describe("ClassRecordWorkspace", () => {
+  it("explains grading categories and links the help to each field in Guided mode", async () => {
+    window.localStorage.setItem("likha-sis:teacher-mode", "guided");
+    renderScreen();
+    await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" });
+
+    const categorySet = screen.getByLabelText("Category set");
+    const category = screen.getByLabelText("Category");
+    expect(categorySet).toHaveAccessibleDescription(/DepEd grading rules/);
+    expect(category).toHaveAccessibleDescription(/activity type/);
+  });
+
   it("lists existing assessment items", async () => {
     renderScreen();
 

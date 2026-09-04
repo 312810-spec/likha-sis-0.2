@@ -240,6 +240,10 @@ function App() {
                 exportService={exportService}
                 sectionId={rosterSectionId}
                 onBack={() => setActiveTab("sections")}
+                onOpenAttendance={(sectionId) => {
+                  setAttendanceSectionId(sectionId);
+                  setActiveTab("attendance");
+                }}
               />
             ) : (
               // Reached only if the roster tab is active with no section

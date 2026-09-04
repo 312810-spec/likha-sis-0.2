@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CurrentSession } from "../../domain/session";
 import { Icon, type IconName } from "../components/icons";
 import {
   HOME_DESTINATION,
@@ -10,6 +11,7 @@ import { TEACHER_MODES, TEACHER_MODE_LABELS } from "../theme/modes";
 import { useTeacherMode } from "../theme/useTeacherMode";
 
 interface SidebarProps {
+  session: CurrentSession;
   activeTab: SignedInTab;
   onNavigate: (tab: SignedInTab) => void;
 }
@@ -18,6 +20,7 @@ const STORAGE_KEY = "likha-sis:nav-collapsed";
 
 const GROUP_ICON: Record<string, IconName> = {
   "Daily Teaching": "today",
+  "Class Overview": "grid",
   "Learner Records": "learners",
   Grading: "grid",
   Security: "shield",
@@ -53,7 +56,7 @@ function readCollapsed(): Set<string> {
   return new Set();
 }
 
-export function Sidebar({ activeTab, onNavigate }: SidebarProps) {
+export function Sidebar({ session, activeTab, onNavigate }: SidebarProps) {
   const { mode, setMode } = useTeacherMode();
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
   const current = normalizeTab(activeTab);
@@ -81,6 +84,10 @@ export function Sidebar({ activeTab, onNavigate }: SidebarProps) {
   return (
     <nav aria-label="Primary" className="app-sidebar">
       <h1 className="app-sidebar-brand">LIKHA-SIS</h1>
+      <p className="app-sidebar-identity">
+        <strong>{session.displayName}</strong>
+        <span>{session.schoolName}</span>
+      </p>
 
       <div className="app-sidebar-scroll">
         <button

@@ -229,7 +229,7 @@ describe("SchoolHeadHome", () => {
     expect(onManageSections).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: "History" }));
-    await user.click(screen.getByRole("button", { name: "SF1 import" }));
+    await user.click(screen.getByRole("button", { name: "Import learners (SF1)" }));
     expect(onOpenSf1Import).toHaveBeenCalledTimes(2);
   });
 
