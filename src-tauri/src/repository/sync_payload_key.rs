@@ -106,8 +106,8 @@ mod tests {
     #[test]
     fn wrap_then_unwrap_round_trips_to_the_original_sspk() {
         let (conn, school_id, user_id) = setup();
-        let credential = device_credential::enroll(&conn, &school_id, &user_id, "device-1", None)
-            .unwrap();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
         let device_secret = decode_hex(&credential.secret_hex);
         let sspk = payload_key::generate_payload_key();
 
@@ -122,8 +122,8 @@ mod tests {
     #[test]
     fn the_stored_wrap_never_contains_the_plaintext_sspk() {
         let (conn, school_id, user_id) = setup();
-        let credential = device_credential::enroll(&conn, &school_id, &user_id, "device-1", None)
-            .unwrap();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
         let device_secret = decode_hex(&credential.secret_hex);
         let sspk = payload_key::generate_payload_key();
 
@@ -142,8 +142,8 @@ mod tests {
     #[test]
     fn unwrap_returns_none_for_a_credential_with_no_wrap() {
         let (conn, school_id, user_id) = setup();
-        let credential = device_credential::enroll(&conn, &school_id, &user_id, "device-1", None)
-            .unwrap();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
         let device_secret = decode_hex(&credential.secret_hex);
 
         assert_eq!(
@@ -199,8 +199,8 @@ mod tests {
     #[test]
     fn wrapping_a_second_sspk_for_an_already_wrapped_credential_is_rejected() {
         let (conn, school_id, user_id) = setup();
-        let credential = device_credential::enroll(&conn, &school_id, &user_id, "device-1", None)
-            .unwrap();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
         let device_secret = decode_hex(&credential.secret_hex);
         let sspk = payload_key::generate_payload_key();
         wrap_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk).unwrap();
