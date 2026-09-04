@@ -1,5 +1,34 @@
 # CURRENT HANDOFF
 
+## ADR-0068 Grade 12 DO 8 carryover (2026-09-04) — code complete, verification owed
+
+Owner confirmation: Grade 12 remains on the old curriculum and uses the old
+grading format for SY 2026-2027. The new Zero-Based Grading System starts in
+SY 2027-2028. This is a grade-calculation transition, not by itself evidence
+that the Grade 12 curriculum or form template changes on that date. Existing
+`uses_zero_based_grading` logic already enforces the calculation boundary.
+
+Branch `codex/grade12-do8-carryover`, stacked on
+`origin/claude/wave5-adr-0067-local-host-sync` so migration 30 follows that
+branch's migrations 28-29 without collision.
+
+Five non-default Grade 12 legacy SHS policies were added using DO 8's existing
+Written Work / Performance Task / Quarterly Assessment category set: Core
+25/50/25; Academic Other 25/45/30; Academic special 35/40/25; TVL/Sports/Arts
+Other 20/60/20; TVL/Sports/Arts special 20/60/20. The last two remain separate
+for truthful applicability even though their weights match. No algorithm or
+UI change was needed; the existing picker and computation are data-driven.
+
+Evidence and caveats: ADR-0068 and SOURCE-REGISTRY. The Central Office
+issuance page was verified, while its linked PDF returned 403 here; an
+official DepEd Caraga-hosted reproduction of Table 5 supplied the exact table
+cross-check. Authored Rust tests cover the migration and computation.
+
+**Owed before merge:** Rust format/test/Clippy on a Rust-capable runner,
+independent compliance/correctness review, then rebase after the ADR-0067
+receiver commit lands and open a focused PR. Do not merge migration 30 ahead
+of migrations 28-29 without renumbering/rebasing.
+
 ## ADR-0067 hub push/pull receiver (2026-09-04), commit + PR owed
 
 Branch `claude/wave5-adr-0067-local-host-sync`, continuing directly on top of

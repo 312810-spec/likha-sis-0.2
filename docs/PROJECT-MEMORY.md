@@ -1,5 +1,23 @@
 # PROJECT MEMORY
 
+## Grade 12 legacy SHS grading closure (2026-09-04)
+
+- Owner decision: Grade 12 remains on the old curriculum and uses the old
+  grading format for SY 2026-2027. The new Zero-Based Grading System takes
+  effect in SY 2027-2028; do not infer a curriculum/template transition from
+  that grading-calculation date alone.
+- Migration 12 already implemented all six DO 015 Strengthened-SHS weighting
+  groups. Do not describe those six as missing.
+- ADR-0068/migration 30 adds the real remaining gap: five DO 8 Table 5
+  applicability groups for the Grade 12 SY 2026-2027 carryover required by
+  DO 015 Annex D paragraph 49.
+- Legacy policies reference the legacy DO 8 assessment categories and are
+  non-default, explicitly Grade-12-labeled, and manually selected. The two
+  TVL/Sports/Arts groups remain separate despite identical 20/60/20 weights.
+- Migration 30 is deliberately stacked after ADR-0067 migrations 28-29.
+- SF1/SF9/SF10 authoritative-template verification remains a separate Claude
+  Code workstream; avoid overlapping it.
+
 ## Purpose
 
 Durable project facts only. Do not use this as a transcript.

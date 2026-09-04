@@ -1,0 +1,88 @@
+# ADR-0068 — Grade 12 DO 8 weighting carryover
+
+Status: Accepted for implementation; native Rust verification pending
+
+## Context
+
+DepEd Order No. 015, s. 2026 already supplies six Strengthened Senior High
+School weighting groups, and LIKHA implemented all six in migration 12. Annex
+D paragraph 49, however, keeps Grade 12 learners who have not yet adopted the
+Strengthened SHS Curriculum in SY 2026-2027 on the weights from DepEd Order
+No. 8, s. 2015, together with DO 015's adjusted transmutation table.
+
+The remaining gap was therefore not the six current SHS groups. It was the
+five Grade 12 legacy applicability groups in DO 8 Table 5.
+
+## Evidence
+
+- DepEd Central Office's official issuance page identifies DO 8, s. 2015,
+  states its nationwide effect from SY 2015-2016, and links the official
+  `DO_s2015_08.pdf` enclosure:
+  `https://www.deped.gov.ph/2015/04/01/do-8-s-2015-policy-guidelines-on-classroom-assessment-for-the-k-to-12-basic-education-program/`.
+- An official DepEd Caraga school-policy handbook reproduces DO 8 Table 5 and
+  its five SHS applicability columns:
+  `https://caraga.deped.gov.ph/public-files/4670`.
+- ADR-0013's primary-source reading of DO 015 paragraph 49 establishes why
+  those legacy weights, rather than Table 10's Strengthened-SHS weights,
+  apply to Grade 12 in the transition year.
+
+The Central Office PDF returned HTTP 403 to this environment, so this record
+does not pretend the bytes were freshly downloaded here. The figures were
+cross-checked against the official regional reproduction and multiple
+independent transcriptions. A future successful intake of the Central Office
+PDF should be checksum-recorded in `SOURCE-REGISTRY.md`.
+
+## Decision
+
+The owner confirmed on 2026-09-04 that Grade 12 remains under the old
+curriculum and must therefore use the old grading format. In LIKHA this means
+the legacy DO 8 assessment structure and the applicable legacy subject-group
+weights below for SY 2026-2027. The owner separately confirmed that the new
+Zero-Based Grading System becomes effective the following school year,
+SY 2027-2028. That changes the grade-calculation step; it must not be treated
+as proof, by itself, that Grade 12's curriculum or form template also changes.
+
+Add five non-default, explicitly Grade-12-labeled policies using the existing
+legacy DO 8 assessment categories (`Written Work`, `Performance Task`,
+`Quarterly Assessment`):
+
+| Applicability group                                                                   |  WW |  PT |  QA |
+| ------------------------------------------------------------------------------------- | --: | --: | --: |
+| Core Subjects                                                                         | 25% | 50% | 25% |
+| Academic — All Other Subjects                                                         | 25% | 45% | 30% |
+| Academic — Work Immersion/Research/Business Enterprise Simulation/Exhibit/Performance | 35% | 40% | 25% |
+| TVL/Sports/Arts and Design — All Other Subjects                                       | 20% | 60% | 20% |
+| TVL/Sports/Arts and Design — Work Immersion/Research/Exhibit/Performance              | 20% | 60% | 20% |
+
+The last two groups intentionally remain separate even though their numeric
+weights match. Their applicability is different, and collapsing them would
+erase which DepEd row the teacher selected.
+
+No computation algorithm changes. The existing algorithm is data-driven and
+already handles three top-level, non-nested legacy categories. For SY
+2026-2027 it applies the adjusted transmutation table, satisfying DO 015's
+transition rule. For SY 2027-2028 onward, the existing year boundary applies
+Zero-Based Grading and no transmutation.
+
+Migration 30 is stacked after ADR-0067's migrations 28-29 to avoid colliding
+with the active sync work.
+
+## Safety and UX constraints
+
+- These policies are non-default and visibly labeled Grade 12 legacy.
+- They must be paired with the legacy DO 8 category set. A mismatch fails
+  closed as “not yet computable”; it cannot silently compute with DO 015
+  categories.
+- They are not valid for current Grade 11 Strengthened-SHS records.
+- Automatic subject-name inference remains prohibited; teachers select the
+  applicable group explicitly.
+
+## Verification
+
+Authored tests prove that all five rows exist, each totals 100%, every
+component belongs to the legacy category set, the two equal-weight track
+groups remain separately selectable, and an end-to-end 35/40/25 computation
+produces IG 57.5 then TG 72 under the SY 2026-2027 adjusted table.
+
+This runner has no Rust toolchain. `cargo fmt --check`, `cargo test`, and
+`cargo clippy --all-targets -- -D warnings` remain mandatory before merge.
