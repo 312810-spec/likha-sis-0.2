@@ -20,9 +20,28 @@ encrypted local queue, bounded batches, idempotent enqueue, fixed retry codes,
 school-scoped retry/acknowledgement, and rollback proof. No domain repository
 emits changes yet, so ordinary application writes are unchanged.
 
+**Completed next slice (2026-09-04, this session):** migration 26
+(`device_sync_credentials`, one active credential per device via a partial
+unique index, SHA-256 digest never the plaintext secret) and migration 27
+(widens `audit_log` for `device_enrolled`/`device_revoked`).
+`repository::device_credential` (enroll/verify/revoke, constant-time secret
+comparison, enumeration-safe `verify`) plus the trusted-boundary
+`auth::enroll_device_sync_credential` (re-verifies username/password exactly
+like `login`, but issues a distinct longer-lived credential instead of an
+interactive session) and `auth::revoke_device_sync_credential`
+(self-or-School-Head, with an explicit same-school check — a School-Head
+role check alone is not enough, the same cross-school bug class this
+module's other `authorize_*` gates already guard against). 29 new tests;
+`cargo test` 689 lib tests, `cargo clippy -D warnings`, `cargo fmt --check`
+all clean. Not yet wired to any Tauri command or network listener — this is
+the persistence/authorization foundation only, matching this project's own
+zero-UI-first precedent.
+
 **Exact next implementation slice:** authoritative hub change-log schema and
-repository with device-derived school scope, replay-safe acceptance, monotonic
-cursor assignment, and conflict staging tests.
+repository (the actual `push`/`pull` receiver): device-derived school scope
+via the new device credential, replay-safe acceptance, monotonic cursor
+assignment, and conflict staging tests. The network listener/transport itself
+remains a separate, later slice (ADR-0067 "What this ADR does NOT decide").
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

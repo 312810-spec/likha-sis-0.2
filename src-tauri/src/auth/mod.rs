@@ -10,9 +10,10 @@ use rusqlite::Connection;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    audit_log as audit_log_repo, installation as installation_repo, role as role_repo,
-    school as school_repo, section as section_repo, section_advisory as section_advisory_repo,
-    session as session_repo, user as user_repo,
+    audit_log as audit_log_repo, device_credential as device_credential_repo,
+    installation as installation_repo, role as role_repo, school as school_repo,
+    section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
+    user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -640,6 +641,139 @@ pub fn admin_reset_teacher_password(
             Err(error)
         }
     }
+}
+
+/// Device Sync Enrollment (ADR-0067, first slice): the trusted-boundary
+/// ceremony an implementation's future enrollment surface will use to
+/// issue a per-device sync credential. Reuses exactly the same
+/// verification this app already trusts for an interactive login
+/// (Argon2id, timing-safe unknown-user handling, account lockout) --
+/// deliberately not a new authentication mechanism. Unlike `login`, this
+/// does NOT set an interactive `SessionManager` session: the credential
+/// it issues is a distinct, longer-lived class (see
+/// `repository::device_credential`) for a background sync that cannot
+/// prompt for a password on every use, matching ADR-0067's "Authentication
+/// and keys" section.
+///
+/// `device_id` identifies the physical device and is stable across
+/// re-enrollment -- a device already enrolled for this school is
+/// re-enrolled (its previous credential revoked), never duplicated, see
+/// `device_credential::enroll`.
+///
+/// Not yet called by any command -- this is the authorization/persistence
+/// foundation, matching this project's own established zero-UI-first
+/// precedent (RBAC, Curriculum, Teacher Load, Section Advisory all shipped
+/// their first increment with full test coverage and no caller). The
+/// network listener that will actually expose this to a remote device is
+/// deliberately out of scope here -- see ADR-0067 "What this ADR does NOT
+/// decide."
+pub fn enroll_device_sync_credential(
+    conn: &Connection,
+    username: &str,
+    password: &str,
+    school_id: &str,
+    device_id: &str,
+    device_label: Option<&str>,
+) -> AppResult<device_credential_repo::EnrolledCredential> {
+    let user = match user_repo::verify_credentials(conn, username, password) {
+        Ok(user) => user,
+        Err(AppError::AccountLocked) => {
+            audit_log_repo::record(
+                conn,
+                school_id,
+                None,
+                username,
+                AuditEventType::AccountLocked,
+            )?;
+            return Err(AppError::AccountLocked);
+        }
+        Err(AppError::AuthenticationFailed) => {
+            audit_log_repo::record(conn, school_id, None, username, AuditEventType::LoginFailed)?;
+            return Err(AppError::AuthenticationFailed);
+        }
+        Err(e) => return Err(e),
+    };
+
+    if !user_repo::is_member_of_school(conn, &user.id, school_id)? {
+        audit_log_repo::record(
+            conn,
+            school_id,
+            Some(&user.id),
+            &user.username,
+            AuditEventType::LoginFailed,
+        )?;
+        return Err(AppError::Unauthorized);
+    }
+
+    let credential =
+        device_credential_repo::enroll(conn, school_id, &user.id, device_id, device_label)?;
+
+    audit_log_repo::record(
+        conn,
+        school_id,
+        Some(&user.id),
+        &user.username,
+        AuditEventType::DeviceEnrolled,
+    )?;
+
+    Ok(credential)
+}
+
+/// Revokes a device's sync credential. Requires an active interactive
+/// session scoped to the same school, AND that the caller either owns the
+/// device being revoked or holds `ManageSchoolMembership` (the same
+/// School-Head-only authority that already governs onboarding/removing a
+/// school member) -- deliberately reusing
+/// `authorize_view_teacher_load`'s established self-or-School-Head shape
+/// rather than inventing a new capability for what is, in practice, the
+/// ICT coordinator's job. Returns `Ok(false)`, not an error, for an
+/// already-revoked or unknown credential id within the caller's own
+/// school scope (idempotent, matching `device_credential::revoke`
+/// itself) -- `Err(Unauthorized)` is reserved for the authorization check.
+pub fn revoke_device_sync_credential(
+    conn: &Connection,
+    sessions: &SessionManager,
+    credential_id: &str,
+) -> AppResult<bool> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+
+    let owner = device_credential_repo::owner(conn, credential_id)?;
+    let is_own_device = matches!(&owner, Some((owner_school, owner_user)) if *owner_school == school_id && *owner_user == user_id);
+    // A School Head's role holds only within their own school -- role
+    // membership alone says nothing about which school `credential_id`
+    // belongs to. Without this same-school check, a School Head in School
+    // B could pass `is_school_head` for a credential that actually
+    // belongs to School A, the same class of cross-school bug
+    // `authorize_view_teacher_load`/`authorize_adviser_of_section` guard
+    // against elsewhere in this module (caught here by
+    // `revoke_device_sync_credential_denies_a_school_head_from_a_different_school`
+    // during this function's own TDD pass, not shipped and fixed later).
+    let credential_in_this_school =
+        matches!(&owner, Some((owner_school, _)) if *owner_school == school_id);
+    let is_school_head = credential_in_this_school
+        && role_repo::has_any_role(
+            conn,
+            &user_id,
+            &school_id,
+            Capability::ManageSchoolMembership.allowed_roles(),
+        )?;
+    if !is_own_device && !is_school_head {
+        return Err(AppError::Unauthorized);
+    }
+
+    let revoked = device_credential_repo::revoke(conn, &school_id, credential_id)?;
+    if revoked {
+        if let Some(user) = user_repo::find_by_id(conn, &user_id)? {
+            audit_log_repo::record(
+                conn,
+                &school_id,
+                Some(&user.id),
+                &user.username,
+                AuditEventType::DeviceRevoked,
+            )?;
+        }
+    }
+    Ok(revoked)
 }
 
 #[cfg(test)]
@@ -1985,5 +2119,259 @@ mod tests {
             .unwrap()
             .iter()
             .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
+    }
+
+    // ---- Device Sync Enrollment (ADR-0067, first slice) ----
+
+    #[test]
+    fn enroll_device_sync_credential_succeeds_for_correct_credentials_and_audits_it() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            "Ana Cruz",
+        )
+        .unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "correct horse battery staple",
+            &s.id,
+            "device-1",
+            Some("Ana's laptop"),
+        )
+        .unwrap();
+
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_some()
+        );
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries[0].event_type, AuditEventType::DeviceEnrolled);
+        assert_eq!(entries[0].username, "ana.cruz");
+    }
+
+    #[test]
+    fn enroll_device_sync_credential_does_not_create_an_interactive_session() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+
+        enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+            .unwrap();
+
+        // Deliberately not asserted via a `SessionManager` at all --
+        // this function never receives one, unlike `login` -- proving by
+        // construction that enrollment cannot start an interactive
+        // session as a side effect.
+    }
+
+    #[test]
+    fn enroll_device_sync_credential_fails_with_wrong_password_and_issues_nothing() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "correct password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+
+        let result = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "wrong password",
+            &s.id,
+            "device-1",
+            None,
+        );
+
+        assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries[0].event_type, AuditEventType::LoginFailed);
+    }
+
+    #[test]
+    fn enroll_device_sync_credential_fails_for_a_user_not_in_that_school() {
+        let conn = open_test_db();
+        let school_a = school::create(&conn, "School A").unwrap();
+        let school_b = school::create(&conn, "School B").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &school_a.id).unwrap();
+
+        let result = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &school_b.id,
+            "device-1",
+            None,
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn enroll_device_sync_credential_respects_account_lockout() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "correct password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        for _ in 0..user::MAX_FAILED_LOGIN_ATTEMPTS {
+            let _ = user::verify_credentials(&conn, "ana.cruz", "wrong password");
+        }
+
+        let result = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "correct password",
+            &s.id,
+            "device-1",
+            None,
+        );
+
+        assert!(matches!(result, Err(AppError::AccountLocked)));
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_allows_a_user_to_revoke_their_own_device() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential =
+            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+                .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+
+        let revoked = revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap();
+
+        assert!(revoked);
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_none()
+        );
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(entries[0].event_type, AuditEventType::DeviceRevoked);
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_denies_an_ordinary_teacher_revoking_someone_elses_device() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
+        let credential =
+            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+                .unwrap();
+        let other = user::create_user(&conn, "ben.reyes", "password", "Ben Reyes").unwrap();
+        user::add_school_membership(&conn, &other.id, &s.id).unwrap();
+        role_repo::grant(&conn, &other.id, &s.id, role_repo::TEACHER).unwrap();
+        let other_sessions = SessionManager::new();
+        login(&conn, &other_sessions, "ben.reyes", "password", &s.id).unwrap();
+
+        let result = revoke_device_sync_credential(&conn, &other_sessions, &credential.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_allows_a_school_head_to_revoke_a_colleagues_device() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
+        let credential =
+            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+                .unwrap();
+        let head = user::create_user(&conn, "principal.a", "password", "Principal A").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let head_sessions = SessionManager::new();
+        login(&conn, &head_sessions, "principal.a", "password", &s.id).unwrap();
+
+        let revoked = revoke_device_sync_credential(&conn, &head_sessions, &credential.id).unwrap();
+
+        assert!(revoked);
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_denies_a_school_head_from_a_different_school() {
+        let conn = open_test_db();
+        let school_a = school::create(&conn, "School A").unwrap();
+        let school_b = school::create(&conn, "School B").unwrap();
+        let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &owner.id, &school_a.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &school_a.id,
+            "device-1",
+            None,
+        )
+        .unwrap();
+        let head = user::create_user(&conn, "principal.b", "password", "Principal B").unwrap();
+        user::add_school_membership(&conn, &head.id, &school_b.id).unwrap();
+        role_repo::grant(&conn, &head.id, &school_b.id, role_repo::SCHOOL_HEAD).unwrap();
+        let head_sessions = SessionManager::new();
+        login(
+            &conn,
+            &head_sessions,
+            "principal.b",
+            "password",
+            &school_b.id,
+        )
+        .unwrap();
+
+        let result = revoke_device_sync_credential(&conn, &head_sessions, &credential.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_fails_closed_without_a_session() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential =
+            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+                .unwrap();
+        let sessions = SessionManager::new();
+
+        let result = revoke_device_sync_credential(&conn, &sessions, &credential.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_is_idempotent_for_the_owner() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential =
+            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
+                .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        assert!(revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap());
+
+        let second = revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap();
+
+        assert!(
+            !second,
+            "revoking an already-revoked credential reports false, not an error"
+        );
     }
 }

@@ -1314,6 +1314,74 @@ pub fn migrations() -> Migrations<'static> {
             ON sync_outbox(school_id, created_at, change_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- ADR-0067 device sync credential. A separate, longer-lived
+        -- credential class from the in-memory interactive session
+        -- (auth::SessionManager) -- a background sync cannot prompt for a
+        -- password. Deliberately per-device, never one shared secret: the
+        -- secret itself is never stored, only a SHA-256 digest, verified in
+        -- constant time by repository::device_credential. `revoked_at` is
+        -- checked independently on every sync request, the direct analogue
+        -- of ADR-0004's independent `sessions.revoked_at` lookup.
+        CREATE TABLE device_sync_credentials (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            device_label TEXT,
+            secret_hash BLOB NOT NULL CHECK (length(secret_hash) = 32),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            revoked_at TEXT,
+            last_used_at TEXT
+        );
+
+        CREATE INDEX idx_device_sync_credentials_school
+            ON device_sync_credentials(school_id, revoked_at);
+
+        -- Schema-level backstop, the same pattern already used for
+        -- reference_geo_snapshots' "one current per source": at most one
+        -- ACTIVE credential per physical device per school. Re-enrollment
+        -- must explicitly revoke the old row first rather than silently
+        -- accumulating live credentials for the same device.
+        CREATE UNIQUE INDEX idx_device_sync_credentials_one_active_per_device
+            ON device_sync_credentials(school_id, device_id) WHERE revoked_at IS NULL;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- ADR-0067 device enrollment/revocation auditability -- the
+        -- "device enrollment/revocation log" line item in the ADR's own
+        -- School-laptop operations gate. Same 12-step CHECK-widening
+        -- rebuild as migration 24 (SQLite cannot ALTER a CHECK
+        -- constraint in place); audit_log still has no incoming foreign
+        -- keys from any other table, so this is safe with foreign_keys
+        -- enforcement on.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin', 'device_enrolled', 'device_revoked'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new
+            (id, school_id, user_id, username, actor_user_id, event_type, created_at)
+        SELECT
+            id, school_id, user_id, username, actor_user_id, event_type, created_at
+        FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
     ])
 }
 
@@ -3229,5 +3297,127 @@ mod tests {
             [],
         );
         assert!(unlisted_entity.is_err());
+    }
+
+    #[test]
+    fn migration_26_enforces_the_device_credential_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'ana.cruz', 'hash', 'Ana Cruz')",
+            [],
+        )
+        .unwrap();
+
+        let wrong_length_hash = conn.execute(
+            "INSERT INTO device_sync_credentials
+             (id, school_id, user_id, device_id, secret_hash)
+             VALUES ('c1', 's1', 'u1', 'd1', X'0102')",
+            [],
+        );
+        assert!(
+            wrong_length_hash.is_err(),
+            "secret_hash must be a 32-byte SHA-256 digest, not an arbitrary blob"
+        );
+
+        conn.execute(
+            "INSERT INTO device_sync_credentials
+             (id, school_id, user_id, device_id, secret_hash)
+             VALUES ('c2', 's1', 'u1', 'd1', zeroblob(32))",
+            [],
+        )
+        .unwrap();
+
+        let second_active_for_same_device = conn.execute(
+            "INSERT INTO device_sync_credentials
+             (id, school_id, user_id, device_id, secret_hash)
+             VALUES ('c3', 's1', 'u1', 'd1', zeroblob(32))",
+            [],
+        );
+        assert!(
+            second_active_for_same_device.is_err(),
+            "at most one ACTIVE credential per device is allowed by the partial unique index"
+        );
+
+        conn.execute(
+            "UPDATE device_sync_credentials SET revoked_at = '2026-01-01T00:00:00.000Z' WHERE id = 'c2'",
+            [],
+        )
+        .unwrap();
+        let after_revocation = conn.execute(
+            "INSERT INTO device_sync_credentials
+             (id, school_id, user_id, device_id, secret_hash)
+             VALUES ('c4', 's1', 'u1', 'd1', zeroblob(32))",
+            [],
+        );
+        assert!(
+            after_revocation.is_ok(),
+            "a new active credential is allowed once the prior one is revoked"
+        );
+    }
+
+    #[test]
+    fn migration_27_widens_audit_log_for_device_enrollment_events_without_losing_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations()
+            .to_version(&mut conn, 26)
+            .expect("migrate up to just before the widening migration");
+
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'ana.cruz', 'hash', 'Ana Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al1', 's1', 'u1', 'ana.cruz', 'login_success')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM audit_log", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "no rows should be lost during the widening");
+
+        let accepted = conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al2', 's1', 'u1', 'ana.cruz', 'device_enrolled')",
+            [],
+        );
+        assert!(accepted.is_ok(), "device_enrolled must be accepted");
+
+        let also_accepted = conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al3', 's1', 'u1', 'ana.cruz', 'device_revoked')",
+            [],
+        );
+        assert!(also_accepted.is_ok(), "device_revoked must be accepted");
+
+        let rejected = conn.execute(
+            "INSERT INTO audit_log (id, school_id, user_id, username, event_type) \
+             VALUES ('al4', 's1', 'u1', 'ana.cruz', 'not_a_real_event')",
+            [],
+        );
+        assert!(
+            rejected.is_err(),
+            "an unrecognized event type must still be rejected by the widened CHECK constraint"
+        );
     }
 }
