@@ -51,7 +51,7 @@ pub fn enqueue(
             change.actor_user_id.to_string(),
             entity_kind_str(change.entity_kind),
             change.entity_id.to_string(),
-            change.base_version,
+            change.base_version as i64,
             operation_str(change.operation),
             &change.encrypted_payload,
         ),
@@ -126,6 +126,7 @@ fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<OutboxEntry> {
     let entity_kind: String = row.get(4)?;
     let entity_id: String = row.get(5)?;
     let operation: String = row.get(7)?;
+    let base_version: i64 = row.get(6)?;
     Ok(OutboxEntry {
         school_id: row.get(0)?,
         change: PendingChange {
@@ -134,7 +135,9 @@ fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<OutboxEntry> {
             actor_user_id: parse_uuid(actor_user_id, 3)?,
             entity_kind: parse_entity_kind(&entity_kind, 4)?,
             entity_id: parse_uuid(entity_id, 5)?,
-            base_version: row.get(6)?,
+            base_version: u64::try_from(base_version).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(6, Type::Integer, Box::new(error))
+            })?,
             operation: parse_operation(&operation, 7)?,
             encrypted_payload: row.get(8)?,
         },

@@ -68,11 +68,15 @@ pub fn classify_conflict(base_version: u64, hub_version: u64) -> ConflictDisposi
 pub enum SyncContractError {
     EmptyPayload,
     PayloadTooLarge,
+    BaseVersionTooLarge,
 }
 
 pub const MAX_ENCRYPTED_CHANGE_BYTES: usize = 256 * 1024;
 
 pub fn validate_change(change: &PendingChange) -> Result<(), SyncContractError> {
+    if change.base_version > i64::MAX as u64 {
+        return Err(SyncContractError::BaseVersionTooLarge);
+    }
     if change.encrypted_payload.is_empty() {
         return Err(SyncContractError::EmptyPayload);
     }
@@ -131,6 +135,16 @@ mod tests {
                 MAX_ENCRYPTED_CHANGE_BYTES + 1
             ])),
             Err(SyncContractError::PayloadTooLarge)
+        );
+    }
+
+    #[test]
+    fn base_version_must_fit_the_sqlite_integer_domain() {
+        let mut change = change_with_payload(vec![1]);
+        change.base_version = i64::MAX as u64 + 1;
+        assert_eq!(
+            validate_change(&change),
+            Err(SyncContractError::BaseVersionTooLarge)
         );
     }
 }
