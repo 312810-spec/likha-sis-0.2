@@ -51,15 +51,20 @@ future explicit "authorized organization switch" for legitimate
 multi-school membership is **HYPOTHESIS** — not needed until a real
 multi-school user is a confirmed requirement.
 
-## 3. Roles/permissions (RBAC) — DIRECTION SET, not yet implemented
+## 3. Roles/permissions (RBAC) — BUILT (foundation), reconciled 2026-09-04
 
-No role concept exists anywhere in the code today (`user_school_memberships`
-has no role column; `auth`/`session.ts` have no role checks). This was a
-deliberate, explicit deferral (`docs/product/M8-DECISION.md`, stop
-condition #8: changing access expectations without a documented
-requirement needs the user, not autonomous choice).
+**Corrected from a stale "not yet implemented" status.** Built (Wave 1A,
+`docs/adr/0036-rbac-foundation.md`): `user_school_memberships` carries a
+`roles: string[]` array (a member with no role grant yet is a valid,
+uniform-access state, matching §2's pre-RBAC model), and
+`src-tauri/src/auth/mod.rs` gates mutating operations through a
+capability-oriented `authorize_capability`/`authorize_capability_with_actor`
+check, never a scattered `if role == "..."`. Capabilities defined today:
+`ManageLearners` (Registrar, School Head), `ManageSchoolMembership`,
+`ManageTeachingAssignments`, and `ManageSectionAdvisories` (all
+School-Head-only).
 
-**Starting role model, already confirmed with the user** (M8-DECISION.md
+**Starting role model, confirmed with the user** (M8-DECISION.md
 follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
 
 - School Head: sees/manages all teachers' data within the school.
@@ -67,11 +72,15 @@ follow-up, 2026-08-24): **Teacher, Registrar, School Head.**
   separate from grading/attendance.
 - Teacher: scoped to their own classes/sections, as today.
 
-**Not yet decided**: the exact authority boundaries between these three
-(e.g., can a Registrar edit a grade? can a School Head impersonate a
-teacher's session?) — do not implement from assumption; this needs its
-own short scoping pass when RBAC is actually built, using the confirmed
-three-role starting point as the anchor, not a blank slate.
+**Deliberately not built yet** (per ADR-0036's own scope): any
+account/role-management UI (roles are assigned at the data layer only),
+the full future LIKHA role universe (Adviser, LIS Coordinator, ICT
+Coordinator, Master Teacher/Department Head), and a person holding more
+than one functional assignment in a school at once — the schema already
+supports it (`roles` is an array), but no UI or workflow exercises it.
+Some finer authority boundaries between the three roles (e.g. can a
+Registrar edit a grade?) remain undecided beyond the capabilities listed
+above — extend from this foundation, not from a blank slate.
 
 ## 4. Curriculum / Key Stage versioning — BUILT (foundation), narrower than the full cohort model
 
@@ -115,18 +124,18 @@ any form yet; every export today is a disclosed, non-authoritative CSV.
 Naming pattern in UI: `SF#: practical-use label` (e.g. "SF9: Report
 Card") — the label explains use, never renames the official form.
 
-| Form                                   | Status today                                                                                                                                                                                                                                                                                    | Relationship                                                                                                                                                                                                                                                                                                |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SF1 Enrollment                         | **partially BUILT** — learner/enrollment core, conservative bulk import/reconciliation, transfer/end/enroll foundation, roster/export foundation, and read-only enrollment history exist. Authoritative-template SF1 output is not built.                                                       | Remaining scope includes learner photo, a controlled correction path, authoritative-template output, and any still-evidence-gated SF1 fields. Never silently merge; adviser/authorized user compares candidates. Natural home remains combined with Wave 2 / the former UX-05 Learners scope.               |
-| SF2 Attendance                         | **BUILT** (adviser-facing daily attendance + monthly summary, UX-03; explicitly disclosed as DepEd-SF2-_inspired_, not a section-level replica — see `docs/product/M8-DECISION.md`'s Update 2)                                                                                                  | Feeds SF4; do not duplicate entry.                                                                                                                                                                                                                                                                          |
-| SF3 Book/resource monitoring           | not built                                                                                                                                                                                                                                                                                       | Lower priority.                                                                                                                                                                                                                                                                                             |
-| SF4 School-level monthly consolidation | not built                                                                                                                                                                                                                                                                                       | Default role: LIS Coordinator / authorized records function. Consumes SF2 + learner movement.                                                                                                                                                                                                               |
-| SF5 Promotion & Learning Progress      | not built                                                                                                                                                                                                                                                                                       | Adviser/EOSY workflow; surface seasonally near end of school year, not year-round.                                                                                                                                                                                                                          |
-| SF6 School-level consolidation of SF5  | not built                                                                                                                                                                                                                                                                                       | Default role: LIS Coordinator, School Head oversight. Seasonal, same window as SF5.                                                                                                                                                                                                                         |
-| SF7 Personnel & Teaching Assignment    | not built                                                                                                                                                                                                                                                                                       | Collaborative: School Head, Admin Assistant/Registrar, ICT Coordinator. Teachers verify their own assignment/load and report discrepancies. Consumes Teacher Load (§6), not the other way around.                                                                                                           |
-| SF8 Health & Nutrition                 | not built                                                                                                                                                                                                                                                                                       | Keep the legacy conceptual split (learner/section-level data; Baseline/Pretest consolidation; Endline/Posttest consolidation) as a _starting point_, but revalidate formulas/templates before implementing — do not assume legacy figures remain authoritative. Tighter authorization needed (health data). |
-| SF9 Report Card                        | **partially BUILT** — `report_card.rs`/UX-04 already export a CSV, explicitly disclosed as "DepEd-grade-computation-inspired," not an authoritative-template reproduction, and not gated per subject group. An authoritative-template, three-term-aware, duplex-printable SF9 is **not built**. | Must derive from finalized grades + attendance + learner identity; adviser reviews, doesn't re-encode; batch generation matters. Exact current template dimensions must come from an authoritative source, not a guess.                                                                                     |
-| SF10 Permanent Record                  | **not built at all** (confirmed: zero references anywhere in the repo)                                                                                                                                                                                                                          | Cumulative, strongly controlled, provenance-aware; needs historical records, transfer provenance, controlled corrections, issuance workflow, and a bulk importer that should reuse the same general import/reconciliation architecture as SF1 rather than a bespoke parser.                                 |
+| Form                                   | Status today                                                                                                                                                                                                                                                                                                                                                                            | Relationship                                                                                                                                                                                                                                                                                                |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SF1 Enrollment                         | **partially BUILT** — learner/enrollment core, conservative bulk import/reconciliation, transfer/end/enroll foundation, roster/export foundation, and read-only enrollment history exist. Authoritative-template SF1 output is not built.                                                                                                                                               | Remaining scope includes learner photo, a controlled correction path, authoritative-template output, and any still-evidence-gated SF1 fields. Never silently merge; adviser/authorized user compares candidates. Natural home remains combined with Wave 2 / the former UX-05 Learners scope.               |
+| SF2 Attendance                         | **BUILT** (adviser-facing daily attendance + monthly summary, UX-03; explicitly disclosed as DepEd-SF2-_inspired_, not a section-level replica — see `docs/product/M8-DECISION.md`'s Update 2)                                                                                                                                                                                          | Feeds SF4; do not duplicate entry.                                                                                                                                                                                                                                                                          |
+| SF3 Book/resource monitoring           | not built                                                                                                                                                                                                                                                                                                                                                                               | Lower priority.                                                                                                                                                                                                                                                                                             |
+| SF4 School-level monthly consolidation | **partially BUILT** (`src-tauri/src/export/sf4.rs`, `docs/adr/0059-sf4-monthly-attendance-consolidation.md`) — disclosed CSV export, triggered from `MonthlySummaryScreen.tsx`; not an authoritative-template reproduction.                                                                                                                                                             | Default role: LIS Coordinator / authorized records function. Consumes SF2 + learner movement.                                                                                                                                                                                                               |
+| SF5 Promotion & Learning Progress      | **partially BUILT** (`src-tauri/src/export/sf5.rs`, `docs/adr/0057-sf5-promotion-foundation.md`) — disclosed CSV export, triggered from `SectionRosterScreen.tsx`; not an authoritative-template reproduction.                                                                                                                                                                          | Adviser/EOSY workflow; surface seasonally near end of school year, not year-round.                                                                                                                                                                                                                          |
+| SF6 School-level consolidation of SF5  | **partially BUILT** (`src-tauri/src/export/sf6.rs`, `docs/adr/0058-sf6-school-promotion-summary.md`) — disclosed CSV export, triggered from `SectionsScreen.tsx`; not an authoritative-template reproduction.                                                                                                                                                                           | Default role: LIS Coordinator, School Head oversight. Seasonal, same window as SF5.                                                                                                                                                                                                                         |
+| SF7 Personnel & Teaching Assignment    | not built                                                                                                                                                                                                                                                                                                                                                                               | Collaborative: School Head, Admin Assistant/Registrar, ICT Coordinator. Teachers verify their own assignment/load and report discrepancies. Consumes Teacher Load (§6), not the other way around.                                                                                                           |
+| SF8 Health & Nutrition                 | not built                                                                                                                                                                                                                                                                                                                                                                               | Keep the legacy conceptual split (learner/section-level data; Baseline/Pretest consolidation; Endline/Posttest consolidation) as a _starting point_, but revalidate formulas/templates before implementing — do not assume legacy figures remain authoritative. Tighter authorization needed (health data). |
+| SF9 Report Card                        | **partially BUILT** — `report_card.rs`/UX-04 already export a CSV, explicitly disclosed as "DepEd-grade-computation-inspired," not an authoritative-template reproduction, and not gated per subject group. An authoritative-template, three-term-aware, duplex-printable SF9 is **not built**.                                                                                         | Must derive from finalized grades + attendance + learner identity; adviser reviews, doesn't re-encode; batch generation matters. Exact current template dimensions must come from an authoritative source, not a guess.                                                                                     |
+| SF10 Permanent Record                  | **partially BUILT** (`src-tauri/src/export/sf10.rs`, `src-tauri/src/formgen/`, `docs/adr/0053-sf10-template-applicability-and-versioning.md`, `docs/adr/0063-sf10-permanent-record.md`) — disclosed CSV export, triggered from `LearnerListScreen.tsx`; authoritative-template output not built. Corrects a prior "zero references anywhere in the repo" claim, stale as of 2026-09-04. | Cumulative, strongly controlled, provenance-aware; needs historical records, transfer provenance, controlled corrections, issuance workflow, and a bulk importer that should reuse the same general import/reconciliation architecture as SF1 rather than a bespoke parser.                                 |
 
 ## 6. Teacher Load + Class Schedule — BUILT (foundation), narrower than the full chain
 
@@ -139,7 +148,10 @@ repository functions; `TeacherLoad` (assignment count, distinct-subject/
 preparation count, weekly instructional minutes — confirmed via RA 4670/
 DepEd Order No. 005, s. 2024 to be the right kind of metric) is derived,
 never stored. Authorization: `Capability::ManageTeachingAssignments`
-(School Head only) plus a self-or-School-Head view rule. No UI.
+(School Head only) plus a self-or-School-Head view rule.
+**Corrected 2026-09-04, was stale**: `TeacherLoadScreen.tsx` (179 lines,
+wired in `App.tsx`) is now real, built UI over this foundation — not "no
+UI."
 
 **Not yet built**: the full chain below (personnel/qualifications/
 position/designation, advisory/ancillary duties — deliberately excluded,
@@ -329,13 +341,15 @@ Two new owner-supplied product specifications, recorded verbatim at
 `docs/product/SUBJECT-ATTENDANCE-SPEC.md` and
 `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`.
 
-- **Subject Attendance** — **DIRECTION SET, foundation BUILT (Wave
-  2V)**. A per-subject teacher attendance-monitoring tool, explicitly
-  and permanently separate from SF2 (never shares storage,
-  authorization, or workflow with it). Domain/repository/command layer
-  shipped this wave (`repository::subject_attendance`,
-  `commands::subject_attendance`, migration 22) — no UI yet. Full
-  decision record: ADR-0055.
+- **Subject Attendance** — **BUILT (foundation + UI)**, corrected
+  2026-09-04 from a stale "no UI yet." A per-subject teacher
+  attendance-monitoring tool, explicitly and permanently separate from
+  SF2 (never shares storage, authorization, or workflow with it).
+  Domain/repository/command layer shipped Wave 2V
+  (`repository::subject_attendance`, `commands::subject_attendance`,
+  migration 22); `SubjectAttendanceScreen.tsx` (549 lines, wired in
+  `App.tsx`) is now real, built UI over that foundation. Full decision
+  record: ADR-0055.
 - **Official School Repository** — **DIRECTION SET, not started.** A
   school-owned document repository (memoranda, templates, approved
   forms, policies) surfaced through a school-owned Microsoft 365
