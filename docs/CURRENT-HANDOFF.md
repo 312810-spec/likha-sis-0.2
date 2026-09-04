@@ -1,5 +1,22 @@
 # CURRENT HANDOFF
 
+## PRODUCT-CONTRACT.md reconciliation (2026-09-04)
+
+Per the non-CC repository audit's P1 finding: `docs/product/PRODUCT-CONTRACT.md`
+contained several stale claims that could cause an automated agent to
+duplicate completed work. Corrected against direct source evidence (grep +
+ADR cross-reference), not against prose: RBAC (§3) has a real
+capability-gated foundation (ADR-0036, `Capability::` enum in
+`auth/mod.rs`), not "not yet implemented"; SF4/SF5/SF6 (§5) each ship as a
+disclosed CSV export (`export/sf{4,5,6}.rs`), not "not built"; SF10 (§5)
+has a full `export/sf10.rs` + `formgen/` module and a `LearnerListScreen.tsx`
+entry point, not "zero references anywhere in the repo"; Teacher Load (§6)
+and Subject Attendance (§16.5) both have real, wired UI screens
+(`TeacherLoadScreen.tsx`, `SubjectAttendanceScreen.tsx`), not "no UI." SF7
+was checked and confirmed still genuinely not built — left unchanged.
+`docs/ACTIVE-PLAN.md`/`docs/CURRENT-HANDOFF.md` (CC-owned planning files)
+were not touched by this correction, per the audit's own exclusion list.
+
 ## ADR-0068 Grade 12 DO 8 carryover (2026-09-04) — merged as PR #44 (main `aac0ed7`)
 
 Merged to `main` ahead of this branch's device-identity slice, per owner
