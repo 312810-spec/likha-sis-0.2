@@ -32,7 +32,7 @@ below.
 audit independently confirmed complete. Two Minor parity fixes folded in
 (`item_count` subquery `+ AND ai.school_id`; `dependent_records_stranded`
 grades subquery `+ AND gp.school_id`). Findings archived at
-`.planning/tenant-isolation-audit/security-review.md`.
+`docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-audit.md`.
 
 **Not yet done**: commit the parity fixes; push; open PR (targets `main`).
 
@@ -69,7 +69,7 @@ pricing pages, cited in `.planning/wave5-sync-target/findings.md`.
   preference; device-enrollment as a trusted-boundary ceremony —
   same failure class as the ADR-0004 bootstrap self-grant) plus
   should-fix items, **all folded into ADR-0065**. Findings archived at
-  `.planning/wave5-sync-target/security-review.md`.
+  `docs/security-reviews/2026-09-03-adr-0065-cloud-sync-target.md`.
 - Push; open PR (decision-only, no CI-relevant code).
 - **Do not implement.** The next milestone (one Worker, one D1, one real
   authenticated round trip behind a first-cut `SyncProvider` port) is
@@ -124,8 +124,8 @@ binaries, 0 failed; `cargo clippy --all-targets -- -D warnings` clean;
 shipped (the two should-fix readers it flagged were folded in; the
 doc-wording minor is resolved). Direct return was empty (known
 reviewer-harness retrieval failure); findings retrieved via the
-file-based workaround — full findings in session scratchpad
-`security-review-roster-join.md`.
+file-based workaround — full findings in
+`docs/security-reviews/2026-09-03-section-membership-l-school-id.md`.
 
 **Committed + pushed + rebased.** Commits `3177446` (fix) + `779ee9c`
 (this note) on `claude/p1-roster-school-id-join-hardening`, rebased onto

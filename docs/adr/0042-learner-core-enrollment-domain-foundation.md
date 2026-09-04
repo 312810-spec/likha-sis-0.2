@@ -1276,5 +1276,5 @@ The three new-this-round tests were watched to fail first
 no blocking, no should-fix on the original two-reader change; the
 "completeness" should-fix (the two additional readers) and the
 doc-wording minor are both resolved by this widened version. Full
-findings: session scratchpad `security-review-roster-join.md`, summarised
+findings: `docs/security-reviews/2026-09-03-section-membership-l-school-id.md`, summarised
 in the `docs/VERIFICATION-DEBT.md` top entry.
