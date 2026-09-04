@@ -52,6 +52,15 @@ export { onSessionExpired } from "./infrastructure/tauri/invoke";
 export const authService = new AuthApplicationService(new TauriAuthRepository());
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
+/** @public — the `registerUser` capability is fully implemented and
+ * tested end to end (application service, repository port, Tauri
+ * command, infrastructure adapter) but has no UI consumer yet: today
+ * only the first School Head account is created, via
+ * `setupService.completeSetup`'s first-run bootstrap. This is the
+ * unwired foundation for a future "School Head adds a teacher account"
+ * flow (see `docs/product/PRODUCT-CONTRACT.md` §3 RBAC) — not
+ * confirmed dead code, so not deleted for the 2026-09-04 dead-code-gate
+ * pass. */
 export const userService = new UserApplicationService(new TauriUserRepository());
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());

@@ -8,6 +8,7 @@
  * sharing a type with it.
  */
 
+/** @public — only consumed structurally, via `SubjectAttendanceSession.status`. */
 export type SessionStatus = "held" | "no_class";
 
 /** DepEd-familiar four-value mark; distinct from `AttendanceStatus`
@@ -41,6 +42,9 @@ export interface SubjectAttendanceRosterRow {
   entryStatus: EntryStatus | null;
 }
 
+/** @public — only consumed structurally, via `RecordEntryOutcome`'s
+ * `"recorded"` variant below, which every Subject Attendance screen
+ * imports by name. */
 export interface SubjectAttendanceEntry {
   id: string;
   sessionId: string;
@@ -77,7 +81,10 @@ export interface TeachingAssignmentSummary {
  * exactly. Deliberately no automatic flag/threshold beyond the raw
  * streak number: `docs/product/SUBJECT-ATTENDANCE-SPEC.md` defers
  * configurable school thresholds as a later, separately-designed
- * enhancement. */
+ * enhancement.
+ *
+ * @public — only consumed structurally, via `SubjectAttendanceMonitor.rows`,
+ * which `SubjectMonitorScreen` imports by name. */
 export interface SubjectAttendanceMonitorRow {
   membershipId: string;
   learnerId: string;

@@ -24,8 +24,11 @@ export interface Sf1ImportRow {
   remarks: string | null;
 }
 
+/** @public — only consumed structurally, via `Sf1ValidationIssue.severity`. */
 export type IssueSeverity = "error" | "warning";
 
+/** @public — only consumed structurally, via `Sf1ImportPreview` below,
+ * which `Sf1ImportScreen`/`Sf1DuplicateReview` import by name. */
 export interface Sf1ValidationIssue {
   rowNumber: number;
   field: string;
@@ -33,6 +36,7 @@ export interface Sf1ValidationIssue {
   message: string;
 }
 
+/** @public — only consumed structurally, via `LearnerMatchResult.kind`. */
 export type MatchKind = "exact_lrn" | "suspected_duplicate" | "new";
 
 export interface LearnerMatchResult {

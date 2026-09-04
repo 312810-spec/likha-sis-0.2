@@ -1,3 +1,6 @@
+/** @public — only consumed structurally, via `FieldDisclosure.omittedFields`
+ * and the `Sf*ExportResult`/`ReportCardExportResult`/`LearnerRosterExportResult`
+ * types below that every export screen imports by name. */
 export interface OmittedField {
   field: string;
   reason: string;
@@ -9,6 +12,8 @@ export interface OmittedField {
  * source of truth the UI renders its disclaimer from — it comes straight
  * back from the export command, so the disclaimer can never drift from
  * what the file actually contains.
+ *
+ * @public — only consumed structurally, via the export-result types below.
  */
 export interface FieldDisclosure {
   populatedFields: string[];

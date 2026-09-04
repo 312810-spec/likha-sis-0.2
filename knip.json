@@ -2,5 +2,6 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["src/App.tsx", "src/dev-preview/main.tsx"],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignoreDependencies": ["@playwright/cli", "@fontsource/public-sans"]
+  "ignoreDependencies": ["@playwright/cli", "@fontsource/public-sans"],
+  "ignoreBinaries": ["gitleaks", "osv-scanner"]
 }

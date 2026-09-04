@@ -10,7 +10,12 @@ currently covers; keep this list in sync with `package.json`/CI if either
 changes):
 
 - `npm run quality` — fast normal gate: typecheck, lint, format:check,
-  test. Run for every non-trivial change.
+  architecture-boundary check, `knip` dead-code check, test. Run for
+  every non-trivial change. New exports that are only consumed
+  structurally (referenced by another exported type's field, never
+  imported by name elsewhere) are false positives for `knip` — mark
+  them `@public` in a doc comment rather than deleting real, load-bearing
+  types; a genuinely-unreferenced export gets removed instead.
 - `npm run quality:security` — gitleaks scan + `cargo deny check` +
   OSV-Scanner. Run before considering a milestone touching dependencies
   or secrets complete.

@@ -4,12 +4,6 @@
  * here — matching `AttendanceStatus`'s equivalent convention. */
 export type LearnerScoreStatus = "scored" | "excused" | "not_applicable";
 
-export const LEARNER_SCORE_STATUSES: readonly LearnerScoreStatus[] = [
-  "scored",
-  "excused",
-  "not_applicable",
-];
-
 export interface LearnerScore {
   id: string;
   schoolId: string;
