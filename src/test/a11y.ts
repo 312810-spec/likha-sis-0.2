@@ -10,7 +10,17 @@ import { expect } from "vitest";
  * pass on the real rendered app.
  */
 export async function expectNoAccessibilityViolations(container: Element): Promise<void> {
-  const results = await axe.run(container);
+  const results = await axe.run(container, {
+    rules: {
+      // These rules depend on browser layout/font rendering. axe-core's
+      // label-content-name-mismatch rule creates a canvas to distinguish
+      // text from icon ligatures; jsdom intentionally has no canvas
+      // implementation and logs a warning on every run. The real-browser
+      // accessibility gate remains responsible for both checks.
+      "color-contrast": { enabled: false },
+      "label-content-name-mismatch": { enabled: false },
+    },
+  });
   if (results.violations.length > 0) {
     const summary = results.violations
       .map(
