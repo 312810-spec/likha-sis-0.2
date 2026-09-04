@@ -1,5 +1,57 @@
 # CURRENT HANDOFF
 
+## ADR-0067 device sync enrollment/credential foundation (2026-09-04), commit + PR owed
+
+Branch `claude/wave5-adr-0067-local-host-sync`. Follows PR #40 (merged, from
+the Codex delegation harness) landing ADR-0067's decision plus the
+`SyncProvider` port and encrypted local `sync_outbox` (migration 25). This
+session's independent overlapping ADR-0067 draft was reconciled against #40
+(see the P1 batch entry below for that) and PR #41 opened for a small
+doc-only pointer fix; this entry is the next real code slice.
+
+**What shipped:** migration 26 (`device_sync_credentials` — one active
+credential per physical device per school via a partial unique index,
+SHA-256 digest of a 256-bit random secret, plaintext never stored) and
+migration 27 (widens `audit_log`'s CHECK for `device_enrolled`/
+`device_revoked`, same 12-step rebuild pattern as migration 24).
+`repository::device_credential` (`enroll`/`verify`/`revoke`/`owner`,
+constant-time secret comparison, `verify` collapses unknown/revoked/wrong-secret
+into one enumeration-safe `None`). `auth::enroll_device_sync_credential` is
+the trusted-boundary ceremony ADR-0067's "Authentication and keys" section
+describes: it re-verifies username/password exactly like `login` (Argon2id,
+lockout, audit trail) but issues the separate longer-lived sync credential
+instead of an interactive `SessionManager` session.
+`auth::revoke_device_sync_credential` requires an active session and either
+device ownership or `ManageSchoolMembership` (School Head) — **with an
+explicit same-school check on the School-Head path**, a real bug this
+function's own TDD pass caught before shipping: checking the role alone let
+a School Head from a _different_ school pass authorization for a credential
+that then silently no-op'd instead of failing closed (same cross-school bug
+class `authorize_view_teacher_load`/`authorize_adviser_of_section` already
+guard against elsewhere in this module).
+
+**Verification:** 29 new tests (12 `device_credential`, 11 `auth`, 2
+migration contract tests, plus the failing-then-fixed cross-school case).
+`cargo test` 689 lib tests + all integration binaries, 0 failed. `cargo
+clippy --all-targets -- -D warnings` clean (two real findings fixed: a
+type-complexity lint factored into a named `CredentialRow` type, and
+`.is_multiple_of()` over manual `% 2`). `cargo fmt --check` clean. `npm run quality` (frontend gate; no TS touched
+by this slice) — typecheck, ESLint, Prettier, architecture check, 92 files /
+965 tests, all green. (A first background run of this command returned an
+ambiguous "exit 0" summary while its own output showed a Prettier failure
+on this handoff file's markdown — not trusted; fixed the formatting and
+reran synchronously to confirm the real result above.)
+
+**Not yet wired to any Tauri command or network listener** — this is the
+persistence/authorization foundation only, matching this project's own
+zero-UI-first precedent (RBAC, Curriculum, Teacher Load, Section Advisory
+all shipped their first increment the same way). The actual hub `push`/
+`pull` receiver (device-derived school scope via this credential,
+replay-safe acceptance, monotonic cursor, conflict staging) is the next
+slice — see `docs/ACTIVE-PLAN.md`'s top entry.
+
+**Not yet done:** commit; push; PR (targets `main`).
+
 ## ADR-0067 school-laptop sync direction + first contract slice (2026-09-04)
 
 The school laptop in the supervised computer lab is now the authoritative

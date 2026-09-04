@@ -20,6 +20,14 @@ pub enum AuditEventType {
     /// (`user_id`/`username`) are genuinely different people — see
     /// migration 24 and `AuditLogEntry::actor_user_id`.
     PasswordResetByAdmin,
+    /// A device was issued a per-device sync credential via
+    /// `auth::enroll_device_sync_credential` (ADR-0067). Self-caused --
+    /// the enrolling user is the same as `user_id`/`username` -- so this
+    /// is recorded with plain `record`, not `record_admin_action`.
+    DeviceEnrolled,
+    /// A device's sync credential was revoked via
+    /// `repository::device_credential::revoke` (ADR-0067).
+    DeviceRevoked,
 }
 
 impl AuditEventType {
@@ -30,6 +38,8 @@ impl AuditEventType {
             AuditEventType::AccountLocked => "account_locked",
             AuditEventType::Logout => "logout",
             AuditEventType::PasswordResetByAdmin => "password_reset_by_admin",
+            AuditEventType::DeviceEnrolled => "device_enrolled",
+            AuditEventType::DeviceRevoked => "device_revoked",
         }
     }
 
@@ -40,6 +50,8 @@ impl AuditEventType {
             "account_locked" => Ok(AuditEventType::AccountLocked),
             "logout" => Ok(AuditEventType::Logout),
             "password_reset_by_admin" => Ok(AuditEventType::PasswordResetByAdmin),
+            "device_enrolled" => Ok(AuditEventType::DeviceEnrolled),
+            "device_revoked" => Ok(AuditEventType::DeviceRevoked),
             other => Err(rusqlite::Error::FromSqlConversionFailure(
                 0,
                 rusqlite::types::Type::Text,
