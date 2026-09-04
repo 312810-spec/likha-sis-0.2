@@ -356,7 +356,7 @@ export function MonthlySummaryScreen({
             aria-disabled={exporting || loading || !report || report.learners.length === 0}
             onClick={handleExportSf2}
           >
-            {exporting ? "Exporting…" : "Export SF2 (CSV)"}
+            {exporting ? "Exporting…" : "Export SF2 (Monthly attendance, CSV)"}
           </button>
 
           {exportError && <Alert tone="error">{exportError}</Alert>}
@@ -385,7 +385,7 @@ export function MonthlySummaryScreen({
           )}
 
           <button type="button" aria-disabled={exportingSf4} onClick={handleExportSf4}>
-            {exportingSf4 ? "Exporting…" : "Export SF4 (CSV, whole school)"}
+            {exportingSf4 ? "Exporting…" : "Export SF4 (School attendance summary, CSV)"}
           </button>
 
           {exportSf4Error && <Alert tone="error">{exportSf4Error}</Alert>}

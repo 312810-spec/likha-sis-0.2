@@ -1,5 +1,43 @@
 # CURRENT HANDOFF
 
+## ADR-0067 school-laptop sync direction + first contract slice (2026-09-04)
+
+The school laptop in the supervised computer lab is now the authoritative
+school-wide consolidation hub; teacher devices remain offline-first encrypted,
+authorized replicas. The ICT coordinator is custodian. ADR-0067 records the
+Recommended LAN + optional Tailscale path, the LAN-only Next Best, conflict
+review instead of silent LWW, separate offline-login and sync credentials,
+separate database/payload keys, and the production operations/DPO gate.
+
+First code slice: `src-tauri/src/sync/mod.rs` adds provider-neutral change
+types, an explicit entity allowlist, bounded encrypted payload validation, the
+`SyncProvider` port, and tested conflict classification. It contains no network
+server, persistence, credentials, or production-ready sync claim.
+
+**Verification on this runner:** `npm run quality` passed (typecheck, ESLint,
+Prettier, architecture check, 92 files / 965 tests). `git diff --check` passed.
+Rust tests, formatting, Clippy, and native build remain explicitly unverified
+because this runner has no `cargo` executable; CI/another Rust-capable machine
+must close that gate before merge.
+
+Next: atomic local outbox persistence and tests, then hub persistence and
+device enrollment. Do not enter real learner data until ADR-0067's operations,
+native verification, backup/restore, and school-head/DPO sign-off gates pass.
+
+### Local outbox continuation
+
+Migration 25 and `repository::sync_outbox` now provide the encrypted queue.
+Enqueue uses `change_id` as a replay/idempotency key; batches are oldest-first
+and capped at 100; reads, retry updates, and acknowledgements include the
+trusted school predicate. Retry errors use a fixed code enum so exception text
+or learner data cannot be persisted accidentally. A transaction rollback test
+proves a domain write and its outbox write can be atomic. No existing domain
+write is wired to emit changes yet.
+
+Available verification after this slice: `npm run quality` passed again (92
+files / 965 tests) and `git diff --check` passed. Rust checks remain owed on a
+Rust-capable runner.
+
 ## P1 batch: UI-redesign reviews closed + Wave 5 PoC blocked (2026-09-04)
 
 Branch `claude/redesign-review-followups`, off `main`. Discharges the

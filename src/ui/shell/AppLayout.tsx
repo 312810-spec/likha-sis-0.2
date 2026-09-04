@@ -121,7 +121,7 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
         inert={sidebarInert}
         aria-hidden={sidebarInert || undefined}
       >
-        <Sidebar activeTab={activeTab} onNavigate={navigate} />
+        <Sidebar session={session} activeTab={activeTab} onNavigate={navigate} />
       </div>
       <div className="app-layout-main" inert={mainInert} aria-hidden={mainInert || undefined}>
         <TopBar

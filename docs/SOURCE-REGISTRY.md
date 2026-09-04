@@ -1,5 +1,13 @@
 # Source Registry
 
+## ADR-0067 — school-laptop sync transport (added 2026-09-04)
+
+| Source                                                                                          | Purpose                                                                           | Status                                                  | Notes                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tailscale official DERP, ACL, Tailnet Lock, auth-key, and Windows unattended-mode documentation | Optional encrypted reachability from teacher devices to the supervised lab laptop | **PILOT**                                               | Direct peer paths are preferred but DERP may relay end-to-end encrypted traffic and metadata outside the Philippines. Use deny-by-default grants/ACLs, device expiry/revocation, and Tailnet Lock during the pilot. It is transport only, never LIKHA authorization. |
+| Headscale official documentation                                                                | Self-hosted Tailscale-compatible control server                                   | **REFERENCE / NEXT BEST FOR CONTROL-PLANE SOVEREIGNTY** | Adds a separately reachable server and substantial operator burden; it does not solve CGNAT by itself. Not selected for the first one-school pilot.                                                                                                                  |
+| National Privacy Commission, Data Privacy Act IRR and Data Security guidance                    | Remote access, accountable processing, encryption, and organizational controls    | **PRIMARY — PRODUCTION GATE**                           | Requires written school policy, accountable access, strong protection, and DPO/school-head review before real learner use.                                                                                                                                           |
+
 ## Reveal-Exported-File Feature (added 2026-09-01)
 
 Full context: `docs/CURRENT-HANDOFF.md` reveal-in-folder entry. Adds an

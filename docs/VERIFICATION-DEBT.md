@@ -1,5 +1,18 @@
 # Verification Debt
 
+## ADR-0067 school-laptop sync hub (2026-09-04) — OPEN
+
+The provider-neutral contract and local outbox have authored unit coverage, but
+those Rust tests have not run on this runner and no end-to-end sync exists.
+Open gates: wire domain mutations into the outbox; hub persistence; hub-side
+replay/idempotency and forged-scope tests; device enrollment/revocation;
+payload key lifecycle; LAN and
+optional Tailscale transport; weeks-offline catch-up; conflict-review UI;
+Windows service/reboot behavior; BitLocker/firewall/patch validation; two-copy
+encrypted backup and witnessed restore; outage/recovery exercise; native
+NVDA/Narrator pass; and written school-head/DepEd-DPO approval. Synthetic data
+only until all production gates are closed.
+
 ## UI-redesign independent reviews + Wave 5 governance gate (2026-09-04)
 
 Branch `claude/redesign-review-followups`. The owed independent reviews

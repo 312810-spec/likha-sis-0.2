@@ -1221,6 +1221,19 @@ label {
   color: var(--color-primary);
   border-bottom: 1px solid var(--color-border-soft);
 }
+.app-sidebar-identity {
+  display: none;
+  margin: 0 calc(var(--spacing-unit) * 1.25) var(--spacing-unit);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+.app-sidebar-identity strong,
+.app-sidebar-identity span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .app-sidebar-scroll {
   flex: 1;
@@ -1544,6 +1557,9 @@ label {
   }
   .app-sidebar-modes {
     display: flex;
+  }
+  .app-sidebar-identity {
+    display: block;
   }
 
   .app-bottomnav {

@@ -317,6 +317,7 @@ function renderScreen(
   Object.assign(exportRepo, exportOverrides);
   const exportService = new ExportApplicationService(exportRepo);
   const onBack = vi.fn();
+  const onOpenAttendance = vi.fn();
   const result = render(
     <ModeProvider>
       <SectionRosterScreen
@@ -325,10 +326,11 @@ function renderScreen(
         exportService={exportService}
         sectionId={sectionId}
         onBack={onBack}
+        onOpenAttendance={onOpenAttendance}
       />
     </ModeProvider>,
   );
-  return { ...result, repo, formRepo, exportRepo, onBack };
+  return { ...result, repo, formRepo, exportRepo, onBack, onOpenAttendance };
 }
 
 const GUIDED_NOTE = /always your class as it stands today/;
@@ -355,7 +357,7 @@ describe("SectionRosterScreen", () => {
   });
 
   it("renders the roster with each learner, LRN, and a friendly enrolment date, ordered as given", async () => {
-    renderScreen();
+    const { onOpenAttendance } = renderScreen();
 
     expect(await screen.findByText("Mabini — roster")).toBeInTheDocument();
     expect(screen.getByText("Grade 7 · 2025-2026")).toBeInTheDocument();
@@ -369,6 +371,11 @@ describe("SectionRosterScreen", () => {
     expect(screen.getByText("2 Jun 2025")).toBeInTheDocument();
     expect(screen.getByText("15 Aug 2025")).toBeInTheDocument();
     expect(screen.getByText("Not recorded")).toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Take attendance for this section" }));
+    expect(onOpenAttendance).toHaveBeenCalledWith("sec-1");
   });
 
   it("passes today's date as the as-of date to the roster query", async () => {
@@ -424,6 +431,7 @@ describe("SectionRosterScreen", () => {
           formGenerationService={formGenerationService}
           sectionId="sec-1"
           onBack={vi.fn()}
+          onOpenAttendance={vi.fn()}
         />
       </ModeProvider>,
     );

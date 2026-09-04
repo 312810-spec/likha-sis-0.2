@@ -7,6 +7,7 @@ pub mod export;
 pub mod formgen;
 pub mod import;
 pub mod repository;
+pub mod sync;
 
 use std::sync::Mutex;
 

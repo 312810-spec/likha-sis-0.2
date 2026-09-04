@@ -531,8 +531,15 @@ export function ClassRecordWorkspace({
       <div className="form-row">
         <div className="field">
           <label htmlFor="workspace-category-set">Category set</label>
+          {mode === "guided" && (
+            <p className="field-hint" id="workspace-category-set-hint">
+              Choose the DepEd grading rules that define how activity types are grouped and weighted
+              for this class record.
+            </p>
+          )}
           <select
             id="workspace-category-set"
+            aria-describedby={mode === "guided" ? "workspace-category-set-hint" : undefined}
             value={categorySetId}
             onChange={(event) => setCategorySetId(event.target.value)}
           >
@@ -546,8 +553,15 @@ export function ClassRecordWorkspace({
         </div>
         <div className="field">
           <label htmlFor="workspace-category">Category</label>
+          {mode === "guided" && (
+            <p className="field-hint" id="workspace-category-hint">
+              Choose the activity type, such as Written Works or Performance Tasks. This decides
+              which grading weight the scores use.
+            </p>
+          )}
           <select
             id="workspace-category"
+            aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
             value={categoryId}
             onChange={(event) => setCategoryId(event.target.value)}
           >

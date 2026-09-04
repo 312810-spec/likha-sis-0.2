@@ -1284,6 +1284,36 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- ADR-0067 local sync outbox. This is an encrypted change queue,
+        -- not a second domain datastore: payloads are encrypted before
+        -- insertion and the table deliberately carries no learner fields.
+        -- `change_id` is the idempotency key used by the authoritative hub.
+        CREATE TABLE sync_outbox (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'assessment_item', 'learner_score',
+                'grading_period', 'subject', 'teaching_assignment'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+        "#,
+        ),
     ])
 }
 
@@ -3171,5 +3201,33 @@ mod tests {
             rejected.is_err(),
             "an unrecognized event type must still be rejected by the widened CHECK constraint"
         );
+    }
+
+    #[test]
+    fn migration_25_enforces_the_encrypted_outbox_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        let empty_payload = conn.execute(
+            "INSERT INTO sync_outbox
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'')",
+            [],
+        );
+        assert!(empty_payload.is_err());
+
+        let unlisted_entity = conn.execute(
+            "INSERT INTO sync_outbox
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, base_version, operation, encrypted_payload)
+             VALUES ('c2', 's1', 'd1', 'u1', 'session', 'x1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(unlisted_entity.is_err());
     }
 }

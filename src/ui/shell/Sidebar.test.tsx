@@ -5,11 +5,23 @@ import { Sidebar } from "./Sidebar";
 import type { SignedInTab } from "../components/workbench-nav-data";
 import { ModeProvider } from "../theme/ModeContext";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
+import type { CurrentSession } from "../../domain/session";
+
+const session: CurrentSession = {
+  userId: "u1",
+  username: "ana.cruz",
+  displayName: "Ana Cruz",
+  schoolId: "s1",
+  schoolName: "Rizal Elementary",
+  expiresAtUnixMs: 1_000_000,
+  idleExpiresAtUnixMs: 2_000_000,
+  roles: ["teacher"],
+};
 
 function renderSidebar(activeTab: SignedInTab = "attendance", onNavigate = vi.fn()) {
   return render(
     <ModeProvider>
-      <Sidebar activeTab={activeTab} onNavigate={onNavigate} />
+      <Sidebar session={session} activeTab={activeTab} onNavigate={onNavigate} />
     </ModeProvider>,
   );
 }
@@ -18,12 +30,20 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => window.localStorage.clear());
 
 describe("Sidebar", () => {
-  it("renders the brand, a pinned Home, and the four groups", () => {
+  it("renders the brand, signed-in identity, pinned Home, and navigation groups", () => {
     renderSidebar();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "LIKHA-SIS" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    for (const g of ["Daily Teaching", "Learner Records", "Grading", "Security"]) {
+    expect(screen.getByText("Ana Cruz")).toBeInTheDocument();
+    expect(screen.getByText("Rizal Elementary")).toBeInTheDocument();
+    for (const g of [
+      "Daily Teaching",
+      "Class Overview",
+      "Learner Records",
+      "Grading",
+      "Security",
+    ]) {
       expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "true");
     }
   });
