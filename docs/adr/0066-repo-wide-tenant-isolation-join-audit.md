@@ -135,7 +135,7 @@ tables). Two Minor parity fixes were folded in on review:
 grades subquery gained `AND gp.school_id = ?2` (matching fixes #1/#2 on
 the same table). Both are availability-only, not leaks, and not
 reachable via `assessment_item::create` / `class_record::create`. Full
-findings: `.planning/tenant-isolation-audit/security-review.md`.
+findings: `docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-audit.md`.
 
 ## Consequences
 

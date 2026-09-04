@@ -29,7 +29,7 @@ JOIN SQL). Two Minor parity fixes folded in: `class_record`
 `DETAIL_SELECT_LIST` `item_count` subquery `+ AND ai.school_id =
 cr.school_id`; `section_membership::dependent_records_stranded` grades
 subquery `+ AND gp.school_id = ?2`. Both availability-only, not leaks.
-Full findings: `.planning/tenant-isolation-audit/security-review.md`.
+Full findings: `docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-audit.md`.
 
 **`section_membership::dependent_records_stranded`** got its
 `+ AND cr.school_id = ?2` with no dedicated test (NOT-EXISTS guard,
@@ -123,7 +123,7 @@ tests are genuine (forged `INSERT` satisfies all FKs, `.unwrap()` would
 panic on failure, fails without the production change). The review's one
 should-fix (two additional readers unhardened) and one doc-wording minor
 were both resolved by widening this slice to cover all five readers.
-Full findings file: session scratchpad `security-review-roster-join.md`.
+Full findings file: `docs/security-reviews/2026-09-03-section-membership-l-school-id.md`.
 
 ## Wave 1 UI redesign shell (2026-09-03)
 

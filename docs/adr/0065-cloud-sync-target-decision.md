@@ -506,5 +506,4 @@ Left for the implementation milestone (its own ADR + a mandatory
   allowlist; cloud-copy PII encryption as a requirement; device-
   enrollment trusted-boundary callout) plus should-fix items, all
   folded into this version. Full findings:
-  `.planning/wave5-sync-target/` / session scratchpad
-  `security-review-adr-0065.md`.
+  `docs/security-reviews/2026-09-03-adr-0065-cloud-sync-target.md`.
