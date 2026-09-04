@@ -1,10 +1,10 @@
 [package]
 name = "app"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.2.0"
+description = "LIKHA-SIS 0.2 - native-first, local-first, offline-capable SIS for Philippine DepEd schools"
+authors = ["LIKHA-SIS contributors"]
 license = ""
-repository = ""
+repository = "https://github.com/312810-spec/likha-sis-0.2"
 edition = "2021"
 rust-version = "1.95"
 publish = false
