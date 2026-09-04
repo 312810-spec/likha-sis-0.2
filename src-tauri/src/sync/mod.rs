@@ -31,6 +31,28 @@ pub enum ChangeOperation {
     Delete,
 }
 
+impl ChangeOperation {
+    /// The stored/wire string form -- also the exact `CHECK (operation IN
+    /// (...))` allowlist in migrations 25/28. Pure string mapping, no
+    /// `rusqlite` dependency: this module deliberately contains no
+    /// database code (see the module doc comment), so a caller wraps this
+    /// into its own storage-layer error type.
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            ChangeOperation::Upsert => "upsert",
+            ChangeOperation::Delete => "delete",
+        }
+    }
+
+    pub fn from_db_str(value: &str) -> Option<ChangeOperation> {
+        match value {
+            "upsert" => Some(ChangeOperation::Upsert),
+            "delete" => Some(ChangeOperation::Delete),
+            _ => None,
+        }
+    }
+}
+
 /// Explicit allowlist. Authentication, sessions, credentials, local audit
 /// material, and encryption keys are intentionally absent.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -46,6 +68,43 @@ pub enum EntityKind {
     GradingPeriod,
     Subject,
     TeachingAssignment,
+}
+
+impl EntityKind {
+    /// The stored/wire string form -- also the exact `CHECK (entity_kind
+    /// IN (...))` allowlist in migrations 25/28. Pure string mapping, see
+    /// `ChangeOperation::as_db_str`'s doc comment for why this has no
+    /// `rusqlite` dependency.
+    pub fn as_db_str(self) -> &'static str {
+        match self {
+            EntityKind::Learner => "learner",
+            EntityKind::Section => "section",
+            EntityKind::SectionMembership => "section_membership",
+            EntityKind::Attendance => "attendance",
+            EntityKind::SubjectAttendance => "subject_attendance",
+            EntityKind::AssessmentItem => "assessment_item",
+            EntityKind::LearnerScore => "learner_score",
+            EntityKind::GradingPeriod => "grading_period",
+            EntityKind::Subject => "subject",
+            EntityKind::TeachingAssignment => "teaching_assignment",
+        }
+    }
+
+    pub fn from_db_str(value: &str) -> Option<EntityKind> {
+        match value {
+            "learner" => Some(EntityKind::Learner),
+            "section" => Some(EntityKind::Section),
+            "section_membership" => Some(EntityKind::SectionMembership),
+            "attendance" => Some(EntityKind::Attendance),
+            "subject_attendance" => Some(EntityKind::SubjectAttendance),
+            "assessment_item" => Some(EntityKind::AssessmentItem),
+            "learner_score" => Some(EntityKind::LearnerScore),
+            "grading_period" => Some(EntityKind::GradingPeriod),
+            "subject" => Some(EntityKind::Subject),
+            "teaching_assignment" => Some(EntityKind::TeachingAssignment),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

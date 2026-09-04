@@ -1382,6 +1382,78 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- ADR-0067 hub-side accepted change log -- the authoritative,
+        -- ordered record `repository::sync_hub` appends to once a pushed
+        -- change is ACCEPTED (its `base_version` matched the entity's
+        -- current hub version). `cursor` is the position other devices
+        -- pull from; `version` is the new per-entity version a matching
+        -- base_version must reference on a later push. A change that
+        -- fails the version check never reaches this table -- see
+        -- migration 29's sync_conflict_review.
+        CREATE TABLE sync_hub_log (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'assessment_item', 'learner_score',
+                'grading_period', 'subject', 'teaching_assignment'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        -- Pull pagination: "changes after this cursor, for this school."
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+
+        -- "What is this entity's current accepted version" -- the read
+        -- `repository::sync_hub::current_version` does on every push to
+        -- decide accept vs. conflict-stage.
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- ADR-0067 conflict staging. A pushed change whose base_version
+        -- did not match the entity's current hub version lands here
+        -- instead of sync_hub_log -- "Learner identity, enrollment,
+        -- attendance, and grading records never use silent
+        -- last-write-wins" (ADR-0067 protocol contract, point 6). This
+        -- migration stages conflicts only; the review/resolution UI and
+        -- workflow are a later, separate slice (ADR-0067 "What this ADR
+        -- does NOT decide").
+        CREATE TABLE sync_conflict_review (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'assessment_item', 'learner_score',
+                'grading_period', 'subject', 'teaching_assignment'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT
+        );
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+        "#,
+        ),
     ])
 }
 
@@ -3418,6 +3490,106 @@ mod tests {
         assert!(
             rejected.is_err(),
             "an unrecognized event type must still be rejected by the widened CHECK constraint"
+        );
+    }
+
+    #[test]
+    fn migration_28_enforces_the_hub_log_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO sync_hub_log
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 1, 'upsert', X'01')",
+            [],
+        )
+        .unwrap();
+        let cursor: i64 = conn
+            .query_row(
+                "SELECT cursor FROM sync_hub_log WHERE change_id = 'c1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cursor, 1, "the first accepted change occupies cursor 1");
+
+        let zero_version = conn.execute(
+            "INSERT INTO sync_hub_log
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, version, operation, encrypted_payload)
+             VALUES ('c2', 's1', 'd1', 'u1', 'learner', 'l2', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(
+            zero_version.is_err(),
+            "an accepted log entry's version must be at least 1"
+        );
+
+        let duplicate_change_id = conn.execute(
+            "INSERT INTO sync_hub_log
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l3', 2, 'upsert', X'01')",
+            [],
+        );
+        assert!(
+            duplicate_change_id.is_err(),
+            "change_id is the idempotency key and must be globally unique"
+        );
+
+        let unlisted_entity = conn.execute(
+            "INSERT INTO sync_hub_log
+             (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id, version, operation, encrypted_payload)
+             VALUES ('c3', 's1', 'd1', 'u1', 'session', 'x1', 1, 'upsert', X'01')",
+            [],
+        );
+        assert!(unlisted_entity.is_err());
+    }
+
+    #[test]
+    fn migration_29_enforces_the_conflict_review_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO sync_conflict_review
+             (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+              submitted_base_version, current_hub_version, operation, encrypted_payload)
+             VALUES ('r1', 'c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 1, 'upsert', X'01')",
+            [],
+        )
+        .unwrap();
+
+        let empty_payload = conn.execute(
+            "INSERT INTO sync_conflict_review
+             (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+              submitted_base_version, current_hub_version, operation, encrypted_payload)
+             VALUES ('r2', 'c2', 's1', 'd1', 'u1', 'learner', 'l2', 0, 1, 'upsert', X'')",
+            [],
+        );
+        assert!(empty_payload.is_err());
+
+        let duplicate_change_id = conn.execute(
+            "INSERT INTO sync_conflict_review
+             (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+              submitted_base_version, current_hub_version, operation, encrypted_payload)
+             VALUES ('r3', 'c1', 's1', 'd1', 'u1', 'learner', 'l3', 0, 1, 'upsert', X'01')",
+            [],
+        );
+        assert!(
+            duplicate_change_id.is_err(),
+            "change_id must be unique here too, matching sync_hub_log's idempotency key"
         );
     }
 }
