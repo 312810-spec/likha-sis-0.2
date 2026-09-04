@@ -31,6 +31,11 @@ Shared stack:
 - Zero-billing-oriented; no paid services without explicit approval.
 - Comfortable is the default teacher interface mode.
 - Efficient / Comfortable / Guided retain functional parity.
+- For the one-school deployment, the supervised lab laptop is the
+  authoritative consolidation/sync hub and the ICT coordinator is custodian.
+  Teacher devices remain offline-first, encrypted, scope-limited replicas.
+  See ADR-0067; production learner use still requires its written DPO/operations
+  and native verification gates.
 
 ## Architecture
 

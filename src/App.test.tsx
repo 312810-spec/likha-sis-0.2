@@ -72,7 +72,7 @@ describe("App", () => {
 
     expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toBeInTheDocument();
-    expect(screen.getByText(/Rizal Elementary/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Rizal Elementary/).length).toBeGreaterThan(0);
   });
 
   it("shows the school-head Home view switch for a session that holds school_head", async () => {

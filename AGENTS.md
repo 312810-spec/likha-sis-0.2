@@ -42,9 +42,9 @@ At session start read:
 3. `docs/ACTIVE-PLAN.md`
 4. only ADRs/docs relevant to the current task
 
-Detailed, topic-specific rules live in `.Codex/rules/` (architecture,
+Detailed, topic-specific rules live in `.claude/rules/` (architecture,
 security-privacy, testing, project-state, autonomous-development) and
-narrowly-triggered procedures live in `.Codex/skills/` — read the
+narrowly-triggered procedures live in `.claude/skills/` — read the
 relevant one when the task matches it rather than expecting this file to
 contain everything.
 
@@ -66,7 +66,7 @@ Rules:
   instruction to do so.
 
 **Default mode is Autonomous Continuous Development** — see
-`.Codex/rules/autonomous-development.md` for the full loop and rules.
+`.claude/rules/autonomous-development.md` for the full loop and rules.
 In short: a completed milestone is a checkpoint, not a stopping point.
 Verify it, record it, then autonomously select and continue to the next
 highest-value work using LIKHA's priority order above. Stop only for a

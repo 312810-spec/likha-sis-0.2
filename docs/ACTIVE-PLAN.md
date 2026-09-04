@@ -1,5 +1,23 @@
 # ACTIVE PLAN
 
+## School-laptop authoritative sync hub — ADR-0067 (added 2026-09-04) — foundation in progress
+
+The owner selected one supervised, always-on computer-lab laptop as the
+complete school consolidation point, with the ICT coordinator as custodian.
+ADR-0067 supersedes ADR-0065's offshore target. Recommended reachability is
+school LAN plus optional Tailscale for home sync; Next Best is LAN-only with
+home changes queued offline. The provider-neutral `SyncProvider` contract,
+allowlist, size guard, and review-not-last-write-wins policy are implemented.
+
+**Still required before production PII:** persistent transactional outbox and
+hub log; enrolled/revocable device credentials; payload key ceremony; scoped
+push/pull adapters; conflict-review UI; sync status UI; laptop hardening;
+encrypted backup and witnessed restore drill; native Windows verification;
+school-head/DepEd-DPO written approval. No real learner data before these gates.
+
+**Exact next implementation slice:** local outbox schema and repository with
+atomic domain-write capture, idempotency tests, and school-scope tests.
+
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 
 Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`;

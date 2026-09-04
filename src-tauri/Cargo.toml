@@ -26,7 +26,7 @@ tauri = { version = "2.11.3", features = [] }
 tauri-plugin-log = "2"
 rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
 rusqlite_migration = "2"
-uuid = { version = "1.20.0", features = ["v7"] }
+uuid = { version = "1.20.0", features = ["v7", "serde"] }
 rand = "0.10.2"
 zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
 argon2 = { version = "0.5.3", features = ["zeroize"] }

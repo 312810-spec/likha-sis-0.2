@@ -243,42 +243,31 @@ adoption decisions) before writing any adapter code. No learner PII
 should ever be required by a generation tool. Nothing in this area has
 been started.
 
-## 12. Cloud / sync / web access — TECHNICAL SHORTLIST CHOSEN (ADR-0065); governance gate CONDITIONAL; PoC BLOCKED
+## 12. Sync and remote access — SCHOOL-LAPTOP HUB SELECTED (ADR-0067)
 
-No cloud/sync code exists yet — `SyncProvider` is still only the
-architecture-diagram placeholder from ADR-0001's layering statement.
-**ADR-0065** ran a 20-scenario pass (zero-cost + no-payment-card gate,
-100-point metric) and technically favours a **Cloudflare Worker + one D1
-database** for the school (next best: Worker + single SQLite Durable
-Object; third: Turso single-database). Scope (owner, 2026-09-03): **one
-database for one school**.
+One supervised, always-on laptop in the school computer lab is the
+authoritative consolidation hub for one school's dataset. The ICT coordinator
+is custodian. Teacher devices keep encrypted, scope-limited SQLite replicas;
+local work and offline login never depend on hub availability.
 
-**But the recommended target is NOT approvable as specified.** The
-2026-09-04 DepEd/government data-governance gate
-(`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`;
-ADR-0065 "2026-09-04 governance gate" addendum) found **Executive Order
-No. 119, s. 2026** — a government data classification + residency
-framework covering data private contractors hold on an agency's behalf.
-A DepEd school's learner PII is realistically classified **Confidential**
-(offshore only with a Joint Oversight Committee approval LIKHA cannot
-self-grant) or **Restricted** (secured cloud anywhere with encryption);
-the EO 119 implementing guidelines that settle this are due **~November
-2026**. Until then a "single global/US D1" cannot be committed to.
-**Do not begin the sync implementation PoC.** Re-run the gate when the
-EO 119 IRR publishes and after confirming with the DepEd Data Protection
-Officer; the likely re-scope is a **Philippines-hostable** backend
-(PH/DICT-accredited CSP or GovCloud), which would need explicit
-paid-infrastructure approval if no free PH option qualifies.
+Recommended reachability is direct LAN on campus plus optional Tailscale for
+home synchronization, assuming CGNAT until the ISP proves otherwise. Next Best
+is LAN-only: home changes remain safely queued until the teacher returns.
+Tailscale is transport, not identity or authorization. LIKHA uses a separate,
+revocable per-device sync credential and encrypted application payloads.
 
-Design constraints that stand regardless of provider (from ADR-0065,
-still binding on whatever target is finally chosen): decision-only until
-its own implementation ADR + mandatory `security-reviewer`; the synced
-set is an allowlist of domain tables only (no auth/session/credential/
-audit tables leave the device); no plaintext learner PII in the cloud
-copy; device enrollment is a trusted-boundary ceremony; per-device
-revocable credential. Cloud is never the teacher's working database;
-SQLite remains primary; offline writes save locally first. Web/PWA
-access respects the same school/role authorization boundaries as native.
+The hub validates and orders accepted changes; it does not silently win
+conflicts. Divergent learner, enrollment, attendance, and grading edits enter a
+review queue. Pulls are filtered to the authenticated teacher/device scope. The
+synced allowlist excludes authentication, sessions, password hashes, local
+audit material, and keys.
+
+ADR-0065's offshore Cloudflare selection is superseded. It remains useful as
+historical research but is not an implementation target. Remote Tailscale
+traffic may transit an offshore encrypted relay, so LIKHA must not claim that
+all data paths remain in the Philippines. Production learner use requires
+documented school-head/DepEd-DPO approval plus the hardening, key-management,
+backup/restore, and native verification gates in ADR-0067.
 
 ## 13. Local session / auth hardening — BUILT (current), HYPOTHESIS (extension)
 
