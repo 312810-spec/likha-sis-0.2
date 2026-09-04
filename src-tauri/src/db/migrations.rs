@@ -1518,6 +1518,28 @@ pub fn migrations() -> Migrations<'static> {
             ('00000000-0000-7000-8000-000000000543', '00000000-0000-7000-8000-000000000054', '00000000-0000-7000-8000-000000000323', 20.0);
         "#,
         ),
+        M::up(
+            r#"
+        -- M31: ADR-0067 local device identity: a stable id for THIS
+        -- physical installation, independent of which school it is used
+        -- for or which user is logged in. Generated once and never
+        -- changed -- device enrollment
+        -- (auth::enroll_device_sync_credential) and every outbox change
+        -- this device ever emits are stamped with it. Singleton table,
+        -- same `id INTEGER PRIMARY KEY CHECK (id = 1)` pattern as
+        -- installation_state (migration 3); see
+        -- repository::device_identity for the race-safe get-or-create.
+        --
+        -- Sequenced after migration 30 (Grade 12 DO 8 carryover,
+        -- PR #44/codex/merged-priorities-20260904) because that branch
+        -- merged to main first -- see docs/CURRENT-HANDOFF.md.
+        CREATE TABLE device_identity (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            device_id TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
     ])
 }
 
@@ -3739,5 +3761,26 @@ mod tests {
         assert!(rows[1].0.contains("Immersion/Research/Exhibit/Performance"));
         assert_eq!(rows[0].1, "20/60/20");
         assert_eq!(rows[1].1, "20/60/20");
+    }
+
+    #[test]
+    fn migration_31_enforces_the_device_identity_singleton() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO device_identity (id, device_id) VALUES (1, 'd1')",
+            [],
+        )
+        .unwrap();
+
+        let second_row = conn.execute(
+            "INSERT INTO device_identity (id, device_id) VALUES (2, 'd2')",
+            [],
+        );
+        assert!(
+            second_row.is_err(),
+            "only one device_identity row is ever allowed, matching installation_state"
+        );
     }
 }

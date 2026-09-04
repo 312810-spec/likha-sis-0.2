@@ -1,6 +1,6 @@
 # ACTIVE PLAN
 
-## Grade 12 DO 8 weighting carryover — ADR-0068 (2026-09-04) — implemented, native verification pending
+## Grade 12 DO 8 weighting carryover — ADR-0068 (2026-09-04) — merged as PR #44 (main `aac0ed7`)
 
 The six Strengthened-SHS policies were already complete in migration 12; the
 actual remaining P0 grading gap was Grade 12's DO 8, s. 2015 transition rule.
@@ -9,10 +9,14 @@ existing legacy category set. Tests cover seed completeness, 100% totals,
 category-set isolation, separate equal-weight track groups, and an end-to-end
 35/40/25 computation using DO 015's adjusted SY 2026-2027 transmutation.
 
-Branch `codex/grade12-do8-carryover` is stacked on the active ADR-0067 branch
-because that branch already owns migrations 28-29. Rust verification and an
-independent compliance/correctness review are owed before merge. SF1/SF9/SF10
-template verification remains with the separate Claude Code workstream.
+Actually merged to `main` directly (not stacked on the ADR-0067 branch as
+originally planned below) — the owner chose codex-first during the 2026-09-04
+non-CC repository audit, so this landed as migration 30 and the ADR-0067
+branch's `device_identity` migration was renumbered 30 → 31 and rebased on
+top instead. A `cargo fmt` fix (the PR's only CI failure) was applied before
+merge; full CI (Quality Gate Ubuntu+Windows, Security Gate) passed green —
+independent-compliance review is still owed. SF1/SF9/SF10 template
+verification remains with the separate Claude Code workstream.
 
 ## School-laptop authoritative sync hub — ADR-0067 (added 2026-09-04) — foundation in progress
 
@@ -74,13 +78,49 @@ tests + all integration binaries, 0 failed. `cargo clippy -D warnings` and
 receiver is called directly by tests today; the actual LAN/Tailscale
 transport adapter is the next slice after this one.
 
-**Exact next implementation slice:** the network listener/transport adapter
-(ADR-0067 D1: LAN discovery + optional Tailscale) that actually calls
-`device_credential::verify` then `sync_hub::push_batch`/`pull_since` over the
-wire, plus wiring at least one domain write (e.g. `learner` upsert) to emit a
-`PendingChange` into the existing local `sync_outbox` so there is an
-end-to-end path to exercise. Conflict-review UI/resolution workflow and the
-Android client remain separate, later slices.
+**Completed next slice (2026-09-04, this session):** migration 31
+(`device_identity`, renumbered from 30 after rebasing onto merged PR #44's
+migration 30 — see the ADR-0068 entry above; same
+`id INTEGER PRIMARY KEY CHECK (id = 1)` singleton pattern as
+`installation_state`) and
+`repository::device_identity::current_or_create` — a stable id for THIS
+physical installation, generated once and race-safe the same way
+`installation::claim_bootstrap_slot` already is (an `INSERT ... ON CONFLICT
+DO NOTHING` as the real write, never a `SELECT`-then-act check). Needed
+before either device enrollment or outbox wiring can use a real device id
+instead of a caller-invented placeholder string. 4 new tests. `cargo test`
+708 lib tests + all integration binaries, 0 failed; `cargo clippy -D
+warnings` and `cargo fmt --check` clean.
+
+**Genuinely blocked, not just not-yet-started:** wiring an actual domain
+write (e.g. `learner` upsert) to emit a `PendingChange` into `sync_outbox`
+requires payloads to already be encrypted before they reach that table —
+`sync::PendingChange`'s own doc comment says so, and `sync_outbox`'s
+`encrypted_payload` column name assumes it. ADR-0067's "Authentication and
+keys" section calls for a **separate sync-payload key wrapped per enrolled
+device** (distinct from each device's own SQLCipher key), but the actual
+encryption scheme and key-wrapping mechanism have **not been decided** —
+this is one of the still-required items listed at the top of this file
+("payload key ceremony"). Implementing outbox wiring with an improvised
+scheme instead of a real decision would be exactly the kind of
+security-critical shortcut this project's own rules (TDD + independent
+review for persistence/security logic; no guessed crypto) exist to prevent.
+**This needs its own design pass before code** — likely a short ADR
+addendum choosing the scheme (e.g. AES-256-GCM with a per-school payload
+key, wrapped for each device's public key established at enrollment, vs.
+a simpler shared-symmetric-key-per-school model) and how the key survives
+device loss/rotation. Recommend treating this as the next slice's first
+step, before either outbox wiring or the network listener.
+
+**Exact next implementation slice:** (1) decide and document the sync
+payload encryption/key-wrapping scheme (ADR-0067 addendum), (2) wire it
+into `sync_outbox` enqueue so a domain write (e.g. `learner` upsert) can
+emit a real encrypted `PendingChange` end-to-end, (3) the network
+listener/transport adapter (ADR-0067 D1: LAN discovery + optional
+Tailscale) that calls `device_credential::verify` then
+`sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
+UI/resolution workflow and the Android client remain separate, later
+slices.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

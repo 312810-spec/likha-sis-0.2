@@ -1,6 +1,18 @@
 # CURRENT HANDOFF
 
-## ADR-0068 Grade 12 DO 8 carryover (2026-09-04) — code complete, verification owed
+## ADR-0068 Grade 12 DO 8 carryover (2026-09-04) — merged as PR #44 (main `aac0ed7`)
+
+Merged to `main` ahead of this branch's device-identity slice, per owner
+decision during the non-CC repository audit (2026-09-04): codex's migration
+30 (Grade 12 DO 8 carryover) lands first; this branch's `device_identity`
+migration is renumbered 30 → 31 and rebased on top. A `cargo fmt` fix (the
+PR's only CI failure — logic/tests were already green) was applied directly
+to `codex/merged-priorities-20260904` before merge; CI then passed in full
+(Quality Gate Ubuntu + Windows, Security Gate gitleaks/cargo-deny/osv-scanner)
+— the first freshly-confirmed pass of the Rust checks this candidate's own
+audit had flagged as unverified. The paragraph below is preserved as
+originally written (pre-merge) for history; its migration-30/28-29 sequencing
+description no longer matches what actually landed.
 
 Owner confirmation: Grade 12 remains on the old curriculum and uses the old
 grading format for SY 2026-2027. The new Zero-Based Grading System starts in
@@ -30,6 +42,51 @@ receiver commit lands and open a focused PR. Do not merge migration 30 ahead
 of migrations 28-29 without renumbering/rebasing.
 
 ## ADR-0067 hub push/pull receiver (2026-09-04), commit + PR owed
+
+## ADR-0067 local device identity + payload-encryption gate found (2026-09-04), commit + PR owed
+
+Branch `claude/wave5-adr-0067-local-host-sync`, continuing on top of the
+merged hub-receiver slice below (PR #42, merged as `f7e4f46`). Rebased
+2026-09-04 onto `main` `aac0ed7` (after PR #44 merged) — `device_identity`
+is now migration 31, not 30; migration 30 is codex's Grade 12 DO 8 carryover.
+
+**What shipped:** migration 31 (`device_identity`) and
+`repository::device_identity::current_or_create` — a stable id for THIS
+physical installation (independent of school/user), generated once,
+race-safe the same way `installation::claim_bootstrap_slot` already is (a
+real `INSERT ... ON CONFLICT DO NOTHING` write, never a `SELECT`-then-act
+check). This was a genuine prerequisite: device enrollment
+(`auth::enroll_device_sync_credential`) and any future outbox-emitting
+domain write both need a real device id, and nothing in this codebase
+generated one before now. 4 new tests. `cargo test` 708 lib tests + all
+integration binaries, 0 failed. `cargo clippy -D warnings` and `cargo fmt
+--check` clean.
+
+**Found, not built: the sync payload-encryption scheme is undecided, and
+this genuinely blocks the next two slices.** Went to wire a domain write
+(e.g. `learner` upsert) into `sync_outbox` as planned, but
+`sync::PendingChange`'s own doc comment ("Plaintext learner data must never
+cross the provider boundary") and the `encrypted_payload` column name both
+assume payloads are already encrypted before insertion — and ADR-0067's
+"Authentication and keys" section calls for a **separate sync-payload key,
+wrapped per enrolled device**, distinct from each device's own SQLCipher
+key. That scheme was never actually decided (it's listed as still-required
+in this file's own top entry — "payload key ceremony"). Implementing outbox
+wiring against an improvised encryption scheme instead of a real decision
+would be exactly the security shortcut this project's own rules (TDD +
+independent review for persistence/security logic) exist to prevent, so
+this was deliberately **not** done. Recorded as the next slice's first step
+in `docs/ACTIVE-PLAN.md`'s top entry: decide and document the
+encryption/key-wrapping scheme (a short ADR-0067 addendum) before either
+outbox wiring or the network listener.
+
+**Verification:** see above — Rust side fully green. `npm run quality`
+(frontend gate; no TS touched by this slice) — 92 files / 965 tests, all
+green, checked directly against the command's own output.
+
+**Not yet done:** commit; push; PR (targets `main`).
+
+## ADR-0067 hub push/pull receiver (2026-09-04), merged as PR #42
 
 Branch `claude/wave5-adr-0067-local-host-sync`, continuing directly on top of
 the merged device-credential slice below (PR #41, merged as `d8ef0f5`).
@@ -63,11 +120,11 @@ directly against the command's own output, not just its reported exit code).
 
 **Not yet wired to a network listener.** `push_change`/`pull_since` are
 called directly by tests today; the actual LAN/Tailscale transport adapter
-(ADR-0067 D1) is the next slice, along with wiring at least one domain write
-to actually emit a `PendingChange` into `sync_outbox` so there is an
-end-to-end path to exercise.
+(ADR-0067 D1) is a later slice — see the entry above for what actually
+blocked "wiring a domain write" next (the payload-encryption scheme, not
+this).
 
-**Not yet done:** commit; push; PR (targets `main`).
+**Merged 2026-09-04 as PR #42** (`f7e4f46`).
 
 ## ADR-0067 device sync enrollment/credential foundation (2026-09-04), merged as PR #41
 

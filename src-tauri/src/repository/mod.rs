@@ -5,6 +5,7 @@ pub mod audit_log;
 pub mod class_record;
 pub mod curriculum;
 pub mod device_credential;
+pub mod device_identity;
 pub mod grading;
 pub mod grading_computation;
 pub mod installation;
