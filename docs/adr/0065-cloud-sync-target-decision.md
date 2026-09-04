@@ -1,14 +1,17 @@
 # ADR-0065 — Cloud Sync Target Decision (zero-card, single-database)
 
-Status: **Accepted for the technical shortlist, but the recommended
-target (a single global Cloudflare D1) is NOT approvable as-is** — the
-DepEd / government data-governance gate this ADR flagged as
-decision-invalidating has **partially triggered** (see the "2026-09-04
-governance gate" addendum at the end). Still decision-only: no
-`SyncProvider` implementation, no Worker, no schema change. **Do not
-begin the sync implementation PoC** until the gate is re-run against the
-Executive Order No. 119, s. 2026 implementing guidelines (expected
-~November 2026) and confirmed with the DepEd Data Protection Officer.
+Status: **Superseded as the Wave 5 direction by ADR-0067** (a
+Philippines-resident local-host sync architecture that clears the EO 119
+block without waiting for November). This ADR is retained as the
+_offshore-cloud_ shortlist and analysis: its recommended target (a
+single global Cloudflare D1) is **NOT approvable as-is** — the DepEd /
+government data-governance gate flagged here as decision-invalidating
+**partially triggered** (see the "2026-09-04 governance gate" addendum).
+The offshore option stays **paused**; revisit only if a future need for
+cross-school aggregation or a genuine cloud backend arises, and only
+after the EO 119, s. 2026 implementing guidelines (~November 2026) and a
+DepEd DPO consultation. Still decision-only: no code shipped from this
+ADR.
 
 Supersedes the unmerged draft on branch
 `origin/claude/cloudflare-likha-setup-a5oq5i`
