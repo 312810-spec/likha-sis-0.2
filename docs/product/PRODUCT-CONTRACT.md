@@ -243,30 +243,42 @@ adoption decisions) before writing any adapter code. No learner PII
 should ever be required by a generation tool. Nothing in this area has
 been started.
 
-## 12. Cloud / sync / web access — TARGET CHOSEN (ADR-0065), not implemented
+## 12. Cloud / sync / web access — TECHNICAL SHORTLIST CHOSEN (ADR-0065); governance gate CONDITIONAL; PoC BLOCKED
 
 No cloud/sync code exists yet — `SyncProvider` is still only the
-architecture-diagram placeholder from ADR-0001's layering statement. The
-**target** is now decided: **ADR-0065** (20-scenario pass, zero-cost +
-no-payment-card gate, 100-point metric) selects a **Cloudflare Worker in
-front of one D1 database** for the school, with a Cloudflare Worker +
-single SQLite **Durable Object** as the next best fallback, and Turso
-single-database as the third fallback only if leaving Cloudflare. Scope
-for now (owner, 2026-09-03): **one database for one school**, not a
-multi-tenant platform and not one-DB-per-school-at-scale. The earlier
-"Durable Object per school" hypothesis is superseded — that pick was
-driven by multi-tenant structural isolation, which the single-school
-scope removed.
+architecture-diagram placeholder from ADR-0001's layering statement.
+**ADR-0065** ran a 20-scenario pass (zero-cost + no-payment-card gate,
+100-point metric) and technically favours a **Cloudflare Worker + one D1
+database** for the school (next best: Worker + single SQLite Durable
+Object; third: Turso single-database). Scope (owner, 2026-09-03): **one
+database for one school**.
 
-ADR-0065 is decision-only: no Worker, no schema change, no `SyncProvider`
-implementation. It explicitly does **not** decide the sync unit, the
-conflict policy, the cloud device-credential shape, or end-to-end
-encryption of the cloud copy — those belong to the implementation
-milestone, which gets its own ADR and a mandatory `security-reviewer`
-pass. Cloud is never the teacher's working database; SQLite remains
-primary; offline writes save locally first. Web/PWA access (for
-iOS/macOS/stakeholders) must respect the same school/role authorization
-boundaries as native — no separate, weaker web auth path.
+**But the recommended target is NOT approvable as specified.** The
+2026-09-04 DepEd/government data-governance gate
+(`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`;
+ADR-0065 "2026-09-04 governance gate" addendum) found **Executive Order
+No. 119, s. 2026** — a government data classification + residency
+framework covering data private contractors hold on an agency's behalf.
+A DepEd school's learner PII is realistically classified **Confidential**
+(offshore only with a Joint Oversight Committee approval LIKHA cannot
+self-grant) or **Restricted** (secured cloud anywhere with encryption);
+the EO 119 implementing guidelines that settle this are due **~November
+2026**. Until then a "single global/US D1" cannot be committed to.
+**Do not begin the sync implementation PoC.** Re-run the gate when the
+EO 119 IRR publishes and after confirming with the DepEd Data Protection
+Officer; the likely re-scope is a **Philippines-hostable** backend
+(PH/DICT-accredited CSP or GovCloud), which would need explicit
+paid-infrastructure approval if no free PH option qualifies.
+
+Design constraints that stand regardless of provider (from ADR-0065,
+still binding on whatever target is finally chosen): decision-only until
+its own implementation ADR + mandatory `security-reviewer`; the synced
+set is an allowlist of domain tables only (no auth/session/credential/
+audit tables leave the device); no plaintext learner PII in the cloud
+copy; device enrollment is a trusted-boundary ceremony; per-device
+revocable credential. Cloud is never the teacher's working database;
+SQLite remains primary; offline writes save locally first. Web/PWA
+access respects the same school/role authorization boundaries as native.
 
 ## 13. Local session / auth hardening — BUILT (current), HYPOTHESIS (extension)
 

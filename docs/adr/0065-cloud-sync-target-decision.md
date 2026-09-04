@@ -1,7 +1,14 @@
 # ADR-0065 — Cloud Sync Target Decision (zero-card, single-database)
 
-Status: Accepted — **decision-only** (no `SyncProvider` implementation,
-no Worker, no schema change ships with this ADR)
+Status: **Accepted for the technical shortlist, but the recommended
+target (a single global Cloudflare D1) is NOT approvable as-is** — the
+DepEd / government data-governance gate this ADR flagged as
+decision-invalidating has **partially triggered** (see the "2026-09-04
+governance gate" addendum at the end). Still decision-only: no
+`SyncProvider` implementation, no Worker, no schema change. **Do not
+begin the sync implementation PoC** until the gate is re-run against the
+Executive Order No. 119, s. 2026 implementing guidelines (expected
+~November 2026) and confirmed with the DepEd Data Protection Officer.
 
 Supersedes the unmerged draft on branch
 `origin/claude/cloudflare-likha-setup-a5oq5i`
@@ -416,16 +423,26 @@ have to argue against from scratch:
   restart cannot prompt for a password), a conscious divergence from
   ADR-0004's in-memory non-resumable session — not a "mirror" of it, and
   not licence for `remember-me` semantics on the local login.
-- **DepEd data-governance is a decision-invalidating dependency.** The
-  RA 10173 / NPC position (no data-localisation mandate; cross-border
-  transfer permitted with a lawful basis, comparable protection, and
-  disclosure) is necessary but not sufficient. Before implementation,
-  confirm DepEd's own data-governance issuances (e.g. DepEd Order
-  No. 58, s. 2017 and successors) do not impose stricter learner-data
-  handling / data-sharing-agreement / consent rules or prohibit
-  offshore processing outright. **If they prohibit it, the Cloudflare
-  pick is void** and this ADR must be re-run against
-  Philippines-hostable options.
+- **DepEd / government data-governance is a decision-invalidating
+  dependency — and it has partially triggered (2026-09-04 gate, see the
+  addendum below).** The RA 10173 / NPC position (no data-localisation
+  mandate; cross-border transfer permitted with a lawful basis,
+  comparable protection, and disclosure) is necessary but not
+  sufficient. **Executive Order No. 119, s. 2026** (government data
+  classification + residency framework; covers government data held by
+  private contractors regardless of whether it is personal data) makes
+  offshore hosting of a school's learner PII contingent on its EO 119
+  classification: **Restricted** → cloud anywhere with encryption
+  (achievable by LIKHA); **Confidential** → domestic by default,
+  offshore only with **Joint Oversight Committee approval** (a
+  government act LIKHA cannot self-grant, with no published process
+  yet). The classification is not yet settled — the EO 119 implementing
+  guidelines are due ~November 2026. Until then, a "single global/US D1"
+  is **not approvable**. (`docs/adr/0065`'s original citation of "DepEd
+  Order No. 58, s. 2017" was wrong — that Order adopts new school forms;
+  it is not a data-privacy policy. DepEd relies on RA 10173 directly
+  plus regional Privacy Manuals; the DepEd Central Office Privacy Manual
+  must be obtained from the DepEd DPO before this gate can close.)
 
 ## What this ADR does NOT decide
 
@@ -507,3 +524,72 @@ Left for the implementation milestone (its own ADR + a mandatory
   enrollment trusted-boundary callout) plus should-fix items, all
   folded into this version. Full findings:
   `docs/security-reviews/2026-09-03-adr-0065-cloud-sync-target.md`.
+
+## Addendum — 2026-09-04 governance gate: CONDITIONAL, PoC blocked
+
+The DepEd / government data-governance dependency was researched
+(`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`, with
+sources). **Gate verdict: CONDITIONAL — and the recommended target is
+non-compliant as literally specified.**
+
+- **No absolute prohibition.** RA 10173 has no data-localisation rule
+  and its accountability principle permits international transfer to a
+  processor; no DepEd Order forbids a school-level SIS from using cloud
+  storage.
+- **But `Executive Order No. 119, s. 2026`** (signed 13-14 July 2026;
+  "government data classification + data residency framework") is a new
+  controlling instrument this ADR did not account for. It covers **all
+  government data in digital form, including data a private entity
+  processes or stores on a government agency's behalf** — procurement,
+  outsourcing and cloud arrangements are named explicitly — **regardless
+  of whether the data is personal data**. A DepEd public school is a
+  government agency; LIKHA hosting its learner data on Cloudflare is a
+  private entity processing government data. In scope.
+- Under EO 119 the offshore-hosting rule depends on classification:
+  **Top Secret / Secret** → within PH territory (would block Cloudflare;
+  implausible for a roster); **Confidential** → domestic by default,
+  offshore only with prior **Joint Oversight Committee** approval (a
+  government act LIKHA cannot self-grant; process not yet published) —
+  **effectively blocked**; **Restricted** → secured cloud anywhere with
+  encryption + recognised standards — **conditionally clear, achievable
+  by LIKHA**. A whole school's identifiable learner PII (including sex
+  and, via SF8, health/nutrition data) is realistically **Confidential
+  or Restricted**; which one is **not yet settled** — EO 119's
+  implementing guidelines (Joint Oversight Committee, co-chaired by DICT
+  - NSC) are due within 120 days of signing, **~mid-November 2026**.
+- EO 119 also requires cross-border transfers of government data with
+  personal information to carry protection "comparable to the DPA
+  standard," and that the data stays subject to Philippine law and
+  jurisdiction wherever processed. The **DICT Cloud First Policy** (DC
+  2017-002, amended 2020) additionally expects sensitive government data
+  on a DICT-accredited CSP or the Philippine GovCloud.
+
+### Consequence for Wave 5
+
+1. **Do not lock "Cloudflare Workers + single global D1" and do not
+   start the implementation PoC.** The decision-invalidating dependency
+   has partially triggered: at least one plausible classification
+   (Confidential) makes the current design contingent on a government
+   approval with no process yet.
+2. **Preferred re-scope:** a **Philippines-hostable** sync backend (a
+   PH-based / DICT-accredited CSP, GovCloud, or in-country self-host) so
+   residency is satisfied by construction and only the DPA
+   processor/notice obligations remain. The 20-scenario shortlist in
+   this ADR should be re-run with a **"data location pinnable to a
+   Philippine (or at most ASEAN) region"** gate added, weighing
+   PH-region providers that were out of scope under the zero-card
+   constraint against a paid PH option (which would need the owner's
+   explicit paid-infrastructure approval).
+3. **If Cloudflare is retained:** only with a contract pinning the D1
+   primary and all replicas to a PH/ASEAN region, plus the full
+   DPA-processor + EO 119 + DICT prerequisite list in the research doc,
+   and go-live gated on the EO 119 IRR and (if Confidential) JOC
+   approval.
+4. **Re-run this gate** once the EO 119 implementing guidelines publish
+   (~November 2026) and after direct confirmation from the DepEd Data
+   Protection Officer (`dataprivacy.dpo@deped.gov.ph`) — including
+   sight of the DepEd Central Office Privacy Manual, which could not be
+   retrieved and may carry processor/cloud constraints.
+5. **Citation correction:** "DepEd Order No. 58, s. 2017" (referenced
+   above as a data-governance issuance) is actually an adoption of new
+   school forms, not a data-privacy policy — corrected in place.

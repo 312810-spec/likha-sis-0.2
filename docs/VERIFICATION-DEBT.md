@@ -1,5 +1,71 @@
 # Verification Debt
 
+## UI-redesign independent reviews + Wave 5 governance gate (2026-09-04)
+
+Branch `claude/redesign-review-followups`. The owed independent reviews
+of the UI redesign (Waves 1-6, ADR-0064) and UX-02/03/04 — dispatched
+repeatedly since Wave 1 but never retrieved — were run this session
+against `main`. Reports archived: `docs/reviews/2026-09-04-ui-redesign-{architecture,teacher-ux,accessibility}.md`.
+
+**Architecture review — CLOSED.** Verdict PASS, no blocking / no
+should-fix. `check:architecture` + `check:dev-preview-isolation` pass;
+no `src/ui/**` import of `composition`/`infrastructure`/`@tauri-apps`;
+primitives are presentational-only; the Wave 4 `school_day_totals` read
+is properly layered. 4 Minor/Informational items, all already in
+ADR-0064's accepted backlog (`SchoolHeadHome` multi-service orchestration
+in a UI component; `PageHeader`/`Page` coexist until `TeacherWorkspaceScreen`
+is deleted).
+
+**Teacher-UX review — CLOSED.** Verdict PASS-WITH-MINORS, 0 blocking.
+Functional parity across Efficient/Comfortable/Guided holds; Guided help
+is genuine; the trust-critical flows (end-enrollment, delete, every SF
+export) are confirmed and honestly disclosed. Fixed this session: **S4**
+(School-Head Home showed a raw ISO date + "N rows" — now `formatIsoDate`
+
+- "N learners"). Carried as smaller backlog: S1 (opaque nav labels
+  "Subject Monitor"/"Adviser View"/"SF1: Enrollment"), S2 ("Category set"
+  unexplained in Guided in the Class Record Workspace), S3 (no
+  roster→attendance shortcut), plus assorted Minors (M8/M9 page-level
+  error banners without Retry; M12 phone shell shows no signed-in
+  identity).
+
+**Accessibility review — DOWNGRADED, not fully closed.** Verdict
+PASS-WITH-MINORS, no Critical/Serious in source. Fixed this session:
+**F1** (`home-view-toggle` had zero CSS → no visible pressed state; now
+mirrors `.app-topbar-modes` with a `✓` non-colour cue), **F2** (no
+skip-to-content link with an ~18-item persistent sidebar; added a
+`.skip-link` → `#main-content`), **F3** (drawer focus-return raced the
+destination screen's heading-focus; `navigate` now suppresses the
+hamburger refocus, Escape/scrim still restore). F4/F5 are advisory, no
+change. **Still open (retained debt):** the native NVDA/Narrator +
+compiled-binary pass and `npm run quality:ui` (Playwright/axe) across the
+redesigned surface — the phone landmark-uniqueness contract rests on
+`inert` actually taking effect in WebView2 (jsdom can't verify), and
+`DataTable`'s reflow header association is browser-dependent. Both were
+already tracked (Wave 1 UI redesign shell entry); browser binary absent
+in this environment. Also still open: UX-02/03/04's own a11y review of
+`TeacherWorkspaceScreen` (still on `PageHeader`, not audited here).
+
+**Verification of the F1-F3 / S4 fixes**: 5 new/updated tests
+(`AppLayout.test.tsx` skip-link + no-refocus-on-nav; `SchoolHeadHome.test.tsx`
+readable date + "learners" not "rows"). `npm run quality` — typecheck /
+eslint / prettier / architecture / **vitest 963/963** all green. No Rust
+touched. `quality:ui` still blocked (no browser binary).
+
+**Wave 5 sync PoC — BLOCKED (governance gate).** The DepEd/government
+data-governance dependency ADR-0065 flagged as decision-invalidating was
+researched (`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`).
+Verdict **CONDITIONAL / effectively BLOCKED for the current design**:
+**Executive Order No. 119, s. 2026** (government data classification +
+residency framework, covers data private contractors hold for an agency)
+puts offshore hosting of a school's learner PII behind its EO 119
+classification — Confidential needs a Joint Oversight Committee approval
+LIKHA cannot self-grant; the settling implementing guidelines are due
+~Nov 2026. ADR-0065 status changed, PoC must not start, re-scope toward
+a Philippines-hostable backend is the likely path. ADR-0065's "DepEd
+Order No. 58, s. 2017" citation was wrong (school-forms order, not a
+privacy policy) — corrected.
+
 ## Repo-wide tenant-isolation JOIN audit — CLOSED, review pending (2026-09-04)
 
 Branch `claude/tenant-isolation-join-audit`. Full record:

@@ -40,6 +40,13 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
     return () => mql.removeEventListener("change", onChange);
   }, []);
 
+  // Set to false by `navigate` so the drawer close that accompanies a
+  // destination select does NOT pull focus back to the hamburger --
+  // each screen's `Page` moves focus to its own `<h2>` on mount, and two
+  // `.focus()` calls in one commit would race (WCAG 2.4.3). Escape /
+  // scrim / explicit close leave this true and restore focus normally.
+  const restoreFocusOnClose = useRef(true);
+
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
   }, []);
@@ -52,13 +59,17 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
   const prevDrawerOpen = useRef(drawerOpen);
   useEffect(() => {
     if (prevDrawerOpen.current && !drawerOpen) {
-      document.querySelector<HTMLElement>("[data-drawer-toggle]")?.focus();
+      if (restoreFocusOnClose.current) {
+        document.querySelector<HTMLElement>("[data-drawer-toggle]")?.focus();
+      }
+      restoreFocusOnClose.current = true;
     }
     prevDrawerOpen.current = drawerOpen;
   }, [drawerOpen]);
 
   const navigate = useCallback(
     (tab: SignedInTab) => {
+      restoreFocusOnClose.current = false;
       setDrawerOpen(false);
       onNavigate(tab);
     },
@@ -100,6 +111,9 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
 
   return (
     <div className="app-layout" data-drawer={drawerOpen ? "open" : "closed"}>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <div className="app-layout-scrim" onClick={closeDrawer} aria-hidden="true" />
       <div
         className="app-layout-sidebar"
@@ -116,7 +130,9 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
           onLogout={onLogout}
           onOpenDrawer={() => setDrawerOpen(true)}
         />
-        <main className="app-canvas">{children}</main>
+        <main id="main-content" tabIndex={-1} className="app-canvas">
+          {children}
+        </main>
         <BottomNav
           activeTab={activeTab}
           onNavigate={navigate}

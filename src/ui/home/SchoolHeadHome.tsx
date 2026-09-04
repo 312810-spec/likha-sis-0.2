@@ -58,6 +58,19 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** `YYYY-MM-DD` -> `4 Sep 2026`, matching `LearnerListScreen` /
+ * `SectionRosterScreen`. (Consolidating these three into a shared util is
+ * tracked as a Minor in the redesign review follow-ups.) */
+function formatIsoDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return iso;
+  const [, year, month, day] = match;
+  const monthName = MONTHS[Number(month) - 1];
+  return monthName ? `${Number(day)} ${monthName} ${year}` : iso;
+}
+
 function formatImportDate(createdAt: string): string {
   const parsed = new Date(createdAt);
   return Number.isNaN(parsed.getTime()) ? createdAt : parsed.toLocaleDateString();
@@ -209,8 +222,8 @@ export function SchoolHeadHome({
   const attendanceValue = attendancePct === null ? "—" : `${attendancePct}%`;
   const attendanceFoot =
     attendancePct === null
-      ? `no attendance recorded yet · ${todayIso}`
-      : `${attendance.present} present of ${marked} marked · ${todayIso}`;
+      ? `no attendance recorded yet · ${formatIsoDate(todayIso)}`
+      : `${attendance.present} present of ${marked} marked · ${formatIsoDate(todayIso)}`;
   const attendanceTone: KpiTone =
     attendancePct === null
       ? "neutral"
@@ -269,7 +282,8 @@ export function SchoolHeadHome({
                 <ul className="learner-list">
                   {history.slice(0, RECENT_IMPORT_LIMIT).map((entry) => (
                     <li key={entry.id}>
-                      {entry.sourceFilename} · {entry.rowsCommitted} rows ·{" "}
+                      {entry.sourceFilename} · {entry.rowsCommitted}{" "}
+                      {entry.rowsCommitted === 1 ? "learner" : "learners"} ·{" "}
                       {formatImportDate(entry.createdAt)}
                     </li>
                   ))}
