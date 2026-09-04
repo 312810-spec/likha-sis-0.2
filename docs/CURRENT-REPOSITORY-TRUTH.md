@@ -4,7 +4,7 @@ Status: authoritative snapshot for non-Claude-Code-owned work
 
 Snapshot date: 2026-09-04
 
-Baseline: `origin/main` at `d8ef0f5`
+Baseline: `origin/main` at `f7e4f46`
 
 ## How to use this snapshot
 
@@ -24,25 +24,25 @@ Code:
 
 - SF1, SF9, and SF10 template acquisition, fidelity, generation, and related
   form-format decisions;
-- the `claude/wave5-adr-0067-local-host-sync` receiver branch and all follow-on
-  sync transport, conflict, status, and device-ceremony implementation;
+- all follow-on sync transport, conflict, status, and device-ceremony
+  implementation beyond the receiver foundation merged through PR #42;
 - historical files or implementation files changed by those workstreams.
 
 Their status must be reconciled only after the corresponding CC branch lands.
-Nothing in this document claims that those branches are merged.
+This snapshot records the already-merged receiver without modifying its code.
 
 ## Present on `main`
 
-| Area                   | Repository evidence at `d8ef0f5`                                                                                                                     | Current classification                                                                                                      |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Teacher Load           | Domain/application/repository support plus `TeacherLoadScreen`, School Head colleague view, assignments, and schedule-meeting foundations            | Built foundation and UI; constraint-driven generation, relief workflow, and complete personnel/SF7 chain remain future work |
-| Subject Attendance     | Rust commands/repository, TypeScript port/service/adapter, `SubjectAttendanceScreen`, Today’s Classes integration, Subject Monitor, and Adviser View | Built foundation and UI; intentionally separate from official SF2 attendance                                                |
-| SF4                    | Export module and UI trigger exist                                                                                                                   | Built derived CSV foundation; authoritative-template fidelity is a separate evidence question                               |
-| SF5                    | Export module and section-roster UI trigger exist                                                                                                    | Built derived CSV foundation; not proof of official-template fidelity                                                       |
-| SF6                    | Export module and sections-screen UI trigger exist                                                                                                   | Built derived CSV foundation; not proof of official-template fidelity                                                       |
-| UI redesign            | Waves 1–6, independent architecture/teacher-UX/accessibility reviews, and follow-up fixes are merged                                                 | Built; native NVDA/Narrator and packaged-binary accessibility verification remain open                                      |
-| Tenant isolation       | Learner-membership hardening and repo-wide joined-table audit are merged                                                                             | Source review and regression coverage complete; release hardware/security verification remains open                         |
-| Sync client foundation | `SyncProvider` contract, local transactional outbox, and device credential enrollment/revocation foundation are on `main`                            | Foundation only; not end-to-end sync and not production-ready                                                               |
+| Area               | Repository evidence at `f7e4f46`                                                                                                                     | Current classification                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Teacher Load       | Domain/application/repository support plus `TeacherLoadScreen`, School Head colleague view, assignments, and schedule-meeting foundations            | Built foundation and UI; constraint-driven generation, relief workflow, and complete personnel/SF7 chain remain future work |
+| Subject Attendance | Rust commands/repository, TypeScript port/service/adapter, `SubjectAttendanceScreen`, Today’s Classes integration, Subject Monitor, and Adviser View | Built foundation and UI; intentionally separate from official SF2 attendance                                                |
+| SF4                | Export module and UI trigger exist                                                                                                                   | Built derived CSV foundation; authoritative-template fidelity is a separate evidence question                               |
+| SF5                | Export module and section-roster UI trigger exist                                                                                                    | Built derived CSV foundation; not proof of official-template fidelity                                                       |
+| SF6                | Export module and sections-screen UI trigger exist                                                                                                   | Built derived CSV foundation; not proof of official-template fidelity                                                       |
+| UI redesign        | Waves 1–6, independent architecture/teacher-UX/accessibility reviews, and follow-up fixes are merged                                                 | Built; native NVDA/Narrator and packaged-binary accessibility verification remain open                                      |
+| Tenant isolation   | Learner-membership hardening and repo-wide joined-table audit are merged                                                                             | Source review and regression coverage complete; release hardware/security verification remains open                         |
+| Sync foundation    | `SyncProvider`, local outbox, device credentials, and the repository-level hub push/pull receiver are on `main`                                      | Foundation only; no listening transport or end-to-end production sync                                                       |
 
 ## Not present on `main`
 
@@ -58,9 +58,9 @@ The following must not be described as shipped at this baseline:
   and device-loss release certification;
 - native NVDA/Narrator certification.
 
-The remote commit `3c83b76` contains a hub receiver foundation, but it is not
-an ancestor of this snapshot. A remote branch is not evidence that a feature
-is present on `main`.
+The hub receiver commit `3c83b76` is an ancestor of this snapshot through PR
+#42. This establishes repository/protocol behavior only; it does not establish
+a deployed listening service or end-to-end synchronization.
 
 ## Verification truth
 
