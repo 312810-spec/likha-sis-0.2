@@ -76,6 +76,13 @@ describe("AppLayout", () => {
     expect(within(main).getByTestId("screen")).toBeInTheDocument();
   });
 
+  it("offers a skip-to-content link that targets the main landmark (WCAG 2.4.1)", () => {
+    renderLayout();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveAttribute("href", "#main-content");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+  });
+
   it("starts with the drawer closed", () => {
     const { container } = renderLayout();
     expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "closed");
@@ -105,6 +112,22 @@ describe("AppLayout", () => {
     await user.click(within(sidebar).getByRole("button", { name: "Learners" }));
     expect(onNavigate).toHaveBeenCalledWith("learners");
     expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "closed");
+  });
+
+  it("does NOT pull focus back to the hamburger when a destination is selected", async () => {
+    // Redesign accessibility review F3: the destination screen focuses its
+    // own heading on mount; the drawer close that rides along must not also
+    // grab focus (two .focus() in one commit race, WCAG 2.4.3). Contrast
+    // with the Escape/scrim path, which does restore focus (asserted above).
+    matchMediaResult = true;
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderLayout({ onNavigate });
+    const hamburger = screen.getByRole("button", { name: "Open navigation" });
+    await user.click(hamburger);
+    const sidebar = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(sidebar).getByRole("button", { name: "Learners" }));
+    expect(hamburger).not.toHaveFocus();
   });
 
   it("closes the drawer when the scrim is clicked", async () => {

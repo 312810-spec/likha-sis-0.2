@@ -3125,6 +3125,15 @@ one permitted resume) kept failing. Deliberately does **not** grant
 why that was ruled out. Use this pattern next time the failure recurs,
 after the one permitted resume, before falling back to self-review.
 
+**Refinement (2026-09-04):** the `teacher-ux-reviewer`, `accessibility-reviewer`,
+and `deped-researcher` agents have **no `Write` tool at all** (only
+Read/Grep/Glob, plus Bash for the a11y one / WebSearch+WebFetch for the
+researcher), so a "write your findings to a file" instruction to those
+dedicated agents cannot work and the resume is wasted. For those three,
+skip straight to a `general-purpose` agent with the dedicated reviewer's
+checklist inlined. `security-reviewer` and `architecture-reviewer` do
+have `Bash` and were able to write a findings file directly this session.
+
 ## Section-membership readers cross-school JOIN hardening (added 2026-09-03)
 
 Every reader that joins `learners` to `section_memberships` now
@@ -3165,7 +3174,43 @@ Deliberately unrelated to the separate, still-evidence-blocked official
 this is the same disclosure-not-refusal CSV pattern SF2/SF4/SF5/SF6
 already ship. Full detail: `docs/adr/0063-sf10-permanent-record.md`.
 
-## Cloud Sync Target ratified — Cloudflare Worker + single D1 (added 2026-09-03)
+## UI-redesign independent reviews closed; Wave 5 sync PoC blocked by EO 119 (added 2026-09-04)
+
+The owed independent reviews of the UI redesign (Waves 1-6, ADR-0064) +
+UX-02/03/04 were finally run (via `general-purpose` agents writing to
+files — the dedicated `teacher-ux-reviewer` / `accessibility-reviewer`
+have no Write tool and could not deliver findings through the harness).
+Reports: `docs/reviews/2026-09-04-ui-redesign-*.md`. **Architecture PASS
+(debt closed). Teacher-UX PASS-WITH-MINORS (debt closed; S4 fixed —
+`SchoolHeadHome` raw ISO date + "rows" → `formatIsoDate` + "learners").
+Accessibility PASS-WITH-MINORS (downgraded, not closed): F1 (`home-view-toggle`
+had no CSS/pressed state), F2 (skip-to-content link added), F3 (drawer
+focus-return no longer races the Page heading focus) fixed; the native
+NVDA/Narrator + `quality:ui` pass across the redesigned surface remains
+owed.** vitest 963/963.
+
+**Wave 5 sync PoC is BLOCKED.** The DepEd/government data-governance gate
+ADR-0065 flagged as decision-invalidating was researched
+(`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`).
+**Executive Order No. 119, s. 2026** (signed 13-14 July 2026) — a
+government data classification + residency framework that covers
+government data held by private contractors regardless of whether it is
+personal data — makes offshore hosting of a school's learner PII
+contingent on its EO 119 classification: **Confidential** → offshore
+only with Joint Oversight Committee approval (a government act LIKHA
+cannot self-grant, no published process); **Restricted** → secured cloud
+anywhere with encryption. The classification is unsettled until the EO
+119 implementing guidelines publish (~November 2026). ADR-0065's status
+is now "shortlist chosen but not approvable as-is"; the sync
+implementation PoC must not start; the likely re-scope is a
+Philippines-hostable backend (which may need paid-infra approval if no
+free PH option qualifies). ADR-0065's "DepEd Order No. 58, s. 2017"
+citation was wrong — that Order adopts new school forms, it is not a
+data-privacy policy; DepEd relies on RA 10173 directly + regional
+Privacy Manuals; the DepEd Central Office Privacy Manual must be
+obtained from the DepEd DPO before the gate can close.
+
+## Cloud Sync Target ratified — Cloudflare Worker + single D1 (added 2026-09-03; SUPERSEDED by the 2026-09-04 EO 119 gate above)
 
 **ADR-0065** decides Wave 5's cloud sync target (decision-only — no
 Worker, no schema, no `SyncProvider` implementation). 20-scenario

@@ -1,5 +1,41 @@
 # CURRENT HANDOFF
 
+## P1 batch: UI-redesign reviews closed + Wave 5 PoC blocked (2026-09-04)
+
+Branch `claude/redesign-review-followups`, off `main`. Discharges the
+last two P1 items from the repo-wide sweep.
+
+**Owed independent reviews — RUN.** Reports at
+`docs/reviews/2026-09-04-ui-redesign-{architecture,teacher-ux,accessibility}.md`.
+
+- Architecture: **PASS**, debt **CLOSED**, no code change.
+- Teacher-UX: **PASS-WITH-MINORS**, debt **CLOSED**. Fixed S4 (School-Head
+  Home raw ISO date + "rows" → `formatIsoDate` + "learners"). S1/S2/S3 +
+  Minors → small new backlog.
+- Accessibility: **PASS-WITH-MINORS**, **downgraded not closed**. Fixed
+  F1 (`home-view-toggle` had no CSS/pressed state), F2 (added
+  skip-to-content link), F3 (drawer focus no longer races the
+  destination heading). Native NVDA/Narrator + `quality:ui` pass still
+  owed (browser binary absent); UX-02's `TeacherWorkspaceScreen` a11y
+  not yet audited.
+
+**Verification:** `npm run quality` — typecheck / eslint / prettier /
+architecture / **vitest 963/963**. No Rust touched.
+
+**Wave 5 sync PoC — BLOCKED.** The DepEd/government data-governance gate
+(`docs/research/2026-09-04-deped-data-governance-gate-eo-119.md`) came
+back **CONDITIONAL / effectively BLOCKED**: **EO 119, s. 2026** puts
+offshore hosting of a school's learner PII behind an EO 119
+classification whose implementing guidelines are due ~Nov 2026;
+Confidential would require a government approval LIKHA cannot self-grant.
+ADR-0065 status changed; **do not start the PoC**; re-scope toward a
+Philippines-hostable backend once the EO 119 IRR publishes + the DepEd
+DPO confirms. ADR-0065's "DO 58 s.2017" citation corrected (it is a
+school-forms order, not a privacy policy). PRODUCT-CONTRACT §12 updated.
+
+**Not yet done:** commit; push; PR (targets `main`; docs + a small
+frontend diff).
+
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (2026-09-04), review + PR owed
 
 Branch `claude/tenant-isolation-join-audit`, off `main` (post #34/#36).

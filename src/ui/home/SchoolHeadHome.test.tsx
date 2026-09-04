@@ -239,12 +239,17 @@ describe("SchoolHeadHome", () => {
     expect(await screen.findByText("No imports yet.")).toBeInTheDocument();
   });
 
-  it("lists recent import filenames when history exists", async () => {
+  it("lists recent import filenames, counting learners not 'rows'", async () => {
     renderHome({
-      history: [makeHistory({ id: "import-9", sourceFilename: "SF1-Rizal.xlsx" })],
+      history: [
+        makeHistory({ id: "import-9", sourceFilename: "SF1-Rizal.xlsx", rowsCommitted: 30 }),
+      ],
     });
 
     expect(await screen.findByText(/SF1-Rizal\.xlsx/)).toBeInTheDocument();
+    // "30 learners", never "30 rows" (redesign teacher-UX review S4).
+    expect(screen.getByText(/30 learners/)).toBeInTheDocument();
+    expect(screen.queryByText(/30 rows/)).not.toBeInTheDocument();
   });
 
   it("shows an error with a working Retry after a failed load", async () => {
@@ -307,12 +312,16 @@ describe("SchoolHeadHome", () => {
 
   // --- Wave 4 Task 4: the three enrichment cards -------------------------
 
-  it("shows the attendance-today KPI value and raw-count foot", async () => {
+  it("shows the attendance-today KPI value and raw-count foot with a readable date", async () => {
     renderHome({ dayTotals: { present: 90, absent: 6, tardy: 4 } });
 
     expect(await screen.findByText("Attendance today")).toBeInTheDocument();
     expect(screen.getByText("90%")).toBeInTheDocument();
-    expect(screen.getByText(/90 present of 100 marked · \d{4}-\d{2}-\d{2}/)).toBeInTheDocument();
+    // Foot: raw present/marked counts, and the date formatted "4 Sep 2026",
+    // not a bare ISO string (redesign teacher-UX review S4).
+    expect(
+      screen.getByText(/90 present of 100 marked · \d{1,2} [A-Z][a-z]{2} \d{4}/),
+    ).toBeInTheDocument();
   });
 
   it("tones the attendance KPI success at roughly 90 percent", async () => {
@@ -342,7 +351,7 @@ describe("SchoolHeadHome", () => {
     renderHome({ dayTotals: { present: 0, absent: 0, tardy: 0 } });
 
     expect(
-      await screen.findByText(/no attendance recorded yet · \d{4}-\d{2}-\d{2}/),
+      await screen.findByText(/no attendance recorded yet · \d{1,2} [A-Z][a-z]{2} \d{4}/),
     ).toBeInTheDocument();
     const kpi = screen.getByText("Attendance today").closest(".kpi") as HTMLElement;
     expect(kpi).toHaveAttribute("data-tone", "neutral");

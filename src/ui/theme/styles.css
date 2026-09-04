@@ -1446,6 +1446,44 @@ label {
   display: none;
 }
 
+/* Skip-to-content: the persistent sidebar puts ~18 nav items ahead of the
+   page on every screen, so a sighted keyboard user needs a bypass
+   (WCAG 2.4.1). Visually hidden until focused. */
+.skip-link {
+  position: absolute;
+  left: var(--spacing-unit);
+  top: calc(var(--spacing-unit) * -6);
+  z-index: 100;
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-radius: var(--radius);
+  font-weight: 700;
+  transition: top var(--motion-duration-routine) var(--motion-easing-standard);
+}
+.skip-link:focus {
+  top: var(--spacing-unit);
+}
+
+/* School-head Home view switch (School overview / My teaching). Mirrors
+   .app-topbar-modes exactly -- background swap + non-colour checkmark on
+   the pressed button, so the active view is perceivable without colour
+   (WCAG 1.4.1). */
+.home-view-toggle {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  margin-bottom: var(--spacing-unit);
+}
+.home-view-toggle button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+.home-view-toggle button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
 /* Pre-auth chrome: Login / First-run setup / the initial status check
    render here, deliberately outside the shell. */
 .app-boot {
