@@ -118,14 +118,50 @@ actually encrypt a domain write's `PendingChange`, since that must work
 offline without hub contact. Key rotation remains deferred to a
 documented custodian procedure, unchanged from ADR-0067's own scope.
 
-**Exact next implementation slice:** (1) decide and implement the
-client-side local-persistence format for the unwrapped SSPK, wiring
-`auth::enroll_device_sync_credential` to fetch/unwrap it via a new Tauri
-command, (2) wire it into `sync_outbox` enqueue so a domain write (e.g.
-`learner` upsert) can emit a real encrypted `PendingChange` end-to-end,
-(3) the network listener/transport adapter (ADR-0067 D1: LAN discovery +
-optional Tailscale) that calls `device_credential::verify` then
-`sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
+**Completed next slice (2026-09-05, this session):** a status-report
+cross-check against the shipped code found `device_credential::enroll`
+was never actually extended to call `wrap_for_credential` — ADR-0069's own
+"Verification" section claimed it was, the code did not match — and a
+genuine contradiction in ADR-0069's mechanism as written: it required
+"never persisted in plaintext anywhere... beyond the single transaction"
+for the SSPK, while also requiring every enrollment after the first to
+"wrap the same underlying key," which is impossible without persisting it
+_somewhere_ durable. Resolved by extending the SAME DPAPI-protected local
+key-file pattern (`crypto::dpapi`/`db::open_app_db`) ADR-0069 itself named
+as "the natural answer" for client-side persistence — applied first to the
+hub's own local copy, a second, separately-named file
+(`db::load_or_mint_sspk`, `SSPK_KEY_FILE_NAME`), never sharing a file or
+value with the SQLCipher key. `auth::enroll_device_sync_credential` now
+takes the resolved SSPK as a parameter and wraps it for the new credential
+in the same atomic `SAVEPOINT` as `device_credential::enroll` — closing
+the gap for real, not just in the ADR's prose. Also added
+`crypto::payload_key::encrypt_payload`/`decrypt_payload` — general-purpose
+AES-256-GCM encrypt/decrypt of arbitrary-length bytes under the SSPK
+(distinct from `wrap_payload_key`/`unwrap_payload_key`, which only ever
+wrap a fixed 32-byte key), the actual primitive an outbox-enqueuing domain
+write will call. Full record: ADR-0069's 2026-09-05 addendum. 19 new
+tests (2 `auth`, 7 `crypto::payload_key`). `cargo test`: 737 lib tests +
+all integration binaries, 0 failed; `cargo clippy -D warnings` and `cargo
+fmt --check` clean.
+
+**Still not done:** no Tauri command resolves an SSPK or calls
+enrollment; no domain write encrypts a payload and calls
+`sync_outbox::enqueue`; per-entity "what hub version does this device
+believe it's at" tracking (needed to set a correct `base_version` on an
+_update_, not just a first-time create) does not exist anywhere; the
+network listener/transport does not exist.
+
+**Exact next implementation slice:** (1) a per-entity local version-cache
+(what hub `version` this device last saw for each entity it has touched) —
+needed before any _update_ (not just a first create) can set a correct
+`base_version`; without it every update would incorrectly claim
+`base_version = 0` and get conflict-staged against any entity already
+synced once. (2) Wire one real domain write (e.g. `learner` upsert) through
+a Tauri command that resolves the SSPK, encrypts the change with
+`encrypt_payload`, and calls `sync_outbox::enqueue` — the first actual
+end-to-end path. (3) The network listener/transport adapter (ADR-0067 D1:
+LAN discovery + optional Tailscale) that calls `device_credential::verify`
+then `sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
 UI/resolution workflow and the Android client remain separate, later
 slices.
 

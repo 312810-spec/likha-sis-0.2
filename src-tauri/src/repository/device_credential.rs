@@ -192,7 +192,12 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn hex_decode(value: &str) -> Option<Vec<u8>> {
+/// Decodes an `EnrolledCredential::secret_hex` (or any hex string of the
+/// same shape) back to raw bytes. `pub(crate)` -- shared with
+/// `auth::enroll_device_sync_credential`, which needs the raw secret
+/// bytes to derive an ADR-0069 payload-key wrap key, not just this
+/// module's own tests.
+pub(crate) fn hex_decode(value: &str) -> Option<Vec<u8>> {
     if !value.len().is_multiple_of(2) {
         return None;
     }

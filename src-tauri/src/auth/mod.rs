@@ -7,13 +7,14 @@ use std::time::{Duration, SystemTime};
 
 use rusqlite::Connection;
 
+use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
     audit_log as audit_log_repo, device_credential as device_credential_repo,
     installation as installation_repo, role as role_repo, school as school_repo,
     section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
-    user as user_repo,
+    sync_payload_key as sync_payload_key_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -667,6 +668,16 @@ pub fn admin_reset_teacher_password(
 /// network listener that will actually expose this to a remote device is
 /// deliberately out of scope here -- see ADR-0067 "What this ADR does NOT
 /// decide."
+///
+/// `sspk` is this installation's already-resolved school sync-payload key
+/// (ADR-0069) -- `db::load_or_mint_sspk` resolves it from the local
+/// DPAPI-protected file. Resolving it is a filesystem/Tauri concern, not
+/// this pure-`Connection` function's job (matching every other repository
+/// function in this codebase), so the caller passes it in already
+/// available. Once a credential is issued, this wraps the SSPK for it in
+/// the SAME atomic step -- ADR-0069's decision that every active
+/// credential ends up with exactly one wrap, never a credential issued
+/// without one.
 pub fn enroll_device_sync_credential(
     conn: &Connection,
     username: &str,
@@ -674,6 +685,7 @@ pub fn enroll_device_sync_credential(
     school_id: &str,
     device_id: &str,
     device_label: Option<&str>,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
 ) -> AppResult<device_credential_repo::EnrolledCredential> {
     let user = match user_repo::verify_credentials(conn, username, password) {
         Ok(user) => user,
@@ -705,18 +717,44 @@ pub fn enroll_device_sync_credential(
         return Err(AppError::Unauthorized);
     }
 
-    let credential =
-        device_credential_repo::enroll(conn, school_id, &user.id, device_id, device_label)?;
+    conn.execute_batch("SAVEPOINT device_sync_enrollment")?;
+    let outcome = (|| -> AppResult<device_credential_repo::EnrolledCredential> {
+        let credential =
+            device_credential_repo::enroll(conn, school_id, &user.id, device_id, device_label)?;
 
-    audit_log_repo::record(
-        conn,
-        school_id,
-        Some(&user.id),
-        &user.username,
-        AuditEventType::DeviceEnrolled,
-    )?;
+        let device_secret = device_credential_repo::hex_decode(&credential.secret_hex)
+            .ok_or_else(|| AppError::key_store("enrolled credential secret was not valid hex"))?;
+        sync_payload_key_repo::wrap_for_credential(
+            conn,
+            school_id,
+            &credential.id,
+            &device_secret,
+            sspk,
+        )?;
 
-    Ok(credential)
+        audit_log_repo::record(
+            conn,
+            school_id,
+            Some(&user.id),
+            &user.username,
+            AuditEventType::DeviceEnrolled,
+        )?;
+
+        Ok(credential)
+    })();
+
+    match outcome {
+        Ok(credential) => {
+            conn.execute_batch("RELEASE device_sync_enrollment")?;
+            Ok(credential)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO device_sync_enrollment; RELEASE device_sync_enrollment",
+            );
+            Err(error)
+        }
+    }
 }
 
 /// Revokes a device's sync credential. Requires an active interactive
@@ -787,6 +825,16 @@ mod tests {
 
     fn open_test_db() -> Connection {
         db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
+    }
+
+    /// A fixed, arbitrary school sync-payload key for tests -- these
+    /// tests exercise `enroll_device_sync_credential`'s own authorization
+    /// and enrollment logic, not ADR-0069's key derivation itself (that
+    /// is `sync_payload_key`'s and `crypto::payload_key`'s own test
+    /// coverage), so a real `db::load_or_mint_sspk` resolution is neither
+    /// needed nor possible here (that function needs a Tauri `AppHandle`).
+    fn test_sspk() -> [u8; PAYLOAD_KEY_LEN] {
+        [0x42; PAYLOAD_KEY_LEN]
     }
 
     #[test]
@@ -2143,6 +2191,7 @@ mod tests {
             &s.id,
             "device-1",
             Some("Ana's laptop"),
+            &test_sspk(),
         )
         .unwrap();
 
@@ -2157,14 +2206,78 @@ mod tests {
     }
 
     #[test]
+    fn enroll_device_sync_credential_wraps_the_sspk_for_the_new_credential() {
+        // ADR-0069: enrollment must also mint/wrap the school's
+        // sync-payload key for the new credential in the same atomic
+        // step -- not just issue the credential itself.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sspk = test_sspk();
+
+        let credential = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-1", None, &sspk,
+        )
+        .unwrap();
+
+        let device_secret = device_credential_repo::hex_decode(&credential.secret_hex).unwrap();
+        let unwrapped =
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential.id, &device_secret)
+                .unwrap()
+                .expect("enrollment must have stored a wrap for the new credential");
+        assert_eq!(unwrapped, sspk);
+    }
+
+    #[test]
+    fn two_devices_enrolled_with_the_same_sspk_both_recover_it() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sspk = test_sspk();
+
+        let device_a = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-a", None, &sspk,
+        )
+        .unwrap();
+        let device_b = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-b", None, &sspk,
+        )
+        .unwrap();
+
+        let secret_a = device_credential_repo::hex_decode(&device_a.secret_hex).unwrap();
+        let secret_b = device_credential_repo::hex_decode(&device_b.secret_hex).unwrap();
+        let recovered_a =
+            sync_payload_key_repo::unwrap_for_credential(&conn, &device_a.id, &secret_a)
+                .unwrap()
+                .unwrap();
+        let recovered_b =
+            sync_payload_key_repo::unwrap_for_credential(&conn, &device_b.id, &secret_b)
+                .unwrap()
+                .unwrap();
+
+        assert_eq!(recovered_a, sspk);
+        assert_eq!(recovered_b, sspk);
+    }
+
+    #[test]
     fn enroll_device_sync_credential_does_not_create_an_interactive_session() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
 
-        enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-            .unwrap();
+        enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
 
         // Deliberately not asserted via a `SessionManager` at all --
         // this function never receives one, unlike `login` -- proving by
@@ -2186,6 +2299,7 @@ mod tests {
             &s.id,
             "device-1",
             None,
+            &test_sspk(),
         );
 
         assert!(matches!(result, Err(AppError::AuthenticationFailed)));
@@ -2208,6 +2322,7 @@ mod tests {
             &school_b.id,
             "device-1",
             None,
+            &test_sspk(),
         );
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
@@ -2230,6 +2345,7 @@ mod tests {
             &s.id,
             "device-1",
             None,
+            &test_sspk(),
         );
 
         assert!(matches!(result, Err(AppError::AccountLocked)));
@@ -2241,9 +2357,16 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
-        let credential =
-            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-                .unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
         let sessions = SessionManager::new();
         login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
 
@@ -2265,9 +2388,16 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
-        let credential =
-            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-                .unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
         let other = user::create_user(&conn, "ben.reyes", "password", "Ben Reyes").unwrap();
         user::add_school_membership(&conn, &other.id, &s.id).unwrap();
         role_repo::grant(&conn, &other.id, &s.id, role_repo::TEACHER).unwrap();
@@ -2290,9 +2420,16 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
-        let credential =
-            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-                .unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
         let head = user::create_user(&conn, "principal.a", "password", "Principal A").unwrap();
         user::add_school_membership(&conn, &head.id, &s.id).unwrap();
         role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
@@ -2318,6 +2455,7 @@ mod tests {
             &school_a.id,
             "device-1",
             None,
+            &test_sspk(),
         )
         .unwrap();
         let head = user::create_user(&conn, "principal.b", "password", "Principal B").unwrap();
@@ -2344,9 +2482,16 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
-        let credential =
-            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-                .unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
         let sessions = SessionManager::new();
 
         let result = revoke_device_sync_credential(&conn, &sessions, &credential.id);
@@ -2360,9 +2505,16 @@ mod tests {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &u.id, &s.id).unwrap();
-        let credential =
-            enroll_device_sync_credential(&conn, "ana.cruz", "password", &s.id, "device-1", None)
-                .unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
         let sessions = SessionManager::new();
         login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
         assert!(revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap());

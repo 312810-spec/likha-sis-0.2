@@ -1,6 +1,57 @@
 # CURRENT HANDOFF
 
-## ADR-0069 sync payload key ceremony (2026-09-04/05) — foundation shipped, PR #46 owed CI
+## ADR-0069 addendum: hub SSPK persistence + real enrollment wiring (2026-09-05), commit + PR owed
+
+Branch `fix/sspk-hub-persistence-and-enrollment-wiring`, cut from `main`
+after PR #46 merged. Executed as the "exact next action" from a status
+report cross-checking this ADR against the shipped code.
+
+**Found**: `device_credential::enroll` was never actually extended to call
+`wrap_for_credential` — ADR-0069's own "Verification" section claimed it
+was, the code did not. Also found a genuine contradiction in the ADR's
+mechanism as written: point 1 said the SSPK is never persisted in
+plaintext beyond one transaction, while point 6 required every enrollment
+after the first to re-wrap "the same underlying key" — impossible without
+persisting the plaintext SSPK somewhere durable, since the hub cannot
+recover a key it never wrote down and cannot decrypt an existing device's
+wrap without that device's enrollment secret (only its SHA-256 digest is
+ever stored).
+
+**Resolved** by extending the SAME DPAPI-protected local key-file pattern
+`crypto::dpapi`/`db::open_app_db` already use for the SQLCipher key — the
+ADR's own "Not yet decided" section had already named this as "the
+natural answer," so this applies it, not invents something new.
+`db::load_or_mint_sspk`/`SSPK_KEY_FILE_NAME` (`likha-sis-sspk.key`, a
+second, separately-named file, never sharing a value with the SQLCipher
+key). `auth::enroll_device_sync_credential` now takes the resolved SSPK
+as a parameter and wraps it for the new credential in the same atomic
+`SAVEPOINT` as `device_credential::enroll` — closing the gap for real,
+with tests proving both a fresh enrollment and two independent devices
+each recover the identical SSPK. Also added
+`crypto::payload_key::encrypt_payload`/`decrypt_payload` — general-purpose
+AES-256-GCM encrypt/decrypt of arbitrary-length bytes under the SSPK
+(distinct from the fixed-32-byte-only `wrap_payload_key`/`unwrap_payload_key`),
+the actual primitive a future outbox-enqueuing domain write will call.
+Full record: ADR-0069's 2026-09-05 addendum.
+
+**Verification**: 19 new tests (2 `auth`, 7 `crypto::payload_key` — plus
+`sync_payload_key`/migration tests already existed and re-ran clean).
+`cargo test`: 737 lib tests + all integration binaries, 0 failed; `cargo
+clippy --all-targets -D warnings` and `cargo fmt --check` clean. `npm run
+quality`: 93 files / 967 tests, clean — confirmed against the command's
+own direct output a second time in this same session, after a first
+background run's "exit 0" summary again disagreed with its own visible
+Prettier failure (same class of issue already noted twice earlier in this
+file — the background-task exit-code summary for this command is not
+reliable on its own and must be checked against its actual output).
+
+**Not yet done**: commit; push; PR (targets `main`). Still not built: any
+Tauri command that resolves an SSPK or calls enrollment; a domain write
+that encrypts a payload and calls `sync_outbox::enqueue`; per-entity
+"known hub version" tracking (needed for a correct `base_version` on an
+_update_, not just a first create); the network listener/transport.
+
+## ADR-0069 sync payload key ceremony (2026-09-04/05) — foundation shipped, merged (PR #46)
 
 **What shipped**: the mechanism ADR-0067 left undecided — see
 `docs/adr/0069-sync-payload-key-ceremony.md` for the full decision record
