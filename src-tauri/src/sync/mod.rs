@@ -116,10 +116,7 @@ mod tests {
 
     #[test]
     fn divergent_edit_requires_review_instead_of_last_write_wins() {
-        assert_eq!(
-            classify_conflict(4, 5),
-            ConflictDisposition::ReviewRequired
-        );
+        assert_eq!(classify_conflict(4, 5), ConflictDisposition::ReviewRequired);
     }
 
     #[test]
@@ -129,7 +126,10 @@ mod tests {
             Err(SyncContractError::EmptyPayload)
         );
         assert_eq!(
-            validate_change(&change_with_payload(vec![0; MAX_ENCRYPTED_CHANGE_BYTES + 1])),
+            validate_change(&change_with_payload(vec![
+                0;
+                MAX_ENCRYPTED_CHANGE_BYTES + 1
+            ])),
             Err(SyncContractError::PayloadTooLarge)
         );
     }

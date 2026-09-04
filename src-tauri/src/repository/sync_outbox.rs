@@ -268,10 +268,7 @@ mod tests {
         )
         .unwrap());
         assert!(!acknowledge(&conn, &second.id, &change.change_id.to_string()).unwrap());
-        assert_eq!(
-            pending_for_school(&conn, &first.id, 100).unwrap().len(),
-            1
-        );
+        assert_eq!(pending_for_school(&conn, &first.id, 100).unwrap().len(), 1);
     }
 
     #[test]
