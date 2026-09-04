@@ -3125,6 +3125,15 @@ one permitted resume) kept failing. Deliberately does **not** grant
 why that was ruled out. Use this pattern next time the failure recurs,
 after the one permitted resume, before falling back to self-review.
 
+**Refinement (2026-09-04):** the `teacher-ux-reviewer`, `accessibility-reviewer`,
+and `deped-researcher` agents have **no `Write` tool at all** (only
+Read/Grep/Glob, plus Bash for the a11y one / WebSearch+WebFetch for the
+researcher), so a "write your findings to a file" instruction to those
+dedicated agents cannot work and the resume is wasted. For those three,
+skip straight to a `general-purpose` agent with the dedicated reviewer's
+checklist inlined. `security-reviewer` and `architecture-reviewer` do
+have `Bash` and were able to write a findings file directly this session.
+
 ## Section-membership readers cross-school JOIN hardening (added 2026-09-03)
 
 Every reader that joins `learners` to `section_memberships` now
