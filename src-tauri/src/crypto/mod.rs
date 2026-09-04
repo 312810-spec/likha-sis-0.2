@@ -1,5 +1,6 @@
 #[cfg(windows)]
 mod dpapi;
+pub mod payload_key;
 
 use std::path::Path;
 

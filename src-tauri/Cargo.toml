@@ -54,8 +54,10 @@ umya-spreadsheet = "3"
 # rejected: its docs explicitly disclaim algorithm stability across Rust
 # releases, which would silently break a fingerprint persisted in SQLite
 # after a toolchain upgrade.
-sha2 = "0.10"
+sha2 = "0.11"
 tauri-plugin-opener = "2.5.5"
+aes-gcm = { version = "0.11.1", features = ["zeroize"] }
+hkdf = "0.13.0"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

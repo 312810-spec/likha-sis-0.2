@@ -1540,6 +1540,31 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M32: ADR-0069 sync payload key ceremony. One wrapped copy of
+        -- the school's sync-payload key (SSPK) per active device sync
+        -- credential -- never the plaintext SSPK itself, which is only
+        -- ever held transiently in hub-process memory at wrap time (see
+        -- repository::device_credential and crypto::payload_key). A
+        -- revoked credential's row is left in place (this project's
+        -- tombstone-not-delete convention) but becomes unreachable the
+        -- moment device_credential::verify rejects the revoked
+        -- credential, before any caller could reach a wrap lookup.
+        CREATE TABLE sync_payload_key_wraps (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            credential_id TEXT NOT NULL UNIQUE
+                REFERENCES device_sync_credentials(id) ON DELETE CASCADE,
+            wrapped_key BLOB NOT NULL,
+            nonce BLOB NOT NULL CHECK (length(nonce) = 12),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_sync_payload_key_wraps_school
+            ON sync_payload_key_wraps(school_id);
+        "#,
+        ),
     ])
 }
 
@@ -3781,6 +3806,78 @@ mod tests {
         assert!(
             second_row.is_err(),
             "only one device_identity row is ever allowed, matching installation_state"
+        );
+    }
+
+    #[test]
+    fn migration_32_enforces_the_sync_payload_key_wrap_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('u1', 'ana.cruz', 'hash', 'Ana Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO device_sync_credentials
+             (id, school_id, user_id, device_id, secret_hash)
+             VALUES ('c1', 's1', 'u1', 'd1', zeroblob(32))",
+            [],
+        )
+        .unwrap();
+
+        let wrong_length_nonce = conn.execute(
+            "INSERT INTO sync_payload_key_wraps
+             (id, school_id, credential_id, wrapped_key, nonce)
+             VALUES ('w1', 's1', 'c1', zeroblob(48), X'0102')",
+            [],
+        );
+        assert!(
+            wrong_length_nonce.is_err(),
+            "nonce must be exactly 12 bytes (AES-256-GCM's standard nonce size)"
+        );
+
+        conn.execute(
+            "INSERT INTO sync_payload_key_wraps
+             (id, school_id, credential_id, wrapped_key, nonce)
+             VALUES ('w2', 's1', 'c1', zeroblob(48), zeroblob(12))",
+            [],
+        )
+        .unwrap();
+
+        let second_wrap_for_same_credential = conn.execute(
+            "INSERT INTO sync_payload_key_wraps
+             (id, school_id, credential_id, wrapped_key, nonce)
+             VALUES ('w3', 's1', 'c1', zeroblob(48), zeroblob(12))",
+            [],
+        );
+        assert!(
+            second_wrap_for_same_credential.is_err(),
+            "at most one wrap per credential -- a re-enrolled device gets its own new \
+             credential row (and therefore its own new wrap), never a second wrap for \
+             the same credential_id"
+        );
+
+        conn.execute("DELETE FROM device_sync_credentials WHERE id = 'c1'", [])
+            .unwrap();
+        let orphan_count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sync_payload_key_wraps WHERE credential_id = 'c1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            orphan_count, 0,
+            "deleting a credential cascades to its wrap -- never leaves a wrap \
+             pointing at a nonexistent credential"
         );
     }
 }
