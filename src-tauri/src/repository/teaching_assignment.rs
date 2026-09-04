@@ -144,7 +144,7 @@ const DETAIL_SELECT: &str = "SELECT ta.id, ta.school_id, ta.teacher_user_id, \
      FROM teaching_assignments ta \
      JOIN sections sec ON sec.id = ta.section_id \
      JOIN subjects sub ON sub.id = ta.subject_id \
-     WHERE ta.school_id = ?1";
+     WHERE ta.school_id = ?1 AND sec.school_id = ?1 AND sub.school_id = ?1";
 
 /// Every assignment held by `teacher_user_id` within `school_id` -- the
 /// data a teacher's own "what do I teach" view and the load calculation
@@ -257,6 +257,35 @@ mod tests {
         let found = find_by_id_in_school(&conn, &school_id, &created.id).unwrap();
 
         assert_eq!(found, Some(created));
+    }
+
+    #[test]
+    fn detail_list_does_not_leak_a_forged_cross_school_assignment() {
+        // Defense in depth (repo-wide tenant-isolation JOIN audit):
+        // `create` validates section/subject are in-school, so this row
+        // cannot be made normally — but a hand-forged `teaching_assignments`
+        // row pointing at another school's section/subject must not surface
+        // that section's or subject's name through `DETAIL_SELECT`, because
+        // each JOIN independently constrains `school_id`.
+        let conn = open_test_db();
+        let (school_id, teacher_id, ..) = setup(&conn);
+        let other = school::create(&conn, "Other School").unwrap();
+        let other_sec =
+            section::create(&conn, &other.id, "2026-2027", "9", "SecretSection").unwrap();
+        let other_sub = subject::create(&conn, &other.id, "SecretSubject").unwrap();
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta-forged', ?1, ?2, ?3, ?4)",
+            (&school_id, &teacher_id, &other_sec.id, &other_sub.id),
+        )
+        .unwrap();
+
+        let list = list_by_teacher_in_school(&conn, &school_id, &teacher_id).unwrap();
+
+        assert!(
+            list.iter().all(|d| d.id != "ta-forged"),
+            "an assignment whose section/subject belong to another school must not appear"
+        );
     }
 
     #[test]

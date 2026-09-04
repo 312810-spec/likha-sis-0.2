@@ -162,6 +162,7 @@ pub fn roster_for_section_date(
          JOIN section_memberships sm ON sm.learner_id = l.id \
          LEFT JOIN attendance_records a \
            ON a.learner_id = l.id AND a.attendance_date = ?3 AND a.section_id = ?2 \
+              AND a.school_id = ?1 \
          WHERE sm.section_id = ?2 AND sm.school_id = ?1 AND l.school_id = ?1 \
            AND sm.starts_on <= ?3 AND (sm.ends_on IS NULL OR ?3 < sm.ends_on) \
          ORDER BY l.family_name, l.given_name",
@@ -651,6 +652,35 @@ mod tests {
         assert!(
             roster.iter().all(|e| e.learner_id != foreign.id),
             "a learner belonging to another school must never appear, even via a forged membership row"
+        );
+    }
+
+    #[test]
+    fn roster_for_section_date_left_join_ignores_a_foreign_school_attendance_record() {
+        // Defense in depth (repo-wide tenant-isolation JOIN audit): the
+        // `LEFT JOIN attendance_records` must also constrain `a.school_id`,
+        // matching `learner_score::roster_for_item`'s `ls.school_id`
+        // predicate. A hand-forged attendance row in another school for an
+        // in-scope learner + section + date must not surface its status
+        // here.
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        let other = school::create(&conn, "Other School").unwrap();
+        conn.execute(
+            "INSERT INTO attendance_records \
+                 (id, school_id, section_id, learner_id, attendance_date, status) \
+             VALUES ('a-forged', ?1, ?2, ?3, ?4, 'present')",
+            (&other.id, &section_id, &learner_id, "2026-08-24"),
+        )
+        .unwrap();
+
+        let roster = roster_for_section_date(&conn, &school_id, &section_id, "2026-08-24").unwrap();
+
+        assert_eq!(roster.len(), 1);
+        assert_eq!(roster[0].learner_id, learner_id);
+        assert_eq!(
+            roster[0].status, None,
+            "an attendance record belonging to another school must not show as this learner's status"
         );
     }
 

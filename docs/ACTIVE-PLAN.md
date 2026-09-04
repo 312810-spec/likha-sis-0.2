@@ -1,5 +1,40 @@
 # ACTIVE PLAN
 
+## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
+
+Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`;
+`.planning/tenant-isolation-audit/findings.md`; `docs/CURRENT-HANDOFF.md`
+top entry; `docs/VERIFICATION-DEBT.md`. Branch
+`claude/tenant-isolation-join-audit` off `main` (post #34/#36).
+
+**Scope**: the follow-up the PR #34 `security-reviewer` flagged — sweep
+**every** `JOIN` across two+ tenant tables (not just the `learners`
+family) for the "independently constrain every joined tenant table"
+property.
+
+**What shipped**: 8 readers hardened across 6 repository files
+(`class_record`, `teaching_assignment`, `attendance`,
+`grading_computation`, `schedule_meeting`, `section_membership`), each
+adding an independent `school_id` constraint on a joined tenant table.
+All defense-in-depth (create paths already validate FKs).
+`grading_computation::leaf_percentage_score` gained a `school_id`
+parameter; both `compute_term_grade` call sites updated. No schema,
+migration, command, or `authorize_*` change.
+
+**Verification actually run**: TDD — 5 forged-row regression tests, each
+watched RED (predicates reverted) then GREEN. `cargo test` 656 lib + all
+20 integration binaries, 0 failed. `cargo clippy --all-targets -- -D
+warnings` clean. `cargo fmt --check` clean. `npm run quality` (no TS
+touched) + `npm run quality:security` — see CURRENT-HANDOFF.
+
+**Not done**: independent `security-reviewer` pass (owed); commit; push;
+PR.
+
+**Next**: none pre-selected. Remaining P1-tier items (per the repo-wide
+sweep): the independent-review backlog (UI redesign Waves 1-6, UX-02/03/04,
+Wave 2A); Wave 5 sync implementation PoC (gated on the DepEd
+data-governance check + an explicit instruction).
+
 ## Cloud Sync Target Decision — ADR-0065 (added 2026-09-03) — complete (decision-only)
 
 Full record: `docs/adr/0065-cloud-sync-target-decision.md`;

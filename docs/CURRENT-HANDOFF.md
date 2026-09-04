@@ -1,5 +1,41 @@
 # CURRENT HANDOFF
 
+## Repo-wide tenant-isolation JOIN audit — ADR-0066 (2026-09-04), review + PR owed
+
+Branch `claude/tenant-isolation-join-audit`, off `main` (post #34/#36).
+Follows PR #34's `security-reviewer` note that its `l.school_id`
+hardening covered only the `learners`-JOIN family. This audit swept
+**every** `JOIN` across two+ tenant tables in `src-tauri/src/repository/**`
+(none exist in `export/**` or `formgen/**`).
+
+**Result**: 8 readers hardened (all defense-in-depth — every relevant
+create path already validates same-school FKs, so cross-school FK rows
+cannot arise through the app). Adds an independent `school_id` constraint
+on each joined tenant table in: `class_record` `DETAIL_SELECT_LIST` +
+`section_and_period_range_in_school` + `school_year_in_school`;
+`teaching_assignment` `DETAIL_SELECT`; `attendance::roster_for_section_date`
+(the `attendance_records` `LEFT JOIN`); `grading_computation::leaf_percentage_score`
+(new `school_id` param); `schedule_meeting` conflict/load queries;
+`section_membership::dependent_records_stranded`. The
+`grading_computation` one is grade-correctness (a forged foreign score
+would inflate a DepEd term grade — regression test proves PS 85.0 vs
+92.5). Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`;
+`.planning/tenant-isolation-audit/findings.md`.
+
+**Verification**: 5 new forged-row regression tests, each watched RED
+(with predicates reverted) then GREEN. `cargo test` 656 lib + all
+integration binaries 0 failed; `cargo clippy -D warnings` clean;
+`cargo fmt --check` clean; `npm run quality` / `quality:security` — see
+below.
+
+**Independent `security-reviewer`: PASS** — no blocking, no should-fix;
+audit independently confirmed complete. Two Minor parity fixes folded in
+(`item_count` subquery `+ AND ai.school_id`; `dependent_records_stranded`
+grades subquery `+ AND gp.school_id`). Findings archived at
+`.planning/tenant-isolation-audit/security-review.md`.
+
+**Not yet done**: commit the parity fixes; push; open PR (targets `main`).
+
 ## Cloud Sync Target decided — ADR-0065 (2026-09-03), review + merge owed
 
 **Branch** `claude/wave5-sync-target-decision`, cut from the P1 security

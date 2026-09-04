@@ -1,5 +1,42 @@
 # Verification Debt
 
+## Repo-wide tenant-isolation JOIN audit — CLOSED, review pending (2026-09-04)
+
+Branch `claude/tenant-isolation-join-audit`. Full record:
+`docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`.
+
+**Closed**: the ADR-0042-addendum `security-reviewer`'s note that the
+`l.school_id` sweep only covered the `learners`-JOIN family. Every `JOIN`
+across two+ tenant tables in `src-tauri/src/repository/**` was audited;
+8 readers gained an independent `school_id` constraint on each joined
+tenant table (`class_record` ×3, `teaching_assignment`, `attendance`
+LEFT JOIN, `grading_computation::leaf_percentage_score`, `schedule_meeting`
+×3, `section_membership::dependent_records_stranded`). All
+defense-in-depth — every create path already validates same-school FKs.
+
+**Verification actually run**: 5 forged-row regression tests, each
+watched RED (predicates reverted: foreign name resolves / `Some(Present)`
+vs `None` / PS 92.5 vs 85.0 / `TeacherConflict` vs `Created`) then GREEN.
+`cargo test` 656 lib + all integration binaries 0 failed; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo fmt --check` clean;
+`npm run quality` (no TS touched) + `npm run quality:security` — recorded
+in the branch handoff entry.
+
+**Independent `security-reviewer` — DONE, verdict PASS.** No blocking, no
+should-fix. Independently re-confirmed the audit is complete (also swept
+`commands/`, `import/`, `auth/`, `export/`, `formgen/` — no multi-table
+JOIN SQL). Two Minor parity fixes folded in: `class_record`
+`DETAIL_SELECT_LIST` `item_count` subquery `+ AND ai.school_id =
+cr.school_id`; `section_membership::dependent_records_stranded` grades
+subquery `+ AND gp.school_id = ?2`. Both availability-only, not leaks.
+Full findings: `.planning/tenant-isolation-audit/security-review.md`.
+
+**`section_membership::dependent_records_stranded`** got its
+`+ AND cr.school_id = ?2` with no dedicated test (NOT-EXISTS guard,
+`ls.school_id` already constrained, `cr.section_id` scoped; covered by
+existing transfer/end tests) — recorded so a reviewer knows it was
+deliberate.
+
 ## `quality:ui` smoke green again after the UI-redesign merge — CLOSED (2026-09-03)
 
 Branch `claude/fix-ui-smoke-redesigned-nav` off `main` at `860cede`.

@@ -568,7 +568,8 @@ fn dependent_records_stranded(
            JOIN assessment_items ai ON ai.id = ls.assessment_item_id \
            JOIN class_records cr ON cr.id = ai.class_record_id \
            JOIN grading_periods gp ON gp.id = cr.grading_period_id \
-           WHERE ls.learner_id = ?1 AND ls.school_id = ?2 AND cr.section_id = ?3 \
+           WHERE ls.learner_id = ?1 AND ls.school_id = ?2 AND cr.school_id = ?2 \
+             AND gp.school_id = ?2 AND cr.section_id = ?3 \
              AND ls.status = 'scored' \
              AND (gp.ends_on < ?4 OR gp.starts_on >= ?5) \
              AND NOT EXISTS ( \
