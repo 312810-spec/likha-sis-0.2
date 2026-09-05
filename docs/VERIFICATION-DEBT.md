@@ -1,5 +1,22 @@
 # Verification Debt
 
+## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
+
+Owed from this slice (ADR-0069's newest addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail): no
+`security-reviewer` subagent was reachable in this session's toolset
+(same gap as the two prior ADR-0069 addenda). A rigorous self-review was
+performed instead per this project's documented reviewer-failure
+fallback, covering the new `GET /sync/payload-key-wrap` endpoint's
+credential-scoping, the fail-closed behavior on a missing wrap row or a
+rejected decrypted payload, and the `school_id` cross-check in
+`sync_client::apply_decrypted_change`. No blocking issue was found, but a
+genuinely independent review of this change (`hub_server`'s new
+endpoint, `repository::sync_payload_key::get_wrap_for_credential`,
+`sync_client::resolve_sspk`/`apply_decrypted_change`,
+`repository::learner::upsert_from_sync`) remains owed. Retry when a
+reviewer harness/subagent is confirmed healthy.
+
 ## Payload-key rotation on device revocation (2026-09-05) — independent review + native DPAPI verification owed
 
 Three items owed from this slice (ADR-0069's rotation addendum,

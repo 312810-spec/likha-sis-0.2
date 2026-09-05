@@ -132,6 +132,48 @@ pub fn ensure_wrapped_for_credential(
     wrap_for_credential(conn, school_id, credential_id, device_secret, sspk)
 }
 
+/// The raw (still-wrapped) bytes of a stored `sync_payload_key_wraps` row,
+/// as served to the OWNING device over `/sync/payload-key-wrap` -- see
+/// `hub_server`'s handler. The hub never unwraps this itself (it does not
+/// hold the device secret needed to); it only ever hands back exactly what
+/// `wrap_for_credential`/`ensure_wrapped_for_credential` stored, and the
+/// requesting device unwraps it locally with its own secret via
+/// `payload_key::unwrap_payload_key`. This keeps the plaintext SSPK from
+/// ever crossing the network boundary a second time -- only its per-device
+/// wrapped form does, exactly like the original enrollment ceremony.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StoredWrap {
+    pub wrapped_key: Vec<u8>,
+    pub nonce: Vec<u8>,
+}
+
+/// Fetches a credential's stored wrap row verbatim, without unwrapping it
+/// -- the counterpart read `hub_server`'s new `/sync/payload-key-wrap`
+/// handler needs, since the hub itself never holds a device's secret and
+/// so can never call `unwrap_for_credential` on a device's behalf. `None`
+/// for a credential with no wrap row yet (should not happen for a
+/// credential that has completed at least one authenticated request, per
+/// `ensure_wrapped_for_credential`'s lazy-establishment guarantee, but not
+/// itself an error state worth distinguishing from "not found" here,
+/// matching `unwrap_for_credential`'s own convention).
+pub fn get_wrap_for_credential(
+    conn: &Connection,
+    credential_id: &str,
+) -> AppResult<Option<StoredWrap>> {
+    conn.query_row(
+        "SELECT wrapped_key, nonce FROM sync_payload_key_wraps WHERE credential_id = ?1",
+        [credential_id],
+        |row| {
+            Ok(StoredWrap {
+                wrapped_key: row.get(0)?,
+                nonce: row.get(1)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
 /// Rotates a school's sync-payload key by discarding every existing wrap
 /// row for it (ADR-0069 addendum: "key rotation on device revocation").
 ///
@@ -300,6 +342,38 @@ mod tests {
         assert!(
             second.is_err(),
             "at most one wrap per credential -- matches the migration's UNIQUE constraint"
+        );
+    }
+
+    #[test]
+    fn get_wrap_for_credential_returns_the_stored_ciphertext_and_nonce_verbatim() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        let device_secret = decode_hex(&credential.secret_hex);
+        let sspk = payload_key::generate_payload_key();
+        wrap_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk).unwrap();
+
+        let stored = get_wrap_for_credential(&conn, &credential.id)
+            .unwrap()
+            .expect("a wrap was just stored");
+
+        assert_ne!(stored.wrapped_key, sspk.to_vec());
+        let wrap_key = payload_key::derive_wrap_key(&device_secret);
+        let unwrapped =
+            payload_key::unwrap_payload_key(&wrap_key, &stored.nonce, &stored.wrapped_key).unwrap();
+        assert_eq!(unwrapped, sspk);
+    }
+
+    #[test]
+    fn get_wrap_for_credential_is_none_when_no_wrap_exists() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+
+        assert_eq!(
+            get_wrap_for_credential(&conn, &credential.id).unwrap(),
+            None
         );
     }
 

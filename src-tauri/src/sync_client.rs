@@ -11,18 +11,20 @@
 //! read and to unit-test (see this module's own tests, which drive a
 //! real `hub_server::router` bound to an ephemeral loopback port).
 //!
-//! **Deliberately NOT done in this slice** (see ADR-0067's "payload key
-//! ceremony" gap, `crypto::payload_key`'s own doc comment, and this
-//! slice's task description): decrypting `encrypted_payload` and
-//! materializing it into a domain table (`learners`, `sections`, ...).
-//! No Tauri command or persisted state yet gives a device the SSPK
-//! needed to do that safely, and building that ceremony is explicitly a
-//! separate increment. What this module *can* do without it -- and does
-//! -- is track *that* a change happened for an entity (its version) and
-//! detect when this device must not blindly trust that version because
-//! it has its own unsynced local edit to the same entity, staging that
-//! case into the same conflict-review queue the push side already uses,
-//! never a silent last-write-wins.
+//! ADR-0069 addendum (payload encrypt/decrypt round trip): a
+//! non-conflicting pulled change is now actually decrypted (via
+//! `resolve_sspk`'s `/sync/payload-key-wrap` round trip and
+//! `crypto::payload_key::decrypt_payload`) and materialized into its
+//! domain table through the existing repository write path -- see
+//! `apply_decrypted_change`. Scoped to exactly the one entity kind
+//! already wired end to end on the push side, `EntityKind::Learner` (see
+//! `commands::learner`'s own doc comment); every other `EntityKind`
+//! variant has no producing write path yet, so decrypting one here is
+//! unreachable in practice and is treated as a rejection rather than a
+//! silent no-op success. A change this device has its own unsynced local
+//! edit for is still never decrypted-and-applied -- it is staged into the
+//! same conflict-review queue the push side already uses, exactly as
+//! before this addendum, never a silent last-write-wins.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,12 +32,13 @@ use std::time::Duration;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
-    device_sync_client_credential, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
-    sync_version_cache,
+    device_credential, device_sync_client_credential, learner, sync_conflict_review, sync_hub,
+    sync_outbox, sync_pull_cursor, sync_version_cache,
 };
-use crate::sync::PendingChange;
+use crate::sync::{EntityKind, PendingChange};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
@@ -113,6 +116,17 @@ struct PullResponseBody {
     changes: Vec<sync_hub::AcceptedChange>,
 }
 
+/// Mirrors `hub_server`'s own (private) `PayloadKeyWrapResponseBody` --
+/// two independent types rather than a shared one, matching every other
+/// wire struct in this pair of modules (`PushRequestBody`/`PullQuery`
+/// etc. are likewise duplicated rather than imported, since `hub_server`'s
+/// are deliberately private to that module).
+#[derive(Debug, Deserialize)]
+struct PayloadKeyWrapResponseBody {
+    wrapped_key: Vec<u8>,
+    nonce: Vec<u8>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PushRunSummary {
     /// How many outbox rows were included in this round's batch (0 if
@@ -132,7 +146,47 @@ pub struct PullRunSummary {
     pub received: usize,
     pub applied: usize,
     pub conflicted: usize,
+    /// A non-conflicting change whose `encrypted_payload` failed to
+    /// decrypt (wrong/rotated key, corrupted ciphertext, tampered
+    /// auth tag) -- rejected, never partially applied. See `pull_once`'s
+    /// own doc comment for why this halts the rest of the batch rather
+    /// than skipping past it.
+    pub rejected: usize,
     pub failed: bool,
+}
+
+/// Fetches this device's own wrap of the school's current sync-payload key
+/// (ADR-0069 addendum: `/sync/payload-key-wrap`) and unwraps it locally
+/// with the device secret this device already holds -- the plaintext SSPK
+/// itself never crosses the network a second time, only its per-device
+/// wrapped form does (see `sync_payload_key::StoredWrap`'s own doc
+/// comment). Returns `Ok(None)` for any failure along the way (network
+/// error, non-2xx, malformed body, or a wrap that fails to decrypt) --
+/// deliberately not distinguished from each other here, since every case
+/// means the same thing to `pull_once`: this round cannot safely decrypt
+/// anything, so no non-conflicting change should be applied. Resolved
+/// fresh on every pull round rather than cached across rounds -- this is
+/// the same "no new persisted key material" scope boundary
+/// `crypto::payload_key`'s own doc comment already draws around this
+/// slice (DPAPI-backed local caching is explicitly deferred, see this
+/// module's task-level doc comment).
+fn resolve_sspk(
+    client: &reqwest::blocking::Client,
+    config: &SyncClientConfig,
+) -> Option<[u8; PAYLOAD_KEY_LEN]> {
+    let response = client
+        .get(format!("{}/sync/payload-key-wrap", config.base_url))
+        .header(CREDENTIAL_ID_HEADER, &config.credential_id)
+        .header(DEVICE_SECRET_HEADER, &config.device_secret_hex)
+        .send()
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let body: PayloadKeyWrapResponseBody = response.json().ok()?;
+    let device_secret = device_credential::hex_decode(&config.device_secret_hex)?;
+    let wrap_key = payload_key::derive_wrap_key(&device_secret);
+    payload_key::unwrap_payload_key(&wrap_key, &body.nonce, &body.wrapped_key).ok()
 }
 
 /// Drains up to `PUSH_BATCH_LIMIT` pending `sync_outbox` rows for
@@ -346,6 +400,12 @@ pub fn pull_once(
         received: body.changes.len(),
         ..Default::default()
     };
+    // Resolved lazily -- only fetched (one extra HTTP round trip) if this
+    // batch actually contains a non-conflicting change that needs
+    // decrypting; a pull that turns out to be all-conflicts, or empty,
+    // never touches the payload-key-wrap endpoint at all.
+    let mut sspk: Option<Option<[u8; PAYLOAD_KEY_LEN]>> = None;
+
     for change in &body.changes {
         let entity_id = change.entity_id.to_string();
         let locally_known = sync_version_cache::known_version(
@@ -370,19 +430,90 @@ pub fn pull_once(
                 change,
             )?;
             summary.conflicted += 1;
-        } else {
-            sync_version_cache::record_known_version(
-                conn,
-                &config.school_id,
-                change.entity_kind,
-                &entity_id,
-                change.version,
-            )?;
-            summary.applied += 1;
+            sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
+            continue;
         }
-        sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
+
+        // Non-conflicting: this device must actually decrypt and
+        // materialize the change before trusting it -- never a bare
+        // version-cache bump. A tampered or undecryptable payload is
+        // rejected outright: neither the domain table nor the version
+        // cache nor the cursor advances past it, so this exact change is
+        // retried (and re-flagged) on every future pull round rather than
+        // silently skipped or partially applied.
+        let key = *sspk.get_or_insert_with(|| resolve_sspk(client, config));
+        let Some(key) = key else {
+            summary.rejected += 1;
+            summary.failed = true;
+            break;
+        };
+
+        match apply_decrypted_change(conn, &config.school_id, change, &key) {
+            Ok(()) => {
+                sync_version_cache::record_known_version(
+                    conn,
+                    &config.school_id,
+                    change.entity_kind,
+                    &entity_id,
+                    change.version,
+                )?;
+                summary.applied += 1;
+                sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
+            }
+            Err(()) => {
+                summary.rejected += 1;
+                summary.failed = true;
+                break;
+            }
+        }
     }
     Ok(summary)
+}
+
+/// Decrypts `change.encrypted_payload` under `sspk` and, for the one
+/// entity kind this slice wires end to end (`EntityKind::Learner`),
+/// applies it via the existing `repository::learner` write path -- never
+/// raw SQL here (`.claude/rules/architecture.md`: "All SQL lives in
+/// Rust ... repository"). `Err(())` on ANY failure (decrypt/auth-tag
+/// failure, malformed JSON, or a decrypted payload whose own `school_id`
+/// does not match this pull's school) -- deliberately a unit error, not
+/// `AppResult`, so `pull_once` cannot accidentally propagate a
+/// decrypt failure as a hard `?`-short-circuit that would abort the whole
+/// batch loop before recording `summary.rejected`/`failed` for the caller.
+/// A payload whose declared `school_id` mismatches `school_id` is treated
+/// exactly like a tampered payload -- decrypting successfully under this
+/// school's SSPK already strongly implies it, but this is defense in
+/// depth, not proof, so it is still checked explicitly rather than trusted
+/// silently (`.claude/rules/security-privacy.md`: enforce at the
+/// repository boundary, not by omission).
+///
+/// Entity kinds other than `Learner` are deliberately left unhandled here
+/// -- no domain write path for them is enqueued anywhere yet (see
+/// `commands::learner`'s own doc comment: this is the ONLY entity wired to
+/// `sync_outbox` so far), so decrypting one is unreachable in practice.
+/// Rather than silently accepting an unknown kind as a no-op success (which
+/// would look identical to "applied" to a future caller), it is treated the
+/// same as any other rejection -- fail closed on anything this slice does
+/// not yet know how to materialize, rather than pretend success.
+fn apply_decrypted_change(
+    conn: &Connection,
+    school_id: &str,
+    change: &sync_hub::AcceptedChange,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> Result<(), ()> {
+    let plaintext =
+        payload_key::decrypt_payload(sspk, &change.encrypted_payload).map_err(|_| ())?;
+
+    match change.entity_kind {
+        EntityKind::Learner => {
+            let incoming: learner::Learner = serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            learner::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        _ => Err(()),
+    }
 }
 
 /// One push round followed by one pull round, for whichever
@@ -474,13 +605,13 @@ mod tests {
     /// with an actual `reqwest::blocking::Client` -- exercising the real
     /// HTTP boundary this client module talks over, not just the router
     /// as a `tower::Service` the way `hub_server`'s own tests do.
-    fn spawn_test_hub(conn: Connection) -> SocketAddr {
+    fn spawn_test_hub(conn: Connection, sspk: [u8; PAYLOAD_KEY_LEN]) -> SocketAddr {
         let std_listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         std_listener.set_nonblocking(true).unwrap();
         let addr = std_listener.local_addr().unwrap();
         let router = crate::hub_server::router(crate::hub_server::HubServerState {
             db: Arc::new(Mutex::new(conn)),
-            sspk: crate::crypto::payload_key::generate_payload_key(),
+            sspk,
         });
         std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
@@ -506,6 +637,14 @@ mod tests {
         school_id: String,
         device_id: Uuid,
         user_id: String,
+        /// The SAME key `spawn_test_hub`'s `HubServerState` was given --
+        /// exposed so tests can directly encrypt a realistic payload the
+        /// way `commands::learner::enqueue_learner_sync_change` does, and
+        /// so a "tampered ciphertext" test can start from a genuinely
+        /// valid encryption rather than arbitrary bytes. Never itself sent
+        /// over the wire; `pull_once` under test always recovers its own
+        /// copy via the real `/sync/payload-key-wrap` HTTP round trip.
+        sspk: [u8; PAYLOAD_KEY_LEN],
     }
 
     fn setup() -> TestFixture {
@@ -525,7 +664,8 @@ mod tests {
 
         let school_id = school.id.clone();
         let user_id = user.id.clone();
-        let addr = spawn_test_hub(hub_conn);
+        let sspk = crate::crypto::payload_key::generate_payload_key();
+        let addr = spawn_test_hub(hub_conn, sspk);
 
         // The client under test has its OWN separate local database --
         // it needs its own copy of the school row (an FK target for
@@ -552,6 +692,7 @@ mod tests {
             school_id,
             device_id,
             user_id,
+            sspk,
         }
     }
 
@@ -579,6 +720,34 @@ mod tests {
             operation: ChangeOperation::Upsert,
             encrypted_payload: vec![9, 9, 9],
         }
+    }
+
+    fn synthetic_learner(fixture: &TestFixture, entity_id: Uuid) -> learner::Learner {
+        learner::Learner {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            given_name: "Ana".to_string(),
+            family_name: "Cruz".to_string(),
+            lrn: Some("123456789012".to_string()),
+            sex: Some("F".to_string()),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_change`, but with a REAL encrypted-under-`fixture.sspk`
+    /// learner payload -- what `pull_once` under test must actually
+    /// decrypt and materialize, not a placeholder. Mirrors exactly what
+    /// `commands::learner::enqueue_learner_sync_change` produces in
+    /// production: `serde_json::to_vec` then `payload_key::encrypt_payload`.
+    fn make_learner_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        let plaintext = serde_json::to_vec(&synthetic_learner(fixture, entity_id)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
     }
 
     #[test]
@@ -757,7 +926,7 @@ mod tests {
             sync_outbox::enqueue(
                 conn,
                 &fixture.school_id,
-                &make_change(&fixture, entity_id, 0),
+                &make_learner_change(&fixture, entity_id, 0),
             )
             .unwrap();
             push_once(conn, &client, &config).unwrap();
@@ -780,8 +949,17 @@ mod tests {
         assert_eq!(summary.received, 1);
         assert_eq!(summary.applied, 1);
         assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
         {
             let conn = &fixture.conn;
+            // The real point of this slice: an actual row now exists in
+            // the domain table, not just an advanced version watermark.
+            let materialized =
+                learner::find_by_id_in_school(conn, &fixture.school_id, &entity_id.to_string())
+                    .unwrap()
+                    .expect("pull_once must have materialized the learner row");
+            assert_eq!(materialized, synthetic_learner(&fixture, entity_id));
             assert_eq!(
                 sync_version_cache::known_version(
                     conn,
@@ -872,6 +1050,119 @@ mod tests {
                     .0,
                 1
             );
+            // A staged conflict must never touch the domain table -- no
+            // blind decrypt-and-overwrite.
+            assert!(learner::find_by_id_in_school(
+                conn,
+                &fixture.school_id,
+                &entity_id.to_string()
+            )
+            .unwrap()
+            .is_none());
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_payload_without_applying_or_advancing_past_it() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_learner_change(&fixture, entity_id, 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            assert!(learner::find_by_id_in_school(
+                conn,
+                &fixture.school_id,
+                &entity_id.to_string()
+            )
+            .unwrap()
+            .is_none());
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::Learner,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                0,
+                "a rejected change must never advance the version cache"
+            );
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_payload_encrypted_under_the_wrong_key() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_learner_change(&fixture, entity_id, 0);
+            let plaintext = serde_json::to_vec(&synthetic_learner(&fixture, entity_id)).unwrap();
+            let wrong_key = crate::crypto::payload_key::generate_payload_key();
+            change.encrypted_payload =
+                payload_key::encrypt_payload(&wrong_key, &plaintext).unwrap();
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            assert!(learner::find_by_id_in_school(
+                conn,
+                &fixture.school_id,
+                &entity_id.to_string()
+            )
+            .unwrap()
+            .is_none());
         };
     }
 

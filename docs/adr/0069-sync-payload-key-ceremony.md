@@ -423,3 +423,156 @@ rejects a revoked credential, not that this function does) now also
 asserts the function itself refuses. Full suite after this fix: 786 lib
 tests passed (784 + 2 new), `cargo fmt --check` clean, `cargo clippy
 --all-targets -- -D warnings` clean.
+
+## Addendum (2026-09-05) — the encrypt/decrypt round trip closed end to end for the learner entity
+
+This slice closes the one remaining gap this ADR's own "Deliberately NOT
+shipped" notes above kept flagging: pulled changes were never decrypted
+or materialized, only version-tracked. Scoped to exactly the entity
+already wired on the push side (`EntityKind::Learner`, via
+`commands::learner`), per this slice's own task boundary — not
+generalized to every `EntityKind` variant yet.
+
+**On enqueue**: already done by an earlier slice
+(`commands::learner::enqueue_learner_sync_change`) — a created/duplicate-
+checked learner is serialized to JSON and encrypted under the resolved
+SSPK via `crypto::payload_key::encrypt_payload` before
+`sync_outbox::enqueue` ever sees it. This addendum found that wiring
+already complete and correctly tested; nothing needed to change there.
+
+**On pull — new this slice**: `sync_client::pull_once` now actually
+decrypts a non-conflicting `AcceptedChange`'s `encrypted_payload` and
+applies it, instead of only advancing `sync_version_cache`'s watermark.
+This needed a new capability the client side did not have: a way for a
+device to obtain its OWN plaintext SSPK. The wrap row
+(`sync_payload_key_wraps`) lives only in the HUB's database — a device's
+own local database never held one — so a new authenticated hub endpoint,
+`GET /sync/payload-key-wrap`, was added: it hands the requesting device
+back exactly its own stored wrap (ciphertext + nonce), read via the new
+`repository::sync_payload_key::get_wrap_for_credential` (a plain,
+un-unwrapping SELECT — the hub itself never holds a device's secret, so
+it could never unwrap on the device's behalf even if it wanted to). The
+device unwraps that response locally with the wrap key it derives from
+its own already-held device secret
+(`crypto::payload_key::derive_wrap_key` + `unwrap_payload_key`,
+`sync_client::resolve_sspk`) — the plaintext SSPK crosses the network
+boundary exactly as many times as it did before this addendum (zero;
+only its per-device wrapped form ever does), consistent with the
+enrollment ceremony's own existing guarantee.
+
+This is a genuinely new wiring point (a new network endpoint plus a new
+client-side HTTP round trip on every pull round that needs to decrypt
+something), not merely filling in a stub — hence this addendum rather
+than treating it as an unrecorded implementation detail. It also means
+`hub_server::authenticate`'s existing lazy `ensure_wrapped_for_credential`
+call has a second consumer now (the new endpoint's own `authenticate`
+call), not just the push/pull handlers — no new behavior there, but
+worth noting since a wrap row can now be _read back_ by a device, not
+only lazily _written_ for it.
+
+**Applying a decrypted change**: routed through the EXISTING repository
+write path, `repository::learner::upsert_from_sync` (new), an
+`INSERT ... ON CONFLICT(id) DO UPDATE` — deliberately not a separate
+insert-vs-update branch, since a pulled change this device chose to
+apply (i.e. it has no unsynced local edit disputing it — the existing
+conflict check is unchanged) is never something to distinguish "new to
+this device" from "this device has a stale copy" for. The decrypted
+payload's own `school_id` field is cross-checked against the pull's
+`config.school_id` before writing — defense in depth (decrypting
+successfully under this school's SSPK already strongly implies the
+match, but this is not treated as proof) — a mismatch is rejected exactly
+like a tampered payload, never silently written under a possibly-wrong
+school scope.
+
+**Fail-closed on rejection**: a payload that fails to decrypt (wrong or
+rotated key, corrupted ciphertext, tampered AES-GCM auth tag), fails to
+deserialize as the expected entity, or fails the `school_id` cross-check
+is rejected outright — `sync_client::apply_decrypted_change` returns
+`Err(())`, and `pull_once` responds by incrementing a new
+`PullRunSummary::rejected` counter, marking the round `failed`, and
+**stopping the batch loop right there** — neither the domain table, the
+version cache, nor `sync_pull_cursor` advances past the bad change. The
+same exact change is therefore retried (and re-rejected, if the
+condition persists) on every future pull round rather than being
+silently skipped past or partially applied. An entity kind other than
+`Learner` reaching `apply_decrypted_change` (unreachable today — no other
+kind is ever enqueued yet) is treated the same way: fail closed, never a
+silent no-op "success."
+
+**Tests (TDD)**: 2 new at `repository::sync_payload_key`
+(`get_wrap_for_credential` returns the stored ciphertext/nonce verbatim
+and unwraps correctly; returns `None` for a credential with no wrap), 2
+new at `hub_server` (the new endpoint returns THIS device's own wrap of
+the CURRENT `state.sspk`, proven by unwrapping the response and comparing
+directly to `state.sspk`; the endpoint is unauthorized with no
+credential headers), 2 new at `repository::learner`
+(`upsert_from_sync` inserts a never-seen learner; updates an existing row
+in place without duplicating it), and at `sync_client`: the existing
+`pull_once_applies_a_non_conflicting_change` test now asserts a REAL row
+exists in the `learners` table (not just an advanced version watermark),
+the existing conflict test now also asserts the domain table was NOT
+touched, plus two new tests —
+`pull_once_rejects_a_tampered_payload_without_applying_or_advancing_past_it`
+and `pull_once_rejects_a_payload_encrypted_under_the_wrong_key` — both
+proving the domain table, version cache, and cursor all stay put on a
+rejected change. The encrypt-then-decrypt round trip itself was already
+covered by `crypto::payload_key`'s own pre-existing tests (nothing new
+needed there); the "domain write enqueues an actually-encrypted payload"
+requirement was likewise already covered by
+`commands::learner`'s existing `create_learner_with_an_sspk_enqueues_a_
+correctly_encrypted_outbox_entry` test.
+
+**Verification actually run this session**: `cargo build` (whole crate,
+including `src-tauri`'s Tauri binary target) — clean; `cargo test --lib`
+— **794 passed, 0 failed** (784 baseline + 10 new: 2
+`sync_payload_key`, 2 `hub_server`, 2 `learner`, and the pull_once test
+updates/additions in `sync_client` net +4 there); full-crate `cargo test`
+(lib + every integration test binary + doctests) — exit code 0, all
+integration suites green, 0 doctests (unchanged); `cargo fmt --check` —
+clean (after one `cargo fmt` pass this session to fix formatting drift
+this change introduced); `cargo clippy --all-targets -- -D warnings` —
+clean, zero warnings; `npm run quality:security` — **3 ok, 0 failed, 0
+missing** (gitleaks, `cargo-deny`, `osv-scanner` all present and passing;
+no new dependency was added). `npm run quality` (TypeScript side) was not
+attempted — no TS/UI file was touched by this slice, matching the prior
+addendum's own scope boundary.
+
+**Independent review**: a fresh `security-reviewer` subagent was not
+reachable in this session's toolset (same known gap as the prior two
+addenda) — the fallback in `.claude/rules/autonomous-development.md`
+("Reviewer harness failures are not automatic stops") was followed:
+recorded honestly here, and a rigorous self-review was performed instead,
+covering: (1) the new endpoint never returns a wrap for anyone but the
+credential that authenticated the request (`verified.credential_id`, not
+a caller-supplied id — there is no such parameter to mistrust); (2) a
+missing wrap row on this endpoint is treated as `Internal`, never a
+silent empty/default response a caller could mistake for a real (but
+empty) wrap; (3) `apply_decrypted_change`'s `school_id` cross-check
+closes the one plausible "decrypts fine but for the wrong tenant"
+concern defense-in-depth, even though it is not reachable today given
+the SSPK is already per-school; (4) confirmed the batch-stopping
+behavior on rejection is a deliberate fail-closed choice, not an
+oversight -- continuing past a rejected change and only skipping it would
+let a persistent decrypt failure "lose" that one change forever with no
+retry, which is worse than temporarily stalling the rest of that pull
+round behind it (the next round, seconds later per `POLL_INTERVAL`,
+retries from the same cursor position). No blocking issue was found.
+This independent-review debt is retained, not dropped — owed for a
+future session with a healthy reviewer harness, same as the two prior
+addenda's outstanding debt.
+
+**Deliberately NOT shipped this slice, and why**: `db::rotate_sspk` and
+the Windows DPAPI file-overwrite path remain exactly as deferred by the
+prior addendum — untouched by this slice, still needing native Windows
+verification this sandbox cannot perform. Generalizing this same
+encrypt/decrypt wiring to the other nine `EntityKind` variants
+(`Section`, `SectionMembership`, `Attendance`, ...) is explicitly out of
+scope for this slice too — none of them has a producing write path
+enqueued into `sync_outbox` yet, so there is nothing real to generalize
+against without guessing at a schema. Local caching of the unwrapped SSPK
+across pull rounds (today, `resolve_sspk` re-fetches and re-unwraps on
+every round that needs to decrypt something) was deliberately not added
+either — it would be new persisted-or-cached key material, the same
+scope boundary `crypto::payload_key`'s own doc comment already draws
+around this slice, and the extra HTTP round trip's cost is negligible
+next to `POLL_INTERVAL`'s 30-second cadence.

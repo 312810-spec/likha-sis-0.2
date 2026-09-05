@@ -1,5 +1,75 @@
 # CURRENT HANDOFF
 
+## Sync payload encrypt/decrypt round trip closed for the learner entity — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Closed the last open gap this ADR's own notes kept flagging: pulled
+changes were tracked (version watermark only) but never decrypted or
+materialized. Scoped to exactly the one entity already wired on the push
+side, `EntityKind::Learner` — not generalized to other entities.
+
+**What shipped**: enqueue-side encryption was already fully done by an
+earlier slice (`commands::learner::enqueue_learner_sync_change`
+encrypts under the resolved SSPK before `sync_outbox::enqueue`) — this
+slice found that complete and left it unchanged. On pull,
+`sync_client::pull_once` now actually decrypts a non-conflicting
+`AcceptedChange` and applies it via the existing repository write path,
+`repository::learner::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`). Decryption needed a new
+capability: a device's own local DB never held a copy of its SSPK wrap
+(that row lives only in the hub's DB), so a new authenticated hub
+endpoint, `GET /sync/payload-key-wrap`, hands a device back exactly its
+own stored wrap; the device unwraps it locally with its own device
+secret (`sync_client::resolve_sspk`) — the plaintext SSPK still never
+crosses the network, only its per-device wrapped form does, exactly like
+the original enrollment ceremony. A decrypted payload's own `school_id`
+is cross-checked against the pull's school before writing (defense in
+depth). Any failure — decrypt/auth-tag failure, malformed JSON, a
+`school_id` mismatch, or an entity kind with no write path yet — is
+rejected outright: `PullRunSummary::rejected` increments, the round is
+marked `failed`, and the batch loop stops right there so the domain
+table, version cache, and cursor never advance past the bad change (it
+is retried on the next round, never silently skipped or partially
+applied).
+
+**Verification actually run this session**: `cargo build` (whole crate)
+clean; `cargo test --lib` — **794 passed, 0 failed** (784 baseline + 10
+new); full-crate `cargo test` (lib + every integration binary + doctests)
+— exit code 0; `cargo fmt --check` — clean (after one `cargo fmt` pass
+this session); `cargo clippy --all-targets -- -D warnings` — clean, zero
+warnings; `npm run quality:security` — **3 ok, 0 failed, 0 missing**
+(gitleaks, cargo-deny, osv-scanner; no new dependency added). `npm run
+quality` (TS side) was not attempted — no TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent was reachable
+this session (same known gap noted in the two prior addenda) — followed
+the documented fallback: recorded honestly, rigorous self-review
+performed instead (see ADR-0069's newest addendum for the specific
+points checked — credential-scoped wrap lookup, fail-closed on a missing
+wrap row, the `school_id` cross-check's defense-in-depth role, and the
+deliberate batch-stop-on-rejection behavior). No blocking issue found.
+This independent-review debt is retained, not dropped — owed for a
+future session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why**: `db::rotate_sspk` and
+the Windows DPAPI file-overwrite path remain deferred exactly as before
+— untouched, still needs native Windows verification this sandbox cannot
+perform. Generalizing this encrypt/decrypt wiring to the other nine
+`EntityKind` variants is out of scope — none has a producing write path
+enqueued yet, so there is nothing real to generalize against.
+Local caching of the unwrapped SSPK across pull rounds was deliberately
+not added (would be new persisted/cached key material, the same scope
+boundary `crypto::payload_key` already draws) — the extra HTTP round
+trip per pull-with-something-to-decrypt is negligible next to the
+30-second poll cadence.
+
+**Exact next task**: generalize this slice's encrypt/decrypt/apply
+pattern to the next domain entity with a real producing write path (check
+`commands/` for what else calls `sync_outbox::enqueue` or is closest to
+needing it), OR pick up the still-owed `db::rotate_sspk`/DPAPI work once
+native Windows verification is available — whichever the next session's
+evidence favors per this project's priority order
+(`.claude/rules/autonomous-development.md`).
+
 ## Payload-key rotation on device revocation — ADR-0069 addendum (2026-09-05), commit + PR owed
 
 Ran this project's 10-scenario decision process for ADR-0069's own

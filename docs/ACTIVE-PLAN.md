@@ -1,5 +1,45 @@
 # ACTIVE PLAN
 
+## Sync payload encrypt/decrypt round trip closed for the learner entity — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry and ADR-0069's
+newest addendum. Summary: enqueue-side encryption was already complete
+(`commands::learner::enqueue_learner_sync_change`); this slice added
+pull-side decrypt + apply. New: `GET /sync/payload-key-wrap` hub endpoint
+
+- `repository::sync_payload_key::get_wrap_for_credential` (serves a
+  device its own stored wrap, never the plaintext SSPK);
+  `sync_client::resolve_sspk` (fetches + unwraps it locally with the
+  device's own secret); `repository::learner::upsert_from_sync` (the
+  existing-write-path materializer); `sync_client::apply_decrypted_change`
+  (decrypt, deserialize, cross-check `school_id`, upsert — fails closed on
+  any step). `pull_once` now stops the batch and marks the round `failed`
+  on a rejected change rather than skipping past it, so the domain table/
+  version cache/cursor never advance past a bad change.
+
+**Verification actually run**: `cargo build` (whole crate) clean; `cargo
+test --lib` 794/794 passed (784 baseline + 10 new); full-crate `cargo
+test` (lib + integration binaries + doctests) exit code 0; `cargo fmt
+--check` clean; `cargo clippy --all-targets -- -D warnings` clean, zero
+warnings; `npm run quality:security` 3/3 ok (gitleaks, cargo-deny,
+osv-scanner — no new dependency added). `npm run quality` (TS side) not
+attempted — no TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent reachable this
+session — documented fallback followed (recorded honestly, rigorous
+self-review performed, no blocking issue found, debt retained). See
+ADR-0069's newest addendum for the specific self-review points.
+
+**Retained debt**: `db::rotate_sspk`/DPAPI file-overwrite (needs native
+Windows verification); generalizing this encrypt/decrypt pattern to the
+other nine `EntityKind` variants (none has a producing write path yet);
+independent security review (owed, not dropped).
+
+**Exact next slice**: generalize the encrypt/decrypt/apply pattern to the
+next domain entity with a real producing write path, or pick up
+`db::rotate_sspk`/DPAPI once native Windows verification is available —
+per `.claude/rules/autonomous-development.md`'s priority order.
+
 ## Payload-key rotation on device revocation — ADR-0069 addendum (2026-09-05), commit + PR owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry and ADR-0069's

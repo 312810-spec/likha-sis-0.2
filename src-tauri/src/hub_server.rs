@@ -63,6 +63,7 @@ pub fn router(state: HubServerState) -> Router {
     Router::new()
         .route("/sync/push", post(push_handler))
         .route("/sync/pull", get(pull_handler))
+        .route("/sync/payload-key-wrap", get(payload_key_wrap_handler))
         .with_state(state)
 }
 
@@ -292,6 +293,42 @@ async fn pull_handler(
         query.limit,
     )?;
     Ok(Json(PullResponseBody { changes }))
+}
+
+/// `Deserialize` is for `sync_client`'s own decoding of this response, and
+/// for this module's tests -- the real handler only ever serializes it.
+#[derive(Debug, Serialize, Deserialize)]
+struct PayloadKeyWrapResponseBody {
+    wrapped_key: Vec<u8>,
+    nonce: Vec<u8>,
+}
+
+/// ADR-0069 addendum: hands the authenticated device back its OWN wrap of
+/// the school's current sync-payload key, never the plaintext key itself
+/// -- see `sync_payload_key::StoredWrap`'s own doc comment for why the hub
+/// can only ever serve the ciphertext form. `authenticate` above already
+/// guarantees a wrap exists for any device that reaches this handler (its
+/// lazy `ensure_wrapped_for_credential` call runs on every successful
+/// authentication, including this one), so a missing row here would mean
+/// that invariant broke, not a legitimate "not found" -- surfaced as
+/// `Internal` rather than silently returning an empty/default payload a
+/// caller could mistake for a real (but empty) wrap.
+async fn payload_key_wrap_handler(
+    State(state): State<HubServerState>,
+    headers: HeaderMap,
+) -> Result<Json<PayloadKeyWrapResponseBody>, ApiError> {
+    let conn = state
+        .db
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
+
+    let wrap = sync_payload_key::get_wrap_for_credential(&conn, &verified.credential_id)?
+        .ok_or(ApiError::Internal)?;
+    Ok(Json(PayloadKeyWrapResponseBody {
+        wrapped_key: wrap.wrapped_key,
+        nonce: wrap.nonce,
+    }))
 }
 
 #[cfg(test)]
@@ -618,5 +655,66 @@ mod tests {
             None,
             "a revoked credential's failed request must never establish a wrap"
         );
+    }
+
+    /// ADR-0069 addendum: the new payload-key-wrap endpoint hands a device
+    /// back exactly its own wrap of the CURRENT `state.sspk` -- proven by
+    /// unwrapping the response with the device's own secret and comparing
+    /// to `state.sspk` directly, never to a value the response itself
+    /// asserted.
+    #[tokio::test]
+    async fn payload_key_wrap_returns_this_devices_own_wrap_of_the_current_sspk() {
+        let fixture = test_fixture();
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/payload-key-wrap")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: PayloadKeyWrapResponseBody = serde_json::from_slice(&bytes).unwrap();
+
+        let wrap_key = crate::crypto::payload_key::derive_wrap_key(&secret);
+        let recovered = crate::crypto::payload_key::unwrap_payload_key(
+            &wrap_key,
+            &parsed.nonce,
+            &parsed.wrapped_key,
+        )
+        .unwrap();
+        assert_eq!(recovered, fixture.state.sspk);
+    }
+
+    #[tokio::test]
+    async fn payload_key_wrap_without_credential_headers_is_unauthorized() {
+        let fixture = test_fixture();
+        let app = router(fixture.state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/payload-key-wrap")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }
