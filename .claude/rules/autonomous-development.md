@@ -36,6 +36,21 @@ push, and to wait if one is still running.
 This does not override the ordinary wave-boundary stop — it only
 removes idle time inside an already-authorized continuation.
 
+## Batch-implement mode (owner instruction, 2026-09-05)
+
+When the owner explicitly asks to implement all remaining tasks in a
+list and push/CI only once everything is done, switch modes: dispatched
+agents implement and commit LOCALLY (each its own commit, full local
+verification run and reported) but do NOT run `git push` at all. No
+commit in this mode triggers CI, so the CI-push-ordering constraint
+above is moot for the duration — there is nothing to wait for since
+nothing is pushed. Only after every task in the batch is implemented
+and locally verified does one final push happen (all commits at once),
+followed by a single CI run and, if needed, a PR update. This trades
+the wall-clock benefit of per-slice CI feedback for finishing the whole
+batch before spending any CI time — appropriate only when the owner
+asks for it explicitly, not the default.
+
 ## The loop
 
 Understand → Research → Specify → Plan → Implement → Test → Review →
