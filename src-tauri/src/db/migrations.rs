@@ -1565,6 +1565,33 @@ pub fn migrations() -> Migrations<'static> {
             ON sync_payload_key_wraps(school_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- M33: this device's local cache of "what hub version did I last
+        -- see for this entity" (ADR-0067 protocol contract). Needed
+        -- before any UPDATE (not just a first create) can set a correct
+        -- PendingChange.base_version -- without it every update would
+        -- incorrectly claim base_version = 0 and get conflict-staged
+        -- against any entity already synced once. Distinct from
+        -- sync_hub_log.version, which is the HUB's authoritative record;
+        -- this is only ever this one device's own last-known copy of it,
+        -- updated after a push this device made is accepted, or after
+        -- pulling an already-accepted change for this entity from
+        -- another device.
+        CREATE TABLE sync_version_cache (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'assessment_item', 'learner_score',
+                'grading_period', 'subject', 'teaching_assignment'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+        "#,
+        ),
     ])
 }
 
@@ -3878,6 +3905,51 @@ mod tests {
             orphan_count, 0,
             "deleting a credential cascades to its wrap -- never leaves a wrap \
              pointing at a nonexistent credential"
+        );
+    }
+
+    #[test]
+    fn migration_33_enforces_the_version_cache_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO sync_version_cache (school_id, entity_kind, entity_id, known_version)
+             VALUES ('s1', 'learner', 'l1', 0)",
+            [],
+        )
+        .unwrap();
+
+        let negative_version = conn.execute(
+            "INSERT INTO sync_version_cache (school_id, entity_kind, entity_id, known_version)
+             VALUES ('s1', 'learner', 'l2', -1)",
+            [],
+        );
+        assert!(negative_version.is_err());
+
+        let unlisted_entity = conn.execute(
+            "INSERT INTO sync_version_cache (school_id, entity_kind, entity_id, known_version)
+             VALUES ('s1', 'session', 'x1', 0)",
+            [],
+        );
+        assert!(unlisted_entity.is_err());
+
+        let duplicate_key = conn.execute(
+            "INSERT INTO sync_version_cache (school_id, entity_kind, entity_id, known_version)
+             VALUES ('s1', 'learner', 'l1', 5)",
+            [],
+        );
+        assert!(
+            duplicate_key.is_err(),
+            "(school_id, entity_kind, entity_id) is the primary key -- a plain second \
+             INSERT for the same triple must fail (the repository layer uses an upsert,\
+             not a plain INSERT, to update it)"
         );
     }
 }

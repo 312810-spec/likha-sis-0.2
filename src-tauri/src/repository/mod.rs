@@ -25,5 +25,6 @@ pub mod subject_attendance;
 pub mod sync_hub;
 pub mod sync_outbox;
 pub mod sync_payload_key;
+pub mod sync_version_cache;
 pub mod teaching_assignment;
 pub mod user;

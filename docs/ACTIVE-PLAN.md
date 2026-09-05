@@ -151,16 +151,39 @@ believe it's at" tracking (needed to set a correct `base_version` on an
 _update_, not just a first-time create) does not exist anywhere; the
 network listener/transport does not exist.
 
-**Exact next implementation slice:** (1) a per-entity local version-cache
-(what hub `version` this device last saw for each entity it has touched) —
-needed before any _update_ (not just a first create) can set a correct
-`base_version`; without it every update would incorrectly claim
-`base_version = 0` and get conflict-staged against any entity already
-synced once. (2) Wire one real domain write (e.g. `learner` upsert) through
-a Tauri command that resolves the SSPK, encrypts the change with
-`encrypt_payload`, and calls `sync_outbox::enqueue` — the first actual
-end-to-end path. (3) The network listener/transport adapter (ADR-0067 D1:
-LAN discovery + optional Tailscale) that calls `device_credential::verify`
+**Completed next slice (2026-09-05, this session):** migration 33
+(`sync_version_cache`, `PRIMARY KEY (school_id, entity_kind, entity_id)`)
+and `repository::sync_version_cache::known_version`/`record_known_version`
+— this device's local record of "what hub version did I last see for this
+entity," distinct from `sync_hub_log.version` (the hub's own authoritative
+record). `known_version` defaults to `0` for an entity never recorded,
+matching `PendingChange::base_version`'s own "nothing to conflict against
+yet" convention. `record_known_version` is a monotonic upsert
+(`ON CONFLICT ... DO UPDATE SET known_version = MAX(known_version,
+excluded.known_version)`) — an out-of-order ack or pull carrying a stale,
+lower version can never regress what this device already knows. 6 new
+tests, including school-scoped and entity-kind-scoped isolation (the same
+`entity_id` under a different school or a different `entity_kind` tracks
+independently). `cargo test`: 744 lib tests + all integration binaries, 0
+failed; `cargo clippy -D warnings` and `cargo fmt --check` clean. Not yet
+called by any domain write or by the (still nonexistent) push/pull
+orchestration loop that would actually update it after a real round trip
+— this is the persistence primitive only, matching this project's
+zero-UI-first precedent.
+
+**Exact next implementation slice:** wire one real domain write (e.g.
+`learner` upsert) through a Tauri command that: resolves the SSPK
+(`db::load_or_mint_sspk`), reads `sync_version_cache::known_version` for
+the entity being written to get the correct `base_version`, encrypts the
+change with `crypto::payload_key::encrypt_payload`, and calls
+`sync_outbox::enqueue` — the first actual end-to-end path from a teacher's
+edit to an encrypted, correctly-versioned local outbox entry. This also
+needs a decision on WHEN `sync_version_cache` gets updated for a
+successful create (immediately, optimistically, at version 1 — since
+there is nothing to race against locally) versus what happens once a real
+push/pull loop exists (out of scope until the network listener). After
+that: the network listener/transport adapter itself (ADR-0067 D1: LAN
+discovery + optional Tailscale) that calls `device_credential::verify`
 then `sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
 UI/resolution workflow and the Android client remain separate, later
 slices.
