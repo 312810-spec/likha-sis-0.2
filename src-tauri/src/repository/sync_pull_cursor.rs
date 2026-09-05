@@ -22,6 +22,26 @@ pub fn get_cursor(conn: &Connection, school_id: &str) -> AppResult<SyncCursor> {
     Ok(SyncCursor(cursor.unwrap_or(0) as u64))
 }
 
+/// This device's own best-available "last time a pull actually made
+/// progress for this school" signal, for the sync-status screen --
+/// `None` if this device has never pulled a change for `school_id` (no
+/// row exists yet). Note this is NOT the same as "last time this device
+/// successfully contacted the hub": `advance_cursor` is only called when
+/// a pulled change is applied or staged as a conflict (see
+/// `sync_client::pull_once`), so an all-quiet successful poll with
+/// nothing new to pull does not update it. The sync-status screen must
+/// present this honestly (e.g. "last change received") rather than as a
+/// general connectivity health check.
+pub fn last_pull_at(conn: &Connection, school_id: &str) -> AppResult<Option<String>> {
+    conn.query_row(
+        "SELECT updated_at FROM sync_pull_cursor WHERE school_id = ?1",
+        [school_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
 /// Advances this device's watermark to `cursor`. Monotonic, like
 /// `sync_version_cache::record_known_version`: a call with a LOWER
 /// cursor than what is already stored never regresses it, so an
@@ -74,6 +94,24 @@ mod tests {
         advance_cursor(&conn, &school.id, SyncCursor(3)).unwrap();
 
         assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(9));
+    }
+
+    #[test]
+    fn last_pull_at_is_none_before_any_pull() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        assert_eq!(last_pull_at(&conn, &school.id).unwrap(), None);
+    }
+
+    #[test]
+    fn last_pull_at_is_set_after_a_pull_advances_the_cursor() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+
+        advance_cursor(&conn, &school.id, SyncCursor(4)).unwrap();
+
+        let last_pull_at = last_pull_at(&conn, &school.id).unwrap();
+        assert!(last_pull_at.is_some());
     }
 
     #[test]

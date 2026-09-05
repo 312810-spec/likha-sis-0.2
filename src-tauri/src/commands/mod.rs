@@ -18,6 +18,7 @@ pub mod section_advisory;
 pub mod setup;
 pub mod subject;
 pub mod subject_attendance;
+pub mod sync_status;
 pub mod teaching_assignment;
 pub mod user;
 

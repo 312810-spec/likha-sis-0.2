@@ -32,6 +32,59 @@ Resolved with `cargo clean` scoped to this worktree's own
 future session sees the known fix rather than assuming a build
 regression.
 
+## Sync-status screen (2026-09-05)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: closes ADR-0067's "still required before production PII" list
+item "sync status UI" — the last of the three sync-UI items on that
+list. New read-only `commands::sync_status::get_sync_status` composes
+enrollment (`device_sync_client_credential::get`), last-pull time (new
+`sync_pull_cursor::last_pull_at`), pending outgoing change count (new
+`sync_outbox::count_pending_for_school`), a derived "having trouble
+reaching the sync hub" signal (new `sync_outbox::has_pending_failure_for_school`),
+and open-conflict count (already-shipped
+`sync_conflict_review::count_open_for_school`) — all session-scoped, no
+new write path. Full domain/application/infrastructure/UI slice
+(`src/ui/SyncStatusScreen.tsx`, routed as the "Sync Status" tab in the
+existing "Sync" nav group, linking to `ConflictReviewScreen` rather than
+duplicating conflict UI).
+
+**Verification actually run**: `cargo fmt --check` clean (one auto-fix
+applied); targeted new Rust tests — `sync_outbox::` 7/7,
+`sync_pull_cursor::` 6/6, `commands::sync_status::` 3/3, all pass;
+`cargo clippy --all-targets -- -D warnings` clean (zero warnings, whole
+workspace including test targets); `npm run quality:security` 3/3 ok;
+`npm run test` (vitest) 995/995 passed; `npm run
+typecheck`/`lint`/`format:check`/`check:architecture` all clean;
+`npm run check:deadcode` (`knip`) shows only the pre-existing baseline
+finding, no new finding.
+
+**Not run to completion**: whole-crate `cargo test` — this shared box's
+disk was repeatedly exhausted by concurrent parallel worktree builds
+this session (`df -h /` at ~99–100% used more than once, mid-compile `No
+space left on device` failures observed directly). `cargo clippy
+--all-targets` DID compile and pass the same test targets clean.
+Disclosed as environment-resource debt, not silently claimed as
+covered — see `docs/VERIFICATION-DEBT.md`'s matching entry; re-run
+plain `cargo test` once the shared box has stable free space.
+
+**Independent review**: `teacher-ux-reviewer`/`accessibility-reviewer`
+subagent dispatch not attempted — no dispatch tool reachable this
+session (same recurring gap as every prior UI slice). Self-review
+performed per the documented fallback; no blocking issue found.
+Independent-review debt recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Batch mode**: committed locally only, per this session's explicit
+batch-implement instruction. Not pushed; no PR opened from this session.
+
+**Next exact slice**: close the device-management/conflict-review
+slice's own disclosed "keep local" stale-outbox-`base_version` gap (see
+the "Conflict-review screen" entry below), plus the retained native
+NVDA/Narrator passes and independent reviews across all three sync UI
+slices.
+
+> > > > > > > worktree-agent-a23a8e9fd151e7d19
+
 ## Conflict-review screen (2026-09-05)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

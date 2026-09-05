@@ -19,6 +19,7 @@ import { SetupApplicationService } from "./application/setup-service";
 import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
 import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
+import { SyncStatusApplicationService } from "./application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
@@ -43,6 +44,7 @@ import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
 import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repository";
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
 import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject-attendance-repository";
+import { TauriSyncStatusRepository } from "./infrastructure/tauri/sync-status-repository";
 import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
@@ -112,3 +114,4 @@ export const deviceSyncService = new DeviceSyncApplicationService(new TauriDevic
 export const conflictReviewService = new ConflictReviewApplicationService(
   new TauriConflictReviewRepository(),
 );
+export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());

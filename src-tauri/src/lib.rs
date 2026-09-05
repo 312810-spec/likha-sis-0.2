@@ -162,6 +162,7 @@ pub fn run() {
             commands::device_sync::list_device_sync_credentials,
             commands::conflict_review::list_conflict_reviews,
             commands::conflict_review::resolve_conflict_review,
+            commands::sync_status::get_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
