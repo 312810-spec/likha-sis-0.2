@@ -1,5 +1,46 @@
 # ACTIVE PLAN
 
+## Payload-key rotation on device revocation — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry and ADR-0069's
+"the 10-scenario decision on key rotation on revocation" addendum.
+Summary: `auth::revoke_device_sync_credential` now atomically rotates
+the school's sync-payload key by clearing every stored wrap
+(`sync_payload_key::rotate_for_school`); each still-active device
+transparently recovers a fresh wrap on its next authenticated contact
+(`sync_payload_key::ensure_wrapped_for_credential`, called from
+`hub_server::authenticate`). Lazy propagation was chosen over an
+asymmetric-keypair scheme (Next Best) because the hub never retains a
+device's plaintext secret past enrollment, so it cannot proactively
+re-wrap for anyone but the device currently authenticating.
+
+**Verification actually run**: `cargo build --lib` clean; `cargo test
+--lib` 784/784 passed; `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean, zero warnings; full-crate `cargo
+test` (lib + integration binaries + doctests) exit code 0; `npm run
+quality:security` 3/3 ok (gitleaks, cargo-deny, osv-scanner — no new
+dependency added). `npm run quality` (TS side) could not run —
+pre-existing sandbox gap (`tsc` cannot resolve `vite`/`vitest` types,
+`node_modules` incomplete), unrelated to this Rust-only change; see
+`docs/VERIFICATION-DEBT.md`.
+
+**Independent review**: no `security-reviewer` subagent tool was
+available this session; the `security-review` skill's scripted
+`git diff origin/HEAD...` precondition failed in this sandbox
+(unresolvable ref). Fallback per this project's own rule: recorded
+honestly, rigorous self-review performed instead (see
+`docs/CURRENT-HANDOFF.md`'s entry for what it covered), independent
+review retained as owed debt for a future session.
+
+**Deliberately deferred, next exact task**: `db::rotate_sspk` (mint +
+persist a genuinely NEW plaintext SSPK to the hub's local DPAPI file on
+revocation, Windows-only, unverifiable in this sandbox) is not yet
+wired — today's rotation is real and tested at the database/wrap layer,
+but a live revocation on a real installation would still hand out the
+SAME old SSPK to the next re-wrap until that function exists and is
+called from the revoke command path. Needs native Windows verification
+before being marked done.
+
 ## Grade 12 DO 8 weighting carryover — ADR-0068 (2026-09-04) — merged as PR #44 (main `aac0ed7`)
 
 The six Strengthened-SHS policies were already complete in migration 12; the

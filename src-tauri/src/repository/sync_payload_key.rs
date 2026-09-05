@@ -79,6 +79,66 @@ pub fn unwrap_for_credential(
     Ok(Some(sspk))
 }
 
+/// Wraps `sspk` for `credential_id` only if it does not already have a
+/// wrap row -- unlike `wrap_for_credential`, a pre-existing wrap is not an
+/// error, it is a no-op. This is the lazy re-wrap path an authenticated
+/// hub request (`hub_server::authenticate`) calls on every successful
+/// `device_credential::verify`: after `rotate_for_school` clears every
+/// wrap row for a school (see below), the very next authenticated
+/// push/pull from each still-active device transparently re-establishes
+/// that device's wrap using the device secret the request already proved
+/// it holds -- no new UX ceremony, no second network round trip, and the
+/// hub never needs to have retained a revoked device's secret to rotate
+/// everyone else onto the new key.
+pub fn ensure_wrapped_for_credential(
+    conn: &Connection,
+    school_id: &str,
+    credential_id: &str,
+    device_secret: &[u8],
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sync_payload_key_wraps WHERE credential_id = ?1)",
+        [credential_id],
+        |row| row.get(0),
+    )?;
+    if exists {
+        return Ok(());
+    }
+    wrap_for_credential(conn, school_id, credential_id, device_secret, sspk)
+}
+
+/// Rotates a school's sync-payload key by discarding every existing wrap
+/// row for it (ADR-0069 addendum: "key rotation on device revocation").
+///
+/// This function does NOT mint or persist the new plaintext SSPK itself --
+/// that is the same filesystem/DPAPI-file concern `db::load_or_mint_sspk`
+/// already owns for the ORIGINAL key, kept out of this pure-`Connection`
+/// repository layer for the same reason `wrap_for_credential` takes its
+/// `sspk` as an already-resolved parameter rather than resolving it
+/// itself. Callers rotate by minting a fresh SSPK (overwriting the local
+/// DPAPI-protected file) and calling this to invalidate every stored wrap
+/// of the OLD key in the same breath.
+///
+/// Deliberately clears wraps for EVERY device in the school, not only the
+/// revoked one: the hub cannot re-wrap the new key for another device
+/// without that device's plaintext secret (which the hub never retains
+/// past enrollment -- only its hash, per `device_credential`'s design), so
+/// there is no way to selectively "skip" already-active devices here. Each
+/// still-active device transparently recovers a fresh wrap the next time
+/// it authenticates (see `ensure_wrapped_for_credential`); a revoked
+/// device can never authenticate again, so it can never recover one --
+/// meaning a device that cached the OLD SSPK locally before revocation
+/// can decrypt only data encrypted under the now-retired key, never
+/// anything encrypted after rotation.
+pub fn rotate_for_school(conn: &Connection, school_id: &str) -> AppResult<usize> {
+    let cleared = conn.execute(
+        "DELETE FROM sync_payload_key_wraps WHERE school_id = ?1",
+        [school_id],
+    )?;
+    Ok(cleared)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +277,152 @@ mod tests {
             second.is_err(),
             "at most one wrap per credential -- matches the migration's UNIQUE constraint"
         );
+    }
+
+    #[test]
+    fn rotate_for_school_clears_every_wrap_row_for_that_school() {
+        let (conn, school_id, user_id) = setup();
+        let device_a =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-a", None).unwrap();
+        let device_b =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-b", None).unwrap();
+        let sspk = payload_key::generate_payload_key();
+        wrap_for_credential(
+            &conn,
+            &school_id,
+            &device_a.id,
+            &decode_hex(&device_a.secret_hex),
+            &sspk,
+        )
+        .unwrap();
+        wrap_for_credential(
+            &conn,
+            &school_id,
+            &device_b.id,
+            &decode_hex(&device_b.secret_hex),
+            &sspk,
+        )
+        .unwrap();
+
+        let cleared = rotate_for_school(&conn, &school_id).unwrap();
+
+        assert_eq!(cleared, 2);
+        assert_eq!(
+            unwrap_for_credential(&conn, &device_a.id, &decode_hex(&device_a.secret_hex)).unwrap(),
+            None
+        );
+        assert_eq!(
+            unwrap_for_credential(&conn, &device_b.id, &decode_hex(&device_b.secret_hex)).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn rotate_for_school_does_not_touch_another_schools_wraps() {
+        let (conn, school_id, user_id) = setup();
+        let other_school = school::create(&conn, "Bonifacio High").unwrap();
+        let device_a =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-a", None).unwrap();
+        let device_other =
+            device_credential::enroll(&conn, &other_school.id, &user_id, "device-other", None)
+                .unwrap();
+        let sspk = payload_key::generate_payload_key();
+        wrap_for_credential(
+            &conn,
+            &school_id,
+            &device_a.id,
+            &decode_hex(&device_a.secret_hex),
+            &sspk,
+        )
+        .unwrap();
+        wrap_for_credential(
+            &conn,
+            &other_school.id,
+            &device_other.id,
+            &decode_hex(&device_other.secret_hex),
+            &sspk,
+        )
+        .unwrap();
+
+        rotate_for_school(&conn, &school_id).unwrap();
+
+        assert!(unwrap_for_credential(
+            &conn,
+            &device_other.id,
+            &decode_hex(&device_other.secret_hex)
+        )
+        .unwrap()
+        .is_some());
+    }
+
+    #[test]
+    fn ensure_wrapped_is_a_no_op_when_a_wrap_already_exists() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        let device_secret = decode_hex(&credential.secret_hex);
+        let sspk = payload_key::generate_payload_key();
+        wrap_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk).unwrap();
+
+        // A second SSPK must never overwrite the existing wrap silently --
+        // ensure_wrapped only fills a GAP, it never re-wraps in place.
+        let other_sspk = payload_key::generate_payload_key();
+        ensure_wrapped_for_credential(
+            &conn,
+            &school_id,
+            &credential.id,
+            &device_secret,
+            &other_sspk,
+        )
+        .unwrap();
+
+        let unwrapped = unwrap_for_credential(&conn, &credential.id, &device_secret)
+            .unwrap()
+            .unwrap();
+        assert_eq!(unwrapped, sspk, "the original wrap must be left untouched");
+    }
+
+    #[test]
+    fn ensure_wrapped_creates_a_wrap_when_none_exists() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        let device_secret = decode_hex(&credential.secret_hex);
+        let sspk = payload_key::generate_payload_key();
+
+        ensure_wrapped_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk)
+            .unwrap();
+
+        let unwrapped = unwrap_for_credential(&conn, &credential.id, &device_secret)
+            .unwrap()
+            .unwrap();
+        assert_eq!(unwrapped, sspk);
+    }
+
+    #[test]
+    fn rotation_then_ensure_wrapped_recovers_the_new_key_for_a_still_active_device() {
+        let (conn, school_id, user_id) = setup();
+        let device_a =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-a", None).unwrap();
+        let secret_a = decode_hex(&device_a.secret_hex);
+        let old_sspk = payload_key::generate_payload_key();
+        wrap_for_credential(&conn, &school_id, &device_a.id, &secret_a, &old_sspk).unwrap();
+
+        // Simulate a revocation-triggered rotation: the old key's wraps
+        // are cleared, and a fresh SSPK is minted (device-agnostic, not
+        // modeled here -- that step lives in `db::load_or_mint_sspk`).
+        rotate_for_school(&conn, &school_id).unwrap();
+        let new_sspk = payload_key::generate_payload_key();
+        assert_ne!(new_sspk, old_sspk);
+
+        // Device A's very next authenticated contact re-establishes a
+        // wrap of the NEW key using the secret it already proved it holds.
+        ensure_wrapped_for_credential(&conn, &school_id, &device_a.id, &secret_a, &new_sspk)
+            .unwrap();
+
+        let recovered = unwrap_for_credential(&conn, &device_a.id, &secret_a)
+            .unwrap()
+            .unwrap();
+        assert_eq!(recovered, new_sspk);
     }
 }

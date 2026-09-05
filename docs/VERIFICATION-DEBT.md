@@ -1,5 +1,33 @@
 # Verification Debt
 
+## Payload-key rotation on device revocation (2026-09-05) — independent review + native DPAPI verification owed
+
+Three items owed from this slice (ADR-0069's rotation addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
+
+1. **Independent security review not obtained.** No `security-reviewer`
+   subagent tool was available in this session's toolset, and the
+   project's `security-review` skill could not run (its scripted `git
+diff origin/HEAD...` precondition fails in this sandbox — the ref does
+   not resolve here). A rigorous self-review was performed instead per
+   this project's documented fallback, but a genuinely independent review
+   of `repository::sync_payload_key::{rotate_for_school,
+ensure_wrapped_for_credential}`, `auth::revoke_device_sync_credential`'s
+   new rotation call, and `hub_server::authenticate`'s new lazy-rewrap
+   call site remains owed. Retry when a reviewer harness/subagent is
+   confirmed healthy.
+2. **`db::rotate_sspk` does not exist yet** — see this same gap recorded
+   in `docs/CURRENT-HANDOFF.md`'s "Exact next task". Until it exists and
+   is wired into the revocation path, a live revocation clears the
+   database-side wraps (real, tested) but does not yet produce a genuinely
+   new plaintext SSPK for devices to re-wrap against.
+3. **Native Windows DPAPI verification**, once `db::rotate_sspk` exists:
+   this sandboxed Linux environment cannot exercise `DpapiKeyStore` at
+   all (same pre-existing limitation `load_or_mint_sspk` itself already
+   carries — see that function's own doc comment) — a real overwrite/
+   reload round trip of `SSPK_KEY_FILE_NAME` on Windows has never been
+   demonstrated and cannot be demonstrated here.
+
 ## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session — CLOSED same session
 
 Adding `reqwest` as a direct dependency for `sync_client` (ADR-0067) is

@@ -480,6 +480,7 @@ mod tests {
         let addr = std_listener.local_addr().unwrap();
         let router = crate::hub_server::router(crate::hub_server::HubServerState {
             db: Arc::new(Mutex::new(conn)),
+            sspk: crate::crypto::payload_key::generate_payload_key(),
         });
         std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()

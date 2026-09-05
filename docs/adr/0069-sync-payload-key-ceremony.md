@@ -1,8 +1,12 @@
 # ADR-0069 — Sync payload key ceremony (ADR-0067 addendum)
 
-Status: Accepted (foundation), addendum below closes the enrollment-time
-wiring and a persistence gap found in the original text. Still not wired
-into `sync_outbox` enqueue or a network listener — see "Next slice" below.
+Status: Accepted (foundation + key rotation on revocation). Addenda below
+close the enrollment-time wiring, a persistence gap found in the original
+text, and (2026-09-05) the rotation-on-revocation mechanism via the
+10-scenario decision process. Still not wired: `sync_outbox` enqueue does
+not yet encrypt a real payload; `db::rotate_sspk` (minting a genuinely new
+plaintext SSPK on revocation) does not exist yet — see the latest
+addendum's "Deliberately NOT shipped" section.
 
 ## Context
 
@@ -228,3 +232,163 @@ device believe it's at" tracking (needed to set a correct `base_version`
 on an _update_, not just a first-time create) does not exist anywhere;
 the network listener/transport does not exist. Rotation remains
 out of scope per ADR-0067.
+
+## Addendum (2026-09-05) — the 10-scenario decision on key rotation on revocation
+
+By the time this addendum was written, `hub_server` (ADR-0067's own
+addenda) and `sync_client` already existed, closing the "network
+listener/transport does not exist" gap above. This addendum closes the
+one item this ADR had explicitly deferred without a mechanism: what
+happens to the SSPK when a device is revoked.
+
+### Why this needed its own decision, not just "call rotate"
+
+The obvious-looking answer -- "on revocation, mint a new SSPK and
+re-wrap it for every remaining active device" -- is not actually
+available. The hub only ever retains a SHA-256 digest of each device's
+enrollment secret (`device_credential`'s design, unchanged since ADR-0004),
+never the plaintext. Deriving a device's wrap key (`derive_wrap_key`)
+needs the plaintext secret. So the hub cannot re-wrap a new SSPK for any
+device it isn't, at that exact moment, actively authenticating.
+
+### Options considered
+
+1. **Do nothing on revocation (status quo before this addendum).** A
+   revoked device that had already cached the SSPK locally (or captured
+   the hub's own copy some other way) retains indefinite decrypt ability
+   for anything encrypted under that key, forever, with no path to cut it
+   off short of re-keying the whole school by hand. Rejected: this is a
+   real, unbounded exposure window for a device that may have been
+   revoked specifically BECAUSE it was lost or stolen -- exactly the case
+   ADR-0067's "Authentication and keys" section names as the reason a
+   separate, revocable sync credential exists at all ("a stolen device
+   can be denied future sync"). Leaving the payload key itself
+   unrotated defeats half of that promise.
+2. **Fresh asymmetric keypair per device (X25519), so the hub can always
+   re-seal a new SSPK for any device without needing its secret.**
+   Rejected for the same reason ADR-0069's original "Alternatives
+   considered" rejected it: a second crypto primitive family and a new
+   enrollment-time key-exchange step, for a school-LAN deployment that
+   has no PKI and no budget for one. It would solve rotation cleanly, but
+   at a cost this project's zero-PKI, zero-billing constraints (`CLAUDE.md`
+   priorities: teacher usability and offline reliability rank above this
+   marginal improvement, and correctness is not actually improved for the
+   realistic threat model here -- see point 4 below) don't justify.
+3. **Human-mediated re-enrollment: revoking a device requires every OTHER
+   device to be manually re-enrolled too, driven by the ICT custodian.**
+   Rejected: turns a single revocation into an O(n) manual ceremony
+   across every teacher's device, exactly the "new UX ceremony" ADR-0069's
+   original decision was chosen specifically to avoid, and something a
+   school's ICT coordinator would very plausibly skip or delay under
+   real workload, silently leaving devices unable to sync (a teacher
+   usability and offline-reliability regression, both ranked above this
+   in `CLAUDE.md`'s priority order) rather than a security improvement.
+4. **Lazy propagation: rotate by clearing every wrap row for the school;
+   each still-active device transparently re-establishes its own wrap
+   the next time it authenticates, using the same trust the hub already
+   extends it on every push/pull (Recommended).** The hub already sees a
+   device's plaintext secret on every authenticated request (bearer auth
+   over the loopback/LAN trust boundary, matching `hub_server`'s existing
+   design) -- so "wait for the device to next prove itself" costs nothing
+   new: no additional network round trip, no new UX, no new crypto
+   primitive, and it reuses `device_credential::verify`'s existing
+   authentication as the sole gate. A revoked device's credential never
+   verifies again, so it can never reach the re-wrap step, so it can
+   never recover a wrap of any key minted after its revocation. The
+   tradeoff, disclosed rather than hidden: a device revoked while
+   genuinely offline for a long stretch is not retroactively denied
+   access to data encrypted between the moment of revocation and its next
+   contact with the hub -- but it was never going to receive anything new
+   from a network it isn't reachable on anyway, and once it does reconnect
+   its very first authenticated request is what performs the rotation
+   check that then denies it, before that request's own payload is ever
+   returned.
+
+### Decision: option 4 (lazy propagation), fresh SSPK minted and old wraps cleared on revocation, no asymmetric crypto
+
+**Recommended: option 4** -- chosen for the reasons in point 4 above and
+because it is the option requiring the least new surface (no dependency,
+no schema change beyond what `sync_payload_key_wraps` already has, no new
+Tauri command) while closing the real gap (indefinite post-revocation
+decrypt ability). **Next best: option 2** (asymmetric per-device
+keypairs) -- the only option that would also cut off an offline-at-
+rotation-time device immediately rather than lazily, but only worth its
+added complexity if this project ever needs synchronous, guaranteed-immediate
+revocation (e.g. a compliance requirement stronger than "denied at next
+contact"); revisit if that requirement appears. Option 1 (status quo) and
+option 3 (manual re-enrollment) are both rejected outright, not merely
+ranked below Recommended, for the reasons given above.
+
+**What "rotation" means precisely here**: the OLD SSPK is not securely
+erased from anywhere it may already have been cached (a revoked device's
+own local copy, if it had contacted the hub before revocation, is
+unaffected by this rotation and remains exactly as readable to that
+device as before -- this addendum does not, and structurally cannot,
+reach into a device that will never contact the hub again). What
+rotation actually buys is forward secrecy from the moment of rotation
+onward: nothing encrypted under the new SSPK is ever reachable by a
+credential that cannot re-authenticate to obtain it.
+
+**Shipped**:
+
+- `repository::sync_payload_key::rotate_for_school` -- deletes every
+  `sync_payload_key_wraps` row for a school (scoped to that school only,
+  proven by test). Called from `auth::revoke_device_sync_credential`
+  inside the SAME `SAVEPOINT` as `device_credential::revoke`, so a
+  revocation and its rotation either both commit or both roll back
+  together -- there is no window where a credential is revoked but the
+  key is not yet rotated, or vice versa.
+- `repository::sync_payload_key::ensure_wrapped_for_credential` -- wraps
+  the current SSPK for a credential only if it has no wrap row yet
+  (idempotent; a pre-existing wrap is left untouched, never silently
+  overwritten). Called from `hub_server::authenticate`, immediately after
+  `device_credential::verify` succeeds, using the exact same device
+  secret the request just proved it holds and the hub's own in-memory
+  `HubServerState.sspk` (resolved once at listener startup via the
+  existing `db::load_or_mint_sspk`, unchanged). A `verify` failure (unknown
+  id, revoked credential, wrong secret) short-circuits before this call is
+  ever reached -- the enforcement boundary is entirely `verify`'s, by
+  design, not a second check duplicated inside the re-wrap path itself
+  (proven directly: `a_revoked_credential_never_gets_a_lazy_rewrap`).
+- Tests (TDD): repository-level rotation/idempotent-rewrap coverage
+  (`rotate_for_school_clears_every_wrap_row_for_that_school`,
+  `rotate_for_school_does_not_touch_another_schools_wraps`,
+  `ensure_wrapped_is_a_no_op_when_a_wrap_already_exists`,
+  `ensure_wrapped_creates_a_wrap_when_none_exists`,
+  `rotation_then_ensure_wrapped_recovers_the_new_key_for_a_still_active_device`);
+  `auth`-level integration proving a real revocation clears every active
+  device's wrap, not only the revoked one
+  (`revoking_a_device_clears_every_wrap_for_that_school_including_other_active_devices`)
+  and that a revoked credential can never recover a post-rotation wrap
+  (`a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key`);
+  `hub_server`-level end-to-end HTTP proof that one real authenticated
+  request lazily re-establishes a wrap
+  (`a_successful_authenticated_request_lazily_re_establishes_this_devices_wrap`)
+  and that a revoked credential's request never does
+  (`a_revoked_credential_never_gets_a_lazy_rewrap`). 8 new tests across
+  `repository::sync_payload_key`, `auth`, and `hub_server`; full suite
+  (784 lib tests + existing integration/doctests) green, `cargo clippy
+--all-targets -- -D warnings` clean, `cargo fmt --check` clean. See
+  `docs/CURRENT-HANDOFF.md` for the exact command output this session
+  actually ran.
+
+**Deliberately NOT shipped this slice** (still owed, see
+`docs/CURRENT-HANDOFF.md`'s "Exact next task"): no Tauri command yet
+mints and persists a NEW SSPK on the hub's own local DPAPI file when a
+revocation happens -- `revoke_device_sync_credential` rotates the
+DATABASE side (clearing wraps) but nothing yet calls an equivalent of
+`db::load_or_mint_sspk` that OVERWRITES the file with a fresh key rather
+than reloading the existing one; without that, "rotation" today is
+`rotate_for_school`'s wrap-clearing proven correct in isolation, but a
+real revocation on a running installation would still hand out the SAME
+old plaintext SSPK to the next re-wrap unless a `db::rotate_sspk`-shaped
+function is added and wired into the revoke command path. This was
+deferred rather than guessed at because it touches the Windows-only
+DPAPI file store this sandboxed environment cannot exercise or verify
+(same limitation `load_or_mint_sspk` itself already carries) -- adding an
+untested file-overwrite function here would violate this project's "never
+claim a check passed unless it actually ran" rule more than it would
+close the gap. Recorded in `docs/VERIFICATION-DEBT.md`. Domain-table
+materialization of pulled changes (decrypting `encrypted_payload` and
+writing to `learners`/etc.) remains out of scope, unchanged from
+ADR-0067's own client-side-sync-loop addendum.

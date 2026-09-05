@@ -29,8 +29,9 @@ use axum::Router;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
 use crate::error::{AppError, AppResult};
-use crate::repository::{device_credential, school, sync_hub};
+use crate::repository::{device_credential, school, sync_hub, sync_payload_key};
 use crate::sync::{PendingChange, SyncCursor};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
@@ -43,6 +44,15 @@ const LOOPBACK_BIND_ADDR: &str = "127.0.0.1:7878";
 #[derive(Clone)]
 pub struct HubServerState {
     pub db: Arc<Mutex<Connection>>,
+    /// This installation's school sync-payload key (ADR-0069), resolved
+    /// once at listener startup via `db::load_or_mint_sspk` -- never
+    /// re-resolved per request. Used only to lazily re-establish a
+    /// device's wrap (`ensure_wrapped_for_credential`) on every
+    /// successfully authenticated request, which is what actually
+    /// propagates a post-revocation rotation (`sync_payload_key::
+    /// rotate_for_school`) to each still-active device without a new
+    /// enrollment ceremony.
+    pub sspk: [u8; PAYLOAD_KEY_LEN],
 }
 
 /// Builds the router. `state` is cloned into each request handler by
@@ -79,8 +89,8 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
 /// use, perhaps by a second launch of this same app) is logged, never a
 /// panic -- a local-first desktop app must keep working even when sync
 /// is unavailable.
-pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
-    let app_router = router(HubServerState { db });
+pub fn spawn(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], bind_addr: SocketAddr) {
+    let app_router = router(HubServerState { db, sspk });
     tauri::async_runtime::spawn(async move {
         match tokio::net::TcpListener::bind(bind_addr).await {
             Ok(listener) => {
@@ -112,10 +122,11 @@ pub fn maybe_spawn_listener(app: &tauri::AppHandle) -> AppResult<()> {
     if !should_listen(&conn)? {
         return Ok(());
     }
+    let sspk = crate::db::load_or_mint_sspk(app)?;
     let bind_addr: SocketAddr = LOOPBACK_BIND_ADDR
         .parse()
         .expect("LOOPBACK_BIND_ADDR is a hardcoded valid address");
-    spawn(Arc::new(Mutex::new(conn)), bind_addr);
+    spawn(Arc::new(Mutex::new(conn)), sspk, bind_addr);
     Ok(())
 }
 
@@ -164,6 +175,7 @@ impl IntoResponse for ApiError {
 fn authenticate(
     conn: &Connection,
     headers: &HeaderMap,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
 ) -> Result<device_credential::VerifiedDevice, ApiError> {
     let credential_id = headers
         .get(CREDENTIAL_ID_HEADER)
@@ -174,7 +186,50 @@ fn authenticate(
         .and_then(|value| value.to_str().ok())
         .ok_or(ApiError::Unauthorized)?;
 
-    device_credential::verify(conn, credential_id, secret_hex)?.ok_or(ApiError::Unauthorized)
+    let verified = device_credential::verify(conn, credential_id, secret_hex)?
+        .ok_or(ApiError::Unauthorized)?;
+
+    // ADR-0069 addendum: this is the lazy re-wrap propagation point for
+    // key rotation on revocation. A device that reaches this line has
+    // just proved (via `verify`, above) it holds a currently-ACTIVE
+    // credential's real secret -- exactly the trust `ensure_wrapped_for_
+    // credential` needs to safely (re)establish its wrap of the current
+    // SSPK, whether this is its very first contact (unchanged from
+    // before this addendum) or its first contact since another device in
+    // the school was revoked (`rotate_for_school` already cleared its
+    // stale wrap of the OLD key). A revoked device can never reach this
+    // line -- `verify` already rejected it above -- so it can never
+    // recover a wrap of a key minted after its own revocation. A failure
+    // here is intentionally swallowed rather than surfaced as a request
+    // error: it never blocks the push/pull this request actually asked
+    // for, and the same lazy recovery is retried on the device's very
+    // next authenticated request.
+    // `secret_hex` already decoded successfully inside `verify` above (it
+    // returns `None` on malformed hex, which would have already produced
+    // `Unauthorized` before this line) -- re-decoding here rather than
+    // threading the bytes back out of `verify` keeps that function's
+    // signature unchanged, and this `Some` is therefore unreachable to be
+    // `None` in practice. Still handled explicitly (never a silent
+    // `unwrap_or_default()` empty-secret fallback) so a future change to
+    // `verify`'s hex-validation cannot quietly turn this into a
+    // wrong-key wrap attempt.
+    let Some(device_secret) = device_credential::hex_decode(secret_hex) else {
+        log::warn!(
+            "verified credential's secret failed to re-decode as hex; skipping lazy re-wrap"
+        );
+        return Ok(verified);
+    };
+    if let Err(error) = sync_payload_key::ensure_wrapped_for_credential(
+        conn,
+        &verified.school_id,
+        credential_id,
+        &device_secret,
+        sspk,
+    ) {
+        log::warn!("could not lazily re-wrap sync payload key for a device: {error}");
+    }
+
+    Ok(verified)
 }
 
 #[derive(Debug, Deserialize)]
@@ -196,7 +251,7 @@ async fn push_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers)?;
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
 
     if body.changes.len() > sync_hub::MAX_PUSH_BATCH {
         return Err(ApiError::BadRequest("push batch too large"));
@@ -228,7 +283,7 @@ async fn pull_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers)?;
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
 
     let changes = sync_hub::pull_since(
         &conn,
@@ -277,6 +332,7 @@ mod tests {
         TestFixture {
             state: HubServerState {
                 db: Arc::new(Mutex::new(conn)),
+                sspk: crate::crypto::payload_key::generate_payload_key(),
             },
             user_id: user.id,
             device_id,
@@ -466,5 +522,101 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// ADR-0069 addendum: proves the lazy re-wrap propagation actually
+    /// fires over a real authenticated HTTP request, not just at the
+    /// repository layer in isolation. An unrelated device's stored wrap
+    /// (simulating "already active before some OTHER device got revoked
+    /// and rotation cleared every wrap") is gone before the request, and
+    /// present again -- of the CURRENT `state.sspk` -- immediately after
+    /// one successful authenticated pull.
+    #[tokio::test]
+    async fn a_successful_authenticated_request_lazily_re_establishes_this_devices_wrap() {
+        let fixture = test_fixture();
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        assert_eq!(
+            sync_payload_key::unwrap_for_credential(
+                &fixture.state.db.lock().unwrap(),
+                &fixture.credential.id,
+                &secret
+            )
+            .unwrap(),
+            None,
+            "no wrap exists yet -- test_fixture never calls the enrollment ceremony's wrap step"
+        );
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/pull?after=0&limit=10")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let recovered = sync_payload_key::unwrap_for_credential(
+            &fixture.state.db.lock().unwrap(),
+            &fixture.credential.id,
+            &secret,
+        )
+        .unwrap()
+        .expect("a wrap must now exist, lazily re-established by the authenticated request");
+        assert_eq!(recovered, fixture.state.sspk);
+    }
+
+    /// A revoked credential must never reach the lazy re-wrap path at all
+    /// -- `authenticate` returns `Unauthorized` before `ensure_wrapped_for_
+    /// credential` is even called, so a revoked device gains no wrap of
+    /// the current (or any future) SSPK by attempting a request.
+    #[tokio::test]
+    async fn a_revoked_credential_never_gets_a_lazy_rewrap() {
+        let fixture = test_fixture();
+        {
+            let conn = fixture.state.db.lock().unwrap();
+            device_credential::revoke(
+                &conn,
+                &school::list_all(&conn).unwrap()[0].id,
+                &fixture.credential.id,
+            )
+            .unwrap();
+        }
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/pull?after=0&limit=10")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            sync_payload_key::unwrap_for_credential(
+                &fixture.state.db.lock().unwrap(),
+                &fixture.credential.id,
+                &secret
+            )
+            .unwrap(),
+            None,
+            "a revoked credential's failed request must never establish a wrap"
+        );
     }
 }

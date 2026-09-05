@@ -1,5 +1,120 @@
 # CURRENT HANDOFF
 
+## Payload-key rotation on device revocation — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Ran this project's 10-scenario decision process for ADR-0069's own
+"Rotation … out of scope" gap and implemented the chosen mechanism.
+Full reasoning and the 4 options considered: ADR-0069's new "the
+10-scenario decision on key rotation on revocation" addendum.
+
+**Decision (Recommended)**: lazy propagation. Revoking a device
+(`auth::revoke_device_sync_credential`) now also calls the new
+`repository::sync_payload_key::rotate_for_school`, which deletes every
+stored wrap row for that school — not only the revoked device's — inside
+the SAME `SAVEPOINT` as the revocation itself (atomic: both commit or
+both roll back together). Each still-active device transparently
+recovers a fresh wrap the next time it authenticates: the new
+`sync_payload_key::ensure_wrapped_for_credential` (idempotent — a
+no-op if a wrap already exists) is called from `hub_server::authenticate`
+immediately after `device_credential::verify` succeeds, reusing the exact
+device secret that request already proved it holds and the hub's own
+in-memory SSPK (`HubServerState.sspk`, now resolved once at listener
+startup via the pre-existing `db::load_or_mint_sspk`). A revoked
+credential never verifies again, so it can never reach the re-wrap step,
+so it can never recover a wrap of any key minted after its own
+revocation — proven directly by test, not just asserted.
+
+**Why lazy, not an immediate hub-driven re-wrap of every device**: the
+hub only ever retains a SHA-256 digest of each device's enrollment
+secret (unchanged since ADR-0004), never the plaintext — it has no way to
+derive another device's wrap key except at the moment that device itself
+authenticates. Asymmetric per-device keypairs (X25519) would let the hub
+re-seal proactively, but were rejected as Next Best only: a second crypto
+primitive family and a new enrollment-time key-exchange step this
+zero-PKI, zero-billing school-LAN deployment does not need, given the
+realistic threat model (a revoked device denied access the moment it
+would otherwise reconnect is an acceptable, disclosed tradeoff — not
+"do nothing," which was also considered and rejected outright).
+
+**Tests (TDD)**: 8 new tests — 5 at `repository::sync_payload_key`
+(rotation clears a school's wraps and only that school's; idempotent
+ensure-wrap creates vs. no-ops; a rotated-then-reauthenticated device
+recovers the new key), 2 at `auth` (a real revocation clears an
+unrelated still-active device's wrap too; a revoked device's secret can
+never establish a wrap of a post-rotation key), 2 at `hub_server`
+(a real authenticated HTTP request lazily re-establishes a wrap end to
+end; a revoked credential's request never does). All new and pre-existing
+tests pass.
+
+**Verification actually run this session** (real command output, not
+assumed): `cargo build --lib` — clean; `cargo test --lib` — **784 passed,
+0 failed**; targeted `cargo test --lib` filters for `sync_payload_key::`,
+`hub_server::`, and the new `auth::` revoke/rotation tests — all pass
+individually; `cargo fmt --check` — clean (after one `cargo fmt` pass to
+fix drift this session introduced); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings; a background `cargo test` (full crate:
+lib + all integration test binaries + doctests) — completed with exit
+code 0, integration suites (`subject_attendance`, `teaching_assignment_
+management`, others) all green, 0 doctests (unchanged, still none in this
+crate); `npm run quality:security` — **3 ok, 0 failed, 0 missing**
+(gitleaks, `cargo-deny`, `osv-scanner` all present and passing this
+session; no new dependency was added, so this mainly reconfirms the
+existing dependency tree is still clean). `npm run quality` (the
+TypeScript-side gate) could NOT run this session — `tsc -b` fails on
+missing `vite`/`vitest`/`@types/node` type declarations, an environment
+gap (`node_modules` not fully installed in this sandbox) unrelated to
+this change (no TypeScript/UI file was touched) — recorded honestly
+rather than skipped silently; see `docs/VERIFICATION-DEBT.md`.
+
+**Independent review**: dispatching a fresh `security-reviewer` agent
+context was not available in this session's toolset (no such subagent
+tool surfaced); the project's own `security-review` skill was invoked but
+its scripted `git diff` precondition failed in this sandbox (ambiguous
+`origin/HEAD` — this branch's remote-tracking setup doesn't resolve that
+ref here). Following this project's documented reviewer-failure fallback:
+recorded honestly here, a rigorous self-review was performed instead
+(covering: DoS potential of clearing all wraps on any revocation — bounded
+by the same authorization gate revocation itself already requires;
+`ensure_wrapped_for_credential` having no revoked-state check of its own
+— deliberate, its safety is entirely `verify`'s gate, proven by test;
+tightened a defensive `unwrap_or_default()` empty-secret fallback in
+`hub_server::authenticate` to an explicit, logged skip instead, since a
+silent empty-secret fallback is exactly the kind of guessed-crypto
+shortcut this project's rules exist to prevent, even though it is
+provably unreachable given `verify` already succeeded), and this
+independent-review debt is retained, not dropped — owed for a future
+session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why** (see ADR-0069's same
+addendum for full reasoning): no Tauri command yet mints and persists a
+NEW plaintext SSPK on the hub's own local DPAPI-protected file when a
+revocation happens — today's `rotate_for_school` correctly clears the
+DATABASE side (every wrap row), but nothing yet calls an
+`load_or_mint_sspk`-shaped "overwrite, don't reload" function to actually
+produce a fresh plaintext key for the next re-wrap to use; a real running
+installation's next re-wrap would still hand out the SAME old SSPK it
+already recognized (the DATABASE-level protection this slice ships is
+real and tested — old wraps are genuinely gone — but the full end-to-end
+"a NEW key exists" story needs this last piece). Deferred rather than
+guessed at because it touches the Windows-only DPAPI file store this
+sandboxed environment cannot exercise or verify at all (same limitation
+`load_or_mint_sspk` itself already carries, unchanged) — implementing an
+untested file-overwrite function would be worse than leaving the gap
+honestly recorded. Domain-table materialization of decrypted pulled
+changes remains out of scope, unchanged from the prior slice.
+
+**Exact next task**: add `db::rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]>`
+(Windows-gated, mirroring `load_or_mint_sspk`'s structure but overwriting
+`SSPK_KEY_FILE_NAME` with a freshly generated key rather than reloading
+the existing one) and wire it into a real Tauri command path that calls
+`revoke_device_sync_credential`, so a live revocation actually produces a
+new plaintext SSPK end to end, not just a cleared wrap table. Needs
+native Windows verification per `docs/VERIFICATION-DEBT.md` (DPAPI file
+overwrite/reload round-trip) before it can be marked genuinely done.
+After that: wiring an actual domain write to encrypt a payload and call
+`sync_outbox::enqueue`, and decrypting pulled changes into domain tables
+in `sync_client` — both still fully open, unchanged from the prior slice.
+
 ## Client-side sync loop: push/pull over loopback HTTP (2026-09-05), commit + PR owed
 
 Executed the exact next slice named below: the device-side client that
