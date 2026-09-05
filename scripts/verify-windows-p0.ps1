@@ -70,21 +70,40 @@ try {
     $commit = (& git rev-parse HEAD).Trim()
     $branch = (& git branch --show-current).Trim()
 
+    $secureBoot = 'UNAVAILABLE'
+    try {
+        $secureBoot = Confirm-SecureBootUEFI -ErrorAction Stop
+    } catch {
+        $secureBoot = 'UNAVAILABLE'
+    }
+    $firewallProfiles = @([PSCustomObject]@{ status = 'UNAVAILABLE' })
+    try {
+        $firewallProfiles = @(Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction)
+    } catch {
+        $firewallProfiles = @([PSCustomObject]@{ status = 'UNAVAILABLE' })
+    }
+    $systemVolumeBitLocker = [PSCustomObject]@{ status = 'UNAVAILABLE' }
+    try {
+        $systemVolumeBitLocker = Get-BitLockerVolume -MountPoint $env:SystemDrive |
+            Select-Object MountPoint, VolumeStatus, ProtectionStatus, EncryptionMethod
+    } catch {
+        $systemVolumeBitLocker = [PSCustomObject]@{ status = 'UNAVAILABLE' }
+    }
+    $windowsUpdateService = [PSCustomObject]@{ status = 'UNAVAILABLE' }
+    try {
+        $windowsUpdateService = Get-Service -Name wuauserv | Select-Object Status, StartType
+    } catch {
+        $windowsUpdateService = [PSCustomObject]@{ status = 'UNAVAILABLE' }
+    }
+
     $posture = [ordered]@{
         capturedUtc = (Get-Date).ToUniversalTime().ToString('o')
         os = [Environment]::OSVersion.VersionString
         architecture = $env:PROCESSOR_ARCHITECTURE
-        secureBoot = try { Confirm-SecureBootUEFI -ErrorAction Stop } catch { 'UNAVAILABLE' }
-        firewallProfiles = try {
-            @(Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction, DefaultOutboundAction)
-        } catch { @([PSCustomObject]@{ status = 'UNAVAILABLE' }) }
-        systemVolumeBitLocker = try {
-            Get-BitLockerVolume -MountPoint $env:SystemDrive |
-                Select-Object MountPoint, VolumeStatus, ProtectionStatus, EncryptionMethod
-        } catch { [PSCustomObject]@{ status = 'UNAVAILABLE' } }
-        windowsUpdateService = try {
-            Get-Service -Name wuauserv | Select-Object Status, StartType
-        } catch { [PSCustomObject]@{ status = 'UNAVAILABLE' } }
+        secureBoot = $secureBoot
+        firewallProfiles = $firewallProfiles
+        systemVolumeBitLocker = $systemVolumeBitLocker
+        windowsUpdateService = $windowsUpdateService
     }
     $posture | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $EvidenceRoot 'windows-security-posture.json') -Encoding utf8
 
