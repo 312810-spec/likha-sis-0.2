@@ -1,4 +1,5 @@
 use rusqlite::{types::Type, Connection, OptionalExtension};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -12,7 +13,14 @@ use crate::sync::{
 /// own 100-item clamp.
 pub const MAX_PUSH_BATCH: usize = 100;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// `Serialize`/`Deserialize` here (and on `AcceptedChange` below) are for
+/// the network listener's response bodies -- `PendingChange`/`SyncCursor`
+/// already derive them for the same reason (the request side). Nothing
+/// in this repository module depends on a wire format itself; these
+/// derives only make the types transport-ready for whichever listener
+/// implementation is chosen.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "outcome", content = "cursor", rename_all = "snake_case")]
 pub enum PushOutcome {
     /// Newly applied. Carries the hub cursor position this change now
     /// occupies in `sync_hub_log`.
@@ -30,7 +38,8 @@ pub enum PushOutcome {
     ConflictStaged,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AcceptedChange {
     pub cursor: SyncCursor,
     pub change_id: Uuid,
@@ -499,5 +508,35 @@ mod tests {
         let pulled = pull_since(&conn, &verified.school_id, SyncCursor(0), 2).unwrap();
 
         assert_eq!(pulled.len(), 2);
+    }
+
+    #[test]
+    fn push_outcome_round_trips_through_json_for_all_variants() {
+        for outcome in [
+            PushOutcome::Accepted(SyncCursor(7)),
+            PushOutcome::AlreadyApplied(SyncCursor(3)),
+            PushOutcome::ConflictStaged,
+        ] {
+            let json = serde_json::to_string(&outcome).unwrap();
+            let round_tripped: PushOutcome = serde_json::from_str(&json).unwrap();
+            assert_eq!(round_tripped, outcome);
+        }
+    }
+
+    #[test]
+    fn accepted_change_round_trips_through_json() {
+        let (conn, verified) = setup();
+        let outcome =
+            push_change(&conn, &verified, &change_for(&verified, Uuid::now_v7(), 0)).unwrap();
+        let PushOutcome::Accepted(cursor) = outcome else {
+            panic!("expected Accepted");
+        };
+        let pulled = pull_since(&conn, &verified.school_id, SyncCursor(0), 1).unwrap();
+        assert_eq!(pulled[0].cursor, cursor);
+
+        let json = serde_json::to_string(&pulled[0]).unwrap();
+        let round_tripped: AcceptedChange = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(round_tripped, pulled[0]);
     }
 }

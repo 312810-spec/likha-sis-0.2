@@ -1,6 +1,78 @@
 # CURRENT HANDOFF
 
-## First real domain write wired to sync_outbox (2026-09-05), commit + PR owed
+## Network listener HTTP surface: axum decided, router built (2026-09-05), commit + PR owed
+
+Branch cut from `main` after PR #49 merged. Executed the "exact next
+implementation slice" from the domain-write-wiring entry below: the
+network listener's HTTP surface.
+
+**Library research**: an in-session subagent researched the HTTP-library
+choice; its final report was not retrievable — the same
+already-documented agent-resume/retrieval failure this project has hit
+repeatedly since M7 (see `docs/PROJECT-MEMORY.md`'s standing note on
+this). Per the established protocol for exactly this situation, did the
+research directly instead of retrying the agent: **`axum`** (tokio-rs
+org) — v0.8.9, MIT, actively maintained (last published 2026-04, verified
+via the crates.io API directly, not memory). Compared against `warp`
+(0.4.3, MIT, also actively maintained — a legitimate Next Best, but its
+`Filter` combinator API is less ergonomic than axum's plain functions),
+`tiny_http` (0.12.0, last published 2022-10 — effectively dormant, ruled
+out on maintenance grounds alone), `actix-web` (too heavy for two JSON
+endpoints), and a hand-rolled raw-TCP framing (reinvents what an audited
+library already gives for free). Full record: ADR-0067's 2026-09-05
+network-listener addendum.
+
+**What shipped**: new `hub_server` module — an `axum::Router` exposing
+`POST /sync/push` and `GET /sync/pull`, authenticated via
+`x-likha-credential-id`/`x-likha-device-secret` headers (never a query
+parameter, so a secret never lands in a proxy/access-log line) through
+`device_credential::verify`'s existing enumeration-safe check, wired
+straight to the already-built `sync_hub::push_batch`/`pull_since`.
+Errors crossing this network boundary map to a small closed set
+(401/400/500 with fixed, generic messages) — never an internal database
+error string, matching `AppError::Import`/`FormGeneration`'s existing
+"never leak the underlying error text" discipline at the Tauri IPC
+boundary. Reuses the `tokio` runtime Tauri already runs internally
+(`tauri::async_runtime::spawn` is the documented pattern; no
+`#[tokio::main]`, no second runtime) — not yet actually spawned/bound,
+see below.
+
+**A real bug found and fixed before it could ship**: `sync_hub::PushOutcome`'s
+first attempt at `#[serde(tag = "...")]` (internally tagged) does not
+support a tuple variant wrapping a newtype (`Accepted(SyncCursor)`) —
+serde rejects this at serialization time, not compile time, so it would
+have silently panicked/errored on the very first real `Accepted` response
+in production. Caught by this slice's own round-trip test, not shipped
+and fixed later. Switched to `tag` + `content` (adjacently tagged).
+
+**New dependencies**: `axum` 0.8.9 (`default-features = false`, only
+`json`/`http1`/`tokio` features — no HTTP/2, multipart, or websocket
+surface this API doesn't use); dev-only `tower` (`util` feature, for
+testing the router as a `tower::Service` without a real TCP socket) and
+`tokio` (`macros`+`rt-multi-thread`, for `#[tokio::test]`).
+
+**Verification**: 5 new `hub_server` tests, including a full authenticated
+push-then-pull round trip through the router (no real TCP socket bound).
+`cargo test`: 759 lib tests + all integration binaries, 0 failed; `cargo
+clippy --all-targets -- -D warnings` and `cargo fmt --check` clean; `npm
+run quality:security` (gitleaks + cargo-deny + osv-scanner) run and
+confirmed clean — no new advisories from any of the three new
+dependencies (a genuine check given this slice's own new dependency
+surface, not skipped). `npm run quality` — checked directly against
+output, not just exit code (see this file's repeated note on why).
+
+**Deliberately NOT done in this slice**: binding the router to a real TCP
+socket or choosing which interface to bind (LAN/Tailscale, never
+`0.0.0.0`, per ADR-0067's own operations gate); wiring it into Tauri app
+startup; a TLS-or-documented-plaintext-inside-transport decision; rate
+limiting; the client side of this protocol (nothing yet calls these two
+endpoints from a device).
+
+**Not yet done**: commit; push; PR (targets `main`). See
+`docs/ACTIVE-PLAN.md`'s top entry for the exact next slice: wiring the
+router into real Tauri app startup, and the client-side push/pull loop.
+
+## First real domain write wired to sync_outbox (2026-09-05), merged (PR #49)
 
 Branch cut from `main` after PR #48 merged. Executed the "exact next
 implementation slice" from the version-cache entry below:

@@ -58,6 +58,21 @@ sha2 = "0.11"
 tauri-plugin-opener = "2.5.5"
 aes-gcm = { version = "0.11.1", features = ["zeroize"] }
 hkdf = "0.13.0"
+# ADR-0067 network listener (school-laptop sync hub). tokio-rs org,
+# MIT-licensed, actively maintained (last published 2026-04). Chosen over
+# warp (also actively maintained, also tokio-based, but its Filter
+# combinator API is less ergonomic for this team than axum's plain
+# extractor/handler functions) and over tiny_http (last published
+# 2022-10 -- effectively dormant, and would need this project to hand-roll
+# JSON/routing/auth-extraction support it provides for free). Reuses the
+# tokio runtime Tauri already depends on internally (`tauri::async_runtime::spawn`
+# is the documented pattern for running an axum server inside a Tauri app,
+# not a second/parallel runtime). `default-features = false` keeps only
+# what a small, LAN-only, JSON push/pull API needs: `json` (request/response
+# bodies), `http1` (no HTTP/2 needed on a LAN), `tokio` (the server driver).
+# See `docs/adr/0067-school-laptop-authoritative-sync-hub.md`'s network-
+# listener addendum for the full decision record.
+axum = { version = "0.8.9", default-features = false, features = ["json", "http1", "tokio", "query"] }
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend
@@ -71,3 +86,5 @@ windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win3
 [dev-dependencies]
 tempfile = "3.27.0"
 proptest = "1"
+tower = { version = "0.5.3", default-features = false, features = ["util"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }

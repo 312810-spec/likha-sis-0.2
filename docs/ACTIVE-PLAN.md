@@ -219,17 +219,60 @@ a regression (SF1 import never emitted sync changes before this slice
 either), but worth closing before sync is considered complete for
 learner data.
 
-**Exact next implementation slice:** the network listener/transport
-adapter itself (ADR-0067 D1: LAN discovery + optional Tailscale) that
-calls `device_credential::verify` then
-`sync_hub::push_batch`/`pull_since` over the wire — the piece that
-actually drains `sync_outbox` and would, for the first time, need to
-decide how/when `sync_version_cache` gets written (on push acceptance,
-and on pull). Wiring an UPDATE (not just create) domain write is a
-second, closely related piece — it needs `sync_version_cache::known_version`
-for a real `base_version`, unlike this slice's always-0 create case.
-Also still open: SF1 import's own sync wiring (above); conflict-review
-UI/resolution workflow; the Android client.
+**Completed next slice (2026-09-05, this session):** the network
+listener's HTTP surface itself. Researched the library choice first (an
+in-session subagent's research report was not retrievable — a known,
+already-documented harness failure mode this project has hit before, see
+M7; per the established protocol, did the research directly instead of
+retrying): **`axum`** (tokio-rs org, MIT, actively maintained), over
+`warp` (also maintained, less ergonomic `Filter` API), `tiny_http`
+(dormant since 2022-10), `actix-web` (too heavy for two JSON endpoints),
+and hand-rolled raw TCP (reinvents what an audited library gives for
+free). Full record: ADR-0067's 2026-09-05 network-listener addendum.
+
+New `hub_server` module: an `axum::Router` exposing `POST /sync/push` and
+`GET /sync/pull`, both authenticated via `x-likha-credential-id`/
+`x-likha-device-secret` headers (never a query param) through
+`device_credential::verify`'s existing enumeration-safe check, wired
+straight to `sync_hub::push_batch`/`pull_since`. Errors crossing this
+boundary map to a small closed set (401/400/500, fixed generic messages)
+— never an internal error string, matching `AppError::Import`/
+`FormGeneration`'s existing IPC-boundary discipline. Along the way, found
+and fixed a real bug before it could ship: `PushOutcome`'s naive
+`#[serde(tag = "...")]` derive doesn't support a tuple variant wrapping a
+newtype (`Accepted(SyncCursor)`) — serde rejects it at serialization
+time, not compile time — switched to `tag`+`content` (adjacently tagged).
+5 new tests, including a full authenticated push-then-pull round trip
+through the router as a `tower::Service` (no real TCP socket bound).
+`Learner`'s (and `PendingChange`'s existing) `Serialize`+`Deserialize`
+pattern extended to `sync_hub::PushOutcome`/`AcceptedChange` for the same
+reason. New dependencies: `axum` 0.8.9 (`json`,`http1`,`tokio` features
+only), `tower` (dev-only, `util` feature, for router testing), `tokio`
+(dev-only, `macros`+`rt-multi-thread`, for `#[tokio::test]`). `cargo
+test`: 759 lib tests + all integration binaries, 0 failed; `cargo clippy
+-D warnings` and `cargo fmt --check` clean; `npm run quality:security`
+(gitleaks + cargo-deny + osv-scanner) clean — no new advisories from any
+of the three new dependencies.
+
+**Deliberately NOT done in this slice** (see ADR-0067's addendum for the
+full list): binding the router to a real TCP socket and choosing which
+interface to bind (LAN/Tailscale, never `0.0.0.0`); wiring it into Tauri
+app startup; TLS-or-documented-plaintext-inside-transport decision;
+rate limiting; the CLIENT side of this protocol (nothing yet calls these
+two endpoints from a device — the router only has a server implementation
+and tests so far).
+
+**Exact next implementation slice:** wire `hub_server::router` into
+actual Tauri app startup — resolve the LAN/Tailscale bind address,
+`tauri::async_runtime::spawn` the listener alongside the existing app
+setup, and decide how/when `sync_version_cache` gets written now that a
+real push/pull round trip can happen (on push acceptance, and on pull).
+After that: the actual client-side push/pull loop that drains
+`sync_outbox` and calls these endpoints; wiring an UPDATE (not just
+create) domain write (needs `sync_version_cache::known_version` for a
+real `base_version`, unlike this slice's always-0 create case); SF1
+import's own sync wiring; conflict-review UI/resolution workflow; the
+Android client.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 
