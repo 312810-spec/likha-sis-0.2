@@ -1,19 +1,32 @@
 # Verification Debt
 
-## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session
+## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session — CLOSED same session
 
 Adding `reqwest` as a direct dependency for `sync_client` (ADR-0067) is
 exactly the kind of change `.claude/rules/testing.md` says should get a
 `npm run quality:security` pass before being considered complete. That
-check could not run in this sandboxed session: `gitleaks`, `cargo-deny`,
-and `osv-scanner` are all missing from `PATH` here (`scripts/check-
-security.mjs` itself reports "0 ok, 0 failed, 3 missing" and explicitly
-labels this an unverified result, not a clean pass). `cargo test`/`cargo
-clippy`/`cargo fmt --check` all genuinely ran and are clean (see
-`docs/CURRENT-HANDOFF.md`'s matching entry) — only the dependency-
-advisory/secret-scan layer is unverified. Owed: run `npm run
-quality:security` on a runner with those three tools installed before
-this dependency addition is treated as fully cleared.
+check initially could not run in this sandboxed session: `gitleaks`,
+`cargo-deny`, and `osv-scanner` were all missing from `PATH` (`scripts/
+check-security.mjs` first reported "0 ok, 0 failed, 3 missing").
+
+**Closed later in the same session**: all three tools were installed and
+run for real, not assumed. `osv-scanner` v2.5.1 and `gitleaks` v8.30.1
+were downloaded as official prebuilt binaries and their SHA-256 checksums
+independently verified against the values already recorded in
+`docs/SOURCE-REGISTRY.md` before use (both matched exactly). `cargo-deny`
+v0.20.2 was built from source via `cargo install cargo-deny --locked`
+(~3.5 min). Re-running `npm run quality:security` then reported
+**"3 ok, 0 failed, 0 missing"**: `gitleaks` — 101 commits scanned, ~25.5 MB,
+no leaks found; `cargo-deny` — advisories/bans/licenses/sources all ok
+(directly covers the new `reqwest` dependency and its tree); `osv-scanner`
+— 585 crates.io + 341 npm packages scanned, all 18 known advisories
+matched this repository's own pre-existing, already-justified ignore
+entries in `src-tauri/deny.toml` (unmaintained GTK3/`unic-*`/
+`proc-macro-error` transitive Tauri-Linux deps), "No issues found" —
+`reqwest` itself not flagged at all. Combined with `cargo test`/`cargo
+clippy`/`cargo fmt --check` (see `docs/CURRENT-HANDOFF.md`'s matching
+entry), this dependency addition is now fully cleared, not merely
+recorded as an open gap.
 
 ## Grade 12 DO 8 carryover grading policies (2026-09-04) — Rust gate CLOSED 2026-09-05
 

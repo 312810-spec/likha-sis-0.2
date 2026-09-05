@@ -366,11 +366,13 @@ untouched, pull applying a non-conflicting change, pull staging a
 conflict without touching the live version cache, never-enrolled no-op
 gate. `cargo test` (full crate): 775 lib tests + all integration binaries,
 0 failed (up from 762). `cargo clippy --all-targets -- -D warnings` and
-`cargo fmt --check`: both clean. `npm run quality:security` could not run
-in this sandboxed session — `gitleaks`/`cargo-deny`/`osv-scanner` are all
-missing from `PATH` here, an unverified check, not a clean pass (see
-`docs/CURRENT-HANDOFF.md`'s matching entry). `npm run quality` not
-re-run — no TypeScript/frontend surface changed.
+`cargo fmt --check`: both clean. `npm run quality:security`: initially
+missing tools, then closed later the same session — `gitleaks`/
+`cargo-deny`/`osv-scanner` installed (checksums verified against
+`docs/SOURCE-REGISTRY.md` for the two prebuilt binaries) and re-run
+clean, **3 ok, 0 failed, 0 missing** (see `docs/CURRENT-HANDOFF.md`'s and
+`docs/VERIFICATION-DEBT.md`'s matching entries for the full detail).
+`npm run quality` not re-run — no TypeScript/frontend surface changed.
 
 **Exact next implementation slice:** the ADR-0069 payload-key ceremony —
 wire `crypto::payload_key`'s existing primitives and the migration-32

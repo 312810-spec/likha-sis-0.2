@@ -58,13 +58,21 @@ ephemeral loopback port, not just a `tower::Service` call. `cargo test`
 762 → 775 nets the union of all of them). `cargo clippy --all-targets --
 -D warnings`: clean. `cargo fmt --check`: clean (after running plain
 `cargo fmt` once to restyle this slice's own new test code — recorded
-honestly, not hand-fixed). `npm run quality:security`: **could not run**
-in this sandboxed session — `gitleaks`, `cargo-deny`, and `osv-scanner`
-are all missing from `PATH` here (0 ok, 0 failed, 3 missing per
-`scripts/check-security.mjs`'s own summary); this is an unverified
-dependency-addition check, not a clean pass, and is recorded as such
-rather than claimed. `npm run quality` not re-run — no TypeScript/
-frontend surface changed this slice (Rust-only).
+honestly, not hand-fixed). `npm run quality:security`: initially could
+not run (`gitleaks`/`cargo-deny`/`osv-scanner` missing from `PATH`), then
+**closed later in the same session** — all three installed for real
+(`osv-scanner` v2.5.1 and `gitleaks` v8.30.1 as official prebuilt
+binaries with SHA-256 checksums independently verified against
+`docs/SOURCE-REGISTRY.md`'s recorded values before use; `cargo-deny`
+v0.20.2 built from source via `cargo install --locked`) and re-run:
+**3 ok, 0 failed, 0 missing** — gitleaks 101 commits/~25.5 MB no leaks;
+`cargo-deny` advisories/bans/licenses/sources all ok (covers the new
+`reqwest` dependency); `osv-scanner` 585 crates.io + 341 npm packages,
+all 18 known advisories match this repo's own pre-existing justified
+`deny.toml` ignores, `reqwest` itself not flagged. Full detail in
+`docs/VERIFICATION-DEBT.md`'s matching entry (closed same session, not
+left open). `npm run quality` not re-run — no TypeScript/frontend
+surface changed this slice (Rust-only).
 
 **Toolchain note**: this sandboxed environment's Rust toolchain was
 `1.94.1`, below this crate's declared `rust-version = "1.95"` — updated to
