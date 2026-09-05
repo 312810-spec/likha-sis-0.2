@@ -171,22 +171,65 @@ orchestration loop that would actually update it after a real round trip
 — this is the persistence primitive only, matching this project's
 zero-UI-first precedent.
 
-**Exact next implementation slice:** wire one real domain write (e.g.
-`learner` upsert) through a Tauri command that: resolves the SSPK
-(`db::load_or_mint_sspk`), reads `sync_version_cache::known_version` for
-the entity being written to get the correct `base_version`, encrypts the
-change with `crypto::payload_key::encrypt_payload`, and calls
-`sync_outbox::enqueue` — the first actual end-to-end path from a teacher's
-edit to an encrypted, correctly-versioned local outbox entry. This also
-needs a decision on WHEN `sync_version_cache` gets updated for a
-successful create (immediately, optimistically, at version 1 — since
-there is nothing to race against locally) versus what happens once a real
-push/pull loop exists (out of scope until the network listener). After
-that: the network listener/transport adapter itself (ADR-0067 D1: LAN
-discovery + optional Tailscale) that calls `device_credential::verify`
-then `sync_hub::push_batch`/`pull_since` over the wire. Conflict-review
-UI/resolution workflow and the Android client remain separate, later
-slices.
+**Completed next slice (2026-09-05, this session):** the first real
+domain write wired end-to-end — `commands::learner::create_learner` and
+`create_learner_with_duplicate_check` (the command the manual Create
+Learner UI actually calls). Before touching either command, hit a real
+product question: `db::load_or_mint_sspk` mints a brand-new DPAPI key
+file unconditionally on first call, so wiring it into an existing,
+already-shipped, UI-called command would silently start creating
+cryptographic material and outbox rows for every installation, including
+ones that never intend to use the school-laptop sync hub. Asked the
+owner rather than deciding unilaterally: **sync stays opt-in by
+enrollment** — a domain write only emits a sync change if this school
+already has at least one active device sync credential
+(`device_credential::has_active_for_school`, new). A non-enrolled
+installation behaves exactly as it did before ADR-0067 existed: no SSPK
+file, no outbox row, zero new side effects.
+
+When enrolled, the learner insert and the outbox enqueue are atomic
+together in one `SAVEPOINT`. `base_version` is unconditionally `0` for
+this create case (a brand-new `entity_id` has no prior hub version to
+conflict against) — `sync_version_cache` is deliberately NOT written here
+(only read, by a future update path): writing it optimistically before
+any real hub round trip could let the cache diverge from truth with no
+pull able to correct it downward, since `record_known_version` is a
+monotonic-max upsert. The command layer's `AppHandle`-dependent SSPK
+resolution is a thin, one-line wrapper (`resolve_sspk_if_enrolled`); all
+the substantial logic is a plain `&Connection`-only function so it's
+fully unit-testable without a real Tauri runtime, matching this
+codebase's existing `commands::auth` precedent for command-layer unit
+tests. `Learner` gained `Deserialize` (previously outbound-only) so the
+test suite (and a future materializer) can round-trip the JSON payload
+after decryption.
+
+4 new tests in `commands::learner` (no-SSPK is a no-op; an enrolled
+create's outbox entry round-trips through `encrypt_payload`/
+`decrypt_payload` back to the identical `Learner`; the change is stamped
+with this installation's own `device_identity`; a rejected
+`LrnConflict` duplicate-check attempt enqueues nothing) plus 4 new
+`device_credential::has_active_for_school` tests. `cargo test`: 752 lib
+tests + all integration binaries, 0 failed; `cargo clippy -D warnings`
+and `cargo fmt --check` clean.
+
+**Known, disclosed limitation:** SF1 bulk import's commit path calls
+`repository::learner::create` directly, bypassing this command entirely
+— so bulk-imported learners are NOT yet covered by this sync wiring. Not
+a regression (SF1 import never emitted sync changes before this slice
+either), but worth closing before sync is considered complete for
+learner data.
+
+**Exact next implementation slice:** the network listener/transport
+adapter itself (ADR-0067 D1: LAN discovery + optional Tailscale) that
+calls `device_credential::verify` then
+`sync_hub::push_batch`/`pull_since` over the wire — the piece that
+actually drains `sync_outbox` and would, for the first time, need to
+decide how/when `sync_version_cache` gets written (on push acceptance,
+and on pull). Wiring an UPDATE (not just create) domain write is a
+second, closely related piece — it needs `sync_version_cache::known_version`
+for a real `base_version`, unlike this slice's always-0 create case.
+Also still open: SF1 import's own sync wiring (above); conflict-review
+UI/resolution workflow; the Android client.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

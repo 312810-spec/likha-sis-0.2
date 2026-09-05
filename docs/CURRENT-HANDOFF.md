@@ -1,6 +1,66 @@
 # CURRENT HANDOFF
 
-## Per-device sync version cache (2026-09-05), commit + PR owed
+## First real domain write wired to sync_outbox (2026-09-05), commit + PR owed
+
+Branch cut from `main` after PR #48 merged. Executed the "exact next
+implementation slice" from the version-cache entry below:
+`commands::learner::create_learner`/`create_learner_with_duplicate_check`
+(the command the manual Create Learner UI actually calls) now encrypt and
+enqueue a `sync_outbox` entry for a newly created learner.
+
+**A real product question surfaced before touching either command**:
+`db::load_or_mint_sspk` mints a brand-new DPAPI key file unconditionally
+on first call. Wiring it directly into an already-shipped, UI-called
+command would silently start creating cryptographic material and outbox
+rows for every installation — including ones that never intend to use the
+school-laptop sync hub. Asked the owner rather than deciding
+unilaterally (`AskUserQuestion` — this affects "offline reliability" and
+"teacher usability" priorities and touches a command real screens already
+call, not an ordinary plumbing choice): **sync stays opt-in by
+enrollment**. New `device_credential::has_active_for_school` gates the
+sync path — a non-enrolled installation behaves exactly as it did before
+ADR-0067 existed, zero new side effects.
+
+**What shipped**: when enrolled, the learner insert and the outbox
+enqueue are atomic together in one `SAVEPOINT`. `base_version` is
+unconditionally `0` for this create case (a brand-new `entity_id` has no
+prior hub version) — `sync_version_cache` is deliberately only ever READ
+by this wiring, never written: writing it optimistically before a real
+hub round trip could let the cache diverge from truth with no future
+pull able to correct it downward (`record_known_version` only ever
+advances). The `AppHandle`-dependent SSPK resolution is a thin one-line
+wrapper (`resolve_sspk_if_enrolled`); the substantial logic is a plain
+`&Connection`-only function, fully unit-testable without a real Tauri
+runtime — the existing test file for these commands only ever
+stood in for the command via repository calls directly (never actually
+exercising the real `#[tauri::command]` function or the new sync logic
+inside it), so this session's tests are the first real coverage of this
+wiring, added as `commands::learner`'s own test module (matching
+`commands::auth`'s existing precedent for command-layer unit tests, not
+a new pattern). `Learner` gained `Deserialize` (previously
+outbound-to-frontend only) so the payload can round-trip through JSON
+after decryption.
+
+**Verification**: 4 new `commands::learner` tests (no-SSPK is a
+behavioral no-op; an enrolled create's outbox entry decrypts back to the
+identical `Learner`; the change is stamped with this installation's own
+`device_identity`; a rejected duplicate-check attempt enqueues nothing)
+plus 4 new `device_credential::has_active_for_school` tests. `cargo
+test`: 752 lib tests + all integration binaries, 0 failed; `cargo clippy
+--all-targets -- -D warnings` and `cargo fmt --check` clean; `npm run
+quality` — checked directly against output, not just exit code (see this
+file's repeated note on why).
+
+**Disclosed limitation, not a regression**: SF1 bulk import's commit path
+calls `repository::learner::create` directly, bypassing this command —
+bulk-imported learners are NOT yet covered by this sync wiring (they
+never were before this slice either).
+
+**Not yet done**: commit; push; PR (targets `main`). See
+`docs/ACTIVE-PLAN.md`'s top entry for the exact next slice: the network
+listener/transport, and wiring an UPDATE (not just create) domain write.
+
+## Per-device sync version cache (2026-09-05), merged (PR #48)
 
 Branch `fix/sspk-hub-persistence-and-enrollment-wiring` continued (or a
 fresh branch cut from `main` after PR #47 merged — see git history for
@@ -28,12 +88,9 @@ against the command's own output before claiming success (this file has
 twice now recorded a background run's misleading "exit 0" summary that
 disagreed with a real Prettier failure in its own visible output).
 
-**Not yet done**: commit; push; PR (targets `main`). Still not called by
-any domain write, or by the (still nonexistent) push/pull orchestration
-loop that would update it after a real network round trip — persistence
-primitive only, matching this project's zero-UI-first precedent. See
-`docs/ACTIVE-PLAN.md`'s top-of-thread entry for the exact next slice this
-unblocks: wiring one real domain write end-to-end.
+**Merged 2026-09-05 as PR #48** (`144579a`). Now read (never written) by
+the domain-write wiring in the entry above; still not written by any
+push/pull orchestration loop, which doesn't exist yet.
 
 ## ADR-0069 addendum: hub SSPK persistence + real enrollment wiring (2026-09-05), merged (PR #47)
 

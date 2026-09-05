@@ -166,6 +166,26 @@ pub fn owner(conn: &Connection, credential_id: &str) -> AppResult<Option<(String
     .map_err(Into::into)
 }
 
+/// True if this school has at least one active (non-revoked) sync
+/// credential -- i.e. whether ANY device has actually completed the
+/// enrollment ceremony. This is the gate a domain write's sync-outbox
+/// wiring checks before doing any sync work at all: an installation that
+/// has never enrolled a device must behave exactly as it did before ADR-0067
+/// existed -- no SSPK file minted, no outbox rows written, matching the
+/// owner's explicit choice that sync stays opt-in-by-enrollment, never
+/// forced on every installation by default.
+pub fn has_active_for_school(conn: &Connection, school_id: &str) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM device_sync_credentials
+             WHERE school_id = ?1 AND revoked_at IS NULL
+         )",
+        [school_id],
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
 fn revoke_active_for_device(conn: &Connection, school_id: &str, device_id: &str) -> AppResult<()> {
     conn.execute(
         "UPDATE device_sync_credentials
@@ -386,6 +406,39 @@ mod tests {
         let (conn, ..) = setup();
 
         assert_eq!(owner(&conn, "does-not-exist").unwrap(), None);
+    }
+
+    #[test]
+    fn has_active_for_school_is_false_before_any_enrollment() {
+        let (conn, school_id, _user_id) = setup();
+
+        assert!(!has_active_for_school(&conn, &school_id).unwrap());
+    }
+
+    #[test]
+    fn has_active_for_school_is_true_after_an_enrollment() {
+        let (conn, school_id, user_id) = setup();
+        enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+
+        assert!(has_active_for_school(&conn, &school_id).unwrap());
+    }
+
+    #[test]
+    fn has_active_for_school_is_false_once_the_only_credential_is_revoked() {
+        let (conn, school_id, user_id) = setup();
+        let credential = enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        revoke(&conn, &school_id, &credential.id).unwrap();
+
+        assert!(!has_active_for_school(&conn, &school_id).unwrap());
+    }
+
+    #[test]
+    fn has_active_for_school_is_school_scoped() {
+        let (conn, school_id, user_id) = setup();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+
+        assert!(!has_active_for_school(&conn, &other_school.id).unwrap());
     }
 
     #[test]
