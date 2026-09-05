@@ -20,6 +20,15 @@ pub const KEY_LEN: usize = 32;
 /// protects, orphaning all previously encrypted data without any warning.
 pub trait KeyStore {
     fn load_or_create_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]>;
+
+    /// Overwrites `key_file` with a genuinely NEW, freshly generated key,
+    /// regardless of whether a key already exists there -- unlike
+    /// `load_or_create_key`, this never reads or reuses the previous
+    /// value. Implementations MUST make the overwrite atomic (the file on
+    /// disk is always either the complete old key or the complete new
+    /// key, never a partially-written one), since a crash mid-write must
+    /// not leave a corrupted key file behind.
+    fn rotate_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]>;
 }
 
 /// Generates a fresh cryptographically random key using the OS CSPRNG.

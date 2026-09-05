@@ -29,6 +29,10 @@ impl KeyStore for DpapiKeyStore {
             Err(e) => Err(e.into()),
         }
     }
+
+    fn rotate_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]> {
+        rotate_key_file(key_file).map_err(Into::into)
+    }
 }
 
 fn load_key(key_file: &Path) -> AppResult<[u8; KEY_LEN]> {
@@ -63,6 +67,63 @@ fn create_new_key_file(key_file: &Path) -> std::io::Result<[u8; KEY_LEN]> {
         .map_err(|e| std::io::Error::other(format!("could not protect new key: {e}")))?;
     file.write_all(&protected)?;
     Ok(key)
+}
+
+/// Overwrites `key_file` with a genuinely new key, atomically: the fresh
+/// key is protected and written to a sibling temp file first, then
+/// `rename`d over `key_file`. On the same filesystem (guaranteed here --
+/// the temp file is a sibling in `key_file`'s own parent directory, never
+/// a system temp dir on a possibly different volume), `rename` is a
+/// single filesystem operation that either fully completes or fully
+/// fails -- there is no window where `key_file` is missing or
+/// half-written, unlike writing directly into it in place. Does not
+/// require (or even read) an existing `key_file` -- rotation always
+/// succeeds by writing a fresh key, whether or not one was there before.
+fn rotate_key_file(key_file: &Path) -> std::io::Result<[u8; KEY_LEN]> {
+    use std::io::Write;
+
+    let parent = key_file.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "key file path has no parent directory",
+        )
+    })?;
+    // A random suffix (rather than a fixed ".tmp" name) means two
+    // concurrent rotations of the same key file never collide on the
+    // temp file itself -- each writes its own, and only the LAST rename
+    // to complete wins, which is an acceptable outcome for a rotation
+    // (the file always ends up holding one fully-valid key either way,
+    // never a mix of two).
+    let temp_file = parent.join(format!(".{}.rotate-tmp", generate_key_suffix()));
+
+    let key = generate_key();
+    let protected = protect(&key)
+        .map_err(|e| std::io::Error::other(format!("could not protect rotated key: {e}")))?;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_file)?;
+    file.write_all(&protected)?;
+    file.sync_all()?;
+    drop(file);
+
+    let rename_result = std::fs::rename(&temp_file, key_file);
+    if rename_result.is_err() {
+        let _ = std::fs::remove_file(&temp_file);
+    }
+    rename_result?;
+
+    Ok(key)
+}
+
+/// A short random hex suffix for `rotate_key_file`'s temp filename --
+/// reuses this module's own DPAPI-independent CSPRNG source
+/// (`generate_key`) rather than adding a new randomness dependency just
+/// for a filename.
+fn generate_key_suffix() -> String {
+    let bytes = generate_key();
+    bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn protect(data: &[u8]) -> windows::core::Result<Vec<u8>> {
@@ -182,5 +243,69 @@ mod tests {
             result.is_err(),
             "corrupted key file must error, never silently mint a new key"
         );
+    }
+
+    #[test]
+    fn rotate_key_replaces_an_existing_key_with_a_genuinely_different_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("sspk.key");
+        let store = DpapiKeyStore;
+        let original = store.load_or_create_key(&key_file).unwrap();
+
+        let rotated = store.rotate_key(&key_file).unwrap();
+
+        assert_ne!(
+            rotated, original,
+            "rotation must produce a different key, not the same value"
+        );
+        let reread = store.load_or_create_key(&key_file).unwrap();
+        assert_eq!(
+            reread, rotated,
+            "a later load must see the ROTATED key, not the original"
+        );
+    }
+
+    #[test]
+    fn rotate_key_succeeds_even_when_no_key_file_exists_yet() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("sspk.key");
+        let store = DpapiKeyStore;
+
+        let rotated = store.rotate_key(&key_file).unwrap();
+
+        let reread = store.load_or_create_key(&key_file).unwrap();
+        assert_eq!(reread, rotated);
+    }
+
+    #[test]
+    fn rotate_key_never_leaves_a_temp_file_behind() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("sspk.key");
+        let store = DpapiKeyStore;
+
+        store.rotate_key(&key_file).unwrap();
+
+        let leftover: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path() != key_file)
+            .collect();
+        assert!(
+            leftover.is_empty(),
+            "rotate_key must clean up its temp file on success, found: {leftover:?}"
+        );
+    }
+
+    #[test]
+    fn rotate_key_produces_a_file_that_still_round_trips_through_unprotect() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("sspk.key");
+        let store = DpapiKeyStore;
+
+        let rotated = store.rotate_key(&key_file).unwrap();
+
+        let protected = std::fs::read(&key_file).unwrap();
+        let recovered = unprotect(&protected).unwrap();
+        assert_eq!(recovered.as_slice(), &rotated[..]);
     }
 }

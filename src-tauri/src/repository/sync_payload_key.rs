@@ -108,15 +108,6 @@ pub fn ensure_wrapped_for_credential(
     device_secret: &[u8],
     sspk: &[u8; PAYLOAD_KEY_LEN],
 ) -> AppResult<()> {
-    let exists: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sync_payload_key_wraps WHERE credential_id = ?1)",
-        [credential_id],
-        |row| row.get(0),
-    )?;
-    if exists {
-        return Ok(());
-    }
-
     let is_active: bool = conn.query_row(
         "SELECT EXISTS(
              SELECT 1 FROM device_sync_credentials
@@ -129,7 +120,66 @@ pub fn ensure_wrapped_for_credential(
         return Ok(());
     }
 
+    // Self-healing check (found by independent security review of
+    // ADR-0069's `db::rotate_sspk` addendum): a plain "does a wrap row
+    // already exist" check is not enough once the SSPK can actually be
+    // rotated, not just have its wraps cleared. `rotate_for_school`
+    // (DB) and `db::rotate_sspk` (the DPAPI file) cannot commit
+    // atomically together -- a device that authenticates in the narrow
+    // gap between the DB wrap-clear committing and the file rotation
+    // completing would be handed a wrap of the OLD `sspk` (whatever this
+    // exact call was given), and a plain existence check would then
+    // never revisit that wrap again, permanently stranding that one
+    // device on a stale key. Comparing the wrap's own decrypted content
+    // against the `sspk` THIS call was given -- not merely whether a row
+    // exists -- makes this self-healing regardless of ordering: a stale
+    // wrap is detected and refreshed the very next time this device
+    // authenticates, no matter when in the DB/filesystem gap it was
+    // created.
+    if let Some(current) = unwrap_for_credential(conn, credential_id, device_secret)? {
+        if current == *sspk {
+            return Ok(());
+        }
+        return refresh_wrap_for_credential(conn, school_id, credential_id, device_secret, sspk);
+    }
+
     wrap_for_credential(conn, school_id, credential_id, device_secret, sspk)
+}
+
+/// Overwrites a credential's existing wrap row with a wrap of `sspk` --
+/// unlike `wrap_for_credential` (a plain `INSERT`, which a dedicated test
+/// proves errors on a pre-existing row -- "at most one wrap per
+/// credential" -- since that plain-insert failure is exactly what a
+/// double-enrollment bug should surface), this is the deliberate,
+/// narrowly-scoped exception: `ensure_wrapped_for_credential`'s
+/// self-healing path, where overwriting a row that is already known to
+/// be stale (its decrypted content does not match the current `sspk`)
+/// is the correct, intended outcome, not a bug to catch.
+fn refresh_wrap_for_credential(
+    conn: &Connection,
+    school_id: &str,
+    credential_id: &str,
+    device_secret: &[u8],
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let wrap_key = payload_key::derive_wrap_key(device_secret);
+    let wrapped = payload_key::wrap_payload_key(&wrap_key, sspk)?;
+
+    conn.execute(
+        "INSERT INTO sync_payload_key_wraps (id, school_id, credential_id, wrapped_key, nonce)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(credential_id) DO UPDATE SET
+             wrapped_key = excluded.wrapped_key,
+             nonce = excluded.nonce",
+        (
+            Uuid::now_v7().to_string(),
+            school_id,
+            credential_id,
+            &wrapped.ciphertext,
+            &wrapped.nonce[..],
+        ),
+    )?;
+    Ok(())
 }
 
 /// The raw (still-wrapped) bytes of a stored `sync_payload_key_wraps` row,
@@ -454,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn ensure_wrapped_is_a_no_op_when_a_wrap_already_exists() {
+    fn ensure_wrapped_is_a_no_op_when_the_existing_wrap_already_matches_the_current_sspk() {
         let (conn, school_id, user_id) = setup();
         let credential =
             device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
@@ -462,22 +512,64 @@ mod tests {
         let sspk = payload_key::generate_payload_key();
         wrap_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk).unwrap();
 
-        // A second SSPK must never overwrite the existing wrap silently --
-        // ensure_wrapped only fills a GAP, it never re-wraps in place.
-        let other_sspk = payload_key::generate_payload_key();
+        ensure_wrapped_for_credential(&conn, &school_id, &credential.id, &device_secret, &sspk)
+            .unwrap();
+
+        let unwrapped = unwrap_for_credential(&conn, &credential.id, &device_secret)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            unwrapped, sspk,
+            "a wrap that already matches the current SSPK must be left as-is"
+        );
+    }
+
+    /// Independent security review of ADR-0069's `db::rotate_sspk`
+    /// addendum found a real bug in an earlier version of this function:
+    /// a plain "does a wrap row already exist" check would permanently
+    /// strand a device on a stale key if it happened to authenticate in
+    /// the narrow, unavoidable gap between the DB-side wrap-clear
+    /// committing (`rotate_for_school`) and the DPAPI SSPK file actually
+    /// finishing its rotation (`db::rotate_sspk`) -- that device would be
+    /// wrapped with whatever `sspk` this exact call was given (the
+    /// not-yet-rotated OLD value), and a plain existence check would then
+    /// never revisit it. This proves the fix directly: a wrap whose
+    /// DECRYPTED content no longer matches the current `sspk` is treated
+    /// as stale and refreshed, not left alone.
+    #[test]
+    fn ensure_wrapped_self_heals_a_stale_wrap_that_no_longer_matches_the_current_sspk() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        let device_secret = decode_hex(&credential.secret_hex);
+        let stale_sspk = payload_key::generate_payload_key();
+        wrap_for_credential(
+            &conn,
+            &school_id,
+            &credential.id,
+            &device_secret,
+            &stale_sspk,
+        )
+        .unwrap();
+
+        let current_sspk = payload_key::generate_payload_key();
+        assert_ne!(current_sspk, stale_sspk);
         ensure_wrapped_for_credential(
             &conn,
             &school_id,
             &credential.id,
             &device_secret,
-            &other_sspk,
+            &current_sspk,
         )
         .unwrap();
 
         let unwrapped = unwrap_for_credential(&conn, &credential.id, &device_secret)
             .unwrap()
             .unwrap();
-        assert_eq!(unwrapped, sspk, "the original wrap must be left untouched");
+        assert_eq!(
+            unwrapped, current_sspk,
+            "a stale wrap must self-heal to the current SSPK, not stay stranded on the old one"
+        );
     }
 
     #[test]

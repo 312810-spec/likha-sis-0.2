@@ -1,5 +1,72 @@
 # ACTIVE PLAN
 
+## `db::rotate_sspk` closes ADR-0069's device-revocation key rotation (2026-09-05), commit + PR owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: added
+`KeyStore::rotate_key`/`DpapiKeyStore::rotate_key_file` (atomic
+generate-protect-write-to-temp-then-rename overwrite of an existing
+DPAPI-protected key file), `db::rotate_sspk(app: &AppHandle)` mirroring
+`load_or_mint_sspk`, and `auth::revoke_device_sync_credential_and_rotate_sspk`
+(closure-injected so the coordination logic stays testable without a
+real Tauri runtime) composing the existing, unchanged
+`revoke_device_sync_credential` with the new rotation. Run on real
+Windows hardware this session — the DPAPI tests genuinely exercise
+`CryptProtectData`/`CryptUnprotectData`, not a hardware-gated skip.
+
+**Ordering**: filesystem rotation happens only after the DB-side
+revoke/wrap-clear commits, never inside its `SAVEPOINT` — chosen because
+a filesystem hiccup must never block the security-critical revocation
+itself, and a rotation retry is always safe on its own. Proven with a
+test that injects a rotation failure and confirms the revocation still
+committed. This ordering alone does not close the DB/filesystem gap
+between the two steps — see Independent review below for what does.
+
+**Verification actually run**: `cargo build --lib` clean; `cargo test
+--lib` 825/825 passed (816 baseline + 9 new: 4 in `crypto::dpapi`, 4 in
+`auth`, net 1 in `repository::sync_payload_key`); full-crate `cargo test`
+(lib + integration binaries + doctests) exit code 0; `cargo fmt --check`
+clean; `cargo clippy --all-targets -- -D warnings` clean, zero warnings;
+`npm run quality:security` 3/3 ok (gitleaks, cargo-deny, osv-scanner —
+all genuinely present on this machine, re-run clean after the fix below;
+no new dependency added). `npm run quality` (TS side) not attempted — no
+TS/UI file touched.
+
+**Independent review — real finding, fixed same session**: a
+`security-reviewer` subagent found a genuine SHOULD-FIX: the original
+`ensure_wrapped_for_credential` only checked whether a wrap row existed,
+not whether its content matched the current SSPK, so a device
+authenticating in the DB/filesystem rotation gap would get permanently
+stranded on a stale key (the exists-only check would never revisit it).
+Fixed: it now compares a wrap's actual decrypted content against the
+SSPK it was given and self-heals a mismatch via a new, narrowly-scoped
+`refresh_wrap_for_credential` upsert — closing the race regardless of
+which order the DB/filesystem steps land in. One pre-existing test had
+encoded the old (buggy) behavior as intentional; corrected into two
+tests (matching wrap stays untouched; stale wrap self-heals). Reviewer's
+three other findings were informational only, no action needed (no
+Tauri command reaches this yet; key zeroization matches an existing
+codebase-wide pattern; a `fsync`-before-rename inconsistency with the
+older `create_new_key_file` noted for future alignment). No blocking
+findings; no recurrence of this project's two previously-documented
+failure classes.
+
+**Retained debt**: no Tauri command or UI exists for device
+enrollment/revocation at all (confirmed by search before starting —
+not a regression from this slice); the remaining sync-entity
+generalization backlog (`SectionMembership` + six other `EntityKind`
+variants).
+
+**Product-direction note**: ADR-0067's school-laptop hub is the settled
+architecture, confirmed by the owner this session — the EO 119 legal
+block only constrains the already-superseded offshore-Cloudflare
+direction (ADR-0065), not this one.
+
+**Exact next slice**: build the actual device-enrollment/revocation
+Tauri command(s) plus the conflict-review UI (ADR-0067's named open
+production gates), or continue the sync-entity generalization backlog
+(`SectionMembership` next) — whichever the next session's evidence
+favors per `.claude/rules/autonomous-development.md`.
+
 ## Sync payload encrypt/decrypt generalized to a third entity, Section — closes the Attendance FK gap (2026-09-05), commit + PR owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: wired

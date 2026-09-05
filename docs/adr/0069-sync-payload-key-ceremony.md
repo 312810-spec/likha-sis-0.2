@@ -576,3 +576,133 @@ either — it would be new persisted-or-cached key material, the same
 scope boundary `crypto::payload_key`'s own doc comment already draws
 around this slice, and the extra HTTP round trip's cost is negligible
 next to `POLL_INTERVAL`'s 30-second cadence.
+
+## Addendum (2026-09-05) — `db::rotate_sspk` closes the deferred file-overwrite path, run on real Windows hardware
+
+The prior addendum's own deferral above is now closed. This session ran
+on a genuine Windows machine (not the Linux sandbox that deferred this
+three times before), so the new DPAPI-touching code and tests exercise
+the real `CryptProtectData`/`CryptUnprotectData` Win32 APIs, not a
+skipped placeholder.
+
+**What shipped**: `crypto::KeyStore` gained a second trait method,
+`rotate_key`, alongside the existing `load_or_create_key`. Unlike that
+method (which reads and reuses an existing key, only minting on a
+missing file), `rotate_key` always overwrites the target file with a
+genuinely new key regardless of what's there, via
+`DpapiKeyStore::rotate_key_file`: generate → DPAPI-protect → write to a
+randomly-suffixed sibling temp file → `rename` that temp file over the
+target path. The temp file is a sibling in the same directory (never a
+separate system temp dir, which could be a different volume) so the
+final `rename` is a single filesystem operation with no window where the
+target is missing or half-written; a rename failure removes the
+now-orphaned temp file before propagating the error. `db::rotate_sspk`
+is a one-line wrapper over this, structured identically to
+`load_or_mint_sspk` (same `cfg(windows)`/`cfg(not(windows))` split, same
+fail-closed error message on an unsupported platform).
+
+**Wiring decision — closure injection over threading an `AppHandle`
+through `auth`**: the natural "wire it into the revocation call site"
+instruction (this ADR's own prior addenda, and `docs/CURRENT-HANDOFF.md`'s
+recurring "exact next task") could have meant changing
+`auth::revoke_device_sync_credential`'s own signature to accept an
+`AppHandle` and call `db::rotate_sspk` internally. That would have broken
+every one of that function's existing tests, none of which can construct
+a real `AppHandle` (this crate has no `tauri::test` mock-runtime
+dependency, and adding one just for this would be a new dev-dependency
+for a single call site). Instead, a new
+`auth::revoke_device_sync_credential_and_rotate_sspk` composes the
+existing, completely unchanged `revoke_device_sync_credential` with a
+`rotate_sspk: impl FnOnce() -> AppResult<()>` closure parameter — the
+same "accept already-resolved crypto material, never a Tauri handle"
+convention this module already uses for `enroll_device_sync_credential`'s
+`sspk` parameter. This keeps 100% of the existing revocation test suite
+untouched and makes the new coordination logic itself fully testable
+(closure call counting, forced-failure injection) without any Tauri
+runtime dependency at all.
+
+**Ordering decision**: filesystem rotation runs strictly after the
+DB-side revoke/wrap-clear `SAVEPOINT` has released (committed), never
+inside it — a filesystem write cannot participate in a SQL transaction,
+so true cross-system atomicity isn't achievable, and the two possible
+failure directions are not equally bad. Committing the DB revoke first
+means a filesystem hiccup can never block or roll back the
+security-critical revocation itself; if rotation then fails, the
+function returns `Err`, and a rotation retry is always safe since it
+never needs to know or verify the previous key's value. The reverse
+order (rotate, then revoke) risks the worse inconsistency: the SSPK file
+already changed while a rolled-back DB transaction leaves every device's
+stored wrap still describing the OLD key, silently breaking every future
+sync round for every device until manually corrected. A dedicated test
+injects a forced rotation failure and confirms the revocation is still
+durably committed regardless.
+
+**No command/UI surface exists for this at all** — confirmed by
+searching the whole `commands/` tree before starting: neither
+`enroll_device_sync_credential` nor `revoke_device_sync_credential` (nor
+now `revoke_device_sync_credential_and_rotate_sspk`) is wrapped in a
+`#[tauri::command]` anywhere in this codebase. This is not a regression
+from this slice — building that command and the conflict-review UI
+remain the concrete open items under this ADR's own "OPEN" production
+gates.
+
+**Tests**: `crypto::dpapi` — 4 new, all genuinely exercising DPAPI on
+this Windows machine (rotation produces a different key and a later load
+sees the rotated value; rotation succeeds with no prior file; no temp
+file left behind on success; the rotated file still round-trips through
+`unprotect`). `auth` — 4 new (rotation invoked exactly once on an actual
+revocation; never invoked for an unknown credential, matching the
+existing `Unauthorized` gate; never invoked when the caller lacks
+authority to revoke; a forced rotation failure does not undo the
+already-committed revocation). `repository::sync_payload_key` — net 1
+new, see the real finding below.
+
+**Independent review — real finding, fixed same session**: a
+`security-reviewer` subagent was dispatched specifically for this
+crypto-sensitive change and found a genuine SHOULD-FIX, confirmed
+reachable given this slice's own chosen ordering, not a false positive:
+`ensure_wrapped_for_credential` only checked whether a wrap row already
+*existed* for a credential, never whether its content actually matched
+the current SSPK. Because the DB-side wrap-clear (`rotate_for_school`)
+and the filesystem SSPK rotation (`db::rotate_sspk`) cannot commit
+atomically together, a device authenticating in the gap between the DB
+commit and the file rotation finishing would be wrapped against the
+NOT-YET-ROTATED old key — and the exists-only check meant that wrap
+would never be revisited again, permanently stranding that one device on
+a stale key while every other device moved on to the new one.
+
+**Fix**: `ensure_wrapped_for_credential` now unwraps and compares a
+wrap's actual decrypted content against the SSPK it was given for THIS
+call; a mismatch is treated as stale and triggers a new
+`refresh_wrap_for_credential` — a narrowly-scoped `INSERT ... ON
+CONFLICT(credential_id) DO UPDATE`, deliberately kept separate from
+`wrap_for_credential`'s existing plain-`INSERT` contract (a dedicated
+test proves that one still errors on a second wrap for the same
+credential — "at most one wrap per credential" remains a real invariant
+for the normal enrollment path, only this self-healing path is allowed
+to overwrite). This closes the race regardless of which order the two
+non-atomic steps land in: a stale wrap self-heals the very next time
+that device authenticates, no matter which side of the gap created it —
+making the earlier "commit DB first" ordering decision belt-and-suspenders
+rather than the only thing standing between this feature and a real bug.
+One pre-existing test,
+`ensure_wrapped_is_a_no_op_when_a_wrap_already_exists`, had encoded the
+old (buggy) behavior as the intended contract ("a second SSPK must never
+overwrite the existing wrap"); split into two corrected tests: one
+proving a wrap that already matches the current SSPK is left untouched,
+one (`ensure_wrapped_self_heals_a_stale_wrap...`) proving a stale one
+self-heals.
+
+Reviewer's three other findings were informational, no action taken: (1)
+this feature is not reachable via any Tauri command yet, matching the
+"no command/UI surface exists for this at all" note above — expected,
+not a gap introduced here; (2) the freshly generated key in
+`dpapi.rs` is not explicitly zeroized after use, but this matches an
+existing, pre-established pattern elsewhere in this same file, not a new
+regression; (3) `rotate_key_file` calls `fsync` before its rename while
+the older `create_new_key_file` does not — a minor inconsistency worth
+aligning if that older function is ever touched again, not blocking now.
+No BLOCKING findings. No recurrence of this project's two
+previously-documented failure classes (unauthenticated bootstrap,
+check-then-act singleton races) — `revoke_device_sync_credential`'s own
+authorization gate was independently re-confirmed intact.
