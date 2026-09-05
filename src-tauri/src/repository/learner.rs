@@ -1,10 +1,16 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+/// `Deserialize` exists for `commands::learner`'s ADR-0067/0069 sync
+/// wiring, which round-trips a `Learner` through JSON as the (encrypted)
+/// outbox payload -- not needed by the Tauri IPC boundary itself, which
+/// only ever serializes this struct outbound to the frontend. A
+/// deliberately simple wire format for this first payload; a real
+/// materializer may need a more considered schema later.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Learner {
     pub id: String,
