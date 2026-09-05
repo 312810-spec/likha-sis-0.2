@@ -3,6 +3,8 @@ pub mod assessment_item;
 pub mod attendance;
 pub mod auth;
 pub mod class_record;
+pub mod conflict_review;
+pub mod device_sync;
 pub mod export;
 pub mod formgen;
 pub mod grading;
@@ -16,6 +18,7 @@ pub mod section_advisory;
 pub mod setup;
 pub mod subject;
 pub mod subject_attendance;
+pub mod sync_status;
 pub mod teaching_assignment;
 pub mod user;
 

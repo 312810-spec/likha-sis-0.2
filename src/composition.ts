@@ -2,6 +2,8 @@ import { AssessmentApplicationService } from "./application/assessment-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
+import { ConflictReviewApplicationService } from "./application/conflict-review-service";
+import { DeviceSyncApplicationService } from "./application/device-sync-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
 import { FormGenerationApplicationService } from "./application/form-generation-service";
@@ -17,12 +19,15 @@ import { SetupApplicationService } from "./application/setup-service";
 import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
 import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
+import { SyncStatusApplicationService } from "./application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
+import { TauriConflictReviewRepository } from "./infrastructure/tauri/conflict-review-repository";
+import { TauriDeviceSyncRepository } from "./infrastructure/tauri/device-sync-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
@@ -39,6 +44,7 @@ import { TauriSetupRepository } from "./infrastructure/tauri/setup-repository";
 import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repository";
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
 import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject-attendance-repository";
+import { TauriSyncStatusRepository } from "./infrastructure/tauri/sync-status-repository";
 import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
@@ -104,3 +110,8 @@ export const schoolAttendanceService = new SchoolAttendanceApplicationService(
 export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new TauriSectionAdvisoryRepository(),
 );
+export const deviceSyncService = new DeviceSyncApplicationService(new TauriDeviceSyncRepository());
+export const conflictReviewService = new ConflictReviewApplicationService(
+  new TauriConflictReviewRepository(),
+);
+export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());

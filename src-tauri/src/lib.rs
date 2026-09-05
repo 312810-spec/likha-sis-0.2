@@ -9,6 +9,7 @@ pub mod hub_server;
 pub mod import;
 pub mod repository;
 pub mod sync;
+pub mod sync_client;
 
 use std::sync::Mutex;
 
@@ -52,6 +53,15 @@ pub fn run() {
             // never be able to crash app startup.
             if let Err(error) = hub_server::maybe_spawn_listener(app.handle()) {
                 log::error!("hub sync listener setup failed: {error}");
+            }
+
+            // ADR-0067 client-side sync loop: only starts if this
+            // installation has a locally stored sync client credential
+            // (see `sync_client::should_run`'s own doc comment) -- a
+            // no-op for a never-enrolled installation, symmetric with
+            // the hub-listener gate immediately above.
+            if let Err(error) = sync_client::maybe_spawn_loop(app.handle()) {
+                log::error!("sync client loop setup failed: {error}");
             }
 
             Ok(())
@@ -147,6 +157,12 @@ pub fn run() {
             commands::reference_geo::list_psgc_units,
             commands::formgen::generate_sf1_form,
             commands::formgen::generate_sf9_form,
+            commands::device_sync::enroll_device_sync_credential,
+            commands::device_sync::revoke_device_sync_credential,
+            commands::device_sync::list_device_sync_credentials,
+            commands::conflict_review::list_conflict_reviews,
+            commands::conflict_review::resolve_conflict_review,
+            commands::sync_status::get_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

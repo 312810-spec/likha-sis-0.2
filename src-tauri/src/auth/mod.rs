@@ -799,17 +799,97 @@ pub fn revoke_device_sync_credential(
         return Err(AppError::Unauthorized);
     }
 
-    let revoked = device_credential_repo::revoke(conn, &school_id, credential_id)?;
-    if revoked {
-        if let Some(user) = user_repo::find_by_id(conn, &user_id)? {
-            audit_log_repo::record(
-                conn,
-                &school_id,
-                Some(&user.id),
-                &user.username,
-                AuditEventType::DeviceRevoked,
-            )?;
+    conn.execute_batch("SAVEPOINT device_sync_revocation")?;
+    let outcome = (|| -> AppResult<bool> {
+        let revoked = device_credential_repo::revoke(conn, &school_id, credential_id)?;
+        if revoked {
+            // ADR-0069 addendum ("key rotation on device revocation"):
+            // discard every stored wrap of this school's sync-payload key,
+            // not only the revoked device's. The hub cannot selectively
+            // re-wrap the (still-to-be-minted) new key for other active
+            // devices without their plaintext secrets, which it never
+            // retains past enrollment -- so every device recovers a fresh
+            // wrap lazily on its next authenticated contact (see
+            // `sync_payload_key::ensure_wrapped_for_credential`, called
+            // from `hub_server::authenticate`). This is what actually
+            // denies the revoked device access to any FUTURE payload: its
+            // credential can never authenticate again, so it can never
+            // reach that lazy re-wrap path, while data encrypted before
+            // rotation remains exactly as readable to it as revocation
+            // alone would have left it (unchanged from before this
+            // addendum, and not a new exposure).
+            sync_payload_key_repo::rotate_for_school(conn, &school_id)?;
+            if let Some(user) = user_repo::find_by_id(conn, &user_id)? {
+                audit_log_repo::record(
+                    conn,
+                    &school_id,
+                    Some(&user.id),
+                    &user.username,
+                    AuditEventType::DeviceRevoked,
+                )?;
+            }
         }
+        Ok(revoked)
+    })();
+
+    match outcome {
+        Ok(revoked) => {
+            conn.execute_batch("RELEASE device_sync_revocation")?;
+            Ok(revoked)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO device_sync_revocation; RELEASE device_sync_revocation",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// `revoke_device_sync_credential`, additionally rotating the school's
+/// SSPK file itself (`db::rotate_sspk`) once the revocation has actually
+/// committed -- the piece ADR-0069's revocation addendum left as "not yet
+/// decided": `rotate_for_school` above already clears every stored
+/// per-device wrap, but until the SSPK file itself is rotated too, a
+/// fresh wrap would still just re-wrap the SAME old plaintext key.
+///
+/// Takes `rotate_sspk` as a closure rather than an `AppHandle` directly,
+/// matching this module's existing convention of accepting already-
+/// resolved crypto material instead of a Tauri handle (see
+/// `enroll_device_sync_credential`'s `sspk` parameter, and
+/// `commands::learner::resolve_sspk_if_enrolled`'s doc comment for why
+/// `db::rotate_sspk` itself needs a real `AppHandle` and is therefore
+/// deliberately NOT exercised directly by this function's own tests) --
+/// a real caller passes `|| db::rotate_sspk(&app).map(|_| ())`. This
+/// keeps the coordination logic here -- "only rotate the SSPK file when
+/// a credential was actually revoked, and surface a rotation failure
+/// distinctly from a revocation failure" -- fully testable without a
+/// real Tauri runtime.
+///
+/// Deliberately calls `rotate_sspk` only AFTER `revoke_device_sync_credential`
+/// has fully committed, not inside its `SAVEPOINT`: a filesystem
+/// operation cannot participate in a SQLite transaction, so the two
+/// cannot be made atomic with each other. This ordering chooses the
+/// safer failure mode of the two available: if `rotate_sspk` then fails,
+/// the credential is already durably revoked (the security-critical
+/// half of this operation, which must never be blocked by a filesystem
+/// hiccup) and this function returns `Err` to signal that the SSPK
+/// itself was NOT rotated and must be retried -- a safe retry, since
+/// rotation never needs to know or verify the previous key's value. The
+/// reverse ordering (rotate first, revoke second) would risk the opposite,
+/// worse inconsistency: the SSPK file already changed while a rolled-back
+/// DB transaction leaves every device's stored wrap still describing the
+/// OLD key, silently breaking every future sync round for every device
+/// until manually corrected.
+pub fn revoke_device_sync_credential_and_rotate_sspk(
+    conn: &Connection,
+    sessions: &SessionManager,
+    credential_id: &str,
+    rotate_sspk: impl FnOnce() -> AppResult<()>,
+) -> AppResult<bool> {
+    let revoked = revoke_device_sync_credential(conn, sessions, credential_id)?;
+    if revoked {
+        rotate_sspk()?;
     }
     Ok(revoked)
 }
@@ -2380,6 +2460,273 @@ mod tests {
         );
         let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries[0].event_type, AuditEventType::DeviceRevoked);
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_invokes_rotation_exactly_once_on_success() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        let revoked =
+            revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential.id, || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(revoked);
+        assert_eq!(rotation_calls.get(), 1);
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_never_rotates_for_an_unknown_credential() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        // An unknown credential id resolves to no owner at all, so the
+        // caller can neither be "their own device" nor a School Head
+        // over it -- `revoke_device_sync_credential`'s own authorization
+        // check rejects this the same way it would a real cross-school
+        // credential, matching its documented `Err(Unauthorized)` gate.
+        let result = revoke_device_sync_credential_and_rotate_sspk(
+            &conn,
+            &sessions,
+            "never-enrolled-credential",
+            || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            },
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert_eq!(
+            rotation_calls.get(),
+            0,
+            "rotation must never run when nothing was actually revoked"
+        );
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_never_rotates_when_unauthorized() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let other = user::create_user(&conn, "ben.reyes", "password", "Ben Reyes").unwrap();
+        user::add_school_membership(&conn, &other.id, &s.id).unwrap();
+        role_repo::grant(&conn, &other.id, &s.id, role_repo::TEACHER).unwrap();
+        let other_sessions = SessionManager::new();
+        login(&conn, &other_sessions, "ben.reyes", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        let result = revoke_device_sync_credential_and_rotate_sspk(
+            &conn,
+            &other_sessions,
+            &credential.id,
+            || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            },
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert_eq!(rotation_calls.get(), 0);
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_some(),
+            "an unauthorized attempt must not revoke the credential either"
+        );
+    }
+
+    /// Proves this function's core safety property: a rotation failure
+    /// must never undo or hide the fact that the credential was already
+    /// durably revoked. The revocation is the security-critical half and
+    /// must not be blocked by (or rolled back due to) a filesystem
+    /// problem in the unrelated SSPK-rotation half.
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_keeps_the_revocation_even_if_rotation_fails() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+
+        let result =
+            revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential.id, || {
+                Err(AppError::key_store("simulated rotation failure"))
+            });
+
+        assert!(result.is_err());
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_none(),
+            "the credential must remain revoked even though rotation itself failed"
+        );
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(
+            entries[0].event_type,
+            AuditEventType::DeviceRevoked,
+            "the revocation audit entry must still be recorded"
+        );
+    }
+
+    /// ADR-0069 addendum: revoking a device must rotate the school's
+    /// sync-payload key by invalidating every stored wrap, not merely the
+    /// revoked device's -- proving `revoke_device_sync_credential` actually
+    /// calls `sync_payload_key::rotate_for_school`, not just
+    /// `device_credential::revoke`.
+    #[test]
+    fn revoking_a_device_clears_every_wrap_for_that_school_including_other_active_devices() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sspk = test_sspk();
+        let credential_a = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-a", None, &sspk,
+        )
+        .unwrap();
+        let credential_b = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-b", None, &sspk,
+        )
+        .unwrap();
+        let secret_a = device_credential_repo::hex_decode(&credential_a.secret_hex).unwrap();
+        let secret_b = device_credential_repo::hex_decode(&credential_b.secret_hex).unwrap();
+        assert!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_b.id, &secret_b)
+                .unwrap()
+                .is_some(),
+            "device B must start with a valid wrap"
+        );
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+
+        revoke_device_sync_credential(&conn, &sessions, &credential_a.id).unwrap();
+
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_a.id, &secret_a)
+                .unwrap(),
+            None,
+            "the revoked device's own wrap must be gone"
+        );
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_b.id, &secret_b)
+                .unwrap(),
+            None,
+            "an unrelated STILL-ACTIVE device's wrap of the old key must also be invalidated \
+             by rotation -- it recovers a fresh wrap lazily on its next authenticated contact, \
+             not by keeping the old one"
+        );
+    }
+
+    /// A device revoked BEFORE rotation cannot recover a wrap of whatever
+    /// new SSPK gets minted after rotation. Belt AND suspenders, proven
+    /// separately: (1) in production, `ensure_wrapped_for_credential` is
+    /// only ever reachable through `hub_server::authenticate`, which
+    /// requires a successful `device_credential::verify` first, and a
+    /// revoked credential never verifies (asserted below). (2) An
+    /// independent review found that `ensure_wrapped_for_credential` itself
+    /// had no `revoked_at` awareness -- if any future caller ever invoked
+    /// it without going through `verify` first, it would have silently
+    /// re-established decrypt capability for a revoked device. That gap is
+    /// now closed with an explicit active-credential check inside the
+    /// function itself (defense in depth, not reliant on caller ordering),
+    /// which this test also proves directly: calling it with the revoked
+    /// device's own real secret is a silent no-op, not a successful wrap.
+    #[test]
+    fn a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let secret = device_credential_repo::hex_decode(&credential.secret_hex).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap();
+        let new_sspk = test_sspk();
+
+        // Even called directly, bypassing `verify` entirely, this must be
+        // a no-op for a revoked credential -- proving the function's own
+        // internal active-credential check, not just the one call site's
+        // ordering.
+        sync_payload_key_repo::ensure_wrapped_for_credential(
+            &conn,
+            &s.id,
+            &credential.id,
+            &secret,
+            &new_sspk,
+        )
+        .unwrap();
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential.id, &secret).unwrap(),
+            None,
+            "ensure_wrapped_for_credential must refuse to wrap for a revoked credential, \
+             even when called directly with that device's own correct secret"
+        );
+        assert_eq!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex).unwrap(),
+            None,
+            "the revoked credential itself must also never verify again -- the production \
+             call site's first line of defense, independent of the check above"
+        );
     }
 
     #[test]

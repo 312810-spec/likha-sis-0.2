@@ -4,6 +4,8 @@ import {
   attendanceService,
   authService,
   classRecordService,
+  conflictReviewService,
+  deviceSyncService,
   enrollmentHistoryService,
   exportService,
   formGenerationService,
@@ -20,6 +22,7 @@ import {
   sf1ImportService,
   subjectAttendanceService,
   subjectService,
+  syncStatusService,
   teachingAssignmentService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
@@ -28,6 +31,8 @@ import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
+import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
+import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
@@ -42,6 +47,7 @@ import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
+import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
@@ -435,6 +441,15 @@ function App() {
             <AuditLogScreen authService={authService} />
           ) : activeTab === "admin-password-reset" ? (
             <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+          ) : activeTab === "devices" ? (
+            <DeviceManagementScreen deviceSyncService={deviceSyncService} />
+          ) : activeTab === "conflict-review" ? (
+            <ConflictReviewScreen conflictReviewService={conflictReviewService} />
+          ) : activeTab === "sync-status" ? (
+            <SyncStatusScreen
+              syncStatusService={syncStatusService}
+              onReviewConflicts={() => setActiveTab("conflict-review")}
+            />
           ) : null}
         </AppLayout>
       ) : (

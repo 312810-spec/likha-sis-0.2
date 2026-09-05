@@ -7,6 +7,50 @@ record the checkpoint, produce the required summary, identify the exact
 next slice, and stop. Never begin the next wave without a new user
 instruction to continue.
 
+## Prompt-ahead discipline (owner instruction, 2026-09-05; refined 2026-09-05)
+
+When a slice's CI is running (or an implementation agent is otherwise
+in flight) and the mode in effect explicitly allows continuing past one
+wave boundary without re-asking (e.g. an owner-directed multi-priority
+run), do not sit idle waiting for it. As soon as the current slice's
+commit is pushed and its CI has started, immediately identify the next
+priority from current evidence, generate its implementation prompt with
+`prompt-master`, and dispatch it right away — do not wait for the
+preceding CI run to finish before starting the next slice's
+implementation/local work. This conserves wall-clock time across a
+chain of priorities.
+
+**CI-push ordering constraint**: a dispatched next-slice agent must do
+its own implementation, local verification (`cargo test`/`npm run
+quality`/etc.), and prepare its commit — but must NOT push (and thereby
+trigger its own CI run) while a preceding commit's CI on the same
+branch is still in progress. This repo's Quality Gate cancels an
+in-progress run the instant a new commit lands on the same branch/PR,
+so stacking pushes faster than CI completes silently discards
+verification (this happened repeatedly before this constraint was
+added — see 2026-09-05 session history). Each dispatched prompt must
+explicitly instruct the agent to check the preceding run's actual
+completion (success/failure, not merely "in progress") before its own
+push, and to wait if one is still running.
+
+This does not override the ordinary wave-boundary stop — it only
+removes idle time inside an already-authorized continuation.
+
+## Batch-implement mode (owner instruction, 2026-09-05)
+
+When the owner explicitly asks to implement all remaining tasks in a
+list and push/CI only once everything is done, switch modes: dispatched
+agents implement and commit LOCALLY (each its own commit, full local
+verification run and reported) but do NOT run `git push` at all. No
+commit in this mode triggers CI, so the CI-push-ordering constraint
+above is moot for the duration — there is nothing to wait for since
+nothing is pushed. Only after every task in the batch is implemented
+and locally verified does one final push happen (all commits at once),
+followed by a single CI run and, if needed, a PR update. This trades
+the wall-clock benefit of per-slice CI feedback for finishing the whole
+batch before spending any CI time — appropriate only when the owner
+asks for it explicitly, not the default.
+
 ## The loop
 
 Understand → Research → Specify → Plan → Implement → Test → Review →
@@ -58,7 +102,7 @@ tests passed; an ADR was written; the roadmap lists a "next candidate";
 several technical candidates exist; the current wave needs research; a
 new architecture decision requires the scenario process;
 independent review has debt; a reviewer harness fails under the
-established retry rule (below); documentation says "pick M_/M_/etc.";
+established retry rule (below); documentation says "pick M*/M*/etc.";
 or an earlier handoff says "no candidate pre-selected." The completed
 wave boundary is the mandatory stopping point.
 

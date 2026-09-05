@@ -1,5 +1,218 @@
 # Verification Debt
 
+## Stale outbox `base_version` after "keep local" (2026-09-05) — CLOSED
+
+**Closed.** Item 3 of the conflict-review screen entry below (the
+"keep local" resolution leaving a still-pending `sync_outbox` entry's
+`base_version` stale) is fixed: `resolve_conflict_review`'s `KeepLocal`
+branch now calls the new
+`repository::sync_outbox::correct_base_version_for_entity` before
+`sync_conflict_review::mark_resolved`, advancing the matching pending
+outbox row's `base_version` to `current_hub_version`. Covered by
+`repository::sync_outbox::tests::correct_base_version_for_entity_*`
+(update/no-op/school-scoping) and
+`commands::conflict_review::tests::keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`
+(end-to-end: stale outbox row → resolve keep-local → corrected push is
+`Accepted`, not `ConflictStaged`), plus a regression test
+(`using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`)
+proving the `UseIncoming` path is unaffected. Verified this session:
+`cargo test` (full crate, 845 lib tests + this module's, all passing),
+`cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+(clean), `npm run quality:security` (gitleaks/cargo-deny/osv-scanner,
+all OK). `npm run quality`/`quality:ui` (TS/UI layers) were not touched
+by this fix and were not re-run — this was a pure Rust repository/
+command-layer change.
+
+## Sync-status screen (2026-09-05) — independent review, native accessibility pass, and a whole-crate `cargo test` re-run owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/SyncStatusScreen.tsx` +
+`src-tauri/src/commands/sync_status.rs` + supporting repository/TS
+layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and conflict-review
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked. No blocking issue was found, but a
+   genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Whole-crate `cargo test` did not run to completion this session.**
+   Multiple parallel worktree agents shared this box's filesystem and
+   repeatedly drove it to `No space left on device` mid-compile (`df -h
+/` observed at ~99–100% used more than once) — an environment-resource
+   condition, not a code defect. What DID run clean: every targeted new
+   test (`sync_outbox::`, `sync_pull_cursor::`, `commands::sync_status::`
+   — 10 tests, all passing), and `cargo clippy --all-targets -- -D
+warnings` across the whole workspace including every test target
+   (zero warnings) once brief headroom existed. Re-run plain `cargo
+test` once the shared box has stable free disk space, per
+   `.claude/rules/testing.md`'s own "still run plain `cargo test` at
+   least once" stable-checkpoint requirement.
+
+## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/ConflictReviewScreen.tsx` + its supporting
+Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and device-sync-command
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked, including one real gap found and fixed
+   during self-review (a non-blocking `aria-disabled` button that could
+   still be clicked). No other blocking issue was found, but a genuinely
+   independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **CLOSED (2026-09-05).** "Keep local" leaving the stale outbox
+   `base_version` uncorrected — see the "Stale outbox `base_version`
+   after 'keep local'" entry at the top of this file for the fix and
+   its verification.
+
+## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/DeviceManagementScreen.tsx` + its
+supporting Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session.
+   A rigorous self-review was performed instead per this project's
+   documented fallback (see the handoff entry for exactly what was
+   checked: plain-language destructive-action copy, enumeration-safe
+   generic failure message, `expectNoAccessibilityViolations` in both the
+   closed and mid-confirmation states). No blocking issue was found, but
+   a genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Focus-management gap, knowingly retained.** Opening the inline
+   "Remove device" confirmation panel does not move keyboard focus into
+   it — a keyboard/screen-reader user must continue tabbing forward from
+   the "Remove device" button to reach "Cancel"/"Yes, remove this
+   device," rather than focus landing there automatically the way a true
+   modal dialog would. No modal/dialog primitive exists yet in this
+   codebase (`src/ui/components/`) to reuse, and building one was judged
+   out of scope for a single-screen slice. Revisit if/when this codebase
+   gains a shared dialog component, or sooner if the native accessibility
+   pass above flags it as a real problem in practice.
+
+## Device sync enrollment/revocation Tauri commands (2026-09-05) — independent review + TS quality gate owed
+
+Two items owed from this slice (`docs/CURRENT-HANDOFF.md`'s matching
+entry has full detail):
+
+1. **Independent security review not obtained.** A `security-reviewer`
+   subagent dispatch was attempted for `src-tauri/src/commands/device_sync.rs`
+   — exactly the class of authorization/credential-management command
+   surface this project previously found a real bug in (ADR-0004's
+   unauthenticated-bootstrap incident) — and was unreachable this
+   session, the same known reviewer-harness gap recorded against the
+   three prior ADR-0067/0069 slices below. A rigorous self-review was
+   performed instead per this project's documented fallback: confirmed
+   `school_id` is never a client-supplied parameter on the revoke
+   command (derived only from the active session inside
+   `auth::revoke_device_sync_credential`'s own
+   `require_active_session` check) and is re-verified server-side on the
+   enroll command (`is_member_of_school`, matching `login`'s established
+   credential-based bootstrap shape from ADR-0004); confirmed the revoke
+   command calls the rotating `revoke_device_sync_credential_and_rotate_sspk`
+   wrapper exclusively, never the raw non-rotating function; added a new
+   end-to-end test proving the SSPK genuinely differs after rotation,
+   invoked through the command's own call shape rather than the
+   underlying `auth::*` function directly. No blocking issue was found,
+   but a genuinely independent review of this diff remains owed. Retry
+   when a reviewer harness/subagent is confirmed healthy.
+2. **`npm run quality` (TS typecheck/lint/format/architecture/knip/vitest)
+   could not be run this session.** `node_modules` was empty (0
+   packages) in this environment — unrelated to this change, which
+   touched only `src-tauri/**` and `docs/**`, no TypeScript. Run it
+   before the next TS-touching slice ships, and ideally once here too
+   once `npm install` is available, to confirm no incidental drift.
+
+## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
+
+Owed from this slice (ADR-0069's newest addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail): no
+`security-reviewer` subagent was reachable in this session's toolset
+(same gap as the two prior ADR-0069 addenda). A rigorous self-review was
+performed instead per this project's documented reviewer-failure
+fallback, covering the new `GET /sync/payload-key-wrap` endpoint's
+credential-scoping, the fail-closed behavior on a missing wrap row or a
+rejected decrypted payload, and the `school_id` cross-check in
+`sync_client::apply_decrypted_change`. No blocking issue was found, but a
+genuinely independent review of this change (`hub_server`'s new
+endpoint, `repository::sync_payload_key::get_wrap_for_credential`,
+`sync_client::resolve_sspk`/`apply_decrypted_change`,
+`repository::learner::upsert_from_sync`) remains owed. Retry when a
+reviewer harness/subagent is confirmed healthy.
+
+## Payload-key rotation on device revocation (2026-09-05) — independent review + native DPAPI verification owed
+
+Three items owed from this slice (ADR-0069's rotation addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
+
+1. **Independent security review not obtained.** No `security-reviewer`
+   subagent tool was available in this session's toolset, and the
+   project's `security-review` skill could not run (its scripted `git
+diff origin/HEAD...` precondition fails in this sandbox — the ref does
+   not resolve here). A rigorous self-review was performed instead per
+   this project's documented fallback, but a genuinely independent review
+   of `repository::sync_payload_key::{rotate_for_school,
+ensure_wrapped_for_credential}`, `auth::revoke_device_sync_credential`'s
+   new rotation call, and `hub_server::authenticate`'s new lazy-rewrap
+   call site remains owed. Retry when a reviewer harness/subagent is
+   confirmed healthy.
+2. **`db::rotate_sspk` does not exist yet** — see this same gap recorded
+   in `docs/CURRENT-HANDOFF.md`'s "Exact next task". Until it exists and
+   is wired into the revocation path, a live revocation clears the
+   database-side wraps (real, tested) but does not yet produce a genuinely
+   new plaintext SSPK for devices to re-wrap against.
+3. **Native Windows DPAPI verification**, once `db::rotate_sspk` exists:
+   this sandboxed Linux environment cannot exercise `DpapiKeyStore` at
+   all (same pre-existing limitation `load_or_mint_sspk` itself already
+   carries — see that function's own doc comment) — a real overwrite/
+   reload round trip of `SSPK_KEY_FILE_NAME` on Windows has never been
+   demonstrated and cannot be demonstrated here.
+
+## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session — CLOSED same session
+
+Adding `reqwest` as a direct dependency for `sync_client` (ADR-0067) is
+exactly the kind of change `.claude/rules/testing.md` says should get a
+`npm run quality:security` pass before being considered complete. That
+check initially could not run in this sandboxed session: `gitleaks`,
+`cargo-deny`, and `osv-scanner` were all missing from `PATH` (`scripts/
+check-security.mjs` first reported "0 ok, 0 failed, 3 missing").
+
+**Closed later in the same session**: all three tools were installed and
+run for real, not assumed. `osv-scanner` v2.5.1 and `gitleaks` v8.30.1
+were downloaded as official prebuilt binaries and their SHA-256 checksums
+independently verified against the values already recorded in
+`docs/SOURCE-REGISTRY.md` before use (both matched exactly). `cargo-deny`
+v0.20.2 was built from source via `cargo install cargo-deny --locked`
+(~3.5 min). Re-running `npm run quality:security` then reported
+**"3 ok, 0 failed, 0 missing"**: `gitleaks` — 101 commits scanned, ~25.5 MB,
+no leaks found; `cargo-deny` — advisories/bans/licenses/sources all ok
+(directly covers the new `reqwest` dependency and its tree); `osv-scanner`
+— 585 crates.io + 341 npm packages scanned, all 18 known advisories
+matched this repository's own pre-existing, already-justified ignore
+entries in `src-tauri/deny.toml` (unmaintained GTK3/`unic-*`/
+`proc-macro-error` transitive Tauri-Linux deps), "No issues found" —
+`reqwest` itself not flagged at all. Combined with `cargo test`/`cargo
+clippy`/`cargo fmt --check` (see `docs/CURRENT-HANDOFF.md`'s matching
+entry), this dependency addition is now fully cleared, not merely
+recorded as an open gap.
+
 ## Grade 12 DO 8 carryover grading policies (2026-09-04) — Rust gate CLOSED 2026-09-05
 
 Migration 30 and repository tests cover the five Grade 12 legacy-SHS
@@ -249,9 +462,9 @@ Full findings file: `docs/security-reviews/2026-09-03-section-membership-l-schoo
 ## Wave 1 UI redesign shell (2026-09-03)
 
 The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),
-its phone-width drawer focus-trap, and the phone bottom nav have **jsdom
+its phone-width drawer focus-trap, and the phone bottom nav have \*\*jsdom
 
-- axe (`expectNoAccessibilityViolations`) coverage only** so far. A
+- axe (`expectNoAccessibilityViolations`) coverage only\*\* so far. A
   native NVDA/Narrator + compiled-binary visual pass is owed — is the
   persistent sidebar readable and comfortable, does the drawer trap and
   return focus correctly under a real screen reader, is the bottom-nav
