@@ -26,7 +26,6 @@
     "quality:security": "node scripts/check-security.mjs",
     "quality:ui": "node scripts/ui-smoke.mjs",
     "harness:verify": "node scripts/harness/verify.mjs",
-    "relay:wave-report": "node scripts/relay-wave-report.mjs",
     "quality:full": "npm run harness:verify && npm run quality && cd src-tauri && cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings"
   },
   "dependencies": {
