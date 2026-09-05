@@ -1,16 +1,36 @@
 # Verification Debt
 
-## Grade 12 DO 8 carryover grading policies (2026-09-04) — OPEN
+## Grade 12 DO 8 carryover grading policies (2026-09-04) — Rust gate CLOSED 2026-09-05
 
-Migration 30 and repository tests now cover the five Grade 12 legacy-SHS
+Migration 30 and repository tests cover the five Grade 12 legacy-SHS
 applicability groups required by DO 15, s. 2026 Annex D paragraph 49, using
 the DO 8, s. 2015 Table 5 weights and the already-active adjusted
-transmutation table for SY 2026-2027. TypeScript quality gates passed, but
-this runner has no Rust toolchain, so `cargo fmt --check`, `cargo clippy
---all-targets -- -D warnings`, and the Rust test suite remain owed. The
-official DepEd DO 8 landing page was verified; its linked PDF returned 403
-from this environment, so the exact Table 5 transcription was
-cross-checked against DepEd Caraga's official Classroom Assessment handbook.
+transmutation table for SY 2026-2027. The official DepEd DO 8 landing page
+was verified; its linked PDF returned 403 from this environment, so the
+exact Table 5 transcription was cross-checked against DepEd Caraga's
+official Classroom Assessment handbook — that sourcing caveat stands.
+
+**Rust verification gate, previously owed on a runner with no Cargo
+toolchain — now genuinely run and confirmed on a Rust-capable runner
+(2026-09-05)**: `cargo fmt --check` clean; `cargo clippy --all-targets -- -D
+warnings` clean; `cargo test` (full crate) 762 lib tests + all integration
+binaries, 0 failed, run twice for reproducibility after one transient,
+unrelated flake (`tests/formgen.rs`, an SF1/SF9 form-generation binary this
+milestone never touches) — the isolated re-run and both full-suite reruns
+were clean, consistent with environmental flakiness under heavy concurrent
+system load (multiple sessions were active on this machine at the time),
+not a regression. The three DO 8-specific tests
+(`migration_30_seeds_all_five_grade12_do8_carryover_groups`,
+`migration_30_preserves_the_two_distinct_legacy_track_groups_with_matching_weights`,
+`compute_term_grade_applies_grade12_do8_weights_with_adjusted_transmutation`)
+were also run in isolation and pass.
+
+**Still open, not closed by the above**: the independent DepEd-compliance
+review `docs/ACTIVE-PLAN.md`'s ADR-0068 entry records as owed (a fresh
+reviewer checking the DO 8 Table 5 transcription and the carryover
+applicability logic against the source material) — a correctness/compliance
+review, not a toolchain-availability gate, and outside what a Rust test run
+can prove on its own.
 
 ## ADR-0067 school-laptop sync hub (2026-09-04) — OPEN
 
