@@ -1,6 +1,57 @@
 # CURRENT HANDOFF
 
-## Network listener HTTP surface: axum decided, router built (2026-09-05), commit + PR owed
+## Network listener wired into real Tauri startup, loopback only (2026-09-05), commit + PR owed
+
+Branch cut from `main` after PR #50 merged. Executed the "exact next
+implementation slice" from the axum-router entry below: wiring the
+router into actual app startup.
+
+**What shipped**: `hub_server::maybe_spawn_listener`, called from
+`lib.rs`'s `setup` hook. Gated the same way the client-side write path
+already is (`commands::learner`'s enrollment gate) — new
+`hub_server::should_listen` starts the listener only if this
+installation has ever enrolled a device for some school
+(`device_credential::has_active_for_school`, checked across every school
+`school::list_all` returns). A never-enrolled, plain installation's
+startup is completely unaffected — no new socket, no new attack surface.
+A bind failure (e.g. the port already in use) is logged, never fatal —
+sync must never crash app startup.
+
+**Deliberately scoped down rather than half-verified**: binds
+**loopback only** (`127.0.0.1:7878`), not a real LAN or Tailscale
+interface. Resolving the actual bind interface (never `0.0.0.0`, per
+ADR-0067's own operations gate) needs either a new interface-enumeration
+crate (unresearched) or a documented manual-configuration decision, plus
+native Windows network verification this sandboxed environment cannot
+perform. Recorded honestly as this slice's boundary rather than guessed
+at — the wiring and gate logic are proven; real LAN reachability is not.
+
+The listener's own state opens a SEPARATE `Connection` to the same
+encrypted database file (axum's `State` extractor needs `'static`+`Clone`,
+which Tauri's own managed `State<'_, Mutex<Connection>>` can't satisfy) —
+safe under this app's existing WAL mode, already enabled specifically for
+multi-connection coexistence; not a new concurrency risk.
+
+**Dependency change**: `tokio` promoted from dev-only to a direct
+runtime dependency (`net`+`rt` features) — `hub_server`'s production
+code now calls `tokio::net::TcpListener` directly, which needs a direct
+`Cargo.toml` edge, not just the transitive one Tauri/axum already
+provided.
+
+**Verification**: 3 new `should_listen` tests (false before enrollment,
+true after, false again once the only credential is revoked). `cargo
+test`: 762 lib tests + all integration binaries, 0 failed; `cargo clippy
+--all-targets -- -D warnings` and `cargo fmt --check` clean; `npm run
+quality:security` clean (the `tokio` dependency promotion added no new
+advisories) — re-run given this slice touched `Cargo.toml` again. `npm
+run quality` — checked directly against output, not just exit code.
+
+**Not yet done**: commit; push; PR (targets `main`). See
+`docs/ACTIVE-PLAN.md`'s top entry for the exact next slice: resolving
+the real LAN/Tailscale bind interface (needs research + native
+verification), and the client-side push/pull loop.
+
+## Network listener HTTP surface: axum decided, router built (2026-09-05), merged (PR #50)
 
 Branch cut from `main` after PR #49 merged. Executed the "exact next
 implementation slice" from the domain-write-wiring entry below: the
@@ -68,9 +119,8 @@ startup; a TLS-or-documented-plaintext-inside-transport decision; rate
 limiting; the client side of this protocol (nothing yet calls these two
 endpoints from a device).
 
-**Not yet done**: commit; push; PR (targets `main`). See
-`docs/ACTIVE-PLAN.md`'s top entry for the exact next slice: wiring the
-router into real Tauri app startup, and the client-side push/pull loop.
+**Merged 2026-09-05 as PR #50** (`8a99f24`). Now wired into real Tauri
+startup by the entry above.
 
 ## First real domain write wired to sync_outbox (2026-09-05), merged (PR #49)
 

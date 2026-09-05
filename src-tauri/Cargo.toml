@@ -73,6 +73,14 @@ hkdf = "0.13.0"
 # See `docs/adr/0067-school-laptop-authoritative-sync-hub.md`'s network-
 # listener addendum for the full decision record.
 axum = { version = "0.8.9", default-features = false, features = ["json", "http1", "tokio", "query"] }
+# Already resolved transitively (Tauri itself depends on tokio; axum's
+# `tokio` feature above needs it too) -- promoted to a direct dependency
+# because `hub_server`'s own production code calls `tokio::net::TcpListener`
+# directly, which Rust requires a direct `Cargo.toml` edge for, not just a
+# transitive one. `net` (`TcpListener`) + `rt` (the runtime `axum::serve`
+# drives) only -- this app still runs on Tauri's own tokio runtime via
+# `tauri::async_runtime::spawn`, never a second `#[tokio::main]` runtime.
+tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"] }
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

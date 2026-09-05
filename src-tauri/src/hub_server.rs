@@ -1,17 +1,5 @@
 //! ADR-0067 network listener: the hub's authenticated push/pull HTTP API.
 //!
-//! This module builds and tests an `axum::Router`; it deliberately does
-//! NOT bind a real TCP socket or decide which interface to listen on --
-//! that is a separate, Tauri-startup-level concern (resolving the LAN/
-//! Tailscale interface address, never `0.0.0.0`, per ADR-0067's own
-//! "School-laptop operations gate": "the host listener binds to the
-//! Tailscale / LAN interface only, never `0.0.0.0`"). Building the
-//! tested router first, wiring it to actual app startup as a later
-//! increment, matches this codebase's established zero-UI-first
-//! precedent (RBAC, Curriculum, `sync_hub`, `sync_payload_key` all
-//! shipped their first increment with full test coverage and no live
-//! caller).
-//!
 //! Every device identifies itself on every request via two custom
 //! headers (`x-likha-credential-id`, `x-likha-device-secret`) -- never a
 //! query parameter or URL segment, so a credential secret never ends up
@@ -20,7 +8,17 @@
 //! enumeration-safe, constant-time check already used everywhere else in
 //! this codebase; an unknown id, a revoked credential, and a wrong
 //! secret are all indistinguishable `Unauthorized` responses here too.
+//!
+//! `maybe_spawn_listener` wires this into real Tauri app startup, but
+//! **deliberately binds loopback only** (`127.0.0.1`), not a real LAN or
+//! Tailscale interface -- resolving the actual bind interface (never
+//! `0.0.0.0`, per ADR-0067's own "School-laptop operations gate") needs
+//! either a new interface-enumeration dependency or a documented manual-
+//! configuration decision, plus native Windows network verification this
+//! sandboxed development environment cannot perform. Not reachable from
+//! another device yet; see ADR-0067's network-listener addendum.
 
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use axum::extract::{Query, State};
@@ -31,12 +29,16 @@ use axum::Router;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::error::AppError;
-use crate::repository::{device_credential, sync_hub};
+use crate::error::{AppError, AppResult};
+use crate::repository::{device_credential, school, sync_hub};
 use crate::sync::{PendingChange, SyncCursor};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
+
+/// Loopback-only until LAN/Tailscale interface resolution is implemented
+/// and verified on real hardware -- see this module's own doc comment.
+const LOOPBACK_BIND_ADDR: &str = "127.0.0.1:7878";
 
 #[derive(Clone)]
 pub struct HubServerState {
@@ -52,6 +54,69 @@ pub fn router(state: HubServerState) -> Router {
         .route("/sync/push", post(push_handler))
         .route("/sync/pull", get(pull_handler))
         .with_state(state)
+}
+
+/// True if ANY school known to this installation has at least one
+/// active device sync credential -- i.e. this installation has actually
+/// completed the enrollment ceremony for some school at least once
+/// (ADR-0067 D4: enrollment happens on the hub). A plain, never-enrolled
+/// installation stays completely unaffected: no listener starts, the
+/// same "sync stays opt-in by enrollment" decision already made for the
+/// client-side write path (see `commands::learner`'s own doc comment for
+/// why that gate exists) applied symmetrically to the server side.
+pub fn should_listen(conn: &Connection) -> AppResult<bool> {
+    for known_school in school::list_all(conn)? {
+        if device_credential::has_active_for_school(conn, &known_school.id)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Spawns the listener bound to `bind_addr`, reusing the `tokio` runtime
+/// Tauri already runs internally (`tauri::async_runtime::spawn`, not a
+/// second/parallel runtime). A bind failure (e.g. the port is already in
+/// use, perhaps by a second launch of this same app) is logged, never a
+/// panic -- a local-first desktop app must keep working even when sync
+/// is unavailable.
+pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
+    let app_router = router(HubServerState { db });
+    tauri::async_runtime::spawn(async move {
+        match tokio::net::TcpListener::bind(bind_addr).await {
+            Ok(listener) => {
+                log::info!("hub sync listener bound to {bind_addr}");
+                if let Err(error) = axum::serve(listener, app_router).await {
+                    log::error!("hub sync listener stopped: {error}");
+                }
+            }
+            Err(error) => {
+                log::error!("hub sync listener failed to bind {bind_addr}: {error}");
+            }
+        }
+    });
+}
+
+/// Starts the hub listener if (and only if) `should_listen` says this
+/// installation has ever enrolled a device for some school -- otherwise
+/// a no-op, so a plain non-syncing installation's startup is completely
+/// unaffected. Opens a SEPARATE `Connection` to the same encrypted
+/// database file specifically for the listener's own `'static`+`Clone`
+/// state (axum's `State` extractor requires this; Tauri's own managed
+/// `tauri::State<'_, Mutex<Connection>>` can't satisfy it, since its
+/// lifetime is tied to the invoking command). Safe: `db::open` already
+/// enables WAL mode specifically so multiple connections to the same
+/// SQLite file coexist correctly -- this is not a new concurrency risk,
+/// it is the documented reason WAL mode was already chosen.
+pub fn maybe_spawn_listener(app: &tauri::AppHandle) -> AppResult<()> {
+    let conn = crate::db::open_app_db(app)?;
+    if !should_listen(&conn)? {
+        return Ok(());
+    }
+    let bind_addr: SocketAddr = LOOPBACK_BIND_ADDR
+        .parse()
+        .expect("LOOPBACK_BIND_ADDR is a hardcoded valid address");
+    spawn(Arc::new(Mutex::new(conn)), bind_addr);
+    Ok(())
 }
 
 /// A request-level error, deliberately NOT `AppError` itself -- an
@@ -228,6 +293,42 @@ mod tests {
             .header(DEVICE_SECRET_HEADER, secret_hex)
             .body(Body::from(body.to_string()))
             .unwrap()
+    }
+
+    #[test]
+    fn should_listen_is_false_for_a_fresh_never_enrolled_installation() {
+        let conn = crate::db::open(
+            std::path::Path::new(":memory:"),
+            &crate::crypto::generate_key(),
+        )
+        .unwrap();
+        school::create(&conn, "Rizal Elementary").unwrap();
+
+        assert!(!should_listen(&conn).unwrap());
+    }
+
+    #[test]
+    fn should_listen_is_true_once_any_school_has_an_active_credential() {
+        let fixture = test_fixture();
+        let conn = fixture.state.db.lock().unwrap();
+
+        assert!(should_listen(&conn).unwrap());
+    }
+
+    #[test]
+    fn should_listen_is_false_again_once_the_only_credential_is_revoked() {
+        let fixture = test_fixture();
+        {
+            let conn = fixture.state.db.lock().unwrap();
+            let credential_school = device_credential::owner(&conn, &fixture.credential.id)
+                .unwrap()
+                .unwrap()
+                .0;
+            device_credential::revoke(&conn, &credential_school, &fixture.credential.id).unwrap();
+        }
+
+        let conn = fixture.state.db.lock().unwrap();
+        assert!(!should_listen(&conn).unwrap());
     }
 
     #[tokio::test]
