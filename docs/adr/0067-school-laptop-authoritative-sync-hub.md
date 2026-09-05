@@ -186,3 +186,38 @@ reasoning for payload transport); per-device rate limiting; request body size
 limits beyond the existing `MAX_PUSH_BATCH`/`sync::validate_change` payload
 cap; and the client side of this protocol (a device's own HTTP client calling
 these two endpoints) — nothing yet drains `sync_outbox` over the network.
+
+## Addendum (2026-09-05) — startup wiring, loopback only
+
+Wired `hub_server::router` into real Tauri app startup
+(`hub_server::maybe_spawn_listener`, called from `lib.rs`'s `setup` hook).
+Gated the same way the client-side write path already is
+(`commands::learner`'s enrollment gate): `hub_server::should_listen` starts
+the listener only if this installation has ever enrolled a device for some
+school. A never-enrolled, plain installation's startup is completely
+unaffected — no new socket, no new attack surface. A bind failure is logged,
+never fatal, matching this codebase's "sync must never crash the app"
+discipline.
+
+**Deliberately scoped down rather than half-verified**: binds **loopback
+only** (`127.0.0.1:7878`), not a real LAN or Tailscale interface. Resolving
+the actual bind interface (never `0.0.0.0`) needs either a new
+interface-enumeration crate (unresearched so far) or a documented
+manual-configuration decision, plus native Windows network verification —
+this sandboxed development environment can prove the wiring compiles and the
+gate logic is correct, but cannot prove real LAN reachability. Recorded
+honestly as the boundary of this slice, per this project's "never claim a
+check passed unless it actually ran" rule, rather than guessing at an
+interface-selection heuristic that could not be verified here.
+
+The listener's own state opens a SEPARATE `Connection` to the same encrypted
+database file (axum's `State` extractor needs `'static` + `Clone`, which
+Tauri's own managed `State<'_, Mutex<Connection>>` cannot satisfy, since its
+lifetime is tied to the invoking command) — safe under this app's existing
+WAL mode, which was already enabled specifically so multiple connections to
+the same SQLite file coexist correctly; not a new concurrency risk.
+
+`tokio` promoted from a dev-only to a direct runtime dependency (`net`+`rt`
+features) — `hub_server`'s production code now calls
+`tokio::net::TcpListener` directly, which needs a direct `Cargo.toml` edge,
+not just the transitive one Tauri/axum already provided.

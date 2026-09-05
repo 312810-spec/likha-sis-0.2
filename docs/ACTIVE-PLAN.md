@@ -262,17 +262,50 @@ rate limiting; the CLIENT side of this protocol (nothing yet calls these
 two endpoints from a device — the router only has a server implementation
 and tests so far).
 
-**Exact next implementation slice:** wire `hub_server::router` into
-actual Tauri app startup — resolve the LAN/Tailscale bind address,
-`tauri::async_runtime::spawn` the listener alongside the existing app
-setup, and decide how/when `sync_version_cache` gets written now that a
-real push/pull round trip can happen (on push acceptance, and on pull).
-After that: the actual client-side push/pull loop that drains
-`sync_outbox` and calls these endpoints; wiring an UPDATE (not just
+**Completed next slice (2026-09-05, this session):** wired
+`hub_server::router` into real Tauri app startup —
+`hub_server::maybe_spawn_listener` is called from `lib.rs`'s `setup`
+hook. Gated the same way the client-side write path already was
+(`commands::learner`): new `hub_server::should_listen` starts the
+listener only if this installation has ever enrolled a device for some
+school (`device_credential::has_active_for_school`, checked across every
+school `school::list_all` returns) — a plain, never-enrolled installation's
+startup is completely unaffected, no new socket, no new attack surface.
+A bind failure (e.g. the port already in use) is logged, never fatal —
+sync must never be able to crash app startup.
+
+**Deliberately scoped down rather than half-verified**: the listener
+binds **loopback only** (`127.0.0.1:7878`), not a real LAN or Tailscale
+interface. Resolving the actual bind interface (never `0.0.0.0`, per
+ADR-0067's own operations gate) needs either a new interface-enumeration
+dependency or a documented manual-configuration decision, plus native
+Windows network verification this sandboxed development environment
+cannot perform — recorded as the honest boundary of this slice rather
+than guessed at. The listener's own state (a second `Connection` to the
+same encrypted database file, opened specifically because axum's `State`
+extractor needs `'static`+`Clone`, which Tauri's own managed
+`State<'_, Mutex<Connection>>` can't satisfy) is safe under WAL mode,
+already enabled specifically for multi-connection coexistence.
+
+3 new `should_listen` tests (false before enrollment, true after, false
+again once the only credential is revoked). `cargo test`: 762 lib tests +
+all integration binaries, 0 failed; `cargo clippy -D warnings` and
+`cargo fmt --check` clean; `npm run quality:security` clean (promoting
+`tokio` from a dev-only to a direct runtime dependency, for
+`tokio::net::TcpListener`, added no new advisories).
+
+**Exact next implementation slice:** resolve the actual LAN/Tailscale
+bind interface (research needed: an interface-enumeration crate, or a
+documented manual-configuration path) and get native Windows network
+verification — this is what actually makes the hub reachable from
+another device; loopback alone proves the wiring but not reachability.
+In parallel/after: the client-side push/pull loop that drains
+`sync_outbox` and calls these two endpoints from a device; deciding
+how/when `sync_version_cache` gets written now that a real round trip is
+possible (on push acceptance, and on pull); wiring an UPDATE (not just
 create) domain write (needs `sync_version_cache::known_version` for a
-real `base_version`, unlike this slice's always-0 create case); SF1
-import's own sync wiring; conflict-review UI/resolution workflow; the
-Android client.
+real `base_version`); SF1 import's own sync wiring; conflict-review
+UI/resolution workflow; the Android client.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
 

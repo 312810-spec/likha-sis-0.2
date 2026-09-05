@@ -43,6 +43,17 @@ pub fn run() {
             app.manage(Mutex::new(conn));
             app.manage(auth::SessionManager::new());
 
+            // ADR-0067 network listener: only starts if this installation
+            // has ever enrolled a device for some school (see
+            // `hub_server::should_listen`'s own doc comment) -- a no-op,
+            // not a startup failure, for a plain non-syncing installation.
+            // Bind failures are logged, not fatal -- see
+            // `hub_server::spawn`'s own doc comment for why sync must
+            // never be able to crash app startup.
+            if let Err(error) = hub_server::maybe_spawn_listener(app.handle()) {
+                log::error!("hub sync listener setup failed: {error}");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
