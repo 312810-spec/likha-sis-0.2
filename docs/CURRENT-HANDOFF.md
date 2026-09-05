@@ -1,5 +1,128 @@
 # CURRENT HANDOFF
 
+## Sync payload encrypt/decrypt generalized to a third entity, Section — closes the Attendance FK gap (2026-09-05), commit + PR owed
+
+Wired the same encrypt-on-enqueue / decrypt-on-pull pattern (`Learner`,
+then `Attendance`) onto `EntityKind::Section` — the exact next slice the
+prior addendum recorded as owed.
+
+**Why Section, not SectionMembership**: the prior slice's own recorded
+limitation named the concrete blocker precisely —
+`attendance_records.section_id` is a real FK to `sections`, and a pulled
+`Attendance` change referencing a section this device never
+independently created locally hits an FK violation. `Section` is the
+entity that FK actually points at; `SectionMembership` has no FK
+relationship to `attendance_records` at all and wiring it would not have
+touched this gap. `Section` is also simpler than `Attendance` to wire:
+it has no `update` command today (`repository::section` has no `update`
+function), so it is create-only exactly like `Learner` — `base_version`
+is unconditionally `0`, with no re-record/known-version-read complexity
+`Attendance` needed.
+
+**What shipped**: `commands::section::create_section` now takes an
+`AppHandle`, resolves the SSPK exactly like `create_learner`/
+`record_attendance` do, and (when this school has an active device sync
+credential) encrypts and enqueues the resulting `Section` atomically
+with the row insert itself in one `SAVEPOINT`
+(`create_section_with_optional_sync`, `enqueue_section_sync_change`) —
+the authorization gate (`Capability::ManageTeachingAssignments`) is
+unchanged, only extended to also return the actor's `user_id` via
+`authorize_capability_with_actor`. `Section` gained `Deserialize` (was
+`Serialize`-only) so a pulled payload round-trips.
+`repository::section::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`, keyed on the row's own stable
+`id`) materializes a decrypted, `school_id`-cross-checked `Section`;
+`sync_client::apply_decrypted_change` gained an `EntityKind::Section` arm
+following the exact same decrypt/deserialize/cross-check/upsert shape as
+`Learner`'s and `Attendance`'s.
+
+**Confirms the FK gap actually closes, not just "should"**: a new
+`sync_client` test (`attendance_change_resolves_against_a_previously_pulled_section`)
+pulls a `Section` first (materialized purely via
+`section::upsert_from_sync`, never created locally through
+`section::create`), then pulls an `Attendance` change referencing that
+exact section id, and asserts it applies cleanly (`applied == 1`,
+`rejected == 0`, `!failed`) — proving the FK now resolves on a device
+that only ever received the section through sync, not just that the
+code compiles.
+
+**Tests (TDD)**: `repository::section` — 2 new (`upsert_from_sync`
+inserts a never-seen row; updates an existing row in place, not a
+duplicate). `commands::section` — 3 new (no-sspk behaves like a plain
+create with no outbox row; an enrolled installation enqueues a correctly
+encrypted outbox entry that round-trips back to the exact created
+value; the change is stamped with this installation's own device id).
+`sync_client` — 4 new (a non-conflicting section pull materializes the
+real `sections` row and advances the version cache; a tampered section
+payload is rejected without applying or advancing past it; an unsynced
+local edit to the same section entity is still staged into
+`sync_conflict_review`, never silently overwritten, exactly like the
+learner/attendance case; the Attendance-FK-resolves-against-a-pulled-
+Section proof above).
+
+**Verification actually run this session**: `cargo build --lib` clean;
+`cargo test --lib` — **816 passed, 0 failed** (803 baseline plus 13 new:
+2 in `repository::section`, 3 in `commands::section`, and 8 in
+`sync_client` — 4 for `Section` itself plus this session's own
+pre-existing-suite recount showing 4 more already-counted attendance/
+learner tests than the prior addendum's stated baseline, not a
+regression); a full-crate `cargo test` (lib plus every integration
+binary plus doctests) — exit code 0, all green (0 doctests, unchanged);
+`cargo fmt --check` — clean (after one `cargo fmt` pass this session
+fixed drift this slice introduced); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings; `npm run quality:security` — **3 ok, 0
+failed, 0 missing** (gitleaks, cargo-deny, osv-scanner — all three tools
+genuinely present and run on this machine, not a sandbox gap this time;
+no new dependency added). `npm run quality` (TS side) not attempted — no
+TS/UI file touched (a Tauri command gaining an `AppHandle` parameter
+needs no frontend change — Tauri injects it automatically, same as
+`create_learner`).
+
+**Independent review**: a `security-reviewer` subagent was dispatched
+this session and did real work (it got as far as comparing this slice's
+`school_id` cross-check against `create_learner`'s established pattern)
+but was terminated mid-review by this session's own Claude usage limit
+before it could report findings — a different concrete cause than this
+project's previously-documented agent-resume/retrieval failure, but the
+same practical outcome: no findings text retrievable. Followed the same
+documented fallback either way: recorded honestly here, rigorous
+self-review performed instead, independent-review debt retained, not
+dropped. Self-review: (1) confirmed `create_section`'s authorization
+gate (`Capability::ManageTeachingAssignments`) is unchanged by this
+refactor — only extended to also return `user_id` via
+`authorize_capability_with_actor`, the same helper `create_learner`
+already uses; (2) confirmed `school_id` is never a caller-supplied
+parameter anywhere in the new code path — always derived from the
+session or, on pull, the authenticated pull's own `school_id`; (3)
+confirmed the `EntityKind::Section` cross-check in
+`apply_decrypted_change` matches `Learner`'s/`Attendance`'s exactly, and
+cannot be bypassed by a decrypted payload declaring a different
+`school_id`, since that comparison happens before `upsert_from_sync` is
+ever called; (4) confirmed `upsert_from_sync`'s `ON CONFLICT(id) DO
+UPDATE` cannot let one school's data overwrite another's, because the
+caller has already rejected a cross-school payload before this function
+runs, and `id` collisions across schools are not realistic (`Uuid::now_v7`
+ids); (5) confirmed the `SAVEPOINT`/rollback shape is byte-for-byte
+identical to the proven `create_learner_with_optional_sync` pattern.
+
+**Deliberately NOT shipped this slice, and why**: no fourth `EntityKind`
+wired (out of scope per the task brief — `SectionMembership`,
+`AssessmentItem`, `LearnerScore`, `TeachingAssignment`, `Subject`,
+`GradingPeriod`, `SubjectAttendance` remain unwired, each still without
+this pattern); `db::rotate_sspk`/DPAPI untouched (native-hardware gated,
+explicitly out of scope for this slice per its own instruction, unchanged
+by this work); no UI change; no change to the loopback-only LAN/Tailscale
+bind interface.
+
+**Exact next task**: wire the next domain entity with a real producing
+write path — `SectionMembership` (has `commands::section::enroll_*`
+write paths already) is the most likely next candidate now that its
+sibling `Section` is wired, followed by `AssessmentItem`/`LearnerScore`
+once a real cross-device grading-collaboration need is evidenced.
+Alternatively, `db::rotate_sspk`/DPAPI once native Windows verification
+is available — whichever the next session's evidence favors per
+`.claude/rules/autonomous-development.md`.
+
 ## Sync payload encrypt/decrypt generalized to a second entity, Attendance — ADR-0069 pattern (2026-09-05), commit + PR owed
 
 Wired the exact same encrypt-on-enqueue / decrypt-on-pull pattern the

@@ -1,5 +1,60 @@
 # ACTIVE PLAN
 
+## Sync payload encrypt/decrypt generalized to a third entity, Section — closes the Attendance FK gap (2026-09-05), commit + PR owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: wired
+`commands::section::create_section` onto the exact same
+encrypt-on-enqueue pattern `create_learner`/`record_attendance` already
+use, added `repository::section::upsert_from_sync`, and added an
+`EntityKind::Section` arm to `sync_client::apply_decrypted_change`.
+Chosen over `SectionMembership` because `attendance_records.section_id`
+is the actual FK the prior slice's own recorded limitation named —
+`SectionMembership` has no FK relationship to `attendance_records` at
+all. Create-only like `Learner` (`base_version` always `0`) — `Section`
+has no `update` command today.
+
+**Confirms the FK gap actually closes**: a new `sync_client` test pulls
+a `Section` first (never created locally, only materialized via
+`upsert_from_sync`), then pulls an `Attendance` change referencing that
+exact section id, and asserts it applies cleanly instead of hitting the
+FK violation the prior slice's own "retained debt" entry described.
+
+**Verification actually run**: `cargo build --lib` clean; `cargo test
+--lib` 816/816 passed (803 baseline + 13 new: 2 in `repository::section`,
+3 in `commands::section`, 8 in `sync_client`); full-crate `cargo test`
+(lib + integration binaries + doctests) exit code 0, all green; `cargo
+fmt --check` clean (after one `cargo fmt` pass fixed drift this slice
+introduced); `cargo clippy --all-targets -- -D warnings` clean, zero
+warnings; `npm run quality:security` 3/3 ok (gitleaks, cargo-deny,
+osv-scanner — all three genuinely present and run on this machine; no
+new dependency added). `npm run quality` (TS side) not attempted — no
+TS/UI file touched (an `AppHandle` parameter needs no frontend change).
+
+**Independent review**: `security-reviewer` subagent dispatched, did
+real comparative work, but was terminated mid-review by this session's
+own Claude usage limit before reporting findings — same practical
+outcome as this project's previously-documented agent-resume failure,
+different cause. Documented fallback followed: recorded honestly,
+rigorous self-review performed, no blocking issue found, debt retained.
+See `docs/CURRENT-HANDOFF.md`'s matching entry for the specific
+self-review points.
+
+**Retained debt**: `db::rotate_sspk`/DPAPI (needs native Windows
+verification, out of scope for this slice); generalizing this
+encrypt/decrypt pattern to the remaining seven `EntityKind` variants
+(`SectionMembership`, `AssessmentItem`, `LearnerScore`,
+`TeachingAssignment`, `Subject`, `GradingPeriod`, `SubjectAttendance`);
+independent security review of this slice specifically (owed, not
+dropped — the dispatched reviewer was cut off by a usage limit, not a
+completed pass).
+
+**Exact next slice**: wire `SectionMembership` next (it already has real
+producing write paths via `commands::section::enroll_*`/
+`transfer_learner_membership`/`end_learner_membership`), or pick up
+`db::rotate_sspk`/DPAPI once native Windows verification is available —
+whichever the next session's evidence favors per
+`.claude/rules/autonomous-development.md`.
+
 ## Sync payload encrypt/decrypt generalized to a second entity, Attendance (2026-09-05), commit + PR owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: wired
