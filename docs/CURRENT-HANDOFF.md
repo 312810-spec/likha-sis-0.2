@@ -1,5 +1,124 @@
 # CURRENT HANDOFF
 
+## Sync-status screen shipped (2026-09-05), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`, worked in a parallel
+worktree. Closes ADR-0067's "still required before production PII" list
+item named "sync status UI" — the last of the three sync UI surfaces
+that list called out (device-management and conflict-review already
+shipped, both above). A teacher/ICT coordinator can now see, in plain
+language: whether THIS device is enrolled for sync, roughly how
+up to date it is, how many of its own changes are still waiting to
+send, and whether any sync conflicts need a decision — with a link to
+the existing `ConflictReviewScreen` rather than a second conflict UI.
+
+- **Read-only, no new write path.** `commands::sync_status::get_sync_status`
+  (new module) composes four already-tested reads, session-scoped
+  (`require_active_school_scope`, never a client-supplied `school_id`):
+  `device_sync_client_credential::get` (enrollment), two new
+  `sync_pull_cursor`/`sync_outbox` reads (below), and the already-shipped
+  `sync_conflict_review::count_open_for_school`.
+- **What's honestly NOT tracked, and how that's handled rather than
+  invented**: there is no existing "last successful push" or general
+  connectivity-health timestamp anywhere in this codebase, and the task
+  explicitly ruled out touching `sync_client`'s push/pull logic to add
+  one. `sync_pull_cursor.updated_at` only advances when a pull actually
+  applies or stages a change (`sync_client::pull_once`) — an all-quiet
+  successful poll with nothing new doesn't move it. New
+  `sync_pull_cursor::last_pull_at` surfaces this honestly as "last time a
+  change was received," not as a health check — both the Rust doc
+  comment and the screen's copy say so. Similarly, there's no dedicated
+  push-failure flag; new `sync_outbox::has_pending_failure_for_school`
+  derives a "having trouble reaching the sync hub" signal from a fact
+  that's already recorded (`record_attempt`'s `last_error_code` on a
+  still-pending row) rather than inventing new state.
+- **New repository functions** (both with new unit tests):
+  `sync_pull_cursor::last_pull_at` (2 tests) and
+  `sync_outbox::count_pending_for_school` /
+  `has_pending_failure_for_school` (4 tests).
+- **New Tauri command**: `get_sync_status`, wired in `lib.rs`'s
+  `invoke_handler`. 3 command-level tests (never-enrolled school reports
+  nothing but `enrolled: false`; an enrolled school with a failed pending
+  push reports it honestly; status is school-scoped).
+- **Frontend**: full port/service/adapter/screen stack, mirroring
+  `DeviceManagementScreen`/`ConflictReviewScreen`'s established shape —
+  `domain/sync-status.ts`, `domain/ports/sync-status-repository.ts`,
+  `infrastructure/tauri/sync-status-repository.ts`,
+  `application/sync-status-service.ts` (+ test), `ui/SyncStatusScreen.tsx`
+  (+ test, including `expectNoAccessibilityViolations`). Wired into
+  `App.tsx`/`composition.ts`/`workbench-nav-data.ts` as a new "Sync
+  Status" destination in the existing "Sync" nav group (alongside
+  "Review Sync Conflicts"), with an in-screen "Review conflicts" button
+  that navigates there when conflicts exist.
+- **Copy is plain-language, not a technical dashboard**: no raw cursor
+  numbers, error codes, or ISO timestamps shown directly — "Last
+  synced"/"changes waiting to sync"/"conflicts need your review," per
+  the task's own instruction. A relative-time formatter ("2 minutes
+  ago") is used for the recent past, falling back to a plain local
+  date/time otherwise.
+- **Teacher modes**: all three modes (Efficient/Comfortable/Guided) show
+  identical functional content; Guided additionally shows an explanatory
+  hint paragraph, matching the established convention on the two sibling
+  screens.
+
+**Verification actually run this session**: `cargo fmt --check` clean
+after one auto-fix; targeted new Rust tests (10, all pass:
+`sync_outbox::` 7, `sync_pull_cursor::` 6 counting pre-existing,
+`commands::sync_status::` 3); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings, ran to completion once disk headroom
+allowed it (see below); `npm run quality:security` — gitleaks/cargo
+deny/osv-scanner all clean, no new advisories; `npm run test` (vitest) —
+995/995 passed after fixing one curly-quote assertion mismatch in the
+new screen's own test; `npm run typecheck`/`lint`/`format:check`/
+`check:architecture` — all clean (architecture check explicitly passed:
+no restricted import found). `npm run check:deadcode` (`knip`) shows
+only the pre-existing baseline findings (`@tauri-apps/cli`/`prettier`
+unused-devDependency, unrelated to this slice) already documented
+elsewhere in this file as a standing baseline — no new finding.
+
+**Not run to completion this session: whole-crate `cargo test`.**
+Multiple parallel worktree agents on this same box are building large
+Rust targets concurrently; the shared filesystem repeatedly hit `No
+space left on device` mid-compile (observed directly, `df -h /` at
+~99–100% used more than once during this session, including one
+`rustc-LLVM IO failure` and one `failed to build archive` from disk
+exhaustion, not a code defect). `cargo clippy --all-targets -- -D
+warnings` DID complete clean in the same session (it compiles the same
+test targets `cargo test` would) once headroom briefly existed, and
+every targeted test for the actual new code passed. This is disclosed
+as environment-resource verification debt, not silently claimed as
+covered — see `docs/VERIFICATION-DEBT.md`'s matching new entry.
+
+**Independent review**: no subagent-dispatch tool was reachable this
+session (the same recurring gap `docs/VERIFICATION-DEBT.md` already
+records for the device-management and conflict-review slices). Did a
+rigorous self-review instead, per the documented fallback: confirmed no
+new write path exists anywhere in this slice; confirmed `school_id` is
+never client-supplied on `get_sync_status`; confirmed no raw
+error-code/cursor value is ever serialized to the frontend; confirmed
+the a11y structural test passes; confirmed all three teacher modes
+render identical functional content. No blocking issue found. A
+genuinely independent review remains owed — recorded as debt, not
+dropped.
+
+**Visual verification gap** (disclosed, not new): this sandboxed
+environment has no browser/screenshot tool for the compiled native
+Tauri binary, matching every prior UI slice's own disclosed limitation.
+Automated `axe-core` structural results are not a substitute for a
+human/screen-reader pass.
+
+**Batch mode**: implemented and committed LOCALLY only, per this
+session's explicit batch-implement instruction — deliberately NOT
+pushed. The orchestrating session pushes and opens/updates the PR once
+every parallel task in the batch is done.
+
+**Exact next slice** (recorded, not implemented): the device-management
+screen's own disclosed gap — "keep local" not correcting the stale
+outbox `base_version` after a conflict resolution (see this file's
+"Conflict-review screen shipped" entry above, item 3) — remains the
+next concrete sync-correctness candidate, now that all three ADR-0067
+"still required before production PII" UI items are shipped.
+
 ## Conflict-review screen shipped (2026-09-05)
 
 **Shipped.** The device-management screen's own "next exact slice" (see

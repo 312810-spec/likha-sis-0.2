@@ -83,6 +83,35 @@ pub fn pending_for_school(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Count of changes still queued (not yet acknowledged by the hub) for
+/// one school -- the sync-status screen's "N changes waiting to sync"
+/// figure. Not bounded by `pending_for_school`'s 100-row page limit;
+/// this is a true `COUNT(*)`.
+pub fn count_pending_for_school(conn: &Connection, school_id: &str) -> AppResult<u64> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sync_outbox WHERE school_id = ?1",
+        [school_id],
+        |row| row.get(0),
+    )?;
+    Ok(count as u64)
+}
+
+/// True if at least one still-pending change for this school recorded a
+/// failed attempt (`last_error_code IS NOT NULL`) -- the sync-status
+/// screen's best-available "having trouble reaching the sync hub"
+/// signal. This is a real, already-recorded fact (`record_attempt`),
+/// not an invented health check: a change that has never been attempted,
+/// or that failed once and then succeeded (which acknowledges and
+/// deletes the row), does not trip this.
+pub fn has_pending_failure_for_school(conn: &Connection, school_id: &str) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE school_id = ?1 AND last_error_code IS NOT NULL)",
+        [school_id],
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
 /// Removes an acknowledged change only within its school boundary. A repeated
 /// acknowledgement is harmless and reports `false`.
 pub fn acknowledge(conn: &Connection, school_id: &str, change_id: &str) -> AppResult<bool> {
@@ -230,6 +259,70 @@ mod tests {
         .unwrap());
         assert!(!acknowledge(&conn, &second.id, &change.change_id.to_string()).unwrap());
         assert_eq!(pending_for_school(&conn, &first.id, 100).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn count_pending_for_school_counts_only_that_schools_queued_changes() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let first = school::create(&conn, "First School").unwrap();
+        let second = school::create(&conn, "Second School").unwrap();
+        enqueue(&conn, &first.id, &change()).unwrap();
+        enqueue(&conn, &first.id, &change()).unwrap();
+        enqueue(&conn, &second.id, &change()).unwrap();
+
+        assert_eq!(count_pending_for_school(&conn, &first.id).unwrap(), 2);
+        assert_eq!(count_pending_for_school(&conn, &second.id).unwrap(), 1);
+    }
+
+    #[test]
+    fn count_pending_for_school_drops_to_zero_once_acknowledged() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let change = change();
+        enqueue(&conn, &school.id, &change).unwrap();
+
+        acknowledge(&conn, &school.id, &change.change_id.to_string()).unwrap();
+
+        assert_eq!(count_pending_for_school(&conn, &school.id).unwrap(), 0);
+    }
+
+    #[test]
+    fn has_pending_failure_for_school_is_false_until_an_attempt_records_an_error() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let change = change();
+        enqueue(&conn, &school.id, &change).unwrap();
+
+        assert!(!has_pending_failure_for_school(&conn, &school.id).unwrap());
+
+        record_attempt(
+            &conn,
+            &school.id,
+            &change.change_id.to_string(),
+            Some(AttemptErrorCode::HubUnavailable),
+        )
+        .unwrap();
+
+        assert!(has_pending_failure_for_school(&conn, &school.id).unwrap());
+    }
+
+    #[test]
+    fn has_pending_failure_for_school_is_false_once_the_failing_change_is_acknowledged() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let change = change();
+        enqueue(&conn, &school.id, &change).unwrap();
+        record_attempt(
+            &conn,
+            &school.id,
+            &change.change_id.to_string(),
+            Some(AttemptErrorCode::Timeout),
+        )
+        .unwrap();
+
+        acknowledge(&conn, &school.id, &change.change_id.to_string()).unwrap();
+
+        assert!(!has_pending_failure_for_school(&conn, &school.id).unwrap());
     }
 
     #[test]

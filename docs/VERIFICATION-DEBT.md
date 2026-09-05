@@ -1,5 +1,36 @@
 # Verification Debt
 
+## Sync-status screen (2026-09-05) — independent review, native accessibility pass, and a whole-crate `cargo test` re-run owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/SyncStatusScreen.tsx` +
+`src-tauri/src/commands/sync_status.rs` + supporting repository/TS
+layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and conflict-review
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked. No blocking issue was found, but a
+   genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Whole-crate `cargo test` did not run to completion this session.**
+   Multiple parallel worktree agents shared this box's filesystem and
+   repeatedly drove it to `No space left on device` mid-compile (`df -h
+/` observed at ~99–100% used more than once) — an environment-resource
+   condition, not a code defect. What DID run clean: every targeted new
+   test (`sync_outbox::`, `sync_pull_cursor::`, `commands::sync_status::`
+   — 10 tests, all passing), and `cargo clippy --all-targets -- -D
+warnings` across the whole workspace including every test target
+   (zero warnings) once brief headroom existed. Re-run plain `cargo
+test` once the shared box has stable free disk space, per
+   `.claude/rules/testing.md`'s own "still run plain `cargo test` at
+   least once" stable-checkpoint requirement.
+
 ## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
