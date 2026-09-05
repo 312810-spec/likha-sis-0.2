@@ -109,6 +109,50 @@ pub fn record_attempt(
     )? == 1)
 }
 
+/// Corrects a still-pending outbox row's `base_version` after a teacher
+/// resolves a pull-side conflict by keeping this device's own local edit
+/// (`ConflictResolution::KeptLocal` in `sync_conflict_review`). That
+/// resolution clears the conflict-review row but, on its own, leaves this
+/// device's pending push for the same entity still carrying whatever
+/// `base_version` it was originally enqueued with -- which is now stale,
+/// since the hub-side version has since advanced to `new_base_version`
+/// (the `current_hub_version` recorded when the conflict was staged). Left
+/// uncorrected, the NEXT push attempt for this entity would still submit
+/// the old `base_version`, and `sync_hub::push_change` would treat it as
+/// stale and re-stage the very conflict this resolution was meant to
+/// close.
+///
+/// Scoped to `school_id` + `entity_kind` + `entity_id` rather than
+/// `change_id`, because the outbox row this must correct is this DEVICE's
+/// own still-pending push for the entity -- an entirely different
+/// `change_id` from the pulled change that was staged as a conflict (see
+/// `sync_conflict_review::stage_pull_conflict`'s own doc comment: the
+/// conflict row never touches the domain table or this device's own
+/// queued push). A no-op (returns `0`) when there is no matching pending
+/// row -- e.g. this device's own push already went through, or it never
+/// had one queued for this entity -- which is a normal, harmless case,
+/// not an error.
+pub fn correct_base_version_for_entity(
+    conn: &Connection,
+    school_id: &str,
+    entity_kind: EntityKind,
+    entity_id: &str,
+    new_base_version: u64,
+) -> AppResult<u64> {
+    let updated = conn.execute(
+        "UPDATE sync_outbox
+         SET base_version = ?1
+         WHERE school_id = ?2 AND entity_kind = ?3 AND entity_id = ?4",
+        (
+            new_base_version as i64,
+            school_id,
+            entity_kind.as_db_str(),
+            entity_id,
+        ),
+    )?;
+    Ok(updated as u64)
+}
+
 fn attempt_error_str(error: AttemptErrorCode) -> &'static str {
     match error {
         AttemptErrorCode::Offline => "offline",
@@ -257,5 +301,66 @@ mod tests {
         assert!(pending_for_school(&conn, &school.id, 100)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn correct_base_version_for_entity_updates_the_matching_pending_row() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let change = change();
+        enqueue(&conn, &school.id, &change).unwrap();
+
+        let updated = correct_base_version_for_entity(
+            &conn,
+            &school.id,
+            change.entity_kind,
+            &change.entity_id.to_string(),
+            7,
+        )
+        .unwrap();
+
+        assert_eq!(updated, 1);
+        let entries = pending_for_school(&conn, &school.id, 20).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].change.base_version, 7);
+    }
+
+    #[test]
+    fn correct_base_version_for_entity_is_a_harmless_no_op_when_nothing_is_pending() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+
+        let updated = correct_base_version_for_entity(
+            &conn,
+            &school.id,
+            EntityKind::Learner,
+            &Uuid::now_v7().to_string(),
+            7,
+        )
+        .unwrap();
+
+        assert_eq!(updated, 0);
+    }
+
+    #[test]
+    fn correct_base_version_for_entity_is_school_scoped() {
+        let conn = db::open(Path::new(":memory:"), &crypto::generate_key()).unwrap();
+        let first = school::create(&conn, "First School").unwrap();
+        let second = school::create(&conn, "Second School").unwrap();
+        let change = change();
+        enqueue(&conn, &first.id, &change).unwrap();
+
+        let updated = correct_base_version_for_entity(
+            &conn,
+            &second.id,
+            change.entity_kind,
+            &change.entity_id.to_string(),
+            7,
+        )
+        .unwrap();
+
+        assert_eq!(updated, 0);
+        let entries = pending_for_school(&conn, &first.id, 20).unwrap();
+        assert_eq!(entries[0].change.base_version, 0);
     }
 }

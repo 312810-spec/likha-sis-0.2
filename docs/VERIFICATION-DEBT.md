@@ -1,5 +1,28 @@
 # Verification Debt
 
+## Stale outbox `base_version` after "keep local" (2026-09-05) — CLOSED
+
+**Closed.** Item 3 of the conflict-review screen entry below (the
+"keep local" resolution leaving a still-pending `sync_outbox` entry's
+`base_version` stale) is fixed: `resolve_conflict_review`'s `KeepLocal`
+branch now calls the new
+`repository::sync_outbox::correct_base_version_for_entity` before
+`sync_conflict_review::mark_resolved`, advancing the matching pending
+outbox row's `base_version` to `current_hub_version`. Covered by
+`repository::sync_outbox::tests::correct_base_version_for_entity_*`
+(update/no-op/school-scoping) and
+`commands::conflict_review::tests::keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`
+(end-to-end: stale outbox row → resolve keep-local → corrected push is
+`Accepted`, not `ConflictStaged`), plus a regression test
+(`using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`)
+proving the `UseIncoming` path is unaffected. Verified this session:
+`cargo test` (full crate, 845 lib tests + this module's, all passing),
+`cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+(clean), `npm run quality:security` (gitleaks/cargo-deny/osv-scanner,
+all OK). `npm run quality`/`quality:ui` (TS/UI layers) were not touched
+by this fix and were not re-run — this was a pure Rust repository/
+command-layer change.
+
 ## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
@@ -19,20 +42,10 @@ Rust/TS layers):
    performed.** This sandboxed environment has no browser/screenshot
    tool for the compiled app. Automated axe-core results (structural
    only) are not a substitute — see `.claude/rules/testing.md`.
-3. **"Keep local" does not correct the stale outbox `base_version`,
-   disclosed rather than silently accepted as solved.** Choosing "keep
-   local" marks the conflict resolved but does not rewrite this device's
-   still-pending `sync_outbox` entry for the same entity — that entry
-   keeps the `base_version` it originally computed, which is now stale
-   relative to `current_hub_version`. If it pushes again before the
-   hub's version changes further, `repository::sync_hub::push_change`
-   will stage a fresh push-side conflict for the same entity, surfacing
-   back on this same review screen rather than being lost or looping
-   silently — but a teacher choosing "keep local" today may reasonably
-   expect that to be the end of it. Deliberately not fixed this slice:
-   the task's own scope boundary said not to touch `sync_client::pull_once`'s
-   or `push_once`'s staging logic. See `docs/CURRENT-HANDOFF.md`'s "Next
-   exact slice" for the two candidate fixes.
+3. **CLOSED (2026-09-05).** "Keep local" leaving the stale outbox
+   `base_version` uncorrected — see the "Stale outbox `base_version`
+   after 'keep local'" entry at the top of this file for the fix and
+   its verification.
 
 ## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
 

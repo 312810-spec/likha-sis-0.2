@@ -15,7 +15,7 @@ use crate::repository::sync_hub::AcceptedChange;
 use crate::repository::{attendance, learner, section};
 use crate::repository::{
     sync_conflict_review::{self, ConflictResolution, ConflictReviewRow},
-    sync_version_cache,
+    sync_outbox, sync_version_cache,
 };
 use crate::sync::EntityKind;
 use crate::sync_client::{self, SyncClientConfig};
@@ -274,14 +274,17 @@ fn parse_uuid(value: &str, what: &str) -> AppResult<Uuid> {
 /// pull) and advances this device's `sync_version_cache` watermark to
 /// the hub's version, so this entity is no longer treated as behind.
 ///
-/// **Known limitation, disclosed rather than silently swallowed**:
-/// `KeepLocal` does not rewrite this device's still-pending `sync_outbox`
-/// entry's stale `base_version` (out of this slice's scope --
-/// `sync_client::pull_once`'s and `push_once`'s own staging logic are
-/// deliberately untouched). If that entry pushes again before the hub's
-/// version changes further, `sync_hub::push_change` will stage a fresh
-/// push-side conflict for the same entity, surfacing back on this same
-/// screen for another review rather than looping silently or being lost.
+/// `KeepLocal` also corrects this device's own still-pending
+/// `sync_outbox` entry for the same entity, if one exists
+/// (`sync_outbox::correct_base_version_for_entity`): the row's
+/// `base_version` is advanced to `current_hub_version` (the hub-side
+/// version recorded when this conflict was staged), so the NEXT push for
+/// this entity is recognized as building on the latest known hub state.
+/// Without this, the resolution would clear the conflict-review row but
+/// leave the outbox push carrying the same stale `base_version` that
+/// caused the conflict in the first place, letting `sync_hub::push_change`
+/// re-stage the identical conflict on the very next push attempt --
+/// disclosed and closed rather than left as a known limitation.
 #[tauri::command]
 pub fn resolve_conflict_review(
     app: AppHandle,
@@ -300,12 +303,21 @@ pub fn resolve_conflict_review(
     };
 
     match resolution {
-        ConflictResolutionChoice::KeepLocal => sync_conflict_review::mark_resolved(
-            &conn,
-            &school_id,
-            &conflict_id,
-            ConflictResolution::KeptLocal,
-        ),
+        ConflictResolutionChoice::KeepLocal => {
+            sync_outbox::correct_base_version_for_entity(
+                &conn,
+                &school_id,
+                row.entity_kind,
+                &row.entity_id,
+                row.current_hub_version,
+            )?;
+            sync_conflict_review::mark_resolved(
+                &conn,
+                &school_id,
+                &conflict_id,
+                ConflictResolution::KeptLocal,
+            )
+        }
         ConflictResolutionChoice::UseIncoming => {
             // Primary: the same network round trip `pull_once` itself
             // uses to obtain this device's own wrap of the SSPK (works
@@ -365,8 +377,9 @@ pub fn resolve_conflict_review(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{school, sync_conflict_review::stage_pull_conflict};
-    use crate::sync::{ChangeOperation, SyncCursor};
+    use crate::repository::device_credential::VerifiedDevice;
+    use crate::repository::{school, sync_conflict_review::stage_pull_conflict, sync_hub};
+    use crate::sync::{ChangeOperation, PendingChange, SyncCursor};
     use std::path::Path;
 
     fn open_test_db() -> Connection {
@@ -566,6 +579,173 @@ mod tests {
         assert_eq!(
             sync_conflict_review::count_open_for_school(&conn, &s.id).unwrap(),
             0
+        );
+    }
+
+    /// Reproduces the exact gap this task closes: after "keep local", this
+    /// device's own still-pending `sync_outbox` push for the same entity
+    /// must carry the hub's current version as its `base_version`, so the
+    /// NEXT push is accepted rather than re-staged as another conflict.
+    /// Exercises the same composition `resolve_conflict_review`'s
+    /// `KeepLocal` branch performs (`correct_base_version_for_entity` then
+    /// `mark_resolved`), matching this module's established test
+    /// convention for command bodies that wrap already-tested logic.
+    #[test]
+    fn keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let entity_id = Uuid::now_v7();
+
+        let verified = VerifiedDevice {
+            credential_id: "cred-1".to_string(),
+            school_id: s.id.clone(),
+            user_id: Uuid::now_v7().to_string(),
+            device_id: Uuid::now_v7().to_string(),
+        };
+
+        // The hub already has one accepted change for this entity (version 1).
+        let first = PendingChange {
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::parse_str(&verified.device_id).unwrap(),
+            actor_user_id: Uuid::parse_str(&verified.user_id).unwrap(),
+            entity_kind: EntityKind::Learner,
+            entity_id,
+            base_version: 0,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![1, 2, 3],
+        };
+        assert_eq!(
+            sync_hub::push_change(&conn, &verified, &first).unwrap(),
+            sync_hub::PushOutcome::Accepted(SyncCursor(1))
+        );
+
+        // This device's own still-pending outbox push for the same entity
+        // was enqueued back when the hub was at version 0 -- now stale.
+        let outbox_change = PendingChange {
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::parse_str(&verified.device_id).unwrap(),
+            actor_user_id: Uuid::parse_str(&verified.user_id).unwrap(),
+            entity_kind: EntityKind::Learner,
+            entity_id,
+            base_version: 0,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![4, 5, 6],
+        };
+        sync_outbox::enqueue(&conn, &s.id, &outbox_change).unwrap();
+
+        // A conflict is staged for this entity at current_hub_version = 1.
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::Learner,
+            entity_id,
+            version: 1,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![7, 8, 9],
+        };
+        stage_pull_conflict(&conn, &s.id, 0, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        // The exact composition `resolve_conflict_review`'s `KeepLocal`
+        // branch performs.
+        sync_outbox::correct_base_version_for_entity(
+            &conn,
+            &s.id,
+            row.entity_kind,
+            &row.entity_id,
+            row.current_hub_version,
+        )
+        .unwrap();
+        assert!(sync_conflict_review::mark_resolved(
+            &conn,
+            &s.id,
+            &row.id,
+            ConflictResolution::KeptLocal,
+        )
+        .unwrap());
+
+        // The corrected outbox entry now carries the hub's current version.
+        let pending = sync_outbox::pending_for_school(&conn, &s.id, 20).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].change.base_version, 1);
+
+        // Pushing it now is accepted, not re-staged as a conflict.
+        let mut resend = pending[0].change.clone();
+        resend.device_id = Uuid::parse_str(&verified.device_id).unwrap();
+        resend.actor_user_id = Uuid::parse_str(&verified.user_id).unwrap();
+        let outcome = sync_hub::push_change(&conn, &verified, &resend).unwrap();
+        assert_eq!(outcome, sync_hub::PushOutcome::Accepted(SyncCursor(2)));
+    }
+
+    /// Regression: the "use incoming" path must not touch an unrelated
+    /// pending outbox entry for the same entity -- only `KeepLocal`
+    /// corrects `base_version`, since `UseIncoming` already advances this
+    /// device's applied state via `sync_version_cache`, and the pending
+    /// outbox push is a separate, still-unsynced edit this task's scope
+    /// does not touch.
+    #[test]
+    fn using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let local = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
+        let sspk = test_sspk();
+        let incoming = learner::Learner {
+            given_name: "Anna".to_string(),
+            ..local.clone()
+        };
+        let row = stage_learner_conflict(&conn, &s.id, &incoming, &sspk);
+
+        let outbox_change = PendingChange {
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::Learner,
+            entity_id: Uuid::parse_str(&local.id).unwrap(),
+            base_version: 0,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![9, 9, 9],
+        };
+        sync_outbox::enqueue(&conn, &s.id, &outbox_change).unwrap();
+
+        let change = AcceptedChange {
+            cursor: SyncCursor(0),
+            change_id: parse_uuid(&row.change_id, "change id").unwrap(),
+            device_id: parse_uuid(&row.device_id, "device id").unwrap(),
+            actor_user_id: parse_uuid(&row.actor_user_id, "actor id").unwrap(),
+            entity_kind: row.entity_kind,
+            entity_id: parse_uuid(&row.entity_id, "entity id").unwrap(),
+            version: row.current_hub_version,
+            operation: row.operation,
+            encrypted_payload: row.encrypted_payload.clone(),
+        };
+        sync_client::apply_decrypted_change(&conn, &s.id, &change, &sspk).unwrap();
+        sync_version_cache::record_known_version(
+            &conn,
+            &s.id,
+            row.entity_kind,
+            &row.entity_id,
+            row.current_hub_version,
+        )
+        .unwrap();
+        sync_conflict_review::mark_resolved(
+            &conn,
+            &s.id,
+            &row.id,
+            ConflictResolution::UsedIncoming,
+        )
+        .unwrap();
+
+        let pending = sync_outbox::pending_for_school(&conn, &s.id, 20).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(
+            pending[0].change.base_version, 0,
+            "UseIncoming must not touch an unrelated pending outbox entry's base_version"
         );
     }
 }

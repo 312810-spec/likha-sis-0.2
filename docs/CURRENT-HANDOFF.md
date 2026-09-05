@@ -1,5 +1,83 @@
 # CURRENT HANDOFF
 
+## Stale outbox `base_version` after "keep local" fixed (2026-09-05)
+
+**Closed.** The conflict-review screen entry below disclosed a real gap:
+choosing "keep local" cleared the `sync_conflict_review` row but left this
+device's own still-pending `sync_outbox` push for the same entity
+carrying whatever `base_version` it was originally enqueued with — now
+stale relative to `current_hub_version`. The NEXT push for that entity
+would still submit the old `base_version`, and
+`repository::sync_hub::push_change` would treat it as stale and re-stage
+the very conflict the resolution was meant to close.
+
+- **Root cause, confirmed by reading both state machines before
+  changing anything**: `sync_conflict_review::mark_resolved` only ever
+  touches the `sync_conflict_review` table; nothing in the "keep local"
+  path ever wrote back to `sync_outbox`. `sync_outbox`'s own state
+  machine (`enqueue`/`acknowledge`/`record_attempt`) never re-derives
+  `base_version` after it is first enqueued either — it is set once, at
+  `enqueue` time, and otherwise immutable until the row is deleted by
+  `acknowledge`.
+- **Fix, scoped to exactly the call path named in the task**: a new
+  `repository::sync_outbox::correct_base_version_for_entity(conn,
+school_id, entity_kind, entity_id, new_base_version)` — school-scoped,
+  keyed by `entity_kind` + `entity_id` (not `change_id`, since the
+  outbox row it must correct is this device's own separate pending push,
+  a different `change_id` from the pulled change that was staged as a
+  conflict), a harmless no-op when nothing is pending for that entity.
+  `commands::conflict_review::resolve_conflict_review`'s `KeepLocal`
+  branch now calls it with `row.current_hub_version` immediately before
+  `sync_conflict_review::mark_resolved`. No change to `sync_outbox`'s or
+  `sync_conflict_review`'s general state machine, no UI change, no other
+  `EntityKind` wiring touched — matching the task's explicit
+  out-of-scope list.
+- **Tests added (TDD)**: `repository::sync_outbox::tests::correct_base_version_for_entity_updates_the_matching_pending_row`,
+  `..._is_a_harmless_no_op_when_nothing_is_pending`,
+  `..._is_school_scoped`; and in `commands::conflict_review::tests`,
+  `keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`
+  (end-to-end: stage a hub state at version 1, enqueue a stale
+  `base_version = 0` outbox row, stage+resolve the conflict as
+  `KeepLocal`, then push the corrected outbox row through
+  `sync_hub::push_change` and assert `Accepted`, not `ConflictStaged`)
+  and a regression test,
+  `using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`,
+  proving the `UseIncoming` path is unaffected. All pre-existing
+  conflict-review tests pass unmodified.
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 845 lib tests passing, 0 failed, including the new
+  ones (also re-run filtered to `conflict_review::tests`: 16 passed).
+  `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+  `cargo fmt --check` — clean, no drift. `npm run quality:security` —
+  gitleaks/`cargo deny check`/OSV-Scanner all OK (3 ok, 0 failed, 0
+  missing). `npm run quality`/`quality:ui` (TS/UI layers) were not
+  re-run — this fix touched only the Rust repository and command
+  layers, no TS/UI files.
+- **A real environment hazard hit and resolved this session**: the host
+  disk was completely full (0 bytes free) partway through this task,
+  failing `cargo test`/`clippy` with linker I/O errors. Resolved by
+  `cargo clean` on this worktree's own `src-tauri/target` (freed ~8.4
+  GiB, none of it shared with the other active worktree or the main
+  checkout) — not a code or config change, recorded here only because a
+  future session hitting the same "No space left on device" error on
+  this host should know `cargo clean` in its own worktree is the known
+  fix, not a sign of a real build regression.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new "CLOSED" entry replacing
+  item 3 of the conflict-review screen's owed-debt list, which now
+  points here).
+
+**Next exact slice**: the two other items disclosed by the
+conflict-review screen entry below remain genuinely owed and are next
+in priority order — (1) the independent `teacher-ux-reviewer`/
+`accessibility-reviewer` review of `src/ui/ConflictReviewScreen.tsx`
+that no subagent-dispatch tool could reach this session, and (2) a
+native NVDA/Narrator pass on the compiled Tauri binary (no
+browser/screenshot tool in this sandboxed environment). Neither blocks
+further correctness work; both are tracked in
+`docs/VERIFICATION-DEBT.md`. No other push-side/pull-side sync
+correctness gap is currently known.
+
 ## Conflict-review screen shipped (2026-09-05)
 
 **Shipped.** The device-management screen's own "next exact slice" (see

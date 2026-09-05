@@ -1,5 +1,37 @@
 # ACTIVE PLAN
 
+## Stale outbox `base_version` after "keep local" fix (2026-09-05)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: `repository::sync_outbox::correct_base_version_for_entity`
+(new, school-scoped, keyed by `entity_kind`+`entity_id`) is called from
+`commands::conflict_review::resolve_conflict_review`'s `KeepLocal`
+branch immediately before `sync_conflict_review::mark_resolved`,
+advancing a matching still-pending outbox row's `base_version` to
+`current_hub_version`. No change to either state machine's general
+shape; no UI change.
+
+Verification actually run this session:
+
+- `cargo test` (full crate, plain `cargo test`, not nextest) — 845 lib
+  tests, 0 failed. New tests: `repository::sync_outbox::tests::correct_base_version_for_entity_updates_the_matching_pending_row`,
+  `..._is_a_harmless_no_op_when_nothing_is_pending`, `..._is_school_scoped`;
+  `commands::conflict_review::tests::keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`,
+  `..._using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`.
+- `cargo clippy --all-targets -- -D warnings` — clean.
+- `cargo fmt --check` — clean.
+- `npm run quality:security` — gitleaks + `cargo deny check` + OSV-Scanner,
+  3 ok / 0 failed / 0 missing.
+- Not re-run: `npm run quality` / `quality:ui` — no TS/UI files were
+  touched by this fix.
+
+Environment note: the host disk was at 0 bytes free partway through this
+session (`No space left on device` linker errors on `cargo test`).
+Resolved with `cargo clean` scoped to this worktree's own
+`src-tauri/target` (freed ~8.4 GiB). Not a code change; recorded so a
+future session sees the known fix rather than assuming a build
+regression.
+
 ## Conflict-review screen (2026-09-05)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
