@@ -1,6 +1,41 @@
 # CURRENT HANDOFF
 
-## ADR-0069 addendum: hub SSPK persistence + real enrollment wiring (2026-09-05), commit + PR owed
+## Per-device sync version cache (2026-09-05), commit + PR owed
+
+Branch `fix/sspk-hub-persistence-and-enrollment-wiring` continued (or a
+fresh branch cut from `main` after PR #47 merged — see git history for
+which). The remaining prerequisite the SSPK-wiring entry below flagged
+before a real domain write can be wired: this device's own local record
+of "what hub version did I last see for this entity."
+
+**What shipped**: migration 33 (`sync_version_cache`,
+`PRIMARY KEY (school_id, entity_kind, entity_id)`) and
+`repository::sync_version_cache::known_version`/`record_known_version`.
+`known_version` defaults to `0` for an entity never recorded (matching
+`PendingChange::base_version`'s own "nothing to conflict against yet"
+convention); `record_known_version` is a monotonic upsert
+(`known_version = MAX(known_version, excluded.known_version)`) so a
+stale, out-of-order ack or pull can never regress what this device
+already knows. Distinct from `sync_hub_log.version` — that is the hub's
+own authoritative record of every device's history; this is only ever
+one device's own cached slice of it.
+
+**Verification**: 6 new tests (school-scoped and entity-kind-scoped
+isolation included) plus a migration contract test. `cargo test`: 744 lib
+tests + all integration binaries, 0 failed; `cargo clippy -D warnings`
+and `cargo fmt --check` clean; `npm run quality` — checked directly
+against the command's own output before claiming success (this file has
+twice now recorded a background run's misleading "exit 0" summary that
+disagreed with a real Prettier failure in its own visible output).
+
+**Not yet done**: commit; push; PR (targets `main`). Still not called by
+any domain write, or by the (still nonexistent) push/pull orchestration
+loop that would update it after a real network round trip — persistence
+primitive only, matching this project's zero-UI-first precedent. See
+`docs/ACTIVE-PLAN.md`'s top-of-thread entry for the exact next slice this
+unblocks: wiring one real domain write end-to-end.
+
+## ADR-0069 addendum: hub SSPK persistence + real enrollment wiring (2026-09-05), merged (PR #47)
 
 Branch `fix/sspk-hub-persistence-and-enrollment-wiring`, cut from `main`
 after PR #46 merged. Executed as the "exact next action" from a status
@@ -45,11 +80,11 @@ Prettier failure (same class of issue already noted twice earlier in this
 file — the background-task exit-code summary for this command is not
 reliable on its own and must be checked against its actual output).
 
-**Not yet done**: commit; push; PR (targets `main`). Still not built: any
+**Merged 2026-09-04 as PR #47** (`b140e5c`). Still not built (see the
+entry above for the per-entity version-cache piece this unblocked): any
 Tauri command that resolves an SSPK or calls enrollment; a domain write
-that encrypts a payload and calls `sync_outbox::enqueue`; per-entity
-"known hub version" tracking (needed for a correct `base_version` on an
-_update_, not just a first create); the network listener/transport.
+that encrypts a payload and calls `sync_outbox::enqueue`; the network
+listener/transport.
 
 ## ADR-0069 sync payload key ceremony (2026-09-04/05) — foundation shipped, merged (PR #46)
 
