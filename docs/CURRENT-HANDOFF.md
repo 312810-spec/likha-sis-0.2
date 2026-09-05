@@ -1,5 +1,70 @@
 # CURRENT HANDOFF
 
+## Verification pass on commit `20a3869` (ADR-0069 device-revocation key rotation wrapper) — no dangling callers, no code change (2026-09-05)
+
+Read-only verification of the wrapper approach shipped in `20a3869`
+(`auth::revoke_device_sync_credential_and_rotate_sspk`). No code change
+was needed — the three checks below all resolve to "confirmed safe" or
+"no gap found," so per the task's action rule this is a docs-only entry.
+
+**1. Every production call site of the original, non-rotating
+`auth::revoke_device_sync_credential` goes through the rotating wrapper —
+confirmed safe.** `grep -n revoke_device_sync_credential
+src-tauri/src/auth/mod.rs` finds exactly one production call to the raw
+function: inside `revoke_device_sync_credential_and_rotate_sspk` itself
+(line 890), which then rotates the SSPK before returning. Every other
+call to the raw function (lines 2453, 2652, 2703, 2754, 2786, 2821,
+2844, 2867, 2869) is inside `#[cfg(test)] mod tests` (module starts line
+897, i.e. all of those line numbers fall inside it) — these are the raw
+function's own unit tests, deliberately exercising the unwrapped
+behavior in isolation, not a production bypass. No other file in
+`src-tauri/src` references either name outside `auth/mod.rs`.
+
+**2. No Tauri command exposes device revocation in either form —
+confirmed, verified directly rather than trusting the prior commit
+message.** `grep -rn revoke_device_sync_credential src-tauri/src/commands/`
+returns zero matches. There is currently no `#[tauri::command]` wired to
+either `revoke_device_sync_credential` or
+`revoke_device_sync_credential_and_rotate_sspk` — device revocation is
+reachable only from Rust-internal callers/tests today, matching ADR-0069's
+"not yet wired to any Tauri command" note. This means the more urgent
+"production-facing gap" the task asked to prioritize does not currently
+exist, because the feature has no command-surface entry point yet at all.
+
+**3. `refresh_wrap_for_credential`'s self-heal narrows the mid-rotation
+race to a single stale request; it does not eliminate a stale wrap being
+issued in the exact request that lands inside the gap.** Traced
+`repository/sync_payload_key.rs` lines 104–183.
+`ensure_wrapped_for_credential` unwraps the credential's existing wrap
+row and compares its _decrypted content_ against the `sspk` the current
+call was given (lines 139–144), not merely "does a row exist." If a
+device authenticates in the narrow window between
+`rotate_for_school`'s DB wrap-clear committing and `db::rotate_sspk`'s
+file rotation completing, and the caller resolving `sspk` for that
+specific request still reads the pre-rotation file, that one request is
+wrapped/handed the OLD key — the check cannot prevent this, because
+within that single call there is nothing yet to compare against (no
+stale row exists to detect for a first-time wrap, and even a mismatch
+detection only fires on a _later_ call). What the content comparison
+does guarantee: the very next time that same device authenticates (once
+the caller resolves the now-rotated SSPK), `current == *sspk` is false,
+so `refresh_wrap_for_credential` (lines 158–183) overwrites the stale
+row via `ON CONFLICT(credential_id) DO UPDATE`. So this is a
+self-healing narrowing (bounded to at most one stale authenticated
+round before auto-correction, matching the code comment at lines
+134–137: "no matter when in the DB/filesystem gap it was created"), not
+a full closure of the race — a device that authenticates exactly inside
+the gap can still be handed one stale wrap before the mechanism corrects
+itself on the following contact. This matches, rather than contradicts,
+what the shipped code comments already claim; no gap in the
+implementation itself was found, only that "self-heals" is a narrower
+guarantee than "the race is closed."
+
+**Net finding: no production bypass, no exposed command, self-heal
+behaves as designed but is a narrowing not an elimination of the race
+window.** No code changed. No push/CI cycle was required for this entry
+(docs-only).
+
 ## `db::rotate_sspk` closes the last open piece of ADR-0069's device-revocation key rotation (2026-09-05), commit + PR owed
 
 Wired the piece that every prior addendum in this chain (rotation-on-
