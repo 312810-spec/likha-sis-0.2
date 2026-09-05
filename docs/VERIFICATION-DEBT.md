@@ -1,5 +1,34 @@
 # Verification Debt
 
+## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/DeviceManagementScreen.tsx` + its
+supporting Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session.
+   A rigorous self-review was performed instead per this project's
+   documented fallback (see the handoff entry for exactly what was
+   checked: plain-language destructive-action copy, enumeration-safe
+   generic failure message, `expectNoAccessibilityViolations` in both the
+   closed and mid-confirmation states). No blocking issue was found, but
+   a genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Focus-management gap, knowingly retained.** Opening the inline
+   "Remove device" confirmation panel does not move keyboard focus into
+   it — a keyboard/screen-reader user must continue tabbing forward from
+   the "Remove device" button to reach "Cancel"/"Yes, remove this
+   device," rather than focus landing there automatically the way a true
+   modal dialog would. No modal/dialog primitive exists yet in this
+   codebase (`src/ui/components/`) to reuse, and building one was judged
+   out of scope for a single-screen slice. Revisit if/when this codebase
+   gains a shared dialog component, or sooner if the native accessibility
+   pass above flags it as a real problem in practice.
+
 ## Device sync enrollment/revocation Tauri commands (2026-09-05) — independent review + TS quality gate owed
 
 Two items owed from this slice (`docs/CURRENT-HANDOFF.md`'s matching

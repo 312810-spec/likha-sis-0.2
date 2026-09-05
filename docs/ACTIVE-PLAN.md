@@ -1,5 +1,38 @@
 # ACTIVE PLAN
 
+## Device management screen (2026-09-05)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: new read-only query
+(`repository::device_credential::list_active_for_school`) + Tauri command
+(`commands::device_sync::list_device_sync_credentials`), plus a full
+domain/application/infrastructure/UI slice
+(`src/ui/DeviceManagementScreen.tsx`, routed as the "Devices" tab in the
+Security nav group), consuming both the new list command and the
+enroll/revoke commands the previous slice added. Card-per-device list,
+plain-language two-step confirmation before revoking, generic failure
+message on denial-or-already-gone (enumeration-safe). Enroll/revoke
+command implementations themselves untouched, per scope.
+
+**Verification actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` (full crate) 826/826
+passed (up from 822 — 4 new Rust tests: 3 repository, 1 command); `npm
+run quality:security` 3/3 ok. `npm run quality` (TS side) — `npm ci`
+resolved this session's empty `node_modules`, then `tsc -b --noEmit`,
+`eslint .`, `prettier --check .`, `check-architecture.mjs`, `knip`, and
+`vitest run` (964/964, 94 files) all passed clean.
+
+**Independent review**: `teacher-ux-reviewer`/`accessibility-reviewer`
+subagent dispatch attempted and unreachable this session (no
+subagent-dispatch tool available) — self-review performed per the
+documented fallback (see handoff entry for exactly what was checked).
+One accessibility gap knowingly retained as debt: the inline confirmation
+panel does not move keyboard focus into itself on open. Independent-review
+debt recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice**: conflict-review UI (surfacing `pull_once`'s staged
+sync conflicts to a teacher).
+
 ## Device sync enrollment/revocation Tauri command surface (2026-09-05)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

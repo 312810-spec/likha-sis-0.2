@@ -159,6 +159,7 @@ pub fn run() {
             commands::formgen::generate_sf9_form,
             commands::device_sync::enroll_device_sync_credential,
             commands::device_sync::revoke_device_sync_credential,
+            commands::device_sync::list_device_sync_credentials,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

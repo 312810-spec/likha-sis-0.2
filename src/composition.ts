@@ -2,6 +2,7 @@ import { AssessmentApplicationService } from "./application/assessment-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
+import { DeviceSyncApplicationService } from "./application/device-sync-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
 import { FormGenerationApplicationService } from "./application/form-generation-service";
@@ -23,6 +24,7 @@ import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-rep
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
+import { TauriDeviceSyncRepository } from "./infrastructure/tauri/device-sync-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
@@ -104,3 +106,4 @@ export const schoolAttendanceService = new SchoolAttendanceApplicationService(
 export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new TauriSectionAdvisoryRepository(),
 );
+export const deviceSyncService = new DeviceSyncApplicationService(new TauriDeviceSyncRepository());

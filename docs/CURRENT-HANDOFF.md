@@ -1,5 +1,142 @@
 # CURRENT HANDOFF
 
+## Device management screen shipped (2026-09-05)
+
+**Shipped.** The device-management gap the prior handoff entry recorded
+as the next exact slice ("this app has enroll/revoke commands but no
+screen to reach them") is closed: a School Head/ICT staff member can now
+see and remove enrolled sync devices from within the app.
+
+- **New read query**: `repository::device_credential::list_active_for_school`
+  (`src-tauri/src/repository/device_credential.rs`) — every currently-
+  active (non-revoked) sync credential for a school, joined to the owning
+  user for a human-readable name, newest-enrolled first. Deliberately
+  read-only and scoped to active credentials only, matching this slice's
+  "list currently enrolled devices" requirement, not a past-revocations
+  audit (later increment). 3 new repository tests.
+- **New Tauri command**: `commands::device_sync::list_device_sync_credentials`
+  (`src-tauri/src/commands/device_sync.rs`) wraps it — `school_id` is
+  always session-derived (`SessionManager::require_active_school_scope`),
+  never a parameter, matching every other tenant-data command. Returns a
+  `DeviceSyncCredentialSummary` DTO carrying no secret material. 1 new
+  command test (DTO mapping). Registered in `lib.rs`'s
+  `generate_handler!`. The existing `enroll_device_sync_credential`/
+  `revoke_device_sync_credential` commands were **not** touched, per this
+  slice's explicit scope.
+- **New TS layers**, following the `SchoolMemberApplicationService`/
+  `AdminPasswordResetScreen` pattern exactly (the codebase's own
+  established template for a same-school reference-data list + one
+  destructive action gated server-side): `domain/device-sync-credential.ts`,
+  `domain/ports/device-sync-repository.ts`,
+  `application/device-sync-service.ts` (+ 6 tests),
+  `infrastructure/tauri/device-sync-repository.ts`, wired in
+  `composition.ts` as `deviceSyncService`. `src/ui/**` and
+  `src/application/**` import no Tauri/infrastructure symbol directly —
+  `npm run check:architecture` passes.
+- **New screen**: `src/ui/DeviceManagementScreen.tsx`, routed as the
+  `"devices"` tab in the "Security" nav group (alongside Sign-in Activity
+  and Reset a Password), labeled "Devices". Any authenticated school
+  member can view the list (matching `AdminPasswordResetScreen`'s
+  "backend alone enforces, UI is not the boundary" convention); removing
+  a device requires a plain-language, two-step confirmation ("Remove
+  device" → an inline panel stating the device stops syncing immediately
+  and this cannot be undone → "Yes, remove this device") — never a single
+  click, never a browser `confirm()`. A denied removal and an
+  already-gone credential both surface the same generic message
+  (`GENERIC_FAILURE_MESSAGE`), matching this codebase's enumeration-safety
+  convention for `AdminPasswordResetScreen`'s own reset flow. Rendered as
+  a card-per-device list (`.device-card`), not a raw admin table, per this
+  project's `impeccable`/`premium-teacher-ui` design guidance for a
+  consequential, security-adjacent screen. Teacher-mode parity: follows
+  every other screen's established pattern exactly — a `field-hint` shown
+  only in Guided mode; Comfortable and Efficient render identically, all
+  three keep full functional parity (no mode gates any control). 17 new
+  UI tests, including 2 `expectNoAccessibilityViolations` passes (closed
+  and mid-confirmation states).
+- **Enrollment/pairing UI, conflict-review UI, and a past-revocations
+  audit view remain explicitly out of scope**, unchanged from the source
+  task — this is one screen (list + revoke), not the full
+  device-management feature.
+
+**Verification actually run this session:**
+
+- `cargo fmt --check`: clean.
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo test` (full crate): **826 passed, 0 failed** (lib; up from 822),
+  plus all integration test binaries green, 0 doctests.
+- `npm run quality:security` (gitleaks + `cargo deny check` +
+  OSV-Scanner): 3 ok, 0 failed, 0 missing.
+- `npm run quality` (typecheck, lint, format:check, architecture,
+  `knip`, vitest): **all green** — `node_modules` was empty at the start
+  of this session (same environment condition the prior handoff entry
+  recorded as debt); `npm ci` was run and resolved it, so this session's
+  `npm run quality` result is real, not carried-over debt. `tsc -b
+--noEmit` clean; `eslint .` clean; `prettier --check .` clean;
+  `check-architecture.mjs` clean ("no restricted imports found"); `knip`
+  clean; `vitest run` **964/964 passed** (94 test files).
+- **Visual verification gap, disclosed plainly**: this sandboxed
+  environment has no browser/screenshot tool for the compiled Tauri
+  binary. The screen's structural accessibility was checked with
+  `expectNoAccessibilityViolations` (axe-core) in both its closed and
+  mid-confirmation states, and its CSS was authored against this
+  project's existing design tokens (`--color-danger`,
+  `--color-surface-2`, `--radius-large`, `--elevation-1`, etc.) — but no
+  human/screen-reader pass on the rendered native app occurred. Recorded
+  in `docs/VERIFICATION-DEBT.md`.
+
+**Independent review:** `teacher-ux-reviewer` and `accessibility-reviewer`
+subagent dispatch was attempted for this new screen; no subagent-dispatch
+tool was reachable in this session (same known harness gap prior
+ADR-0067/0069 slices recorded, not a new failure mode). Falling back to
+this project's documented reviewer-failure procedure: recorded honestly
+here, a rigorous self-review was performed instead —
+
+- **Teacher-UX**: the destructive action cannot be triggered in one
+  click from any state; the confirmation panel states the consequence
+  in plain language ("stop syncing right away," "cannot be undone") with
+  no jargon ("credential," "revoke" never shown to the reader — the
+  button and panel say "remove"/"removed"); a device with no label
+  falls back to "Unnamed device" rather than showing a raw id; a
+  relative-to-teacher last-synced/never-synced state is always shown so
+  "is this device actually in use" is answerable without technical
+  knowledge; the empty state and loading state match every other
+  screen's established components (`EmptyState`, `Loading`) rather than
+  inventing new copy patterns.
+- **Accessibility**: `expectNoAccessibilityViolations` passed for both
+  states (axe-core, structural only); the confirmation panel is a
+  `role="group"` with an `aria-label` naming which device it is about,
+  so a screen-reader user does not lose that context after tabbing past
+  the "Remove device" button; every button has a discernible accessible
+  name (no icon-only controls); the danger-tone text is never the only
+  signal (the panel's own sentence carries the meaning, tone is
+  additive, matching `StatusChip`'s own established WCAG 1.4.1
+  reasoning). **One accessibility gap knowingly NOT fixed this
+  session**, recorded as debt rather than silently accepted: unlike a
+  true modal dialog, opening the inline confirmation panel does not
+  move keyboard focus into it — a keyboard/screen-reader user must
+  continue tabbing forward from "Remove device" to reach "Cancel"/"Yes,
+  remove this device," rather than focus landing there automatically.
+  No modal/dialog primitive exists yet in this codebase to reuse (see
+  `src/ui/components/`), and building one was judged out of scope for
+  a single-screen slice; a native NVDA/Narrator pass against the real
+  Tauri binary is still owed regardless.
+- Independent-review debt retained for both roles — a fresh-context
+  pass on this specific diff is still owed when subagent dispatch is
+  available in a later session.
+
+**Verification debt added:** native NVDA/Narrator pass on this screen;
+independent `teacher-ux-reviewer`/`accessibility-reviewer` passes; the
+inline-confirmation-panel focus-management gap noted above. See
+`docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice:** conflict-review UI (surfacing `pull_once`'s staged
+sync conflicts to a teacher) is now the clearest unblocked next
+candidate — the device-management gap this slice closed was the other
+of the two candidates the prior handoff left open. A past-revocations
+audit log for the Devices screen (deferred explicitly this slice) is a
+smaller, lower-priority alternative if conflict-review turns out to need
+more research first.
+
 ## Device sync enrollment/revocation Tauri command surface added (2026-09-05)
 
 **Shipped.** Added `commands::device_sync::{enroll_device_sync_credential,

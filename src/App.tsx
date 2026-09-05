@@ -4,6 +4,7 @@ import {
   attendanceService,
   authService,
   classRecordService,
+  deviceSyncService,
   enrollmentHistoryService,
   exportService,
   formGenerationService,
@@ -28,6 +29,7 @@ import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
+import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
@@ -435,6 +437,8 @@ function App() {
             <AuditLogScreen authService={authService} />
           ) : activeTab === "admin-password-reset" ? (
             <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+          ) : activeTab === "devices" ? (
+            <DeviceManagementScreen deviceSyncService={deviceSyncService} />
           ) : null}
         </AppLayout>
       ) : (

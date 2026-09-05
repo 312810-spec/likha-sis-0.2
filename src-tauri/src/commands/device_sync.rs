@@ -9,7 +9,7 @@ use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::db;
 use crate::error::AppResult;
-use crate::repository::device_credential::EnrolledCredential;
+use crate::repository::device_credential::{self, ActiveDeviceCredential, EnrolledCredential};
 use crate::repository::device_identity;
 
 /// Tauri command surface for ADR-0067's device sync enrollment/revocation
@@ -18,9 +18,9 @@ use crate::repository::device_identity;
 /// fully implemented and tested since Wave 2's ADR-0067/0069 work, but --
 /// as recorded in `docs/CURRENT-HANDOFF.md` -- neither was ever wired to
 /// a `#[tauri::command]`, so the app itself could not reach them. This
-/// module closes that gap. Deliberately does NOT add a device-management
-/// UI screen (out of scope for this slice) -- these commands exist so the
-/// later UI has something real to call.
+/// module closes that gap; `list_device_sync_credentials` (below) was
+/// added in the following slice once `src/ui/DeviceManagementScreen.tsx`
+/// needed a read side to list against.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnrolledDeviceCredential {
@@ -124,6 +124,52 @@ pub fn revoke_device_sync_credential(
     auth::revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential_id, || {
         db::rotate_sspk(&app).map(|_| ())
     })
+}
+
+/// One row of the device-management screen's list -- see
+/// `ActiveDeviceCredential`'s own doc comment for what's included and
+/// why (no secret material).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceSyncCredentialSummary {
+    pub credential_id: String,
+    pub device_label: Option<String>,
+    pub owner_display_name: String,
+    pub owner_username: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+}
+
+impl From<ActiveDeviceCredential> for DeviceSyncCredentialSummary {
+    fn from(value: ActiveDeviceCredential) -> Self {
+        Self {
+            credential_id: value.credential_id,
+            device_label: value.device_label,
+            owner_display_name: value.owner_display_name,
+            owner_username: value.owner_username,
+            created_at: value.created_at,
+            last_used_at: value.last_used_at,
+        }
+    }
+}
+
+/// Lists every currently-enrolled (active) device sync credential for
+/// the caller's own school, newest-enrolled first. Read-only reference
+/// data -- any authenticated school member may view it, matching
+/// `list_school_members`'s established "same-school reference data"
+/// convention; the destructive action (`revoke_device_sync_credential`)
+/// carries its own, stricter authorization gate. `school_id` is always
+/// session-derived, never a parameter, matching every other tenant-data
+/// command in this codebase.
+#[tauri::command]
+pub fn list_device_sync_credentials(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Vec<DeviceSyncCredentialSummary>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    let devices = device_credential::list_active_for_school(&conn, &school_id)?;
+    Ok(devices.into_iter().map(Into::into).collect())
 }
 
 #[cfg(test)]
@@ -358,5 +404,39 @@ mod tests {
                 .is_some(),
             "the credential must remain active after a denied cross-school revocation attempt"
         );
+    }
+
+    /// Exercises the list command's actual DTO-mapping body
+    /// (`DeviceSyncCredentialSummary::from`), the one piece of this
+    /// command's own logic that isn't already covered by
+    /// `device_credential::list_active_for_school`'s own tests -- the
+    /// `State`-unwrapping shell above it cannot be constructed outside a
+    /// running Tauri app, matching this module's established convention
+    /// for the other two commands.
+    #[test]
+    fn list_command_maps_active_devices_to_the_dto_with_no_secret_material() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        crate::repository::device_credential::enroll(
+            &conn,
+            &s.id,
+            &u.id,
+            "device-1",
+            Some("Ana's laptop"),
+        )
+        .unwrap();
+
+        let devices = crate::repository::device_credential::list_active_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .map(DeviceSyncCredentialSummary::from)
+            .collect::<Vec<_>>();
+
+        assert_eq!(devices.len(), 1);
+        assert_eq!(devices[0].device_label.as_deref(), Some("Ana's laptop"));
+        assert_eq!(devices[0].owner_display_name, "Ana Cruz");
+        assert_eq!(devices[0].owner_username, "ana.cruz");
     }
 }
