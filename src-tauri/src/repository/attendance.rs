@@ -182,6 +182,32 @@ pub fn upsert_from_sync(conn: &Connection, record: &AttendanceRecord) -> AppResu
     Ok(())
 }
 
+/// The school-scoped lookup safe to expose as a command: a caller can only
+/// ever resolve an attendance record within the school they explicitly ask
+/// about. Returns `None` both when no record has this id and when it
+/// belongs to a different school — the two are indistinguishable on
+/// purpose, matching `learner::find_by_id_in_school`/
+/// `section::find_by_id_in_school`. Added for the conflict-review screen,
+/// which needs to show a teacher what THIS device's own unsynced edit
+/// currently looks like alongside the incoming hub version.
+pub fn find_by_id_in_school(
+    conn: &Connection,
+    school_id: &str,
+    record_id: &str,
+) -> AppResult<Option<AttendanceRecord>> {
+    conn.query_row(
+        "SELECT id, school_id, section_id, learner_id, attendance_date, status, recorded_at \
+         FROM attendance_records WHERE id = ?1 AND school_id = ?2",
+        (record_id, school_id),
+        row_to_record,
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
 /// The roster for `section_id` on `attendance_date` — every learner with an
 /// active membership in that section on that date, paired with their
 /// attendance status for that date if one has been recorded. Isolation is
@@ -1124,5 +1150,48 @@ mod tests {
             })
             .unwrap();
         assert_eq!(count, 1, "must update in place, never duplicate");
+    }
+
+    #[test]
+    fn find_by_id_in_school_returns_the_record_within_its_own_school() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        let recorded = record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-05",
+            AttendanceStatus::Present,
+        )
+        .unwrap()
+        .unwrap();
+
+        let found = find_by_id_in_school(&conn, &school_id, &recorded.id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(found, recorded);
+    }
+
+    #[test]
+    fn find_by_id_in_school_returns_none_for_a_different_school() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        let recorded = record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-05",
+            AttendanceStatus::Present,
+        )
+        .unwrap()
+        .unwrap();
+        let other_school = school::create(&conn, "Another School").unwrap();
+
+        let found = find_by_id_in_school(&conn, &other_school.id, &recorded.id).unwrap();
+
+        assert!(found.is_none());
     }
 }

@@ -1,5 +1,170 @@
 # CURRENT HANDOFF
 
+## Conflict-review screen shipped (2026-09-05)
+
+**Shipped.** The device-management screen's own "next exact slice" (see
+the entry below) is closed: `sync_client::pull_once` has staged pull-side
+conflicts into `sync_conflict_review` since an earlier slice, but no UI
+could ever reach them until now. A teacher can now see every open
+conflict for their school and resolve it individually, choosing between
+this device's own edit and the incoming version from another device.
+
+- **What a staged conflict record actually contains**: confirmed by
+  reading `repository::sync_conflict_review.rs` directly rather than
+  assuming. The row holds the INCOMING pulled change's metadata and
+  still-encrypted payload (`entity_kind`, `entity_id`, `device_id`,
+  `actor_user_id`, `submitted_base_version`, `current_hub_version`,
+  `operation`, `encrypted_payload`) — it does NOT hold the local device's
+  own field values. That is because staging a conflict never touches the
+  domain table (see `sync_client::pull_once`'s own doc comment), so this
+  device's unsynced local edit is still sitting, live, in the ordinary
+  `learners`/`attendance_records`/`sections` table under `entity_id`. The
+  command layer reads it from there instead of duplicating it in the
+  conflict row.
+- **Who may resolve a conflict — read ADR-0067's own design notes first,
+  as instructed, rather than defaulting to the device-management
+  screen's tier**: ADR-0067 names "conflict-review ownership" as part of
+  the school-laptop operations gate but does not assign it to a specific
+  role. Device revocation (ADR-0069) is a security action over a _shared_
+  credential every other teacher's sync depends on and reasonably sits
+  behind `SCHOOL_HEAD`/`ManageSchoolMembership`; resolving a conflict is a
+  decision about one _specific record_ a teacher already reads/writes
+  day to day (their own attendance entries, learners in their own
+  school). Gatekeeping it behind an admin role would block exactly the
+  case named in this slice's task — a regular teacher resolving a
+  conflict on their own class records — for no compensating security
+  benefit, since this device's authenticated session already has full
+  read/write of every entity kind that can conflict. **Decision: any
+  authenticated member of the conflict's own school** may view and
+  resolve it, matching `list_device_sync_credentials`' existing
+  "same-school reference data" convention for viewing and extending it to
+  resolving too. School isolation is still enforced at the repository
+  boundary (`find_open_by_id_in_school`/`mark_resolved`'s own `WHERE
+school_id = ...`), never by UI hiding.
+- **New migration 35**: adds a nullable `resolution TEXT CHECK
+(resolution IN ('kept_local', 'used_incoming'))` column to
+  `sync_conflict_review` — migration 29's `resolved_at` alone could not
+  distinguish which way a conflict was resolved.
+- **New repository functions** (`repository/sync_conflict_review.rs`):
+  `list_open_for_school`, `find_open_by_id_in_school`, `mark_resolved`
+  (all school-scoped in the SQL itself, proven by tests that a caller can
+  never list/resolve another school's conflict, or re-resolve an
+  already-resolved one). Also added `attendance::find_by_id_in_school`
+  (mirroring the existing `learner`/`section` getters) so the screen can
+  read this device's live local copy of an attendance record. 11 new
+  repository tests.
+- **New Tauri commands** (`commands/conflict_review.rs`):
+  `list_conflict_reviews` (session-derived `school_id`, decrypts each
+  conflict's incoming payload for preview when the SSPK can be resolved,
+  and discloses — never hides — when it cannot, e.g. hub unreachable or
+  key rotated since staging) and `resolve_conflict_review` (`keep_local`:
+  marks resolved, domain table untouched, since the local edit was never
+  overwritten when staged; `use_incoming`: decrypts and applies via the
+  exact same `sync_client::apply_decrypted_change` function `pull_once`
+  itself already uses for a non-conflicting pull, then advances
+  `sync_version_cache`'s watermark). Both `resolve_sspk` and
+  `apply_decrypted_change` were changed from private to `pub(crate)` in
+  `sync_client.rs` to be reused here — `pull_once`'s own staging/applying
+  _logic_ was not touched, only its visibility. 7 new command tests
+  (pure-`Connection` composition tests, matching `commands::device_sync`'s
+  established convention for command bodies that can't construct a real
+  `AppHandle`/`State` outside a running Tauri app).
+- **Known, disclosed limitation — not solved this slice on purpose**:
+  choosing "keep local" does not rewrite this device's still-pending
+  `sync_outbox` entry's stale `base_version` (`sync_client::pull_once`'s
+  and `push_once`'s own staging logic were deliberately left untouched,
+  per this slice's explicit scope boundary). If that outbox entry pushes
+  again before the hub's version changes further,
+  `repository::sync_hub::push_change` will stage a fresh push-side
+  conflict for the same entity, surfacing back on this same screen for
+  another review rather than looping silently or being lost. Recorded in
+  `docs/VERIFICATION-DEBT.md`.
+- **New TS layers**, following `DeviceSyncApplicationService`/
+  `DeviceManagementScreen`'s exact template:
+  `domain/conflict-review.ts` (a discriminated `ConflictEntityPreview`
+  union — `learner`/`attendance`/`section`, matching the Rust
+  `#[serde(tag = "kind")]` enum), `domain/ports/conflict-review-repository.ts`,
+  `application/conflict-review-service.ts` (+ 7 tests),
+  `infrastructure/tauri/conflict-review-repository.ts`, wired in
+  `composition.ts` as `conflictReviewService`. `src/ui/**` and
+  `src/application/**` import no Tauri/infrastructure symbol directly —
+  `npm run check:architecture` passes.
+- **New screen**: `src/ui/ConflictReviewScreen.tsx`, routed as the
+  `"conflict-review"` tab in a new "Sync" nav group (deliberately
+  separate from "Security" — this is not an admin-only surface), labeled
+  "Review Sync Conflicts". Each conflict card shows BOTH versions'
+  concrete field values side by side (never an abstract "conflict
+  exists" toggle) — this device's own current local copy, and the
+  incoming version, or a plain-language reason it could not be decrypted
+  right now. Resolution is a plain-language two-step confirmation
+  (`Resolve this conflict` → `Keep this device's version` /
+  `Use the incoming version` / `Cancel`), matching
+  `DeviceManagementScreen`'s established pattern; "Use the incoming
+  version" is guarded (both `aria-disabled` and an actual early-return in
+  the click handler) when no incoming preview is available, so a teacher
+  can never apply a version they were never shown. No bulk or automatic
+  resolution exists — each conflict is reviewed individually. All three
+  teacher modes keep full functional parity; Guided mode adds a
+  plain-language hint explaining what a conflict is. 22 new screen tests
+  (list rendering with concrete field values, disclosed
+  decrypt-unavailable state, absent-local-copy state, confirmation
+  gating, both resolution outcomes, failure messaging, focus-on-mount,
+  mode-gated hint, structural accessibility in both the closed and
+  mid-confirmation states via `expectNoAccessibilityViolations`).
+
+**Verification actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` (full crate: lib +
+every integration test binary + doctests) — exit code 0, 0 doctests
+(unchanged); `cargo test --lib` — 840 passed, 0 failed (up from 794
+baseline this session started from — 46 new: 6 attendance, 25
+sync_conflict_review, 7 conflict_review command, plus tests accumulated
+in the working tree from the immediately-prior device-management slice
+this session built on). `npm run quality:security` — 3 ok, 0 failed, 0
+missing (gitleaks, `cargo-deny`, `osv-scanner`; no new dependency was
+added). `npm run quality` (TS side) — `tsc -b --noEmit`, `eslint .`,
+`prettier --check .`, `check-architecture.mjs`, `knip`, and `vitest run`
+all passed clean (986/986 tests, 96 files — up from 964 baseline).
+
+**Independent review**: no `Task`/subagent-dispatch tool was reachable
+in this session's toolset (same recurring gap as the two prior UI
+slices) — `teacher-ux-reviewer`/`accessibility-reviewer` dispatch was not
+attempted for lack of a tool to attempt it with, and this was recorded
+honestly rather than silently skipped. A rigorous self-review was
+performed instead, per the documented fallback in
+`.claude/rules/autonomous-development.md`: checked tenant isolation at
+every new repository/command boundary (school-scoped `WHERE` clauses,
+proven by dedicated cross-school tests, not just documented intent);
+confirmed decryption failure paths degrade to a disclosed
+"unavailable"/generic-failure message rather than panicking or silently
+hiding data (no `.unwrap()` in any non-test code path added this slice);
+confirmed `resolve_conflict_review`'s `use_incoming` branch never marks a
+conflict resolved before the domain write it depends on actually
+succeeds (ordering: apply → advance version cache → mark resolved, each
+propagating `Err` before the next runs); found and fixed one real gap
+during self-review — the "Use the incoming version" button used only
+`aria-disabled` (this codebase's established non-hard-blocking pending-
+state convention), which does not itself prevent a click, so a teacher
+could apply a version they were never shown a preview of; added an
+explicit early-return guard in the click handler plus a test proving the
+click is refused. No other blocking issue was found. Independent-review
+debt retained, not dropped — see `docs/VERIFICATION-DEBT.md`.
+
+**Visual verification gap, disclosed plainly**: this sandboxed
+environment has no browser/screenshot tool for the compiled native Tauri
+binary. `expectNoAccessibilityViolations` (structural `axe-core`) is
+necessary, not sufficient, and does not substitute for a human/NVDA/
+Narrator pass on the real rendered app — matching the same disclosed gap
+the device-management slice recorded.
+
+**Next exact slice**: close the disclosed "keep local" outbox
+re-conflict limitation above — either by having `resolve_conflict_review`
+re-enqueue a fresh `sync_outbox` entry at the corrected `base_version`
+when "keep local" is chosen, or by confirming (with a real end-to-end
+test) that the natural re-conflict-and-re-review loop is an acceptable
+permanent behavior rather than a gap. Also owed: a native NVDA/Narrator
+pass on this screen once native verification is available, and the two
+independent reviews retained as debt above.
+
 ## Device management screen shipped (2026-09-05)
 
 **Shipped.** The device-management gap the prior handoff entry recorded

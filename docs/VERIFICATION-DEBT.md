@@ -1,5 +1,39 @@
 # Verification Debt
 
+## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/ConflictReviewScreen.tsx` + its supporting
+Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and device-sync-command
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked, including one real gap found and fixed
+   during self-review (a non-blocking `aria-disabled` button that could
+   still be clicked). No other blocking issue was found, but a genuinely
+   independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **"Keep local" does not correct the stale outbox `base_version`,
+   disclosed rather than silently accepted as solved.** Choosing "keep
+   local" marks the conflict resolved but does not rewrite this device's
+   still-pending `sync_outbox` entry for the same entity — that entry
+   keeps the `base_version` it originally computed, which is now stale
+   relative to `current_hub_version`. If it pushes again before the
+   hub's version changes further, `repository::sync_hub::push_change`
+   will stage a fresh push-side conflict for the same entity, surfacing
+   back on this same review screen rather than being lost or looping
+   silently — but a teacher choosing "keep local" today may reasonably
+   expect that to be the end of it. Deliberately not fixed this slice:
+   the task's own scope boundary said not to touch `sync_client::pull_once`'s
+   or `push_once`'s staging logic. See `docs/CURRENT-HANDOFF.md`'s "Next
+   exact slice" for the two candidate fixes.
+
 ## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items

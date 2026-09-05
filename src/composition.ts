@@ -2,6 +2,7 @@ import { AssessmentApplicationService } from "./application/assessment-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
+import { ConflictReviewApplicationService } from "./application/conflict-review-service";
 import { DeviceSyncApplicationService } from "./application/device-sync-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
@@ -24,6 +25,7 @@ import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-rep
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
+import { TauriConflictReviewRepository } from "./infrastructure/tauri/conflict-review-repository";
 import { TauriDeviceSyncRepository } from "./infrastructure/tauri/device-sync-repository";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
@@ -107,3 +109,6 @@ export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new TauriSectionAdvisoryRepository(),
 );
 export const deviceSyncService = new DeviceSyncApplicationService(new TauriDeviceSyncRepository());
+export const conflictReviewService = new ConflictReviewApplicationService(
+  new TauriConflictReviewRepository(),
+);

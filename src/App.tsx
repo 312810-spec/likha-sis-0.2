@@ -4,6 +4,7 @@ import {
   attendanceService,
   authService,
   classRecordService,
+  conflictReviewService,
   deviceSyncService,
   enrollmentHistoryService,
   exportService,
@@ -29,6 +30,7 @@ import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
+import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
@@ -439,6 +441,8 @@ function App() {
             <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
           ) : activeTab === "devices" ? (
             <DeviceManagementScreen deviceSyncService={deviceSyncService} />
+          ) : activeTab === "conflict-review" ? (
+            <ConflictReviewScreen conflictReviewService={conflictReviewService} />
           ) : null}
         </AppLayout>
       ) : (

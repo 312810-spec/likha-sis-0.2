@@ -1627,6 +1627,23 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M35: the conflict-review screen (ADR-0067/0069) needs to record
+        -- WHICH way a teacher resolved a staged conflict, not just THAT it
+        -- was resolved -- migration 29's `resolved_at` alone cannot
+        -- distinguish "kept this device's own edit" from "accepted the
+        -- incoming hub version," which matters for support/audit
+        -- ("why does this record look like the other teacher's version?").
+        -- Nullable and unconstrained-until-resolved, matching
+        -- `resolved_at`'s own shape: both are NULL for every still-open
+        -- conflict, and both are set together, in the same UPDATE, the
+        -- moment a conflict is resolved.
+        ALTER TABLE sync_conflict_review
+            ADD COLUMN resolution TEXT
+            CHECK (resolution IN ('kept_local', 'used_incoming'));
+        "#,
+        ),
     ])
 }
 

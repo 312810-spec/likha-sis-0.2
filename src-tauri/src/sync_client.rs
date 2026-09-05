@@ -175,7 +175,7 @@ pub struct PullRunSummary {
 /// `crypto::payload_key`'s own doc comment already draws around this
 /// slice (DPAPI-backed local caching is explicitly deferred, see this
 /// module's task-level doc comment).
-fn resolve_sspk(
+pub(crate) fn resolve_sspk(
     client: &reqwest::blocking::Client,
     config: &SyncClientConfig,
 ) -> Option<[u8; PAYLOAD_KEY_LEN]> {
@@ -502,7 +502,7 @@ pub fn pull_once(
 /// look identical to "applied" to a future caller), it is treated the
 /// same as any other rejection -- fail closed on anything this slice does
 /// not yet know how to materialize, rather than pretend success.
-fn apply_decrypted_change(
+pub(crate) fn apply_decrypted_change(
     conn: &Connection,
     school_id: &str,
     change: &sync_hub::AcceptedChange,

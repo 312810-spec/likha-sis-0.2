@@ -1841,3 +1841,92 @@ label {
   gap: calc(var(--spacing-unit) * 0.5);
   flex-wrap: wrap;
 }
+
+/* Conflict review (Review Sync Conflicts screen): each card shows both
+   versions of a record side by side, since a teacher needs concrete
+   facts -- not an abstract "conflict exists" toggle -- to choose which
+   one survives. */
+.conflict-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-unit);
+}
+
+.conflict-review-card {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-large);
+  box-shadow: var(--elevation-1);
+  padding: calc(var(--spacing-unit) * 1.2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-unit);
+}
+
+.conflict-review-card-main {
+  min-width: 0;
+}
+
+.conflict-review-card-name {
+  margin: 0 0 calc(var(--spacing-unit) * 0.2) 0;
+  font-weight: 700;
+  font-size: var(--font-size-large);
+}
+
+.conflict-review-card-detail {
+  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0;
+  color: var(--color-text-muted);
+}
+
+.conflict-review-versions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--spacing-unit);
+}
+
+.conflict-review-version {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  padding: calc(var(--spacing-unit) * 0.75);
+}
+
+.conflict-review-version h3 {
+  margin: 0 0 calc(var(--spacing-unit) * 0.4) 0;
+  font-size: var(--font-size-base);
+}
+
+.conflict-review-version ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+.conflict-review-version p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.conflict-review-card-confirm {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  padding: var(--spacing-unit);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.conflict-review-card-confirm-text {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.conflict-review-card-confirm-actions {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-wrap: wrap;
+}

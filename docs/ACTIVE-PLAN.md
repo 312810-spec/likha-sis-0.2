@@ -1,5 +1,39 @@
 # ACTIVE PLAN
 
+## Conflict-review screen (2026-09-05)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: migration 35 (`resolution` column on `sync_conflict_review`),
+new repository functions (`list_open_for_school`,
+`find_open_by_id_in_school`, `mark_resolved`, plus
+`attendance::find_by_id_in_school`), new Tauri commands
+(`commands::conflict_review::list_conflict_reviews`/
+`resolve_conflict_review`), and a full domain/application/infrastructure/
+UI slice (`src/ui/ConflictReviewScreen.tsx`, routed as the "Review Sync
+Conflicts" tab in a new "Sync" nav group). Any authenticated school
+member may resolve their own school's conflicts — a deliberate departure
+from the device-management screen's stricter tier, reasoned from
+ADR-0067's own (role-unspecified) design notes rather than assumed.
+
+**Verification actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` (full crate) exit 0;
+`cargo test --lib` 840/840 passed (up from 794 baseline — 46 new); `npm
+run quality:security` 3/3 ok. `npm run quality` (TS side) — `tsc -b
+--noEmit`, `eslint .`, `prettier --check .`, `check-architecture.mjs`,
+`knip`, `vitest run` (986/986, 96 files) all passed clean.
+
+**Independent review**: `teacher-ux-reviewer`/`accessibility-reviewer`
+subagent dispatch not attempted — no dispatch tool reachable this
+session (same recurring gap as the two prior UI slices). Self-review
+performed per the documented fallback; found and fixed one real gap (an
+`aria-disabled` button that did not actually block its click) before
+considering this done. Independent-review debt recorded in
+`docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice**: close the disclosed "keep local" outbox
+re-conflict limitation (see handoff entry), plus the native NVDA/
+Narrator pass and the two retained independent reviews.
+
 ## Device management screen (2026-09-05)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

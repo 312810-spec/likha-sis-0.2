@@ -3,6 +3,7 @@ pub mod assessment_item;
 pub mod attendance;
 pub mod auth;
 pub mod class_record;
+pub mod conflict_review;
 pub mod device_sync;
 pub mod export;
 pub mod formgen;
