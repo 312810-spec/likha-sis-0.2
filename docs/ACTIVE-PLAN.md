@@ -14,9 +14,30 @@ originally planned below) — the owner chose codex-first during the 2026-09-04
 non-CC repository audit, so this landed as migration 30 and the ADR-0067
 branch's `device_identity` migration was renumbered 30 → 31 and rebased on
 top instead. A `cargo fmt` fix (the PR's only CI failure) was applied before
-merge; full CI (Quality Gate Ubuntu+Windows, Security Gate) passed green —
-independent-compliance review is still owed. SF1/SF9/SF10 template
-verification remains with the separate Claude Code workstream.
+merge; full CI (Quality Gate Ubuntu+Windows, Security Gate) passed green.
+SF1/SF9/SF10 template verification remains with the separate Claude Code
+workstream.
+
+**Rust-toolchain verification gate CLOSED (2026-09-05)**: `cargo fmt
+--check`/`cargo clippy --all-targets -- -D warnings`/`cargo test` (full
+crate, 762 lib tests + all integration binaries) all genuinely run and
+confirmed clean on a Rust-capable runner, closing what this ADR recorded
+as owed while it was authored on a toolchain-less runner.
+
+**Weight-transcription re-verification CLOSED (2026-09-05)**: directly
+retrieved and read the ADR's own cited DepEd Caraga regional source
+(an 80-page handbook PDF, readable via paginated PDF extraction though not
+via a plain HTML fetch) and independently transcribed its Table 2 —
+matches the ADR's Decision table and migration 30's seed data exactly,
+digit for digit, across all five groups. Full record:
+`docs/adr/0068-grade12-do8-weighting-carryover.md`'s 2026-09-05 addendum;
+`docs/VERIFICATION-DEBT.md`.
+
+**Still owed, not closed by the above**: the actual DepEd Central Office
+PDF remains unretrieved (still 403 from this environment); an independent
+check of the carryover _applicability_ logic (which learners/subjects fall
+into each of the five groups) is distinct from the weight-figure
+re-verification above and remains open.
 
 ## School-laptop authoritative sync hub — ADR-0067 (added 2026-09-04) — foundation in progress
 
@@ -307,7 +328,7 @@ create) domain write (needs `sync_version_cache::known_version` for a
 real `base_version`); SF1 import's own sync wiring; conflict-review
 UI/resolution workflow; the Android client.
 
-## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
+## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, merged as PR #37
 
 Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`;
 `.planning/tenant-isolation-audit/findings.md`; `docs/CURRENT-HANDOFF.md`
@@ -334,8 +355,11 @@ watched RED (predicates reverted) then GREEN. `cargo test` 656 lib + all
 warnings` clean. `cargo fmt --check` clean. `npm run quality` (no TS
 touched) + `npm run quality:security` — see CURRENT-HANDOFF.
 
-**Not done**: independent `security-reviewer` pass (owed); commit; push;
-PR.
+**Done**: independent `security-reviewer` pass returned PASS, two Minor
+parity fixes folded in; committed, pushed, and merged as PR #37
+(`8286c19`; parity fixes `5f12458`). This entry was stale (recorded as
+"not done" after the work had already landed) — corrected 2026-09-05
+while auditing verification/handoff docs for staleness.
 
 **Next**: none pre-selected. Remaining P1-tier items (per the repo-wide
 sweep): the independent-review backlog (UI redesign Waves 1-6, UX-02/03/04,
