@@ -1,9 +1,13 @@
 # ADR-0068 — Grade 12 DO 8 weighting carryover
 
 Status: Accepted for implementation; native Rust verification complete
-(2026-09-05, see "Verification" below). Independent DepEd-compliance
-review of the DO 8 Table 5 transcription and carryover applicability
-logic remains owed.
+and the DO 8 Table 5 weight transcription independently re-verified
+against the cited regional source directly (2026-09-05, see
+"Verification" below). The Central Office primary-source PDF itself
+remains unretrieved from this environment (still 403); a fresh reviewer
+pass on the carryover _applicability_ reasoning (which learners fall
+into which of the five groups) is still owed, distinct from the weight
+figures this addendum confirms.
 
 ## Context
 
@@ -94,3 +98,46 @@ clean; `cargo test` (full crate) 762 lib tests + all integration binaries,
 0 failed, including the three DO 8-specific tests named above, each
 confirmed in isolation too. Full record: `docs/VERIFICATION-DEBT.md`'s
 Grade 12 DO 8 entry.
+
+## Addendum (2026-09-05) — direct read of the cited regional source
+
+This ADR's own Evidence section already cited
+`https://caraga.deped.gov.ph/public-files/4670` but disclosed the Central
+Office PDF itself as unretrievable (403); it is not clear from the
+original text whether that regional document was actually opened and
+read, or only cited from a secondary description. Retrieved and read it
+directly this session (an 80-page DepEd Caraga "Unified Student School
+Handbook" draft; a plain HTML fetch cannot parse it, but paginated PDF
+extraction can). Found the table explicitly under a section headed
+"Section 2. Grading System (DepEd Order No. 8, s 2015)": **Table 2,
+"Weight of the Components for Senior High"** (the handbook's own Table 1
+is the separate Junior High weight table, not used by this ADR).
+
+Independently transcribed from the source image, the table's five
+columns (Core Subjects; Academic Track — All other subjects; Academic
+Track — Work Immersion/Research/Business Enterprise Simulation/Exhibit/
+Performance; Technical-Vocational Livelihood — All other subjects;
+Technical-Vocational Livelihood — Work Immersion/Research/Exhibit/
+Performance, the last two sharing one merged value cell per row) read:
+
+| Component            | Core | Acad. other | Acad. immersion | TVL (both sub-groups) |
+| -------------------- | ---: | ----------: | --------------: | --------------------: |
+| Written Work         |  25% |         25% |             35% |                   20% |
+| Performance Tasks    |  50% |         45% |             40% |                   60% |
+| Quarterly Assessment |  25% |         30% |             25% |                   20% |
+
+This matches this ADR's own Decision table and migration 30's seeded
+`grading_weight_components` rows **exactly**, digit for digit, across all
+five applicability groups (including the TVL Other/TVL Immersion pair
+sharing identical merged-cell values, matching this ADR's own note about
+why they still remain separate rows). No discrepancy found.
+
+This closes the weight-transcription half of the still-owed independent
+review with a genuine primary-adjacent source read, not a re-trust of the
+existing citation. It does **not** close: (a) obtaining the actual DepEd
+Central Office `DO_s2015_08.pdf` (still 403 from this environment --
+`SOURCE-REGISTRY.md`'s checksum-recording instruction remains
+unactionable until that changes), or (b) an independent check of the
+_applicability_ reasoning (which real learners/subjects fall into each of
+the five groups) -- only the weight figures themselves were re-verified
+here.

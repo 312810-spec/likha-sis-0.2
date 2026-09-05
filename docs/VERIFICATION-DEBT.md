@@ -25,12 +25,22 @@ not a regression. The three DO 8-specific tests
 `compute_term_grade_applies_grade12_do8_weights_with_adjusted_transmutation`)
 were also run in isolation and pass.
 
-**Still open, not closed by the above**: the independent DepEd-compliance
-review `docs/ACTIVE-PLAN.md`'s ADR-0068 entry records as owed (a fresh
-reviewer checking the DO 8 Table 5 transcription and the carryover
-applicability logic against the source material) — a correctness/compliance
-review, not a toolchain-availability gate, and outside what a Rust test run
-can prove on its own.
+**Weight-transcription re-verification — CLOSED 2026-09-05**: retrieved and
+directly read the ADR's own cited DepEd Caraga regional source
+(`https://caraga.deped.gov.ph/public-files/4670`, an 80-page handbook PDF —
+a plain HTML fetch cannot parse it, but paginated PDF page extraction can).
+Its **Table 2, "Weight of the Components for Senior High"**, under a
+section headed "DepEd Order No. 8, s 2015," was independently transcribed
+and matches ADR-0068's Decision table and migration 30's seeded
+`grading_weight_components` rows **exactly**, digit for digit, across all
+five applicability groups. Full transcription and reasoning:
+`docs/adr/0068-grade12-do8-weighting-carryover.md`'s 2026-09-05 addendum.
+
+**Still open, not closed by the above**: the actual DepEd Central Office
+`DO_s2015_08.pdf` remains unretrieved from this environment (still 403);
+and an independent check of the carryover _applicability_ logic (which
+real learners/subjects fall into each of the five groups, as opposed to
+the weight figures themselves) is still owed.
 
 ## ADR-0067 school-laptop sync hub (2026-09-04) — OPEN
 
