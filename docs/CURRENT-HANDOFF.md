@@ -19,7 +19,7 @@ a skipped/ignored placeholder.
 
 **What shipped**: `crypto::KeyStore` gained a second trait method,
 `rotate_key` (alongside the existing `load_or_create_key`), implemented
-for `DpapiKeyStore` as `rotate_key_file` —  generates a fresh key,
+for `DpapiKeyStore` as `rotate_key_file` — generates a fresh key,
 DPAPI-protects it, writes it to a sibling temp file with a random
 suffix, then atomically `rename`s it over the target path (cleaning up
 the temp file on a rename failure). Unlike `load_or_create_key`, this
@@ -66,7 +66,7 @@ ordering.
 searching the whole `commands/` tree before starting this slice: neither
 `enroll_device_sync_credential` nor `revoke_device_sync_credential` has
 ever been wrapped in a `#[tauri::command]`. This slice wires the
-rotation into the revocation *function*, ready for whichever future
+rotation into the revocation _function_, ready for whichever future
 command/UI actually exposes device management — building that command
 and its UI is a separate, larger scope item (the "conflict-review UI"
 and device-management surface both remain part of ADR-0067's still-open
@@ -104,7 +104,7 @@ run quality` (TS side) not attempted — no TS/UI file touched.
 `security-reviewer` subagent was dispatched for this crypto-sensitive
 change and found a genuine SHOULD-FIX, not a false positive: the
 original `ensure_wrapped_for_credential` only checked whether a wrap row
-already *existed* for a credential, not whether its content actually
+already _existed_ for a credential, not whether its content actually
 matched the current SSPK. Since the DB-side wrap-clear
 (`rotate_for_school`) and the filesystem SSPK rotation (`db::rotate_sspk`)
 cannot commit atomically together (a filesystem write cannot join a SQL

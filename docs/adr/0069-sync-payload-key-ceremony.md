@@ -662,7 +662,7 @@ new, see the real finding below.
 crypto-sensitive change and found a genuine SHOULD-FIX, confirmed
 reachable given this slice's own chosen ordering, not a false positive:
 `ensure_wrapped_for_credential` only checked whether a wrap row already
-*existed* for a credential, never whether its content actually matched
+_existed_ for a credential, never whether its content actually matched
 the current SSPK. Because the DB-side wrap-clear (`rotate_for_school`)
 and the filesystem SSPK rotation (`db::rotate_sspk`) cannot commit
 atomically together, a device authenticating in the gap between the DB
