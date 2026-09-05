@@ -1,6 +1,9 @@
 # ADR-0068 — Grade 12 DO 8 weighting carryover
 
-Status: Accepted for implementation; native Rust verification pending
+Status: Accepted for implementation; native Rust verification complete
+(2026-09-05, see "Verification" below). Independent DepEd-compliance
+review of the DO 8 Table 5 transcription and carryover applicability
+logic remains owed.
 
 ## Context
 
@@ -84,5 +87,10 @@ component belongs to the legacy category set, the two equal-weight track
 groups remain separately selectable, and an end-to-end 35/40/25 computation
 produces IG 57.5 then TG 72 under the SY 2026-2027 adjusted table.
 
-This runner has no Rust toolchain. `cargo fmt --check`, `cargo test`, and
-`cargo clippy --all-targets -- -D warnings` remain mandatory before merge.
+Genuinely run on a Rust-capable runner (2026-09-05, previously recorded as
+owed while this ADR was authored on a runner with no Cargo toolchain):
+`cargo fmt --check` clean; `cargo clippy --all-targets -- -D warnings`
+clean; `cargo test` (full crate) 762 lib tests + all integration binaries,
+0 failed, including the three DO 8-specific tests named above, each
+confirmed in isolation too. Full record: `docs/VERIFICATION-DEBT.md`'s
+Grade 12 DO 8 entry.
