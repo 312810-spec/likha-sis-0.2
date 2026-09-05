@@ -1,5 +1,42 @@
 # ACTIVE PLAN
 
+## Device sync enrollment/revocation Tauri command surface (2026-09-05)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: `src-tauri/src/commands/device_sync.rs`
+(`enroll_device_sync_credential`, `revoke_device_sync_credential`),
+registered in `commands/mod.rs` and `lib.rs`'s `generate_handler!`.
+Closes the "implemented but unreachable from any Tauri command" gap the
+prior verification-pass entry documented for ADR-0067/0069. Enroll
+mirrors `commands::auth::login`'s credential-based bootstrap shape
+(`school_id` re-verified server-side, never blindly trusted); revoke
+derives `school_id` only from the active session and calls the rotating
+`auth::revoke_device_sync_credential_and_rotate_sspk` wrapper exclusively
+— never the raw, non-rotating function.
+
+**Verification actually run**: `cargo build --lib` clean; `cargo test
+--lib` 822/822 passed (5 new tests in `commands::device_sync::tests`:
+enroll wrong-school-denied, enroll wrong-password-denied, enroll
+happy-path proving a usable credential, revoke happy-path proving the
+SSPK genuinely rotates through the command's own call shape, revoke
+cross-school-head-denied); full-crate `cargo test` (lib + integration
+binaries + doctests) exit code 0, all green; `cargo fmt --check` clean;
+`cargo clippy --all-targets -- -D warnings` clean, zero warnings; `npm
+run quality:security` 3/3 ok (gitleaks, cargo-deny, osv-scanner). `npm
+run quality` (TS side) could not run — this session's `node_modules` is
+empty, an environment condition unrelated to this Rust-only change; see
+`docs/VERIFICATION-DEBT.md`.
+
+**Independent review**: `security-reviewer` subagent dispatch attempted
+and unreachable this session (same known harness gap as prior ADR-0067/
+0069 slices) — self-review performed per the documented fallback,
+focused specifically on the authorization gate and the revoke command's
+rotation path (see the handoff entry for exactly what was checked).
+Independent-review debt recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice**: device-management UI (enroll/revoke screen) or
+conflict-review UI — either now unblocked, neither pre-selected.
+
 ## `db::rotate_sspk` closes ADR-0069's device-revocation key rotation (2026-09-05), commit + PR owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: added

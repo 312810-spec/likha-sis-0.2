@@ -1,5 +1,99 @@
 # CURRENT HANDOFF
 
+## Device sync enrollment/revocation Tauri command surface added (2026-09-05)
+
+**Shipped.** Added `commands::device_sync::{enroll_device_sync_credential,
+revoke_device_sync_credential}` (`src-tauri/src/commands/device_sync.rs`,
+new module registered in `commands/mod.rs` and `lib.rs`'s
+`generate_handler!`), closing the gap the previous handoff entry
+documented: ADR-0067's device enrollment and ADR-0069's rotating
+revocation (`auth::enroll_device_sync_credential`,
+`auth::revoke_device_sync_credential_and_rotate_sspk`) were fully
+implemented and tested at the Rust layer but reachable from zero
+`#[tauri::command]`s — this app could not enroll or revoke a device
+through any code path a real caller could reach.
+
+- **Enroll command** resolves THIS installation's own device id via
+  `device_identity::current_or_create` (never a client-supplied device
+  id — there is exactly one physical device behind a given Tauri
+  process). Mirrors `commands::auth::login`'s shape deliberately, not the
+  session-derived-`school_id` convention: like `login`, this is the
+  _bootstrap_ of trust for a credential class that has no session yet to
+  derive scope from. `school_id` is accepted as a parameter but is
+  re-verified server-side inside `auth::enroll_device_sync_credential`
+  against the authenticating user's actual school membership — a caller
+  cannot enroll into a school the user isn't a member of, regardless of
+  what `school_id` it passes. Resolves/mints the school's SSPK via
+  `db::load_or_mint_sspk` and wraps it for the new credential atomically
+  with issuance, same contract as every other `resolve_sspk_if_enrolled`
+  caller in this codebase.
+- **Revoke command** wraps `auth::revoke_device_sync_credential_and_rotate_sspk`
+  ONLY — never the raw, non-rotating `auth::revoke_device_sync_credential`
+  — via `db::rotate_sspk` in its closure. `school_id` is never a
+  parameter; it is derived entirely from the active interactive session
+  inside the wrapped function itself (`SessionManager::require_active_session`),
+  matching every other tenant-data command in this codebase and ADR-0004's
+  established convention.
+
+**Verification actually run this session:**
+
+- `cargo test` (full crate): **822 passed, 0 failed** (lib), plus all
+  integration test binaries green, 0 doctests. New module contributes 5
+  tests: 2 enroll authorization-boundary tests (wrong school, wrong
+  password), 1 enroll happy-path (proves a usable credential — verified
+  against `device_credential::verify`, the same check the sync hub
+  itself performs), 1 revoke happy-path proving the SSPK genuinely
+  rotates **through the command-shaped call**, not by calling the
+  underlying `auth::*` rotation path directly, and 1 revoke
+  cross-school-head-denied authorization-boundary test (credential stays
+  active after the denied attempt).
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo fmt --check`: clean, no diff.
+- `npm run quality:security` (gitleaks + `cargo deny check` + OSV-Scanner):
+  3 ok, 0 failed, 0 missing.
+- `npm run quality` (TS typecheck/lint/architecture/knip/vitest): **not
+  run** — this session's `node_modules` is empty (0 packages), a
+  pre-existing environment condition unrelated to this change (no
+  TypeScript file was touched by this slice). Recorded as verification
+  debt below, not silently skipped.
+
+**Independent review:** a `security-reviewer` subagent dispatch was
+attempted for this authorization-and-credential-management surface (the
+exact class of command where this project previously found a real bug —
+ADR-0004's unauthenticated-bootstrap incident). Falling back to this
+project's documented reviewer-failure procedure: recorded honestly here,
+a rigorous self-review was performed instead, specifically re-checking
+(a) that `school_id` can never be trusted from the client for the revoke
+path (confirmed: not a parameter at all) and is re-verified server-side
+for the enroll path (confirmed: `is_member_of_school` check inside
+`auth::enroll_device_sync_credential`, already covered by an existing
+`Err(Unauthorized)` test this new command surface now also exercises
+through its own boundary test), and (b) that the revoke command's
+rotation path is exclusively the rotating wrapper (confirmed by direct
+read of `device_sync.rs`: the only call is to
+`revoke_device_sync_credential_and_rotate_sspk`, and a new end-to-end
+test proves the rotation closure genuinely fires and the resulting key
+genuinely differs, invoked through the command function's own call
+shape). **Independent-review debt retained** — a fresh-context
+`security-reviewer` pass on this specific diff is still owed and should
+be run in a later session when the harness is available.
+
+**Out of scope, deferred (unchanged from the source task):** no device
+management UI, no other `EntityKind` sync wiring,
+`db::rotate_sspk`/`refresh_wrap_for_credential`/the rotating wrapper
+itself untouched.
+
+**Verification debt added:** `npm run quality` could not be run this
+session (empty `node_modules`) — see `docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice:** device-management UI (enroll/revoke screen for a
+School Head/ICT coordinator, consuming the two commands this slice
+added) — the natural next step now that a real command surface exists to
+build it against. Conflict-review UI (surfacing `pull_once`'s staged
+sync conflicts to a teacher) is the other unblocked candidate; either is
+viable next, no candidate pre-selected here per this project's own
+"do not implement the next slice" rule.
+
 ## Verification pass on commit `20a3869` (ADR-0069 device-revocation key rotation wrapper) — no dangling callers, no code change (2026-09-05)
 
 Read-only verification of the wrapper approach shipped in `20a3869`

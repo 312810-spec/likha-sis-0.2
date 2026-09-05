@@ -157,6 +157,8 @@ pub fn run() {
             commands::reference_geo::list_psgc_units,
             commands::formgen::generate_sf1_form,
             commands::formgen::generate_sf9_form,
+            commands::device_sync::enroll_device_sync_credential,
+            commands::device_sync::revoke_device_sync_credential,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

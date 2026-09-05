@@ -1,5 +1,38 @@
 # Verification Debt
 
+## Device sync enrollment/revocation Tauri commands (2026-09-05) — independent review + TS quality gate owed
+
+Two items owed from this slice (`docs/CURRENT-HANDOFF.md`'s matching
+entry has full detail):
+
+1. **Independent security review not obtained.** A `security-reviewer`
+   subagent dispatch was attempted for `src-tauri/src/commands/device_sync.rs`
+   — exactly the class of authorization/credential-management command
+   surface this project previously found a real bug in (ADR-0004's
+   unauthenticated-bootstrap incident) — and was unreachable this
+   session, the same known reviewer-harness gap recorded against the
+   three prior ADR-0067/0069 slices below. A rigorous self-review was
+   performed instead per this project's documented fallback: confirmed
+   `school_id` is never a client-supplied parameter on the revoke
+   command (derived only from the active session inside
+   `auth::revoke_device_sync_credential`'s own
+   `require_active_session` check) and is re-verified server-side on the
+   enroll command (`is_member_of_school`, matching `login`'s established
+   credential-based bootstrap shape from ADR-0004); confirmed the revoke
+   command calls the rotating `revoke_device_sync_credential_and_rotate_sspk`
+   wrapper exclusively, never the raw non-rotating function; added a new
+   end-to-end test proving the SSPK genuinely differs after rotation,
+   invoked through the command's own call shape rather than the
+   underlying `auth::*` function directly. No blocking issue was found,
+   but a genuinely independent review of this diff remains owed. Retry
+   when a reviewer harness/subagent is confirmed healthy.
+2. **`npm run quality` (TS typecheck/lint/format/architecture/knip/vitest)
+   could not be run this session.** `node_modules` was empty (0
+   packages) in this environment — unrelated to this change, which
+   touched only `src-tauri/**` and `docs/**`, no TypeScript. Run it
+   before the next TS-touching slice ships, and ideally once here too
+   once `npm install` is available, to confirm no incidental drift.
+
 ## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
 
 Owed from this slice (ADR-0069's newest addendum,
