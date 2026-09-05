@@ -315,18 +315,81 @@ all integration binaries, 0 failed; `cargo clippy -D warnings` and
 `tokio` from a dev-only to a direct runtime dependency, for
 `tokio::net::TcpListener`, added no new advisories).
 
-**Exact next implementation slice:** resolve the actual LAN/Tailscale
-bind interface (research needed: an interface-enumeration crate, or a
-documented manual-configuration path) and get native Windows network
-verification — this is what actually makes the hub reachable from
-another device; loopback alone proves the wiring but not reachability.
-In parallel/after: the client-side push/pull loop that drains
-`sync_outbox` and calls these two endpoints from a device; deciding
-how/when `sync_version_cache` gets written now that a real round trip is
-possible (on push acceptance, and on pull); wiring an UPDATE (not just
-create) domain write (needs `sync_version_cache::known_version` for a
-real `base_version`); SF1 import's own sync wiring; conflict-review
-UI/resolution workflow; the Android client.
+**Completed next slice (2026-09-05, this session):** the client-side
+push/pull loop this section's own "exact next implementation slice" named
+below — new `sync_client` module. `push_once` drains `sync_outbox` in
+bounded batches (50/round) to `POST /sync/push` and maps the hub's
+per-change outcome onto `sync_outbox`'s EXISTING acknowledge/
+`record_attempt` state machine: `Accepted`/`AlreadyApplied` → advance
+`sync_version_cache` to `base_version + 1` and acknowledge;
+`ConflictStaged` → acknowledge without touching the version cache (the
+hub already durably recorded it; retrying only replays the same outcome);
+any transport/HTTP/protocol failure → `record_attempt` with the matching
+existing `AttemptErrorCode`, outbox row left completely untouched.
+`pull_once` GETs `/sync/pull` after this device's own stored cursor (new
+`repository::sync_pull_cursor`, migration 34) and, per accepted change,
+either advances `sync_version_cache`'s watermark or — when this device
+has its own unsynced local edit (a `sync_outbox` row) for the same entity
+— stages it into the existing `sync_conflict_review` queue via new
+`repository::sync_conflict_review::stage_pull_conflict` (reusing migration
+29's table for a new pull-side case) instead of overwriting the live
+version cache: never silent last-write-wins on the pull side either.
+`sync_client::maybe_spawn_loop` wired into `lib.rs`'s `setup` hook next to
+`hub_server::maybe_spawn_listener`, gated by `sync_client::should_run` on
+a new `device_sync_client_credential` table (migration 34) — this
+device's own retained copy of the bearer secret
+`device_credential::enroll` returns exactly once, which nothing
+previously stored anywhere reusable. A never-enrolled installation stays
+completely unaffected.
+
+New direct dependency: `reqwest` (`blocking`+`json`+`query` only, no TLS
+feature — every request targets loopback plain HTTP). Full reasoning
+(including why `cargo tree -i reqwest` was misleading) in ADR-0067's new
+addendum.
+
+**Deliberately NOT done, and why** (ADR-0067's addendum has the full
+reasoning): decrypting `AcceptedChange::encrypted_payload` and writing
+pulled changes into actual domain tables — needs the ADR-0069 payload-key
+ceremony, which has no Tauri command exposing it yet; wiring
+`auth::enroll_device_sync_credential` to auto-populate
+`device_sync_client_credential` (no enrollment command is surfaced to any
+caller yet, so nothing populates either credential table outside this
+module's own tests); a sync-status UI.
+
+8 new `sync_client` tests, each driven over a REAL HTTP round trip
+(`hub_server::router` bound to an ephemeral loopback port via a
+background-thread tokio runtime, hit with an actual
+`reqwest::blocking::Client`), not just `tower::Service` calls: outbox
+draining + acknowledgement, no-op on an empty outbox, push-side conflict
+staging + dequeue, unauthorized-credential handling leaves the outbox row
+untouched, pull applying a non-conflicting change, pull staging a
+conflict without touching the live version cache, never-enrolled no-op
+gate. `cargo test` (full crate): 775 lib tests + all integration binaries,
+0 failed (up from 762). `cargo clippy --all-targets -- -D warnings` and
+`cargo fmt --check`: both clean. `npm run quality:security` could not run
+in this sandboxed session — `gitleaks`/`cargo-deny`/`osv-scanner` are all
+missing from `PATH` here, an unverified check, not a clean pass (see
+`docs/CURRENT-HANDOFF.md`'s matching entry). `npm run quality` not
+re-run — no TypeScript/frontend surface changed.
+
+**Exact next implementation slice:** the ADR-0069 payload-key ceremony —
+wire `crypto::payload_key`'s existing primitives and the migration-32
+`sync_payload_key_wraps` table into an actual per-device unwrap, so
+`sync_client::pull_once` can decrypt and materialize pulled changes into
+real domain tables instead of only advancing the version-cache watermark.
+A Tauri command surfacing `auth::enroll_device_sync_credential` (and
+populating `device_sync_client_credential`) is a reasonable prerequisite
+to bundle into the same slice, since neither credential table has a real
+caller yet outside tests. Also still open: resolving the actual
+LAN/Tailscale bind interface (research needed: an interface-enumeration
+crate, or a documented manual-configuration path) and native Windows
+network verification — this is what actually makes the hub reachable
+from another device; loopback alone proves the wiring, not reachability.
+Further out: an UPDATE (not just create) domain write path that calls
+`sync_version_cache::known_version` for a real `base_version`; SF1
+import's own sync wiring; conflict-review UI/resolution workflow (now
+needed for BOTH push- and pull-side staged conflicts); the Android
+client.
 
 ## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, merged as PR #37
 

@@ -1,5 +1,20 @@
 # Verification Debt
 
+## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session
+
+Adding `reqwest` as a direct dependency for `sync_client` (ADR-0067) is
+exactly the kind of change `.claude/rules/testing.md` says should get a
+`npm run quality:security` pass before being considered complete. That
+check could not run in this sandboxed session: `gitleaks`, `cargo-deny`,
+and `osv-scanner` are all missing from `PATH` here (`scripts/check-
+security.mjs` itself reports "0 ok, 0 failed, 3 missing" and explicitly
+labels this an unverified result, not a clean pass). `cargo test`/`cargo
+clippy`/`cargo fmt --check` all genuinely ran and are clean (see
+`docs/CURRENT-HANDOFF.md`'s matching entry) — only the dependency-
+advisory/secret-scan layer is unverified. Owed: run `npm run
+quality:security` on a runner with those three tools installed before
+this dependency addition is treated as fully cleared.
+
 ## Grade 12 DO 8 carryover grading policies (2026-09-04) — Rust gate CLOSED 2026-09-05
 
 Migration 30 and repository tests cover the five Grade 12 legacy-SHS
@@ -249,9 +264,9 @@ Full findings file: `docs/security-reviews/2026-09-03-section-membership-l-schoo
 ## Wave 1 UI redesign shell (2026-09-03)
 
 The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),
-its phone-width drawer focus-trap, and the phone bottom nav have **jsdom
+its phone-width drawer focus-trap, and the phone bottom nav have \*\*jsdom
 
-- axe (`expectNoAccessibilityViolations`) coverage only** so far. A
+- axe (`expectNoAccessibilityViolations`) coverage only\*\* so far. A
   native NVDA/Narrator + compiled-binary visual pass is owed — is the
   persistent sidebar readable and comfortable, does the drawer trap and
   return focus correctly under a real screen reader, is the bottom-nav

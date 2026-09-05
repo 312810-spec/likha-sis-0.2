@@ -9,6 +9,7 @@ pub mod hub_server;
 pub mod import;
 pub mod repository;
 pub mod sync;
+pub mod sync_client;
 
 use std::sync::Mutex;
 
@@ -52,6 +53,15 @@ pub fn run() {
             // never be able to crash app startup.
             if let Err(error) = hub_server::maybe_spawn_listener(app.handle()) {
                 log::error!("hub sync listener setup failed: {error}");
+            }
+
+            // ADR-0067 client-side sync loop: only starts if this
+            // installation has a locally stored sync client credential
+            // (see `sync_client::should_run`'s own doc comment) -- a
+            // no-op for a never-enrolled installation, symmetric with
+            // the hub-listener gate immediately above.
+            if let Err(error) = sync_client::maybe_spawn_loop(app.handle()) {
+                log::error!("sync client loop setup failed: {error}");
             }
 
             Ok(())

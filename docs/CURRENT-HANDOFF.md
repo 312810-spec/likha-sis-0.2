@@ -1,5 +1,92 @@
 # CURRENT HANDOFF
 
+## Client-side sync loop: push/pull over loopback HTTP (2026-09-05), commit + PR owed
+
+Executed the exact next slice named below: the device-side client that
+talks to `hub_server` over HTTP.
+
+**What shipped**: a new `sync_client` module — `push_once` drains
+`sync_outbox` in bounded batches (50/round) to `POST /sync/push` and maps
+the hub's per-change outcome onto `sync_outbox`'s EXISTING
+acknowledge/`record_attempt` state machine (no new retry semantics
+invented); `pull_once` GETs `/sync/pull` after this device's own stored
+cursor (new `sync_pull_cursor` repository/migration 34) and, for each
+accepted change, either advances `sync_version_cache`'s per-entity
+watermark (no local unsynced edit for that entity) or stages it into the
+existing `sync_conflict_review` queue (new
+`sync_conflict_review::stage_pull_conflict`, reusing migration 29's table)
+when this device has an unsynced local edit for the same entity — never
+silent last-write-wins on the pull side, matching the push side's
+existing rule. `sync_client::maybe_spawn_loop`, wired into `lib.rs`'s
+`setup` hook next to `hub_server::maybe_spawn_listener`, starts a
+background-thread loop only if `sync_client::should_run` finds a stored
+client credential (new `device_sync_client_credential` table, migration
+34 — this device's own retained copy of the secret
+`device_credential::enroll` returns once, needed because nothing
+previously stored it anywhere a client could reuse it) — a never-enrolled
+installation is completely unaffected, symmetric with the hub-listener
+gate.
+
+**Dependency change**: `reqwest` (`blocking`+`json`+`query` features only,
+no TLS — every request targets loopback plain HTTP) promoted to a real
+direct dependency; see ADR-0067's new addendum for why `cargo tree -i
+reqwest` was misleading (it was only resolvable for tauri's wasm32-target
+feature, not actually in this app's native dependency graph).
+
+**Deliberately NOT done, and why** (full reasoning in ADR-0067's new
+addendum): decrypting `encrypted_payload` and writing pulled changes into
+actual domain tables (`learners`, `sections`, ...) — that needs the
+ADR-0069 payload-key ceremony, which has no Tauri command exposing it yet
+and is explicitly a separate increment; wiring
+`auth::enroll_device_sync_credential` to automatically populate
+`device_sync_client_credential` (there is still no enrollment command
+surfaced to any caller at all, so nothing populates either table yet
+outside this module's own tests); a sync-status UI; the LAN/Tailscale bind
+interface (`hub_server`'s pre-existing gap, unchanged here).
+
+**Verification**: 8 new `sync_client` tests (outbox draining +
+acknowledgement, no-op on empty outbox, push-side conflict staging +
+dequeue, unauthorized-credential handling leaves the outbox row untouched,
+pull applying a non-conflicting change, pull staging a conflict without
+touching the live version cache, never-enrolled no-op gate) — each driven
+over a REAL HTTP round trip against a `hub_server::router` bound to an
+ephemeral loopback port, not just a `tower::Service` call. `cargo test`
+(full crate): **775 lib tests + all integration binaries, 0 failed**
+(up from 762 before this slice — 13 new: 8 `sync_client`, 3
+`device_sync_client_credential`, 2 `sync_conflict_review`;
+`sync_pull_cursor`'s 4 tests land inside that same lib-test count too,
+762 → 775 nets the union of all of them). `cargo clippy --all-targets --
+-D warnings`: clean. `cargo fmt --check`: clean (after running plain
+`cargo fmt` once to restyle this slice's own new test code — recorded
+honestly, not hand-fixed). `npm run quality:security`: **could not run**
+in this sandboxed session — `gitleaks`, `cargo-deny`, and `osv-scanner`
+are all missing from `PATH` here (0 ok, 0 failed, 3 missing per
+`scripts/check-security.mjs`'s own summary); this is an unverified
+dependency-addition check, not a clean pass, and is recorded as such
+rather than claimed. `npm run quality` not re-run — no TypeScript/
+frontend surface changed this slice (Rust-only).
+
+**Toolchain note**: this sandboxed environment's Rust toolchain was
+`1.94.1`, below this crate's declared `rust-version = "1.95"` — updated to
+stable `1.98.1` via `rustup update stable` before any of the above could
+even compile. Also needed `libgtk-3-dev`/`libwebkit2gtk-4.1-dev` and
+related GTK/WebKit dev packages (present as runtime libs but not as
+pkg-config `-dev` packages) installed via `apt-get` before `cargo
+check`/`test` could link Tauri's Linux GUI backend at all — neither of
+these is a code change, just this session's own environment setup,
+recorded here in case a future session hits the same fresh-container gap.
+
+**Exact next slice**: the ADR-0069 payload-key ceremony — wiring
+`crypto::payload_key`'s existing primitives and the migration-32
+`sync_payload_key_wraps` table into an actual per-device unwrap, so
+`sync_client::pull_once` can decrypt `AcceptedChange::encrypted_payload`
+and materialize it into real domain tables instead of only advancing the
+version-cache watermark. A Tauri command surfacing
+`auth::enroll_device_sync_credential` (and populating
+`device_sync_client_credential`/wiring `hub_server::spawn`'s bind address
+selection) remains a prerequisite for any of this to be reachable outside
+a test, and is a reasonable candidate to bundle into the same slice.
+
 ## Network listener wired into real Tauri startup, loopback only (2026-09-05), commit + PR owed
 
 Branch cut from `main` after PR #50 merged. Executed the "exact next

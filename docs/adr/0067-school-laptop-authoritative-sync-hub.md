@@ -221,3 +221,119 @@ the same SQLite file coexist correctly; not a new concurrency risk.
 features) — `hub_server`'s production code now calls
 `tokio::net::TcpListener` directly, which needs a direct `Cargo.toml` edge,
 not just the transitive one Tauri/axum already provided.
+
+## Addendum (2026-09-05) — client-side sync loop (push/pull over loopback HTTP)
+
+Added the device-side counterpart to `hub_server`: a new `sync_client` module
+that drains `sync_outbox` in bounded batches to `POST /sync/push` and
+periodically `GET /sync/pull`s changes accepted from other devices, wired
+into real Tauri startup the same way (`sync_client::maybe_spawn_loop`, gated
+by `sync_client::should_run`) so a never-enrolled installation stays
+completely unaffected.
+
+**HTTP client decision: `reqwest` (blocking).** `cargo tree -i reqwest`
+showed it was already resolvable in this workspace's lockfile, but only as
+an optional dependency of a `tauri` feature reachable for the `wasm32`
+target — not actually part of the dependency graph for this app's real
+native target, so it needed a real, direct addition rather than "just use
+what's already there." Evaluated against building on `hyper`/`tower`
+directly (axum's own stack, already a dependency): rejected as needless
+hand-rolled HTTP-client plumbing (connection handling, redirects, body
+buffering) for a two-endpoint client a mature library already does
+correctly. Chose `reqwest::blocking` (not the async client) because this
+loop is a plain "wake up, push, pull, sleep" worker on its own background
+`std::thread`, not code that needs to share Tauri's tokio runtime — a
+blocking client keeps it simple to read and, importantly, simple to test
+without `#[tokio::test]` plumbing of its own. `default-features = false`
+with only `blocking`, `json`, and `query` (typed query-string building for
+`GET /sync/pull?after=&limit=`, matching axum's own `Query` extractor) —
+deliberately **no TLS feature**: every request targets `127.0.0.1` in plain
+HTTP, matching `hub_server`'s own loopback-only, plaintext-inside-the-trust-
+boundary decision; a TLS backend would be dead dependency weight for a URL
+that can never be `https://`.
+
+**New local state, added because the client side genuinely had nothing to
+authenticate or resume with yet:**
+
+- `device_sync_client_credential` (migration 34): this device's own retained
+  copy of the credential it needs to present on every push/pull request
+  (`x-likha-credential-id`/`x-likha-device-secret`) — distinct from
+  `device_sync_credentials` (migration 26), which is the HUB's
+  verification-side table and stores only a `secret_hash`, never a usable
+  secret. Until this slice, `device_credential::enroll`'s returned secret was
+  used once and then discarded by every caller (its own doc comment says so
+  verbatim) — meaning no device could actually have authenticated a second
+  request even if a client existed. This is NOT the ADR-0069 payload-key
+  ceremony (that remains out of scope for this slice, see below); it is
+  strictly the bearer secret for the sync HTTP protocol itself.
+- `sync_pull_cursor` (migration 34): this device's own "last hub cursor I
+  have fully processed" watermark per school — the pull-side counterpart to
+  `sync_version_cache`'s per-entity watermark.
+- `repository::sync_conflict_review::stage_pull_conflict`: reuses the
+  existing `sync_conflict_review` table (migration 29) for a NEW case —
+  pull-side conflicts — rather than a second table. A pull-side conflict is
+  defined here as "this device already has an unsynced local edit
+  (`sync_outbox` row) for the same entity the pulled change targets"; that
+  case is staged for review, the version cache is left untouched, and the
+  pull cursor still advances (this device _has_ processed the change, by
+  staging it, just not applied it live) — never silent last-write-wins on
+  the pull side, matching the push side's existing rule.
+
+**What "applying a pull-side change" means in this slice, and what it
+deliberately does NOT mean:** for a non-conflicting `AcceptedChange`, the
+only action taken is advancing `sync_version_cache`'s known-version
+watermark for that entity. It does **not** decrypt `encrypted_payload` and
+write a `learners`/`sections`/... domain row. That decryption needs the
+school's sync-payload key (SSPK), and per this slice's task description and
+this ADR's own already-recorded gap, the payload-key ceremony (wiring
+`crypto::payload_key`'s existing primitives and the migration-32
+`sync_payload_key_wraps` table into an actual per-device unwrap at
+enrollment/use time) is explicitly a separate, later increment — no Tauri
+command exposes any of it yet, so no device could safely decrypt a payload
+even if this slice tried to. Advancing the version watermark without the
+domain write is still meaningful and safe on its own: it is exactly the
+state `sync_version_cache` needs so this device's _own_ next edit to that
+entity computes a correct (non-stale) `base_version`, and it never
+constructs or displays plaintext data this device hasn't decrypted.
+Materializing pulled changes into domain tables remains this feature's next
+real gap, tracked as this slice's own follow-on (see
+`docs/CURRENT-HANDOFF.md`).
+
+**Push-side outcome handling reuses `sync_outbox`'s existing state machine
+verbatim** (`acknowledge`/`record_attempt` with its fixed
+`AttemptErrorCode`s) — `sync_client::push_once` only decides which existing
+call an HTTP outcome maps to: `Accepted`/`AlreadyApplied` → advance
+`sync_version_cache` to `base_version + 1` (the same arithmetic
+`sync_hub::push_change` applies server-side) and acknowledge;
+`ConflictStaged` → acknowledge without touching the version cache (the hub
+already durably recorded the conflict in its own review queue; retrying
+only ever replays the same outcome, so the row is dequeued rather than
+retried forever); a transport error, a non-2xx status, or a malformed/
+mismatched response body → `record_attempt` with `Offline`/`Timeout`/
+`Unauthorized`/`HubUnavailable`/`ProtocolRejected` as appropriate, and the
+outbox row is left completely untouched otherwise (no partial
+acknowledgement, no corruption) so the next round retries it.
+
+**Tested via a real HTTP round trip**, not just `tower::Service` calls like
+`hub_server`'s own tests: each test binds a real `hub_server::router` to an
+ephemeral loopback TCP port (`127.0.0.1:0`) on a background thread running
+its own minimal single-threaded tokio runtime, and drives it with an actual
+`reqwest::blocking::Client` from a second, independent in-memory database
+standing in for a second physical device — proving the wire format, header
+names, and status-code handling actually work over a socket, not only that
+the Rust types line up. 8 new tests: outbox draining + acknowledgement,
+no-op on an empty outbox, push-side conflict staging + dequeue, unauthorized-
+credential handling leaves the outbox row untouched, pull applying a
+non-conflicting change, pull staging a conflict without touching the live
+version cache, and the never-enrolled-installation no-op gate.
+
+**Deliberately NOT done in this slice** (separate, later increments): the
+payload-key ceremony and any actual domain-table materialization of pulled
+changes (discussed above); wiring `auth::enroll_device_sync_credential`'s
+real enrollment flow to call
+`device_sync_client_credential::store` automatically (today nothing
+populates that table except this module's own tests and a future Tauri
+command neither of which exists yet — there is still no enrollment command
+surfaced at all); a sync-status UI; per-device rate limiting on the hub
+side; TLS; and resolving the LAN/Tailscale bind interface (`hub_server`'s
+own already-recorded gap, unchanged by this slice).

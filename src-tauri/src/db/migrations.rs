@@ -1592,6 +1592,41 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M34: ADR-0067 client-side sync loop foundation.
+        --
+        -- `device_sync_client_credential`: THIS device's own copy of the
+        -- credential it needs to authenticate its outbound
+        -- `/sync/push`/`/sync/pull` requests -- distinct from
+        -- `device_sync_credentials` (migration 26), which is the HUB's
+        -- verification-side table and stores only a secret_hash, never a
+        -- usable secret. A device that pushes/pulls must retain the
+        -- actual bearer secret `device_credential::enroll` returned it
+        -- exactly once; this is where that retention lives. One row per
+        -- school this device has enrolled for (in practice almost always
+        -- one). Contains no learner/domain data, so it is not itself an
+        -- ADR-0067 sync entity and never flows through sync_outbox.
+        CREATE TABLE device_sync_client_credential (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            credential_id TEXT NOT NULL,
+            device_secret_hex TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        -- `sync_pull_cursor`: this device's own "last hub cursor I have
+        -- fully processed" watermark for one school -- the pull-side
+        -- counterpart to `sync_version_cache` (migration 33), which
+        -- tracks per-entity state. `0` (the default, via absence of a
+        -- row) means "never pulled," matching `sync_hub::pull_since`'s
+        -- own `after: SyncCursor(0)` convention for a first pull.
+        CREATE TABLE sync_pull_cursor (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            cursor INTEGER NOT NULL CHECK (cursor >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
     ])
 }
 

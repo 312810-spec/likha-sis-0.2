@@ -81,6 +81,26 @@ axum = { version = "0.8.9", default-features = false, features = ["json", "http1
 # drives) only -- this app still runs on Tauri's own tokio runtime via
 # `tauri::async_runtime::spawn`, never a second `#[tokio::main]` runtime.
 tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"] }
+# ADR-0067 client-side sync loop: the small blocking HTTP client that
+# drains sync_outbox to POST /sync/push and GETs /sync/pull against the
+# loopback-only hub_server above. `reqwest` was already present
+# transitively in this workspace's lockfile (pulled in by an optional
+# tauri feature for its wasm32 target only -- confirmed via
+# `cargo tree -i reqwest`, which prints nothing for our actual native
+# target) so it was not, in fact, already usable; this promotes it to a
+# real direct dependency. `default-features = false` with only
+# `blocking` (a plain synchronous client -- this loop runs on its own
+# background OS thread, not inside Tauri's tokio runtime, so no async
+# plumbing is needed), `json` (typed request/response bodies matching
+# hub_server's own `axum::Json` extractors), and `query` (typed
+# `?after=&limit=` query strings for `GET /sync/pull`, matching axum's
+# own `query` feature it already enables for the `Query` extractor).
+# Deliberately NO tls feature:
+# every request targets `127.0.0.1` in plain HTTP, matching this ADR's
+# own "loopback only, plaintext HTTP inside the trust boundary" decision
+# for `hub_server` -- a TLS backend would be dead weight and a bigger
+# dependency surface for a URL that can never be `https://`.
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query"] }
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend
