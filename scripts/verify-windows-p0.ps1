@@ -44,8 +44,17 @@ function Invoke-EvidenceCommand {
     )
 
     $started = (Get-Date).ToUniversalTime()
-    $output = & $Command @Arguments 2>&1 | Out-String
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 wraps native stderr (including Cargo progress)
+        # as non-terminating NativeCommandError records. Capture that evidence
+        # without letting the script-wide Stop preference abort the checkpoint.
+        $ErrorActionPreference = 'Continue'
+        $output = & $Command @Arguments 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $safeName = $Name -replace '[^A-Za-z0-9._-]', '-'
     Protect-EvidenceText $output | Set-Content -LiteralPath (Join-Path $EvidenceRoot "$safeName.log") -Encoding utf8
     $results.Add([PSCustomObject]@{
