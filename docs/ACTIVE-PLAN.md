@@ -307,7 +307,7 @@ create) domain write (needs `sync_version_cache::known_version` for a
 real `base_version`); SF1 import's own sync wiring; conflict-review
 UI/resolution workflow; the Android client.
 
-## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, review pending
+## Repo-wide tenant-isolation JOIN audit — ADR-0066 (added 2026-09-04) — complete, merged as PR #37
 
 Full record: `docs/adr/0066-repo-wide-tenant-isolation-join-audit.md`;
 `.planning/tenant-isolation-audit/findings.md`; `docs/CURRENT-HANDOFF.md`
@@ -334,8 +334,11 @@ watched RED (predicates reverted) then GREEN. `cargo test` 656 lib + all
 warnings` clean. `cargo fmt --check` clean. `npm run quality` (no TS
 touched) + `npm run quality:security` — see CURRENT-HANDOFF.
 
-**Not done**: independent `security-reviewer` pass (owed); commit; push;
-PR.
+**Done**: independent `security-reviewer` pass returned PASS, two Minor
+parity fixes folded in; committed, pushed, and merged as PR #37
+(`8286c19`; parity fixes `5f12458`). This entry was stale (recorded as
+"not done" after the work had already landed) — corrected 2026-09-05
+while auditing verification/handoff docs for staleness.
 
 **Next**: none pre-selected. Remaining P1-tier items (per the repo-wide
 sweep): the independent-review backlog (UI redesign Waves 1-6, UX-02/03/04,

@@ -572,7 +572,7 @@ school-forms order, not a privacy policy). PRODUCT-CONTRACT §12 updated.
 **Not yet done:** commit; push; PR (targets `main`; docs + a small
 frontend diff).
 
-## Repo-wide tenant-isolation JOIN audit — ADR-0066 (2026-09-04), review + PR owed
+## Repo-wide tenant-isolation JOIN audit — ADR-0066 (2026-09-04), merged as PR #37
 
 Branch `claude/tenant-isolation-join-audit`, off `main` (post #34/#36).
 Follows PR #34's `security-reviewer` note that its `l.school_id`
@@ -606,7 +606,10 @@ audit independently confirmed complete. Two Minor parity fixes folded in
 grades subquery `+ AND gp.school_id`). Findings archived at
 `docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-audit.md`.
 
-**Not yet done**: commit the parity fixes; push; open PR (targets `main`).
+**Merged as PR #37** (`8286c19`; parity fixes in `5f12458`). This entry
+was stale (recorded "not yet done" after the work had already landed) —
+corrected 2026-09-05 while auditing verification debt for staleness; see
+`docs/ACTIVE-PLAN.md`'s matching correction.
 
 ## Cloud Sync Target decided — ADR-0065 (2026-09-03), review + merge owed
 
