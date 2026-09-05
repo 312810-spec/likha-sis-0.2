@@ -15,7 +15,8 @@ device's plaintext secret past enrollment, so it cannot proactively
 re-wrap for anyone but the device currently authenticating.
 
 **Verification actually run**: `cargo build --lib` clean; `cargo test
---lib` 784/784 passed; `cargo fmt --check` clean; `cargo clippy
+--lib` 786/786 passed (784 first pass + 2 added by a self-review fix —
+see below); `cargo fmt --check` clean; `cargo clippy
 --all-targets -- -D warnings` clean, zero warnings; full-crate `cargo
 test` (lib + integration binaries + doctests) exit code 0; `npm run
 quality:security` 3/3 ok (gitleaks, cargo-deny, osv-scanner — no new
@@ -28,9 +29,14 @@ pre-existing sandbox gap (`tsc` cannot resolve `vite`/`vitest` types,
 available this session; the `security-review` skill's scripted
 `git diff origin/HEAD...` precondition failed in this sandbox
 (unresolvable ref). Fallback per this project's own rule: recorded
-honestly, rigorous self-review performed instead (see
-`docs/CURRENT-HANDOFF.md`'s entry for what it covered), independent
-review retained as owed debt for a future session.
+honestly, rigorous self-review performed instead — and it found a real
+gap, not just style nits: `ensure_wrapped_for_credential` had no
+`revoked_at` check of its own (safety depended entirely on its one call
+site's ordering), and the test meant to prove otherwise actually proved
+something weaker. Both fixed in this same slice before being marked
+done — see `docs/CURRENT-HANDOFF.md`'s entry and ADR-0069's newest
+addendum for the full account. Independent review of the fixed version
+is still retained as owed debt for a future session.
 
 **Deliberately deferred, next exact task**: `db::rotate_sspk` (mint +
 persist a genuinely NEW plaintext SSPK to the hub's local DPAPI file on

@@ -47,8 +47,9 @@ end; a revoked credential's request never does). All new and pre-existing
 tests pass.
 
 **Verification actually run this session** (real command output, not
-assumed): `cargo build --lib` — clean; `cargo test --lib` — **784 passed,
-0 failed**; targeted `cargo test --lib` filters for `sync_payload_key::`,
+assumed): `cargo build --lib` — clean; `cargo test --lib` — **786 passed,
+0 failed** (784 from this slice's first pass, +2 more added by the
+self-review fix below); targeted `cargo test --lib` filters for `sync_payload_key::`,
 `hub_server::`, and the new `auth::` revoke/rotation tests — all pass
 individually; `cargo fmt --check` — clean (after one `cargo fmt` pass to
 fix drift this session introduced); `cargo clippy --all-targets -- -D
@@ -75,13 +76,27 @@ ref here). Following this project's documented reviewer-failure fallback:
 recorded honestly here, a rigorous self-review was performed instead
 (covering: DoS potential of clearing all wraps on any revocation — bounded
 by the same authorization gate revocation itself already requires;
-`ensure_wrapped_for_credential` having no revoked-state check of its own
-— deliberate, its safety is entirely `verify`'s gate, proven by test;
 tightened a defensive `unwrap_or_default()` empty-secret fallback in
 `hub_server::authenticate` to an explicit, logged skip instead, since a
 silent empty-secret fallback is exactly the kind of guessed-crypto
 shortcut this project's rules exist to prevent, even though it is
-provably unreachable given `verify` already succeeded), and this
+provably unreachable given `verify` already succeeded). The self-review
+also found a real gap, not just a style nit: **`ensure_wrapped_for_credential`
+had no `revoked_at` check of its own** — its only protection was that its
+sole real call site (`hub_server::authenticate`) happens to call it after
+`verify` already succeeds. A test named as if it proved the function
+itself refused revoked credentials
+(`a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key`)
+actually only proved `verify` rejects them — a misleading test, caught
+during self-review rather than shipped uncorrected. **Fixed before
+considering this slice done**: the function now independently checks
+`device_sync_credentials.revoked_at IS NULL` (and existence) before
+wrapping, with two new tests calling it directly with no `verify` in the
+loop (`ensure_wrapped_is_a_no_op_for_a_revoked_credential`,
+`ensure_wrapped_is_a_no_op_for_an_unknown_credential`), and the
+previously-misleading test corrected to actually assert the function's
+own refusal. Full detail: ADR-0069's newest addendum. This is now genuine
+defense in depth, not reliant on one caller's ordering. This
 independent-review debt is retained, not dropped — owed for a future
 session with a healthy reviewer harness.
 

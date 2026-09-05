@@ -392,3 +392,34 @@ close the gap. Recorded in `docs/VERIFICATION-DEBT.md`. Domain-table
 materialization of pulled changes (decrypting `encrypted_payload` and
 writing to `learners`/etc.) remains out of scope, unchanged from
 ADR-0067's own client-side-sync-loop addendum.
+
+## Addendum (2026-09-05) — self-review finding closed: `ensure_wrapped_for_credential` now checks revocation itself
+
+A self-review of the rotation addendum above (performed as the
+documented fallback for an unavailable independent-reviewer subagent,
+`docs/VERIFICATION-DEBT.md`) found that `ensure_wrapped_for_credential`
+had no `revoked_at` check of its own -- its safety depended entirely on
+its one real call site (`hub_server::authenticate`) always calling it
+_after_ a successful `device_credential::verify`. That is true today, but
+is a convention, not an enforced invariant: any future caller that
+invoked it without checking revocation first would silently re-establish
+a revoked device's decrypt capability. This is exactly the class of gap
+`.claude/rules/security-privacy.md` warns against ("security must never
+rely on ... enforce at the ... repository ... boundary").
+
+**Fixed in the same slice, before considering it done**:
+`ensure_wrapped_for_credential` now also checks
+`device_sync_credentials.revoked_at IS NULL` (and that the credential
+exists at all) before wrapping, refusing silently (returning `Ok(())`
+with no wrap created, matching its existing no-op-on-already-wrapped
+shape) for a revoked or unknown credential -- independent of whatever its
+caller already checked. Two new tests prove this directly, calling the
+function with no `verify` call anywhere in the test:
+`ensure_wrapped_is_a_no_op_for_a_revoked_credential`,
+`ensure_wrapped_is_a_no_op_for_an_unknown_credential`. The existing
+`auth::a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key`
+test (previously misleadingly named -- it had only proved `verify`
+rejects a revoked credential, not that this function does) now also
+asserts the function itself refuses. Full suite after this fix: 786 lib
+tests passed (784 + 2 new), `cargo fmt --check` clean, `cargo clippy
+--all-targets -- -D warnings` clean.

@@ -2464,13 +2464,19 @@ mod tests {
     }
 
     /// A device revoked BEFORE rotation cannot recover a wrap of whatever
-    /// new SSPK gets minted after rotation -- `ensure_wrapped_for_credential`
-    /// is only ever reachable through `hub_server::authenticate`, which
-    /// itself requires a successful `device_credential::verify`, and a
-    /// revoked credential never verifies. This test proves the invariant at
-    /// the repository layer directly (no HTTP plumbing needed): the revoked
-    /// device's secret can never again be used to establish a wrap of a
-    /// key minted after its revocation.
+    /// new SSPK gets minted after rotation. Belt AND suspenders, proven
+    /// separately: (1) in production, `ensure_wrapped_for_credential` is
+    /// only ever reachable through `hub_server::authenticate`, which
+    /// requires a successful `device_credential::verify` first, and a
+    /// revoked credential never verifies (asserted below). (2) An
+    /// independent review found that `ensure_wrapped_for_credential` itself
+    /// had no `revoked_at` awareness -- if any future caller ever invoked
+    /// it without going through `verify` first, it would have silently
+    /// re-established decrypt capability for a revoked device. That gap is
+    /// now closed with an explicit active-credential check inside the
+    /// function itself (defense in depth, not reliant on caller ordering),
+    /// which this test also proves directly: calling it with the revoked
+    /// device's own real secret is a silent no-op, not a successful wrap.
     #[test]
     fn a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key() {
         let conn = open_test_db();
@@ -2493,15 +2499,10 @@ mod tests {
         revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap();
         let new_sspk = test_sspk();
 
-        // Nothing but `hub_server::authenticate`'s post-`verify` call site
-        // ever invokes this -- and `verify` already rejects the revoked
-        // credential, so this call is unreachable in the real system. This
-        // test exercises it directly anyway, to prove the repository layer
-        // itself would still refuse to help even if some future caller
-        // skipped the verify step by mistake: `ensure_wrapped_for_credential`
-        // has no `revoked_at` awareness of its own, so this documents that
-        // its safety comes entirely from being gated behind `verify`, not
-        // from any check inside this function.
+        // Even called directly, bypassing `verify` entirely, this must be
+        // a no-op for a revoked credential -- proving the function's own
+        // internal active-credential check, not just the one call site's
+        // ordering.
         sync_payload_key_repo::ensure_wrapped_for_credential(
             &conn,
             &s.id,
@@ -2511,10 +2512,16 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential.id, &secret).unwrap(),
+            None,
+            "ensure_wrapped_for_credential must refuse to wrap for a revoked credential, \
+             even when called directly with that device's own correct secret"
+        );
+        assert_eq!(
             device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex).unwrap(),
             None,
-            "the revoked credential itself must never verify again, which is what actually \
-             keeps this device from ever reaching ensure_wrapped_for_credential in production"
+            "the revoked credential itself must also never verify again -- the production \
+             call site's first line of defense, independent of the check above"
         );
     }
 

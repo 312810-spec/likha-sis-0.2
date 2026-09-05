@@ -90,6 +90,17 @@ pub fn unwrap_for_credential(
 /// it holds -- no new UX ceremony, no second network round trip, and the
 /// hub never needs to have retained a revoked device's secret to rotate
 /// everyone else onto the new key.
+///
+/// Defense in depth: also refuses to wrap for a credential that is
+/// `revoked_at IS NOT NULL` or does not exist, even though the one real
+/// call site (`hub_server::authenticate`) already gates this behind a
+/// successful `device_credential::verify` (which itself already rejects a
+/// revoked credential) -- security must not rely on a single caller
+/// always getting the ordering right (`.claude/rules/security-privacy.md`:
+/// "enforce at the ... repository ... boundary, not by omitting a
+/// button"). A revocation review found this function had no such check of
+/// its own; this closes that gap rather than leaving it as pure
+/// convention.
 pub fn ensure_wrapped_for_credential(
     conn: &Connection,
     school_id: &str,
@@ -105,6 +116,19 @@ pub fn ensure_wrapped_for_credential(
     if exists {
         return Ok(());
     }
+
+    let is_active: bool = conn.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM device_sync_credentials
+             WHERE id = ?1 AND school_id = ?2 AND revoked_at IS NULL
+         )",
+        (credential_id, school_id),
+        |row| row.get(0),
+    )?;
+    if !is_active {
+        return Ok(());
+    }
+
     wrap_for_credential(conn, school_id, credential_id, device_secret, sspk)
 }
 
@@ -397,6 +421,54 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(unwrapped, sspk);
+    }
+
+    /// Defense in depth: `ensure_wrapped_for_credential` must refuse a
+    /// revoked credential on its own, not merely because its real call
+    /// site (`hub_server::authenticate`) happens to check first. Exercises
+    /// the repository function directly, with no `verify` call anywhere
+    /// in this test.
+    #[test]
+    fn ensure_wrapped_is_a_no_op_for_a_revoked_credential() {
+        let (conn, school_id, user_id) = setup();
+        let credential =
+            device_credential::enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+        let device_secret = decode_hex(&credential.secret_hex);
+        device_credential::revoke(&conn, &school_id, &credential.id).unwrap();
+
+        ensure_wrapped_for_credential(
+            &conn,
+            &school_id,
+            &credential.id,
+            &device_secret,
+            &payload_key::generate_payload_key(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            unwrap_for_credential(&conn, &credential.id, &device_secret).unwrap(),
+            None,
+            "a revoked credential must never gain a wrap, even called directly"
+        );
+    }
+
+    #[test]
+    fn ensure_wrapped_is_a_no_op_for_an_unknown_credential() {
+        let (conn, school_id, _user_id) = setup();
+
+        ensure_wrapped_for_credential(
+            &conn,
+            &school_id,
+            "no-such-credential",
+            b"irrelevant secret bytes",
+            &payload_key::generate_payload_key(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            unwrap_for_credential(&conn, "no-such-credential", b"irrelevant secret bytes").unwrap(),
+            None
+        );
     }
 
     #[test]
