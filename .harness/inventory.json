@@ -54,6 +54,6 @@
       "quality:security",
       "quality:ui"
     ],
-    "workflows": ["claude.yml", "harness-health.yml", "quality.yml", "security.yml"]
+    "workflows": ["harness-health.yml", "quality.yml", "security.yml"]
   }
 }
