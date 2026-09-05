@@ -7,6 +7,19 @@ record the checkpoint, produce the required summary, identify the exact
 next slice, and stop. Never begin the next wave without a new user
 instruction to continue.
 
+## Prompt-ahead discipline (owner instruction, 2026-09-05)
+
+When a slice's CI is running (or an implementation agent is otherwise
+in flight) and the mode in effect explicitly allows continuing past one
+wave boundary without re-asking (e.g. an owner-directed multi-priority
+run), do not sit idle waiting for it. Immediately identify the next
+priority from current evidence, generate its implementation prompt with
+`prompt-master`, and have it ready (or already dispatched) so the
+next slice starts the moment the current one's CI/agent finishes. This
+conserves wall-clock time across a chain of priorities. It does not
+override the ordinary wave-boundary stop — it only removes idle time
+inside an already-authorized continuation.
+
 ## The loop
 
 Understand → Research → Specify → Plan → Implement → Test → Review →
@@ -58,7 +71,7 @@ tests passed; an ADR was written; the roadmap lists a "next candidate";
 several technical candidates exist; the current wave needs research; a
 new architecture decision requires the scenario process;
 independent review has debt; a reviewer harness fails under the
-established retry rule (below); documentation says "pick M_/M_/etc.";
+established retry rule (below); documentation says "pick M*/M*/etc.";
 or an earlier handoff says "no candidate pre-selected." The completed
 wave boundary is the mandatory stopping point.
 
