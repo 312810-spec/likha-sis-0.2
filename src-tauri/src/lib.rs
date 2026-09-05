@@ -5,6 +5,7 @@ pub mod db;
 pub mod error;
 pub mod export;
 pub mod formgen;
+pub mod hub_server;
 pub mod import;
 pub mod repository;
 pub mod sync;

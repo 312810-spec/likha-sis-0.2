@@ -123,3 +123,66 @@ internet outages. It accepts responsibility for physical security, patching,
 power, monitoring, backups, key custody, and recovery. Home edits may remain
 queued until the laptop becomes reachable; users must see last-successful-sync,
 pending-change count, and actionable errors rather than a false "synced" state.
+
+## Addendum (2026-09-05) — network listener library decision
+
+This ADR's "What this ADR does NOT decide" left the exact wire protocol open.
+The actual surface needed turned out to be small: two authenticated JSON
+operations (push a batch of already-encrypted changes; pull changes after a
+cursor), both already fully implemented and tested as plain functions
+(`repository::device_credential::verify`, `repository::sync_hub::push_batch`/
+`pull_since`) — the listener's only job is to authenticate a request and
+shuttle bytes to/from them.
+
+**Decision: `axum`** (tokio-rs org). Evaluated against `warp`, `actix-web`,
+`tiny_http`, and a hand-rolled raw-TCP framing:
+
+- `axum` 0.8.9, MIT, actively maintained (last published 2026-04, verified
+  via the crates.io API). Plain extractor/handler functions, no macro DSL —
+  the most ergonomic fit for this team. `default-features = false` with only
+  `json`, `http1`, `tokio` — no HTTP/2, no multipart/websocket surface this
+  API doesn't use.
+- `warp` 0.4.3, MIT, also actively maintained (last published 2026-05) — a
+  legitimate Next Best, but its `Filter` combinator API is less ergonomic for
+  this team than axum's plain functions (a documented tradeoff independent
+  developers report when porting between the two).
+- `tiny_http` 0.12.0 — last published 2022-10, effectively dormant. Would
+  also mean hand-rolling JSON body handling, routing, and typed extraction
+  axum/warp already provide. Rejected on maintenance grounds alone.
+- `actix-web` — a heavier, actor-model framework with much more surface
+  (middleware stacks, its own runtime abstractions) than two JSON endpoints
+  need. Not evaluated further given axum already fits cleanly.
+- Hand-rolled raw TCP + custom framing — rejected: reinvents HTTP parsing,
+  JSON extraction, and routing that already-audited libraries provide for
+  free, for a correctness-first project, with no compensating benefit over
+  axum for this small a surface.
+
+**Tauri integration**: reuses the `tokio` runtime Tauri already runs
+internally — `tauri::async_runtime::spawn` is the documented pattern for
+running an axum server inside a Tauri app (no second/parallel runtime, no
+`#[tokio::main]`).
+
+**What shipped this slice**: `hub_server` module — an `axum::Router` exposing
+`POST /sync/push` and `GET /sync/pull`, both requiring `x-likha-credential-id`
+/`x-likha-device-secret` headers (never a query parameter, so a secret never
+ends up in a proxy/access-log line), verified via `device_credential::verify`
+with the same enumeration-safe collapse (unknown id / revoked / wrong secret
+all return the same generic `401`). Errors crossing this boundary are mapped
+to a small closed set (`401`/`400`/`500` with fixed, generic messages) —
+never an internal database error string, the same "never leak the underlying
+error text" discipline `AppError::Import`/`FormGeneration` already apply at
+the Tauri IPC boundary. Tested via `axum`+`tower`'s router-as-a-`Service`
+pattern (no real TCP socket bound) including a full authenticated push→pull
+round trip. New dev-dependencies: `tower` (`util` feature, router testing
+only) and `tokio` (`macros`+`rt-multi-thread`, for `#[tokio::test]`).
+
+**Deliberately NOT done in this slice** (a separate, later increment): binding
+the router to an actual TCP listener and deciding which interface address to
+bind (LAN and/or Tailscale — **never `0.0.0.0`**, per this ADR's own
+School-laptop operations gate); wiring it into Tauri app startup; TLS (or a
+documented decision that the LAN/Tailscale transport itself is the trust
+boundary and plaintext HTTP inside it is acceptable, matching ADR-0069's
+reasoning for payload transport); per-device rate limiting; request body size
+limits beyond the existing `MAX_PUSH_BATCH`/`sync::validate_change` payload
+cap; and the client side of this protocol (a device's own HTTP client calling
+these two endpoints) — nothing yet drains `sync_outbox` over the network.
