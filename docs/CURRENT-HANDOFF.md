@@ -1,5 +1,120 @@
 # CURRENT HANDOFF
 
+## Sync payload encrypt/decrypt generalized to a second entity, Attendance — ADR-0069 pattern (2026-09-05), commit + PR owed
+
+Wired the exact same encrypt-on-enqueue / decrypt-on-pull pattern the
+prior slice closed for `EntityKind::Learner` onto a second entity,
+`EntityKind::Attendance` — the next domain write path this project's
+priority order actually favors. This is following an established
+pattern, not a new architecture decision, so the 10-scenario process
+was not run for it.
+
+**Why Attendance, not one of the other eight unwired `EntityKind`
+variants**: of the entities with a real producing write path already in
+this codebase (`commands::attendance::record_attendance` is the only
+other mature domain write besides learner creation), attendance is the
+kind of record a teacher needs reflected promptly across a shared
+school-laptop hub — another teacher, or the registrar, checking the same
+section's roster later the same day — unlike rarely-changing reference
+data (subjects, grading periods) or entities with no producing command
+yet (`SectionMembership`, `AssessmentItem`, `LearnerScore`,
+`TeachingAssignment`, `Section`, `Subject`, `GradingPeriod`,
+`SubjectAttendance`). This matches the task brief's own priority
+ordering (teacher usability / offline reliability) over reference data.
+
+**What shipped**: `commands::attendance::record_attendance` now takes an
+`AppHandle`, resolves the SSPK exactly like `create_learner` does, and
+(when this school has an active device sync credential) encrypts and
+enqueues the resulting `AttendanceRecord` atomically with the write
+itself in one `SAVEPOINT` (`record_attendance_with_optional_sync`,
+`enqueue_attendance_sync_change`). Unlike the learner slice (a
+create-only write, always `base_version = 0`), attendance can be
+re-recorded for the same learner/date, so `enqueue_attendance_sync_change`
+reads this device's own `sync_version_cache` known-version for the
+entity id as `base_version`, so a genuine second edit is not
+misreported as a stale self-conflict. On the pull side,
+`repository::attendance::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`, keyed on the row's own stable
+`id` rather than the `(learner_id, attendance_date)` unique constraint
+`record`'s own insert conflicts on) materializes a decrypted,
+school_id-cross-checked `AttendanceRecord`; `sync_client::apply_decrypted_change`
+gained an `EntityKind::Attendance` arm following the exact same
+decrypt/deserialize/cross-check/upsert shape as `Learner`'s.
+`AttendanceRecord` gained `Deserialize` (was `Serialize`-only) so a
+pulled payload can round-trip.
+
+**A real limitation surfaced by this choice, recorded honestly (not
+fixed — out of scope this slice)**: `attendance_records.section_id` and
+`.learner_id` are real FKs to `sections`/`learners`. `Learner` is
+sync-wired, so a pulled attendance row's learner FK will already resolve
+on a device that has pulled that learner. `Section` is **not**
+sync-wired yet — no producing write path exists for it — so a device
+that pulls an attendance change referencing a section it has never
+independently created locally will hit an FK violation, which this
+slice's fail-closed design already handles safely (rejected, retried
+every future round, domain table/cursor never advance past it) but will
+never actually succeed until `Section` is also wired. This is a strong
+argument for `Section` (or `SectionMembership`) being the next entity
+generalized, not a bug in this slice.
+
+**Tests (TDD)**: `repository::attendance` — 2 new (`upsert_from_sync`
+inserts a never-seen row; updates an existing row in place, not a
+duplicate). `commands::attendance` — 4 new (no-sspk behaves like a plain
+record with no outbox row; an enrolled installation enqueues a correctly
+encrypted outbox entry that round-trips back to the exact recorded
+value; re-recording the same entity enqueues with the known base
+version, not unconditionally 0; the change is stamped with this
+installation's own device id). `sync_client` — 3 new (a non-conflicting
+attendance pull materializes the real `attendance_records` row and
+advances the version cache; a tampered attendance payload is rejected
+without applying or advancing past it; an unsynced local edit to the
+same attendance entity is still staged into `sync_conflict_review`,
+never silently overwritten, exactly like the learner case).
+
+**Verification actually run this session**: `cargo build --lib` clean;
+`cargo test --lib` — **803 passed, 0 failed** (794 baseline plus 9 new
+for this slice: 2 in `repository::attendance`, 4 in
+`commands::attendance`, 3 in `sync_client`); a full-crate `cargo test`
+(lib plus every integration binary plus doctests) — exit code 0, all
+green (0 doctests, unchanged); `cargo fmt
+--check` — clean (after one `cargo fmt` pass this session fixed drift
+this slice introduced); `cargo clippy --all-targets -- -D warnings` —
+clean, zero warnings; `npm run quality:security` — **3 ok, 0 failed, 0
+missing** (gitleaks, cargo-deny, osv-scanner; no new dependency added).
+`npm run quality` (TS side) not attempted — no TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent was reachable
+this session (same known gap noted in every prior addendum in this
+chain) — followed the documented fallback: recorded honestly here,
+rigorous self-review performed instead. Self-review focus: (1) the
+`section_id`/`learner_id` FK limitation above — confirmed it fails
+closed (rejected + retried), never silently drops or corrupts data; (2)
+confirmed `upsert_from_sync` deliberately does not re-validate
+roster/section-membership on pull, matching this codebase's established
+trust model (an enrolled device's pushed change is already trusted the
+same way the hub already trusts it for every other entity — no new
+trust boundary introduced); (3) confirmed the `base_version` read from
+`sync_version_cache` at enqueue time cannot be spoofed by a caller (it
+is derived server-side from local state, never a parameter); (4)
+confirmed the `SAVEPOINT`/rollback shape is identical to the proven
+`create_learner_with_optional_sync` pattern. No blocking issue found.
+This independent-review debt is retained, not dropped — owed for a
+future session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why**: no third `EntityKind`
+wired (out of scope per the task brief); `db::rotate_sspk`/DPAPI
+untouched (native-hardware gated, unchanged); the `Section` FK gap noted
+above is recorded as a limitation, not patched around with a
+workaround that would weaken the fail-closed guarantee.
+
+**Exact next task**: wire `Section` (or `SectionMembership`) next — both
+because it is architecturally required to unblock `Attendance` pulls in
+practice on a device that has not independently created the same
+sections, and because it is itself reference data a shared hub benefits
+from replicating. Alternatively, `db::rotate_sspk`/DPAPI once native
+Windows verification is available — whichever the next session's
+evidence favors per `.claude/rules/autonomous-development.md`.
+
 ## Sync payload encrypt/decrypt round trip closed for the learner entity — ADR-0069 addendum (2026-09-05), commit + PR owed
 
 Closed the last open gap this ADR's own notes kept flagging: pulled

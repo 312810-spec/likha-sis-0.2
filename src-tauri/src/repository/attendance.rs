@@ -51,7 +51,7 @@ impl AttendanceStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AttendanceRecord {
     pub id: String,
@@ -140,6 +140,46 @@ pub fn record(
     )
     .map(Some)
     .map_err(AppError::from)
+}
+
+/// Sync-pull counterpart to `record` — materializes an `AttendanceRecord`
+/// this device received (already validated/enqueued by whichever device
+/// originally called `record`), instead of re-deriving one from raw
+/// caller input. Mirrors `learner::upsert_from_sync`'s exact shape: an
+/// `INSERT ... ON CONFLICT(id) DO UPDATE` keyed on the row's own stable
+/// `id` (not the `(learner_id, attendance_date)` unique constraint
+/// `record`'s own insert conflicts on) — the same `id`, minted once on the
+/// originating device, is what every other device's pulled copy of this
+/// row must converge on, exactly like a learner's `id` does. Not
+/// re-validating section/roster membership here is deliberate and safe:
+/// this data already passed that check on the device that originally
+/// called `record`; re-deriving it here would let a stale local
+/// section/membership row on THIS device silently reject a pull that is
+/// actually correct hub-side truth. `.claude/rules/architecture.md`: all
+/// SQL stays in Rust/this repository module, never in `sync_client`.
+pub fn upsert_from_sync(conn: &Connection, record: &AttendanceRecord) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO attendance_records \
+             (id, school_id, section_id, learner_id, attendance_date, status, recorded_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+         ON CONFLICT(id) DO UPDATE SET \
+             school_id = excluded.school_id, \
+             section_id = excluded.section_id, \
+             learner_id = excluded.learner_id, \
+             attendance_date = excluded.attendance_date, \
+             status = excluded.status, \
+             recorded_at = excluded.recorded_at",
+        (
+            &record.id,
+            &record.school_id,
+            &record.section_id,
+            &record.learner_id,
+            &record.attendance_date,
+            record.status.as_db_str(),
+            &record.recorded_at,
+        ),
+    )?;
+    Ok(())
 }
 
 /// The roster for `section_id` on `attendance_date` — every learner with an
@@ -1021,5 +1061,68 @@ mod tests {
         let report = monthly_grid_for_section(&conn, &school_id, &section_a, 2026, 8).unwrap();
 
         assert_eq!(report.learners.len(), 2, "only section A's two members");
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_record_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        let incoming = AttendanceRecord {
+            id: Uuid::now_v7().to_string(),
+            school_id: school_id.clone(),
+            section_id: section_id.clone(),
+            learner_id: learner_id.clone(),
+            attendance_date: "2026-08-24".to_string(),
+            status: AttendanceStatus::Present,
+            recorded_at: "2026-08-24T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let stored = conn
+            .query_row(
+                "SELECT status FROM attendance_records WHERE id = ?1",
+                [&incoming.id],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "present");
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let (school_id, section_id, learner_id) = setup_enrolled_learner(&conn);
+        let original = record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-24",
+            AttendanceStatus::Absent,
+        )
+        .unwrap()
+        .unwrap();
+
+        let updated = AttendanceRecord {
+            status: AttendanceStatus::Tardy,
+            ..original.clone()
+        };
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let stored = conn
+            .query_row(
+                "SELECT status FROM attendance_records WHERE id = ?1",
+                [&original.id],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "tardy");
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM attendance_records", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 1, "must update in place, never duplicate");
     }
 }

@@ -1,5 +1,46 @@
 # ACTIVE PLAN
 
+## Sync payload encrypt/decrypt generalized to a second entity, Attendance (2026-09-05), commit + PR owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Summary: wired
+`commands::attendance::record_attendance` onto the exact same
+encrypt-on-enqueue pattern `create_learner` already uses, added
+`repository::attendance::upsert_from_sync`, and added an
+`EntityKind::Attendance` arm to `sync_client::apply_decrypted_change`.
+Chosen over the other unwired entities because it is the domain write a
+teacher needs reflected promptly across a shared school-laptop hub.
+Unlike learner (create-only, `base_version` always 0), attendance can be
+re-recorded, so its enqueue reads `sync_version_cache`'s known version as
+`base_version`.
+
+**Verification actually run**: `cargo build --lib` clean; `cargo test
+--lib` 803/803 passed (794 baseline + 9 new); full-crate `cargo test`
+(lib + integration binaries + doctests) exit code 0; `cargo fmt --check`
+clean; `cargo clippy --all-targets -- -D warnings` clean, zero warnings;
+`npm run quality:security` 3/3 ok (gitleaks, cargo-deny, osv-scanner — no
+new dependency added). `npm run quality` (TS side) not attempted — no
+TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent reachable this
+session — documented fallback followed (recorded honestly, rigorous
+self-review performed, no blocking issue found, debt retained). See
+`docs/CURRENT-HANDOFF.md`'s matching entry for the specific self-review
+points, including the `Section` FK limitation this choice surfaced.
+
+**Retained debt**: `db::rotate_sspk`/DPAPI (needs native Windows
+verification); generalizing this encrypt/decrypt pattern to the
+remaining eight `EntityKind` variants; independent security review
+(owed, not dropped); a device that pulls an attendance change
+referencing a section it has never independently created locally will
+FK-reject it (fails closed, retried forever, never silently corrupts —
+but never succeeds until `Section` is also sync-wired).
+
+**Exact next slice**: wire `Section` (or `SectionMembership`) next — it
+both unblocks real-world `Attendance` pulls and is itself reference data
+worth replicating, or pick up `db::rotate_sspk`/DPAPI once native
+Windows verification is available — whichever the next session's
+evidence favors per `.claude/rules/autonomous-development.md`.
+
 ## Sync payload encrypt/decrypt round trip closed for the learner entity — ADR-0069 addendum (2026-09-05), commit + PR owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry and ADR-0069's

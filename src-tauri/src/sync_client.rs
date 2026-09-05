@@ -16,12 +16,14 @@
 //! `resolve_sspk`'s `/sync/payload-key-wrap` round trip and
 //! `crypto::payload_key::decrypt_payload`) and materialized into its
 //! domain table through the existing repository write path -- see
-//! `apply_decrypted_change`. Scoped to exactly the one entity kind
-//! already wired end to end on the push side, `EntityKind::Learner` (see
-//! `commands::learner`'s own doc comment); every other `EntityKind`
-//! variant has no producing write path yet, so decrypting one here is
-//! unreachable in practice and is treated as a rejection rather than a
-//! silent no-op success. A change this device has its own unsynced local
+//! `apply_decrypted_change`. Scoped to the entity kinds actually wired
+//! end to end on the push side: `EntityKind::Learner` (see
+//! `commands::learner`'s own doc comment) and, added in a later
+//! addendum, `EntityKind::Attendance` (see `commands::attendance`'s own
+//! doc comment); every other `EntityKind` variant has no producing write
+//! path yet, so decrypting one here is unreachable in practice and is
+//! treated as a rejection rather than a silent no-op success. A change
+//! this device has its own unsynced local
 //! edit for is still never decrypted-and-applied -- it is staged into the
 //! same conflict-review queue the push side already uses, exactly as
 //! before this addendum, never a silent last-write-wins.
@@ -35,8 +37,8 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
-    device_credential, device_sync_client_credential, learner, sync_conflict_review, sync_hub,
-    sync_outbox, sync_pull_cursor, sync_version_cache,
+    attendance, device_credential, device_sync_client_credential, learner, sync_conflict_review,
+    sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
 };
 use crate::sync::{EntityKind, PendingChange};
 
@@ -487,12 +489,13 @@ pub fn pull_once(
 /// silently (`.claude/rules/security-privacy.md`: enforce at the
 /// repository boundary, not by omission).
 ///
-/// Entity kinds other than `Learner` are deliberately left unhandled here
-/// -- no domain write path for them is enqueued anywhere yet (see
-/// `commands::learner`'s own doc comment: this is the ONLY entity wired to
-/// `sync_outbox` so far), so decrypting one is unreachable in practice.
-/// Rather than silently accepting an unknown kind as a no-op success (which
-/// would look identical to "applied" to a future caller), it is treated the
+/// Entity kinds other than `Learner`/`Attendance` are deliberately left
+/// unhandled here -- no domain write path for them is enqueued anywhere
+/// yet (see `commands::learner`'s and `commands::attendance`'s own doc
+/// comments: these are the only two entities wired to `sync_outbox` so
+/// far), so decrypting one is unreachable in practice. Rather than
+/// silently accepting an unknown kind as a no-op success (which would
+/// look identical to "applied" to a future caller), it is treated the
 /// same as any other rejection -- fail closed on anything this slice does
 /// not yet know how to materialize, rather than pretend success.
 fn apply_decrypted_change(
@@ -511,6 +514,14 @@ fn apply_decrypted_change(
                 return Err(());
             }
             learner::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        EntityKind::Attendance => {
+            let incoming: attendance::AttendanceRecord =
+                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            attendance::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
         _ => Err(()),
     }
@@ -746,6 +757,54 @@ mod tests {
     ) -> PendingChange {
         let mut change = make_change(fixture, entity_id, base_version);
         let plaintext = serde_json::to_vec(&synthetic_learner(fixture, entity_id)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    /// Like `synthetic_learner`, but an `AttendanceRecord` -- the second
+    /// entity kind wired end to end (see `commands::attendance`'s own doc
+    /// comment for why attendance was chosen next). `attendance_records`
+    /// has real FK columns to `sections`/`learners`
+    /// (`db::migrations`), so this creates a real section and learner in
+    /// the CLIENT's own local db first -- the same "this device's local
+    /// copy of shared reference rows" pattern `setup()` already uses for
+    /// the `schools` row.
+    fn synthetic_attendance_record(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+    ) -> attendance::AttendanceRecord {
+        let section = crate::repository::section::create(
+            &fixture.conn,
+            &fixture.school_id,
+            "2025-2026",
+            "7",
+            &format!("Section-{entity_id}"),
+        )
+        .unwrap();
+        let learner =
+            learner::create(&fixture.conn, &fixture.school_id, "Ana", "Cruz", None, None).unwrap();
+        attendance::AttendanceRecord {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            section_id: section.id,
+            learner_id: learner.id,
+            attendance_date: "2026-08-24".to_string(),
+            status: attendance::AttendanceStatus::Present,
+            recorded_at: "2026-08-24T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_learner_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` attendance payload.
+    fn make_attendance_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::Attendance;
+        let plaintext =
+            serde_json::to_vec(&synthetic_attendance_record(fixture, entity_id)).unwrap();
         change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
         change
     }
@@ -1163,6 +1222,169 @@ mod tests {
             )
             .unwrap()
             .is_none());
+        };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_attendance_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_attendance_change(&fixture, entity_id, 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT status FROM attendance_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "present");
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::Attendance,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_attendance_payload_without_applying_or_advancing_past_it() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_attendance_change(&fixture, entity_id, 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM attendance_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_an_attendance_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's attendance change lands at the hub.
+        {
+            let conn = &fixture.conn;
+            let mut other_device_change = make_change(&fixture, entity_id, 0);
+            other_device_change.entity_kind = EntityKind::Attendance;
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently edited the SAME entity and has not
+        // pushed it yet.
+        {
+            let conn = &fixture.conn;
+            let mut local_change = make_change(&fixture, entity_id, 0);
+            local_change.entity_kind = EntityKind::Attendance;
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM attendance_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
         };
     }
 
