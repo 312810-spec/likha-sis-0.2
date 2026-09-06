@@ -154,11 +154,7 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
 /// -- a local-first desktop app must keep working even when sync is
 /// unavailable, and a failure on one interface must never take down the
 /// others (each address gets its own independent task).
-pub fn spawn(
-    db: Arc<Mutex<Connection>>,
-    sspk: [u8; PAYLOAD_KEY_LEN],
-    bind_addr: SocketAddr,
-) {
+pub fn spawn(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], bind_addr: SocketAddr) {
     let app_router = router(HubServerState { db, sspk });
     tauri::async_runtime::spawn(async move {
         match tokio::net::TcpListener::bind(bind_addr).await {
@@ -181,11 +177,7 @@ pub fn spawn(
 /// -- and can fail to bind -- completely independently: a taken port or a
 /// changed address on one interface never prevents the others (including
 /// loopback) from serving.
-pub fn spawn_all(
-    db: Arc<Mutex<Connection>>,
-    sspk: [u8; PAYLOAD_KEY_LEN],
-    addresses: &[Ipv4Addr],
-) {
+pub fn spawn_all(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], addresses: &[Ipv4Addr]) {
     for &addr in addresses {
         spawn(
             Arc::clone(&db),
