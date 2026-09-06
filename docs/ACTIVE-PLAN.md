@@ -1,5 +1,50 @@
 # ACTIVE PLAN
 
+## GradingPeriod sync wiring (2026-09-06)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: eighth entity wired through ADR-0067/0069's sync
+encrypt/decrypt pattern, after Learner, Attendance, Section,
+LearnerScore, AssessmentItem, Subject, TeachingAssignment.
+`repository::grading::upsert_from_sync` (new, id-keyed upsert bypassing
+`create`'s own policy-period-existence/date-order/uniqueness
+validation), `commands::grading::create_grading_period_with_optional_sync`
+(new, mirrors `teaching_assignment`'s SAVEPOINT + unconditional
+`base_version = 0` shape, wiring only the `create` verb — there is no
+`update`/`remove` command on grading periods), and a new
+`EntityKind::GradingPeriod` arm in `sync_client::apply_decrypted_change`.
+
+This worktree's branch had fallen behind the shared integration branch
+`claude/repo-priority-automation-8h96zx` (missing the entire
+ADR-0067/0069 foundation through the TeachingAssignment slice) —
+fast-forward-merged onto that tip before starting, a pure catch-up.
+
+`SubjectAttendance` remains the one entity with no sync wiring at all;
+`SectionMembership` remains deferred pending its own multi-verb design
+(five temporal verbs) — recorded as the next candidates.
+
+Verification actually run this session:
+
+- `cargo test --lib` (from a clean `target/` after `cargo clean`): 901
+  passed, 0 failed, including all new `grading`/`commands::grading`/
+  `sync_client` tests.
+- Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+  individually via `cargo test --test <name>` (deleting each linked
+  binary after it ran to stay under this container's disk quota, which a
+  single unrestricted `cargo test` cannot fit): all 18 exited 0, no
+  `FAILED` anywhere, including `grading` (5 tests).
+- `cargo clippy --all-targets -- -D warnings`: clean on the first run.
+- `cargo fmt --check`: found drift in this slice's own new code, fixed
+  with plain `cargo fmt`, re-ran `--check` clean.
+- `npm run quality:security`: clean (gitleaks + cargo-deny + OSV-Scanner,
+  3 ok / 0 failed / 0 missing).
+- `npm run quality`: TS-side steps (`typecheck`/`lint`/`format:check`/
+  `check:architecture`) passed; `check:deadcode` (`knip`) fails on
+  pre-existing, unrelated findings present before this slice touched
+  anything (this slice changed only 3 Rust files) — not a regression.
+
+Not pushed; commit is local only per this task's batch-mode instruction.
+
 ## TeachingAssignment sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
