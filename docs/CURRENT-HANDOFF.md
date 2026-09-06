@@ -1,5 +1,128 @@
 # CURRENT HANDOFF
 
+## School Membership Removal (2026-09-06), committed locally, push held (see below)
+
+Branch `claude/repo-priority-automation-8h96zx`, worktree
+`agent-aee5e5274192fe6a2`. Closes the one concrete, well-scoped gap
+identified from the "Build remaining named feature backlog" item: a
+School Head had no way to revoke a school member's access once granted.
+Teacher Load was confirmed already fully built; "My Day" and "Creation
+Studio" have no product scoping anywhere in the docs and were
+deliberately NOT attempted (inventing requirements is against this
+project's rules); branding was judged not urgent. This slice does not
+touch any of those.
+
+**What shipped**:
+
+- `repository/user::remove_school_membership(conn, user_id, school_id)`
+  (new): deletes the `user_school_memberships` row. `user_school_roles`
+  cascades via its existing `ON DELETE CASCADE` FK on the
+  `(user_id, school_id)` composite (migration 16) -- no new cascade
+  logic needed. Every other table that references a user (audit_log,
+  teaching_assignment, learner records, etc.) references `user_id`
+  directly, never the membership row, so a removed member's own created
+  records are never touched -- proven by a dedicated test
+  (`remove_school_membership_leaves_the_removed_members_own_records_untouched`).
+- **Last-School-Head guard (repository-level, fail-closed)**: confirmed
+  this WAS a real, unguarded gap -- nothing in the existing schema or
+  auth layer stopped a school from being left with zero School Heads,
+  and the app has no recovery flow for that state (no UI to grant the
+  role to anyone once nobody holds `ManageSchoolMembership`). Added a
+  guard in `remove_school_membership` itself: refuses (returns
+  `Ok(false)`, not an error, matching this codebase's established
+  enumeration-safety return shape) when removing this membership would
+  leave the school with zero School Heads, scoped per-school (a user
+  can be the sole head of school A but freely removable from school B).
+  Six repository tests cover this directly, including the sole-head
+  self-removal case and the per-school scoping case.
+- `auth::remove_school_member` (new): reuses `ManageSchoolMembership`
+  (School-Head-only, via `authorize_capability_with_actor` -- the same
+  gate `add_user_to_school`/`admin_reset_teacher_password` already use),
+  `school_id` derived only from the caller's session, never a parameter.
+  Effective immediately: revokes every active session the target holds
+  in that school (`session_repo::revoke_all_for_user`) and records a new
+  `AuditEventType::SchoolMembershipRemoved` audit event, both in the
+  same savepoint/rollback transaction as the membership removal itself
+  -- directly mirrors `admin_reset_teacher_password`'s established
+  pattern. Migration 36 widens `audit_log`'s `event_type` CHECK
+  (12-step rebuild, same shape as migrations 24/26). Returns `Ok(false)`
+  for an unknown target, a target in a different school, or a
+  last-School-Head refusal -- all indistinguishable, matching
+  `admin_reset_teacher_password`'s enumeration-safety contract. 11 new
+  auth-layer tests cover authorization (School-Head-only, Registrar and
+  Teacher both denied), cross-school isolation, session revocation, and
+  the audit/session/removal transactional rollback-together case.
+- `commands::user::remove_school_member` (new Tauri command), registered
+  in `lib.rs`.
+- Frontend: `SchoolMemberRepository.removeMember` (port),
+  `TauriSchoolMemberRepository.removeMember` (adapter calling
+  `remove_school_member`), `SchoolMemberApplicationService.removeMember`
+  (trims/validates the target id before calling the port, matching this
+  codebase's established application-service validation pattern). New
+  `SchoolMembershipScreen.tsx` (nav: Security group, tab id
+  `school-members`, label "School Members") lists every member with
+  their roles and a two-step, plain-language "Remove member" /
+  "Yes, remove this member" confirmation (no single-click or
+  `confirm()` dialog), directly modeled on `DeviceManagementScreen.tsx`'s
+  established destructive-action pattern. Any authenticated member sees
+  the same screen -- the backend alone enforces who can actually remove
+  someone, matching this codebase's "security must not rely on UI
+  hiding" convention.
+- ADR-0067's device/sync de-provisioning: investigated, no existing
+  linkage point found to extend (this is a local membership/session
+  concept, not a sync-device credential) -- a plain local membership
+  removal is a complete, valid slice on its own, per the task's own
+  framing. Not built.
+
+**Verified this session** (all commands actually run, not asserted):
+
+- `cd src-tauri && cargo fmt --check` -- clean after one `cargo fmt`
+  pass (a few long test lines needed reflowing; no manual restyling).
+- `cargo clippy --all-targets -- -D warnings` -- clean, no warnings.
+- `cargo test --lib` -- 950 passed, 0 failed.
+- `cargo test` (full checkpoint, unit + any integration/doc tests) --
+  see the exact counts in this session's own final report; ran clean
+  after `cargo clean` was needed once to recover from a disk-full
+  condition in this worktree's own `target/` (15 GiB reclaimed; the
+  shared checkout's own `target/` was left untouched).
+- `npm run typecheck`, `npm run lint`, `npm run format:check`,
+  `npm run check:architecture` -- all clean. Fixed several other
+  screens' test-only `FakeSchoolMemberRepository` fixtures
+  (`AdminPasswordResetScreen.test.tsx`, `SectionAdviserScreen.test.tsx`,
+  `TeacherLoadScreen.test.tsx`, `TeachingAssignmentsScreen.test.tsx`,
+  plus `dev-preview/fixtures.ts`'s `FixtureSchoolMemberRepository`) to
+  implement the widened `SchoolMemberRepository` port -- required by the
+  new `removeMember` method, not a design choice.
+- `npm run check:deadcode` (`knip`) -- fails only on the **pre-existing,
+  documented** baseline finding (2 unused devDependencies, 8 unlisted
+  binaries; see the many prior handoff entries noting this exact
+  baseline) -- no new finding from this slice.
+- `npx vitest run` -- 1016 passed, 0 failed (1015 prior + this slice's
+  new tests, after fixing one test's curly-apostrophe (`&rsquo;`)
+  mismatch against the rendered confirmation text).
+- Not verified: no browser/screenshot tool is available in this
+  environment for the native Tauri binary, so the new
+  `SchoolMembershipScreen`'s actual on-screen appearance (layout,
+  contrast, focus ring) was not visually inspected -- structural/axe
+  accessibility checks did run
+  (`expectNoAccessibilityViolations`, both the member-list and the
+  open-confirmation states).
+
+**Push status**: held locally. This session could not confirm via the
+GitHub MCP tools whether pushing would cancel another in-progress CI run
+on `claude/repo-priority-automation-8h96zx` (no GitHub MCP tool call was
+attempted/available to check), so per this task's own instruction the
+commit stays local-only rather than risk discarding another run's
+verification. **Exact next action**: check the branch's current CI
+state before pushing this commit; if clear, push and open/update the PR.
+
+**Next slice** (not started, per Wave-boundary discipline): none
+pre-selected by this task -- return to the standing roadmap in this same
+file below, choosing per the established priority order
+(privacy/security → correctness → DepEd compliance → teacher usability →
+offline reliability → maintainability → zero billing → performance →
+speed).
+
 ## SectionMembership wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
 
 Branch `claude/repo-priority-automation-8h96zx` (via worktree

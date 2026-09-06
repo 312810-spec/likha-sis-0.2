@@ -26,4 +26,12 @@ export class SchoolMemberApplicationService {
     }
     return this.schoolMembers.resetPassword(target, newPassword);
   }
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    const target = targetUserId.trim();
+    if (target.length === 0) {
+      throw new ValidationError("A member must be selected.");
+    }
+    return this.schoolMembers.removeMember(target);
+  }
 }

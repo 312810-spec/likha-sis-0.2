@@ -18,6 +18,7 @@ export type SignedInTab =
   | "class-records"
   | "audit-log"
   | "admin-password-reset"
+  | "school-members"
   | "devices"
   | "conflict-review"
   | "sync-status";
@@ -49,6 +50,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "class-records": "Class Records",
   "audit-log": "Sign-in Activity",
   "admin-password-reset": "Reset a Password",
+  "school-members": "School Members",
   devices: "Devices",
   "conflict-review": "Review Sync Conflicts",
   "sync-status": "Sync Status",
@@ -100,7 +102,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Security",
-    tabs: [tab("audit-log"), tab("admin-password-reset"), tab("devices")],
+    tabs: [tab("audit-log"), tab("admin-password-reset"), tab("school-members"), tab("devices")],
   },
 ];
 

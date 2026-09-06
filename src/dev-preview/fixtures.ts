@@ -1123,6 +1123,10 @@ export class FixtureSchoolMemberRepository implements SchoolMemberRepository {
   async resetPassword(targetUserId: string): Promise<boolean> {
     return FIXTURE_SCHOOL_MEMBERS.some((member) => member.id === targetUserId);
   }
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    return FIXTURE_SCHOOL_MEMBERS.some((member) => member.id === targetUserId);
+  }
 }
 
 /** In-memory-only advisory state for `sec-not-started` (Wave 3G's own

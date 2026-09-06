@@ -33,6 +33,7 @@ import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
+import { SchoolMembershipScreen } from "./ui/SchoolMembershipScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
@@ -441,6 +442,8 @@ function App() {
             <AuditLogScreen authService={authService} />
           ) : activeTab === "admin-password-reset" ? (
             <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+          ) : activeTab === "school-members" ? (
+            <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
           ) : activeTab === "devices" ? (
             <DeviceManagementScreen deviceSyncService={deviceSyncService} />
           ) : activeTab === "conflict-review" ? (

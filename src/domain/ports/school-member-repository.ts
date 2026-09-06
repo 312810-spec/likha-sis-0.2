@@ -21,4 +21,16 @@ export interface SchoolMemberRepository {
    * comment.
    */
   resetPassword(targetUserId: string, newPassword: string): Promise<boolean>;
+  /**
+   * Revokes `targetUserId`'s membership (and every role they held) in
+   * the caller's own school, effective immediately -- their existing
+   * sessions in that school are revoked too. Returns `false` (not a
+   * thrown error) when `targetUserId` doesn't exist, isn't a member of
+   * the caller's school, or when removing them would leave the school
+   * with zero School Heads -- the same enumeration-safety/fail-closed
+   * shape `resetPassword` already uses. A thrown `Unauthorized` means
+   * the caller itself lacks the `ManageSchoolMembership` capability --
+   * see `auth::remove_school_member`'s doc comment.
+   */
+  removeMember(targetUserId: string): Promise<boolean>;
 }

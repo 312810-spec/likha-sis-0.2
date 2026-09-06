@@ -644,6 +644,82 @@ pub fn admin_reset_teacher_password(
     }
 }
 
+/// School Membership Removal: a School Head revokes a colleague's
+/// membership in their own school. Reuses `ManageSchoolMembership`
+/// (School-Head-only) exactly like `add_user_to_school` and
+/// `admin_reset_teacher_password` -- removing someone is the same
+/// authority class as onboarding or resetting them, and all three
+/// already resolve to the same role. `school_id` comes only from the
+/// caller's own session (`authorize_capability_with_actor`), never a
+/// client-supplied parameter, matching this codebase's established rule
+/// for every tenant-data command.
+///
+/// Effective immediately: on a successful removal, every active session
+/// `target_user_id` holds for `school_id` is revoked in the same
+/// transaction, mirroring `admin_reset_teacher_password`'s
+/// `session_repo::revoke_all_for_user` call -- otherwise a removed
+/// member's already-open app session would keep working until it
+/// expired on its own. `revoke_all_for_user` is global to the user (not
+/// school-scoped, matching its existing signature and
+/// `admin_reset_teacher_password`'s established use of it) -- acceptable
+/// here for the same reason it already is there: a session is scoped to
+/// one school at creation (migration 1's `sessions.school_id`), so a
+/// member who also belongs to a different school simply logs back in
+/// under that school's own membership, which this removal never touches.
+///
+/// Returns `Ok(false)` -- not an error, the same enumeration-safety shape
+/// `admin_reset_teacher_password` already uses -- when `target_user_id`
+/// does not exist, is not a member of `school_id`, or when removing them
+/// would leave `school_id` with zero School Heads (see
+/// `user_repo::remove_school_membership`'s doc comment for why that
+/// guard exists). `Err(Unauthorized)` is reserved for the capability
+/// check itself.
+pub fn remove_school_member(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_membership_removal")?;
+    let outcome = (|| -> AppResult<bool> {
+        if !user_repo::remove_school_membership(conn, &target.id, &school_id)? {
+            return Ok(false);
+        }
+        session_repo::revoke_all_for_user(conn, &target.id)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMembershipRemoved,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(removed) => {
+            conn.execute_batch("RELEASE school_membership_removal")?;
+            Ok(removed)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_membership_removal; RELEASE school_membership_removal",
+            );
+            Err(error)
+        }
+    }
+}
+
 /// Device Sync Enrollment (ADR-0067, first slice): the trusted-boundary
 /// ceremony an implementation's future enrollment surface will use to
 /// issue a per-device sync credential. Reuses exactly the same
@@ -2247,6 +2323,205 @@ mod tests {
             .unwrap()
             .iter()
             .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
+    }
+
+    // ---- School Membership Removal ----
+
+    #[test]
+    fn remove_school_member_succeeds_for_a_school_head_removing_a_same_school_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = remove_school_member(&conn, &sessions, &teacher.id);
+
+        assert!(result.unwrap());
+        assert!(!user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        remove_school_member(&conn, &sessions, &teacher.id).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let removal_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMembershipRemoved)
+            .expect("a school_membership_removed event must be recorded");
+        assert_eq!(
+            removal_entry.user_id,
+            Some(teacher.id),
+            "the event's subject is the account whose membership was removed"
+        );
+        assert_eq!(removal_entry.username, "ana.cruz");
+        assert_eq!(
+            removal_entry.actor_user_id,
+            Some(head_id),
+            "the event's actor is the School Head who performed the removal"
+        );
+        assert_eq!(
+            removal_entry.actor_username,
+            Some("corazon.santos".to_string())
+        );
+    }
+
+    #[test]
+    fn remove_school_member_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &teacher_b.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "an ordinary Teacher must not be able to remove a colleague's membership"
+        );
+        assert!(user::is_member_of_school(&conn, &teacher_b.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_denies_a_registrar_only_session() {
+        // Registrar is deliberately NOT in ManageSchoolMembership's
+        // allowed roles -- see the capability's own doc comment.
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let registrar = user::create_user(&conn, "reg.one", "password", "Reg One").unwrap();
+        user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
+        role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
+        login(&conn, &sessions, "reg.one", "password", &s.id).unwrap();
+        let teacher = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &teacher.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = remove_school_member(&conn, &sessions, "some-user-id");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn remove_school_member_returns_false_without_writing_an_audit_event_for_an_unknown_target() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = remove_school_member(&conn, &sessions, "does-not-exist");
+
+        assert!(!result.unwrap());
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert!(entries
+            .iter()
+            .all(|e| e.event_type != AuditEventType::SchoolMembershipRemoved));
+    }
+
+    #[test]
+    fn remove_school_member_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+
+        let not_found_result = remove_school_member(&conn, &sessions, "does-not-exist");
+        let wrong_school_result = remove_school_member(&conn, &sessions, &outsider.id);
+
+        assert_eq!(
+            not_found_result.unwrap(),
+            wrong_school_result.unwrap(),
+            "a nonexistent target and a real target in a different school must be \
+             indistinguishable, so neither can be used to enumerate accounts in another school"
+        );
+        assert!(
+            user::is_member_of_school(&conn, &outsider.id, &other_school.id).unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn remove_school_member_refuses_to_strip_the_last_school_head_via_the_command_gate() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &head.id);
+
+        assert!(
+            !result.unwrap(),
+            "a School Head must not be able to remove the school's last School Head, \
+             even themselves"
+        );
+        assert!(user::is_member_of_school(&conn, &head.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_revokes_every_existing_target_session() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+
+        remove_school_member(&conn, &head_sessions, &teacher.id).unwrap();
+
+        assert!(matches!(
+            teacher_sessions.require_active_session(&conn),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn remove_school_member_rolls_back_removal_sessions_and_audit_together() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_membership_removal_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'school_membership_removed' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result = remove_school_member(&conn, &head_sessions, &teacher.id);
+
+        assert!(result.is_err());
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+        assert!(teacher_sessions.require_active_session(&conn).is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::SchoolMembershipRemoved));
     }
 
     // ---- Device Sync Enrollment (ADR-0067, first slice) ----

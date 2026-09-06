@@ -79,6 +79,7 @@ pub fn run() {
             commands::user::add_user_to_school,
             commands::user::list_school_members,
             commands::user::admin_reset_teacher_password,
+            commands::user::remove_school_member,
             commands::setup::installation_status,
             commands::setup::bootstrap_installation,
             commands::auth::login,

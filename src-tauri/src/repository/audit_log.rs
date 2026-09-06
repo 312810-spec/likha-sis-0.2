@@ -28,6 +28,11 @@ pub enum AuditEventType {
     /// A device's sync credential was revoked via
     /// `repository::device_credential::revoke` (ADR-0067).
     DeviceRevoked,
+    /// A School Head removed a colleague's school membership via
+    /// `auth::remove_school_member`/`user::remove_school_membership`.
+    /// Actor-distinct from its subject, same as `PasswordResetByAdmin` --
+    /// see migration 36.
+    SchoolMembershipRemoved,
 }
 
 impl AuditEventType {
@@ -40,6 +45,7 @@ impl AuditEventType {
             AuditEventType::PasswordResetByAdmin => "password_reset_by_admin",
             AuditEventType::DeviceEnrolled => "device_enrolled",
             AuditEventType::DeviceRevoked => "device_revoked",
+            AuditEventType::SchoolMembershipRemoved => "school_membership_removed",
         }
     }
 
@@ -52,6 +58,7 @@ impl AuditEventType {
             "password_reset_by_admin" => Ok(AuditEventType::PasswordResetByAdmin),
             "device_enrolled" => Ok(AuditEventType::DeviceEnrolled),
             "device_revoked" => Ok(AuditEventType::DeviceRevoked),
+            "school_membership_removed" => Ok(AuditEventType::SchoolMembershipRemoved),
             other => Err(rusqlite::Error::FromSqlConversionFailure(
                 0,
                 rusqlite::types::Type::Text,

@@ -25,6 +25,17 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
     }
     return this.resetPasswordResult;
   }
+
+  removeMemberCalls: string[] = [];
+  removeMemberResult: boolean | "reject" = true;
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    this.removeMemberCalls.push(targetUserId);
+    if (this.removeMemberResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.removeMemberResult;
+  }
 }
 
 describe("SchoolMemberApplicationService", () => {
@@ -76,5 +87,33 @@ describe("SchoolMemberApplicationService", () => {
 
     await expect(service.resetPassword("u-1", "short")).rejects.toThrow(ValidationError);
     expect(repo.resetPasswordCalls).toHaveLength(0);
+  });
+
+  it("removes a member, trimming the target id", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.removeMember(" u-1 ");
+
+    expect(result).toBe(true);
+    expect(repo.removeMemberCalls).toEqual(["u-1"]);
+  });
+
+  it("propagates a false removal result (target not found, wrong school, or last School Head) without throwing", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.removeMemberResult = false;
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.removeMember("u-1");
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty target id before ever calling the repository for removal", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.removeMember("  ")).rejects.toThrow(ValidationError);
+    expect(repo.removeMemberCalls).toHaveLength(0);
   });
 });
