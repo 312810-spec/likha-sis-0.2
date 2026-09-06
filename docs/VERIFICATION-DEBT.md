@@ -1,5 +1,79 @@
 # Verification Debt
 
+## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
+
+`commands::section`'s three new `*_with_optional_sync` wrappers
+(`enroll_learner_membership`/`transfer_learner_membership`/
+`end_learner_membership`), `repository::section_membership::
+upsert_from_sync`, and the new `EntityKind::SectionMembership` arm in
+`sync_client::apply_decrypted_change` close the `SectionMembership` slot
+of ADR-0067/0069's entity rollout (see `docs/CURRENT-HANDOFF.md`'s
+matching entry for the full design rationale). As with the prior
+entity slices, no subagent-dispatch tool was available in this session
+to obtain the independent review `.claude/rules/security-privacy.md`
+requires for milestones touching persistence/sync. A rigorous
+self-review was performed instead, per this project's documented
+reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `SectionMembership` arm, matching every
+  other entity exactly.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, never re-derives or re-validates section/learner
+  eligibility (deliberate — that already ran on the originating device,
+  same reasoning as `attendance::upsert_from_sync`), and never deletes a
+  row (only closes it via `ends_on`) — covered by
+  `upsert_from_sync_inserts_a_membership_this_device_has_never_seen`/
+  `upsert_from_sync_updates_an_existing_row_in_place`.
+- Confirmed the conflict path is exercised for THIS entity specifically,
+  not merely assumed from the generic pattern:
+  `pull_once_stages_a_section_membership_conflict_when_this_device_has_an_unsynced_local_edit`
+  proves a `base_version` mismatch on a pending local edit routes to
+  `sync_conflict_review` and never touches the domain table or the
+  version cache — enrollment data never uses silent last-write-wins.
+- Confirmed each `*_with_optional_sync` wrapper enqueues ONLY on its
+  success outcome variant (`Enrolled`/`Ended`/`Transferred`) — every
+  rejection outcome (`AlreadyEnrolled`, `NotFound`, `NotCurrent`,
+  `MembershipNotFound`, `DestinationNotFound`, `SameSection`,
+  `InvalidEffectiveDate`/`InvalidStartDate`, `ZeroLengthInterval`,
+  `DependentRecordConflict`) enqueues nothing, covered by three
+  dedicated "a rejected write never enqueues" tests (one per verb).
+
+**Known, deliberate trade-offs (not defects, but real limitations)**,
+recorded rather than silently accepted:
+
+1. **Enqueue not atomic with the domain write.** Unlike
+   `Attendance`/`LearnerScore`/`Section` (one `SAVEPOINT` wraps both the
+   domain write and the outbox enqueue), the three
+   `SectionMembership` verbs each own an internal
+   `Connection::transaction()` for their own multi-step eligibility
+   checks, and rusqlite transactions do not nest inside an outer
+   `SAVEPOINT`. The enqueue call happens immediately after that
+   transaction has already committed, as a following step. A crash in
+   the narrow window between the domain commit and the enqueue commit
+   can leave a domain write that succeeded locally without a
+   corresponding outbox row — the change stays correct locally but does
+   not reach the hub until some other trigger re-syncs it (there isn't
+   one yet; this is genuinely a gap, not merely a delay). It can never
+   invert the failure mode (no enqueue for a write that didn't happen,
+   no wrong `base_version`). A future slice could close this by
+   converting `end_membership`/`transfer_membership`/`enroll_membership`
+   to the SAVEPOINT-based style `section_membership::enroll` already
+   uses (so an outer `SAVEPOINT` from the command layer could wrap both
+   steps), but that is a real refactor of the domain transaction
+   plumbing, out of scope for this slice.
+2. **Two of `SectionMembership`'s five write paths remain unwired.**
+   `section_membership::enroll` (the bulk create-and-place primitive
+   behind `enroll_learner_in_section`, used by CSV import via
+   `import::commit`) and `correct_same_day_placement` (the one-time
+   same-day data-entry fix) are not wired to sync at all — a
+   bulk-imported enrollment or a same-day correction stays purely local
+   on the device that made it until a future slice wires them. This
+   matches the existing precedent of bulk/import paths staying unwired
+   for other entities, but is recorded explicitly here since
+   `SectionMembership` uniquely has five distinct write paths where
+   every other entity has one or two.
+
 ## Subject sync wiring (2026-09-06) — independent security review owed
 
 `commands::subject::create_subject`, `repository::subject::
