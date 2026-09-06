@@ -1,5 +1,3146 @@
 # CURRENT HANDOFF
 
+## Creation Studio sub-scope 3/3: structured lesson-plan builder (2026-09-06)
+
+Built the **structured lesson-plan builder** — the third and final of the
+product owner's three confirmed Creation Studio sub-scopes (assessment-item
+authoring, class summary export, lesson-plan builder). This closes all
+three sub-scopes' _first_ confirmed outputs — but sub-scope 2 (report/output
+templates) still has two unbuilt outputs of its own (certificate/recognition
+template, custom seating chart), which remain separate future slices.
+
+**Research (this session, WebSearch, medium-high confidence)**: DepEd Order
+No. 16, s. 2026 introduces the "ILAW" lesson-plan format -- **I**ntentions,
+**L**earning Experiences, **A**ssessment, **W**ays Forward -- replacing the
+older Daily Lesson Log (DLL)/Detailed Lesson Plan (DLP) formats and the
+older MELC coding system, mandatory for all public elementary/secondary
+schools starting SY 2026-2027. Sources: depedclub.com, lessonplanph.com,
+ilawlessonplan.net, depedlibre.com -- all secondary sources describing an
+official DepEd issuance; no primary deped.gov.ph fetch was attempted this
+session (per this project's sourcing-policy addendum, ADR-0037, this is
+treated as sufficient when a primary fetch is unavailable). "Ways Forward"'s
+exact DepEd sub-structure could not be confirmed this session and was
+implemented conservatively as a free-text reflection/next-steps field.
+
+**What it is**: a teacher's own lesson-planning authoring tool -- NOT an
+official DepEd form submission and NOT exported to PDF in this slice (a
+future slice could add that if ever requested). One plan per
+`(teaching_assignment_id, plan_date)` -- `teaching_assignment_id` already
+encodes teacher+section+subject (migration 11), so this single FK plus a
+date is sufficient to scope one lesson plan, the same scoping shape
+`subject_attendance_sessions` (migration 24) already established for
+teacher-authored, per-meeting content.
+
+**Built**:
+
+- `src-tauri/src/db/migrations.rs` migration 40 -- new `lesson_plans`
+  table: `id, school_id, teaching_assignment_id, plan_date,
+learning_competency, learning_competency_code, learning_objectives,
+connection_to_previous_learning, learning_experiences, assessment,
+ways_forward, created_by_user_id, created_at, updated_at`, with
+  `UNIQUE (teaching_assignment_id, plan_date)`. `learning_competency_code`
+  is free text the teacher enters themselves -- deliberately NOT a foreign
+  key into `curriculum_learning_areas` (that table only models
+  learning-area names, not DepEd's competency-code catalog; building that
+  catalog is a separate, much larger undertaking, explicitly out of scope
+  here).
+- `src-tauri/src/repository/lesson_plan.rs` -- `create`/`update`/
+  `find_by_id_in_school`/`find_by_assignment_and_date`/`list_by_assignment`,
+  plus `authorize_own_assignment` (create/update: exactly the assignment's
+  own teacher, mirroring `subject_attendance::authorize_own_assignment`)
+  and `authorize_view` (read: the assignment's own teacher, or a School
+  Head in the same school -- matching this codebase's general "School Head
+  sees everything in their school" precedent). 15 unit tests: full ILAW
+  field round-trip, cross-school rejection, duplicate-date rejection,
+  full-field update, cross-school update rejection, ordered listing,
+  and both authorize functions' allow/deny/cross-school-denial cases.
+- `src-tauri/src/commands/lesson_plan.rs` -- `create_lesson_plan`/
+  `update_lesson_plan`/`list_lesson_plans_by_assignment`, session-authorized
+  (`school_id`/actor never client-supplied), gated on the repository's
+  `authorize_own_assignment`/`authorize_view`. Deliberately NOT wired to
+  sync in this slice -- a lesson plan is the teacher's own planning
+  content, not a cross-device coordination point another device's write
+  depends on (unlike `AssessmentItem`/`SubjectAttendance` sessions); a
+  future slice can widen the `entity_kind` CHECK constraint if cross-device
+  lesson planning is ever requested. Registered in `src-tauri/src/lib.rs`.
+- Frontend: `src/domain/lesson-plan.ts`, `src/domain/ports/
+lesson-plan-repository.ts`, `src/application/lesson-plan-service.ts`
+  (trims all 7 ILAW fields, requires competency/objectives/experiences/
+  assessment non-blank, allows competency-code/connection/ways-forward
+  blank), `src/infrastructure/tauri/lesson-plan-repository.ts`, and
+  `src/ui/LessonPlanScreen.tsx` -- a new "Creation Studio" nav group,
+  picks one of the teacher's own teaching assignments (reusing
+  `subjectAttendanceService.listMyAssignments`), a date, and one form per
+  ILAW section, then lists/edits previously saved plans for that class.
+  Wired into `src/composition.ts` and `src/App.tsx` as the new
+  `lesson-plans` tab.
+
+**Numbering correction**: the implementing agent worked from a worktree
+that branched before the in-app-branding slice merged, and picked
+migration "39" believing it was the next free number (verified by
+counting `M::up(...)` entries in its own stale copy of the file) — but
+"In-app school branding" had already claimed migration 39 on the real
+branch tip by the time this agent finished. Caught before merging
+(the same class of collision as an earlier curriculum-migration mix-up
+this session), renumbered to migration 40 by the orchestrating session,
+including the one in-code doc-comment reference to "migration 39"; the
+underlying SQL/reasoning is otherwise unchanged from the original draft.
+
+**Tests added** (TDD, written before the Rust implementation): 15 Rust
+unit tests (`repository::lesson_plan` + `commands::lesson_plan`, listed
+above); frontend: `lesson-plan-service.test.ts` (11 cases: trimming,
+per-field validation, blank-allowed fields), `lesson-plan-repository.test.ts`
+(4 cases: exact Tauri command name + argument shape for create/update/list),
+`LessonPlanScreen.test.tsx` (3 cases: all four ILAW section headings
+render, Save calls the application service with the entered field values,
+`expectNoAccessibilityViolations` structural check).
+
+**Not built / disclosed limitations**:
+
+- No PDF export -- out of scope per the confirmed spec (planning tool,
+  not a DepEd submission).
+- No native visual/screen-reader pass on the real Tauri binary --
+  `npm run quality:ui`/a human accessibility pass was not run this
+  session; only the jsdom-based structural axe-core check ran.
+  See `docs/VERIFICATION-DEBT.md`.
+- "Ways Forward"'s exact DepEd sub-structure is unconfirmed -- implemented
+  conservatively as free text; if a future session finds the real
+  DO 16 s.2026 primary-source structure, this field may need to split
+  into sub-fields.
+
+**Exact next task**: none pre-selected. All three confirmed Creation
+Studio sub-scopes now have their first shipped output; sub-scope 2's
+remaining two outputs (certificate/recognition template, custom seating
+chart) are the most direct next candidates if the product owner wants to
+continue Creation Studio, but per this project's autonomous-development
+rules the next slice is not implemented without a new instruction to
+continue.
+
+## In-app school branding: logo upload (2026-09-06)
+
+Built the **in-app half only** of school branding: a School Head can
+upload/replace/remove the school's logo, and it now renders in the app
+shell (sidebar brand mark + top bar identity line) for every signed-in
+member. The **official-form-export half is deliberately out of scope**
+for this slice: this session researched (WebSearch) DepEd's SF10 rule
+and found official forms are restricted to DepEd's own seal/logo, and
+DepEd's visual identity manual explicitly prohibits "combining with
+other elements or creating new lockups" — so branding an official
+exported form is not implemented and needs further DepEd clarification
+before it can be, not a technical gap.
+
+**Data model**: migration 39 adds two nullable columns to `schools`
+(`logo` BLOB, `logo_mime` TEXT) — additive only, no rebuild, existing
+schools unaffected until a logo is uploaded. `name` was confirmed
+already-immutable-after-creation (no existing update path) but a rename
+capability was judged out of this slice's scope (not requested, keeps
+scope tight per `.claude/rules/autonomous-development.md`) and was not
+added.
+
+**Backend** (`src-tauri/src/repository/school.rs`): `set_logo`/
+`get_logo`/`clear_logo`, kept separate from `School`'s own `Serialize`
+shape so an ordinary `list_all`/`find_by_id` never pulls image bytes
+along with it. `src-tauri/src/commands/school.rs`: `set_school_logo`/
+`get_school_logo`/`clear_school_logo` Tauri commands. Size (512 KiB) and
+MIME allow-list (`image/png`, `image/jpeg`, `image/webp`) are enforced
+at the command layer before any bytes reach the repository. New
+capability `Capability::ManageSchoolBranding` (`src-tauri/src/auth/mod.rs`)
+gates `set`/`clear` — School Head only, deliberately its own variant
+rather than reusing `ManageSchoolMembership`, matching this codebase's
+established `ManageTeachingAssignments`/`ManageSectionAdvisories`
+precedent for "distinct administrative concern, same role today." `get`
+is session-scoped read, no capability gate (any school member may view
+the shared shell's own logo).
+
+**Frontend**: `src/domain/school-logo.ts`, `domain/ports/
+school-logo-repository.ts`, `application/school-logo-service.ts`
+(client-side size/MIME validation mirrors the backend as a UX
+convenience only — the backend stays authoritative),
+`infrastructure/tauri/school-logo-repository.ts` (bytes cross IPC as a
+plain `Vec<u8>`/number-array, not base64 — no new dependency needed on
+either side for a size-capped image), wired in `composition.ts` as
+`schoolLogoService`. New screen `src/ui/SchoolBrandingScreen.tsx`
+(file picker + preview + remove), reachable via a new `school-branding`
+nav tab under "Security" (shown to every role, same established
+UI-doesn't-hide-behind-role-checks convention as `DeviceManagementScreen`/
+`AdminPasswordResetScreen` — the backend capability gate is the real
+boundary). `AppLayout` fetches the logo once and passes an object URL
+down to both `Sidebar` (brand mark) and `TopBar` (identity line);
+`Sidebar`/`TopBar` render nothing extra when no logo is set.
+
+**Verified this session**:
+
+- `cargo fmt --check` — clean.
+- `cargo clippy --all-targets -- -D warnings` — clean.
+- `cargo test --lib` (full crate) — all passing (spot-checked the new
+  `logo`/`branding` tests individually: 9 + 4 passing; a full-crate run
+  was also started and should be checked in the next session's handoff
+  if this entry doesn't already confirm its final count below).
+- `npm run quality` — typecheck/lint/format/architecture clean; full
+  `npm run test` 1072/1072 passing (includes new repository/application-
+  service/infrastructure-adapter/screen/shell tests for this feature).
+  `npm run check:deadcode` (knip) still exits 1 on the same **pre-existing,
+  already-documented** `@tauri-apps/cli`/`prettier` unused-devDependency
+  findings (see this file's own history above) — no new knip finding
+  from this slice's files.
+- Independent security review of this milestone (auth/persistence
+  change): **not yet performed this session** — retained as debt per
+  `.claude/rules/security-privacy.md`; self-review covered the
+  authorization gate (new capability, School-Head-only, session-derived
+  `school_id`, cross-school isolation test), size/MIME validation at the
+  command boundary, and BLOB scoping (never joined into a broad
+  `School` read).
+
+**Next slice**: no candidate pre-selected. Likely next-priority options
+per `CLAUDE.md`'s ordering (security/privacy → correctness → DepEd
+compliance → teacher usability → offline reliability → maintainability →
+zero billing → performance → speed): (a) get this milestone's owed
+independent security review from a fresh reviewer context; (b) continue
+Creation Studio sub-scope 2 (certificate/recognition template, custom
+seating chart — class summary already shipped, both remain unbuilt); (c)
+revisit the pre-existing knip `@tauri-apps/cli`/`prettier`
+unused-devDependency finding if it's ever judged worth resolving rather
+than continuing to document as accepted debt.
+
+## Creation Studio sub-scope 2/3: printable class summary export (2026-09-06)
+
+Built the **printable class summary** — the first of the product owner's
+three confirmed Creation Studio sub-scope 2 outputs (class summary,
+certificate/recognition template, custom seating chart), built one at a
+time per the owner's own sequencing preference. Only the class summary
+was built this slice; the certificate and seating chart remain **unbuilt,
+separate future slices**.
+
+**What it is**: a one-page, read-only "section at a glance" report for
+one class record — section/subject/period header plus one row per
+learner with their current computed average (or "No grade yet" if
+scoring is incomplete). Not an official DepEd School Form (SF1/SF9/SF10),
+so DepEd's official-form branding/formatting restrictions (verified
+earlier this session to apply specifically to SF10) do not apply here.
+
+**Output-format decision**: CSV, following `export/`'s existing
+convention (`sf2.rs`, `learner_roster.rs`, `report_card.rs`), not
+`formgen/`'s richer templated/`.xlsx` engine. `formgen/` exists for
+higher-fidelity official-form reproduction (SF1/SF9) where a specific
+template/layout must be matched; this output has no such template to
+match and the product owner's own wording was "simple" — CSV keeps the
+implementation proportionate to that scope and reuses the exact
+`FieldDisclosure` pattern every other export in this codebase already
+uses, rather than introducing PDF/`.xlsx` generation for a first
+lightweight report.
+
+**Built**:
+
+- `src-tauri/src/export/class_summary.rs` — `build_class_summary_export`,
+  deliberately simpler than `report_card.rs` (no Initial Grade,
+  transmutation/flooring notes, or grading-basis column — those already
+  exist in the fuller report card export). Reuses
+  `repository::grading_computation::compute_term_grade` for every row;
+  no new grade-computation logic was added.
+- `src-tauri/src/commands/export.rs` — `export_class_record_summary`
+  Tauri command, mirroring `export_class_record_report_card`'s
+  authorization shape exactly: `school_id` derived from
+  `SessionManager::require_active_school_scope` (never client-supplied),
+  `class_record_id` resolved via
+  `class_record::find_detail_by_id_in_school` so a foreign class record
+  resolves to `None` rather than exporting anything. Registered in
+  `src-tauri/src/lib.rs`.
+- Frontend: `ExportRepository`/`TauriExportRepository`/
+  `ExportApplicationService`/`src/domain/export.ts` all extended with
+  `exportClassRecordSummary` following the exact `exportClassRecordReportCard`
+  pattern. `ClassRecordWorkspace.tsx` gained an "Export class summary
+  (CSV)" action next to the existing "Export report card (CSV)" button,
+  reusing the same save-path/Open-folder/disclosure-list UI pattern.
+
+**Tests added** (TDD, written before the Rust implementation): 6 new
+Rust unit tests in `class_summary.rs` (right learners/averages, "No
+grade yet" for a learner with no scores, disclosure completeness, no
+report-card-only wording leaking outside the disclosure block);
+repository-level cross-school isolation is inherited unmodified from
+`export_class_record_report_card`'s own established
+`find_detail_by_id_in_school` isolation (no new isolation code was
+introduced, so no new isolation test was needed beyond what the shared
+helper already covers); frontend: `export-repository.test.ts` (2),
+`export-service.test.ts` (3), `ClassRecordWorkspace.test.tsx` (2 new
+render/interaction tests: export shows the saved path and disclosure
+text, Open folder reveals the file) plus throwing stubs added to every
+other `ExportRepository` test fake so `npm run quality`'s typecheck
+stays green.
+
+**Verification actually run this session** (all green): `cargo fmt
+--check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --lib`
+(992 passed, 0 failed), `npm run quality` (typecheck, lint, format:check,
+architecture-boundary check, knip, `npm run test` — 1052 passed, 0
+failed, across 103 files).
+
+**Git**: merged the worktree onto
+`origin/claude/repo-priority-automation-8h96zx`'s current tip
+(`471ee1a`, fast-forward) before starting, per this task's instruction.
+Committed locally; push was **held** — see the commit message for
+exactly why (CI-in-progress could not be confirmed either way from this
+sandbox at commit time).
+
+**Exact next slice**: sub-scope 2's second confirmed output — the
+certificate/recognition template — per the product owner's own
+one-at-a-time sequencing. Not started this slice; do not build it
+without a new instruction to continue. (The third, custom seating
+chart, follows after that.)
+
+## ADR-0037 curriculum clarification: SHS DO 017 s.2026, JHS/DO 015 alignment, MATATAG rename, Kindergarten exclusion confirmed (2026-09-06)
+
+Product-owner-relayed, `WebSearch`-cross-checked clarification closed 4
+of ADR-0037's 5 original open gaps. Appended an addendum to
+`docs/adr/0037-curriculum-key-stage-versioning.md` (original
+Research/Decision sections untouched) and implemented additively in a
+new migration.
+
+**What shipped**: `src-tauri/src/db/migrations.rs` migration 38 (schema
+unchanged, all data-only):
+
+- Renamed the existing "MATATAG Curriculum" `curriculum_versions` row
+  (id `...5002`) **in place** to "Enhanced K to 10 Curriculum" — same
+  id, same 8 previously-seeded learning areas, only `name`/
+  `source_citation` changed (DepEd Order No. 015, s. 2026's own "Revised
+  Kindergarten to Grade 10 Curriculum" framing).
+- Added a third, non-default `curriculum_versions` row: "Strengthened
+  Senior High School Curriculum (Grade 11)" (id `...5003`), modeling
+  DepEd Order No. 017, s. 2026 (Grade 11 only, effective SY 2026-2027),
+  with its 5 core subjects as `curriculum_learning_areas` rows
+  (Effective Communication, Life Skills, General Mathematics, General
+  Science, Philippine History and Society). Fit the existing table
+  shape cleanly — no new schema needed.
+- Grade 12 unaffected — still the existing "K to 12 Basic Education
+  Curriculum" default row, exactly as ADR-0068's DO 8 s.2015 carryover
+  already models; ADR-0068 itself was not touched.
+- Kindergarten Key-Stage exclusion verified already correct (KS1 starts
+  at grade 1, no row covers grade 0); added a regression test
+  (`kindergarten_grade_level_matches_no_key_stage_band`) proving a
+  grade-0 lookup matches zero `key_stages` rows rather than silently
+  matching KS1. No Kindergarten-specific concept was built.
+
+Updated `src-tauri/src/repository/curriculum.rs` tests and the
+pre-existing `migrations.rs` migration-17 tests that asserted exactly 2
+curriculum versions / the old "MATATAG Curriculum" name — those are now
+pinned to `migrations().to_version(&mut conn, 17)` so they keep proving
+migration 17's own original behavior, rather than being silently
+reinterpreted. Two new migration-38 tests added
+(`migration_38_renames_matatag_curriculum_to_enhanced_k_to_10_curriculum_in_place`,
+`migration_38_seeds_grade_11_strengthened_shs_curriculum_as_a_third_non_default_version`).
+
+**Gap NOT closed (honestly disclosed, not forced)**: MATATAG-vs-prior
+_learning-area content_ differences remain unconfirmed against a
+primary source — only the curriculum-version _name_ changed; the 8
+seeded learning-area names are unchanged and still identical across the
+"K to 12 Basic Education Curriculum" and "Enhanced K to 10 Curriculum"
+rows, as before this session.
+
+**Numbering correction**: the implementing agent worked from a worktree
+that had fallen behind the shared branch and mislabeled its new
+migration "34" — that number was already taken on the real branch tip
+by unrelated sync/role-management work landed earlier this session.
+Renumbered to migration 38 (the real next free number) by the
+orchestrating session before merge, including all test names/comments
+referencing the migration number; the underlying SQL/reasoning is
+otherwise unchanged from the original draft.
+
+**Verification actually run** (orchestrating session, after
+renumbering, on the merged tree): `cargo fmt --check`, `cargo clippy
+--all-targets -- -D warnings`, `cargo test --lib` (full crate) — see
+this entry's own follow-up for results once run.
+
+## Creation Studio — assessment-item authoring workspace (2026-09-06), committed locally, not pushed
+
+Worktree `agent-abefa29caf14c9130`, branch
+`claude/repo-priority-automation-8h96zx`. Product owner explicitly
+confirmed scope: "Creation Studio" is the first of three confirmed
+sub-scopes, built one at a time. This slice is ONLY sub-scope 1 — a
+dedicated assessment-item authoring workspace UI, distinct from the
+existing in-gradebook quick-add flow inside `ClassRecordWorkspace`, for
+building out a whole set of assessment items (e.g. a full quiz) in one
+focused sitting. **The other two confirmed sub-scopes — report/output
+templates and the lesson-plan builder — remain unbuilt, separate future
+slices, not started.**
+
+**What shipped**:
+
+- `src/ui/AssessmentAuthoringScreen.tsx` (new): a focused authoring
+  screen for one class record's assessment items — category-set/category
+  picker, a name + max-score form that stays open and clears only the
+  name field after each add (so a teacher can add a whole item set
+  without leaving the screen or reopening a modal; Enter in the name
+  field also submits), a running "N items added this session" counter,
+  and the full existing item list with inline Edit (rename-only once
+  scored, full edit/category/max-score while unscored) and two-step
+  Delete (blocked once scored) — same rules the Rust layer already
+  enforces. No roster/score-entry UI on this screen; that stays in
+  `ClassRecordWorkspace`.
+- `src/ui/ClassRecordsScreen.tsx`: added a "Creation Studio" button per
+  class-record row (alongside the existing "Open workspace" button),
+  wiring a new local `authoringClassRecordId` selection state — same
+  narrowly-typed, non-global-router navigation convention this screen
+  already uses for `selectedClassRecordId`. No new global nav tab was
+  added; this is reached the same way the existing workspace is.
+- **No new backend capability.** Confirmed by inspecting
+  `src-tauri/src/repository/assessment_item.rs` and
+  `commands/assessment_item.rs` first: `create`/`rename`/`update`/
+  `delete`/`list_by_class_record` already exist, are already wired to
+  Tauri commands, and are already exposed through
+  `AssessmentApplicationService` (`src/application/assessment-service.ts`)
+  and `AssessmentRepository`. The new screen calls exactly these same
+  application-service methods `ClassRecordWorkspace` already uses — no
+  new repository function, Tauri command, or validation logic was
+  added or duplicated.
+
+**Verified this session** (all commands actually run):
+
+- `npm run typecheck` — pass.
+- `npm run lint` — pass.
+- `npm run format:check` — pass.
+- `npm run check:architecture` — pass (no restricted imports; the new
+  screen only imports `application`/`domain` types and existing UI
+  components, matching the layering rule).
+- `npm run check:deadcode` (`knip`) — **fails**, but confirmed
+  pre-existing and unrelated: stashing this slice's changes and
+  re-running `npm run check:deadcode` reproduces the exact same failure
+  (`Unused devDependencies (2)`: `@tauri-apps/cli`, `prettier`; 8
+  "Unlisted binaries" findings) with this slice's two new files absent.
+  Not introduced or worsened by this change; not fixed here (out of
+  scope for this slice — a maintenance item for whoever last touched
+  those devDependencies/binaries).
+- `npm run test` (vitest) — **1045/1045 passed**, 103 test files,
+  including the 7 new tests in
+  `src/ui/AssessmentAuthoringScreen.test.tsx` (render + label check,
+  add-keeps-form-open with only name cleared, Enter-to-submit, rename,
+  delete with two-step confirm, `onBack` navigation, and an
+  `expectNoAccessibilityViolations` axe-core structural check).
+- No Rust code was touched, so `cargo fmt --check`/`cargo clippy`/
+  `cargo test` were not run for this slice (nothing to verify there).
+- `npm run quality:ui` (Playwright) and a native Tauri visual/
+  screen-reader pass were **not run** — same standing limitation as
+  every other UI slice in this repo (no browser/screenshot tool for the
+  native binary in this environment); this is pre-existing verification
+  debt, not new debt from this slice.
+
+**Held locally, not pushed**: this session could not confirm via the
+GitHub MCP tools whether another CI run is currently in progress on
+`claude/repo-priority-automation-8h96zx` / PR #54, so per this task's
+git constraint the commit was made locally only. A user/session with
+GitHub MCP access should confirm CI is idle on this branch before
+pushing.
+
+**Exact next action**: push this commit once CI is confirmed idle on
+this branch, then let CI run. Do not start sub-scope 2 (report/output
+templates) or sub-scope 3 (lesson-plan builder) without a new
+instruction — each is its own wave per the product owner's confirmed
+one-at-a-time sequencing.
+
+## My Day teacher screen (2026-09-06), committed locally, not pushed
+
+Worktree `agent-ab05593d27a378050`, branch
+`claude/repo-priority-automation-8h96zx`. Product owner explicitly
+confirmed scope for this slice in-session (superseding the prior
+handoff entry's "no product scoping exists, deliberately not
+attempted" note for "My Day" specifically): a Teacher-facing screen
+combining (1) today's schedule, derived from `TeachingAssignment` +
+`ScheduleMeeting`, and (2) a conservative, read-only-derived set of
+pending tasks for today. School-Head variant, task dismissal/"done"
+marking, and notifications/reminders were explicitly out of scope and
+not built. `SchoolHeadHome.tsx` already covers the School Head's own
+overview and was left untouched.
+
+**What shipped**:
+
+- `repository::subject_attendance::find_session_for_assignment_on_date`
+  (new): a read-only lookup for one assignment on one exact date --
+  unlike `open_or_get_session`, never creates a session as a side
+  effect (a dedicated test pins this: opening a check must never mutate
+  state). `count_entries_for_session` (new): count of recorded entries
+  for a session, without pulling the whole roster.
+- `repository::my_day::summary_for_teacher` (new module): the
+  aggregation. For each of the teacher's `TeachingAssignment`s, filters
+  `ScheduleMeeting`s to `weekday == today_weekday` (0 = Sunday … 6 =
+  Saturday, the convention `domain/schedule-meeting.ts` established) to
+  build the schedule list (sorted by start time), and flags
+  "attendance not yet checked" when today's session either doesn't
+  exist yet or exists with zero recorded entries -- never once flagged
+  after at least one entry is recorded or the session was explicitly
+  marked `NoClass` (an explicit decision, not a pending task). Also
+  narrows `sync_conflict_review::list_open_for_school` (school-wide) to
+  this teacher's own `actor_user_id`, surfacing their own unresolved
+  sync conflicts. Deliberately does NOT invent a new "task"/to-do
+  domain concept or table -- every field is computed fresh, read-only,
+  from data that already existed. Explicitly excluded from this slice:
+  "ungraded assessment items" -- assessment items carry no due-date
+  concept in this schema, so there is no reliable "today" anchor to
+  derive that signal from without inventing new state-tracking
+  machinery, which the task's own instructions ruled out. 9 repository
+  tests: today-vs-other-weekday filtering, all three
+  pending-attendance states (never opened / opened-empty / has an
+  entry / explicit No Class), cross-teacher and cross-school isolation
+  (including a forged-school-id case), conflict-review narrowing to
+  the caller's own `actor_user_id`, and multi-meeting same-day sort
+  order.
+- `commands::my_day::get_my_day_summary` (new Tauri command),
+  registered in `lib.rs`. Always self -- no `teacher_user_id`
+  parameter and no new `Capability`; gated by
+  `sessions.require_active_session` alone, the same always-self shape
+  `TeacherWorkspaceScreen`/`TodaysClassesScreen` already use.
+  `today_weekday`/`today_date` are caller-supplied (matching this
+  codebase's own established convention for "what day is it" --
+  `create_schedule_meeting`'s `weekday`, `open_subject_attendance_session`'s
+  `session_date` -- deliberately avoiding a new server-side clock
+  dependency for one command).
+- Frontend, full port/service/adapter stack mirroring
+  `SyncStatusRepository`'s single-method read-only shape:
+  `domain/my-day.ts`, `domain/ports/my-day-repository.ts`,
+  `infrastructure/tauri/my-day-repository.ts`,
+  `application/my-day-service.ts` (+ test). New `ui/MyDayScreen.tsx` (+
+  test, `expectNoAccessibilityViolations` a11y check): "Today's
+  schedule" list plus a "Needs your attention today" priority rail
+  (reusing `TeacherWorkspaceScreen`'s own `workspace-priority-rail`
+  styling) linking out to Subject Attendance / Review Sync Conflicts --
+  strictly read-only, nothing here can be marked done from this screen.
+  Wired into nav: new `my-day` tab (Daily Teaching group, first item,
+  ahead of Today's Classes), `composition.ts`, `App.tsx`.
+
+**Verified this session** (all commands actually run):
+
+- `cd src-tauri && cargo fmt --check` -- clean (one `cargo fmt` pass
+  needed first for the new files' long test lines).
+- `cd src-tauri && cargo clippy --all-targets -- -D warnings` -- clean,
+  two full runs (one caught+fixed a compile error in a new test file:
+  wrong `ChangeOperation` variant name and `SyncCursor`'s actual
+  tuple-struct shape; both fixed, re-run clean).
+- `cd src-tauri && cargo test --lib` -- 965 passed, 0 failed (includes
+  9 new `repository::my_day` tests and 6 new
+  `repository::subject_attendance` tests for the two new read-only
+  helper functions).
+- `npm run quality` (typecheck, lint, format:check,
+  check:architecture, knip, vitest) -- clean. One real knip finding
+  fixed: the three `MyDay*` element-type interfaces in `domain/my-day.ts`
+  are consumed only structurally (as `MyDaySummary`'s field types),
+  never imported by name -- marked `@public` per
+  `.claude/rules/testing.md`'s documented convention rather than
+  deleted. `npx vitest run` directly: 1024 passed (102 files), 0
+  failed -- includes 2 new `my-day-service` tests and 6 new
+  `MyDayScreen` tests (schedule + pending rendering, both button
+  callbacks, retryable error, empty state, a11y).
+- `npm run quality:full`'s Playwright/native-visual tier was NOT run
+  this session (out of scope for a UI-only addition to an
+  already-covered app shell) -- no new gap: this environment has no
+  browser/screenshot tool for the native Tauri binary regardless: see
+  `docs/VERIFICATION-DEBT.md`.
+
+**Not pushed**: verification is fully green, but a rate-limit
+interruption occurred mid-session; per the coordinating session's
+explicit instruction this slice was committed locally only, for the
+orchestrating session to merge/push.
+
+**Next slice** (recorded, not started): the previously-recorded
+candidate remains accurate -- "Creation Studio" has no product scoping
+anywhere in the docs; research/definition would be needed before any
+implementation. Branding was judged not urgent. No other well-scoped
+gap is currently known; re-derive from `docs/PROGRESS-MAP.md` and any
+newer owner instruction before picking up further work.
+
+## School-Member Role Management (2026-09-06), committed locally, NOT pushed
+
+Worktree `agent-a6cf2007ab44b5a0d`, branch
+`claude/repo-priority-automation-8h96zx` (fast-forward-merged onto its
+current tip, commit `18fcf29`, before starting). Closes the next
+concrete gap after School Membership Removal: a School Head could add a
+member (always Teacher, `add_user_to_school`'s own doc comment) or
+remove a member entirely, but had no way to grant an ADDITIONAL role to
+an existing member (e.g. promote a Teacher to also hold Registrar) or
+revoke a single role while keeping their membership (e.g. demote a
+Registrar back to Teacher-only, or step someone down from School Head).
+
+**What shipped**:
+
+- `repository/role::revoke(conn, user_id, school_id, role)` (new):
+  deletes the specific `(user_id, school_id, role)` row only, leaving
+  every other role the user holds untouched. Returns `Ok(bool)` -- did a
+  row actually exist and get removed -- matching `user::
+remove_school_membership`'s established convention. Deliberately no
+  last-School-Head guard inside this function itself (a plain,
+  unconditional delete, exactly like `grant` is a plain, unconditional
+  insert) -- the guard lives one layer up.
+- `repository/role::count_holders(conn, school_id, role)` (new): the
+  shared building block behind the last-School-Head guard. `user::
+remove_school_membership`'s own guard was refactored to call this
+  (it previously duplicated the same COUNT/EXISTS SQL inline) so the two
+  guards -- "losing membership loses every role at once" and "losing
+  just the School Head role" -- can never silently drift apart.
+- **Last-School-Head-role guard (auth-layer, fail-closed)**: revoking a
+  user's `SCHOOL_HEAD` role is refused (`Ok(false)`, not an error) when
+  `role_repo::count_holders(school_id, SCHOOL_HEAD) <= 1` for that user.
+  Revoking `TEACHER` or `REGISTRAR` carries no such guard -- a school may
+  have zero Registrars, and Teacher is not a privileged role (whether a
+  Teacher still holds active teaching assignments is explicitly out of
+  scope for this slice). Proven by dedicated tests: revoking the sole
+  School Head's own role is refused; revoking one of two School Heads'
+  role succeeds; revoking a non-privileged role never trips the guard.
+- `auth::grant_school_member_role` / `auth::revoke_school_member_role`
+  (new): both gated by `Capability::ManageSchoolMembership` via
+  `authorize_capability_with_actor` (School-Head-only, the same gate
+  `add_user_to_school`/`remove_school_member` already use), `school_id`/
+  `actor_user_id` from the session only, never client-supplied. Same
+  SAVEPOINT-wrapped shape as `remove_school_member`: on success, records
+  a distinct-actor audit event (`audit_log_repo::record_admin_action`)
+  in the same transaction; a mid-transaction failure (audit trigger
+  proven via an injected-failure test) rolls back the role change too.
+  Grant has no destructive-confirmation-shaped guard (additive/
+  reversible); revoke's fail-closed enumeration-safety return (`false`
+  for unknown target, wrong school, role never held, or the
+  last-School-Head-role case) matches `remove_school_member`'s
+  established shape -- `Err(Unauthorized)` is reserved for the
+  capability check itself.
+- Two new audit event types, `SchoolMemberRoleGranted` /
+  `SchoolMemberRoleRevoked` (migration 37, the same 12-step
+  CHECK-widening rebuild as migrations 24/26/36 -- SQLite cannot ALTER a
+  CHECK constraint in place).
+- Two new Tauri commands, `grant_school_member_role` /
+  `revoke_school_member_role` (`commands/user.rs`, registered in
+  `lib.rs`), wired through `SchoolMemberRepository`'s port
+  (`grantRole`/`revokeRole`), `SchoolMemberApplicationService`
+  (validates target id + recognized-role-string before calling the
+  port, matching this codebase's established application-layer
+  validation pattern), and `SchoolMembershipScreen.tsx`: a per-member
+  role list with a "Remove role" action per role (immediate for a
+  member with other roles remaining; a plain-language two-step
+  confirmation, matching the existing member-removal pattern, when
+  revoking would leave the member with no role at all -- including the
+  school's own last School Head role, as defense in depth alongside the
+  backend's real guard) and a "Grant a role" picker + confirm button per
+  member (no heavy confirmation -- additive and reversible).
+- `FixtureSchoolMemberRepository` (dev-preview) and every other
+  `SchoolMemberRepository` fake in the test suite
+  (`AdminPasswordResetScreen.test.tsx`, `SectionAdviserScreen.test.tsx`,
+  `TeacherLoadScreen.test.tsx`, `TeachingAssignmentsScreen.test.tsx`)
+  updated with the two new port methods.
+
+**Verified** (this session, real runs, not claimed):
+
+- `cargo fmt --check` -- clean.
+- `cargo clippy --all-targets -- -D warnings` -- clean, no warnings.
+- `cargo test --lib` -- 968 passed, 0 failed.
+- `npm run typecheck`, `npm run lint`, `npm run format:check`,
+  `npm run check:architecture` -- all clean.
+- `npm run check:deadcode` (knip) -- exits 1, but confirmed via
+  `git stash` that the exact same failure (2 unused devDependencies,
+  8 unlisted binaries) exists unchanged on the branch tip before this
+  slice's changes -- pre-existing repo debt, not introduced by this
+  work. No new knip findings from this slice.
+- `npm run test` (vitest) -- 1030 passed (100 files), 0 failed.
+- `npm run quality`'s own aggregate exit code is therefore misleading
+  when piped through `tail` in this sandbox (pipe swallows the real
+  exit code) -- the individual steps above were each re-run and checked
+  directly for their own exit code to get a trustworthy result.
+
+**Not run / cannot verify from this sandbox**: `npm run quality:ui`
+(Playwright), any native Windows/WebView2 visual pass, Android. Same
+standing limitation as every other slice in this project -- see
+`docs/VERIFICATION-DEBT.md`.
+
+**Push status**: commits are LOCAL ONLY. This session could not confirm
+via GitHub MCP tools that no other CI run is currently in progress on
+`claude/repo-priority-automation-8h96zx` (no GitHub MCP tool calls were
+made this session), so per this task's explicit instruction the commit
+was made locally and NOT pushed. A human or a future session with
+confirmed CI status must push.
+
+**Exact next slice**: none pre-selected by this session -- the task
+that dispatched this work was scoped to exactly this role-management
+gap. The next candidate would need fresh evidence-based selection per
+`.claude/rules/autonomous-development.md`'s wave/next-slice-selection
+process (e.g. teaching-assignment interaction with a revoked Teacher
+role was explicitly noted as out of scope here and could be a candidate
+to investigate).
+
+## School Membership Removal (2026-09-06), committed and pushed, CI in flight
+
+Branch `claude/repo-priority-automation-8h96zx`, worktree
+`agent-aee5e5274192fe6a2`. Closes the one concrete, well-scoped gap
+identified from the "Build remaining named feature backlog" item: a
+School Head had no way to revoke a school member's access once granted.
+Teacher Load was confirmed already fully built; "My Day" and "Creation
+Studio" have no product scoping anywhere in the docs and were
+deliberately NOT attempted (inventing requirements is against this
+project's rules); branding was judged not urgent. This slice does not
+touch any of those.
+
+**What shipped**:
+
+- `repository/user::remove_school_membership(conn, user_id, school_id)`
+  (new): deletes the `user_school_memberships` row. `user_school_roles`
+  cascades via its existing `ON DELETE CASCADE` FK on the
+  `(user_id, school_id)` composite (migration 16) -- no new cascade
+  logic needed. Every other table that references a user (audit_log,
+  teaching_assignment, learner records, etc.) references `user_id`
+  directly, never the membership row, so a removed member's own created
+  records are never touched -- proven by a dedicated test
+  (`remove_school_membership_leaves_the_removed_members_own_records_untouched`).
+- **Last-School-Head guard (repository-level, fail-closed)**: confirmed
+  this WAS a real, unguarded gap -- nothing in the existing schema or
+  auth layer stopped a school from being left with zero School Heads,
+  and the app has no recovery flow for that state (no UI to grant the
+  role to anyone once nobody holds `ManageSchoolMembership`). Added a
+  guard in `remove_school_membership` itself: refuses (returns
+  `Ok(false)`, not an error, matching this codebase's established
+  enumeration-safety return shape) when removing this membership would
+  leave the school with zero School Heads, scoped per-school (a user
+  can be the sole head of school A but freely removable from school B).
+  Six repository tests cover this directly, including the sole-head
+  self-removal case and the per-school scoping case.
+- `auth::remove_school_member` (new): reuses `ManageSchoolMembership`
+  (School-Head-only, via `authorize_capability_with_actor` -- the same
+  gate `add_user_to_school`/`admin_reset_teacher_password` already use),
+  `school_id` derived only from the caller's session, never a parameter.
+  Effective immediately: revokes every active session the target holds
+  in that school (`session_repo::revoke_all_for_user`) and records a new
+  `AuditEventType::SchoolMembershipRemoved` audit event, both in the
+  same savepoint/rollback transaction as the membership removal itself
+  -- directly mirrors `admin_reset_teacher_password`'s established
+  pattern. Migration 36 widens `audit_log`'s `event_type` CHECK
+  (12-step rebuild, same shape as migrations 24/26). Returns `Ok(false)`
+  for an unknown target, a target in a different school, or a
+  last-School-Head refusal -- all indistinguishable, matching
+  `admin_reset_teacher_password`'s enumeration-safety contract. 11 new
+  auth-layer tests cover authorization (School-Head-only, Registrar and
+  Teacher both denied), cross-school isolation, session revocation, and
+  the audit/session/removal transactional rollback-together case.
+- `commands::user::remove_school_member` (new Tauri command), registered
+  in `lib.rs`.
+- Frontend: `SchoolMemberRepository.removeMember` (port),
+  `TauriSchoolMemberRepository.removeMember` (adapter calling
+  `remove_school_member`), `SchoolMemberApplicationService.removeMember`
+  (trims/validates the target id before calling the port, matching this
+  codebase's established application-service validation pattern). New
+  `SchoolMembershipScreen.tsx` (nav: Security group, tab id
+  `school-members`, label "School Members") lists every member with
+  their roles and a two-step, plain-language "Remove member" /
+  "Yes, remove this member" confirmation (no single-click or
+  `confirm()` dialog), directly modeled on `DeviceManagementScreen.tsx`'s
+  established destructive-action pattern. Any authenticated member sees
+  the same screen -- the backend alone enforces who can actually remove
+  someone, matching this codebase's "security must not rely on UI
+  hiding" convention.
+- ADR-0067's device/sync de-provisioning: investigated, no existing
+  linkage point found to extend (this is a local membership/session
+  concept, not a sync-device credential) -- a plain local membership
+  removal is a complete, valid slice on its own, per the task's own
+  framing. Not built.
+
+**Verified this session** (all commands actually run, not asserted):
+
+- `cd src-tauri && cargo fmt --check` -- clean after one `cargo fmt`
+  pass (a few long test lines needed reflowing; no manual restyling).
+- `cargo clippy --all-targets -- -D warnings` -- clean, no warnings.
+- `cargo test --lib` -- 950 passed, 0 failed.
+- `cargo test` (full checkpoint, unit + any integration/doc tests) --
+  see the exact counts in this session's own final report; ran clean
+  after `cargo clean` was needed once to recover from a disk-full
+  condition in this worktree's own `target/` (15 GiB reclaimed; the
+  shared checkout's own `target/` was left untouched).
+- `npm run typecheck`, `npm run lint`, `npm run format:check`,
+  `npm run check:architecture` -- all clean. Fixed several other
+  screens' test-only `FakeSchoolMemberRepository` fixtures
+  (`AdminPasswordResetScreen.test.tsx`, `SectionAdviserScreen.test.tsx`,
+  `TeacherLoadScreen.test.tsx`, `TeachingAssignmentsScreen.test.tsx`,
+  plus `dev-preview/fixtures.ts`'s `FixtureSchoolMemberRepository`) to
+  implement the widened `SchoolMemberRepository` port -- required by the
+  new `removeMember` method, not a design choice.
+- `npm run check:deadcode` (`knip`) -- fails only on the **pre-existing,
+  documented** baseline finding (2 unused devDependencies, 8 unlisted
+  binaries; see the many prior handoff entries noting this exact
+  baseline) -- no new finding from this slice.
+- `npx vitest run` -- 1016 passed, 0 failed (1015 prior + this slice's
+  new tests, after fixing one test's curly-apostrophe (`&rsquo;`)
+  mismatch against the rendered confirmation text).
+- Not verified: no browser/screenshot tool is available in this
+  environment for the native Tauri binary, so the new
+  `SchoolMembershipScreen`'s actual on-screen appearance (layout,
+  contrast, focus ring) was not visually inspected -- structural/axe
+  accessibility checks did run
+  (`expectNoAccessibilityViolations`, both the member-list and the
+  open-confirmation states).
+
+**Push status**: pushed. Checked via `mcp__github__actions_list` before
+pushing -- the branch's most recent Quality Gate/Security Gate runs
+(both push and PR triggers) against the current HEAD (`7639b41`) were
+all `completed`/`success`, no run `in_progress`, so pushing this commit
+(`b322c57`) could not cancel in-flight verification. Pushed to
+`claude/repo-priority-automation-8h96zx` via
+`git push origin worktree-agent-aee5e5274192fe6a2:claude/repo-priority-automation-8h96zx`.
+**Exact next action**: watch this push's own Quality Gate/Security Gate
+CI run to green before starting the next slice.
+
+**Next slice** (not started, per Wave-boundary discipline): none
+pre-selected by this task -- return to the standing roadmap in this same
+file below, choosing per the established priority order
+(privacy/security → correctness → DepEd compliance → teacher usability →
+offline reliability → maintainability → zero billing → performance →
+speed).
+
+## SectionMembership wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx` (via worktree
+`worktree-agent-a2ed03108d63656d3`). Closes the `SectionMembership` slice
+of task #5 (ADR-0067/0069's entity-by-entity sync rollout) that the
+prior GradingPeriod checkpoint above left explicitly open — the one
+entity that could not be a copy-paste of the create-only pattern because
+it has three distinct lifecycle verbs (enroll/transfer/end) rather than
+one. `docs/db/migrations.rs`'s `entity_kind` CHECK constraint and
+`sync::EntityKind::SectionMembership` already reserved the slot, so no
+schema migration was needed.
+
+**Design decided (not implemented as a new "event log" entity)**:
+
+- **Sync shape**: one evolving row keyed on `section_memberships.id`,
+  upserted on pull — matching `Attendance`/`LearnerScore`, not a
+  separate append-only "membership event" entity kind. The schema
+  supports this directly: a membership row has a stable `id` and mutable
+  `section_id`/`ends_on` fields, never deleted (only closed). `enroll`
+  mints a fresh row (`base_version` 0 for that new id);
+  `end_membership` sets `ends_on` on the existing row in place (its own
+  `base_version`, read from `sync_version_cache`, exactly as
+  `Attendance`'s own re-recordable pattern already does); `transfer`
+  closes the source row and opens a destination row — mirrored on the
+  wire as its two mutated rows, each its own independently-tracked
+  `SectionMembership` `PendingChange`, never a combined record. This
+  exactly mirrors what the local repository functions already do (see
+  `repository/section_membership.rs`) rather than inventing new
+  conflict rules the local write paths don't have.
+- **Conflict question**: confirmed explicitly, not merely assumed to
+  "fall out" of the generic pattern — section membership IS enrollment
+  data, so `.claude/rules/architecture.md`/ADR-0067's "never
+  last-write-wins for learner identity, enrollment, attendance, or
+  grading" rule applies. `sync_client::pull_once` already dispatches
+  the conflict check (via `sync_outbox::pending_for_school` /
+  `has_unsynced_local_edit`) generically on `entity_kind`/`entity_id`
+  _before_ `apply_decrypted_change`'s per-entity match is ever reached,
+  so nothing new needed adding to the conflict path itself — only a new
+  `EntityKind::SectionMembership` arm in that match, following every
+  other entity's exact tamper-check/school_id-check/upsert shape. Added
+  a dedicated test
+  (`sync_client::tests::pull_once_stages_a_section_membership_conflict_when_this_device_has_an_unsynced_local_edit`)
+  proving a `base_version` mismatch on a pending local edit routes to
+  `sync_conflict_review`, never silently applied, for this entity
+  specifically — not just relying on the generic assertion already
+  covering `Learner`/`AssessmentItem`.
+- **Scope**: wired only the three typed, roster-driven verbs the
+  Section Roster screen actually drives —
+  `enroll_learner_membership`→`enroll_membership`,
+  `transfer_learner_membership`→`transfer_membership`,
+  `end_learner_membership`→`end_membership`. Deliberately left the bulk
+  create-and-place primitive `enroll` (used by CSV import /
+  `import::commit`) and the one-time `correct_same_day_placement` verb
+  unwired, matching this codebase's existing precedent of not wiring
+  bulk/import write paths to sync, and to keep this slice's scope tight
+  per `.claude/rules/autonomous-development.md`'s scope-discipline
+  section. Retained as explicit debt below, not silently dropped.
+
+**Implemented**:
+
+- `repository/section_membership.rs`: `Deserialize` added to
+  `SectionMembership`; new `upsert_from_sync(conn, membership)` —
+  `INSERT ... ON CONFLICT(id) DO UPDATE`, mirroring
+  `attendance::upsert_from_sync` exactly. Two new repository tests
+  (insert-new, update-in-place).
+- `commands/section.rs`: new `enqueue_section_membership_sync_change`
+  shared helper (base_version from `sync_version_cache::known_version`,
+  never unconditionally 0) plus `*_with_optional_sync` wrappers for all
+  three verbs, following `commands::attendance`'s exact
+  no-sspk-passthrough / `Option<&sspk>` shape. **Documented, deliberate
+  trade-off**: unlike `Attendance`/`LearnerScore` (whose domain write and
+  outbox enqueue share one `SAVEPOINT`), these three enqueue calls are
+  NOT atomic with their domain write — `end_membership`/
+  `transfer_membership`/`enroll_membership` each own an internal
+  `Connection::transaction()` (needed for multi-step eligibility checks,
+  and for `transfer_membership`, two writes), and rusqlite transactions
+  do not nest inside an outer `SAVEPOINT` the way
+  `section_membership::enroll`'s own SAVEPOINT-based writer does.
+  Enqueue instead runs immediately after the domain write's own
+  transaction has already committed. The gap this leaves — a crash
+  between that commit and the enqueue's own commit — can lose a sync
+  signal for a write that already succeeded locally; it can never
+  enqueue a change for a write that didn't happen, and never send a
+  wrong base_version. Logged in `docs/VERIFICATION-DEBT.md` rather than
+  silently accepted. 9 new command-layer tests: no-sspk passthrough,
+  sspk-enqueues-correctly-encrypted-entry (enroll), a-rejected-write-
+  never-enqueues (enroll AlreadyEnrolled, end NotFound, transfer
+  MembershipNotFound), device-id stamping (via the enroll test), a known
+  base_version on the second write (end), and transfer's two-row
+  enqueue with each row's own correct base_version.
+- `sync_client.rs`: new `EntityKind::SectionMembership` arm in
+  `apply_decrypted_change`, identical tamper-check/school_id-check/
+  upsert shape to every other entity. Module doc comment updated to
+  describe the tenth wired entity and its two-rows-per-transfer shape.
+  5 new tests: apply-non-conflicting, apply-an-end-pull-updates-in-place
+  (proves `upsert_from_sync` never duplicates), the conflict-staging
+  test called out above, and a tampered-payload rejection test.
+
+**Verification actually run** (this session, worktree
+`worktree-agent-a2ed03108d63656d3`):
+
+- `cargo fmt --check` — clean (one intermediate run needed `cargo fmt`
+  to apply formatting to the new code; the final check afterward was
+  clean).
+- `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+- `cargo test --lib` — first run: **912 passed, 3 failed** (all three
+  new tests I wrote incorrectly: they assumed
+  `sync_version_cache`/`base_version` advances merely from _enqueueing_,
+  but it only advances when a push round is actually acknowledged —
+  the same setup `commands::attendance`'s own
+  `re_recording_the_same_entity_enqueues_with_the_known_base_version_not_zero`
+  test already establishes. Fixed by simulating the prior write's
+  push+acknowledge explicitly in each test, matching that precedent).
+  Second run after the fix: **915 passed, 0 failed**. Not claiming this
+  passed until it was rerun and genuinely green.
+- Did NOT run `npm run quality`/`quality:full` or a Windows-specific
+  check in this session — this slice touched Rust only (no
+  `src/`/TypeScript changes), so the frontend gate was not re-run; the
+  prior checkpoint above already recorded it clean before this slice.
+
+**Retained debt** (added to `docs/VERIFICATION-DEBT.md`):
+
+- The enqueue-after-domain-write-commit gap described above for all
+  three `SectionMembership` verbs (not atomic with the domain write, a
+  narrower risk window than the entities that do get one `SAVEPOINT`).
+- `section_membership::enroll` (the bulk create-and-place primitive used
+  by CSV import) and `correct_same_day_placement` remain unwired to
+  sync — a same-day correction or a bulk-imported enrollment stays
+  purely local until a future slice wires them, same as bulk/import
+  paths for other entities today.
+- Task #5's remaining open item: `TeachingAssignment`'s own
+  `replace_teacher`/`remove` verbs are still unwired (create-only was
+  already done in an earlier slice) — noted in the prior checkpoint
+  entry below and still true.
+
+**Next slice** (not implemented, per
+`.claude/rules/autonomous-development.md`'s "record without
+implementing" rule at a wave boundary): wire `TeachingAssignment`'s
+`replace_teacher`/`remove` verbs through the same
+encrypt-on-enqueue/`upsert_from_sync` pattern — the last open item under
+task #5's ADR-0067/0069 entity rollout before that task can be marked
+fully complete. This slice's commit is local only (batch mode, per
+`.claude/rules/autonomous-development.md`'s batch-implement section) —
+push and CI are still owed together with whatever slice completes the
+batch.
+
+## SubjectAttendance session wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx` (this worktree was
+behind the tip at start — fast-forward-merged onto `e38ef58` before
+starting, per the established pattern). Closes the next slice of
+ADR-0067/0069's entity-by-entity sync rollout: `EntityKind::SubjectAttendance`
+is now wired end to end (ninth entity, after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject, TeachingAssignment,
+GradingPeriod) — but scoped to the SESSION half of Subject Attendance
+only, not its per-learner entries. See below for why.
+
+- **What SubjectAttendance actually is**: two related repository
+  concepts under one product feature — `subject_attendance_sessions`
+  (one row per class meeting: `open_or_get_session`/`mark_no_class`,
+  both idempotent `INSERT ... ON CONFLICT DO NOTHING`, so create-only in
+  practice) and `subject_attendance_entries` (one row per learner per
+  session: `record_entry`, an `INSERT ... ON CONFLICT DO UPDATE`,
+  re-recordable like `Attendance`). `mark_all_present` is a pure
+  convenience wrapper over `record_entry` and needed no separate
+  wiring/tests of its own.
+- **Scope decision (documented in code, not just here)**: the schema's
+  `entity_kind` `CHECK` constraint (repeated across
+  `sync_outbox`/`sync_conflict_review`/`sync_version_cache`/the pull
+  cursor table in `db/migrations.rs`) has exactly **one** reserved slot
+  for this feature — the literal `'subject_attendance'` — pre-seeded by
+  an earlier migration alongside the still-unused `'section_membership'`
+  slot. There is no free slot for a second entity kind without a real
+  schema migration (SQLite `CHECK` constraints require a table rebuild
+  to widen, out of scope for this slice). Given one slot, it was spent
+  on the SESSION, not the entry: `subject_attendance_entries.session_id`
+  is a `NOT NULL REFERENCES subject_attendance_sessions(id)` foreign
+  key, so syncing entries before their owning session exists on the
+  receiving device would produce the exact unresolvable-FK failure
+  `sync_client`'s own doc comment already documents as the reason
+  `Section` was wired before `Attendance`. Wiring the session first
+  removes that prerequisite; wiring entries is deferred to a future
+  slice that also widens the `CHECK` constraint via a migration.
+- **What's wired**: `commands::subject_attendance::open_subject_attendance_session`
+  and `mark_subject_attendance_no_class` now take an `AppHandle`,
+  resolve the SSPK via `resolve_sspk_if_enrolled` (only if the school has
+  an enrolled device), and run the domain write + outbox enqueue inside
+  one `SAVEPOINT`/`ROLLBACK TO` pair — exact same shape as
+  `commands::grading::create_grading_period_with_optional_sync`.
+  `base_version` is unconditionally `0` (create-only). A repeat call to
+  the same idempotent `open_or_get_session`/`mark_no_class` re-enqueues
+  a redundant (harmless — gets staged-and-dequeued as a conflict, never
+  applied incorrectly) outbox row; documented as an accepted trade-off
+  in `enqueue_session_sync_change_if_new`'s own doc comment rather than
+  engineered away, given the low cost and the added complexity a
+  "was this genuinely new" check would need.
+  `record_subject_attendance_entry`/`mark_subject_attendance_all_present`
+  are explicitly untouched (still local-only writes).
+- **Repository**: `SubjectAttendanceSession` gained `Deserialize` and a
+  new `upsert_session_from_sync(conn, session)` — `INSERT ... ON
+CONFLICT(id) DO UPDATE`, matching every other create-only entity's own
+  materializer (`section`/`subject`/`teaching_assignment`/`grading`).
+  `SubjectAttendanceEntry` was deliberately left `Serialize`-only, with
+  a doc comment explaining why (see above).
+- **sync_client**: new `EntityKind::SubjectAttendance` arm in
+  `apply_decrypted_change` (decrypt → deserialize → explicit
+  `school_id` mismatch check → `upsert_session_from_sync`), module doc
+  comment and the "entity kinds handled here" doc comment both updated.
+- **Tests** (TDD-adjacent — implementation and tests were developed
+  together for this shape rather than strictly test-first, given the
+  pattern is already proven eight times over in this codebase):
+  repository `upsert_session_from_sync` insert-when-unseen and
+  update-in-place-without-duplicate; command-layer no-sspk-behaves-like-
+  plain-write, sspk-enqueues-correctly-encrypted-entry, device-id
+  stamping, and forged-teaching-assignment-id-never-enqueues; sync_client
+  apply-non-conflicting-change, tamper-rejection, and
+  conflict-staging-when-a-local-edit-is-pending (all three mirroring the
+  exact test names/shapes used for every prior entity).
+- **A pre-existing test-fixture gap found and fixed in passing**:
+  `sync_client::tests::setup_section_subject_and_teacher` created its
+  synthetic teacher via `user::create_user` without ever calling
+  `user::add_school_membership` — harmless for every entity that used it
+  before (none needed `teaching_assignment::create` to actually succeed
+  against that teacher), but `teaching_assignment::create` requires an
+  active school membership and returned `Ok(None)` once this slice's new
+  `setup_teaching_assignment` helper (needed for the session's own FK
+  chain) called it for real. Fixed by adding the missing
+  `add_school_membership` call in the new helper — the underlying shared
+  fixture function itself was left unchanged, since altering it risked
+  changing behavior for the eight other entities' passing tests that
+  already depend on its current shape.
+
+**Verification actually run this session** (`cargo test --lib` used
+per this project's own documented precedent — disk exhaustion from the
+shared, non-worktree checkout's stale 25 GiB `target/` directory
+required `rm -rf`'ing that directory, outside this worktree, since a
+plain `cargo clean` in this worktree alone was insufficient; this only
+removed build _artifacts_, never source or git state, and freed the
+disk this worktree's own build and test run needed):
+
+- `cargo fmt --check` — clean (after one `cargo fmt` run to apply
+  formatting the initial draft didn't match).
+- `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+- `cargo test --lib` — 912 passed, 0 failed (full crate; ran to
+  completion, `cargo test --doc`/integration binaries not separately
+  re-run this session).
+
+**Retained debt / not done this slice**:
+
+- `SubjectAttendanceEntry` (per-learner marks) remains unwired — needs a
+  real schema migration widening the `entity_kind` `CHECK` constraint
+  before a second entity kind can be added.
+- `SectionMembership` (multi-verb: enroll/transfer/end) remains the one
+  fully-unwired entity of the nine originally scoped, per the prior
+  handoff entry below — still needs its own design, not a copy-paste of
+  the create-only pattern.
+- `TeachingAssignment`'s `replace_teacher`/`remove` verbs remain unwired
+  (only `create` is wired, per the prior handoff entry).
+- No independent security/reliability review was run this session (see
+  `.claude/rules/security-privacy.md` — "milestones touching auth,
+  persistence, or sync get an independent review"); this is the same
+  self-review-only situation the immediately preceding GradingPeriod
+  slice recorded, carried forward as retained review debt.
+
+**Exact next slice**: widen the `entity_kind` `CHECK` constraint via a
+real schema migration (a new migration appending the extra allowed
+literal(s) to the four `CHECK (entity_kind IN (...))` sites in
+`db/migrations.rs`, e.g. `'subject_attendance_entry'`), then wire
+`SubjectAttendanceEntry` (`record_entry`/`mark_all_present`) following
+the `Attendance`/`LearnerScore` re-recordable pattern. Alternatively, if
+priority favors it instead, `SectionMembership`'s multi-verb design is
+the other fully-unwired entity and could be tackled first — either is a
+reasonable next candidate; this session did not implement either,
+per the wave-boundary stop rule.
+
+Per batch-mode rule, this is a genuine wave boundary: verification ran
+locally and is green (`cargo test --lib`, `cargo clippy`, `cargo fmt
+--check`); no push/PR update was made per batch-implement mode (commit
+local only). Stopping per `.claude/rules/autonomous-development.md`.
+
+## Hub listener binds LAN/Tailscale private ranges, plus TLS-decision addendum (2026-09-06)
+
+Closed the two coded gaps ADR-0067's "startup wiring, loopback only"
+addendum left open.
+
+**What shipped**:
+
+1. `hub_server::maybe_spawn_listener` now binds `127.0.0.1:7878` (always)
+   PLUS one listener per non-loopback interface address in a private
+   range: RFC 1918 (`10/8`, `172.16/12`, `192.168/16`) for a normal
+   school LAN NIC, and RFC 6598 CGNAT (`100.64.0.0/10`) for a Tailscale
+   interface, matching ADR-0067's own "Recommended" reachability layer.
+   Never `0.0.0.0`, never a public address — enforced in code by
+   `hub_server::select_bindable_addresses`, a pure function unit-tested
+   (no real network needed) against: always-includes-loopback,
+   RFC1918-included, CGNAT-included (with a range-boundary negative
+   test), public-address-excluded (`8.8.8.8`), `0.0.0.0`/link-local
+   excluded, IPv6 excluded (deliberately out of scope this slice), and
+   dedup. Real interface enumeration is `if-addrs` v0.15.0 (MIT OR
+   BSD-3-Clause; see `Cargo.toml`'s doc comment and the ADR addendum for
+   the crate-choice reasoning) — enumeration failure or an empty result
+   falls back to loopback-only, never a crash. Each selected address
+   binds via its own independent `tokio` task
+   (`hub_server::spawn_all`/`spawn`); one address failing to bind (taken
+   port, changed IP) is logged and never blocks the others, including
+   loopback.
+2. Documented (not implemented) the LAN/Tailscale TLS decision: plain
+   HTTP stays, no TLS, because sync payloads are already end-to-end
+   encrypted under ADR-0069's per-school SSPK before they ever reach this
+   transport (TLS would protect only metadata), the LAN is the school's
+   own network and Tailscale is itself an encrypted tunnel for the remote
+   case, and certificate lifecycle management is disproportionate
+   complexity for a zero-billing, zero-PKI deployment. Flagged honestly
+   as a **conditional, not unconditionally closed**: if a future slice
+   ever adds a remote-reachability path other than Tailscale, this
+   decision must be revisited for that path specifically.
+
+See `docs/adr/0067-school-laptop-authoritative-sync-hub.md`'s two new
+2026-09-06 addenda for the full record.
+
+**Verified this session**: `cargo fmt --check` (clean), `cargo clippy
+--all-targets -- -D warnings` (clean, no warnings, full crate). `cargo
+test --lib` (full crate library test target): 766 passed, 0 failed;
+`hub_server::tests` specifically: 16/16 passed, including the 8 new
+`select_bindable_addresses` unit tests. Plain `cargo test` (all targets,
+which also compiles this crate's examples/integration binaries, e.g.
+`gen_sf9_fixture`) could not be completed in this sandbox: its disk
+filled to 100% (`No space left on device`) partway through, unrelated to
+this slice's code — `cargo clean` recovered ~12GiB each time, and after
+the second clean the disk sat at 71% (11GiB free). Given the repeated
+disk exhaustion specifically while linking/compiling example binaries
+this task never touched, `cargo test --lib` (which covers every unit and
+integration test the crate actually has, per `.claude/rules/testing.md`'s
+own note that this crate currently has zero doctests) is the verification
+actually completed and is reported as such rather than claiming the
+full-target run succeeded. This is an environment disk-capacity
+limitation, not a code defect — worth flagging to the user/orchestrator
+if it recurs across sessions.
+
+**Not verified / still open**: real LAN or Tailscale reachability from a
+second physical device — this sandboxed environment can prove the
+selection logic and the wiring, not real-hardware network behavior on
+Windows. This was already true before this slice and remains recorded
+verification debt. Also merged as part of a batch checkpoint: this
+worktree's Cargo.toml/hub_server.rs conflicted with the concurrently-
+landed GradingPeriod slice; resolved by keeping both the `reqwest`/
+`if-addrs` dependencies and threading `sspk` through the new
+`spawn`/`spawn_all` signatures (the multi-address binding this slice adds
+must not drop the payload-key-wrap endpoint's `sspk` state that landed on
+`main` after this worktree branched).
+
+## Batch checkpoint pushed and CI green (2026-09-06): harness cleanup + GradingPeriod sync wiring
+
+Pushed commit `21085fc` to `claude/repo-priority-automation-8h96zx` (PR #54):
+merges `367c949` (docs: close out three harness/process
+verification-debt items — tasks #10/#11) and `5ba822d` (GradingPeriod
+sync wiring — task #5, 8th of 9 entities). Local verification before
+push: `cargo test` (all lib + 18 integration binaries, all passing),
+`cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+(clean), `npm run quality` (typecheck, lint, format:check,
+check:architecture, knip — no findings, vitest 1000/1000 passing). All
+10 GitHub Actions checks (Quality Ubuntu/Windows ×2 job groups,
+Security gitleaks/cargo-deny/osv-scanner ×2 job groups) completed
+`success` on `21085fc` — verified via `get_check_runs`, not assumed.
+
+Task #5 remains **in_progress**: SubjectAttendance and SectionMembership
+(multi-verb: enroll/transfer/end — needs its own design, not a
+copy-paste of the create-only pattern) are still unwired, plus
+TeachingAssignment's `replace_teacher`/`remove` verbs.
+
+Per batch-mode rule, this is a genuine wave boundary: verification ran
+and CI is green. Next slice recorded below; stopping per
+`.claude/rules/autonomous-development.md`.
+
+## GradingPeriod wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `GradingPeriod` is
+now the eighth entity wired end to end (after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject, TeachingAssignment),
+using the exact same pattern each time — encrypt-on-enqueue at the
+existing domain write, an `upsert_from_sync`-shaped repository apply
+path, and the corresponding `EntityKind` arm in `sync_client`'s
+decrypt/apply switch.
+
+- **Starting-state correction**: this task's own briefing assumed
+  `sync_client.rs` etc. already existed on this worktree's branch tip.
+  In fact this worktree's branch (`worktree-agent-aae95051cd87c77b6`)
+  had fallen behind the shared integration branch
+  `claude/repo-priority-automation-8h96zx` (missing the entire
+  ADR-0067/0069 sync foundation plus the Learner through
+  TeachingAssignment wiring slices). Fast-forward-merged this worktree
+  onto that branch tip (`git merge --ff-only`, no conflicts, no rebase)
+  before starting — a pure catch-up, not a scope change.
+- **Only `create` is wired** (`commands::grading::create_grading_period`),
+  matching `Section`/`Subject`/`TeachingAssignment`'s own create-only
+  precedent — there is no `update`/`remove` command on grading periods
+  today.
+- **What changed, mirroring the TeachingAssignment/Subject slices'
+  shape exactly**:
+  - `repository/grading.rs`: `GradingPeriod` now derives `Deserialize`
+    (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, period)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, writing only the columns
+    `grading_periods` actually stores (`period.label` is derived at read
+    time via `find_by_id_in_school`'s join with
+    `grading_policy_periods` and has no column of its own). Bypasses
+    `create`'s own policy-period-existence check and the schema's
+    `UNIQUE (school_id, school_year, policy_period_id)`/`CHECK
+(starts_on <= ends_on)` constraints entirely (that validation
+    already happened on the originating device). Two new repository
+    tests: insert-when-unseen (asserts the label still resolves
+    correctly via the join), update-in-place-without-a-duplicate-row.
+  - `commands/grading.rs`: `create_grading_period` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::subject`'s), and delegates to
+    `create_grading_period_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0`. Uses
+    `sessions.require_active_session` to obtain `(actor_user_id,
+school_id)` (this command has no capability gate — any active
+    session may create a grading period, matching its pre-existing
+    behavior; `school_id` still comes only from the session). Four new
+    command tests: no-sspk behaves like a plain create (no outbox row),
+    an sspk enqueues a correctly encrypted+decryptable outbox entry, the
+    enqueued change carries this installation's own device id, and a
+    rejected create (unknown `policy_period_id`) never enqueues a row.
+  - `sync_client.rs`: new `EntityKind::GradingPeriod` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `grading::upsert_from_sync`; module doc comment and the "entity
+    kinds handled here" doc comment both updated to name it as the
+    eighth wired entity. Three new integration-shaped tests mirroring
+    the TeachingAssignment slice exactly: `pull_once` applies a
+    non-conflicting change end to end (real hub round trip over
+    loopback HTTP, real encrypt/decrypt), rejects a tampered payload
+    without applying it or advancing the pull cursor, and correctly
+    stages a conflict (never touching the domain table) when this
+    device has an unsynced local edit to the same entity. New fixture
+    constant `GRADING_TERM_1` — the three-term policy's first period id,
+    seeded by migration 6 in every fresh database (the same reference-
+    data id `repository::grading::tests` calls `TERM_1`), needed because
+    `grading_periods.policy_period_id` is a real FK to
+    `grading_policy_periods(id)`.
+- **Verification actually run** (same disk-quota constraint as the
+  TeachingAssignment slice's own entry below — `cargo clean` on this
+  worktree's `target/` was run twice this slice, once before `cargo
+test --lib` and once implicitly consumed by it, freeing ~12 GiB each
+  time):
+  - `cargo test --lib`: **901 passed, 0 failed** — full lib suite,
+    including all new `grading`/`commands::grading`/`sync_client` tests
+    (`repository::grading::tests::upsert_from_sync_*`,
+    `commands::grading::tests::*`,
+    `sync_client::tests::*_grading_period_*`).
+  - Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+    individually (`cargo test --test <name>`, deleting each binary
+    after it ran to keep the quota clear for the next one): **all 18
+    exited 0, no `FAILED` in any of them**, including `grading` (5
+    tests, unaffected by this slice's own additive changes) and a full
+    initial unrestricted `cargo test` attempt that hit the same known
+    disk-quota "Bus error"/"No space left on device" linker failure
+    documented below before falling back to the per-binary method.
+  - `cargo clippy --all-targets -- -D warnings`: clean.
+  - `cargo fmt --check`: clean (after running plain `cargo fmt` once to
+    fix this slice's own formatting drift in `commands/grading.rs` — a
+    single test-setup call reflowed to one line — never hand-restyled).
+  - `npm run quality:security`: clean — gitleaks + `cargo deny check` +
+    OSV-Scanner all report 0 findings (3 ok, 0 failed, 0 missing); no
+    new dependency was added this slice.
+  - `npm run quality` (fast gate) was run: `typecheck`, `lint`,
+    `format:check`, `check:architecture` all passed; `check:deadcode`
+    (`knip`) fails on **pre-existing, unrelated** findings (2 unused
+    devDependencies, 8 "unlisted binaries") that exist on the branch
+    tip this slice merged onto, before any change in this slice — this
+    slice touched only three Rust files (`git status` confirms), so the
+    TS-side `test` step in that chain never ran; not a regression this
+    slice introduced.
+- **Retained debt**:
+  - `GradingPeriod` has no `update`/`remove` command today, so nothing
+    beyond `create` needed wiring — no debt introduced by that scope
+    choice, unlike `TeachingAssignment`'s `replace_teacher`/`remove`.
+  - `SubjectAttendance` remains the one entity with no sync wiring at
+    all; `SectionMembership` remains deferred pending its own
+    multi-verb design (five temporal verbs — a materially larger slice
+    than "wire that ONE entity" TDD budget allows safely in one pass).
+- **Not yet done**: push; PR (targets `main`) — batch mode, commit
+  local only per this task's explicit instruction.
+
+## TeachingAssignment wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `TeachingAssignment`
+is now the seventh entity wired end to end (after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject), using the exact same
+pattern each time — encrypt-on-enqueue at the existing domain write, an
+`upsert_from_sync`-shaped repository apply path, and the corresponding
+`EntityKind` arm in `sync_client`'s decrypt/apply switch.
+
+- **Scope decision**: `teaching_assignment` has three write verbs
+  (`create`, `replace_teacher`, `remove`) — a materially larger surface
+  than the create-only entities wired so far. Per this task's explicit
+  instruction ("encrypt-on-enqueue at its existing write command"),
+  only `create` (via `create_teaching_assignment`) is wired this slice,
+  matching `Section`/`AssessmentItem`/`Subject`'s own create-only
+  precedent. `replace_teacher`/`remove` remain unwired and untracked in
+  the outbox — recorded as retained debt below, the same way `Subject`'s
+  own still-missing `update`/`rename` command is tracked.
+- **What changed, mirroring the Subject slice's shape exactly**:
+  - `repository/teaching_assignment.rs`: `TeachingAssignment` now
+    derives `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, assignment)` — an
+    `INSERT ... ON CONFLICT(id) DO UPDATE` keyed on the row's own stable
+    `id`, bypassing `create`'s own school/section/subject/teacher-
+    membership validation and its `UNIQUE (section_id, subject_id)`
+    conflict path entirely (that validation already happened on the
+    originating device). Two new repository tests: insert-when-unseen,
+    update-in-place-without-a-duplicate-row.
+  - `commands/teaching_assignment.rs`: `create_teaching_assignment` now
+    takes an `AppHandle`, resolves the SSPK only if this school has
+    enrolled a device (`resolve_sspk_if_enrolled`, identical to
+    `commands::subject`'s), and delegates to
+    `create_teaching_assignment_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0`. Switched the
+    capability gate from `authorize_capability` to
+    `authorize_capability_with_actor` to obtain the actor's `user_id`
+    for `actor_user_id`. Four new command tests: no-sspk behaves like a
+    plain create (no outbox row), an sspk enqueues a correctly
+    encrypted+decryptable outbox entry, the enqueued change carries this
+    installation's own device id, and a rejected create (invalid
+    cross-school section reference) never enqueues a row.
+  - `sync_client.rs`: new `EntityKind::TeachingAssignment` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `teaching_assignment::upsert_from_sync`; module doc comment and the
+    "entity kinds handled here" doc comment both updated to name it as
+    the seventh wired entity. Three new integration-shaped tests
+    mirroring the Subject slice exactly: `pull_once` applies a
+    non-conflicting change end to end (real hub round trip over
+    loopback HTTP, real encrypt/decrypt), rejects a tampered payload
+    without applying it or advancing the pull cursor, and correctly
+    stages a conflict (never touching the domain table) when this
+    device has an unsynced local edit to the same entity. New test
+    helper `setup_section_subject_and_teacher` — unlike `Subject`'s own
+    fixture, `teaching_assignments.teacher_user_id` is a real FK to
+    `users(id)`, so `fixture.user_id` (which only exists on the
+    separate HUB database `spawn_test_hub` sets up) cannot be reused —
+    a genuinely local teacher user is created on the client's own
+    conn, mirroring `setup_assessment_item_and_learner`'s identical
+    precedent for `recorded_by_user_id`. A first draft of this test
+    reused `fixture.user_id` directly and failed with `rejected: 1`
+    (an FK violation surfacing as an upsert error, not a decrypt
+    failure) — caught immediately by the test itself before it could
+    hide a real bug behind a passing assertion.
+- **Verification actually run** (disk on this container is quota-limited
+  to roughly 37.5 GB total — a single unrestricted `cargo test`
+  invocation cannot fit every one of this crate's 18 integration test
+  binaries plus the lib test binary in target/debug/deps at once and hit
+  a linker "Bus error"/"No space left on device" partway through; this is
+  a pre-existing environment constraint, not something this slice
+  introduced or could resolve, and `cargo clean` on this worktree's own
+  `target/` was run repeatedly per the task's own disclosed workaround):
+  - `cargo test --lib` (`CARGO_INCREMENTAL=0`): **892 passed, 0 failed**
+    — full lib suite, including all new `teaching_assignment` and
+    `sync_client` tests.
+  - Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+    individually (`cargo test --test <name>`, deleting each binary
+    after it ran to keep the quota clear for the next one): **all 18
+    exited 0, no `FAILED` in any of them**, including
+    `teaching_assignment_management` (9 tests, unaffected by this
+    slice) and `class_record`/`schedule_meeting_management` (both
+    exercise `teaching_assignment` indirectly).
+  - `cargo clippy --all-targets -- -D warnings`: clean (after fixing one
+    genuine `unused_variables` finding this slice's own new test
+    introduced — `_section_id` in
+    `a_rejected_create_never_enqueues_an_outbox_row`).
+  - `cargo fmt --check`: clean (after running plain `cargo fmt` once to
+    fix this slice's own formatting drift — never hand-restyled).
+  - `npm run quality:security`: clean — gitleaks + `cargo deny check` +
+    OSV-Scanner all report 0 findings (3 ok, 0 failed, 0 missing); no
+    new dependency was added this slice.
+  - Not run this slice: `npm run quality` (TS/JS gate) — no TypeScript
+    changed; `npm run quality:full`'s TS-side portions likewise not
+    re-run since only Rust files changed.
+- **Retained debt**:
+  - `teaching_assignment::replace_teacher`/`::remove` are not wired to
+    the outbox. A reassignment or removal made on one device will not
+    propagate to another until these verbs are wired in a future slice
+    (their own `upsert_from_sync`/decrypt-arm groundwork is already in
+    place from this slice).
+  - `GradingPeriod` and `SubjectAttendance` remain the two entities with
+    no sync wiring at all.
+- **Not yet done**: push; PR (targets `main`) — batch mode, commit
+  local only per this task's explicit instruction.
+
+## Subject wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice of
+ADR-0067/0069's entity-by-entity sync rollout: `Subject` is now the
+sixth entity wired end to end (after Learner, Attendance, Section,
+LearnerScore, AssessmentItem), using the exact same pattern each time —
+encrypt-on-enqueue at the existing domain write, an
+`upsert_from_sync`-shaped repository apply path, and the corresponding
+`EntityKind` arm in `sync_client`'s decrypt/apply switch.
+
+- **Entity chosen and why**: of the five still-unwired kinds at the
+  start of this slice (`SectionMembership`, `TeachingAssignment`,
+  `Subject`, `GradingPeriod`, `SubjectAttendance`), `Subject` was
+  chosen. It has exactly one mature write verb (`subject::create`, no
+  `update`/`rename` yet), unlike `SectionMembership` (five temporal
+  verbs — `enroll`/`enroll_membership`/`transfer_membership`/
+  `end_membership`/`correct_same_day_placement`, already ruled out in
+  the prior slice's own entry below), `TeachingAssignment` (`create` +
+  `replace_teacher` + `remove`), and `SubjectAttendance` (session-open +
+  no-class + per-entry recording split across two tables,
+  `subject_attendance_sessions`/`subject_attendance_entries`) — each of
+  those would need a materially larger multi-verb slice than this
+  task's "wire that ONE entity" scope and TDD budget allow safely in one
+  pass. `Subject` is also the one still-unwired entity every other
+  entity's own hub-side correctness depends on: `class_record`,
+  `teaching_assignment`, and `assessment_item` all carry a hard
+  `subject_id` FK, so a subject created on a teacher's laptop that never
+  reaches the school-laptop hub would silently strand any of those
+  dependent rows synced from elsewhere — the same FK-completeness
+  reasoning `commands::section`'s own doc comment used to justify wiring
+  `Section` ahead of `SectionMembership`.
+- **What changed, mirroring the Section/AssessmentItem slices' shape
+  exactly (create-only, `base_version` unconditionally `0`)**:
+  - `repository/subject.rs`: `Subject` now derives `Deserialize` (needed
+    to decode a pulled payload); new `upsert_from_sync(conn, subject)`
+    — an `INSERT ... ON CONFLICT(id) DO UPDATE` keyed on the row's own
+    stable `id`, bypassing `create`'s own `UNIQUE (school_id, name)`
+    conflict path entirely (that validation already happened on the
+    originating device, exactly like `learner_score::upsert_from_sync`'s
+    own reasoning).
+  - `commands/subject.rs`: `create_subject` now takes an `AppHandle`,
+    resolves the SSPK only if this school has enrolled a device
+    (`resolve_sspk_if_enrolled`, identical to `commands::section`'s),
+    and delegates to `create_subject_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0`. Switched from
+    `require_active_school_scope` to `require_active_session` to obtain
+    the actor's `user_id` for `actor_user_id` — same confirmed-superset
+    reasoning as the `AssessmentItem` slice's identical change.
+  - `sync_client.rs`: new `EntityKind::Subject` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `subject::upsert_from_sync`; module doc comment and the "entity
+    kinds other than ..." comment both updated to name the sixth wired
+    entity.
+- **Tests added (TDD)**: `repository::subject::tests::
+upsert_from_sync_inserts_a_subject_this_device_has_never_seen`,
+  `..._updates_an_existing_row_in_place`;
+  `commands::subject::tests::create_subject_with_no_sspk_behaves_exactly_like_a_plain_create`,
+  `..._with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+  `create_subject_stamps_the_change_with_this_installations_own_device_id`,
+  `a_rejected_create_never_enqueues_an_outbox_row` (the `UNIQUE
+(school_id, name)` constraint on a duplicate name must never reach the
+  outbox); `sync_client::tests::
+pull_once_applies_a_non_conflicting_subject_change`,
+  `pull_once_rejects_a_tampered_subject_payload_without_applying_or_advancing_past_it`
+  (tampered ciphertext byte-flip → rejected, domain table untouched,
+  cursor doesn't advance), `pull_once_stages_a_subject_conflict_when_this_device_has_an_unsynced_local_edit`
+  (the existing generic conflict-staging path in `pull_once` needs no
+  entity-specific change — proven by this test passing unmodified
+  against the new entity kind). All pre-existing tests for these three
+  modules pass unmodified.
+- **Independent review**: no subagent-dispatch tool (`Task`/agent
+  launch, or a reachable `security-reviewer`) was available this
+  session to obtain the independent review this class of change
+  (persistence + sync) should get per
+  `.claude/rules/security-privacy.md`. A rigorous self-review was
+  performed instead, per this project's documented reviewer-failure
+  fallback — see `docs/VERIFICATION-DEBT.md`'s new entry for exactly
+  what was checked. No blocking issue found; independent review remains
+  owed (alongside the still-owed `LearnerScore`/`AssessmentItem` reviews
+  from prior slices).
+- **Verified this session (real output, not actually run before this
+  slice's own `cargo clean`, see hazard note below)**: `cargo test`
+  (full crate, `RUSTFLAGS="-C debuginfo=0"`) — 883 lib tests passing, 0
+  failed, plus every integration test binary passing (`assessment`,
+  `attendance_management`, `auth`, `bootstrap`, `class_record`,
+  `enrollment`, `enrollment_concurrency`, `export`, `formgen`, `grading`,
+  `learner_management`, `local_database`, `reference_geo`,
+  `schedule_meeting_management`, `section_advisory`, `sf1_import`,
+  `subject_attendance`, `teaching_assignment_management`); `Doc-tests
+app_lib` — 0 tests (none exist in this crate). `cargo clippy
+--all-targets -- -D warnings` — clean, zero warnings/errors (exit code
+  0). `cargo fmt --check` — found drift in this slice's own new code
+  (two multi-arg test calls and one `use` import list wrapped
+  differently than `rustfmt` wants), fixed with plain `cargo fmt`;
+  re-ran `--check` clean. `npm run quality:security` —
+  gitleaks/`cargo deny check`/OSV-Scanner: 3 ok, 0 failed, 0 missing (no
+  dependency changes in this slice; the two `license-not-encountered`
+  warnings and the pre-existing filtered `RUSTSEC-*` advisories are the
+  same pre-existing, already-accepted entries recorded in
+  `src-tauri/deny.toml` from prior slices).
+- **A real environment hazard hit and resolved this session**: the
+  first `cargo build`/`cargo test` attempts ran fine, but a `cargo test`
+  retry then hit the documented "No space left on device" hazard from
+  the prior `AssessmentItem` slice — this time the harness's own
+  `/tmp` task-output mount hit exactly 0 bytes free mid-run, failing the
+  backgrounded shell tool itself (not a Rust/cargo error). Resolved by
+  `cargo clean --manifest-path src-tauri/Cargo.toml` scoped to this
+  worktree's own `target/` only (freed 11.7GiB), then re-running the
+  full `cargo test`/`cargo clippy` from a clean target with
+  `RUSTFLAGS="-C debuginfo=0"` for `cargo test` (same mitigation the
+  prior slice used) — not a code defect.
+- **Explicitly out of scope, per the task, and not touched**: the other
+  four still-unwired entities (`SectionMembership`, `TeachingAssignment`,
+  `GradingPeriod`, `SubjectAttendance`); any UI change; `db::rotate_sspk`;
+  the rotating wrapper; any other entity's existing wiring.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record).
+
+**Next exact slice**: the independent-review items disclosed by this
+entry and the prior `AssessmentItem`/`LearnerScore` entries, and the
+conflict-review/sync-status screen entries further below, remain the
+next owed non-implementation items (see `docs/VERIFICATION-DEBT.md` for
+all of them). For further ADR-0067/0069 sync rollout, the next viable
+entity is `SectionMembership` (multi-verb, see the prior slice's own
+reasoning below) or `TeachingAssignment`/`SubjectAttendance` (each also
+multi-verb) — none started; no code touched for any of them this
+session.
+
+## AssessmentItem wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `AssessmentItem` is
+now the fifth entity wired end to end (after Learner, Attendance,
+Section, LearnerScore), using the exact same pattern each time —
+encrypt-on-enqueue at the existing domain write, an
+`upsert_from_sync`-shaped repository apply path, and the corresponding
+`EntityKind` arm in `sync_client`'s decrypt/apply switch.
+
+- **Entity chosen and why, including a deliberate deviation from the
+  prior session's recorded suggestion**: of the six still-unwired kinds
+  (`SectionMembership`, `AssessmentItem`, `TeachingAssignment`,
+  `Subject`, `GradingPeriod`, `SubjectAttendance`), the entry below
+  (this same file, previous slice) had provisionally named
+  `SectionMembership` as the likely next candidate. Re-inspecting its
+  actual repository module before committing to it
+  (`repository::section_membership.rs`) surfaced a real complication
+  that entry hadn't weighed: `SectionMembership`'s write surface is not
+  one mature verb but **five** separate temporal ones (`enroll`,
+  `enroll_membership`, `transfer_membership`, `end_membership`,
+  `correct_same_day_placement`), each with its own outcome enum and
+  half-open-interval invariants — wiring "the same pattern as the four
+  already-done entities" onto it would mean either enqueueing from only
+  one of the five verbs (silently under-syncing the other four teacher
+  actions) or a materially larger multi-verb slice than this task's
+  scope ("wire that ONE entity") and TDD budget allow safely in one
+  pass. `AssessmentItem` was chosen instead: it already has a mature
+  write path (`assessment_item::create`, existence-checked against both
+  `class_record_id` and a leaf `category_id` — see
+  `commands::assessment_item::create_assessment_item`'s own doc comment
+  for the full reasoning) AND is genuinely high-value to sync
+  promptly — a teacher's newly created quiz/task item must reach the
+  school-laptop hub before another teacher/adviser can record scores
+  against it (`learner_scores.assessment_item_id` is a hard FK) — unlike
+  the remaining once-a-term reference data (`Subject`, `GradingPeriod`,
+  `TeachingAssignment`). `SectionMembership` is recorded below as the
+  next candidate again, now correctly scoped as a multi-verb slice.
+- **What changed, mirroring the Section slice's shape exactly (create-only,
+  `base_version` unconditionally `0`)**:
+  - `repository/assessment_item.rs`: `AssessmentItem` now derives
+    `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, item)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, never re-validating
+    `category_id` leaf-ness or `class_record_id` school scope (that
+    already happened on the originating device, exactly like
+    `learner_score::upsert_from_sync`'s own reasoning).
+  - `commands/assessment_item.rs`: `create_assessment_item` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::section`'s), and delegates to
+    `create_assessment_item_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0` (create-only, like
+    Learner/Section, not re-recordable like Attendance/LearnerScore).
+    Also switched from `require_active_school_scope` to
+    `require_active_session` to obtain the actor's `user_id` for
+    `actor_user_id` — confirmed a strict superset (the former is
+    implemented in terms of the latter, discarding only `user_id`), so
+    no authorization semantics changed. `rename_assessment_item`/
+    `update_assessment_item`/`delete_assessment_item` are deliberately
+    left unwired — a later slice's scope, not this one's.
+  - `sync_client.rs`: new `EntityKind::AssessmentItem` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `assessment_item::upsert_from_sync`; module doc comment and the
+    "entity kinds other than ..." comment both updated to name the fifth
+    wired entity.
+- **Tests added (TDD)**: `repository::assessment_item::tests::
+upsert_from_sync_inserts_an_item_this_device_has_never_seen`,
+  `..._updates_an_existing_row_in_place`;
+  `commands::assessment_item::tests::create_assessment_item_with_no_sspk_behaves_exactly_like_a_plain_create`,
+  `..._with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+  `create_assessment_item_stamps_the_change_with_this_installations_own_device_id`,
+  `a_rejected_create_never_enqueues_an_outbox_row` (a cross-school
+  `class_record_id` must never reach the outbox); `sync_client::tests::
+pull_once_applies_a_non_conflicting_assessment_item_change`,
+  `pull_once_rejects_a_tampered_assessment_item_payload_without_applying_or_advancing_past_it`
+  (tampered ciphertext byte-flip → rejected, domain table untouched,
+  cursor doesn't advance), `pull_once_stages_an_assessment_item_conflict_when_this_device_has_an_unsynced_local_edit`
+  (the existing generic conflict-staging path in `pull_once` needs no
+  entity-specific change — proven by this test passing unmodified
+  against the new entity kind). All pre-existing tests for these three
+  modules pass unmodified.
+- **Independent review**: no subagent-dispatch tool (`Task`/agent
+  launch, or a reachable `security-reviewer`) was available this
+  session to obtain the independent review this class of change
+  (persistence + sync) should get per
+  `.claude/rules/security-privacy.md`. A rigorous self-review was
+  performed instead, per this project's documented reviewer-failure
+  fallback — see `docs/VERIFICATION-DEBT.md`'s new entry for exactly
+  what was checked (school-scope isolation, id-keyed upsert correctness,
+  enrollment gating, atomicity, rejected-write never enqueuing,
+  authorization-check equivalence, conflict-review path unaffected). No
+  blocking issue found; independent review remains owed (alongside the
+  still-owed `LearnerScore` review from the previous slice).
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 874 lib tests passing, 0 failed, plus every integration
+  test binary passing (`assessment_grading`, `attendance_management`,
+  `class_record_management`, `export_and_reporting`, `formgen`,
+  `learner_roster`, `schedule_meeting_management`, `section_advisory`,
+  `sf1_import`, `subject_attendance`, `teaching_assignment_management`,
+  and others); `Doc-tests app_lib` — 0 tests (none exist in this crate).
+  `cargo clippy --all-targets -- -D warnings` — clean, zero
+  warnings/errors (exit code 0). `cargo fmt --check` — clean, no drift.
+  `npm run quality:security` — gitleaks/`cargo deny check`/OSV-Scanner:
+  3 ok, 0 failed, 0 missing (no dependency changes in this slice).
+  `npm run quality`/`quality:ui` (TS/UI layers) were not run — this
+  slice touched only Rust repository/command/`sync_client` layers, no
+  TS/UI files, matching the task's explicit "no UI changes" scope.
+- **A real environment hazard hit and resolved this session**: `cargo
+test`/`cargo clippy --all-targets` twice hit "No space left on
+  device" on this shared host (root filesystem at 100%, and separately
+  the harness's own `/tmp` task-output mount at 0 bytes free) — not a
+  code defect, per this task's own documented guidance. Resolved both
+  times by `cargo clean --manifest-path src-tauri/Cargo.toml` scoped to
+  this worktree's own `target/` only (freed ~12.7GiB each time); the
+  final full `cargo test`/`cargo clippy` runs that are reported above
+  were run with `RUSTFLAGS="-C debuginfo=0"` for `cargo test` specifically
+  to keep this worktree's disk footprint well under the observed ~12GiB
+  ceiling on this shared host — a build-only flag, not a source or
+  `Cargo.toml` change, and `cargo clippy`/`cargo fmt --check` were still
+  run with the project's normal (unmodified) profile.
+- **Explicitly out of scope, per the task, and not touched**: the other
+  five still-unwired entities; `rename`/`update`/`delete_assessment_item`
+  (only `create` is wired); `db::rotate_sspk`; the rotating wrapper; any
+  UI change; any other entity's existing wiring.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new independent-review-owed
+  entry).
+
+**Next exact slice**: the independent-review items disclosed by this
+entry, the `LearnerScore` entry below, and the conflict-review/
+sync-status screen entries further below remain the next owed
+non-implementation items (see `docs/VERIFICATION-DEBT.md` for all of
+them). For further ADR-0067/0069 sync rollout, the next viable entity is
+`SectionMembership` — now correctly scoped as a **multi-verb** slice
+(see this entry's own reasoning above): wiring `enroll`,
+`enroll_membership`, `transfer_membership`, `end_membership`, and
+`correct_same_day_placement` each to `sync_outbox`, plus one
+`upsert_from_sync` in `repository::section_membership` and one
+`EntityKind::SectionMembership` arm in `sync_client`. Not started; no
+code touched for it this session.
+
+## LearnerScore wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `LearnerScore` is now
+the fourth entity wired end to end (after Learner, Attendance, Section),
+using the exact same pattern each time — encrypt-on-enqueue at the
+existing domain write, an `upsert_from_sync`-shaped repository apply
+path, and the corresponding `EntityKind` arm in `sync_client`'s
+decrypt/apply switch.
+
+- **Entity chosen and why**: of the seven still-unwired kinds
+  (`SectionMembership`, `AssessmentItem`, `LearnerScore`,
+  `TeachingAssignment`, `Subject`, `GradingPeriod`,
+  `SubjectAttendance`), `LearnerScore` was picked because it already has
+  a mature, re-recordable write path (`repository::learner_score::record`,
+  an upsert keyed on `(assessment_item_id, learner_id)` — the same shape
+  as `attendance::record`'s `(learner_id, attendance_date)` key) AND is
+  genuinely high-value to sync promptly: a teacher's own gradebook
+  entries are exactly the kind of record that needs to reach a shared
+  school-laptop hub quickly (e.g. a grade adviser reviewing a subject
+  teacher's just-recorded scores on another device before computing a
+  term grade), unlike rarely-changing reference data
+  (`Subject`/`GradingPeriod`/`TeachingAssignment`) or an entity with no
+  FK relationship narrowing the choice further
+  (`SectionMembership`/`AssessmentItem`/`SubjectAttendance` were all
+  viable too, but `LearnerScore` was the clearest "changes constantly,
+  matters immediately" pick).
+- **What changed, mirroring the Attendance slice's shape exactly**:
+  - `repository/learner_score.rs`: `LearnerScore` now derives
+    `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, score)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, never re-validating
+    item/roster eligibility (that already happened on the originating
+    device, exactly like `attendance::upsert_from_sync`'s own
+    reasoning).
+  - `commands/learner_score.rs`: `record_learner_score` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::attendance`'s), and delegates to
+    `record_learner_score_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` read from `sync_version_cache` (not
+    hardcoded `0`, since this is a re-recordable entity like Attendance,
+    not create-only like Learner/Section).
+  - `sync_client.rs`: new `EntityKind::LearnerScore` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `learner_score::upsert_from_sync`; module doc comment and the
+    "entity kinds other than ..." comment both updated to name the
+    fourth wired entity.
+- **Tests added (TDD)**: `repository::learner_score::tests::
+upsert_from_sync_inserts_a_row_this_device_has_never_seen`,
+  `..._updates_an_existing_row_by_id_not_by_the_assessment_learner_pair`;
+  `commands::learner_score::tests::record_learner_score_with_no_sspk_behaves_exactly_like_a_plain_record`,
+  `..._with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+  `re_recording_the_same_entity_enqueues_with_the_known_base_version_not_zero`,
+  `record_learner_score_stamps_the_change_with_this_installations_own_device_id`,
+  `a_rejected_score_never_enqueues_an_outbox_row` (a score above
+  `max_score` must never reach the outbox); `sync_client::tests::
+pull_once_applies_a_non_conflicting_learner_score_change`,
+  `pull_once_rejects_a_tampered_learner_score_payload_without_applying_or_advancing_past_it`
+  (tampered ciphertext byte-flip → rejected, domain table untouched,
+  cursor doesn't advance), `pull_once_stages_a_learner_score_conflict_when_this_device_has_an_unsynced_local_edit`
+  (the existing generic conflict-staging path in `pull_once` needs no
+  entity-specific change — proven by this test passing unmodified
+  against the new entity kind). All pre-existing tests for these three
+  modules pass unmodified.
+- **A real bug caught and fixed during this slice's own TDD**: the
+  first version of `pull_once_applies_a_non_conflicting_learner_score_change`
+  used `fixture.user_id` (a user that exists only in the separate HUB
+  database `sync_client`'s own test harness spins up) as the synthetic
+  score's `recorded_by_user_id` — a real FK to `users(id)` in the
+  **client's** local db, which doesn't have that row. This failed
+  correctly (`summary.applied == 0`, not the expected `1`) rather than
+  silently miscounting, confirming `upsert_from_sync`'s FK enforcement
+  works as intended; fixed by creating a local teacher user in the
+  client's own db inside the new `setup_assessment_item_and_learner`
+  test fixture.
+- **Independent review**: no subagent-dispatch tool (`Task`/agent
+  launch) was reachable this session to obtain the
+  `security-reviewer` this class of change (persistence + sync) should
+  get per `.claude/rules/security-privacy.md`. A rigorous self-review
+  was performed instead, per this project's documented reviewer-failure
+  fallback — see `docs/VERIFICATION-DEBT.md`'s new entry for exactly
+  what was checked (school-scope isolation, FK/id-keyed upsert
+  correctness, enrollment gating, atomicity, rejected-write never
+  enqueuing). No blocking issue found; independent review remains owed.
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 864 lib tests passing, 0 failed (rerun clean after
+  `cargo fmt`); every integration test binary (`assessment_grading`,
+  `attendance_management`, `class_record_management`,
+  `export_and_reporting`, `formgen`, `learner_roster`,
+  `schedule_meeting_management`, `section_advisory`,
+  `section_membership_and_learner_management`, `sf1_import`,
+  `subject_attendance`, `teaching_assignment_management`, and others)
+  passing; `Doc-tests app_lib` — 0 tests (none exist in this crate, per
+  `.claude/rules/testing.md`'s own note that this isn't yet a real gap).
+  `cargo clippy --all-targets -- -D warnings` — clean, zero
+  warnings/errors. `cargo fmt --check` — clean (one `cargo fmt` pass
+  was needed first to fix this slice's own formatting drift; verified
+  clean afterward and `cargo test` re-run to confirm the reformat
+  changed nothing behaviorally). `npm run quality:security` —
+  gitleaks/`cargo deny check`/OSV-Scanner: 3 ok, 0 failed, 0 missing.
+  `npm run quality`/`quality:ui` (TS/UI layers) were not run — this
+  slice touched only Rust repository/command/`sync_client` layers, no
+  TS/UI files, matching the task's explicit "no UI changes" scope.
+- **A real environment hazard hit and resolved repeatedly this
+  session**: the shared host hit "No space left on device" several
+  times from a second, unrelated worktree (`agent-a9549b79e876242f9`)
+  running its own concurrent `cargo build`/`cargo test` — that worktree
+  has since removed itself. Each time, resolved by `cargo clean` scoped
+  to this worktree's own `src-tauri/target` only (per this task's own
+  documented guidance), and twice by clearing genuinely disposable
+  shared caches unrelated to any worktree's build state (`npm cache
+clean --force`, `/root/.cache/uv`, `/root/.cache/osv-scalibr`,
+  `/root/.cargo/registry/cache` — all safely regenerable download
+  caches, none of them source or another session's in-progress build
+  output). Not a code or config change; recorded in
+  `docs/VERIFICATION-DEBT.md` for a future session hitting the same
+  contention on this host.
+- **Explicitly out of scope, per the task, and not touched**: the other
+  six still-unwired entities; `db::rotate_sspk`; the rotating wrapper;
+  any UI change; any other entity's existing wiring.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new independent-review-owed
+  entry).
+
+**Next exact slice**: the two independent-review/native-accessibility
+items disclosed by the conflict-review and sync-status screen entries
+below remain the next owed non-implementation items (see
+`docs/VERIFICATION-DEBT.md` for both). For further ADR-0067/0069 sync
+rollout, the next viable entity to wire (by the same priority
+reasoning: mature write path + genuine promptness value) is
+`SectionMembership` — it has a mature write path
+(`section_membership::enroll`/`enroll_membership`/`transfer_membership`/
+`end_membership`/`correct_same_day_placement`) and, unlike the
+remaining reference-data kinds, materially affects another device's
+roster/attendance/gradebook views promptly after a mid-day enrollment
+change or correction. Not started; no code touched for it this
+session.
+
+## Stale outbox `base_version` after "keep local" fixed (2026-09-05)
+
+**Closed.** The conflict-review screen entry below disclosed a real gap:
+choosing "keep local" cleared the `sync_conflict_review` row but left this
+device's own still-pending `sync_outbox` push for the same entity
+carrying whatever `base_version` it was originally enqueued with — now
+stale relative to `current_hub_version`. The NEXT push for that entity
+would still submit the old `base_version`, and
+`repository::sync_hub::push_change` would treat it as stale and re-stage
+the very conflict the resolution was meant to close.
+
+- **Root cause, confirmed by reading both state machines before
+  changing anything**: `sync_conflict_review::mark_resolved` only ever
+  touches the `sync_conflict_review` table; nothing in the "keep local"
+  path ever wrote back to `sync_outbox`. `sync_outbox`'s own state
+  machine (`enqueue`/`acknowledge`/`record_attempt`) never re-derives
+  `base_version` after it is first enqueued either — it is set once, at
+  `enqueue` time, and otherwise immutable until the row is deleted by
+  `acknowledge`.
+- **Fix, scoped to exactly the call path named in the task**: a new
+  `repository::sync_outbox::correct_base_version_for_entity(conn,
+school_id, entity_kind, entity_id, new_base_version)` — school-scoped,
+  keyed by `entity_kind` + `entity_id` (not `change_id`, since the
+  outbox row it must correct is this device's own separate pending push,
+  a different `change_id` from the pulled change that was staged as a
+  conflict), a harmless no-op when nothing is pending for that entity.
+  `commands::conflict_review::resolve_conflict_review`'s `KeepLocal`
+  branch now calls it with `row.current_hub_version` immediately before
+  `sync_conflict_review::mark_resolved`. No change to `sync_outbox`'s or
+  `sync_conflict_review`'s general state machine, no UI change, no other
+  `EntityKind` wiring touched — matching the task's explicit
+  out-of-scope list.
+- **Tests added (TDD)**: `repository::sync_outbox::tests::correct_base_version_for_entity_updates_the_matching_pending_row`,
+  `..._is_a_harmless_no_op_when_nothing_is_pending`,
+  `..._is_school_scoped`; and in `commands::conflict_review::tests`,
+  `keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`
+  (end-to-end: stage a hub state at version 1, enqueue a stale
+  `base_version = 0` outbox row, stage+resolve the conflict as
+  `KeepLocal`, then push the corrected outbox row through
+  `sync_hub::push_change` and assert `Accepted`, not `ConflictStaged`)
+  and a regression test,
+  `using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`,
+  proving the `UseIncoming` path is unaffected. All pre-existing
+  conflict-review tests pass unmodified.
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 845 lib tests passing, 0 failed, including the new
+  ones (also re-run filtered to `conflict_review::tests`: 16 passed).
+  `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+  `cargo fmt --check` — clean, no drift. `npm run quality:security` —
+  gitleaks/`cargo deny check`/OSV-Scanner all OK (3 ok, 0 failed, 0
+  missing). `npm run quality`/`quality:ui` (TS/UI layers) were not
+  re-run — this fix touched only the Rust repository and command
+  layers, no TS/UI files.
+- **A real environment hazard hit and resolved this session**: the host
+  disk was completely full (0 bytes free) partway through this task,
+  failing `cargo test`/`clippy` with linker I/O errors. Resolved by
+  `cargo clean` on this worktree's own `src-tauri/target` (freed ~8.4
+  GiB, none of it shared with the other active worktree or the main
+  checkout) — not a code or config change, recorded here only because a
+  future session hitting the same "No space left on device" error on
+  this host should know `cargo clean` in its own worktree is the known
+  fix, not a sign of a real build regression.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new "CLOSED" entry replacing
+  item 3 of the conflict-review screen's owed-debt list, which now
+  points here).
+
+**Next exact slice**: the two other items disclosed by the
+conflict-review screen entry below remain genuinely owed and are next
+in priority order — (1) the independent `teacher-ux-reviewer`/
+`accessibility-reviewer` review of `src/ui/ConflictReviewScreen.tsx`
+that no subagent-dispatch tool could reach this session, and (2) a
+native NVDA/Narrator pass on the compiled Tauri binary (no
+browser/screenshot tool in this sandboxed environment). Neither blocks
+further correctness work; both are tracked in
+`docs/VERIFICATION-DEBT.md`. No other push-side/pull-side sync
+correctness gap is currently known.
+
+## Sync-status screen shipped (2026-09-05), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`, worked in a parallel
+worktree. Closes ADR-0067's "still required before production PII" list
+item named "sync status UI" — the last of the three sync UI surfaces
+that list called out (device-management and conflict-review already
+shipped, both above). A teacher/ICT coordinator can now see, in plain
+language: whether THIS device is enrolled for sync, roughly how
+up to date it is, how many of its own changes are still waiting to
+send, and whether any sync conflicts need a decision — with a link to
+the existing `ConflictReviewScreen` rather than a second conflict UI.
+
+- **Read-only, no new write path.** `commands::sync_status::get_sync_status`
+  (new module) composes four already-tested reads, session-scoped
+  (`require_active_school_scope`, never a client-supplied `school_id`):
+  `device_sync_client_credential::get` (enrollment), two new
+  `sync_pull_cursor`/`sync_outbox` reads (below), and the already-shipped
+  `sync_conflict_review::count_open_for_school`.
+- **What's honestly NOT tracked, and how that's handled rather than
+  invented**: there is no existing "last successful push" or general
+  connectivity-health timestamp anywhere in this codebase, and the task
+  explicitly ruled out touching `sync_client`'s push/pull logic to add
+  one. `sync_pull_cursor.updated_at` only advances when a pull actually
+  applies or stages a change (`sync_client::pull_once`) — an all-quiet
+  successful poll with nothing new doesn't move it. New
+  `sync_pull_cursor::last_pull_at` surfaces this honestly as "last time a
+  change was received," not as a health check — both the Rust doc
+  comment and the screen's copy say so. Similarly, there's no dedicated
+  push-failure flag; new `sync_outbox::has_pending_failure_for_school`
+  derives a "having trouble reaching the sync hub" signal from a fact
+  that's already recorded (`record_attempt`'s `last_error_code` on a
+  still-pending row) rather than inventing new state.
+- **New repository functions** (both with new unit tests):
+  `sync_pull_cursor::last_pull_at` (2 tests) and
+  `sync_outbox::count_pending_for_school` /
+  `has_pending_failure_for_school` (4 tests).
+- **New Tauri command**: `get_sync_status`, wired in `lib.rs`'s
+  `invoke_handler`. 3 command-level tests (never-enrolled school reports
+  nothing but `enrolled: false`; an enrolled school with a failed pending
+  push reports it honestly; status is school-scoped).
+- **Frontend**: full port/service/adapter/screen stack, mirroring
+  `DeviceManagementScreen`/`ConflictReviewScreen`'s established shape —
+  `domain/sync-status.ts`, `domain/ports/sync-status-repository.ts`,
+  `infrastructure/tauri/sync-status-repository.ts`,
+  `application/sync-status-service.ts` (+ test), `ui/SyncStatusScreen.tsx`
+  (+ test, including `expectNoAccessibilityViolations`). Wired into
+  `App.tsx`/`composition.ts`/`workbench-nav-data.ts` as a new "Sync
+  Status" destination in the existing "Sync" nav group (alongside
+  "Review Sync Conflicts"), with an in-screen "Review conflicts" button
+  that navigates there when conflicts exist.
+- **Copy is plain-language, not a technical dashboard**: no raw cursor
+  numbers, error codes, or ISO timestamps shown directly — "Last
+  synced"/"changes waiting to sync"/"conflicts need your review," per
+  the task's own instruction. A relative-time formatter ("2 minutes
+  ago") is used for the recent past, falling back to a plain local
+  date/time otherwise.
+- **Teacher modes**: all three modes (Efficient/Comfortable/Guided) show
+  identical functional content; Guided additionally shows an explanatory
+  hint paragraph, matching the established convention on the two sibling
+  screens.
+
+**Verification actually run this session**: `cargo fmt --check` clean
+after one auto-fix; targeted new Rust tests (10, all pass:
+`sync_outbox::` 7, `sync_pull_cursor::` 6 counting pre-existing,
+`commands::sync_status::` 3); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings, ran to completion once disk headroom
+allowed it (see below); `npm run quality:security` — gitleaks/cargo
+deny/osv-scanner all clean, no new advisories; `npm run test` (vitest) —
+995/995 passed after fixing one curly-quote assertion mismatch in the
+new screen's own test; `npm run typecheck`/`lint`/`format:check`/
+`check:architecture` — all clean (architecture check explicitly passed:
+no restricted import found). `npm run check:deadcode` (`knip`) shows
+only the pre-existing baseline findings (`@tauri-apps/cli`/`prettier`
+unused-devDependency, unrelated to this slice) already documented
+elsewhere in this file as a standing baseline — no new finding.
+
+**Not run to completion this session: whole-crate `cargo test`.**
+Multiple parallel worktree agents on this same box are building large
+Rust targets concurrently; the shared filesystem repeatedly hit `No
+space left on device` mid-compile (observed directly, `df -h /` at
+~99–100% used more than once during this session, including one
+`rustc-LLVM IO failure` and one `failed to build archive` from disk
+exhaustion, not a code defect). `cargo clippy --all-targets -- -D
+warnings` DID complete clean in the same session (it compiles the same
+test targets `cargo test` would) once headroom briefly existed, and
+every targeted test for the actual new code passed. This is disclosed
+as environment-resource verification debt, not silently claimed as
+covered — see `docs/VERIFICATION-DEBT.md`'s matching new entry.
+
+**Independent review**: no subagent-dispatch tool was reachable this
+session (the same recurring gap `docs/VERIFICATION-DEBT.md` already
+records for the device-management and conflict-review slices). Did a
+rigorous self-review instead, per the documented fallback: confirmed no
+new write path exists anywhere in this slice; confirmed `school_id` is
+never client-supplied on `get_sync_status`; confirmed no raw
+error-code/cursor value is ever serialized to the frontend; confirmed
+the a11y structural test passes; confirmed all three teacher modes
+render identical functional content. No blocking issue found. A
+genuinely independent review remains owed — recorded as debt, not
+dropped.
+
+**Visual verification gap** (disclosed, not new): this sandboxed
+environment has no browser/screenshot tool for the compiled native
+Tauri binary, matching every prior UI slice's own disclosed limitation.
+Automated `axe-core` structural results are not a substitute for a
+human/screen-reader pass.
+
+**Batch mode**: implemented and committed LOCALLY only, per this
+session's explicit batch-implement instruction — deliberately NOT
+pushed. The orchestrating session pushes and opens/updates the PR once
+every parallel task in the batch is done.
+
+**Exact next slice** (recorded, not implemented): the device-management
+screen's own disclosed gap — "keep local" not correcting the stale
+outbox `base_version` after a conflict resolution (see this file's
+"Conflict-review screen shipped" entry above, item 3) — remains the
+next concrete sync-correctness candidate, now that all three ADR-0067
+"still required before production PII" UI items are shipped.
+
+## Conflict-review screen shipped (2026-09-05)
+
+**Shipped.** The device-management screen's own "next exact slice" (see
+the entry below) is closed: `sync_client::pull_once` has staged pull-side
+conflicts into `sync_conflict_review` since an earlier slice, but no UI
+could ever reach them until now. A teacher can now see every open
+conflict for their school and resolve it individually, choosing between
+this device's own edit and the incoming version from another device.
+
+- **What a staged conflict record actually contains**: confirmed by
+  reading `repository::sync_conflict_review.rs` directly rather than
+  assuming. The row holds the INCOMING pulled change's metadata and
+  still-encrypted payload (`entity_kind`, `entity_id`, `device_id`,
+  `actor_user_id`, `submitted_base_version`, `current_hub_version`,
+  `operation`, `encrypted_payload`) — it does NOT hold the local device's
+  own field values. That is because staging a conflict never touches the
+  domain table (see `sync_client::pull_once`'s own doc comment), so this
+  device's unsynced local edit is still sitting, live, in the ordinary
+  `learners`/`attendance_records`/`sections` table under `entity_id`. The
+  command layer reads it from there instead of duplicating it in the
+  conflict row.
+- **Who may resolve a conflict — read ADR-0067's own design notes first,
+  as instructed, rather than defaulting to the device-management
+  screen's tier**: ADR-0067 names "conflict-review ownership" as part of
+  the school-laptop operations gate but does not assign it to a specific
+  role. Device revocation (ADR-0069) is a security action over a _shared_
+  credential every other teacher's sync depends on and reasonably sits
+  behind `SCHOOL_HEAD`/`ManageSchoolMembership`; resolving a conflict is a
+  decision about one _specific record_ a teacher already reads/writes
+  day to day (their own attendance entries, learners in their own
+  school). Gatekeeping it behind an admin role would block exactly the
+  case named in this slice's task — a regular teacher resolving a
+  conflict on their own class records — for no compensating security
+  benefit, since this device's authenticated session already has full
+  read/write of every entity kind that can conflict. **Decision: any
+  authenticated member of the conflict's own school** may view and
+  resolve it, matching `list_device_sync_credentials`' existing
+  "same-school reference data" convention for viewing and extending it to
+  resolving too. School isolation is still enforced at the repository
+  boundary (`find_open_by_id_in_school`/`mark_resolved`'s own `WHERE
+school_id = ...`), never by UI hiding.
+- **New migration 35**: adds a nullable `resolution TEXT CHECK
+(resolution IN ('kept_local', 'used_incoming'))` column to
+  `sync_conflict_review` — migration 29's `resolved_at` alone could not
+  distinguish which way a conflict was resolved.
+- **New repository functions** (`repository/sync_conflict_review.rs`):
+  `list_open_for_school`, `find_open_by_id_in_school`, `mark_resolved`
+  (all school-scoped in the SQL itself, proven by tests that a caller can
+  never list/resolve another school's conflict, or re-resolve an
+  already-resolved one). Also added `attendance::find_by_id_in_school`
+  (mirroring the existing `learner`/`section` getters) so the screen can
+  read this device's live local copy of an attendance record. 11 new
+  repository tests.
+- **New Tauri commands** (`commands/conflict_review.rs`):
+  `list_conflict_reviews` (session-derived `school_id`, decrypts each
+  conflict's incoming payload for preview when the SSPK can be resolved,
+  and discloses — never hides — when it cannot, e.g. hub unreachable or
+  key rotated since staging) and `resolve_conflict_review` (`keep_local`:
+  marks resolved, domain table untouched, since the local edit was never
+  overwritten when staged; `use_incoming`: decrypts and applies via the
+  exact same `sync_client::apply_decrypted_change` function `pull_once`
+  itself already uses for a non-conflicting pull, then advances
+  `sync_version_cache`'s watermark). Both `resolve_sspk` and
+  `apply_decrypted_change` were changed from private to `pub(crate)` in
+  `sync_client.rs` to be reused here — `pull_once`'s own staging/applying
+  _logic_ was not touched, only its visibility. 7 new command tests
+  (pure-`Connection` composition tests, matching `commands::device_sync`'s
+  established convention for command bodies that can't construct a real
+  `AppHandle`/`State` outside a running Tauri app).
+- **Known, disclosed limitation — not solved this slice on purpose**:
+  choosing "keep local" does not rewrite this device's still-pending
+  `sync_outbox` entry's stale `base_version` (`sync_client::pull_once`'s
+  and `push_once`'s own staging logic were deliberately left untouched,
+  per this slice's explicit scope boundary). If that outbox entry pushes
+  again before the hub's version changes further,
+  `repository::sync_hub::push_change` will stage a fresh push-side
+  conflict for the same entity, surfacing back on this same screen for
+  another review rather than looping silently or being lost. Recorded in
+  `docs/VERIFICATION-DEBT.md`.
+- **New TS layers**, following `DeviceSyncApplicationService`/
+  `DeviceManagementScreen`'s exact template:
+  `domain/conflict-review.ts` (a discriminated `ConflictEntityPreview`
+  union — `learner`/`attendance`/`section`, matching the Rust
+  `#[serde(tag = "kind")]` enum), `domain/ports/conflict-review-repository.ts`,
+  `application/conflict-review-service.ts` (+ 7 tests),
+  `infrastructure/tauri/conflict-review-repository.ts`, wired in
+  `composition.ts` as `conflictReviewService`. `src/ui/**` and
+  `src/application/**` import no Tauri/infrastructure symbol directly —
+  `npm run check:architecture` passes.
+- **New screen**: `src/ui/ConflictReviewScreen.tsx`, routed as the
+  `"conflict-review"` tab in a new "Sync" nav group (deliberately
+  separate from "Security" — this is not an admin-only surface), labeled
+  "Review Sync Conflicts". Each conflict card shows BOTH versions'
+  concrete field values side by side (never an abstract "conflict
+  exists" toggle) — this device's own current local copy, and the
+  incoming version, or a plain-language reason it could not be decrypted
+  right now. Resolution is a plain-language two-step confirmation
+  (`Resolve this conflict` → `Keep this device's version` /
+  `Use the incoming version` / `Cancel`), matching
+  `DeviceManagementScreen`'s established pattern; "Use the incoming
+  version" is guarded (both `aria-disabled` and an actual early-return in
+  the click handler) when no incoming preview is available, so a teacher
+  can never apply a version they were never shown. No bulk or automatic
+  resolution exists — each conflict is reviewed individually. All three
+  teacher modes keep full functional parity; Guided mode adds a
+  plain-language hint explaining what a conflict is. 22 new screen tests
+  (list rendering with concrete field values, disclosed
+  decrypt-unavailable state, absent-local-copy state, confirmation
+  gating, both resolution outcomes, failure messaging, focus-on-mount,
+  mode-gated hint, structural accessibility in both the closed and
+  mid-confirmation states via `expectNoAccessibilityViolations`).
+
+**Verification actually run**: `cargo fmt --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean; `cargo test` (full crate: lib +
+every integration test binary + doctests) — exit code 0, 0 doctests
+(unchanged); `cargo test --lib` — 840 passed, 0 failed (up from 794
+baseline this session started from — 46 new: 6 attendance, 25
+sync_conflict_review, 7 conflict_review command, plus tests accumulated
+in the working tree from the immediately-prior device-management slice
+this session built on). `npm run quality:security` — 3 ok, 0 failed, 0
+missing (gitleaks, `cargo-deny`, `osv-scanner`; no new dependency was
+added). `npm run quality` (TS side) — `tsc -b --noEmit`, `eslint .`,
+`prettier --check .`, `check-architecture.mjs`, `knip`, and `vitest run`
+all passed clean (986/986 tests, 96 files — up from 964 baseline).
+
+**Independent review**: no `Task`/subagent-dispatch tool was reachable
+in this session's toolset (same recurring gap as the two prior UI
+slices) — `teacher-ux-reviewer`/`accessibility-reviewer` dispatch was not
+attempted for lack of a tool to attempt it with, and this was recorded
+honestly rather than silently skipped. A rigorous self-review was
+performed instead, per the documented fallback in
+`.claude/rules/autonomous-development.md`: checked tenant isolation at
+every new repository/command boundary (school-scoped `WHERE` clauses,
+proven by dedicated cross-school tests, not just documented intent);
+confirmed decryption failure paths degrade to a disclosed
+"unavailable"/generic-failure message rather than panicking or silently
+hiding data (no `.unwrap()` in any non-test code path added this slice);
+confirmed `resolve_conflict_review`'s `use_incoming` branch never marks a
+conflict resolved before the domain write it depends on actually
+succeeds (ordering: apply → advance version cache → mark resolved, each
+propagating `Err` before the next runs); found and fixed one real gap
+during self-review — the "Use the incoming version" button used only
+`aria-disabled` (this codebase's established non-hard-blocking pending-
+state convention), which does not itself prevent a click, so a teacher
+could apply a version they were never shown a preview of; added an
+explicit early-return guard in the click handler plus a test proving the
+click is refused. No other blocking issue was found. Independent-review
+debt retained, not dropped — see `docs/VERIFICATION-DEBT.md`.
+
+**Visual verification gap, disclosed plainly**: this sandboxed
+environment has no browser/screenshot tool for the compiled native Tauri
+binary. `expectNoAccessibilityViolations` (structural `axe-core`) is
+necessary, not sufficient, and does not substitute for a human/NVDA/
+Narrator pass on the real rendered app — matching the same disclosed gap
+the device-management slice recorded.
+
+**Next exact slice**: close the disclosed "keep local" outbox
+re-conflict limitation above — either by having `resolve_conflict_review`
+re-enqueue a fresh `sync_outbox` entry at the corrected `base_version`
+when "keep local" is chosen, or by confirming (with a real end-to-end
+test) that the natural re-conflict-and-re-review loop is an acceptable
+permanent behavior rather than a gap. Also owed: a native NVDA/Narrator
+pass on this screen once native verification is available, and the two
+independent reviews retained as debt above.
+
+## Device management screen shipped (2026-09-05)
+
+**Shipped.** The device-management gap the prior handoff entry recorded
+as the next exact slice ("this app has enroll/revoke commands but no
+screen to reach them") is closed: a School Head/ICT staff member can now
+see and remove enrolled sync devices from within the app.
+
+- **New read query**: `repository::device_credential::list_active_for_school`
+  (`src-tauri/src/repository/device_credential.rs`) — every currently-
+  active (non-revoked) sync credential for a school, joined to the owning
+  user for a human-readable name, newest-enrolled first. Deliberately
+  read-only and scoped to active credentials only, matching this slice's
+  "list currently enrolled devices" requirement, not a past-revocations
+  audit (later increment). 3 new repository tests.
+- **New Tauri command**: `commands::device_sync::list_device_sync_credentials`
+  (`src-tauri/src/commands/device_sync.rs`) wraps it — `school_id` is
+  always session-derived (`SessionManager::require_active_school_scope`),
+  never a parameter, matching every other tenant-data command. Returns a
+  `DeviceSyncCredentialSummary` DTO carrying no secret material. 1 new
+  command test (DTO mapping). Registered in `lib.rs`'s
+  `generate_handler!`. The existing `enroll_device_sync_credential`/
+  `revoke_device_sync_credential` commands were **not** touched, per this
+  slice's explicit scope.
+- **New TS layers**, following the `SchoolMemberApplicationService`/
+  `AdminPasswordResetScreen` pattern exactly (the codebase's own
+  established template for a same-school reference-data list + one
+  destructive action gated server-side): `domain/device-sync-credential.ts`,
+  `domain/ports/device-sync-repository.ts`,
+  `application/device-sync-service.ts` (+ 6 tests),
+  `infrastructure/tauri/device-sync-repository.ts`, wired in
+  `composition.ts` as `deviceSyncService`. `src/ui/**` and
+  `src/application/**` import no Tauri/infrastructure symbol directly —
+  `npm run check:architecture` passes.
+- **New screen**: `src/ui/DeviceManagementScreen.tsx`, routed as the
+  `"devices"` tab in the "Security" nav group (alongside Sign-in Activity
+  and Reset a Password), labeled "Devices". Any authenticated school
+  member can view the list (matching `AdminPasswordResetScreen`'s
+  "backend alone enforces, UI is not the boundary" convention); removing
+  a device requires a plain-language, two-step confirmation ("Remove
+  device" → an inline panel stating the device stops syncing immediately
+  and this cannot be undone → "Yes, remove this device") — never a single
+  click, never a browser `confirm()`. A denied removal and an
+  already-gone credential both surface the same generic message
+  (`GENERIC_FAILURE_MESSAGE`), matching this codebase's enumeration-safety
+  convention for `AdminPasswordResetScreen`'s own reset flow. Rendered as
+  a card-per-device list (`.device-card`), not a raw admin table, per this
+  project's `impeccable`/`premium-teacher-ui` design guidance for a
+  consequential, security-adjacent screen. Teacher-mode parity: follows
+  every other screen's established pattern exactly — a `field-hint` shown
+  only in Guided mode; Comfortable and Efficient render identically, all
+  three keep full functional parity (no mode gates any control). 17 new
+  UI tests, including 2 `expectNoAccessibilityViolations` passes (closed
+  and mid-confirmation states).
+- **Enrollment/pairing UI, conflict-review UI, and a past-revocations
+  audit view remain explicitly out of scope**, unchanged from the source
+  task — this is one screen (list + revoke), not the full
+  device-management feature.
+
+**Verification actually run this session:**
+
+- `cargo fmt --check`: clean.
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo test` (full crate): **826 passed, 0 failed** (lib; up from 822),
+  plus all integration test binaries green, 0 doctests.
+- `npm run quality:security` (gitleaks + `cargo deny check` +
+  OSV-Scanner): 3 ok, 0 failed, 0 missing.
+- `npm run quality` (typecheck, lint, format:check, architecture,
+  `knip`, vitest): **all green** — `node_modules` was empty at the start
+  of this session (same environment condition the prior handoff entry
+  recorded as debt); `npm ci` was run and resolved it, so this session's
+  `npm run quality` result is real, not carried-over debt. `tsc -b
+--noEmit` clean; `eslint .` clean; `prettier --check .` clean;
+  `check-architecture.mjs` clean ("no restricted imports found"); `knip`
+  clean; `vitest run` **964/964 passed** (94 test files).
+- **Visual verification gap, disclosed plainly**: this sandboxed
+  environment has no browser/screenshot tool for the compiled Tauri
+  binary. The screen's structural accessibility was checked with
+  `expectNoAccessibilityViolations` (axe-core) in both its closed and
+  mid-confirmation states, and its CSS was authored against this
+  project's existing design tokens (`--color-danger`,
+  `--color-surface-2`, `--radius-large`, `--elevation-1`, etc.) — but no
+  human/screen-reader pass on the rendered native app occurred. Recorded
+  in `docs/VERIFICATION-DEBT.md`.
+
+**Independent review:** `teacher-ux-reviewer` and `accessibility-reviewer`
+subagent dispatch was attempted for this new screen; no subagent-dispatch
+tool was reachable in this session (same known harness gap prior
+ADR-0067/0069 slices recorded, not a new failure mode). Falling back to
+this project's documented reviewer-failure procedure: recorded honestly
+here, a rigorous self-review was performed instead —
+
+- **Teacher-UX**: the destructive action cannot be triggered in one
+  click from any state; the confirmation panel states the consequence
+  in plain language ("stop syncing right away," "cannot be undone") with
+  no jargon ("credential," "revoke" never shown to the reader — the
+  button and panel say "remove"/"removed"); a device with no label
+  falls back to "Unnamed device" rather than showing a raw id; a
+  relative-to-teacher last-synced/never-synced state is always shown so
+  "is this device actually in use" is answerable without technical
+  knowledge; the empty state and loading state match every other
+  screen's established components (`EmptyState`, `Loading`) rather than
+  inventing new copy patterns.
+- **Accessibility**: `expectNoAccessibilityViolations` passed for both
+  states (axe-core, structural only); the confirmation panel is a
+  `role="group"` with an `aria-label` naming which device it is about,
+  so a screen-reader user does not lose that context after tabbing past
+  the "Remove device" button; every button has a discernible accessible
+  name (no icon-only controls); the danger-tone text is never the only
+  signal (the panel's own sentence carries the meaning, tone is
+  additive, matching `StatusChip`'s own established WCAG 1.4.1
+  reasoning). **One accessibility gap knowingly NOT fixed this
+  session**, recorded as debt rather than silently accepted: unlike a
+  true modal dialog, opening the inline confirmation panel does not
+  move keyboard focus into it — a keyboard/screen-reader user must
+  continue tabbing forward from "Remove device" to reach "Cancel"/"Yes,
+  remove this device," rather than focus landing there automatically.
+  No modal/dialog primitive exists yet in this codebase to reuse (see
+  `src/ui/components/`), and building one was judged out of scope for
+  a single-screen slice; a native NVDA/Narrator pass against the real
+  Tauri binary is still owed regardless.
+- Independent-review debt retained for both roles — a fresh-context
+  pass on this specific diff is still owed when subagent dispatch is
+  available in a later session.
+
+**Verification debt added:** native NVDA/Narrator pass on this screen;
+independent `teacher-ux-reviewer`/`accessibility-reviewer` passes; the
+inline-confirmation-panel focus-management gap noted above. See
+`docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice:** conflict-review UI (surfacing `pull_once`'s staged
+sync conflicts to a teacher) is now the clearest unblocked next
+candidate — the device-management gap this slice closed was the other
+of the two candidates the prior handoff left open. A past-revocations
+audit log for the Devices screen (deferred explicitly this slice) is a
+smaller, lower-priority alternative if conflict-review turns out to need
+more research first.
+
+## Device sync enrollment/revocation Tauri command surface added (2026-09-05)
+
+**Shipped.** Added `commands::device_sync::{enroll_device_sync_credential,
+revoke_device_sync_credential}` (`src-tauri/src/commands/device_sync.rs`,
+new module registered in `commands/mod.rs` and `lib.rs`'s
+`generate_handler!`), closing the gap the previous handoff entry
+documented: ADR-0067's device enrollment and ADR-0069's rotating
+revocation (`auth::enroll_device_sync_credential`,
+`auth::revoke_device_sync_credential_and_rotate_sspk`) were fully
+implemented and tested at the Rust layer but reachable from zero
+`#[tauri::command]`s — this app could not enroll or revoke a device
+through any code path a real caller could reach.
+
+- **Enroll command** resolves THIS installation's own device id via
+  `device_identity::current_or_create` (never a client-supplied device
+  id — there is exactly one physical device behind a given Tauri
+  process). Mirrors `commands::auth::login`'s shape deliberately, not the
+  session-derived-`school_id` convention: like `login`, this is the
+  _bootstrap_ of trust for a credential class that has no session yet to
+  derive scope from. `school_id` is accepted as a parameter but is
+  re-verified server-side inside `auth::enroll_device_sync_credential`
+  against the authenticating user's actual school membership — a caller
+  cannot enroll into a school the user isn't a member of, regardless of
+  what `school_id` it passes. Resolves/mints the school's SSPK via
+  `db::load_or_mint_sspk` and wraps it for the new credential atomically
+  with issuance, same contract as every other `resolve_sspk_if_enrolled`
+  caller in this codebase.
+- **Revoke command** wraps `auth::revoke_device_sync_credential_and_rotate_sspk`
+  ONLY — never the raw, non-rotating `auth::revoke_device_sync_credential`
+  — via `db::rotate_sspk` in its closure. `school_id` is never a
+  parameter; it is derived entirely from the active interactive session
+  inside the wrapped function itself (`SessionManager::require_active_session`),
+  matching every other tenant-data command in this codebase and ADR-0004's
+  established convention.
+
+**Verification actually run this session:**
+
+- `cargo test` (full crate): **822 passed, 0 failed** (lib), plus all
+  integration test binaries green, 0 doctests. New module contributes 5
+  tests: 2 enroll authorization-boundary tests (wrong school, wrong
+  password), 1 enroll happy-path (proves a usable credential — verified
+  against `device_credential::verify`, the same check the sync hub
+  itself performs), 1 revoke happy-path proving the SSPK genuinely
+  rotates **through the command-shaped call**, not by calling the
+  underlying `auth::*` rotation path directly, and 1 revoke
+  cross-school-head-denied authorization-boundary test (credential stays
+  active after the denied attempt).
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo fmt --check`: clean, no diff.
+- `npm run quality:security` (gitleaks + `cargo deny check` + OSV-Scanner):
+  3 ok, 0 failed, 0 missing.
+- `npm run quality` (TS typecheck/lint/architecture/knip/vitest): **not
+  run** — this session's `node_modules` is empty (0 packages), a
+  pre-existing environment condition unrelated to this change (no
+  TypeScript file was touched by this slice). Recorded as verification
+  debt below, not silently skipped.
+
+**Independent review:** a `security-reviewer` subagent dispatch was
+attempted for this authorization-and-credential-management surface (the
+exact class of command where this project previously found a real bug —
+ADR-0004's unauthenticated-bootstrap incident). Falling back to this
+project's documented reviewer-failure procedure: recorded honestly here,
+a rigorous self-review was performed instead, specifically re-checking
+(a) that `school_id` can never be trusted from the client for the revoke
+path (confirmed: not a parameter at all) and is re-verified server-side
+for the enroll path (confirmed: `is_member_of_school` check inside
+`auth::enroll_device_sync_credential`, already covered by an existing
+`Err(Unauthorized)` test this new command surface now also exercises
+through its own boundary test), and (b) that the revoke command's
+rotation path is exclusively the rotating wrapper (confirmed by direct
+read of `device_sync.rs`: the only call is to
+`revoke_device_sync_credential_and_rotate_sspk`, and a new end-to-end
+test proves the rotation closure genuinely fires and the resulting key
+genuinely differs, invoked through the command function's own call
+shape). **Independent-review debt retained** — a fresh-context
+`security-reviewer` pass on this specific diff is still owed and should
+be run in a later session when the harness is available.
+
+**Out of scope, deferred (unchanged from the source task):** no device
+management UI, no other `EntityKind` sync wiring,
+`db::rotate_sspk`/`refresh_wrap_for_credential`/the rotating wrapper
+itself untouched.
+
+**Verification debt added:** `npm run quality` could not be run this
+session (empty `node_modules`) — see `docs/VERIFICATION-DEBT.md`.
+
+**Next exact slice:** device-management UI (enroll/revoke screen for a
+School Head/ICT coordinator, consuming the two commands this slice
+added) — the natural next step now that a real command surface exists to
+build it against. Conflict-review UI (surfacing `pull_once`'s staged
+sync conflicts to a teacher) is the other unblocked candidate; either is
+viable next, no candidate pre-selected here per this project's own
+"do not implement the next slice" rule.
+
+## Verification pass on commit `20a3869` (ADR-0069 device-revocation key rotation wrapper) — no dangling callers, no code change (2026-09-05)
+
+Read-only verification of the wrapper approach shipped in `20a3869`
+(`auth::revoke_device_sync_credential_and_rotate_sspk`). No code change
+was needed — the three checks below all resolve to "confirmed safe" or
+"no gap found," so per the task's action rule this is a docs-only entry.
+
+**1. Every production call site of the original, non-rotating
+`auth::revoke_device_sync_credential` goes through the rotating wrapper —
+confirmed safe.** `grep -n revoke_device_sync_credential
+src-tauri/src/auth/mod.rs` finds exactly one production call to the raw
+function: inside `revoke_device_sync_credential_and_rotate_sspk` itself
+(line 890), which then rotates the SSPK before returning. Every other
+call to the raw function (lines 2453, 2652, 2703, 2754, 2786, 2821,
+2844, 2867, 2869) is inside `#[cfg(test)] mod tests` (module starts line
+897, i.e. all of those line numbers fall inside it) — these are the raw
+function's own unit tests, deliberately exercising the unwrapped
+behavior in isolation, not a production bypass. No other file in
+`src-tauri/src` references either name outside `auth/mod.rs`.
+
+**2. No Tauri command exposes device revocation in either form —
+confirmed, verified directly rather than trusting the prior commit
+message.** `grep -rn revoke_device_sync_credential src-tauri/src/commands/`
+returns zero matches. There is currently no `#[tauri::command]` wired to
+either `revoke_device_sync_credential` or
+`revoke_device_sync_credential_and_rotate_sspk` — device revocation is
+reachable only from Rust-internal callers/tests today, matching ADR-0069's
+"not yet wired to any Tauri command" note. This means the more urgent
+"production-facing gap" the task asked to prioritize does not currently
+exist, because the feature has no command-surface entry point yet at all.
+
+**3. `refresh_wrap_for_credential`'s self-heal narrows the mid-rotation
+race to a single stale request; it does not eliminate a stale wrap being
+issued in the exact request that lands inside the gap.** Traced
+`repository/sync_payload_key.rs` lines 104–183.
+`ensure_wrapped_for_credential` unwraps the credential's existing wrap
+row and compares its _decrypted content_ against the `sspk` the current
+call was given (lines 139–144), not merely "does a row exist." If a
+device authenticates in the narrow window between
+`rotate_for_school`'s DB wrap-clear committing and `db::rotate_sspk`'s
+file rotation completing, and the caller resolving `sspk` for that
+specific request still reads the pre-rotation file, that one request is
+wrapped/handed the OLD key — the check cannot prevent this, because
+within that single call there is nothing yet to compare against (no
+stale row exists to detect for a first-time wrap, and even a mismatch
+detection only fires on a _later_ call). What the content comparison
+does guarantee: the very next time that same device authenticates (once
+the caller resolves the now-rotated SSPK), `current == *sspk` is false,
+so `refresh_wrap_for_credential` (lines 158–183) overwrites the stale
+row via `ON CONFLICT(credential_id) DO UPDATE`. So this is a
+self-healing narrowing (bounded to at most one stale authenticated
+round before auto-correction, matching the code comment at lines
+134–137: "no matter when in the DB/filesystem gap it was created"), not
+a full closure of the race — a device that authenticates exactly inside
+the gap can still be handed one stale wrap before the mechanism corrects
+itself on the following contact. This matches, rather than contradicts,
+what the shipped code comments already claim; no gap in the
+implementation itself was found, only that "self-heals" is a narrower
+guarantee than "the race is closed."
+
+**Net finding: no production bypass, no exposed command, self-heal
+behaves as designed but is a narrowing not an elimination of the race
+window.** No code changed. No push/CI cycle was required for this entry
+(docs-only).
+
+## `db::rotate_sspk` closes the last open piece of ADR-0069's device-revocation key rotation (2026-09-05), commit + PR owed
+
+Wired the piece that every prior addendum in this chain (rotation-on-
+revocation, learner encrypt/decrypt, attendance, section) named as
+retained debt: `db::rotate_sspk`. Before this slice, revoking a device's
+sync credential cleared every stored per-device key-wrap row
+(`repository::sync_payload_key::rotate_for_school`), but the underlying
+plaintext SSPK itself never actually changed — a fresh wrap issued to a
+still-active device would just re-wrap the SAME old key. This closes
+that gap for real, not just at the database layer.
+
+**Run on real Windows hardware this session** — unlike the prior cloud-
+sandbox sessions that deferred this exact task as hardware-gated, this
+machine is a genuine Windows box, so the new DPAPI-touching tests below
+exercise the real `CryptProtectData`/`CryptUnprotectData` Win32 APIs, not
+a skipped/ignored placeholder.
+
+**What shipped**: `crypto::KeyStore` gained a second trait method,
+`rotate_key` (alongside the existing `load_or_create_key`), implemented
+for `DpapiKeyStore` as `rotate_key_file` — generates a fresh key,
+DPAPI-protects it, writes it to a sibling temp file with a random
+suffix, then atomically `rename`s it over the target path (cleaning up
+the temp file on a rename failure). Unlike `load_or_create_key`, this
+never reads or reuses the file's existing contents — it always mints and
+writes a genuinely new key. `db::rotate_sspk(app: &AppHandle)` is a thin
+wrapper mirroring `load_or_mint_sspk` exactly (same cfg(windows)/
+cfg(not(windows)) split, same fail-closed error on unsupported
+platforms), calling `DpapiKeyStore.rotate_key` on the SSPK file path.
+
+`auth::revoke_device_sync_credential` itself is **unchanged** — its
+existing, extensively tested authorization/revocation logic was not
+touched. Instead, a new `auth::revoke_device_sync_credential_and_rotate_sspk`
+composes it with the new rotation: it calls the existing function, and
+only if it returns `revoked == true`, invokes a `rotate_sspk: impl
+FnOnce() -> AppResult<()>` closure. This takes a closure rather than an
+`AppHandle` directly — deliberately, so this coordination logic stays
+testable without a real Tauri runtime, matching this module's existing
+convention of accepting already-resolved crypto material rather than a
+Tauri handle (see `enroll_device_sync_credential`'s `sspk` parameter). A
+real caller passes `|| db::rotate_sspk(&app).map(|_| ())`.
+
+**Ordering decision, reasoned through explicitly**: the filesystem
+rotation happens strictly AFTER the DB-side revoke/wrap-clear has fully
+committed, never inside its `SAVEPOINT` — a filesystem write cannot
+participate in a SQLite transaction, so true cross-system atomicity
+isn't achievable, and the two failure directions are not equally bad.
+Committing the DB revoke first means a filesystem hiccup can never block
+or roll back the security-critical revocation itself; if the rotation
+step then fails, the function returns `Err` so the caller knows to
+retry — and a rotation retry is always safe, since it never needs to
+know or verify the previous key's value. The reverse ordering (rotate
+first, revoke second) would risk the opposite, worse inconsistency: the
+SSPK file already changed while a rolled-back DB transaction leaves
+every device's stored wrap still describing the OLD key, silently
+breaking every future sync round for every device until manually
+corrected. Proven with a dedicated test that injects a rotation failure
+and confirms the revocation is still durably committed regardless.
+**Note**: this ordering choice does not by itself close the DB/filesystem
+gap it describes — see "Independent review" below for the real race it
+left open and the self-healing fix that actually closes it regardless of
+ordering.
+
+**No Tauri command exposes device revocation yet** — confirmed by
+searching the whole `commands/` tree before starting this slice: neither
+`enroll_device_sync_credential` nor `revoke_device_sync_credential` has
+ever been wrapped in a `#[tauri::command]`. This slice wires the
+rotation into the revocation _function_, ready for whichever future
+command/UI actually exposes device management — building that command
+and its UI is a separate, larger scope item (the "conflict-review UI"
+and device-management surface both remain part of ADR-0067's still-open
+production gates, `docs/VERIFICATION-DEBT.md`'s "ADR-0067 school-laptop
+sync hub — OPEN" entry), not silently expanded into this slice.
+
+**Tests (TDD)**: `crypto::dpapi` — 4 new (`rotate_key` produces a
+genuinely different key from the original and a later load sees the
+rotated value, not the original; rotation succeeds even with no prior
+key file; rotation leaves no temp file behind on success; the rotated
+file still round-trips through `unprotect` — all four run against the
+real Windows DPAPI APIs on this machine, not mocked). `auth` — 4 new
+(rotation is invoked exactly once when a credential is actually revoked;
+rotation never runs for an unknown credential, matching the existing
+`Unauthorized` gate; rotation never runs when the caller is unauthorized
+to revoke; a rotation failure does not undo or hide an already-committed
+revocation). `repository::sync_payload_key` — net 1 new (one pre-existing
+test's asserted behavior was corrected, see Independent review below;
+plus a new dedicated regression test for the self-healing fix).
+
+**Verification actually run this session**: `cargo build --lib` clean;
+`cargo test --lib` — **825 passed, 0 failed** (816 baseline plus 9 new:
+4 in `crypto::dpapi`, 4 in `auth`, 1 net new in
+`repository::sync_payload_key`); full-crate `cargo test` (lib plus every
+integration binary plus doctests) — exit code 0, all green; `cargo fmt
+--check` — clean (two `cargo fmt` passes this session fixed drift this
+slice introduced, the second after the independent-review fix below);
+`cargo clippy --all-targets -- -D warnings` — clean, zero warnings; `npm
+run quality:security` — **3 ok, 0 failed, 0 missing** (gitleaks,
+cargo-deny, osv-scanner, all genuinely present and run on this machine;
+re-run after the fix below, still clean; no new dependency added). `npm
+run quality` (TS side) not attempted — no TS/UI file touched.
+
+**Independent review — real finding, fixed same session**: a
+`security-reviewer` subagent was dispatched for this crypto-sensitive
+change and found a genuine SHOULD-FIX, not a false positive: the
+original `ensure_wrapped_for_credential` only checked whether a wrap row
+already _existed_ for a credential, not whether its content actually
+matched the current SSPK. Since the DB-side wrap-clear
+(`rotate_for_school`) and the filesystem SSPK rotation (`db::rotate_sspk`)
+cannot commit atomically together (a filesystem write cannot join a SQL
+transaction), a device that authenticated in the narrow gap between the
+DB commit and the file rotation finishing would be wrapped against the
+NOT-YET-ROTATED old key — and the old exists-only check meant that wrap
+would never be revisited, permanently stranding that one device on a
+stale key. Confirmed as reachable given this slice's own chosen
+ordering (DB commits before the filesystem step), not merely
+theoretical. **Fixed**: `ensure_wrapped_for_credential` now unwraps and
+compares a wrap's actual content against the SSPK it was given, and a
+mismatch triggers a new `refresh_wrap_for_credential` (a narrowly-scoped
+upsert distinct from `wrap_for_credential`'s deliberate plain-insert-
+fails-on-duplicate contract, which a dedicated existing test still
+protects) — self-healing on the device's very next authenticated
+contact, regardless of which side of the DB/filesystem gap created the
+stale wrap. One pre-existing test
+(`ensure_wrapped_is_a_no_op_when_a_wrap_already_exists`) had encoded the
+old, now-corrected behavior as intentional ("a second SSPK must never
+overwrite the existing wrap") — split into two corrected tests: one
+proving a wrap matching the current SSPK is left untouched, one proving
+a stale wrap (decrypts to a different SSPK) self-heals. Reviewer's other
+three findings were informational, no action needed: the feature is not
+yet reachable via any Tauri command (unchanged, expected); the freshly
+generated key isn't zeroized after use in `dpapi.rs`, consistent with
+this codebase's pre-existing pattern, not a new gap; and `rotate_key_file`
+`fsync`s before its rename while the older `create_new_key_file` does
+not — noted for alignment if that function is ever touched again, not
+blocking. No BLOCKING findings. No recurrence of this project's two
+previously-documented failure classes (unauthenticated bootstrap,
+check-then-act singleton races).
+
+**Deliberately NOT shipped this slice, and why**: no Tauri command or UI
+for device enrollment/revocation (none existed before this slice either
+— out of scope, tracked separately under ADR-0067's open production
+gates); the remaining sync-entity generalization backlog
+(`SectionMembership` and six other `EntityKind` variants) untouched; no
+change to the loopback-only LAN/Tailscale bind interface.
+
+**Product-direction note (owner-confirmed this session)**: the school-
+laptop-as-authoritative-hub architecture (ADR-0067) is the settled
+decision — not a hypothesis awaiting resolution. The EO 119, s. 2026
+offshore-hosting legal block recorded in `docs/VERIFICATION-DEBT.md`
+only constrains the already-superseded offshore-Cloudflare direction
+(ADR-0065); it does not block or require re-litigating this
+architecture. Recorded here so a future session doesn't mistake the
+settled hub decision for an open product-policy question.
+
+**Exact next task**: build the actual device-enrollment/revocation Tauri
+command(s) and the conflict-review UI — both are named, real gaps in
+ADR-0067's "OPEN" production-gate entry, and are now the most concrete
+remaining piece standing between the current backend-only state and
+real (non-synthetic) use of the sync hub. Alternatively, continue the
+sync-entity generalization backlog (`SectionMembership` next, per the
+prior addendum) — whichever the next session's evidence favors per
+`.claude/rules/autonomous-development.md`.
+
+## Sync payload encrypt/decrypt generalized to a third entity, Section — closes the Attendance FK gap (2026-09-05), commit + PR owed
+
+Wired the same encrypt-on-enqueue / decrypt-on-pull pattern (`Learner`,
+then `Attendance`) onto `EntityKind::Section` — the exact next slice the
+prior addendum recorded as owed.
+
+**Why Section, not SectionMembership**: the prior slice's own recorded
+limitation named the concrete blocker precisely —
+`attendance_records.section_id` is a real FK to `sections`, and a pulled
+`Attendance` change referencing a section this device never
+independently created locally hits an FK violation. `Section` is the
+entity that FK actually points at; `SectionMembership` has no FK
+relationship to `attendance_records` at all and wiring it would not have
+touched this gap. `Section` is also simpler than `Attendance` to wire:
+it has no `update` command today (`repository::section` has no `update`
+function), so it is create-only exactly like `Learner` — `base_version`
+is unconditionally `0`, with no re-record/known-version-read complexity
+`Attendance` needed.
+
+**What shipped**: `commands::section::create_section` now takes an
+`AppHandle`, resolves the SSPK exactly like `create_learner`/
+`record_attendance` do, and (when this school has an active device sync
+credential) encrypts and enqueues the resulting `Section` atomically
+with the row insert itself in one `SAVEPOINT`
+(`create_section_with_optional_sync`, `enqueue_section_sync_change`) —
+the authorization gate (`Capability::ManageTeachingAssignments`) is
+unchanged, only extended to also return the actor's `user_id` via
+`authorize_capability_with_actor`. `Section` gained `Deserialize` (was
+`Serialize`-only) so a pulled payload round-trips.
+`repository::section::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`, keyed on the row's own stable
+`id`) materializes a decrypted, `school_id`-cross-checked `Section`;
+`sync_client::apply_decrypted_change` gained an `EntityKind::Section` arm
+following the exact same decrypt/deserialize/cross-check/upsert shape as
+`Learner`'s and `Attendance`'s.
+
+**Confirms the FK gap actually closes, not just "should"**: a new
+`sync_client` test (`attendance_change_resolves_against_a_previously_pulled_section`)
+pulls a `Section` first (materialized purely via
+`section::upsert_from_sync`, never created locally through
+`section::create`), then pulls an `Attendance` change referencing that
+exact section id, and asserts it applies cleanly (`applied == 1`,
+`rejected == 0`, `!failed`) — proving the FK now resolves on a device
+that only ever received the section through sync, not just that the
+code compiles.
+
+**Tests (TDD)**: `repository::section` — 2 new (`upsert_from_sync`
+inserts a never-seen row; updates an existing row in place, not a
+duplicate). `commands::section` — 3 new (no-sspk behaves like a plain
+create with no outbox row; an enrolled installation enqueues a correctly
+encrypted outbox entry that round-trips back to the exact created
+value; the change is stamped with this installation's own device id).
+`sync_client` — 4 new (a non-conflicting section pull materializes the
+real `sections` row and advances the version cache; a tampered section
+payload is rejected without applying or advancing past it; an unsynced
+local edit to the same section entity is still staged into
+`sync_conflict_review`, never silently overwritten, exactly like the
+learner/attendance case; the Attendance-FK-resolves-against-a-pulled-
+Section proof above).
+
+**Verification actually run this session**: `cargo build --lib` clean;
+`cargo test --lib` — **816 passed, 0 failed** (803 baseline plus 13 new:
+2 in `repository::section`, 3 in `commands::section`, and 8 in
+`sync_client` — 4 for `Section` itself plus this session's own
+pre-existing-suite recount showing 4 more already-counted attendance/
+learner tests than the prior addendum's stated baseline, not a
+regression); a full-crate `cargo test` (lib plus every integration
+binary plus doctests) — exit code 0, all green (0 doctests, unchanged);
+`cargo fmt --check` — clean (after one `cargo fmt` pass this session
+fixed drift this slice introduced); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings; `npm run quality:security` — **3 ok, 0
+failed, 0 missing** (gitleaks, cargo-deny, osv-scanner — all three tools
+genuinely present and run on this machine, not a sandbox gap this time;
+no new dependency added). `npm run quality` (TS side) not attempted — no
+TS/UI file touched (a Tauri command gaining an `AppHandle` parameter
+needs no frontend change — Tauri injects it automatically, same as
+`create_learner`).
+
+**Independent review**: a `security-reviewer` subagent was dispatched
+this session and did real work (it got as far as comparing this slice's
+`school_id` cross-check against `create_learner`'s established pattern)
+but was terminated mid-review by this session's own Claude usage limit
+before it could report findings — a different concrete cause than this
+project's previously-documented agent-resume/retrieval failure, but the
+same practical outcome: no findings text retrievable. Followed the same
+documented fallback either way: recorded honestly here, rigorous
+self-review performed instead, independent-review debt retained, not
+dropped. Self-review: (1) confirmed `create_section`'s authorization
+gate (`Capability::ManageTeachingAssignments`) is unchanged by this
+refactor — only extended to also return `user_id` via
+`authorize_capability_with_actor`, the same helper `create_learner`
+already uses; (2) confirmed `school_id` is never a caller-supplied
+parameter anywhere in the new code path — always derived from the
+session or, on pull, the authenticated pull's own `school_id`; (3)
+confirmed the `EntityKind::Section` cross-check in
+`apply_decrypted_change` matches `Learner`'s/`Attendance`'s exactly, and
+cannot be bypassed by a decrypted payload declaring a different
+`school_id`, since that comparison happens before `upsert_from_sync` is
+ever called; (4) confirmed `upsert_from_sync`'s `ON CONFLICT(id) DO
+UPDATE` cannot let one school's data overwrite another's, because the
+caller has already rejected a cross-school payload before this function
+runs, and `id` collisions across schools are not realistic (`Uuid::now_v7`
+ids); (5) confirmed the `SAVEPOINT`/rollback shape is byte-for-byte
+identical to the proven `create_learner_with_optional_sync` pattern.
+
+**Deliberately NOT shipped this slice, and why**: no fourth `EntityKind`
+wired (out of scope per the task brief — `SectionMembership`,
+`AssessmentItem`, `LearnerScore`, `TeachingAssignment`, `Subject`,
+`GradingPeriod`, `SubjectAttendance` remain unwired, each still without
+this pattern); `db::rotate_sspk`/DPAPI untouched (native-hardware gated,
+explicitly out of scope for this slice per its own instruction, unchanged
+by this work); no UI change; no change to the loopback-only LAN/Tailscale
+bind interface.
+
+**Exact next task**: wire the next domain entity with a real producing
+write path — `SectionMembership` (has `commands::section::enroll_*`
+write paths already) is the most likely next candidate now that its
+sibling `Section` is wired, followed by `AssessmentItem`/`LearnerScore`
+once a real cross-device grading-collaboration need is evidenced.
+Alternatively, `db::rotate_sspk`/DPAPI once native Windows verification
+is available — whichever the next session's evidence favors per
+`.claude/rules/autonomous-development.md`.
+
+## Sync payload encrypt/decrypt generalized to a second entity, Attendance — ADR-0069 pattern (2026-09-05), commit + PR owed
+
+Wired the exact same encrypt-on-enqueue / decrypt-on-pull pattern the
+prior slice closed for `EntityKind::Learner` onto a second entity,
+`EntityKind::Attendance` — the next domain write path this project's
+priority order actually favors. This is following an established
+pattern, not a new architecture decision, so the 10-scenario process
+was not run for it.
+
+**Why Attendance, not one of the other eight unwired `EntityKind`
+variants**: of the entities with a real producing write path already in
+this codebase (`commands::attendance::record_attendance` is the only
+other mature domain write besides learner creation), attendance is the
+kind of record a teacher needs reflected promptly across a shared
+school-laptop hub — another teacher, or the registrar, checking the same
+section's roster later the same day — unlike rarely-changing reference
+data (subjects, grading periods) or entities with no producing command
+yet (`SectionMembership`, `AssessmentItem`, `LearnerScore`,
+`TeachingAssignment`, `Section`, `Subject`, `GradingPeriod`,
+`SubjectAttendance`). This matches the task brief's own priority
+ordering (teacher usability / offline reliability) over reference data.
+
+**What shipped**: `commands::attendance::record_attendance` now takes an
+`AppHandle`, resolves the SSPK exactly like `create_learner` does, and
+(when this school has an active device sync credential) encrypts and
+enqueues the resulting `AttendanceRecord` atomically with the write
+itself in one `SAVEPOINT` (`record_attendance_with_optional_sync`,
+`enqueue_attendance_sync_change`). Unlike the learner slice (a
+create-only write, always `base_version = 0`), attendance can be
+re-recorded for the same learner/date, so `enqueue_attendance_sync_change`
+reads this device's own `sync_version_cache` known-version for the
+entity id as `base_version`, so a genuine second edit is not
+misreported as a stale self-conflict. On the pull side,
+`repository::attendance::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`, keyed on the row's own stable
+`id` rather than the `(learner_id, attendance_date)` unique constraint
+`record`'s own insert conflicts on) materializes a decrypted,
+school_id-cross-checked `AttendanceRecord`; `sync_client::apply_decrypted_change`
+gained an `EntityKind::Attendance` arm following the exact same
+decrypt/deserialize/cross-check/upsert shape as `Learner`'s.
+`AttendanceRecord` gained `Deserialize` (was `Serialize`-only) so a
+pulled payload can round-trip.
+
+**A real limitation surfaced by this choice, recorded honestly (not
+fixed — out of scope this slice)**: `attendance_records.section_id` and
+`.learner_id` are real FKs to `sections`/`learners`. `Learner` is
+sync-wired, so a pulled attendance row's learner FK will already resolve
+on a device that has pulled that learner. `Section` is **not**
+sync-wired yet — no producing write path exists for it — so a device
+that pulls an attendance change referencing a section it has never
+independently created locally will hit an FK violation, which this
+slice's fail-closed design already handles safely (rejected, retried
+every future round, domain table/cursor never advance past it) but will
+never actually succeed until `Section` is also wired. This is a strong
+argument for `Section` (or `SectionMembership`) being the next entity
+generalized, not a bug in this slice.
+
+**Tests (TDD)**: `repository::attendance` — 2 new (`upsert_from_sync`
+inserts a never-seen row; updates an existing row in place, not a
+duplicate). `commands::attendance` — 4 new (no-sspk behaves like a plain
+record with no outbox row; an enrolled installation enqueues a correctly
+encrypted outbox entry that round-trips back to the exact recorded
+value; re-recording the same entity enqueues with the known base
+version, not unconditionally 0; the change is stamped with this
+installation's own device id). `sync_client` — 3 new (a non-conflicting
+attendance pull materializes the real `attendance_records` row and
+advances the version cache; a tampered attendance payload is rejected
+without applying or advancing past it; an unsynced local edit to the
+same attendance entity is still staged into `sync_conflict_review`,
+never silently overwritten, exactly like the learner case).
+
+**Verification actually run this session**: `cargo build --lib` clean;
+`cargo test --lib` — **803 passed, 0 failed** (794 baseline plus 9 new
+for this slice: 2 in `repository::attendance`, 4 in
+`commands::attendance`, 3 in `sync_client`); a full-crate `cargo test`
+(lib plus every integration binary plus doctests) — exit code 0, all
+green (0 doctests, unchanged); `cargo fmt
+--check` — clean (after one `cargo fmt` pass this session fixed drift
+this slice introduced); `cargo clippy --all-targets -- -D warnings` —
+clean, zero warnings; `npm run quality:security` — **3 ok, 0 failed, 0
+missing** (gitleaks, cargo-deny, osv-scanner; no new dependency added).
+`npm run quality` (TS side) not attempted — no TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent was reachable
+this session (same known gap noted in every prior addendum in this
+chain) — followed the documented fallback: recorded honestly here,
+rigorous self-review performed instead. Self-review focus: (1) the
+`section_id`/`learner_id` FK limitation above — confirmed it fails
+closed (rejected + retried), never silently drops or corrupts data; (2)
+confirmed `upsert_from_sync` deliberately does not re-validate
+roster/section-membership on pull, matching this codebase's established
+trust model (an enrolled device's pushed change is already trusted the
+same way the hub already trusts it for every other entity — no new
+trust boundary introduced); (3) confirmed the `base_version` read from
+`sync_version_cache` at enqueue time cannot be spoofed by a caller (it
+is derived server-side from local state, never a parameter); (4)
+confirmed the `SAVEPOINT`/rollback shape is identical to the proven
+`create_learner_with_optional_sync` pattern. No blocking issue found.
+This independent-review debt is retained, not dropped — owed for a
+future session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why**: no third `EntityKind`
+wired (out of scope per the task brief); `db::rotate_sspk`/DPAPI
+untouched (native-hardware gated, unchanged); the `Section` FK gap noted
+above is recorded as a limitation, not patched around with a
+workaround that would weaken the fail-closed guarantee.
+
+**Exact next task**: wire `Section` (or `SectionMembership`) next — both
+because it is architecturally required to unblock `Attendance` pulls in
+practice on a device that has not independently created the same
+sections, and because it is itself reference data a shared hub benefits
+from replicating. Alternatively, `db::rotate_sspk`/DPAPI once native
+Windows verification is available — whichever the next session's
+evidence favors per `.claude/rules/autonomous-development.md`.
+
+## Sync payload encrypt/decrypt round trip closed for the learner entity — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Closed the last open gap this ADR's own notes kept flagging: pulled
+changes were tracked (version watermark only) but never decrypted or
+materialized. Scoped to exactly the one entity already wired on the push
+side, `EntityKind::Learner` — not generalized to other entities.
+
+**What shipped**: enqueue-side encryption was already fully done by an
+earlier slice (`commands::learner::enqueue_learner_sync_change`
+encrypts under the resolved SSPK before `sync_outbox::enqueue`) — this
+slice found that complete and left it unchanged. On pull,
+`sync_client::pull_once` now actually decrypts a non-conflicting
+`AcceptedChange` and applies it via the existing repository write path,
+`repository::learner::upsert_from_sync` (new,
+`INSERT ... ON CONFLICT(id) DO UPDATE`). Decryption needed a new
+capability: a device's own local DB never held a copy of its SSPK wrap
+(that row lives only in the hub's DB), so a new authenticated hub
+endpoint, `GET /sync/payload-key-wrap`, hands a device back exactly its
+own stored wrap; the device unwraps it locally with its own device
+secret (`sync_client::resolve_sspk`) — the plaintext SSPK still never
+crosses the network, only its per-device wrapped form does, exactly like
+the original enrollment ceremony. A decrypted payload's own `school_id`
+is cross-checked against the pull's school before writing (defense in
+depth). Any failure — decrypt/auth-tag failure, malformed JSON, a
+`school_id` mismatch, or an entity kind with no write path yet — is
+rejected outright: `PullRunSummary::rejected` increments, the round is
+marked `failed`, and the batch loop stops right there so the domain
+table, version cache, and cursor never advance past the bad change (it
+is retried on the next round, never silently skipped or partially
+applied).
+
+**Verification actually run this session**: `cargo build` (whole crate)
+clean; `cargo test --lib` — **794 passed, 0 failed** (784 baseline + 10
+new); full-crate `cargo test` (lib + every integration binary + doctests)
+— exit code 0; `cargo fmt --check` — clean (after one `cargo fmt` pass
+this session); `cargo clippy --all-targets -- -D warnings` — clean, zero
+warnings; `npm run quality:security` — **3 ok, 0 failed, 0 missing**
+(gitleaks, cargo-deny, osv-scanner; no new dependency added). `npm run
+quality` (TS side) was not attempted — no TS/UI file touched.
+
+**Independent review**: no `security-reviewer` subagent was reachable
+this session (same known gap noted in the two prior addenda) — followed
+the documented fallback: recorded honestly, rigorous self-review
+performed instead (see ADR-0069's newest addendum for the specific
+points checked — credential-scoped wrap lookup, fail-closed on a missing
+wrap row, the `school_id` cross-check's defense-in-depth role, and the
+deliberate batch-stop-on-rejection behavior). No blocking issue found.
+This independent-review debt is retained, not dropped — owed for a
+future session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why**: `db::rotate_sspk` and
+the Windows DPAPI file-overwrite path remain deferred exactly as before
+— untouched, still needs native Windows verification this sandbox cannot
+perform. Generalizing this encrypt/decrypt wiring to the other nine
+`EntityKind` variants is out of scope — none has a producing write path
+enqueued yet, so there is nothing real to generalize against.
+Local caching of the unwrapped SSPK across pull rounds was deliberately
+not added (would be new persisted/cached key material, the same scope
+boundary `crypto::payload_key` already draws) — the extra HTTP round
+trip per pull-with-something-to-decrypt is negligible next to the
+30-second poll cadence.
+
+**Exact next task**: generalize this slice's encrypt/decrypt/apply
+pattern to the next domain entity with a real producing write path (check
+`commands/` for what else calls `sync_outbox::enqueue` or is closest to
+needing it), OR pick up the still-owed `db::rotate_sspk`/DPAPI work once
+native Windows verification is available — whichever the next session's
+evidence favors per this project's priority order
+(`.claude/rules/autonomous-development.md`).
+
+## Payload-key rotation on device revocation — ADR-0069 addendum (2026-09-05), commit + PR owed
+
+Ran this project's 10-scenario decision process for ADR-0069's own
+"Rotation … out of scope" gap and implemented the chosen mechanism.
+Full reasoning and the 4 options considered: ADR-0069's new "the
+10-scenario decision on key rotation on revocation" addendum.
+
+**Decision (Recommended)**: lazy propagation. Revoking a device
+(`auth::revoke_device_sync_credential`) now also calls the new
+`repository::sync_payload_key::rotate_for_school`, which deletes every
+stored wrap row for that school — not only the revoked device's — inside
+the SAME `SAVEPOINT` as the revocation itself (atomic: both commit or
+both roll back together). Each still-active device transparently
+recovers a fresh wrap the next time it authenticates: the new
+`sync_payload_key::ensure_wrapped_for_credential` (idempotent — a
+no-op if a wrap already exists) is called from `hub_server::authenticate`
+immediately after `device_credential::verify` succeeds, reusing the exact
+device secret that request already proved it holds and the hub's own
+in-memory SSPK (`HubServerState.sspk`, now resolved once at listener
+startup via the pre-existing `db::load_or_mint_sspk`). A revoked
+credential never verifies again, so it can never reach the re-wrap step,
+so it can never recover a wrap of any key minted after its own
+revocation — proven directly by test, not just asserted.
+
+**Why lazy, not an immediate hub-driven re-wrap of every device**: the
+hub only ever retains a SHA-256 digest of each device's enrollment
+secret (unchanged since ADR-0004), never the plaintext — it has no way to
+derive another device's wrap key except at the moment that device itself
+authenticates. Asymmetric per-device keypairs (X25519) would let the hub
+re-seal proactively, but were rejected as Next Best only: a second crypto
+primitive family and a new enrollment-time key-exchange step this
+zero-PKI, zero-billing school-LAN deployment does not need, given the
+realistic threat model (a revoked device denied access the moment it
+would otherwise reconnect is an acceptable, disclosed tradeoff — not
+"do nothing," which was also considered and rejected outright).
+
+**Tests (TDD)**: 8 new tests — 5 at `repository::sync_payload_key`
+(rotation clears a school's wraps and only that school's; idempotent
+ensure-wrap creates vs. no-ops; a rotated-then-reauthenticated device
+recovers the new key), 2 at `auth` (a real revocation clears an
+unrelated still-active device's wrap too; a revoked device's secret can
+never establish a wrap of a post-rotation key), 2 at `hub_server`
+(a real authenticated HTTP request lazily re-establishes a wrap end to
+end; a revoked credential's request never does). All new and pre-existing
+tests pass.
+
+**Verification actually run this session** (real command output, not
+assumed): `cargo build --lib` — clean; `cargo test --lib` — **786 passed,
+0 failed** (784 from this slice's first pass, +2 more added by the
+self-review fix below); targeted `cargo test --lib` filters for `sync_payload_key::`,
+`hub_server::`, and the new `auth::` revoke/rotation tests — all pass
+individually; `cargo fmt --check` — clean (after one `cargo fmt` pass to
+fix drift this session introduced); `cargo clippy --all-targets -- -D
+warnings` — clean, zero warnings; a background `cargo test` (full crate:
+lib + all integration test binaries + doctests) — completed with exit
+code 0, integration suites (`subject_attendance`, `teaching_assignment_
+management`, others) all green, 0 doctests (unchanged, still none in this
+crate); `npm run quality:security` — **3 ok, 0 failed, 0 missing**
+(gitleaks, `cargo-deny`, `osv-scanner` all present and passing this
+session; no new dependency was added, so this mainly reconfirms the
+existing dependency tree is still clean). `npm run quality` (the
+TypeScript-side gate) could NOT run this session — `tsc -b` fails on
+missing `vite`/`vitest`/`@types/node` type declarations, an environment
+gap (`node_modules` not fully installed in this sandbox) unrelated to
+this change (no TypeScript/UI file was touched) — recorded honestly
+rather than skipped silently; see `docs/VERIFICATION-DEBT.md`.
+
+**Independent review**: dispatching a fresh `security-reviewer` agent
+context was not available in this session's toolset (no such subagent
+tool surfaced); the project's own `security-review` skill was invoked but
+its scripted `git diff` precondition failed in this sandbox (ambiguous
+`origin/HEAD` — this branch's remote-tracking setup doesn't resolve that
+ref here). Following this project's documented reviewer-failure fallback:
+recorded honestly here, a rigorous self-review was performed instead
+(covering: DoS potential of clearing all wraps on any revocation — bounded
+by the same authorization gate revocation itself already requires;
+tightened a defensive `unwrap_or_default()` empty-secret fallback in
+`hub_server::authenticate` to an explicit, logged skip instead, since a
+silent empty-secret fallback is exactly the kind of guessed-crypto
+shortcut this project's rules exist to prevent, even though it is
+provably unreachable given `verify` already succeeded). The self-review
+also found a real gap, not just a style nit: **`ensure_wrapped_for_credential`
+had no `revoked_at` check of its own** — its only protection was that its
+sole real call site (`hub_server::authenticate`) happens to call it after
+`verify` already succeeds. A test named as if it proved the function
+itself refused revoked credentials
+(`a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key`)
+actually only proved `verify` rejects them — a misleading test, caught
+during self-review rather than shipped uncorrected. **Fixed before
+considering this slice done**: the function now independently checks
+`device_sync_credentials.revoked_at IS NULL` (and existence) before
+wrapping, with two new tests calling it directly with no `verify` in the
+loop (`ensure_wrapped_is_a_no_op_for_a_revoked_credential`,
+`ensure_wrapped_is_a_no_op_for_an_unknown_credential`), and the
+previously-misleading test corrected to actually assert the function's
+own refusal. Full detail: ADR-0069's newest addendum. This is now genuine
+defense in depth, not reliant on one caller's ordering. This
+independent-review debt is retained, not dropped — owed for a future
+session with a healthy reviewer harness.
+
+**Deliberately NOT shipped this slice, and why** (see ADR-0069's same
+addendum for full reasoning): no Tauri command yet mints and persists a
+NEW plaintext SSPK on the hub's own local DPAPI-protected file when a
+revocation happens — today's `rotate_for_school` correctly clears the
+DATABASE side (every wrap row), but nothing yet calls an
+`load_or_mint_sspk`-shaped "overwrite, don't reload" function to actually
+produce a fresh plaintext key for the next re-wrap to use; a real running
+installation's next re-wrap would still hand out the SAME old SSPK it
+already recognized (the DATABASE-level protection this slice ships is
+real and tested — old wraps are genuinely gone — but the full end-to-end
+"a NEW key exists" story needs this last piece). Deferred rather than
+guessed at because it touches the Windows-only DPAPI file store this
+sandboxed environment cannot exercise or verify at all (same limitation
+`load_or_mint_sspk` itself already carries, unchanged) — implementing an
+untested file-overwrite function would be worse than leaving the gap
+honestly recorded. Domain-table materialization of decrypted pulled
+changes remains out of scope, unchanged from the prior slice.
+
+**Exact next task**: add `db::rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]>`
+(Windows-gated, mirroring `load_or_mint_sspk`'s structure but overwriting
+`SSPK_KEY_FILE_NAME` with a freshly generated key rather than reloading
+the existing one) and wire it into a real Tauri command path that calls
+`revoke_device_sync_credential`, so a live revocation actually produces a
+new plaintext SSPK end to end, not just a cleared wrap table. Needs
+native Windows verification per `docs/VERIFICATION-DEBT.md` (DPAPI file
+overwrite/reload round-trip) before it can be marked genuinely done.
+After that: wiring an actual domain write to encrypt a payload and call
+`sync_outbox::enqueue`, and decrypting pulled changes into domain tables
+in `sync_client` — both still fully open, unchanged from the prior slice.
+
+## Client-side sync loop: push/pull over loopback HTTP (2026-09-05), commit + PR owed
+
+Executed the exact next slice named below: the device-side client that
+talks to `hub_server` over HTTP.
+
+**What shipped**: a new `sync_client` module — `push_once` drains
+`sync_outbox` in bounded batches (50/round) to `POST /sync/push` and maps
+the hub's per-change outcome onto `sync_outbox`'s EXISTING
+acknowledge/`record_attempt` state machine (no new retry semantics
+invented); `pull_once` GETs `/sync/pull` after this device's own stored
+cursor (new `sync_pull_cursor` repository/migration 34) and, for each
+accepted change, either advances `sync_version_cache`'s per-entity
+watermark (no local unsynced edit for that entity) or stages it into the
+existing `sync_conflict_review` queue (new
+`sync_conflict_review::stage_pull_conflict`, reusing migration 29's table)
+when this device has an unsynced local edit for the same entity — never
+silent last-write-wins on the pull side, matching the push side's
+existing rule. `sync_client::maybe_spawn_loop`, wired into `lib.rs`'s
+`setup` hook next to `hub_server::maybe_spawn_listener`, starts a
+background-thread loop only if `sync_client::should_run` finds a stored
+client credential (new `device_sync_client_credential` table, migration
+34 — this device's own retained copy of the secret
+`device_credential::enroll` returns once, needed because nothing
+previously stored it anywhere a client could reuse it) — a never-enrolled
+installation is completely unaffected, symmetric with the hub-listener
+gate.
+
+**Dependency change**: `reqwest` (`blocking`+`json`+`query` features only,
+no TLS — every request targets loopback plain HTTP) promoted to a real
+direct dependency; see ADR-0067's new addendum for why `cargo tree -i
+reqwest` was misleading (it was only resolvable for tauri's wasm32-target
+feature, not actually in this app's native dependency graph).
+
+**Deliberately NOT done, and why** (full reasoning in ADR-0067's new
+addendum): decrypting `encrypted_payload` and writing pulled changes into
+actual domain tables (`learners`, `sections`, ...) — that needs the
+ADR-0069 payload-key ceremony, which has no Tauri command exposing it yet
+and is explicitly a separate increment; wiring
+`auth::enroll_device_sync_credential` to automatically populate
+`device_sync_client_credential` (there is still no enrollment command
+surfaced to any caller at all, so nothing populates either table yet
+outside this module's own tests); a sync-status UI; the LAN/Tailscale bind
+interface (`hub_server`'s pre-existing gap, unchanged here).
+
+**Verification**: 8 new `sync_client` tests (outbox draining +
+acknowledgement, no-op on empty outbox, push-side conflict staging +
+dequeue, unauthorized-credential handling leaves the outbox row untouched,
+pull applying a non-conflicting change, pull staging a conflict without
+touching the live version cache, never-enrolled no-op gate) — each driven
+over a REAL HTTP round trip against a `hub_server::router` bound to an
+ephemeral loopback port, not just a `tower::Service` call. `cargo test`
+(full crate): **775 lib tests + all integration binaries, 0 failed**
+(up from 762 before this slice — 13 new: 8 `sync_client`, 3
+`device_sync_client_credential`, 2 `sync_conflict_review`;
+`sync_pull_cursor`'s 4 tests land inside that same lib-test count too,
+762 → 775 nets the union of all of them). `cargo clippy --all-targets --
+-D warnings`: clean. `cargo fmt --check`: clean (after running plain
+`cargo fmt` once to restyle this slice's own new test code — recorded
+honestly, not hand-fixed). `npm run quality:security`: initially could
+not run (`gitleaks`/`cargo-deny`/`osv-scanner` missing from `PATH`), then
+**closed later in the same session** — all three installed for real
+(`osv-scanner` v2.5.1 and `gitleaks` v8.30.1 as official prebuilt
+binaries with SHA-256 checksums independently verified against
+`docs/SOURCE-REGISTRY.md`'s recorded values before use; `cargo-deny`
+v0.20.2 built from source via `cargo install --locked`) and re-run:
+**3 ok, 0 failed, 0 missing** — gitleaks 101 commits/~25.5 MB no leaks;
+`cargo-deny` advisories/bans/licenses/sources all ok (covers the new
+`reqwest` dependency); `osv-scanner` 585 crates.io + 341 npm packages,
+all 18 known advisories match this repo's own pre-existing justified
+`deny.toml` ignores, `reqwest` itself not flagged. Full detail in
+`docs/VERIFICATION-DEBT.md`'s matching entry (closed same session, not
+left open). `npm run quality` not re-run — no TypeScript/frontend
+surface changed this slice (Rust-only).
+
+**Toolchain note**: this sandboxed environment's Rust toolchain was
+`1.94.1`, below this crate's declared `rust-version = "1.95"` — updated to
+stable `1.98.1` via `rustup update stable` before any of the above could
+even compile. Also needed `libgtk-3-dev`/`libwebkit2gtk-4.1-dev` and
+related GTK/WebKit dev packages (present as runtime libs but not as
+pkg-config `-dev` packages) installed via `apt-get` before `cargo
+check`/`test` could link Tauri's Linux GUI backend at all — neither of
+these is a code change, just this session's own environment setup,
+recorded here in case a future session hits the same fresh-container gap.
+
+**Exact next slice**: the ADR-0069 payload-key ceremony — wiring
+`crypto::payload_key`'s existing primitives and the migration-32
+`sync_payload_key_wraps` table into an actual per-device unwrap, so
+`sync_client::pull_once` can decrypt `AcceptedChange::encrypted_payload`
+and materialize it into real domain tables instead of only advancing the
+version-cache watermark. A Tauri command surfacing
+`auth::enroll_device_sync_credential` (and populating
+`device_sync_client_credential`/wiring `hub_server::spawn`'s bind address
+selection) remains a prerequisite for any of this to be reachable outside
+a test, and is a reasonable candidate to bundle into the same slice.
+
 ## Network listener wired into real Tauri startup, loopback only (2026-09-05), commit + PR owed
 
 Branch cut from `main` after PR #50 merged. Executed the "exact next

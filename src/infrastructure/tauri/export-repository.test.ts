@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { describe, expect, it, vi } from "vitest";
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf10ExportResult,
@@ -145,6 +146,33 @@ describe("TauriExportRepository", () => {
     mockInvoke.mockResolvedValueOnce(null);
 
     const result = await new TauriExportRepository().exportClassRecordReportCard("unknown");
+
+    expect(result).toBeNull();
+  });
+
+  it("exportClassRecordSummary invokes export_class_record_summary with classRecordId", async () => {
+    const result: ClassSummaryExportResult = {
+      filePath:
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ClassSummary_Mabini_Science_1st_Term.csv",
+      disclosure: {
+        populatedFields: ["School Name"],
+        omittedFields: [{ field: "Initial Grade", reason: "see the full report card" }],
+      },
+    };
+    mockInvoke.mockResolvedValueOnce(result);
+
+    const returned = await new TauriExportRepository().exportClassRecordSummary("cr-1");
+
+    expect(mockInvoke).toHaveBeenCalledWith("export_class_record_summary", {
+      classRecordId: "cr-1",
+    });
+    expect(returned).toEqual(result);
+  });
+
+  it("exportClassRecordSummary returns null when the class record could not be resolved", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
+
+    const result = await new TauriExportRepository().exportClassRecordSummary("unknown");
 
     expect(result).toBeNull();
   });

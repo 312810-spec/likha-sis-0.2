@@ -221,3 +221,222 @@ the same SQLite file coexist correctly; not a new concurrency risk.
 features) — `hub_server`'s production code now calls
 `tokio::net::TcpListener` directly, which needs a direct `Cargo.toml` edge,
 not just the transitive one Tauri/axum already provided.
+
+## Addendum (2026-09-05) — client-side sync loop (push/pull over loopback HTTP)
+
+Added the device-side counterpart to `hub_server`: a new `sync_client` module
+that drains `sync_outbox` in bounded batches to `POST /sync/push` and
+periodically `GET /sync/pull`s changes accepted from other devices, wired
+into real Tauri startup the same way (`sync_client::maybe_spawn_loop`, gated
+by `sync_client::should_run`) so a never-enrolled installation stays
+completely unaffected.
+
+**HTTP client decision: `reqwest` (blocking).** `cargo tree -i reqwest`
+showed it was already resolvable in this workspace's lockfile, but only as
+an optional dependency of a `tauri` feature reachable for the `wasm32`
+target — not actually part of the dependency graph for this app's real
+native target, so it needed a real, direct addition rather than "just use
+what's already there." Evaluated against building on `hyper`/`tower`
+directly (axum's own stack, already a dependency): rejected as needless
+hand-rolled HTTP-client plumbing (connection handling, redirects, body
+buffering) for a two-endpoint client a mature library already does
+correctly. Chose `reqwest::blocking` (not the async client) because this
+loop is a plain "wake up, push, pull, sleep" worker on its own background
+`std::thread`, not code that needs to share Tauri's tokio runtime — a
+blocking client keeps it simple to read and, importantly, simple to test
+without `#[tokio::test]` plumbing of its own. `default-features = false`
+with only `blocking`, `json`, and `query` (typed query-string building for
+`GET /sync/pull?after=&limit=`, matching axum's own `Query` extractor) —
+deliberately **no TLS feature**: every request targets `127.0.0.1` in plain
+HTTP, matching `hub_server`'s own loopback-only, plaintext-inside-the-trust-
+boundary decision; a TLS backend would be dead dependency weight for a URL
+that can never be `https://`.
+
+**New local state, added because the client side genuinely had nothing to
+authenticate or resume with yet:**
+
+- `device_sync_client_credential` (migration 34): this device's own retained
+  copy of the credential it needs to present on every push/pull request
+  (`x-likha-credential-id`/`x-likha-device-secret`) — distinct from
+  `device_sync_credentials` (migration 26), which is the HUB's
+  verification-side table and stores only a `secret_hash`, never a usable
+  secret. Until this slice, `device_credential::enroll`'s returned secret was
+  used once and then discarded by every caller (its own doc comment says so
+  verbatim) — meaning no device could actually have authenticated a second
+  request even if a client existed. This is NOT the ADR-0069 payload-key
+  ceremony (that remains out of scope for this slice, see below); it is
+  strictly the bearer secret for the sync HTTP protocol itself.
+- `sync_pull_cursor` (migration 34): this device's own "last hub cursor I
+  have fully processed" watermark per school — the pull-side counterpart to
+  `sync_version_cache`'s per-entity watermark.
+- `repository::sync_conflict_review::stage_pull_conflict`: reuses the
+  existing `sync_conflict_review` table (migration 29) for a NEW case —
+  pull-side conflicts — rather than a second table. A pull-side conflict is
+  defined here as "this device already has an unsynced local edit
+  (`sync_outbox` row) for the same entity the pulled change targets"; that
+  case is staged for review, the version cache is left untouched, and the
+  pull cursor still advances (this device _has_ processed the change, by
+  staging it, just not applied it live) — never silent last-write-wins on
+  the pull side, matching the push side's existing rule.
+
+**What "applying a pull-side change" means in this slice, and what it
+deliberately does NOT mean:** for a non-conflicting `AcceptedChange`, the
+only action taken is advancing `sync_version_cache`'s known-version
+watermark for that entity. It does **not** decrypt `encrypted_payload` and
+write a `learners`/`sections`/... domain row. That decryption needs the
+school's sync-payload key (SSPK), and per this slice's task description and
+this ADR's own already-recorded gap, the payload-key ceremony (wiring
+`crypto::payload_key`'s existing primitives and the migration-32
+`sync_payload_key_wraps` table into an actual per-device unwrap at
+enrollment/use time) is explicitly a separate, later increment — no Tauri
+command exposes any of it yet, so no device could safely decrypt a payload
+even if this slice tried to. Advancing the version watermark without the
+domain write is still meaningful and safe on its own: it is exactly the
+state `sync_version_cache` needs so this device's _own_ next edit to that
+entity computes a correct (non-stale) `base_version`, and it never
+constructs or displays plaintext data this device hasn't decrypted.
+Materializing pulled changes into domain tables remains this feature's next
+real gap, tracked as this slice's own follow-on (see
+`docs/CURRENT-HANDOFF.md`).
+
+**Push-side outcome handling reuses `sync_outbox`'s existing state machine
+verbatim** (`acknowledge`/`record_attempt` with its fixed
+`AttemptErrorCode`s) — `sync_client::push_once` only decides which existing
+call an HTTP outcome maps to: `Accepted`/`AlreadyApplied` → advance
+`sync_version_cache` to `base_version + 1` (the same arithmetic
+`sync_hub::push_change` applies server-side) and acknowledge;
+`ConflictStaged` → acknowledge without touching the version cache (the hub
+already durably recorded the conflict in its own review queue; retrying
+only ever replays the same outcome, so the row is dequeued rather than
+retried forever); a transport error, a non-2xx status, or a malformed/
+mismatched response body → `record_attempt` with `Offline`/`Timeout`/
+`Unauthorized`/`HubUnavailable`/`ProtocolRejected` as appropriate, and the
+outbox row is left completely untouched otherwise (no partial
+acknowledgement, no corruption) so the next round retries it.
+
+**Tested via a real HTTP round trip**, not just `tower::Service` calls like
+`hub_server`'s own tests: each test binds a real `hub_server::router` to an
+ephemeral loopback TCP port (`127.0.0.1:0`) on a background thread running
+its own minimal single-threaded tokio runtime, and drives it with an actual
+`reqwest::blocking::Client` from a second, independent in-memory database
+standing in for a second physical device — proving the wire format, header
+names, and status-code handling actually work over a socket, not only that
+the Rust types line up. 8 new tests: outbox draining + acknowledgement,
+no-op on an empty outbox, push-side conflict staging + dequeue, unauthorized-
+credential handling leaves the outbox row untouched, pull applying a
+non-conflicting change, pull staging a conflict without touching the live
+version cache, and the never-enrolled-installation no-op gate.
+
+**Deliberately NOT done in this slice** (separate, later increments): the
+payload-key ceremony and any actual domain-table materialization of pulled
+changes (discussed above); wiring `auth::enroll_device_sync_credential`'s
+real enrollment flow to call
+`device_sync_client_credential::store` automatically (today nothing
+populates that table except this module's own tests and a future Tauri
+command neither of which exists yet — there is still no enrollment command
+surfaced at all); a sync-status UI; per-device rate limiting on the hub
+side; TLS; and resolving the LAN/Tailscale bind interface (`hub_server`'s
+own already-recorded gap, unchanged by this slice).
+
+## Addendum (2026-09-06) — network-interface binding (LAN/Tailscale, still no TLS)
+
+Resolves the "loopback only" gap left open by the previous addendum:
+`maybe_spawn_listener` now binds loopback **plus** every non-loopback
+interface address that is in a private range, using a new interface-
+enumeration dependency.
+
+**Crate choice**: [`if-addrs`](https://github.com/messense/if-addrs) v0.15.0
+(MIT OR BSD-3-Clause), the maintained successor to the older `get_if_addrs`
+crate. Evaluated against `local-ip-address`: rejected because it returns a
+single "best guess" address, not the full interface list this module needs
+(it must consider every interface — a school LAN NIC and a Tailscale virtual
+NIC can both be present and both need binding). `if-addrs` is a thin,
+dependency-light wrapper around `getifaddrs` (Unix) / `GetAdaptersAddresses`
+(Windows) — a pure local syscall, no network I/O of its own, no phone-home,
+no paid tier. Its only transitive dependency is `libc`, already present
+elsewhere in this tree. `default-features = false` drops the `link-local`
+feature, which this module has no use for (link-local/APIPA addresses are
+filtered out regardless — see below).
+
+**Selection logic** (`hub_server::select_bindable_addresses`, pure and unit-
+tested with injected address lists, no real network needed to prove the
+invariant): always includes `127.0.0.1`, then adds any distinct non-loopback
+IPv4 address that falls in:
+
+- RFC 1918 private-use ranges (`10.0.0.0/8`, `172.16.0.0/12`,
+  `192.168.0.0/16`) — a normal school LAN interface, and
+- RFC 6598 (`100.64.0.0/10`) — Tailscale's CGNAT range, since ADR-0067's own
+  "Recommended" reachability layer for remote schools is Tailscale, and
+  Tailscale interface addresses live in this range.
+
+Everything else is excluded by construction: `0.0.0.0`, any public address,
+link-local (`169.254.0.0/16`), and IPv6 entirely (out of scope for this
+slice — this deployment's LAN and Tailscale addresses are IPv4 in practice;
+adding IPv6 would double the range/allowlist surface for no currently-needed
+capability, so IPv6 inputs are filtered out rather than silently
+mishandled). This directly enforces the "School-laptop operations gate"'s
+`0.0.0.0`/public-exposure prohibition in code, not just in a doc comment —
+tested with a fake public address (`8.8.8.8`) and a fake `0.0.0.0` input to
+confirm neither is ever selected.
+
+**Failure handling**: interface enumeration failing (or finding nothing
+beyond loopback) falls back to loopback-only, never a crash — same "sync
+must never crash the app" discipline as the rest of this module. Each
+selected address is bound by its own independent `tokio` task
+(`hub_server::spawn_all`); a bind failure on any one address (changed IP,
+permission issue) is logged and does not prevent the others, including
+loopback, from serving.
+
+**Still not verified**: real LAN/Tailscale reachability from a second
+physical device. This sandboxed environment can prove the selection logic
+is correct (unit-tested) and that the wiring compiles and runs (a bound
+`TcpListener` per selected address), but cannot prove a Windows school
+laptop's real LAN NIC or a real Tailscale interface actually enumerates and
+answers as expected on real hardware. Recorded as verification debt, per
+this project's "never claim a check passed unless it actually ran" rule.
+
+## Addendum (2026-09-06) — LAN/Tailscale transport stays plaintext HTTP (no TLS)
+
+The previous "Deliberately NOT done" note left "TLS (or a documented
+decision that the LAN/Tailscale transport itself is the trust boundary...)"
+open for the LAN/Tailscale case specifically (ADR-0069 had already reasoned
+through the loopback case). This addendum closes that gap: **the decision is
+to keep plain HTTP, no TLS, for the LAN/Tailscale transport too**, for three
+reasons:
+
+1. **The payload is already encrypted end-to-end above this layer.**
+   ADR-0069's SSPK (a per-school 256-bit AES-256-GCM key) encrypts every
+   sync payload before it ever reaches `sync_client`/`hub_server` — this
+   module only ever moves `PendingChange::encrypted_payload` bytes, already
+   ciphertext, over the wire (see `sync_hub`/`sync::PendingChange`). TLS on
+   top of this transport would protect metadata (which endpoint, request
+   timing/size, the authentication headers) but not the payload — the thing
+   ADR-0069 identifies as the actual sensitive content.
+2. **The network itself provides a second, independent layer for the
+   residual metadata exposure.** For the LAN case, the wire is the school's
+   own physical/Wi-Fi network, not a shared or public one. For the remote
+   case, this ADR's own "Recommended" reachability layer is Tailscale, which
+   is itself an encrypted (WireGuard) tunnel between devices — traffic
+   inside it is already encrypted at the network layer before it is ever
+   plaintext HTTP "on the wire" in any sense an outside observer could
+   intercept.
+3. **Proportionality.** Adding TLS here means adding certificate issuance,
+   distribution, rotation, and trust-anchor management to a zero-billing,
+   zero-PKI school deployment — real, ongoing complexity — to protect
+   metadata that is already narrow (this API is two JSON endpoints, no
+   browsable content) given points 1 and 2 already cover the payload and the
+   transport.
+
+**Where this reasoning does NOT fully hold, flagged honestly rather than
+forced closed**: point 2's Tailscale half assumes a remote connection
+actually uses Tailscale. If a school ever configures cross-network sync
+reachability by some other means (e.g. a plain port-forward, a VPN this
+project didn't choose, or any path that is not Tailscale's encrypted
+tunnel), the metadata exposure argument in point 2 no longer applies for
+that specific transport, and this decision would need revisiting for that
+case specifically. Nothing in this codebase currently enables any such
+alternate path — `hub_server` only ever binds a LAN/Tailscale-range address,
+never a public one (see the addendum above) — so this is recorded as a
+still-open conditional, not a currently-live gap: if a future slice adds any
+remote-reachability path other than Tailscale, TLS (or an equivalent
+transport-layer protection) must be reconsidered before that path ships.

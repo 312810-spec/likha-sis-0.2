@@ -1,11 +1,11 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
 use crate::repository::{learner, section};
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SectionMembership {
     pub id: String,
@@ -1140,6 +1140,61 @@ pub fn current_membership_for_learner_in_school(
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
         e => Err(e.into()),
     })
+}
+
+/// Sync-pull counterpart to `enroll_membership`/`transfer_membership`/
+/// `end_membership` -- materializes a `SectionMembership` this device
+/// received (already validated/enqueued by whichever device originally
+/// wrote it), instead of re-deriving one from raw caller input. Mirrors
+/// `attendance::upsert_from_sync`'s exact shape: an `INSERT ... ON
+/// CONFLICT(id) DO UPDATE` keyed on the row's own stable `id` -- the same
+/// `id`, minted once on the originating device, is what every other
+/// device's pulled copy of this row must converge on.
+///
+/// Section membership has three lifecycle verbs (enroll/transfer/end)
+/// rather than one, but all three ultimately mutate a `section_memberships`
+/// row identified by its own stable `id` -- `enroll_membership` inserts a
+/// new one, `end_membership` sets `ends_on` on an existing one, and
+/// `transfer_membership` closes the source row and inserts a new
+/// destination row. Each of those rows is synced independently as its own
+/// evolving entity keyed on `id`, exactly like `Attendance`/`LearnerScore`
+/// -- there is no separate "membership event log" entity kind; a
+/// transfer's two mutated rows are simply two `SectionMembership`
+/// `PendingChange`s. This is why `upsert_from_sync` alone (no delete path)
+/// is sufficient: a membership row is never deleted, only closed
+/// (`ends_on` set) -- see this module's own doc comments on `enroll`/
+/// `end_membership` for why the row is retained rather than removed.
+///
+/// Not re-validating school/section/learner eligibility here is
+/// deliberate and safe, matching `attendance::upsert_from_sync`'s own
+/// reasoning: this data already passed that check on the device that
+/// originally wrote it; re-deriving it here would let a stale local
+/// section/learner row on THIS device silently reject a pull that is
+/// actually correct hub-side truth. `.claude/rules/architecture.md`: all
+/// SQL stays in Rust/this repository module, never in `sync_client`.
+pub fn upsert_from_sync(conn: &Connection, membership: &SectionMembership) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO section_memberships \
+             (id, school_id, section_id, learner_id, starts_on, ends_on, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+         ON CONFLICT(id) DO UPDATE SET \
+             school_id = excluded.school_id, \
+             section_id = excluded.section_id, \
+             learner_id = excluded.learner_id, \
+             starts_on = excluded.starts_on, \
+             ends_on = excluded.ends_on, \
+             created_at = excluded.created_at",
+        (
+            &membership.id,
+            &membership.school_id,
+            &membership.section_id,
+            &membership.learner_id,
+            &membership.starts_on,
+            &membership.ends_on,
+            &membership.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 fn row_to_membership(row: &rusqlite::Row) -> rusqlite::Result<SectionMembership> {
@@ -3205,6 +3260,101 @@ mod tests {
     }
 
     #[test]
+    fn dependent_records_stranded_ignores_a_forged_cross_school_grading_period() {
+        // Regression test for the ADR-0066 audit's tenant-isolation fix
+        // (`cr.school_id = ?2` / `gp.school_id = ?2` on the grades
+        // subquery) -- docs/VERIFICATION-DEBT.md flagged this specific
+        // hardening as having "no dedicated test" when it landed. Without
+        // those two predicates, a hand-forged `class_records` row
+        // belonging to *another* school, but reusing this school's real
+        // `section_id`, would be pooled into the grades-stranded check
+        // and could wrongly block an otherwise safe `end_membership` --
+        // an availability bug from a leaked cross-school JOIN, not a data
+        // leak, but exactly the bug class this fix closed.
+        //
+        // `class_record::create` itself validates every FK is in-school
+        // (a cross-school `section_id` can never arise through the app),
+        // so the forged row is inserted directly, matching the technique
+        // `class_record.rs`'s own `forge_cross_school_class_record` helper
+        // uses for the same audit.
+        let mut conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
+            .unwrap()
+            .unwrap();
+
+        // A second, unrelated school with its own real subject/grading
+        // period, then a hand-forged `class_records` row that belongs to
+        // that other school but whose `section_id` is hand-set to *this*
+        // school's real section -- the only way such a row could exist
+        // is a forged/corrupted row, which is exactly the threat model
+        // the audit targeted.
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_sub = subject::create(&conn, &other_school.id, "Science").unwrap();
+        let other_period = grading::create(
+            &conn,
+            &other_school.id,
+            "2026-2027",
+            TERM_1,
+            "2025-09-01",
+            "2025-10-01",
+        )
+        .unwrap()
+        .unwrap();
+        conn.execute(
+            "INSERT INTO class_records \
+                 (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
+             VALUES ('cr-forged-cross-school', ?1, ?2, ?3, ?4, ?5)",
+            (
+                &other_school.id,
+                &section_id,
+                &other_sub.id,
+                &other_period.id,
+                K10_POLICY,
+            ),
+        )
+        .unwrap();
+        let other_item = assessment_item::create(
+            &conn,
+            &other_school.id,
+            "cr-forged-cross-school",
+            WRITTEN_WORKS,
+            "Quiz 1",
+            10.0,
+        )
+        .unwrap()
+        .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
+        // The scored row itself is correctly attributed to *this* school
+        // (this school's own learner, scored by this school's own
+        // teacher) -- only the class-record/grading-period it hangs off
+        // of belong to the other school, which is the forged part.
+        conn.execute(
+            "INSERT INTO learner_scores \
+                 (id, school_id, assessment_item_id, learner_id, status, score, recorded_by_user_id) \
+             VALUES ('score-forged-cross-school', ?1, ?2, ?3, 'scored', 9.0, ?4)",
+            (&school_id, &other_item.id, &l.id, &teacher.id),
+        )
+        .unwrap();
+
+        // Ending this school's membership on 2025-08-15 would strand the
+        // forged score (its grading period, 2025-09-01..2025-10-01, starts
+        // after the resulting interval ends) *if* the grades subquery
+        // failed to scope `class_records`/`grading_periods` to this
+        // school. It must not: the class record and grading period belong
+        // to another school entirely, so the end must succeed cleanly.
+        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-15").unwrap();
+
+        assert!(
+            matches!(outcome, EndMembershipOutcome::Ended { .. }),
+            "a scored row hanging off another school's class_record/grading_period \
+             (even one reusing this school's section id) must never block this school's \
+             membership change: got {outcome:?}"
+        );
+    }
+
+    #[test]
     fn correct_same_day_placement_rejects_a_malformed_as_of_date() {
         let mut conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
@@ -3276,5 +3426,49 @@ mod tests {
             final_state[0].section_id == section_b.id || final_state[0].section_id == section_c.id,
             "the winner's section was applied"
         );
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_membership_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let incoming = SectionMembership {
+            id: Uuid::now_v7().to_string(),
+            school_id: school_id.clone(),
+            section_id: section_id.clone(),
+            learner_id: l.id.clone(),
+            starts_on: "2026-06-08".to_string(),
+            ends_on: None,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0], incoming);
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let placed = enroll(&conn, &school_id, &section_id, &l.id, "2026-06-08")
+            .unwrap()
+            .unwrap();
+
+        // Materializes a pulled "end" for the same membership id -- the row
+        // must be updated in place, not duplicated.
+        let ended = SectionMembership {
+            ends_on: Some("2026-09-15".to_string()),
+            ..placed.clone()
+        };
+        upsert_from_sync(&conn, &ended).unwrap();
+
+        let history = list_by_learner_in_school(&conn, &school_id, &l.id).unwrap();
+        assert_eq!(history.len(), 1, "must update in place, never duplicate");
+        assert_eq!(history[0], ended);
     }
 }

@@ -80,7 +80,7 @@ impl EntryStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectAttendanceSession {
     pub id: String,
@@ -95,6 +95,16 @@ pub struct SubjectAttendanceSession {
     pub updated_at: String,
 }
 
+/// Not `Deserialize` -- unlike `SubjectAttendanceSession`, entries are not
+/// wired to sync in this slice (see `upsert_session_from_sync`'s own doc
+/// comment for why: `subject_attendance_entries.session_id` is a `NOT
+/// NULL` foreign key, and `sync_version_cache`/`sync_outbox`/
+/// `sync_conflict_review`'s `entity_kind` `CHECK` constraint has exactly
+/// one reserved slot for this feature -- `'subject_attendance'` -- which
+/// this slice spends on the session, its own FK prerequisite, exactly
+/// mirroring why `Section` was wired before `Attendance`). A future slice
+/// that widens the `CHECK` constraint (a real schema migration) can wire
+/// entries next.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectAttendanceEntry {
@@ -429,6 +439,98 @@ pub fn mark_all_present(
         )?;
     }
     roster_for_session(conn, school_id, session_id)
+}
+
+/// ADR-0067/0069 sync materializer for a pulled `SubjectAttendanceSession`
+/// — exactly `section::upsert_from_sync`'s shape: `session` is already
+/// decrypted and authenticated, `sync_client::apply_decrypted_change` is
+/// responsible for having rejected a tampered payload before ever calling
+/// this. Deliberate `INSERT ... ON CONFLICT(id) DO UPDATE`, not a
+/// separate insert-or-update branch: a session this device has never seen
+/// locally and a stale local copy are the same write here, by design.
+/// Sessions are, in practice, create-only today — `open_or_get_session`/
+/// `mark_no_class` only ever `INSERT ... ON CONFLICT (teaching_assignment_id,
+/// session_date) DO NOTHING` (a `Held` session is never overwritten back to
+/// `NoClass` or vice versa once created) — but this still upserts keyed on
+/// the row's own stable `id` rather than insert-only, matching every other
+/// create-only entity's own `upsert_from_sync` in this codebase (e.g.
+/// `grading::upsert_from_sync`), so a future update path round-trips
+/// correctly without a second materializer needing to be written later.
+/// Bypasses `open_or_get_session`'s own `teaching_assignment_id` resolution
+/// check entirely — that validation already happened on the originating
+/// device before this row was ever encrypted and enqueued.
+pub fn upsert_session_from_sync(
+    conn: &Connection,
+    session: &SubjectAttendanceSession,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO subject_attendance_sessions \
+             (id, school_id, teaching_assignment_id, section_id, subject_id, session_date, \
+              status, created_by_user_id, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10) \
+         ON CONFLICT(id) DO UPDATE SET \
+             school_id = excluded.school_id, \
+             teaching_assignment_id = excluded.teaching_assignment_id, \
+             section_id = excluded.section_id, \
+             subject_id = excluded.subject_id, \
+             session_date = excluded.session_date, \
+             status = excluded.status, \
+             created_by_user_id = excluded.created_by_user_id, \
+             updated_at = excluded.updated_at",
+        (
+            &session.id,
+            &session.school_id,
+            &session.teaching_assignment_id,
+            &session.section_id,
+            &session.subject_id,
+            &session.session_date,
+            session.status.as_db_str(),
+            &session.created_by_user_id,
+            &session.created_at,
+            &session.updated_at,
+        ),
+    )?;
+    Ok(())
+}
+
+/// Read-only lookup of a session for one assignment on one exact date —
+/// unlike `open_or_get_session`, this never creates one. Used by "My Day"
+/// (`repository::my_day`) to distinguish "not opened yet today" from "opened
+/// today but nothing entered" without the side effect of implicitly opening
+/// a session merely by checking on it.
+pub fn find_session_for_assignment_on_date(
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    session_date: &str,
+) -> AppResult<Option<SubjectAttendanceSession>> {
+    if !is_iso_date(session_date) {
+        return Ok(None);
+    }
+    conn.query_row(
+        &format!(
+            "{SESSION_SELECT} WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND session_date = ?3"
+        ),
+        (school_id, teaching_assignment_id, session_date),
+        row_to_session,
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
+/// Count of recorded `subject_attendance_entries` rows for one session --
+/// used by "My Day" to tell "opened but nothing entered yet" from "at least
+/// one learner has been marked" without pulling the whole roster.
+pub fn count_entries_for_session(conn: &Connection, session_id: &str) -> AppResult<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM subject_attendance_entries WHERE session_id = ?1",
+        (session_id,),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
 }
 
 pub fn find_session_by_id_in_school(
@@ -1478,5 +1580,202 @@ mod tests {
                 .unwrap();
 
         assert!(overview.is_none());
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_returns_none_when_no_session_was_opened() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let result = find_session_for_assignment_on_date(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_never_creates_a_session_as_a_side_effect() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        find_session_for_assignment_on_date(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM subject_attendance_sessions",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0, "a read-only lookup must never open a session");
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_finds_an_already_opened_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let opened = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let found = find_session_for_assignment_on_date(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert_eq!(found, Some(opened));
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_never_leaks_a_different_schools_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap();
+        let other_school = school::create(&conn, "Another School").unwrap();
+
+        let result = find_session_for_assignment_on_date(
+            &conn,
+            &other_school.id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn count_entries_for_session_is_zero_for_a_freshly_opened_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let count = count_entries_for_session(&conn, &session.id).unwrap();
+
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn count_entries_for_session_counts_recorded_entries() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        record_entry(
+            &conn,
+            &f.school_id,
+            &session.id,
+            &f.membership_id,
+            EntryStatus::Present,
+            None,
+            &f.teacher_id,
+        )
+        .unwrap();
+
+        let count = count_entries_for_session(&conn, &session.id).unwrap();
+
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn upsert_session_from_sync_inserts_a_session_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment =
+            teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap();
+        let incoming = SubjectAttendanceSession {
+            id: Uuid::now_v7().to_string(),
+            school_id: f.school_id.clone(),
+            teaching_assignment_id: f.assignment_id.clone(),
+            section_id: assignment.section_id.clone(),
+            subject_id: assignment.subject_id.clone(),
+            session_date: "2026-08-29".to_string(),
+            status: SessionStatus::Held,
+            created_by_user_id: f.teacher_id.clone(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_session_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_session_by_id_in_school(&conn, &f.school_id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.session_date, "2026-08-29");
+        assert_eq!(found.status, SessionStatus::Held);
+        assert_eq!(found.section_id, assignment.section_id);
+    }
+
+    #[test]
+    fn upsert_session_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let original = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let updated = SubjectAttendanceSession {
+            status: SessionStatus::NoClass,
+            ..original.clone()
+        };
+
+        upsert_session_from_sync(&conn, &updated).unwrap();
+
+        let found = find_session_by_id_in_school(&conn, &f.school_id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.status, SessionStatus::NoClass);
+        let count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM subject_attendance_sessions",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "an upsert must never insert a second row");
     }
 }

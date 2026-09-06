@@ -46,7 +46,7 @@ impl LearnerScoreStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LearnerScore {
     pub id: String,
@@ -160,6 +160,49 @@ pub fn record(
     )
     .map(Some)
     .map_err(AppError::from)
+}
+
+/// ADR-0067/0069 sync wiring: applies a pulled `LearnerScore` row exactly
+/// the way `attendance::upsert_from_sync`/`section::upsert_from_sync` do --
+/// an `INSERT ... ON CONFLICT(id) DO UPDATE` keyed on the row's own stable
+/// `id` (the id minted once on the originating device by `record`'s
+/// `Uuid::now_v7()`), never on the `(assessment_item_id, learner_id)`
+/// unique constraint `record`'s own insert conflicts on. Not
+/// re-validating item/roster eligibility here is deliberate and safe, for
+/// the same reason `attendance::upsert_from_sync`'s doc comment gives:
+/// this data already passed that check on the device that originally
+/// called `record`; re-deriving it here would let a stale local
+/// roster/class-record row on THIS device silently reject a pull that is
+/// actually correct hub-side truth. `.claude/rules/architecture.md`: all
+/// SQL stays in Rust/this repository module, never in `sync_client`.
+pub fn upsert_from_sync(conn: &Connection, score: &LearnerScore) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO learner_scores \
+             (id, school_id, assessment_item_id, learner_id, status, score, \
+              recorded_by_user_id, recorded_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+         ON CONFLICT(id) DO UPDATE SET \
+             school_id = excluded.school_id, \
+             assessment_item_id = excluded.assessment_item_id, \
+             learner_id = excluded.learner_id, \
+             status = excluded.status, \
+             score = excluded.score, \
+             recorded_by_user_id = excluded.recorded_by_user_id, \
+             recorded_at = excluded.recorded_at, \
+             updated_at = excluded.updated_at",
+        (
+            &score.id,
+            &score.school_id,
+            &score.assessment_item_id,
+            &score.learner_id,
+            score.status.as_db_str(),
+            score.score,
+            &score.recorded_by_user_id,
+            &score.recorded_at,
+            &score.updated_at,
+        ),
+    )?;
+    Ok(())
 }
 
 /// The roster of learners eligible to be scored on `assessment_item_id`
@@ -526,6 +569,71 @@ mod tests {
         let result = roster_for_item(&conn, &school_b.id, &item_a).unwrap();
 
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_row_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let incoming = LearnerScore {
+            id: Uuid::now_v7().to_string(),
+            school_id: school_id.clone(),
+            assessment_item_id: item_id.clone(),
+            learner_id: learner_id.clone(),
+            status: LearnerScoreStatus::Scored,
+            score: Some(18.0),
+            recorded_by_user_id: teacher_id.clone(),
+            recorded_at: "2026-08-24T00:00:00.000Z".to_string(),
+            updated_at: "2026-08-24T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let stored: (String, Option<f64>) = conn
+            .query_row(
+                "SELECT status, score FROM learner_scores WHERE id = ?1",
+                [&incoming.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(stored, ("scored".to_string(), Some(18.0)));
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_by_id_not_by_the_assessment_learner_pair() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let recorded = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(10.0),
+            &teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let mut updated = recorded.clone();
+        updated.score = Some(15.0);
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM learner_scores", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "upsert must update the existing row, not duplicate it"
+        );
+        let stored_score: Option<f64> = conn
+            .query_row(
+                "SELECT score FROM learner_scores WHERE id = ?1",
+                [&recorded.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored_score, Some(15.0));
     }
 
     #[test]

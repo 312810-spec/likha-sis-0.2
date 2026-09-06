@@ -7,6 +7,7 @@ export type SignedInTab =
   | "section-adviser"
   | "schedule-meetings"
   | "sf1-import"
+  | "my-day"
   | "today-classes"
   | "attendance"
   | "subject-attendance"
@@ -16,8 +17,14 @@ export type SignedInTab =
   | "monthly-summary"
   | "grading-periods"
   | "class-records"
+  | "lesson-plans"
   | "audit-log"
-  | "admin-password-reset";
+  | "admin-password-reset"
+  | "school-members"
+  | "devices"
+  | "conflict-review"
+  | "sync-status"
+  | "school-branding";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -35,6 +42,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "section-adviser": "Section Adviser",
   "schedule-meetings": "Class Schedule",
   "sf1-import": "Import Learners (SF1)",
+  "my-day": "My Day",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
@@ -44,8 +52,14 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "monthly-summary": "Monthly Summary",
   "grading-periods": "Grading Periods",
   "class-records": "Class Records",
+  "lesson-plans": "Lesson Plans",
   "audit-log": "Sign-in Activity",
   "admin-password-reset": "Reset a Password",
+  "school-members": "School Members",
+  devices: "Devices",
+  "conflict-review": "Review Sync Conflicts",
+  "sync-status": "Sync Status",
+  "school-branding": "School Logo",
 };
 
 interface NavGroup {
@@ -69,7 +83,7 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
-    tabs: [tab("today-classes"), tab("attendance"), tab("subject-attendance")],
+    tabs: [tab("my-day"), tab("today-classes"), tab("attendance"), tab("subject-attendance")],
   },
   {
     label: "Class Overview",
@@ -89,8 +103,22 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     tabs: [tab("grading-periods"), tab("class-records")],
   },
   {
+    label: "Creation Studio",
+    tabs: [tab("lesson-plans")],
+  },
+  {
+    label: "Sync",
+    tabs: [tab("sync-status"), tab("conflict-review")],
+  },
+  {
     label: "Security",
-    tabs: [tab("audit-log"), tab("admin-password-reset")],
+    tabs: [
+      tab("audit-log"),
+      tab("admin-password-reset"),
+      tab("school-members"),
+      tab("devices"),
+      tab("school-branding"),
+    ],
   },
 ];
 

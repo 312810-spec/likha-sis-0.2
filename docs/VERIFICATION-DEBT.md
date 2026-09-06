@@ -1,5 +1,465 @@
 # Verification Debt
 
+## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
+
+`commands::section`'s three new `*_with_optional_sync` wrappers
+(`enroll_learner_membership`/`transfer_learner_membership`/
+`end_learner_membership`), `repository::section_membership::
+upsert_from_sync`, and the new `EntityKind::SectionMembership` arm in
+`sync_client::apply_decrypted_change` close the `SectionMembership` slot
+of ADR-0067/0069's entity rollout (see `docs/CURRENT-HANDOFF.md`'s
+matching entry for the full design rationale). As with the prior
+entity slices, no subagent-dispatch tool was available in this session
+to obtain the independent review `.claude/rules/security-privacy.md`
+requires for milestones touching persistence/sync. A rigorous
+self-review was performed instead, per this project's documented
+reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `SectionMembership` arm, matching every
+  other entity exactly.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, never re-derives or re-validates section/learner
+  eligibility (deliberate — that already ran on the originating device,
+  same reasoning as `attendance::upsert_from_sync`), and never deletes a
+  row (only closes it via `ends_on`) — covered by
+  `upsert_from_sync_inserts_a_membership_this_device_has_never_seen`/
+  `upsert_from_sync_updates_an_existing_row_in_place`.
+- Confirmed the conflict path is exercised for THIS entity specifically,
+  not merely assumed from the generic pattern:
+  `pull_once_stages_a_section_membership_conflict_when_this_device_has_an_unsynced_local_edit`
+  proves a `base_version` mismatch on a pending local edit routes to
+  `sync_conflict_review` and never touches the domain table or the
+  version cache — enrollment data never uses silent last-write-wins.
+- Confirmed each `*_with_optional_sync` wrapper enqueues ONLY on its
+  success outcome variant (`Enrolled`/`Ended`/`Transferred`) — every
+  rejection outcome (`AlreadyEnrolled`, `NotFound`, `NotCurrent`,
+  `MembershipNotFound`, `DestinationNotFound`, `SameSection`,
+  `InvalidEffectiveDate`/`InvalidStartDate`, `ZeroLengthInterval`,
+  `DependentRecordConflict`) enqueues nothing, covered by three
+  dedicated "a rejected write never enqueues" tests (one per verb).
+
+**Known, deliberate trade-offs (not defects, but real limitations)**,
+recorded rather than silently accepted:
+
+1. **Enqueue not atomic with the domain write.** Unlike
+   `Attendance`/`LearnerScore`/`Section` (one `SAVEPOINT` wraps both the
+   domain write and the outbox enqueue), the three
+   `SectionMembership` verbs each own an internal
+   `Connection::transaction()` for their own multi-step eligibility
+   checks, and rusqlite transactions do not nest inside an outer
+   `SAVEPOINT`. The enqueue call happens immediately after that
+   transaction has already committed, as a following step. A crash in
+   the narrow window between the domain commit and the enqueue commit
+   can leave a domain write that succeeded locally without a
+   corresponding outbox row — the change stays correct locally but does
+   not reach the hub until some other trigger re-syncs it (there isn't
+   one yet; this is genuinely a gap, not merely a delay). It can never
+   invert the failure mode (no enqueue for a write that didn't happen,
+   no wrong `base_version`). A future slice could close this by
+   converting `end_membership`/`transfer_membership`/`enroll_membership`
+   to the SAVEPOINT-based style `section_membership::enroll` already
+   uses (so an outer `SAVEPOINT` from the command layer could wrap both
+   steps), but that is a real refactor of the domain transaction
+   plumbing, out of scope for this slice.
+2. **Two of `SectionMembership`'s five write paths remain unwired.**
+   `section_membership::enroll` (the bulk create-and-place primitive
+   behind `enroll_learner_in_section`, used by CSV import via
+   `import::commit`) and `correct_same_day_placement` (the one-time
+   same-day data-entry fix) are not wired to sync at all — a
+   bulk-imported enrollment or a same-day correction stays purely local
+   on the device that made it until a future slice wires them. This
+   matches the existing precedent of bulk/import paths staying unwired
+   for other entities, but is recorded explicitly here since
+   `SectionMembership` uniquely has five distinct write paths where
+   every other entity has one or two.
+
+## Subject sync wiring (2026-09-06) — independent security review owed
+
+`commands::subject::create_subject`, `repository::subject::
+upsert_from_sync`, and the `EntityKind::Subject` arm in
+`sync_client::apply_decrypted_change` were added to close ADR-0067's
+next entity slot (see `docs/CURRENT-HANDOFF.md`'s matching entry for the
+full choice rationale and diff summary). As with the
+`AssessmentItem`/`LearnerScore` slices immediately before it, no
+subagent-dispatch tool (`Task`/agent launch, or a reachable
+`security-reviewer`) was available in this session to obtain the
+independent review `.claude/rules/security-privacy.md` requires. A
+rigorous self-review was performed instead, per this project's
+documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `Subject` arm, matching
+  Learner/Attendance/Section/LearnerScore/AssessmentItem exactly — no
+  cross-school pull can materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, deliberately bypasses `subjects`' own `UNIQUE (school_id,
+name)` constraint (that check already ran on the originating device),
+  and never mutates `created_at` on a re-applied pull (covered by
+  `upsert_from_sync_updates_an_existing_row_in_place`) — matching
+  `section::upsert_from_sync`'s/`assessment_item::upsert_from_sync`'s
+  established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`create_subject_with_optional_sync`) is enrollment-gated (`sspk` only
+  resolved via `resolve_sspk_if_enrolled`), atomic with the domain write
+  via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Section/LearnerScore/AssessmentItem, and never enqueues on a rejected
+  domain write (a duplicate `(school_id, name)` hitting `subjects`' own
+  `UNIQUE` constraint — covered by
+  `a_rejected_create_never_enqueues_an_outbox_row`).
+- Confirmed `create_subject`'s switch from `require_active_school_scope`
+  to `require_active_session` is the same strict superset already
+  reviewed for the `AssessmentItem` slice (the former is implemented in
+  terms of the latter, discarding only the `user_id`) — no authorization
+  semantics changed.
+- Confirmed the conflict-review path
+  (`pull_once_stages_a_subject_conflict_when_this_device_has_an_unsynced_local_edit`)
+  passes unmodified against the new entity kind, proving the generic
+  `pull_once` conflict-staging logic needed no `Subject`-specific
+  change.
+- No blocking issue found. Independent review remains owed for
+  `Subject` (alongside the still-owed `AssessmentItem`/`LearnerScore`
+  reviews from prior slices) — periodically retry per
+  `.claude/rules/autonomous-development.md`'s reviewer-failure rule when
+  a subagent-dispatch tool is available again.
+
+## AssessmentItem sync wiring (2026-09-06) — independent security review owed
+
+`commands::assessment_item::create_assessment_item`,
+`repository::assessment_item::upsert_from_sync`, and the
+`EntityKind::AssessmentItem` arm in `sync_client::apply_decrypted_change`
+were added to close ADR-0067's next entity slot (see
+`docs/CURRENT-HANDOFF.md`'s matching entry for the full choice rationale
+and diff summary). As with the `LearnerScore` slice immediately before
+it, no subagent-dispatch tool (`Task`/agent launch, or a reachable
+`security-reviewer`) was available in this session to obtain the
+independent review `.claude/rules/security-privacy.md` requires
+("Milestones touching auth, persistence, or sync get an independent
+security/reliability review"). A rigorous self-review was performed
+instead, per this project's documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `AssessmentItem` arm, matching
+  Learner/Attendance/Section/LearnerScore exactly — no cross-school pull
+  can materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, does not re-validate `category_id` leaf-ness or
+  `class_record_id` school scope (this data already passed those checks
+  on the originating device), and never mutates `created_at` on a
+  re-applied pull (covered by
+  `upsert_from_sync_updates_an_existing_row_in_place`) — matching
+  `section::upsert_from_sync`'s established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`create_assessment_item_with_optional_sync`) is enrollment-gated
+  (`sspk` only resolved via `resolve_sspk_if_enrolled`), atomic with the
+  domain write via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Section/LearnerScore, and never enqueues on a rejected domain write (a
+  cross-school `class_record_id` — covered by
+  `a_rejected_create_never_enqueues_an_outbox_row`).
+- Confirmed `create_assessment_item`'s switch from
+  `require_active_school_scope` to `require_active_session` is a
+  strict superset (the former is implemented in terms of the latter,
+  discarding only the `user_id`) — no authorization semantics changed,
+  only the actor id needed to attribute the sync change is now also
+  captured.
+- Confirmed `base_version` is unconditionally `0` (create-only wiring,
+  matching Learner/Section's precedent, not Attendance/LearnerScore's
+  re-recordable one) — correct because only `create` is wired to the
+  outbox in this slice; `rename`/`update`/`delete` remain unwired and
+  therefore cannot desynchronize a `base_version` this slice never reads.
+- No new PII surface: `AssessmentItem` carries no learner-identifying
+  fields (`id`/`school_id`/`class_record_id`/`category_id`/`name`/
+  `max_score`/`created_at` only).
+- Confirmed the existing conflict-review path is entity-agnostic
+  (`sync_client::pull_once`'s conflict-staging branch runs before
+  `apply_decrypted_change` is ever called, keyed only on
+  `(school_id, entity_kind, entity_id)` version comparison) — adding a
+  new `EntityKind` arm to the decrypt/apply `match` cannot affect it,
+  confirmed directly by
+  `pull_once_stages_an_assessment_item_conflict_when_this_device_has_an_unsynced_local_edit`.
+- No blocking issue found. A genuinely independent review of this diff
+  remains owed — retry when a reviewer subagent is reachable, alongside
+  the still-owed `LearnerScore` review below.
+
+## LearnerScore sync wiring (2026-09-05/06) — independent security review owed
+
+`commands::learner_score::record_learner_score`,
+`repository::learner_score::upsert_from_sync`, and the
+`EntityKind::LearnerScore` arm in `sync_client::apply_decrypted_change`
+were added to close ADR-0067's next entity slot (see
+`docs/CURRENT-HANDOFF.md`'s matching entry for the full choice
+rationale and diff summary). No subagent-dispatch tool (`Task`/agent
+launch) was reachable in this session to obtain the independent
+`security-reviewer` this class of change requires per
+`.claude/rules/security-privacy.md` ("Milestones touching auth,
+persistence, or sync get an independent security/reliability review").
+A rigorous self-review was performed instead, per this project's
+documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id`
+  → reject) is present in the new `LearnerScore` arm, matching
+  Learner/Attendance/Section exactly — no cross-school pull can
+  materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id` (not the `(assessment_item_id, learner_id)` unique
+  constraint `record`'s own insert conflicts on), matching
+  `attendance::upsert_from_sync`'s established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`record_learner_score_with_optional_sync`) is enrollment-gated
+  (`sspk` only resolved via `resolve_sspk_if_enrolled`), atomic with the
+  domain write via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Attendance/Section, and never enqueues on a rejected domain write (a
+  score above `max_score`, an ineligible learner, etc. — covered by
+  `a_rejected_score_never_enqueues_an_outbox_row`).
+- Confirmed `base_version` is read from `sync_version_cache` (not
+  hardcoded `0`), matching Attendance's re-recordable-entity precedent,
+  not Learner/Section's create-only precedent.
+- No new PII surface: `LearnerScore` carries no learner-identifying
+  fields beyond the existing `learner_id`/`recorded_by_user_id`
+  references already present in the unwired struct.
+- No blocking issue found. A genuinely independent review of this diff
+  remains owed — retry when a reviewer subagent is reachable.
+
+**Verified this session (real output)**: `cargo test` (full crate,
+including the new `repository::learner_score::tests::upsert_from_sync_*`,
+`commands::learner_score::tests::*`, and
+`sync_client::tests::*_learner_score_*` tests) — 864 lib tests passing
+0 failed (rerun clean after `cargo fmt`), all integration test binaries
+passing, 0 doctests (none exist in this crate). `cargo clippy
+--all-targets -- -D warnings` — clean. `cargo fmt --check` — clean
+(after one `cargo fmt` pass fixing this slice's own formatting drift).
+`npm run quality:security` — gitleaks/`cargo deny check`/OSV-Scanner:
+3 ok, 0 failed, 0 missing. `npm run quality`/`quality:ui` (TS/UI layers)
+were not run — this slice touched only the Rust repository, command,
+and `sync_client` layers, no TS/UI files.
+
+**A real environment hazard hit and resolved this session**: the shared
+host repeatedly hit "No space left on device" from concurrent
+`cargo build`/`cargo test` activity in a second, unrelated worktree
+building at the same time (that worktree has since been removed by its
+own session). Resolved each time by `cargo clean` scoped to this
+worktree's own `src-tauri/target` (never touching the other worktree's
+or the main checkout's target dirs) and, twice, by clearing genuinely
+disposable shared caches unrelated to any worktree's own build state
+(`npm cache clean --force`, `/root/.cache/uv`, `/root/.cache/osv-scalibr`,
+`/root/.cargo/registry/cache` — all safely regenerable, none of them
+project source or another session's in-progress build output). Recorded
+here per this task's own guidance that this is a known host-sharing
+hazard, not a code defect.
+
+## Stale outbox `base_version` after "keep local" (2026-09-05) — CLOSED
+
+**Closed.** Item 3 of the conflict-review screen entry below (the
+"keep local" resolution leaving a still-pending `sync_outbox` entry's
+`base_version` stale) is fixed: `resolve_conflict_review`'s `KeepLocal`
+branch now calls the new
+`repository::sync_outbox::correct_base_version_for_entity` before
+`sync_conflict_review::mark_resolved`, advancing the matching pending
+outbox row's `base_version` to `current_hub_version`. Covered by
+`repository::sync_outbox::tests::correct_base_version_for_entity_*`
+(update/no-op/school-scoping) and
+`commands::conflict_review::tests::keeping_local_corrects_the_pending_outbox_entry_so_the_next_push_is_accepted`
+(end-to-end: stale outbox row → resolve keep-local → corrected push is
+`Accepted`, not `ConflictStaged`), plus a regression test
+(`using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched`)
+proving the `UseIncoming` path is unaffected. Verified this session:
+`cargo test` (full crate, 845 lib tests + this module's, all passing),
+`cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+(clean), `npm run quality:security` (gitleaks/cargo-deny/osv-scanner,
+all OK). `npm run quality`/`quality:ui` (TS/UI layers) were not touched
+by this fix and were not re-run — this was a pure Rust repository/
+command-layer change.
+
+## Sync-status screen (2026-09-05) — independent review, native accessibility pass, and a whole-crate `cargo test` re-run owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/SyncStatusScreen.tsx` +
+`src-tauri/src/commands/sync_status.rs` + supporting repository/TS
+layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and conflict-review
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked. No blocking issue was found, but a
+   genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Whole-crate `cargo test` did not run to completion this session.**
+   Multiple parallel worktree agents shared this box's filesystem and
+   repeatedly drove it to `No space left on device` mid-compile (`df -h
+/` observed at ~99–100% used more than once) — an environment-resource
+   condition, not a code defect. What DID run clean: every targeted new
+   test (`sync_outbox::`, `sync_pull_cursor::`, `commands::sync_status::`
+   — 10 tests, all passing), and `cargo clippy --all-targets -- -D
+warnings` across the whole workspace including every test target
+   (zero warnings) once brief headroom existed. Re-run plain `cargo
+test` once the shared box has stable free disk space, per
+   `.claude/rules/testing.md`'s own "still run plain `cargo test` at
+   least once" stable-checkpoint requirement.
+
+## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/ConflictReviewScreen.tsx` + its supporting
+Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session
+   (same recurring gap as the device-management and device-sync-command
+   slices before it). A rigorous self-review was performed instead per
+   this project's documented fallback — see the handoff entry for
+   exactly what was checked, including one real gap found and fixed
+   during self-review (a non-blocking `aria-disabled` button that could
+   still be clicked). No other blocking issue was found, but a genuinely
+   independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **CLOSED (2026-09-05).** "Keep local" leaving the stale outbox
+   `base_version` uncorrected — see the "Stale outbox `base_version`
+   after 'keep local'" entry at the top of this file for the fix and
+   its verification.
+
+## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
+owed from this slice (`src/ui/DeviceManagementScreen.tsx` + its
+supporting Rust/TS layers):
+
+1. **Independent `teacher-ux-reviewer`/`accessibility-reviewer` review
+   not obtained.** No subagent-dispatch tool was reachable this session.
+   A rigorous self-review was performed instead per this project's
+   documented fallback (see the handoff entry for exactly what was
+   checked: plain-language destructive-action copy, enumeration-safe
+   generic failure message, `expectNoAccessibilityViolations` in both the
+   closed and mid-confirmation states). No blocking issue was found, but
+   a genuinely independent review of this diff remains owed.
+2. **Native NVDA/Narrator pass on the rendered Tauri binary not
+   performed.** This sandboxed environment has no browser/screenshot
+   tool for the compiled app. Automated axe-core results (structural
+   only) are not a substitute — see `.claude/rules/testing.md`.
+3. **Focus-management gap, knowingly retained.** Opening the inline
+   "Remove device" confirmation panel does not move keyboard focus into
+   it — a keyboard/screen-reader user must continue tabbing forward from
+   the "Remove device" button to reach "Cancel"/"Yes, remove this
+   device," rather than focus landing there automatically the way a true
+   modal dialog would. No modal/dialog primitive exists yet in this
+   codebase (`src/ui/components/`) to reuse, and building one was judged
+   out of scope for a single-screen slice. Revisit if/when this codebase
+   gains a shared dialog component, or sooner if the native accessibility
+   pass above flags it as a real problem in practice.
+
+## Device sync enrollment/revocation Tauri commands (2026-09-05) — independent review + TS quality gate owed
+
+Two items owed from this slice (`docs/CURRENT-HANDOFF.md`'s matching
+entry has full detail):
+
+1. **Independent security review not obtained.** A `security-reviewer`
+   subagent dispatch was attempted for `src-tauri/src/commands/device_sync.rs`
+   — exactly the class of authorization/credential-management command
+   surface this project previously found a real bug in (ADR-0004's
+   unauthenticated-bootstrap incident) — and was unreachable this
+   session, the same known reviewer-harness gap recorded against the
+   three prior ADR-0067/0069 slices below. A rigorous self-review was
+   performed instead per this project's documented fallback: confirmed
+   `school_id` is never a client-supplied parameter on the revoke
+   command (derived only from the active session inside
+   `auth::revoke_device_sync_credential`'s own
+   `require_active_session` check) and is re-verified server-side on the
+   enroll command (`is_member_of_school`, matching `login`'s established
+   credential-based bootstrap shape from ADR-0004); confirmed the revoke
+   command calls the rotating `revoke_device_sync_credential_and_rotate_sspk`
+   wrapper exclusively, never the raw non-rotating function; added a new
+   end-to-end test proving the SSPK genuinely differs after rotation,
+   invoked through the command's own call shape rather than the
+   underlying `auth::*` function directly. No blocking issue was found,
+   but a genuinely independent review of this diff remains owed. Retry
+   when a reviewer harness/subagent is confirmed healthy.
+2. **`npm run quality` (TS typecheck/lint/format/architecture/knip/vitest)
+   could not be run this session.** `node_modules` was empty (0
+   packages) in this environment — unrelated to this change, which
+   touched only `src-tauri/**` and `docs/**`, no TypeScript. Run it
+   before the next TS-touching slice ships, and ideally once here too
+   once `npm install` is available, to confirm no incidental drift.
+
+## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
+
+Owed from this slice (ADR-0069's newest addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail): no
+`security-reviewer` subagent was reachable in this session's toolset
+(same gap as the two prior ADR-0069 addenda). A rigorous self-review was
+performed instead per this project's documented reviewer-failure
+fallback, covering the new `GET /sync/payload-key-wrap` endpoint's
+credential-scoping, the fail-closed behavior on a missing wrap row or a
+rejected decrypted payload, and the `school_id` cross-check in
+`sync_client::apply_decrypted_change`. No blocking issue was found, but a
+genuinely independent review of this change (`hub_server`'s new
+endpoint, `repository::sync_payload_key::get_wrap_for_credential`,
+`sync_client::resolve_sspk`/`apply_decrypted_change`,
+`repository::learner::upsert_from_sync`) remains owed. Retry when a
+reviewer harness/subagent is confirmed healthy.
+
+## Payload-key rotation on device revocation (2026-09-05) — independent review + native DPAPI verification owed
+
+Three items owed from this slice (ADR-0069's rotation addendum,
+`docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
+
+1. **Independent security review not obtained.** No `security-reviewer`
+   subagent tool was available in this session's toolset, and the
+   project's `security-review` skill could not run (its scripted `git
+diff origin/HEAD...` precondition fails in this sandbox — the ref does
+   not resolve here). A rigorous self-review was performed instead per
+   this project's documented fallback, but a genuinely independent review
+   of `repository::sync_payload_key::{rotate_for_school,
+ensure_wrapped_for_credential}`, `auth::revoke_device_sync_credential`'s
+   new rotation call, and `hub_server::authenticate`'s new lazy-rewrap
+   call site remains owed. Retry when a reviewer harness/subagent is
+   confirmed healthy.
+2. **`db::rotate_sspk` does not exist yet** — see this same gap recorded
+   in `docs/CURRENT-HANDOFF.md`'s "Exact next task". Until it exists and
+   is wired into the revocation path, a live revocation clears the
+   database-side wraps (real, tested) but does not yet produce a genuinely
+   new plaintext SSPK for devices to re-wrap against.
+3. **Native Windows DPAPI verification**, once `db::rotate_sspk` exists:
+   this sandboxed Linux environment cannot exercise `DpapiKeyStore` at
+   all (same pre-existing limitation `load_or_mint_sspk` itself already
+   carries — see that function's own doc comment) — a real overwrite/
+   reload round trip of `SSPK_KEY_FILE_NAME` on Windows has never been
+   demonstrated and cannot be demonstrated here.
+
+## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session — CLOSED same session
+
+Adding `reqwest` as a direct dependency for `sync_client` (ADR-0067) is
+exactly the kind of change `.claude/rules/testing.md` says should get a
+`npm run quality:security` pass before being considered complete. That
+check initially could not run in this sandboxed session: `gitleaks`,
+`cargo-deny`, and `osv-scanner` were all missing from `PATH` (`scripts/
+check-security.mjs` first reported "0 ok, 0 failed, 3 missing").
+
+**Closed later in the same session**: all three tools were installed and
+run for real, not assumed. `osv-scanner` v2.5.1 and `gitleaks` v8.30.1
+were downloaded as official prebuilt binaries and their SHA-256 checksums
+independently verified against the values already recorded in
+`docs/SOURCE-REGISTRY.md` before use (both matched exactly). `cargo-deny`
+v0.20.2 was built from source via `cargo install cargo-deny --locked`
+(~3.5 min). Re-running `npm run quality:security` then reported
+**"3 ok, 0 failed, 0 missing"**: `gitleaks` — 101 commits scanned, ~25.5 MB,
+no leaks found; `cargo-deny` — advisories/bans/licenses/sources all ok
+(directly covers the new `reqwest` dependency and its tree); `osv-scanner`
+— 585 crates.io + 341 npm packages scanned, all 18 known advisories
+matched this repository's own pre-existing, already-justified ignore
+entries in `src-tauri/deny.toml` (unmaintained GTK3/`unic-*`/
+`proc-macro-error` transitive Tauri-Linux deps), "No issues found" —
+`reqwest` itself not flagged at all. Combined with `cargo test`/`cargo
+clippy`/`cargo fmt --check` (see `docs/CURRENT-HANDOFF.md`'s matching
+entry), this dependency addition is now fully cleared, not merely
+recorded as an open gap.
+
 ## Grade 12 DO 8 carryover grading policies (2026-09-04) — Rust gate CLOSED 2026-09-05
 
 Migration 30 and repository tests cover the five Grade 12 legacy-SHS
@@ -158,6 +618,32 @@ Full findings: `docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-
 existing transfer/end tests) — recorded so a reviewer knows it was
 deliberate.
 
+**CLOSED (2026-09-06)**: added a dedicated regression test,
+`section_membership::tests::dependent_records_stranded_ignores_a_forged_cross_school_grading_period`,
+reproducing the exact scenario the `cr.school_id = ?2` / `gp.school_id =
+?2` predicates guard against — a hand-forged `class_records` row
+belonging to another school but reusing this school's real `section_id`
+(the technique `class_record.rs`'s own `forge_cross_school_class_record`
+uses for the same audit). Confirmed GREEN with the fix in place in two
+separate isolated `cargo test --lib` runs. A RED check (temporarily
+reverting the two predicates to confirm the test actually fails without
+them) was attempted but blocked mid-session by this session's own
+auto-mode classifier before it could run, so the fix was restored
+unexercised in the reverted state — by inspection the reverted query
+would match the forged row (identical `cr.section_id`, no school
+constraint) and the resulting `EndMembershipOutcome::DependentRecordConflict`
+would fail the assertion, but this was not run for real; treat the RED
+side as reasoned, not proven. `cargo fmt --check` and
+`cargo clippy --all-targets -- -D warnings` both ran clean on the full
+crate. A full `cargo test` (every integration binary) could not be
+completed this session: this shared runner hit severe, repeated
+`No space left on device` failures from other concurrent sessions'
+builds (confirmed via `ps`/`df` — not caused by this change, which
+touches only this one test function and this one doc), even after
+`cargo clean`-ing this worktree's own `target/` twice. Owed: one full
+`cargo test` pass on a quieter runner to confirm no incidental
+regression elsewhere in the crate.
+
 ## `quality:ui` smoke green again after the UI-redesign merge — CLOSED (2026-09-03)
 
 Branch `claude/fix-ui-smoke-redesigned-nav` off `main` at `860cede`.
@@ -185,6 +671,27 @@ pass across the redesigned surface (Wave 1 entry below); and
 which only works while `TeacherWorkspaceScreen` keeps its
 `<section aria-label="Workspace">` — it will need updating when the
 accepted-backlog work deletes that screen and rebuilds Home on `Page`.
+
+**Re-checked 2026-09-06**: confirmed this is still accurate, not stale.
+`TeacherWorkspaceScreen.tsx` line 256 still renders
+`<section aria-label="Workspace">` unchanged (`HomeScreen.tsx` still
+composes it directly), so `ui-smoke.mjs` line 42's
+`page.getByRole("region", { name: "Workspace" })` is not currently
+brittle — it targets a live selector, and the "accepted-backlog work"
+that would delete `TeacherWorkspaceScreen` has not landed. Re-ran the
+whole script this session (`node scripts/ui-smoke.mjs`, after installing
+the missing `chromium_headless_shell-1237` binary via
+`npx playwright install chromium-headless-shell` — not present in this
+worktree's environment beforehand): **PASS** — `quality:ui PASS —
+workflow, enrollment history, phone reflow, context handoff, and axe
+WCAG A/AA (0 non-blocking findings).` No code change made: the
+fragility is a documented forward-looking coupling to
+`TeacherWorkspaceScreen`'s markup, not a present bug, and speculatively
+rewriting the selector now (e.g. to something that wouldn't need
+updating post-deletion) without seeing the actual replacement Home
+markup would be guessing at an interface that doesn't exist yet. Revisit
+when the `TeacherWorkspaceScreen`-deletion/Home-on-`Page` rebuild
+actually starts — update this selector in that same slice, not before.
 
 ## Section-membership readers `l.school_id` JOIN predicate — CLOSED, independently reviewed (2026-09-03)
 
@@ -249,9 +756,9 @@ Full findings file: `docs/security-reviews/2026-09-03-section-membership-l-schoo
 ## Wave 1 UI redesign shell (2026-09-03)
 
 The new sidebar shell (`src/ui/shell/{AppLayout,Sidebar,TopBar,BottomNav}.tsx`),
-its phone-width drawer focus-trap, and the phone bottom nav have **jsdom
+its phone-width drawer focus-trap, and the phone bottom nav have \*\*jsdom
 
-- axe (`expectNoAccessibilityViolations`) coverage only** so far. A
+- axe (`expectNoAccessibilityViolations`) coverage only\*\* so far. A
   native NVDA/Narrator + compiled-binary visual pass is owed — is the
   persistent sidebar readable and comfortable, does the drawer trap and
   return focus correctly under a real screen reader, is the bottom-nav
@@ -539,6 +1046,19 @@ long it ran, whether `run_in_background` or a manual `ScheduleWakeup`
 was used) to file upstream, or if it starts blocking a wave's
 verification step.
 
+**Re-checked 2026-09-06**: no new reproduction, no root-cause evidence
+found in this repository — there is nothing in `docs/`, ADRs, or
+`.claude/` to investigate further from inside the repo, because the
+mechanism in question (the scheduled-wakeup/timer delivery path) lives
+in the hosting platform, not in LIKHA's own source. This session used
+`run_in_background`-style waits for its own long-running commands
+(`npx playwright install`, the `ui-smoke.mjs` run) rather than a
+manually-scheduled timer, consistent with the recorded mitigation, and
+did not hit the failure mode described. Status unchanged: **open,
+unresolved, outside this repository's fix surface** — not stale, not
+resolved, nothing to correct. Continues to be tracked here only so a
+future session with a concrete reproduction has somewhere to record it.
+
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
 Real browser-rendered Playwright verification of the Section Adviser
@@ -568,6 +1088,63 @@ scope-crept into this slice. Also still unwired in dev-preview: Subject
 Attendance, Subject Monitor, Teacher Load, Teaching Assignments,
 Schedule Meetings, SF1 Import — tracked here as retained debt, not
 assumed covered by this session's work.
+
+## Dev-preview fixture coverage for Adviser View / Subject Attendance / Subject Monitor / Teacher Load / Teaching Assignments / Schedule Meetings — closed (2026-09-06)
+
+Six of the seven gaps recorded immediately above are now closed,
+following the exact existing dev-preview fixture pattern (a `Fixture*Repository`
+class in `src/dev-preview/fixtures.ts` implementing the same port
+production's `TauriXRepository` classes do, constructed once at module
+scope in `src/dev-preview/DevPreviewApp.tsx` and passed into the real
+screen component — no new fixture mechanism invented):
+
+- Added `FixtureTeachingAssignmentRepository` (`TeachingAssignmentRepository`
+  port) — seeds three teaching assignments (`teacher-ana` teaches Mabini/
+  Mathematics and Rizal/Science; `teacher-bayani` teaches Bonifacio/MAPEH
+  with no schedule yet, covering the "0 weekly instructional minutes"/
+  empty-schedule state) and two weekly meetings, with genuinely mutable
+  `create`/`remove`/`createMeeting`/`removeMeeting` (including the same
+  teacher/section/room conflict and duplicate detection the real backend
+  enforces) and a derived `getLoad`.
+- Added `FixtureSubjectAttendanceRepository` (`SubjectAttendanceRepository`
+  port) — seeds held/no-class sessions for `ta-1` with a genuine
+  consecutive-absence streak for one learner (so Subject Monitor has a
+  real streak to show) and a `no_class` day (so Subject Attendance's own
+  no-class state is reachable), plus `listAdviserViewSections`/
+  `adviserOverview` built from the same seeded data and the existing
+  Section Adviser fixture's advisory (`teacher-ana` advises
+  `sec-not-started`) so Adviser View, Subject Attendance, Subject
+  Monitor, and Teacher Load all agree on who "my" refers to.
+- Wired `src/dev-preview/DevPreviewApp.tsx`'s `subject-attendance`,
+  `subject-monitor`, `adviser-view`, and `teacher-load` sidebar
+  destinations (previously falling through to the unwired-destination
+  message) to the real `SubjectAttendanceScreen`/`SubjectMonitorScreen`/
+  `AdviserViewScreen`/`TeacherLoadScreen`, and `sections`' "Manage
+  assignments" action through new `teaching-assignments` and
+  `schedule-meetings` tabs to the real `TeachingAssignmentsScreen`/
+  `ScheduleMeetingsScreen`.
+- Verified via `src/dev-preview/DevPreviewApp.render.test.tsx` (new) —
+  a Testing-Library render of `DevPreviewApp` that clicks through the
+  sidebar/Sections handoff to each of the six destinations and asserts
+  the real screen's own heading renders — proving the fixtures actually
+  load through the full service→port→screen chain, not just typecheck.
+  `npm run test`: 951/951 passed (was 946); `npm run typecheck`,
+  `eslint .`, and `prettier --check .` all clean.
+
+**Not closed by this session**: SF1 Import (`Sf1ImportScreen`) remains
+unwired. Its `Sf1ImportApplicationService` needs both an
+`Sf1ImportRepository` fixture (preview/commit/history — feasible) and a
+`FilePicker` fixture (`pickWorkbookFile`) — but this dev-preview is a
+plain browser page with no real OS file dialog to stand in for, so a
+fixture `FilePicker` can only ever return a synthetic, hard-coded path,
+never let a person actually choose a file the way every other screen in
+this fixture lets them genuinely interact with real (fixture) state.
+That's a materially different, weaker kind of "fixture coverage" than
+the other six gaps just closed, and was deliberately not rushed into
+this session. Retained as debt for a future session to design
+deliberately (e.g. a fixture `FilePicker` that offers a small fixed
+menu of synthetic "files" to pick from, each mapped to a canned
+`Sf1ImportPreview`).
 
 ## Wave 3E/3F/3G individual review debt — closed (2026-08-31)
 

@@ -18,10 +18,14 @@ const session: CurrentSession = {
   roles: ["teacher"],
 };
 
-function renderSidebar(activeTab: SignedInTab = "attendance", onNavigate = vi.fn()) {
+function renderSidebar(
+  activeTab: SignedInTab = "attendance",
+  onNavigate = vi.fn(),
+  logoUrl: string | null = null,
+) {
   return render(
     <ModeProvider>
-      <Sidebar session={session} activeTab={activeTab} onNavigate={onNavigate} />
+      <Sidebar session={session} activeTab={activeTab} onNavigate={onNavigate} logoUrl={logoUrl} />
     </ModeProvider>,
   );
 }
@@ -30,6 +34,17 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => window.localStorage.clear());
 
 describe("Sidebar", () => {
+  it("renders no logo image by default (no logo uploaded)", () => {
+    const { container } = renderSidebar();
+    expect(container.querySelector(".app-sidebar-logo")).not.toBeInTheDocument();
+  });
+
+  it("renders the school logo when logoUrl is provided", () => {
+    const { container } = renderSidebar("attendance", vi.fn(), "blob:mock-logo");
+    const img = container.querySelector(".app-sidebar-logo");
+    expect(img).toHaveAttribute("src", "blob:mock-logo");
+  });
+
   it("renders the brand, signed-in identity, pinned Home, and navigation groups", () => {
     renderSidebar();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();

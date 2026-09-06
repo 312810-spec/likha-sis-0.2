@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { SchoolLogoApplicationService } from "../../application/school-logo-service";
 import type { CurrentSession } from "../../domain/session";
 import type { SignedInTab } from "../components/workbench-nav-data";
 import { BottomNav } from "./BottomNav";
@@ -10,6 +11,12 @@ interface AppLayoutProps {
   activeTab: SignedInTab;
   onNavigate: (tab: SignedInTab) => void;
   onLogout: () => void;
+  /** In-app school branding (2026-09-06): fetched once here so both
+   * `Sidebar` and `TopBar` can show the same logo without each making
+   * its own request. Absent from any test that constructs `AppLayout`
+   * without it -- no logo renders, matching "school has no logo yet"
+   * behavior, not an error. */
+  schoolLogoService?: SchoolLogoApplicationService;
   children: ReactNode;
 }
 
@@ -18,8 +25,39 @@ const FOCUSABLE =
 
 const PHONE_QUERY = "(max-width: 860px)";
 
-export function AppLayout({ session, activeTab, onNavigate, onLogout, children }: AppLayoutProps) {
+export function AppLayout({
+  session,
+  activeTab,
+  onNavigate,
+  onLogout,
+  schoolLogoService,
+  children,
+}: AppLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!schoolLogoService) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    schoolLogoService
+      .getLogo()
+      .then((logo) => {
+        if (cancelled || !logo) return;
+        objectUrl = URL.createObjectURL(
+          new Blob([Uint8Array.from(logo.bytes)], { type: logo.mime }),
+        );
+        setLogoUrl(objectUrl);
+      })
+      .catch(() => {
+        // No logo, or it could not be fetched -- the shell falls back
+        // to its text-only identity, same as "no logo uploaded yet."
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [schoolLogoService]);
   const [isPhone, setIsPhone] = useState(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
     return window.matchMedia(PHONE_QUERY).matches;
@@ -121,7 +159,7 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
         inert={sidebarInert}
         aria-hidden={sidebarInert || undefined}
       >
-        <Sidebar session={session} activeTab={activeTab} onNavigate={navigate} />
+        <Sidebar session={session} activeTab={activeTab} onNavigate={navigate} logoUrl={logoUrl} />
       </div>
       <div className="app-layout-main" inert={mainInert} aria-hidden={mainInert || undefined}>
         <TopBar
@@ -129,6 +167,7 @@ export function AppLayout({ session, activeTab, onNavigate, onLogout, children }
           activeTab={activeTab}
           onLogout={onLogout}
           onOpenDrawer={() => setDrawerOpen(true)}
+          logoUrl={logoUrl}
         />
         <main id="main-content" tabIndex={-1} className="app-canvas">
           {children}

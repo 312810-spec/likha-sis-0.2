@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::auth;
 use crate::error::{AppError, AppResult};
+use crate::repository::role;
 
 /// A teacher's LIKHA identity. Never carries the password hash — see
 /// `verify_credentials` for the only place that touches it.
@@ -250,6 +251,44 @@ pub fn is_exclusively_member_of_school(
         |row| row.get(0),
     )?;
     Ok(eligible != 0)
+}
+
+/// Revokes `user_id`'s membership in `school_id`. Cascades (via
+/// `user_school_roles`'s `ON DELETE CASCADE` FK on the
+/// `(user_id, school_id)` composite, migration 16) to remove every role
+/// they held there -- but deliberately leaves everything they authored
+/// untouched: `audit_log`, `teaching_assignment`, learner records, etc.
+/// all reference `user_id` directly (never the membership row), so this
+/// revokes future access only and never scrubs history. Existing
+/// sessions in `school_id` are not touched here -- `commands::user::
+/// remove_school_member` revokes them explicitly, matching
+/// `auth::admin_reset_teacher_password`'s established "effective
+/// immediately" pattern.
+///
+/// Refuses -- returns `Ok(false)`, not an error, the same
+/// enumeration-safety shape `admin_reset_teacher_password` already uses
+/// for its own refusal cases -- when removing this membership would
+/// leave `school_id` with zero School Heads. The app has no recovery
+/// flow for a school with no School Head (no UI to grant the role to
+/// anyone else once nobody holds `ManageSchoolMembership`), so this must
+/// fail closed rather than rely on the UI to warn. A no-op (never
+/// triggers) for a member who never held the School Head role there.
+pub fn remove_school_membership(
+    conn: &Connection,
+    user_id: &str,
+    school_id: &str,
+) -> AppResult<bool> {
+    if role::has_any_role(conn, user_id, school_id, &[role::SCHOOL_HEAD])?
+        && role::count_holders(conn, school_id, role::SCHOOL_HEAD)? <= 1
+    {
+        return Ok(false);
+    }
+
+    let removed = conn.execute(
+        "DELETE FROM user_school_memberships WHERE user_id = ?1 AND school_id = ?2",
+        (user_id, school_id),
+    )?;
+    Ok(removed == 1)
 }
 
 /// True once at least one user account exists. Used to gate the
@@ -707,6 +746,146 @@ mod tests {
 
         assert_eq!(members.len(), 1);
         assert!(members[0].roles.is_empty());
+    }
+
+    #[test]
+    fn remove_school_membership_revokes_membership_and_cascades_role_grants() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        // Two School Heads so removing one never trips the last-head guard.
+        let head_a =
+            create_user(&conn, "corazon.santos", "password12345", "Corazon Santos").unwrap();
+        add_school_membership(&conn, &head_a.id, &s.id).unwrap();
+        role::grant(&conn, &head_a.id, &s.id, role::SCHOOL_HEAD).unwrap();
+        let head_b = create_user(&conn, "bo.reyes", "password12345", "Bo Reyes").unwrap();
+        add_school_membership(&conn, &head_b.id, &s.id).unwrap();
+        role::grant(&conn, &head_b.id, &s.id, role::SCHOOL_HEAD).unwrap();
+        let teacher = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+        add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        role::grant(&conn, &teacher.id, &s.id, role::TEACHER).unwrap();
+
+        let removed = remove_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        assert!(removed);
+        assert!(!is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+        assert!(
+            role::list_roles(&conn, &teacher.id, &s.id)
+                .unwrap()
+                .is_empty(),
+            "the FK cascade must also remove the member's role grants in that school"
+        );
+    }
+
+    #[test]
+    fn remove_school_membership_leaves_the_removed_members_own_records_untouched() {
+        // Removing membership must revoke future access only, never scrub
+        // history -- this test proves it against `audit_log`, the one
+        // table this codebase already attributes to a user by id
+        // independent of `user_school_memberships`.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head = create_user(&conn, "corazon.santos", "password12345", "Corazon Santos").unwrap();
+        add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role::grant(&conn, &head.id, &s.id, role::SCHOOL_HEAD).unwrap();
+        let teacher = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+        add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        role::grant(&conn, &teacher.id, &s.id, role::TEACHER).unwrap();
+        crate::repository::audit_log::record(
+            &conn,
+            &s.id,
+            Some(&teacher.id),
+            &teacher.username,
+            crate::repository::audit_log::AuditEventType::LoginSuccess,
+        )
+        .unwrap();
+
+        remove_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        let entries = crate::repository::audit_log::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(
+            entries.len(),
+            1,
+            "the removed member's prior audit history must survive the removal"
+        );
+        assert_eq!(entries[0].username, "ana.cruz");
+        // The user account itself also survives -- only the membership row
+        // (and its cascaded role grants) is gone.
+        assert!(find_by_id(&conn, &teacher.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn remove_school_membership_refuses_to_strip_the_last_school_head() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head = create_user(&conn, "corazon.santos", "password12345", "Corazon Santos").unwrap();
+        add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role::grant(&conn, &head.id, &s.id, role::SCHOOL_HEAD).unwrap();
+
+        let removed = remove_school_membership(&conn, &head.id, &s.id).unwrap();
+
+        assert!(
+            !removed,
+            "removing the sole School Head must be refused, not silently allowed"
+        );
+        assert!(
+            is_member_of_school(&conn, &head.id, &s.id).unwrap(),
+            "the refused removal must leave the membership intact"
+        );
+    }
+
+    #[test]
+    fn remove_school_membership_allows_removing_one_of_several_school_heads() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head_a =
+            create_user(&conn, "corazon.santos", "password12345", "Corazon Santos").unwrap();
+        add_school_membership(&conn, &head_a.id, &s.id).unwrap();
+        role::grant(&conn, &head_a.id, &s.id, role::SCHOOL_HEAD).unwrap();
+        let head_b = create_user(&conn, "bo.reyes", "password12345", "Bo Reyes").unwrap();
+        add_school_membership(&conn, &head_b.id, &s.id).unwrap();
+        role::grant(&conn, &head_b.id, &s.id, role::SCHOOL_HEAD).unwrap();
+
+        let removed = remove_school_membership(&conn, &head_a.id, &s.id).unwrap();
+
+        assert!(removed);
+        assert!(!is_member_of_school(&conn, &head_a.id, &s.id).unwrap());
+        assert!(is_member_of_school(&conn, &head_b.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_membership_the_last_school_head_guard_is_scoped_per_school() {
+        // A user who is the sole School Head of school A but only a
+        // Teacher in school B must still be removable from school B --
+        // the guard must count School Heads within the school being
+        // acted on, never globally across schools.
+        let conn = open_test_db();
+        let school_a = school::create(&conn, "Rizal Elementary").unwrap();
+        let school_b = school::create(&conn, "Mabini Elementary").unwrap();
+        let user = create_user(&conn, "corazon.santos", "password12345", "Corazon Santos").unwrap();
+        add_school_membership(&conn, &user.id, &school_a.id).unwrap();
+        role::grant(&conn, &user.id, &school_a.id, role::SCHOOL_HEAD).unwrap();
+        add_school_membership(&conn, &user.id, &school_b.id).unwrap();
+        role::grant(&conn, &user.id, &school_b.id, role::TEACHER).unwrap();
+
+        let removed = remove_school_membership(&conn, &user.id, &school_b.id).unwrap();
+
+        assert!(removed);
+        assert!(!is_member_of_school(&conn, &user.id, &school_b.id).unwrap());
+        assert!(
+            is_member_of_school(&conn, &user.id, &school_a.id).unwrap(),
+            "removal from school B must never touch membership in school A"
+        );
+    }
+
+    #[test]
+    fn remove_school_membership_is_a_harmless_false_for_a_non_member() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let user = create_user(&conn, "ana.cruz", "password12345", "Ana Cruz").unwrap();
+
+        let removed = remove_school_membership(&conn, &user.id, &s.id).unwrap();
+
+        assert!(!removed);
     }
 
     mod lockout_properties {

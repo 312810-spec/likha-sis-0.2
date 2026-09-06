@@ -37,6 +37,18 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
     }
     return this.resetPasswordResult;
   }
+
+  async removeMember(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
+
+  async grantRole(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
+
+  async revokeRole(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
 }
 
 function renderScreen(

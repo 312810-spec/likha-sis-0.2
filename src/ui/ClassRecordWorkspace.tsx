@@ -8,7 +8,7 @@ import type {
   AssessmentItemDetail,
 } from "../domain/assessment";
 import { ValidationError } from "../domain/errors";
-import type { ReportCardExportResult } from "../domain/export";
+import type { ClassSummaryExportResult, ReportCardExportResult } from "../domain/export";
 import type {
   ComputedTermGrade,
   LearnerScoreRosterEntry,
@@ -116,6 +116,12 @@ export function ClassRecordWorkspace({
   const [exportingReportCard, setExportingReportCard] = useState(false);
   const [revealingReportCard, setRevealingReportCard] = useState(false);
   const [revealReportCardError, setRevealReportCardError] = useState<string | null>(null);
+  const [classSummaryResult, setClassSummaryResult] = useState<ClassSummaryExportResult | null>(
+    null,
+  );
+  const [exportingClassSummary, setExportingClassSummary] = useState(false);
+  const [revealingClassSummary, setRevealingClassSummary] = useState(false);
+  const [revealClassSummaryError, setRevealClassSummaryError] = useState<string | null>(null);
 
   const rosterOrder = useMemo(() => roster.map((r) => r.learnerId), [roster]);
   function neighborLearnerId(learnerId: string, direction: 1 | -1): string | undefined {
@@ -505,6 +511,40 @@ export function ClassRecordWorkspace({
       setRevealReportCardError("Could not open the folder for this file.");
     } finally {
       setRevealingReportCard(false);
+    }
+  }
+
+  async function handleExportClassSummary() {
+    if (exportingClassSummary) return;
+    setError(null);
+    setRevealClassSummaryError(null);
+    setExportingClassSummary(true);
+    try {
+      const result = await exportService.exportClassRecordSummary(classRecordId);
+      if (result === null) {
+        setError("Could not export — this class record could not be found.");
+      } else {
+        setClassSummaryResult(result);
+      }
+    } catch (err) {
+      setError(
+        err instanceof ValidationError ? err.message : "Could not export the class summary.",
+      );
+    } finally {
+      setExportingClassSummary(false);
+    }
+  }
+
+  async function handleRevealClassSummary() {
+    if (revealingClassSummary || !classSummaryResult) return;
+    setRevealClassSummaryError(null);
+    setRevealingClassSummary(true);
+    try {
+      await exportService.revealExportedFile(classSummaryResult.filePath);
+    } catch {
+      setRevealClassSummaryError("Could not open the folder for this file.");
+    } finally {
+      setRevealingClassSummary(false);
     }
   }
 
@@ -965,6 +1005,40 @@ export function ClassRecordWorkspace({
               >
                 {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
               </button>
+              <button
+                type="button"
+                aria-disabled={exportingClassSummary}
+                onClick={handleExportClassSummary}
+              >
+                {exportingClassSummary ? "Exporting…" : "Export class summary (CSV)"}
+              </button>
+
+              {classSummaryResult && (
+                <Alert tone="success">
+                  <p>
+                    Saved to <code>{classSummaryResult.filePath}</code>.
+                  </p>
+                  <button
+                    type="button"
+                    aria-disabled={revealingClassSummary}
+                    onClick={handleRevealClassSummary}
+                  >
+                    {revealingClassSummary ? "Opening…" : "Open folder"}
+                  </button>
+                  {revealClassSummaryError && <p role="alert">{revealClassSummaryError}</p>}
+                  <p>
+                    This is a simple class summary for your own quick reference, not an official
+                    DepEd form. It does <strong>not</strong> include:
+                  </p>
+                  <ul>
+                    {classSummaryResult.disclosure.omittedFields.map((omitted) => (
+                      <li key={omitted.field}>
+                        <strong>{omitted.field}</strong> — {omitted.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </Alert>
+              )}
 
               {reportCardResult && (
                 <Alert tone="success">

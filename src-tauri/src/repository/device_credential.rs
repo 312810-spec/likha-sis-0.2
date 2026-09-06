@@ -166,6 +166,57 @@ pub fn owner(conn: &Connection, credential_id: &str) -> AppResult<Option<(String
     .map_err(Into::into)
 }
 
+/// One row of `list_active_for_school`'s result: everything a School
+/// Head needs to recognize a device and decide whether to revoke it,
+/// with no secret material -- `secret_hex`/`secret_hash` never leave
+/// `enroll`/the DB respectively.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActiveDeviceCredential {
+    pub credential_id: String,
+    pub device_label: Option<String>,
+    /// The account this device is enrolled under -- who it belongs to,
+    /// not who is revoking it.
+    pub owner_display_name: String,
+    pub owner_username: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+}
+
+/// Every currently-active (non-revoked) sync credential in `school_id`,
+/// newest-enrolled first, joined to the owning user for a human-readable
+/// name -- the read side of the device-management screen. Deliberately
+/// scoped to active credentials only, matching this slice's "list
+/// currently enrolled devices" requirement; a past-revocations audit
+/// view is a later increment (see `docs/CURRENT-HANDOFF.md`). `school_id`
+/// is always caller-supplied from an already-verified session scope,
+/// exactly like every other same-school reference-data read in this
+/// module -- this function performs no authorization itself.
+pub fn list_active_for_school(
+    conn: &Connection,
+    school_id: &str,
+) -> AppResult<Vec<ActiveDeviceCredential>> {
+    let mut stmt = conn.prepare(
+        "SELECT c.id, c.device_label, u.display_name, u.username, c.created_at, c.last_used_at
+         FROM device_sync_credentials c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.school_id = ?1 AND c.revoked_at IS NULL
+         ORDER BY c.created_at DESC",
+    )?;
+    let rows = stmt
+        .query_map([school_id], |row| {
+            Ok(ActiveDeviceCredential {
+                credential_id: row.get(0)?,
+                device_label: row.get(1)?,
+                owner_display_name: row.get(2)?,
+                owner_username: row.get(3)?,
+                created_at: row.get(4)?,
+                last_used_at: row.get(5)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 /// True if this school has at least one active (non-revoked) sync
 /// credential -- i.e. whether ANY device has actually completed the
 /// enrollment ceremony. This is the gate a domain write's sync-outbox
@@ -439,6 +490,49 @@ mod tests {
         enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
 
         assert!(!has_active_for_school(&conn, &other_school.id).unwrap());
+    }
+
+    #[test]
+    fn list_active_for_school_is_empty_before_any_enrollment() {
+        let (conn, school_id, _user_id) = setup();
+
+        assert_eq!(list_active_for_school(&conn, &school_id).unwrap(), vec![]);
+    }
+
+    #[test]
+    fn list_active_for_school_shows_owner_name_and_excludes_revoked_devices() {
+        let (conn, school_id, user_id) = setup();
+        let a = enroll(
+            &conn,
+            &school_id,
+            &user_id,
+            "device-a",
+            Some("Ana's laptop"),
+        )
+        .unwrap();
+        let b = enroll(&conn, &school_id, &user_id, "device-b", None).unwrap();
+        revoke(&conn, &school_id, &b.id).unwrap();
+
+        let devices = list_active_for_school(&conn, &school_id).unwrap();
+
+        assert_eq!(devices.len(), 1);
+        assert_eq!(devices[0].credential_id, a.id);
+        assert_eq!(devices[0].device_label.as_deref(), Some("Ana's laptop"));
+        assert_eq!(devices[0].owner_display_name, "Ana Cruz");
+        assert_eq!(devices[0].owner_username, "ana.cruz");
+        assert!(devices[0].last_used_at.is_none());
+    }
+
+    #[test]
+    fn list_active_for_school_is_school_scoped() {
+        let (conn, school_id, user_id) = setup();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        enroll(&conn, &school_id, &user_id, "device-1", None).unwrap();
+
+        assert_eq!(
+            list_active_for_school(&conn, &other_school.id).unwrap(),
+            vec![]
+        );
     }
 
     #[test]

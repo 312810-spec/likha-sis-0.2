@@ -51,6 +51,45 @@ pub fn create(
     find_by_id(conn, &id).map(|l| l.expect("row just inserted must exist"))
 }
 
+/// Applies a decrypted sync payload for this entity kind (ADR-0067/0069's
+/// pull-side materialization). `learner` is the already-decrypted,
+/// already-authenticated (AES-GCM tag verified) contents of an
+/// `AcceptedChange` -- this function trusts it completely, the same way
+/// `create`/`update` trust their own direct String/Option<&str> arguments;
+/// `sync_client::pull_once` is responsible for having decrypted the
+/// payload and rejected a tampered one BEFORE ever calling this. Deliberate
+/// `INSERT ... ON CONFLICT(id) DO UPDATE`, not a separate insert-or-update
+/// branch: an id this device has never seen locally (the common case --
+/// most learners are created on a different device) and an id this device
+/// already has a stale copy of (this device pulled an earlier version of
+/// the same learner before) are the same write here, by design -- unlike
+/// `update`, there is no "no such learner in this school" outcome to
+/// distinguish, because a `PendingChange` this device chose to apply (see
+/// `pull_once`'s conflict check) is, by definition, not something this
+/// device disputes owning.
+pub fn upsert_from_sync(conn: &Connection, learner: &Learner) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO learners (id, school_id, given_name, family_name, lrn, sex, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+             school_id = excluded.school_id,
+             given_name = excluded.given_name,
+             family_name = excluded.family_name,
+             lrn = excluded.lrn,
+             sex = excluded.sex",
+        (
+            &learner.id,
+            &learner.school_id,
+            &learner.given_name,
+            &learner.family_name,
+            &learner.lrn,
+            &learner.sex,
+            &learner.created_at,
+        ),
+    )?;
+    Ok(())
+}
+
 /// Not school-scoped and intentionally module-private: this exists only to
 /// read back a row this module just wrote (see `create`). Do not expose it
 /// as a Tauri command or call it with a caller-supplied id — that would let
@@ -270,6 +309,7 @@ mod tests {
     use super::*;
     use crate::{db, repository::school};
     use std::path::Path;
+    use uuid::Uuid;
 
     fn open_test_db() -> Connection {
         db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
@@ -284,6 +324,56 @@ mod tests {
         let found = find_by_id(&conn, &created.id).unwrap();
 
         assert_eq!(found, Some(created));
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_learner_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let incoming = Learner {
+            id: Uuid::now_v7().to_string(),
+            school_id: s.id.clone(),
+            given_name: "Ana".to_string(),
+            family_name: "Cruz".to_string(),
+            lrn: Some("123456789012".to_string()),
+            sex: Some("F".to_string()),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id_in_school(&conn, &s.id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.given_name, "Ana");
+        assert_eq!(found.lrn.as_deref(), Some("123456789012"));
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let original = create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
+        let updated = Learner {
+            given_name: "Anna".to_string(),
+            family_name: "Cruz-Reyes".to_string(),
+            lrn: Some("987654321098".to_string()),
+            sex: Some("F".to_string()),
+            ..original.clone()
+        };
+
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id_in_school(&conn, &s.id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.given_name, "Anna");
+        assert_eq!(found.family_name, "Cruz-Reyes");
+        assert_eq!(found.lrn.as_deref(), Some("987654321098"));
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM learners", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "an update must never insert a second row");
     }
 
     #[test]

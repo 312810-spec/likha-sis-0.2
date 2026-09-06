@@ -86,6 +86,43 @@ pub fn list_roles(conn: &Connection, user_id: &str, school_id: &str) -> AppResul
     Ok(roles)
 }
 
+/// Revokes `role` from `user_id` within `school_id` -- the inverse of
+/// `grant`. Deletes the specific `(user_id, school_id, role)` row only,
+/// never touching any other role the user holds there. Returns whether a
+/// row actually existed and was removed (`Ok(false)`, not an error, for
+/// a role the user never held) -- the same "did it actually change
+/// anything" convention `repository::user::remove_school_membership`
+/// already established.
+///
+/// Deliberately performs NO last-School-Head guard itself -- this
+/// function is a plain, unconditional delete, exactly like `grant` is a
+/// plain, unconditional insert. The guard belongs one layer up
+/// (`auth::revoke_school_member_role`) so every caller of this
+/// low-level function -- present or future -- cannot forget it by
+/// construction of the call site they use.
+pub fn revoke(conn: &Connection, user_id: &str, school_id: &str, role: &str) -> AppResult<bool> {
+    let removed = conn.execute(
+        "DELETE FROM user_school_roles WHERE user_id = ?1 AND school_id = ?2 AND role = ?3",
+        (user_id, school_id, role),
+    )?;
+    Ok(removed == 1)
+}
+
+/// Count of users holding `role` within `school_id` -- the shared
+/// building block behind the last-School-Head guard in both
+/// `user::remove_school_membership` (losing membership loses every role
+/// at once) and `auth::revoke_school_member_role` (losing just the
+/// School Head role). Kept here, not duplicated as raw SQL in each
+/// caller, so the two guards can never silently drift apart.
+pub fn count_holders(conn: &Connection, school_id: &str, role: &str) -> AppResult<i64> {
+    conn.query_row(
+        "SELECT count(*) FROM user_school_roles WHERE school_id = ?1 AND role = ?2",
+        (school_id, role),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -206,6 +243,65 @@ mod tests {
             list_roles(&conn, &user_id, &other_school.id).unwrap(),
             Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn revoke_removes_only_the_targeted_role() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+        grant(&conn, &user_id, &school_id, REGISTRAR).unwrap();
+
+        let removed = revoke(&conn, &user_id, &school_id, REGISTRAR).unwrap();
+
+        assert!(removed);
+        assert!(has_any_role(&conn, &user_id, &school_id, &[TEACHER]).unwrap());
+        assert!(!has_any_role(&conn, &user_id, &school_id, &[REGISTRAR]).unwrap());
+    }
+
+    #[test]
+    fn revoke_is_a_harmless_false_for_a_role_never_held() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        let removed = revoke(&conn, &user_id, &school_id, TEACHER).unwrap();
+
+        assert!(!removed);
+    }
+
+    #[test]
+    fn revoke_is_school_scoped() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        user::add_school_membership(&conn, &user_id, &other_school.id).unwrap();
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+        grant(&conn, &user_id, &other_school.id, TEACHER).unwrap();
+
+        let removed = revoke(&conn, &user_id, &school_id, TEACHER).unwrap();
+
+        assert!(removed);
+        assert!(has_any_role(&conn, &user_id, &other_school.id, &[TEACHER]).unwrap());
+    }
+
+    #[test]
+    fn count_holders_reflects_grants_and_revokes_scoped_to_the_school() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_user = user::create_user(&conn, "ben.cruz", "password", "Ben Cruz").unwrap();
+        user::add_school_membership(&conn, &other_user.id, &other_school.id).unwrap();
+
+        assert_eq!(count_holders(&conn, &school_id, SCHOOL_HEAD).unwrap(), 0);
+
+        grant(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
+        grant(&conn, &other_user.id, &other_school.id, SCHOOL_HEAD).unwrap();
+
+        assert_eq!(count_holders(&conn, &school_id, SCHOOL_HEAD).unwrap(), 1);
+
+        revoke(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
+
+        assert_eq!(count_holders(&conn, &school_id, SCHOOL_HEAD).unwrap(), 0);
     }
 
     #[test]

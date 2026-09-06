@@ -135,6 +135,36 @@ pub fn load_or_mint_sspk(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
     ))
 }
 
+/// Overwrites this installation's local SSPK file with a genuinely NEW
+/// key (ADR-0069's device-revocation addendum) -- the piece that
+/// addendum left as "not yet decided": `repository::sync_payload_key::rotate_for_school`
+/// already clears every stored per-device wrap on revocation, but until
+/// this function exists and is called, that DB-side rotation still hands
+/// out fresh wraps of the SAME old plaintext SSPK, not a genuinely new
+/// one. Unlike `load_or_mint_sspk`, this never reuses the existing value
+/// -- see `DpapiKeyStore::rotate_key`'s own doc comment for the atomic
+/// overwrite guarantee (never a half-written file, even on a crash
+/// mid-rotation).
+#[cfg(windows)]
+pub fn rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    std::fs::create_dir_all(&dir)?;
+    DpapiKeyStore.rotate_key(&dir.join(SSPK_KEY_FILE_NAME))
+}
+
+/// See `load_or_mint_sspk`'s non-Windows counterpart -- same fail-closed
+/// reasoning applies to rotation.
+#[cfg(not(windows))]
+pub fn rotate_sspk(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
+    Err(crate::error::AppError::key_store(
+        "no encryption key store is implemented for this platform; \
+         LIKHA-SIS currently ships on Windows only",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

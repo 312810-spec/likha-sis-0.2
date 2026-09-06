@@ -1592,6 +1592,270 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M34: ADR-0067 client-side sync loop foundation.
+        --
+        -- `device_sync_client_credential`: THIS device's own copy of the
+        -- credential it needs to authenticate its outbound
+        -- `/sync/push`/`/sync/pull` requests -- distinct from
+        -- `device_sync_credentials` (migration 26), which is the HUB's
+        -- verification-side table and stores only a secret_hash, never a
+        -- usable secret. A device that pushes/pulls must retain the
+        -- actual bearer secret `device_credential::enroll` returned it
+        -- exactly once; this is where that retention lives. One row per
+        -- school this device has enrolled for (in practice almost always
+        -- one). Contains no learner/domain data, so it is not itself an
+        -- ADR-0067 sync entity and never flows through sync_outbox.
+        CREATE TABLE device_sync_client_credential (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            credential_id TEXT NOT NULL,
+            device_secret_hex TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        -- `sync_pull_cursor`: this device's own "last hub cursor I have
+        -- fully processed" watermark for one school -- the pull-side
+        -- counterpart to `sync_version_cache` (migration 33), which
+        -- tracks per-entity state. `0` (the default, via absence of a
+        -- row) means "never pulled," matching `sync_hub::pull_since`'s
+        -- own `after: SyncCursor(0)` convention for a first pull.
+        CREATE TABLE sync_pull_cursor (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            cursor INTEGER NOT NULL CHECK (cursor >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M35: the conflict-review screen (ADR-0067/0069) needs to record
+        -- WHICH way a teacher resolved a staged conflict, not just THAT it
+        -- was resolved -- migration 29's `resolved_at` alone cannot
+        -- distinguish "kept this device's own edit" from "accepted the
+        -- incoming hub version," which matters for support/audit
+        -- ("why does this record look like the other teacher's version?").
+        -- Nullable and unconstrained-until-resolved, matching
+        -- `resolved_at`'s own shape: both are NULL for every still-open
+        -- conflict, and both are set together, in the same UPDATE, the
+        -- moment a conflict is resolved.
+        ALTER TABLE sync_conflict_review
+            ADD COLUMN resolution TEXT
+            CHECK (resolution IN ('kept_local', 'used_incoming'));
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M36: School-membership removal (`commands::user::
+        -- remove_school_member`) needs its own auditable event type, the
+        -- same as `admin_reset_teacher_password`'s `password_reset_by_admin`
+        -- -- a School Head revoking a colleague's access is exactly the
+        -- kind of admin-actor-distinct-from-subject event this table
+        -- already exists to record. Same 12-step CHECK-widening rebuild
+        -- as migrations 24 and 26 (SQLite cannot ALTER a CHECK constraint
+        -- in place); audit_log still has no incoming foreign keys from
+        -- any other table, so this is safe with foreign_keys enforcement
+        -- on.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin', 'device_enrolled', 'device_revoked',
+                'school_membership_removed'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new
+            (id, school_id, user_id, username, actor_user_id, event_type, created_at)
+        SELECT
+            id, school_id, user_id, username, actor_user_id, event_type, created_at
+        FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M37: School-member role management (`auth::grant_school_member_role`/
+        -- `auth::revoke_school_member_role`) needs its own auditable event
+        -- types, the same class as migration 36's
+        -- `school_membership_removed` -- a School Head granting or revoking
+        -- an additional role for a colleague, actor-distinct from its
+        -- subject. Same 12-step CHECK-widening rebuild as migrations 24, 26,
+        -- and 36 (SQLite cannot ALTER a CHECK constraint in place);
+        -- audit_log still has no incoming foreign keys from any other
+        -- table, so this is safe with foreign_keys enforcement on.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin', 'device_enrolled', 'device_revoked',
+                'school_membership_removed', 'school_member_role_granted',
+                'school_member_role_revoked'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new
+            (id, school_id, user_id, username, actor_user_id, event_type, created_at)
+        SELECT
+            id, school_id, user_id, username, actor_user_id, event_type, created_at
+        FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M38: 2026-09-06 curriculum-model clarification. See ADR-0037's
+        -- addendum for the full research record. Product-owner-relayed,
+        -- WebSearch-cross-checked-this-session facts, additive only (no
+        -- schema change, no row deleted or removed):
+        --
+        --   1. The "MATATAG Curriculum" row (id ...-5002) is renamed to
+        --      "Enhanced K to 10 Curriculum" -- DepEd Order No. 015, s.
+        --      2026 reframes the same revised K-10 curriculum this row
+        --      already models under this name ("the Revised Kindergarten
+        --      to Grade 10 Curriculum"), implementation beginning SY
+        --      2026-2027. Same row, same id, same seeded learning areas
+        --      (English/Filipino/Mathematics/Science/Araling Panlipunan/
+        --      GMRC-Values Education/EPP-TLE/MAPEH) -- only the name and
+        --      citation change; nothing that already references this row
+        --      by id is affected.
+        --   2. A new curriculum_versions row models DepEd Order No. 017,
+        --      s. 2026 ("Strengthened Senior High School Curriculum"),
+        --      which applies to Grade 11 only, effective SY 2026-2027,
+        --      restructuring Grade 11 to 5 core subjects (down from 15)
+        --      taken as full-year courses. Seeded NOT default -- the "K
+        --      to 12 Basic Education Curriculum" row remains the sole
+        --      default for the same reason ADR-0037 originally gave (no
+        --      grade-level normalization on sections.grade_level, so
+        --      there is still no safe way to auto-resolve which
+        --      curriculum applies per record). This is purely additive
+        --      reference data: nothing auto-selects this version yet.
+        --   3. Grade 12 is unaffected -- it stays on the prior/legacy SHS
+        --      curriculum, exactly as ADR-0068's already-implemented
+        --      DepEd Order No. 8, s. 2015 carryover already models. No
+        --      change to that data or code.
+        --   4. Kindergarten remains outside key_stages' scope. Verified
+        --      unchanged: KS1 already starts at min_grade_level = 1, and
+        --      no code path infers a Kindergarten Key Stage from this
+        --      table. No fix was needed; this migration does not touch
+        --      key_stages.
+        UPDATE curriculum_versions SET
+            name = 'Enhanced K to 10 Curriculum',
+            source_citation = 'DepEd''s revised K to 10 curriculum, previously informally called "MATATAG Curriculum," reframed by DepEd Order No. 015, s. 2026 as the "Revised Kindergarten to Grade 10 Curriculum" / "Enhanced K to 10 Curriculum" (explicitly aligned there with "the Revised Kindergarten to Grade 10 Curriculum and the Strengthened Senior High School Curriculum," implementation beginning SY 2026-2027). Phased grade-level rollout previously triangulated (SY 2024-2025: Kindergarten, Grades 1, 4, 7; SY 2025-2026: Grades 2, 3, 5, 8; SY 2026-2027: Grades 6, 9, 10) is unchanged by this rename. Senior High School (Grades 11-12) is not covered by this row -- see the new "Strengthened Senior High School Curriculum (Grade 11)" row (Grade 11) and the existing "K to 12 Basic Education Curriculum" row (Grade 12, per ADR-0068''s DepEd Order No. 8, s. 2015 carryover). Specific learning-area/subject-name differences from the prior K to 12 curriculum remain unconfirmed against a primary source and are not encoded as a difference in curriculum_learning_areas.'
+        WHERE id = '00000000-0000-7000-8000-000000005002';
+
+        INSERT INTO curriculum_versions (id, name, source_citation, is_default) VALUES
+            ('00000000-0000-7000-8000-000000005003',
+             'Strengthened Senior High School Curriculum (Grade 11)',
+             'DepEd Order No. 017, s. 2026, "Strengthened Senior High School Curriculum." Applies to Grade 11 only, effective SY 2026-2027: restructures Grade 11 to 5 core subjects (down from 15), taken as full-year courses, replacing the prior per-semester subject load. Grade 12 is unaffected and remains on the prior/legacy SHS curriculum (see ADR-0068''s DepEd Order No. 8, s. 2015 carryover, modeled by the "K to 12 Basic Education Curriculum" row). Sourced this session via secondary reporting on the official DO 017 s.2026 issuance (sunstar.com.ph, depedsanpablo.com, tchersden.com) -- a direct primary-source deped.gov.ph fetch was not attempted this session; per this project''s sourcing-policy clarification (ADR-0037 addendum), secondary sources that themselves explicitly cite/describe an official DepEd issuance are treated as sufficient when a primary fetch is not available. Seeded NOT default: this application still has no grade-level normalization on sections.grade_level, so nothing yet auto-selects this version for a Grade 11 record.',
+             0);
+
+        INSERT INTO curriculum_learning_areas (id, curriculum_version_id, name) VALUES
+            ('00000000-0000-7000-8000-000000005301', '00000000-0000-7000-8000-000000005003', 'Effective Communication'),
+            ('00000000-0000-7000-8000-000000005302', '00000000-0000-7000-8000-000000005003', 'Life Skills'),
+            ('00000000-0000-7000-8000-000000005303', '00000000-0000-7000-8000-000000005003', 'General Mathematics'),
+            ('00000000-0000-7000-8000-000000005304', '00000000-0000-7000-8000-000000005003', 'General Science'),
+            ('00000000-0000-7000-8000-000000005305', '00000000-0000-7000-8000-000000005003', 'Philippine History and Society');
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M39: In-app school branding (2026-09-06). The product owner
+        -- confirmed "school branding" covers both in-app display and
+        -- official-form export, but this session's DepEd research found
+        -- SF10's official-form rule restricts official forms to DepEd's
+        -- own seal/logo and DepEd's visual identity manual prohibits
+        -- combining it with other lockups -- so only the in-app half
+        -- ships here; official-form export stays out of scope pending
+        -- further DepEd clarification. Nullable, additive columns only:
+        -- a school with no logo uploaded is unaffected. `logo_mime` is a
+        -- small allow-listed set enforced in Rust at the command layer
+        -- (image/png, image/jpeg, image/webp), not a DB CHECK, so it can
+        -- change without another 12-step rebuild. Logo bytes are kept
+        -- small (command-layer size cap) -- this is a school-identity
+        -- icon, not a document store.
+        ALTER TABLE schools ADD COLUMN logo BLOB;
+        ALTER TABLE schools ADD COLUMN logo_mime TEXT;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M40: Creation Studio sub-scope 3/3 -- structured lesson-plan
+        -- builder. Follows the "ILAW" format (Intentions, Learning
+        -- Experiences, Assessment, Ways Forward), researched this session
+        -- (medium-high confidence: multiple consistent secondary sources
+        -- describing an official DepEd Order No. 16, s. 2026 issuance
+        -- replacing DLL/DLP and MELC coding; no primary deped.gov.ph
+        -- fetch attempted -- see docs/CURRENT-HANDOFF.md for the full
+        -- research record). Scoped by (teaching_assignment_id, plan_date)
+        -- -- one plan per teacher/section/subject/day, the same
+        -- ownership+date scoping convention `subject_attendance_sessions`
+        -- already established (migration 24) for teacher-authored,
+        -- per-meeting content: `teaching_assignment_id` already encodes
+        -- teacher+section+subject together (see that table's own
+        -- definition), so a single FK plus a date is sufficient to scope
+        -- one lesson plan, without a separate teacher_user_id column that
+        -- could drift from the assignment's own teacher.
+        --
+        -- `learning_competency_code` is free text the teacher enters
+        -- themselves -- deliberately NOT a foreign key into
+        -- `curriculum_learning_areas` (see ADR-0037's addendum): that
+        -- table only models learning-area names, not DepEd's
+        -- competency-code catalog, and building that catalog is a much
+        -- larger, separate undertaking explicitly out of scope here.
+        --
+        -- `learning_objectives` is stored as a single TEXT column holding
+        -- newline-separated entries (2-3 short lines) rather than a
+        -- child table -- this is free-form teacher-authored text with no
+        -- downstream code ever needing to query a single objective row
+        -- (unlike, say, `assessment_items`, which grade computation must
+        -- address individually) -- the simplest storage that is still
+        -- correct for how this data is actually read (whole, on one
+        -- screen). If a future slice needs to reference one objective
+        -- individually, this can be normalized then.
+        CREATE TABLE lesson_plans (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            plan_date TEXT NOT NULL,
+            -- Intentions
+            learning_competency TEXT NOT NULL,
+            learning_competency_code TEXT NOT NULL DEFAULT '',
+            learning_objectives TEXT NOT NULL,
+            connection_to_previous_learning TEXT NOT NULL DEFAULT '',
+            -- Learning Experiences
+            learning_experiences TEXT NOT NULL,
+            -- Assessment
+            assessment TEXT NOT NULL,
+            -- Ways Forward
+            ways_forward TEXT NOT NULL DEFAULT '',
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (teaching_assignment_id, plan_date)
+        );
+
+        CREATE INDEX idx_lesson_plans_school_date ON lesson_plans(school_id, plan_date);
+        "#,
+        ),
     ])
 }
 
@@ -2771,7 +3035,10 @@ mod tests {
     fn migration_17_seeds_exactly_two_curriculum_versions_with_k_to_12_as_sole_default() {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
-        migrations().to_latest(&mut conn).unwrap();
+        // Migrations 1-17 only, to reproduce this test's own original
+        // premise (exactly two curriculum versions) before migration 38
+        // added a third (Grade 11 Strengthened SHS Curriculum).
+        migrations().to_version(&mut conn, 17).unwrap();
 
         let total: i64 = conn
             .query_row("SELECT COUNT(*) FROM curriculum_versions", [], |r| r.get(0))
@@ -2808,7 +3075,7 @@ mod tests {
 
         let result = conn.execute(
             "UPDATE curriculum_versions SET is_default = 1 \
-             WHERE name = 'MATATAG Curriculum'",
+             WHERE id = '00000000-0000-7000-8000-000000005002'",
             [],
         );
 
@@ -2867,7 +3134,11 @@ mod tests {
     fn migration_17_seeds_the_same_eight_learning_areas_for_each_curriculum_version() {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
-        migrations().to_latest(&mut conn).unwrap();
+        // Migrations 1-17 only -- this test's own original premise (both
+        // curriculum versions seeded so far share the same eight learning
+        // areas) predates migration 38's Grade-11-only core-subject rows,
+        // which deliberately do not share this shape.
+        migrations().to_version(&mut conn, 17).unwrap();
 
         let mut stmt = conn
             .prepare(
@@ -2905,6 +3176,134 @@ mod tests {
         assert!(
             result.is_err(),
             "a learning area must reference a real curriculum version"
+        );
+    }
+
+    /// Proves migration 38's rename is exact: the row that was "MATATAG
+    /// Curriculum" is now "Enhanced K to 10 Curriculum", by the same id,
+    /// with its previously-seeded eight learning areas untouched.
+    #[test]
+    fn migration_38_renames_matatag_curriculum_to_enhanced_k_to_10_curriculum_in_place() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE id = '00000000-0000-7000-8000-000000005002'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "Enhanced K to 10 Curriculum");
+
+        let matatag_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_versions WHERE name = 'MATATAG Curriculum'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(matatag_count, 0, "the old name must no longer exist");
+
+        let learning_area_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_learning_areas \
+                 WHERE curriculum_version_id = '00000000-0000-7000-8000-000000005002'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            learning_area_count, 8,
+            "the renamed row's previously-seeded learning areas must be untouched"
+        );
+    }
+
+    /// Proves migration 38 adds the Grade-11-only Strengthened SHS
+    /// Curriculum (DepEd Order No. 017, s. 2026) as a third, non-default
+    /// curriculum version with exactly its 5 core subjects, without
+    /// disturbing the pre-existing two versions or the sole-default rule.
+    #[test]
+    fn migration_38_seeds_grade_11_strengthened_shs_curriculum_as_a_third_non_default_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM curriculum_versions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(total, 3);
+
+        let default_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            default_count, 1,
+            "the sole-default rule must still hold after adding a third version"
+        );
+
+        let default_name: String = conn
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            default_name, "K to 12 Basic Education Curriculum",
+            "the default must remain unchanged by this migration"
+        );
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT name FROM curriculum_learning_areas \
+                 WHERE curriculum_version_id = '00000000-0000-7000-8000-000000005003' \
+                 ORDER BY id",
+            )
+            .unwrap();
+        let subjects: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            subjects,
+            vec![
+                "Effective Communication".to_string(),
+                "Life Skills".to_string(),
+                "General Mathematics".to_string(),
+                "General Science".to_string(),
+                "Philippine History and Society".to_string(),
+            ]
+        );
+    }
+
+    /// Regression proof for the Kindergarten-Key-Stage-exclusion gap
+    /// ADR-0037's addendum confirms is deliberate: no key_stages row
+    /// covers grade level 0 (Kindergarten), so a naive
+    /// "find the key stage containing this grade level" lookup correctly
+    /// finds nothing for Kindergarten rather than silently matching KS1.
+    #[test]
+    fn kindergarten_grade_level_matches_no_key_stage_band() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let matches: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM key_stages WHERE 0 BETWEEN min_grade_level AND max_grade_level",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            matches, 0,
+            "Kindergarten (grade level 0) must not resolve to any Key Stage band"
         );
     }
 
@@ -3951,5 +4350,42 @@ mod tests {
              INSERT for the same triple must fail (the repository layer uses an upsert,\
              not a plain INSERT, to update it)"
         );
+    }
+
+    #[test]
+    fn migration_39_adds_nullable_logo_columns_that_default_to_absent() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        let (logo, logo_mime): (Option<Vec<u8>>, Option<String>) = conn
+            .query_row(
+                "SELECT logo, logo_mime FROM schools WHERE id = 's1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(logo, None, "an existing school has no logo until uploaded");
+        assert_eq!(logo_mime, None);
+
+        conn.execute(
+            "UPDATE schools SET logo = ?1, logo_mime = 'image/png' WHERE id = 's1'",
+            [vec![1u8, 2, 3]],
+        )
+        .unwrap();
+        let (logo, logo_mime): (Option<Vec<u8>>, Option<String>) = conn
+            .query_row(
+                "SELECT logo, logo_mime FROM schools WHERE id = 's1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(logo, Some(vec![1, 2, 3]));
+        assert_eq!(logo_mime, Some("image/png".to_string()));
     }
 }

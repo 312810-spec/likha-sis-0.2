@@ -4,14 +4,19 @@ import {
   attendanceService,
   authService,
   classRecordService,
+  conflictReviewService,
+  deviceSyncService,
   enrollmentHistoryService,
   exportService,
   formGenerationService,
   gradingService,
   learnerScoreService,
+  lessonPlanService,
   learnerService,
+  myDayService,
   onSessionExpired,
   schoolAttendanceService,
+  schoolLogoService,
   schoolMemberService,
   schoolService,
   sectionAdvisoryService,
@@ -20,6 +25,7 @@ import {
   sf1ImportService,
   subjectAttendanceService,
   subjectService,
+  syncStatusService,
   teachingAssignmentService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
@@ -28,13 +34,19 @@ import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
+import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
+import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
+import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
+import { SchoolMembershipScreen } from "./ui/SchoolMembershipScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
+import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
+import { MyDayScreen } from "./ui/MyDayScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
 import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
@@ -42,6 +54,7 @@ import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
 import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
+import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
@@ -183,6 +196,7 @@ function App() {
           activeTab={activeTab}
           onNavigate={setActiveTab}
           onLogout={handleLogout}
+          schoolLogoService={schoolLogoService}
         >
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
           {activeTab === "workspace" ? (
@@ -377,6 +391,15 @@ function App() {
                 setActiveTab("monthly-summary");
               }}
             />
+          ) : activeTab === "my-day" ? (
+            <MyDayScreen
+              myDayService={myDayService}
+              onCheckAttendance={(teachingAssignmentId) => {
+                setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                setActiveTab("subject-attendance");
+              }}
+              onReviewConflicts={() => setActiveTab("conflict-review")}
+            />
           ) : activeTab === "today-classes" ? (
             <TodaysClassesScreen
               subjectAttendanceService={subjectAttendanceService}
@@ -431,10 +454,29 @@ function App() {
               learnerScoreService={learnerScoreService}
               exportService={exportService}
             />
+          ) : activeTab === "lesson-plans" ? (
+            <LessonPlanScreen
+              lessonPlanService={lessonPlanService}
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={session.userId}
+            />
           ) : activeTab === "audit-log" ? (
             <AuditLogScreen authService={authService} />
           ) : activeTab === "admin-password-reset" ? (
             <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+          ) : activeTab === "school-members" ? (
+            <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
+          ) : activeTab === "devices" ? (
+            <DeviceManagementScreen deviceSyncService={deviceSyncService} />
+          ) : activeTab === "school-branding" ? (
+            <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
+          ) : activeTab === "conflict-review" ? (
+            <ConflictReviewScreen conflictReviewService={conflictReviewService} />
+          ) : activeTab === "sync-status" ? (
+            <SyncStatusScreen
+              syncStatusService={syncStatusService}
+              onReviewConflicts={() => setActiveTab("conflict-review")}
+            />
           ) : null}
         </AppLayout>
       ) : (

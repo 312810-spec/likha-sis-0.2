@@ -9,16 +9,20 @@
 //! this codebase; an unknown id, a revoked credential, and a wrong
 //! secret are all indistinguishable `Unauthorized` responses here too.
 //!
-//! `maybe_spawn_listener` wires this into real Tauri app startup, but
-//! **deliberately binds loopback only** (`127.0.0.1`), not a real LAN or
-//! Tailscale interface -- resolving the actual bind interface (never
-//! `0.0.0.0`, per ADR-0067's own "School-laptop operations gate") needs
-//! either a new interface-enumeration dependency or a documented manual-
-//! configuration decision, plus native Windows network verification this
-//! sandboxed development environment cannot perform. Not reachable from
-//! another device yet; see ADR-0067's network-listener addendum.
+//! `maybe_spawn_listener` wires this into real Tauri app startup and binds
+//! loopback (`127.0.0.1`, always, for same-machine tools/testing) PLUS any
+//! non-loopback interface address in a private range (RFC 1918, or
+//! Tailscale's CGNAT range 100.64.0.0/10) -- see
+//! `select_bindable_addresses` for the filtering logic and ADR-0067's
+//! "network-interface binding" addendum for the full decision record.
+//! Never binds `0.0.0.0` or a public address, per ADR-0067's own
+//! "School-laptop operations gate": this app does not opt a school laptop
+//! into direct internet exposure by default. Real LAN/Tailscale
+//! reachability from another physical device still cannot be verified in
+//! this sandboxed development environment -- only the selection logic and
+//! the wiring are provable here.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::{Query, State};
@@ -29,20 +33,88 @@ use axum::Router;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
+use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
 use crate::error::{AppError, AppResult};
-use crate::repository::{device_credential, school, sync_hub};
+use crate::repository::{device_credential, school, sync_hub, sync_payload_key};
 use crate::sync::{PendingChange, SyncCursor};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
 
-/// Loopback-only until LAN/Tailscale interface resolution is implemented
-/// and verified on real hardware -- see this module's own doc comment.
-const LOOPBACK_BIND_ADDR: &str = "127.0.0.1:7878";
+/// Loopback is always bound, regardless of what interface enumeration
+/// finds -- same-machine tools/tests must keep working even if this
+/// installation somehow has no other bindable interface.
+const LOOPBACK_ADDR: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
+const HUB_PORT: u16 = 7878;
+
+/// True for a private-use (RFC 1918) or Tailscale CGNAT (100.64.0.0/10,
+/// RFC 6598) IPv4 address -- the only non-loopback ranges this app will
+/// ever bind, per ADR-0067's "School-laptop operations gate": a school
+/// LAN interface or a Tailscale interface, never a public address.
+fn is_bindable_private_range(addr: Ipv4Addr) -> bool {
+    let octets = addr.octets();
+    let is_rfc1918 = addr.is_private(); // 10/8, 172.16/12, 192.168/16
+    let is_cgnat = octets[0] == 100 && (64..=127).contains(&octets[1]);
+    is_rfc1918 || is_cgnat
+}
+
+/// Pure filtering logic, deliberately separated from real interface
+/// enumeration so it can be unit-tested with a fake/injected address list
+/// (no real network access needed to prove the security-relevant
+/// invariant: never selects `0.0.0.0` or a public/non-private address).
+/// IPv6 is deliberately out of scope for this slice -- ADR-0067's own
+/// examples (school LAN, Tailscale) are IPv4 in practice for this
+/// deployment, and adding IPv6 would double the range/allowlist surface
+/// to reason about for no currently-needed capability; every IPv6 input
+/// is filtered out here rather than silently mis-handled.
+///
+/// Always includes loopback (`127.0.0.1`) first, regardless of what else
+/// is found, followed by every distinct non-loopback address in `found`
+/// that is a private-use or Tailscale CGNAT IPv4 address. A public
+/// address, a link-local address, `0.0.0.0`, and any IPv6 address are all
+/// excluded.
+fn select_bindable_addresses(found: &[IpAddr]) -> Vec<Ipv4Addr> {
+    let mut selected = vec![LOOPBACK_ADDR];
+    for addr in found {
+        if let IpAddr::V4(v4) = addr {
+            if *v4 != LOOPBACK_ADDR && is_bindable_private_range(*v4) && !selected.contains(v4) {
+                selected.push(*v4);
+            }
+        }
+    }
+    selected
+}
+
+/// Real interface enumeration via `if-addrs` (see `Cargo.toml`'s doc
+/// comment for the crate choice). Never propagates an error up to
+/// `maybe_spawn_listener`/startup -- an enumeration failure (e.g. a
+/// transient OS-level permission issue) must degrade to loopback-only,
+/// never crash app startup, matching this codebase's "sync must never
+/// crash the app" discipline used elsewhere in this module.
+fn enumerate_local_addresses() -> Vec<IpAddr> {
+    match if_addrs::get_if_addrs() {
+        Ok(interfaces) => interfaces.into_iter().map(|iface| iface.ip()).collect(),
+        Err(error) => {
+            log::warn!(
+                "hub sync listener: interface enumeration failed, falling back to loopback only: {error}"
+            );
+            Vec::new()
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct HubServerState {
     pub db: Arc<Mutex<Connection>>,
+    /// This installation's school sync-payload key (ADR-0069), resolved
+    /// once at listener startup via `db::load_or_mint_sspk` -- never
+    /// re-resolved per request. Used only to lazily re-establish a
+    /// device's wrap (`ensure_wrapped_for_credential`) on every
+    /// successfully authenticated request, which is what actually
+    /// propagates a post-revocation rotation (`sync_payload_key::
+    /// rotate_for_school`) to each still-active device without a new
+    /// enrollment ceremony.
+    pub sspk: [u8; PAYLOAD_KEY_LEN],
 }
 
 /// Builds the router. `state` is cloned into each request handler by
@@ -53,6 +125,7 @@ pub fn router(state: HubServerState) -> Router {
     Router::new()
         .route("/sync/push", post(push_handler))
         .route("/sync/pull", get(pull_handler))
+        .route("/sync/payload-key-wrap", get(payload_key_wrap_handler))
         .with_state(state)
 }
 
@@ -73,14 +146,16 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
     Ok(false)
 }
 
-/// Spawns the listener bound to `bind_addr`, reusing the `tokio` runtime
-/// Tauri already runs internally (`tauri::async_runtime::spawn`, not a
-/// second/parallel runtime). A bind failure (e.g. the port is already in
-/// use, perhaps by a second launch of this same app) is logged, never a
-/// panic -- a local-first desktop app must keep working even when sync
-/// is unavailable.
-pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
-    let app_router = router(HubServerState { db });
+/// Spawns one listener task bound to `bind_addr`, reusing the `tokio`
+/// runtime Tauri already runs internally (`tauri::async_runtime::spawn`,
+/// not a second/parallel runtime). A bind failure (e.g. the port is
+/// already in use, perhaps by a second launch of this same app, or an
+/// address that changed after enumeration ran) is logged, never a panic
+/// -- a local-first desktop app must keep working even when sync is
+/// unavailable, and a failure on one interface must never take down the
+/// others (each address gets its own independent task).
+pub fn spawn(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], bind_addr: SocketAddr) {
+    let app_router = router(HubServerState { db, sspk });
     tauri::async_runtime::spawn(async move {
         match tokio::net::TcpListener::bind(bind_addr).await {
             Ok(listener) => {
@@ -94,6 +169,22 @@ pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
             }
         }
     });
+}
+
+/// Spawns one independent listener task per address `select_bindable_addresses`
+/// selected, all sharing the same underlying `db` connection (see `spawn`'s
+/// own doc comment for why one connection is safe here). Each address binds
+/// -- and can fail to bind -- completely independently: a taken port or a
+/// changed address on one interface never prevents the others (including
+/// loopback) from serving.
+pub fn spawn_all(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], addresses: &[Ipv4Addr]) {
+    for &addr in addresses {
+        spawn(
+            Arc::clone(&db),
+            sspk,
+            SocketAddr::new(IpAddr::V4(addr), HUB_PORT),
+        );
+    }
 }
 
 /// Starts the hub listener if (and only if) `should_listen` says this
@@ -112,10 +203,10 @@ pub fn maybe_spawn_listener(app: &tauri::AppHandle) -> AppResult<()> {
     if !should_listen(&conn)? {
         return Ok(());
     }
-    let bind_addr: SocketAddr = LOOPBACK_BIND_ADDR
-        .parse()
-        .expect("LOOPBACK_BIND_ADDR is a hardcoded valid address");
-    spawn(Arc::new(Mutex::new(conn)), bind_addr);
+    let sspk = crate::db::load_or_mint_sspk(app)?;
+    let found = enumerate_local_addresses();
+    let addresses = select_bindable_addresses(&found);
+    spawn_all(Arc::new(Mutex::new(conn)), sspk, &addresses);
     Ok(())
 }
 
@@ -164,6 +255,7 @@ impl IntoResponse for ApiError {
 fn authenticate(
     conn: &Connection,
     headers: &HeaderMap,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
 ) -> Result<device_credential::VerifiedDevice, ApiError> {
     let credential_id = headers
         .get(CREDENTIAL_ID_HEADER)
@@ -174,7 +266,50 @@ fn authenticate(
         .and_then(|value| value.to_str().ok())
         .ok_or(ApiError::Unauthorized)?;
 
-    device_credential::verify(conn, credential_id, secret_hex)?.ok_or(ApiError::Unauthorized)
+    let verified = device_credential::verify(conn, credential_id, secret_hex)?
+        .ok_or(ApiError::Unauthorized)?;
+
+    // ADR-0069 addendum: this is the lazy re-wrap propagation point for
+    // key rotation on revocation. A device that reaches this line has
+    // just proved (via `verify`, above) it holds a currently-ACTIVE
+    // credential's real secret -- exactly the trust `ensure_wrapped_for_
+    // credential` needs to safely (re)establish its wrap of the current
+    // SSPK, whether this is its very first contact (unchanged from
+    // before this addendum) or its first contact since another device in
+    // the school was revoked (`rotate_for_school` already cleared its
+    // stale wrap of the OLD key). A revoked device can never reach this
+    // line -- `verify` already rejected it above -- so it can never
+    // recover a wrap of a key minted after its own revocation. A failure
+    // here is intentionally swallowed rather than surfaced as a request
+    // error: it never blocks the push/pull this request actually asked
+    // for, and the same lazy recovery is retried on the device's very
+    // next authenticated request.
+    // `secret_hex` already decoded successfully inside `verify` above (it
+    // returns `None` on malformed hex, which would have already produced
+    // `Unauthorized` before this line) -- re-decoding here rather than
+    // threading the bytes back out of `verify` keeps that function's
+    // signature unchanged, and this `Some` is therefore unreachable to be
+    // `None` in practice. Still handled explicitly (never a silent
+    // `unwrap_or_default()` empty-secret fallback) so a future change to
+    // `verify`'s hex-validation cannot quietly turn this into a
+    // wrong-key wrap attempt.
+    let Some(device_secret) = device_credential::hex_decode(secret_hex) else {
+        log::warn!(
+            "verified credential's secret failed to re-decode as hex; skipping lazy re-wrap"
+        );
+        return Ok(verified);
+    };
+    if let Err(error) = sync_payload_key::ensure_wrapped_for_credential(
+        conn,
+        &verified.school_id,
+        credential_id,
+        &device_secret,
+        sspk,
+    ) {
+        log::warn!("could not lazily re-wrap sync payload key for a device: {error}");
+    }
+
+    Ok(verified)
 }
 
 #[derive(Debug, Deserialize)]
@@ -196,7 +331,7 @@ async fn push_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers)?;
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
 
     if body.changes.len() > sync_hub::MAX_PUSH_BATCH {
         return Err(ApiError::BadRequest("push batch too large"));
@@ -228,7 +363,7 @@ async fn pull_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers)?;
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
 
     let changes = sync_hub::pull_since(
         &conn,
@@ -237,6 +372,42 @@ async fn pull_handler(
         query.limit,
     )?;
     Ok(Json(PullResponseBody { changes }))
+}
+
+/// `Deserialize` is for `sync_client`'s own decoding of this response, and
+/// for this module's tests -- the real handler only ever serializes it.
+#[derive(Debug, Serialize, Deserialize)]
+struct PayloadKeyWrapResponseBody {
+    wrapped_key: Vec<u8>,
+    nonce: Vec<u8>,
+}
+
+/// ADR-0069 addendum: hands the authenticated device back its OWN wrap of
+/// the school's current sync-payload key, never the plaintext key itself
+/// -- see `sync_payload_key::StoredWrap`'s own doc comment for why the hub
+/// can only ever serve the ciphertext form. `authenticate` above already
+/// guarantees a wrap exists for any device that reaches this handler (its
+/// lazy `ensure_wrapped_for_credential` call runs on every successful
+/// authentication, including this one), so a missing row here would mean
+/// that invariant broke, not a legitimate "not found" -- surfaced as
+/// `Internal` rather than silently returning an empty/default payload a
+/// caller could mistake for a real (but empty) wrap.
+async fn payload_key_wrap_handler(
+    State(state): State<HubServerState>,
+    headers: HeaderMap,
+) -> Result<Json<PayloadKeyWrapResponseBody>, ApiError> {
+    let conn = state
+        .db
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let verified = authenticate(&conn, &headers, &state.sspk)?;
+
+    let wrap = sync_payload_key::get_wrap_for_credential(&conn, &verified.credential_id)?
+        .ok_or(ApiError::Internal)?;
+    Ok(Json(PayloadKeyWrapResponseBody {
+        wrapped_key: wrap.wrapped_key,
+        nonce: wrap.nonce,
+    }))
 }
 
 #[cfg(test)]
@@ -277,6 +448,7 @@ mod tests {
         TestFixture {
             state: HubServerState {
                 db: Arc::new(Mutex::new(conn)),
+                sspk: crate::crypto::payload_key::generate_payload_key(),
             },
             user_id: user.id,
             device_id,
@@ -293,6 +465,87 @@ mod tests {
             .header(DEVICE_SECRET_HEADER, secret_hex)
             .body(Body::from(body.to_string()))
             .unwrap()
+    }
+
+    #[test]
+    fn select_bindable_addresses_always_includes_loopback_even_with_no_interfaces() {
+        let selected = select_bindable_addresses(&[]);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_includes_rfc1918_ranges() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            IpAddr::V4(Ipv4Addr::new(172, 16, 4, 9)),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert!(selected.contains(&LOOPBACK_ADDR));
+        assert!(selected.contains(&Ipv4Addr::new(10, 0, 0, 5)));
+        assert!(selected.contains(&Ipv4Addr::new(172, 16, 4, 9)));
+        assert!(selected.contains(&Ipv4Addr::new(192, 168, 1, 20)));
+        assert_eq!(selected.len(), 4);
+    }
+
+    #[test]
+    fn select_bindable_addresses_includes_tailscale_cgnat_range() {
+        let found = [IpAddr::V4(Ipv4Addr::new(100, 90, 1, 2))];
+        let selected = select_bindable_addresses(&found);
+        assert!(selected.contains(&Ipv4Addr::new(100, 90, 1, 2)));
+    }
+
+    #[test]
+    fn select_bindable_addresses_excludes_cgnat_lookalikes_outside_the_real_range() {
+        // 100.63.x.x and 100.128.x.x are outside RFC 6598's 100.64.0.0/10.
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(100, 63, 1, 2)),
+            IpAddr::V4(Ipv4Addr::new(100, 128, 1, 2)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_never_selects_a_public_address() {
+        let found = [IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+        assert!(!selected.contains(&Ipv4Addr::new(8, 8, 8, 8)));
+    }
+
+    #[test]
+    fn select_bindable_addresses_never_selects_unspecified_or_link_local() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_excludes_ipv6() {
+        let found = [IpAddr::V6(std::net::Ipv6Addr::new(
+            0xfd00, 0, 0, 0, 0, 0, 0, 1,
+        ))];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_deduplicates_and_never_returns_zero_addr() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+            IpAddr::V4(LOOPBACK_ADDR),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(
+            selected,
+            vec![LOOPBACK_ADDR, Ipv4Addr::new(192, 168, 1, 20)]
+        );
+        assert!(!selected.contains(&Ipv4Addr::new(0, 0, 0, 0)));
     }
 
     #[test]
@@ -466,5 +719,162 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// ADR-0069 addendum: proves the lazy re-wrap propagation actually
+    /// fires over a real authenticated HTTP request, not just at the
+    /// repository layer in isolation. An unrelated device's stored wrap
+    /// (simulating "already active before some OTHER device got revoked
+    /// and rotation cleared every wrap") is gone before the request, and
+    /// present again -- of the CURRENT `state.sspk` -- immediately after
+    /// one successful authenticated pull.
+    #[tokio::test]
+    async fn a_successful_authenticated_request_lazily_re_establishes_this_devices_wrap() {
+        let fixture = test_fixture();
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        assert_eq!(
+            sync_payload_key::unwrap_for_credential(
+                &fixture.state.db.lock().unwrap(),
+                &fixture.credential.id,
+                &secret
+            )
+            .unwrap(),
+            None,
+            "no wrap exists yet -- test_fixture never calls the enrollment ceremony's wrap step"
+        );
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/pull?after=0&limit=10")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let recovered = sync_payload_key::unwrap_for_credential(
+            &fixture.state.db.lock().unwrap(),
+            &fixture.credential.id,
+            &secret,
+        )
+        .unwrap()
+        .expect("a wrap must now exist, lazily re-established by the authenticated request");
+        assert_eq!(recovered, fixture.state.sspk);
+    }
+
+    /// A revoked credential must never reach the lazy re-wrap path at all
+    /// -- `authenticate` returns `Unauthorized` before `ensure_wrapped_for_
+    /// credential` is even called, so a revoked device gains no wrap of
+    /// the current (or any future) SSPK by attempting a request.
+    #[tokio::test]
+    async fn a_revoked_credential_never_gets_a_lazy_rewrap() {
+        let fixture = test_fixture();
+        {
+            let conn = fixture.state.db.lock().unwrap();
+            device_credential::revoke(
+                &conn,
+                &school::list_all(&conn).unwrap()[0].id,
+                &fixture.credential.id,
+            )
+            .unwrap();
+        }
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/pull?after=0&limit=10")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            sync_payload_key::unwrap_for_credential(
+                &fixture.state.db.lock().unwrap(),
+                &fixture.credential.id,
+                &secret
+            )
+            .unwrap(),
+            None,
+            "a revoked credential's failed request must never establish a wrap"
+        );
+    }
+
+    /// ADR-0069 addendum: the new payload-key-wrap endpoint hands a device
+    /// back exactly its own wrap of the CURRENT `state.sspk` -- proven by
+    /// unwrapping the response with the device's own secret and comparing
+    /// to `state.sspk` directly, never to a value the response itself
+    /// asserted.
+    #[tokio::test]
+    async fn payload_key_wrap_returns_this_devices_own_wrap_of_the_current_sspk() {
+        let fixture = test_fixture();
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        let app = router(fixture.state.clone());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/payload-key-wrap")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: PayloadKeyWrapResponseBody = serde_json::from_slice(&bytes).unwrap();
+
+        let wrap_key = crate::crypto::payload_key::derive_wrap_key(&secret);
+        let recovered = crate::crypto::payload_key::unwrap_payload_key(
+            &wrap_key,
+            &parsed.nonce,
+            &parsed.wrapped_key,
+        )
+        .unwrap();
+        assert_eq!(recovered, fixture.state.sspk);
+    }
+
+    #[tokio::test]
+    async fn payload_key_wrap_without_credential_headers_is_unauthorized() {
+        let fixture = test_fixture();
+        let app = router(fixture.state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/payload-key-wrap")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }

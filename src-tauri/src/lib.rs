@@ -9,6 +9,7 @@ pub mod hub_server;
 pub mod import;
 pub mod repository;
 pub mod sync;
+pub mod sync_client;
 
 use std::sync::Mutex;
 
@@ -54,11 +55,23 @@ pub fn run() {
                 log::error!("hub sync listener setup failed: {error}");
             }
 
+            // ADR-0067 client-side sync loop: only starts if this
+            // installation has a locally stored sync client credential
+            // (see `sync_client::should_run`'s own doc comment) -- a
+            // no-op for a never-enrolled installation, symmetric with
+            // the hub-listener gate immediately above.
+            if let Err(error) = sync_client::maybe_spawn_loop(app.handle()) {
+                log::error!("sync client loop setup failed: {error}");
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::school::list_schools,
             commands::school::create_school,
+            commands::school::set_school_logo,
+            commands::school::get_school_logo,
+            commands::school::clear_school_logo,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
             commands::learner::create_learner_with_duplicate_check,
@@ -69,6 +82,9 @@ pub fn run() {
             commands::user::add_user_to_school,
             commands::user::list_school_members,
             commands::user::admin_reset_teacher_password,
+            commands::user::remove_school_member,
+            commands::user::grant_school_member_role,
+            commands::user::revoke_school_member_role,
             commands::setup::installation_status,
             commands::setup::bootstrap_installation,
             commands::auth::login,
@@ -98,6 +114,7 @@ pub fn run() {
             commands::export::export_school_eosy_sf6,
             commands::export::export_learner_permanent_record_sf10,
             commands::export::export_class_record_report_card,
+            commands::export::export_class_record_summary,
             commands::export::export_learner_roster,
             commands::grading::list_grading_policies,
             commands::grading::list_grading_policy_periods,
@@ -135,6 +152,10 @@ pub fn run() {
             commands::subject_attendance::list_subject_attendance_sessions,
             commands::subject_attendance::subject_attendance_monitor,
             commands::subject_attendance::adviser_subject_attendance_overview,
+            commands::my_day::get_my_day_summary,
+            commands::lesson_plan::create_lesson_plan,
+            commands::lesson_plan::update_lesson_plan,
+            commands::lesson_plan::list_lesson_plans_by_assignment,
             commands::section_advisory::assign_section_adviser,
             commands::section_advisory::end_section_adviser,
             commands::section_advisory::current_section_adviser,
@@ -147,6 +168,12 @@ pub fn run() {
             commands::reference_geo::list_psgc_units,
             commands::formgen::generate_sf1_form,
             commands::formgen::generate_sf9_form,
+            commands::device_sync::enroll_device_sync_credential,
+            commands::device_sync::revoke_device_sync_credential,
+            commands::device_sync::list_device_sync_credentials,
+            commands::conflict_review::list_conflict_reviews,
+            commands::conflict_review::resolve_conflict_review,
+            commands::sync_status::get_sync_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

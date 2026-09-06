@@ -11,6 +11,7 @@ import type { ClassRecordDetail, GradingWeightPolicy } from "../domain/class-rec
 import type { GradingPeriod } from "../domain/grading";
 import type { Section } from "../domain/section";
 import type { Subject } from "../domain/subject";
+import { AssessmentAuthoringScreen } from "./AssessmentAuthoringScreen";
 import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
@@ -54,6 +55,11 @@ export function ClassRecordsScreen({
   const { mode } = useTeacherMode();
 
   const [selectedClassRecordId, setSelectedClassRecordId] = useState<string | null>(null);
+  // Set only by a class record row's "Creation Studio" action, so
+  // AssessmentAuthoringScreen opens focused on that class record's item
+  // set -- a separate selection from selectedClassRecordId (the roster/
+  // scoring workspace) since the two screens are never open together.
+  const [authoringClassRecordId, setAuthoringClassRecordId] = useState<string | null>(null);
   const [classRecords, setClassRecords] = useState<ClassRecordDetail[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -185,6 +191,27 @@ export function ClassRecordsScreen({
     } finally {
       setCreating(false);
     }
+  }
+
+  if (authoringClassRecordId) {
+    const authoringRecord = classRecords.find((r) => r.id === authoringClassRecordId);
+    const label = authoringRecord
+      ? `${authoringRecord.sectionName} — ${authoringRecord.subjectName} — ${authoringRecord.gradingPeriodLabel} (${authoringRecord.schoolYear})`
+      : null;
+    return (
+      <AssessmentAuthoringScreen
+        classRecordId={authoringClassRecordId}
+        classRecordLabel={label}
+        assessmentService={assessmentService}
+        onBack={() => {
+          setAuthoringClassRecordId(null);
+          classRecordService
+            .listClassRecords()
+            .then((records) => setClassRecords(records))
+            .catch(() => setError("Could not refresh class records."));
+        }}
+      />
+    );
   }
 
   if (selectedClassRecordId) {
@@ -355,6 +382,9 @@ export function ClassRecordsScreen({
                 <td>
                   <button type="button" onClick={() => setSelectedClassRecordId(record.id)}>
                     Open workspace
+                  </button>{" "}
+                  <button type="button" onClick={() => setAuthoringClassRecordId(record.id)}>
+                    Creation Studio
                   </button>
                 </td>
               </tr>

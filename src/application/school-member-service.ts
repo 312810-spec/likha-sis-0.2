@@ -1,7 +1,22 @@
 import { ValidationError } from "../domain/errors";
 import { MIN_PASSWORD_LENGTH } from "../domain/password-policy";
 import type { SchoolMemberRepository } from "../domain/ports/school-member-repository";
-import type { SchoolMember } from "../domain/school-member";
+import { SCHOOL_MEMBER_ROLES, type SchoolMember } from "../domain/school-member";
+
+function validateTargetAndRole(
+  targetUserId: string,
+  role: string,
+): { target: string; role: string } {
+  const target = targetUserId.trim();
+  if (target.length === 0) {
+    throw new ValidationError("A member must be selected.");
+  }
+  const trimmedRole = role.trim();
+  if (!(SCHOOL_MEMBER_ROLES as readonly string[]).includes(trimmedRole)) {
+    throw new ValidationError("Not a recognized role.");
+  }
+  return { target, role: trimmedRole };
+}
 
 /** `listMembers` takes no input to validate, matching every other
  * same-school reference-data read in this codebase. `resetPassword`
@@ -25,5 +40,23 @@ export class SchoolMemberApplicationService {
       throw new ValidationError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
     }
     return this.schoolMembers.resetPassword(target, newPassword);
+  }
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    const target = targetUserId.trim();
+    if (target.length === 0) {
+      throw new ValidationError("A member must be selected.");
+    }
+    return this.schoolMembers.removeMember(target);
+  }
+
+  async grantRole(targetUserId: string, role: string): Promise<boolean> {
+    const { target, role: validRole } = validateTargetAndRole(targetUserId, role);
+    return this.schoolMembers.grantRole(target, validRole);
+  }
+
+  async revokeRole(targetUserId: string, role: string): Promise<boolean> {
+    const { target, role: validRole } = validateTargetAndRole(targetUserId, role);
+    return this.schoolMembers.revokeRole(target, validRole);
   }
 }

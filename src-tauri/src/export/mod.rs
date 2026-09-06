@@ -1,3 +1,4 @@
+pub mod class_summary;
 pub mod csv;
 pub mod learner_roster;
 pub mod report_card;

@@ -414,6 +414,20 @@ pub enum Capability {
     /// about not reusing `ManageSchoolMembership`), even though today
     /// both capabilities resolve to the same role.
     ManageSectionAdvisories,
+    /// Upload, replace, or remove the school's in-app branding logo
+    /// (`repository::school::set_logo`/`clear_logo`) -- see
+    /// `docs/CURRENT-HANDOFF.md`'s 2026-09-06 entry. School Head only,
+    /// deliberately its own variant rather than reusing
+    /// `ManageSchoolMembership`: who a school's identity/branding
+    /// represents is a distinct administrative concern from who its
+    /// members are, matching this codebase's own established precedent
+    /// (`ManageTeachingAssignments`/`ManageSectionAdvisories` reason the
+    /// same way), even though today all four capabilities resolve to
+    /// the same role. In-app display only -- official-form export was
+    /// explicitly dropped from this feature's scope after this
+    /// session's DepEd research found SF10 restricts official forms to
+    /// DepEd's own seal/logo.
+    ManageSchoolBranding,
 }
 
 impl Capability {
@@ -423,6 +437,7 @@ impl Capability {
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -644,6 +659,215 @@ pub fn admin_reset_teacher_password(
     }
 }
 
+/// School Membership Removal: a School Head revokes a colleague's
+/// membership in their own school. Reuses `ManageSchoolMembership`
+/// (School-Head-only) exactly like `add_user_to_school` and
+/// `admin_reset_teacher_password` -- removing someone is the same
+/// authority class as onboarding or resetting them, and all three
+/// already resolve to the same role. `school_id` comes only from the
+/// caller's own session (`authorize_capability_with_actor`), never a
+/// client-supplied parameter, matching this codebase's established rule
+/// for every tenant-data command.
+///
+/// Effective immediately: on a successful removal, every active session
+/// `target_user_id` holds for `school_id` is revoked in the same
+/// transaction, mirroring `admin_reset_teacher_password`'s
+/// `session_repo::revoke_all_for_user` call -- otherwise a removed
+/// member's already-open app session would keep working until it
+/// expired on its own. `revoke_all_for_user` is global to the user (not
+/// school-scoped, matching its existing signature and
+/// `admin_reset_teacher_password`'s established use of it) -- acceptable
+/// here for the same reason it already is there: a session is scoped to
+/// one school at creation (migration 1's `sessions.school_id`), so a
+/// member who also belongs to a different school simply logs back in
+/// under that school's own membership, which this removal never touches.
+///
+/// Returns `Ok(false)` -- not an error, the same enumeration-safety shape
+/// `admin_reset_teacher_password` already uses -- when `target_user_id`
+/// does not exist, is not a member of `school_id`, or when removing them
+/// would leave `school_id` with zero School Heads (see
+/// `user_repo::remove_school_membership`'s doc comment for why that
+/// guard exists). `Err(Unauthorized)` is reserved for the capability
+/// check itself.
+pub fn remove_school_member(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_membership_removal")?;
+    let outcome = (|| -> AppResult<bool> {
+        if !user_repo::remove_school_membership(conn, &target.id, &school_id)? {
+            return Ok(false);
+        }
+        session_repo::revoke_all_for_user(conn, &target.id)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMembershipRemoved,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(removed) => {
+            conn.execute_batch("RELEASE school_membership_removal")?;
+            Ok(removed)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_membership_removal; RELEASE school_membership_removal",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// School-Member Role Management (grant half): a School Head grants a
+/// colleague in their own school an ADDITIONAL role, on top of whatever
+/// they already hold -- e.g. promoting a Teacher to also hold Registrar.
+/// Reuses `ManageSchoolMembership` exactly like `add_user_to_school`/
+/// `remove_school_member` -- granting authority is the same authority
+/// class as onboarding or removing someone. `school_id` comes only from
+/// the caller's own session, never a client-supplied parameter.
+///
+/// Deliberately no destructive-confirmation-shaped guard here: granting
+/// an additional role is additive and reversible (a mistaken grant is
+/// simply revoked again), unlike losing access entirely or losing the
+/// school's last School Head. `role_repo::grant`'s own no-op-on-already-
+/// held and reject-unrecognized-role behavior applies unchanged.
+///
+/// Returns `Ok(false)` -- not an error, the same enumeration-safety shape
+/// `remove_school_member` already uses -- when `target_user_id` does not
+/// exist or is not a member of `school_id`. `Err(Unauthorized)` is
+/// reserved for the capability check itself; an unrecognized `role`
+/// string still surfaces as a real `Err` from `role_repo::grant`, since
+/// that is a caller programming error, not a target-enumeration concern.
+pub fn grant_school_member_role(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    role: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_member_role_grant")?;
+    let outcome = (|| -> AppResult<bool> {
+        role_repo::grant(conn, &target.id, &school_id, role)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMemberRoleGranted,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(granted) => {
+            conn.execute_batch("RELEASE school_member_role_grant")?;
+            Ok(granted)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_member_role_grant; RELEASE school_member_role_grant",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// School-Member Role Management (revoke half): a School Head revokes
+/// one role from a colleague in their own school, while leaving their
+/// membership (and any other role they hold) intact -- e.g. demoting a
+/// Registrar back to Teacher-only, or stepping someone down from School
+/// Head. Gated identically to `grant_school_member_role`.
+///
+/// Fails closed -- returns `Ok(false)`, not an error, matching
+/// `remove_school_membership`'s own enumeration-safety shape -- when
+/// revoking `role::SCHOOL_HEAD` would leave `school_id` with zero School
+/// Heads (`role_repo::count_holders`, the exact same building block
+/// `user_repo::remove_school_membership`'s guard already uses, so the
+/// two guards can never silently drift apart). Revoking `TEACHER` or
+/// `REGISTRAR` carries no such guard -- a school may have zero
+/// Registrars, and Teacher is not a privileged role. Whether a Teacher
+/// still holds active teaching assignments is out of scope here.
+///
+/// Returns `Ok(false)` also when `target_user_id` does not exist, is not
+/// a member of `school_id`, or never held `role` there in the first
+/// place (matching `role_repo::revoke`'s own no-op contract).
+/// `Err(Unauthorized)` is reserved for the capability check itself.
+pub fn revoke_school_member_role(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    role: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+    if role == role_repo::SCHOOL_HEAD && role_repo::count_holders(conn, &school_id, role)? <= 1 {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_member_role_revoke")?;
+    let outcome = (|| -> AppResult<bool> {
+        if !role_repo::revoke(conn, &target.id, &school_id, role)? {
+            return Ok(false);
+        }
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMemberRoleRevoked,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(revoked) => {
+            conn.execute_batch("RELEASE school_member_role_revoke")?;
+            Ok(revoked)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_member_role_revoke; RELEASE school_member_role_revoke",
+            );
+            Err(error)
+        }
+    }
+}
+
 /// Device Sync Enrollment (ADR-0067, first slice): the trusted-boundary
 /// ceremony an implementation's future enrollment surface will use to
 /// issue a per-device sync credential. Reuses exactly the same
@@ -799,17 +1023,97 @@ pub fn revoke_device_sync_credential(
         return Err(AppError::Unauthorized);
     }
 
-    let revoked = device_credential_repo::revoke(conn, &school_id, credential_id)?;
-    if revoked {
-        if let Some(user) = user_repo::find_by_id(conn, &user_id)? {
-            audit_log_repo::record(
-                conn,
-                &school_id,
-                Some(&user.id),
-                &user.username,
-                AuditEventType::DeviceRevoked,
-            )?;
+    conn.execute_batch("SAVEPOINT device_sync_revocation")?;
+    let outcome = (|| -> AppResult<bool> {
+        let revoked = device_credential_repo::revoke(conn, &school_id, credential_id)?;
+        if revoked {
+            // ADR-0069 addendum ("key rotation on device revocation"):
+            // discard every stored wrap of this school's sync-payload key,
+            // not only the revoked device's. The hub cannot selectively
+            // re-wrap the (still-to-be-minted) new key for other active
+            // devices without their plaintext secrets, which it never
+            // retains past enrollment -- so every device recovers a fresh
+            // wrap lazily on its next authenticated contact (see
+            // `sync_payload_key::ensure_wrapped_for_credential`, called
+            // from `hub_server::authenticate`). This is what actually
+            // denies the revoked device access to any FUTURE payload: its
+            // credential can never authenticate again, so it can never
+            // reach that lazy re-wrap path, while data encrypted before
+            // rotation remains exactly as readable to it as revocation
+            // alone would have left it (unchanged from before this
+            // addendum, and not a new exposure).
+            sync_payload_key_repo::rotate_for_school(conn, &school_id)?;
+            if let Some(user) = user_repo::find_by_id(conn, &user_id)? {
+                audit_log_repo::record(
+                    conn,
+                    &school_id,
+                    Some(&user.id),
+                    &user.username,
+                    AuditEventType::DeviceRevoked,
+                )?;
+            }
         }
+        Ok(revoked)
+    })();
+
+    match outcome {
+        Ok(revoked) => {
+            conn.execute_batch("RELEASE device_sync_revocation")?;
+            Ok(revoked)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO device_sync_revocation; RELEASE device_sync_revocation",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// `revoke_device_sync_credential`, additionally rotating the school's
+/// SSPK file itself (`db::rotate_sspk`) once the revocation has actually
+/// committed -- the piece ADR-0069's revocation addendum left as "not yet
+/// decided": `rotate_for_school` above already clears every stored
+/// per-device wrap, but until the SSPK file itself is rotated too, a
+/// fresh wrap would still just re-wrap the SAME old plaintext key.
+///
+/// Takes `rotate_sspk` as a closure rather than an `AppHandle` directly,
+/// matching this module's existing convention of accepting already-
+/// resolved crypto material instead of a Tauri handle (see
+/// `enroll_device_sync_credential`'s `sspk` parameter, and
+/// `commands::learner::resolve_sspk_if_enrolled`'s doc comment for why
+/// `db::rotate_sspk` itself needs a real `AppHandle` and is therefore
+/// deliberately NOT exercised directly by this function's own tests) --
+/// a real caller passes `|| db::rotate_sspk(&app).map(|_| ())`. This
+/// keeps the coordination logic here -- "only rotate the SSPK file when
+/// a credential was actually revoked, and surface a rotation failure
+/// distinctly from a revocation failure" -- fully testable without a
+/// real Tauri runtime.
+///
+/// Deliberately calls `rotate_sspk` only AFTER `revoke_device_sync_credential`
+/// has fully committed, not inside its `SAVEPOINT`: a filesystem
+/// operation cannot participate in a SQLite transaction, so the two
+/// cannot be made atomic with each other. This ordering chooses the
+/// safer failure mode of the two available: if `rotate_sspk` then fails,
+/// the credential is already durably revoked (the security-critical
+/// half of this operation, which must never be blocked by a filesystem
+/// hiccup) and this function returns `Err` to signal that the SSPK
+/// itself was NOT rotated and must be retried -- a safe retry, since
+/// rotation never needs to know or verify the previous key's value. The
+/// reverse ordering (rotate first, revoke second) would risk the opposite,
+/// worse inconsistency: the SSPK file already changed while a rolled-back
+/// DB transaction leaves every device's stored wrap still describing the
+/// OLD key, silently breaking every future sync round for every device
+/// until manually corrected.
+pub fn revoke_device_sync_credential_and_rotate_sspk(
+    conn: &Connection,
+    sessions: &SessionManager,
+    credential_id: &str,
+    rotate_sspk: impl FnOnce() -> AppResult<()>,
+) -> AppResult<bool> {
+    let revoked = revoke_device_sync_credential(conn, sessions, credential_id)?;
+    if revoked {
+        rotate_sspk()?;
     }
     Ok(revoked)
 }
@@ -1798,6 +2102,63 @@ mod tests {
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 
+    // ---- In-app school branding (2026-09-06) ----
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_registrar_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_school_heads_manage_school_branding_from_a_different_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        // A role held in one school must not authorize a capability
+        // resolved against a *different* school's data -- there is no
+        // separate school_id parameter to smuggle here (branding is
+        // always session-scoped), so this proves the same session
+        // cannot somehow pass for a school other than the one its own
+        // role was granted in.
+        let other_school = school::create(&conn, "Other School").unwrap();
+
+        let resolved_school =
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding).unwrap();
+
+        assert_eq!(resolved_school, s.id);
+        assert_ne!(resolved_school, other_school.id);
+    }
+
     #[test]
     fn authorize_view_teacher_load_allows_a_teacher_to_view_their_own() {
         let conn = open_test_db();
@@ -2169,6 +2530,494 @@ mod tests {
             .all(|entry| entry.event_type != AuditEventType::PasswordResetByAdmin));
     }
 
+    // ---- School Membership Removal ----
+
+    #[test]
+    fn remove_school_member_succeeds_for_a_school_head_removing_a_same_school_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = remove_school_member(&conn, &sessions, &teacher.id);
+
+        assert!(result.unwrap());
+        assert!(!user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        remove_school_member(&conn, &sessions, &teacher.id).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let removal_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMembershipRemoved)
+            .expect("a school_membership_removed event must be recorded");
+        assert_eq!(
+            removal_entry.user_id,
+            Some(teacher.id),
+            "the event's subject is the account whose membership was removed"
+        );
+        assert_eq!(removal_entry.username, "ana.cruz");
+        assert_eq!(
+            removal_entry.actor_user_id,
+            Some(head_id),
+            "the event's actor is the School Head who performed the removal"
+        );
+        assert_eq!(
+            removal_entry.actor_username,
+            Some("corazon.santos".to_string())
+        );
+    }
+
+    #[test]
+    fn remove_school_member_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &teacher_b.id);
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "an ordinary Teacher must not be able to remove a colleague's membership"
+        );
+        assert!(user::is_member_of_school(&conn, &teacher_b.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_denies_a_registrar_only_session() {
+        // Registrar is deliberately NOT in ManageSchoolMembership's
+        // allowed roles -- see the capability's own doc comment.
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let registrar = user::create_user(&conn, "reg.one", "password", "Reg One").unwrap();
+        user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
+        role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
+        login(&conn, &sessions, "reg.one", "password", &s.id).unwrap();
+        let teacher = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &teacher.id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = remove_school_member(&conn, &sessions, "some-user-id");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn remove_school_member_returns_false_without_writing_an_audit_event_for_an_unknown_target() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = remove_school_member(&conn, &sessions, "does-not-exist");
+
+        assert!(!result.unwrap());
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert!(entries
+            .iter()
+            .all(|e| e.event_type != AuditEventType::SchoolMembershipRemoved));
+    }
+
+    #[test]
+    fn remove_school_member_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+
+        let not_found_result = remove_school_member(&conn, &sessions, "does-not-exist");
+        let wrong_school_result = remove_school_member(&conn, &sessions, &outsider.id);
+
+        assert_eq!(
+            not_found_result.unwrap(),
+            wrong_school_result.unwrap(),
+            "a nonexistent target and a real target in a different school must be \
+             indistinguishable, so neither can be used to enumerate accounts in another school"
+        );
+        assert!(
+            user::is_member_of_school(&conn, &outsider.id, &other_school.id).unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn remove_school_member_refuses_to_strip_the_last_school_head_via_the_command_gate() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+
+        let result = remove_school_member(&conn, &sessions, &head.id);
+
+        assert!(
+            !result.unwrap(),
+            "a School Head must not be able to remove the school's last School Head, \
+             even themselves"
+        );
+        assert!(user::is_member_of_school(&conn, &head.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn remove_school_member_revokes_every_existing_target_session() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+
+        remove_school_member(&conn, &head_sessions, &teacher.id).unwrap();
+
+        assert!(matches!(
+            teacher_sessions.require_active_session(&conn),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn remove_school_member_rolls_back_removal_sessions_and_audit_together() {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &head_sessions);
+        let teacher_sessions = SessionManager::new();
+        login(&conn, &teacher_sessions, "ana.cruz", "old-password", &s.id).unwrap();
+        conn.execute_batch(
+            "CREATE TRIGGER reject_membership_removal_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'school_membership_removed' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result = remove_school_member(&conn, &head_sessions, &teacher.id);
+
+        assert!(result.is_err());
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+        assert!(teacher_sessions.require_active_session(&conn).is_ok());
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::SchoolMembershipRemoved));
+    }
+
+    // ---- School-Member Role Management ----
+
+    #[test]
+    fn grant_school_member_role_succeeds_for_a_school_head_granting_a_same_school_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR);
+
+        assert!(result.unwrap());
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "granting an additional role must not remove the existing one"
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let grant_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMemberRoleGranted)
+            .expect("a school_member_role_granted event must be recorded");
+        assert_eq!(grant_entry.user_id, Some(teacher.id));
+        assert_eq!(grant_entry.username, "ana.cruz");
+        assert_eq!(grant_entry.actor_user_id, Some(head_id));
+        assert_eq!(
+            grant_entry.actor_username,
+            Some("corazon.santos".to_string())
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, &teacher_b.id, role_repo::REGISTRAR);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(
+            !role_repo::has_any_role(&conn, &teacher_b.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_denies_a_registrar_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let registrar = user::create_user(&conn, "reg.one", "password", "Reg One").unwrap();
+        user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
+        role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
+        login(&conn, &sessions, "reg.one", "password", &s.id).unwrap();
+        let teacher = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::SCHOOL_HEAD);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn grant_school_member_role_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, "some-user-id", role_repo::REGISTRAR);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn grant_school_member_role_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+
+        let not_found_result =
+            grant_school_member_role(&conn, &sessions, "does-not-exist", role_repo::REGISTRAR);
+        let wrong_school_result =
+            grant_school_member_role(&conn, &sessions, &outsider.id, role_repo::REGISTRAR);
+
+        assert_eq!(not_found_result.unwrap(), wrong_school_result.unwrap());
+        assert!(
+            !role_repo::has_any_role(
+                &conn,
+                &outsider.id,
+                &other_school.id,
+                &[role_repo::REGISTRAR]
+            )
+            .unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_removes_only_the_targeted_role() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR);
+
+        assert!(result.unwrap());
+        assert!(
+            !role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "revoking one role must leave the member's other roles and membership intact"
+        );
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn revoke_school_member_role_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::TEACHER).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let revoke_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMemberRoleRevoked)
+            .expect("a school_member_role_revoked event must be recorded");
+        assert_eq!(revoke_entry.user_id, Some(teacher.id));
+        assert_eq!(revoke_entry.actor_user_id, Some(head_id));
+    }
+
+    #[test]
+    fn revoke_school_member_role_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_b.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher_b.id, role_repo::TEACHER);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(
+            role_repo::has_any_role(&conn, &teacher_b.id, &s.id, &[role_repo::TEACHER]).unwrap()
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result =
+            revoke_school_member_role(&conn, &sessions, "some-user-id", role_repo::TEACHER);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn revoke_school_member_role_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+        role_repo::grant(&conn, &outsider.id, &other_school.id, role_repo::TEACHER).unwrap();
+
+        let not_found_result =
+            revoke_school_member_role(&conn, &sessions, "does-not-exist", role_repo::TEACHER);
+        let wrong_school_result =
+            revoke_school_member_role(&conn, &sessions, &outsider.id, role_repo::TEACHER);
+
+        assert_eq!(not_found_result.unwrap(), wrong_school_result.unwrap());
+        assert!(
+            role_repo::has_any_role(&conn, &outsider.id, &other_school.id, &[role_repo::TEACHER])
+                .unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_refuses_to_strip_the_sole_school_heads_school_head_role() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &head.id, role_repo::SCHOOL_HEAD);
+
+        assert!(
+            !result.unwrap(),
+            "a School Head must not be able to strip the school's last School Head role, \
+             even their own"
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &head.id, &s.id, &[role_repo::SCHOOL_HEAD]).unwrap()
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_allows_revoking_one_of_several_school_heads() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head_a =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head_a.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+        let head_b = user::create_user(&conn, "bo.reyes", "password", "Bo Reyes").unwrap();
+        user::add_school_membership(&conn, &head_b.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head_b.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        role_repo::grant(&conn, &head_b.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result =
+            revoke_school_member_role(&conn, &sessions, &head_b.id, role_repo::SCHOOL_HEAD);
+
+        assert!(result.unwrap());
+        assert!(
+            !role_repo::has_any_role(&conn, &head_b.id, &s.id, &[role_repo::SCHOOL_HEAD]).unwrap()
+        );
+        assert!(role_repo::has_any_role(&conn, &head_b.id, &s.id, &[role_repo::TEACHER]).unwrap());
+    }
+
+    #[test]
+    fn revoke_school_member_role_rolls_back_revoke_and_audit_together() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        conn.execute_batch(
+            "CREATE TRIGGER reject_role_revoke_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'school_member_role_revoked' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::TEACHER);
+
+        assert!(result.is_err());
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "a rolled-back revoke must leave the role grant intact"
+        );
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::SchoolMemberRoleRevoked));
+    }
+
     // ---- Device Sync Enrollment (ADR-0067, first slice) ----
 
     #[test]
@@ -2380,6 +3229,273 @@ mod tests {
         );
         let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
         assert_eq!(entries[0].event_type, AuditEventType::DeviceRevoked);
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_invokes_rotation_exactly_once_on_success() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        let revoked =
+            revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential.id, || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(revoked);
+        assert_eq!(rotation_calls.get(), 1);
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_never_rotates_for_an_unknown_credential() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        // An unknown credential id resolves to no owner at all, so the
+        // caller can neither be "their own device" nor a School Head
+        // over it -- `revoke_device_sync_credential`'s own authorization
+        // check rejects this the same way it would a real cross-school
+        // credential, matching its documented `Err(Unauthorized)` gate.
+        let result = revoke_device_sync_credential_and_rotate_sspk(
+            &conn,
+            &sessions,
+            "never-enrolled-credential",
+            || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            },
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert_eq!(
+            rotation_calls.get(),
+            0,
+            "rotation must never run when nothing was actually revoked"
+        );
+    }
+
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_never_rotates_when_unauthorized() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let owner = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &owner.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let other = user::create_user(&conn, "ben.reyes", "password", "Ben Reyes").unwrap();
+        user::add_school_membership(&conn, &other.id, &s.id).unwrap();
+        role_repo::grant(&conn, &other.id, &s.id, role_repo::TEACHER).unwrap();
+        let other_sessions = SessionManager::new();
+        login(&conn, &other_sessions, "ben.reyes", "password", &s.id).unwrap();
+        let rotation_calls = std::cell::Cell::new(0);
+
+        let result = revoke_device_sync_credential_and_rotate_sspk(
+            &conn,
+            &other_sessions,
+            &credential.id,
+            || {
+                rotation_calls.set(rotation_calls.get() + 1);
+                Ok(())
+            },
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert_eq!(rotation_calls.get(), 0);
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_some(),
+            "an unauthorized attempt must not revoke the credential either"
+        );
+    }
+
+    /// Proves this function's core safety property: a rotation failure
+    /// must never undo or hide the fact that the credential was already
+    /// durably revoked. The revocation is the security-critical half and
+    /// must not be blocked by (or rolled back due to) a filesystem
+    /// problem in the unrelated SSPK-rotation half.
+    #[test]
+    fn revoke_device_sync_credential_and_rotate_sspk_keeps_the_revocation_even_if_rotation_fails() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+
+        let result =
+            revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential.id, || {
+                Err(AppError::key_store("simulated rotation failure"))
+            });
+
+        assert!(result.is_err());
+        assert!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex)
+                .unwrap()
+                .is_none(),
+            "the credential must remain revoked even though rotation itself failed"
+        );
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(
+            entries[0].event_type,
+            AuditEventType::DeviceRevoked,
+            "the revocation audit entry must still be recorded"
+        );
+    }
+
+    /// ADR-0069 addendum: revoking a device must rotate the school's
+    /// sync-payload key by invalidating every stored wrap, not merely the
+    /// revoked device's -- proving `revoke_device_sync_credential` actually
+    /// calls `sync_payload_key::rotate_for_school`, not just
+    /// `device_credential::revoke`.
+    #[test]
+    fn revoking_a_device_clears_every_wrap_for_that_school_including_other_active_devices() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let sspk = test_sspk();
+        let credential_a = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-a", None, &sspk,
+        )
+        .unwrap();
+        let credential_b = enroll_device_sync_credential(
+            &conn, "ana.cruz", "password", &s.id, "device-b", None, &sspk,
+        )
+        .unwrap();
+        let secret_a = device_credential_repo::hex_decode(&credential_a.secret_hex).unwrap();
+        let secret_b = device_credential_repo::hex_decode(&credential_b.secret_hex).unwrap();
+        assert!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_b.id, &secret_b)
+                .unwrap()
+                .is_some(),
+            "device B must start with a valid wrap"
+        );
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+
+        revoke_device_sync_credential(&conn, &sessions, &credential_a.id).unwrap();
+
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_a.id, &secret_a)
+                .unwrap(),
+            None,
+            "the revoked device's own wrap must be gone"
+        );
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential_b.id, &secret_b)
+                .unwrap(),
+            None,
+            "an unrelated STILL-ACTIVE device's wrap of the old key must also be invalidated \
+             by rotation -- it recovers a fresh wrap lazily on its next authenticated contact, \
+             not by keeping the old one"
+        );
+    }
+
+    /// A device revoked BEFORE rotation cannot recover a wrap of whatever
+    /// new SSPK gets minted after rotation. Belt AND suspenders, proven
+    /// separately: (1) in production, `ensure_wrapped_for_credential` is
+    /// only ever reachable through `hub_server::authenticate`, which
+    /// requires a successful `device_credential::verify` first, and a
+    /// revoked credential never verifies (asserted below). (2) An
+    /// independent review found that `ensure_wrapped_for_credential` itself
+    /// had no `revoked_at` awareness -- if any future caller ever invoked
+    /// it without going through `verify` first, it would have silently
+    /// re-established decrypt capability for a revoked device. That gap is
+    /// now closed with an explicit active-credential check inside the
+    /// function itself (defense in depth, not reliant on caller ordering),
+    /// which this test also proves directly: calling it with the revoked
+    /// device's own real secret is a silent no-op, not a successful wrap.
+    #[test]
+    fn a_revoked_device_can_never_recover_a_wrap_of_the_post_rotation_key() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let u = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &u.id, &s.id).unwrap();
+        let credential = enroll_device_sync_credential(
+            &conn,
+            "ana.cruz",
+            "password",
+            &s.id,
+            "device-1",
+            None,
+            &test_sspk(),
+        )
+        .unwrap();
+        let secret = device_credential_repo::hex_decode(&credential.secret_hex).unwrap();
+        let sessions = SessionManager::new();
+        login(&conn, &sessions, "ana.cruz", "password", &s.id).unwrap();
+        revoke_device_sync_credential(&conn, &sessions, &credential.id).unwrap();
+        let new_sspk = test_sspk();
+
+        // Even called directly, bypassing `verify` entirely, this must be
+        // a no-op for a revoked credential -- proving the function's own
+        // internal active-credential check, not just the one call site's
+        // ordering.
+        sync_payload_key_repo::ensure_wrapped_for_credential(
+            &conn,
+            &s.id,
+            &credential.id,
+            &secret,
+            &new_sspk,
+        )
+        .unwrap();
+        assert_eq!(
+            sync_payload_key_repo::unwrap_for_credential(&conn, &credential.id, &secret).unwrap(),
+            None,
+            "ensure_wrapped_for_credential must refuse to wrap for a revoked credential, \
+             even when called directly with that device's own correct secret"
+        );
+        assert_eq!(
+            device_credential_repo::verify(&conn, &credential.id, &credential.secret_hex).unwrap(),
+            None,
+            "the revoked credential itself must also never verify again -- the production \
+             call site's first line of defense, independent of the check above"
+        );
     }
 
     #[test]

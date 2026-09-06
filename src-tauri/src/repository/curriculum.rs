@@ -73,17 +73,20 @@ mod tests {
     }
 
     #[test]
-    fn list_versions_returns_both_seeded_versions_with_k_to_12_default_first() {
+    fn list_versions_returns_all_seeded_versions_with_k_to_12_default_first() {
         let conn = open_test_db();
 
         let versions = list_versions(&conn).unwrap();
 
-        assert_eq!(versions.len(), 2);
+        assert_eq!(versions.len(), 3);
         assert!(versions[0].is_default);
         assert_eq!(versions[0].name, "K to 12 Basic Education Curriculum");
         assert!(versions
             .iter()
-            .any(|v| v.name == "MATATAG Curriculum" && !v.is_default));
+            .any(|v| v.name == "Enhanced K to 10 Curriculum" && !v.is_default));
+        assert!(versions.iter().any(|v| v.name
+            == "Strengthened Senior High School Curriculum (Grade 11)"
+            && !v.is_default));
     }
 
     #[test]
@@ -105,14 +108,14 @@ mod tests {
     #[test]
     fn version_exists_is_true_for_a_seeded_version_and_false_for_an_unknown_id() {
         let conn = open_test_db();
-        let matatag_id = list_versions(&conn)
+        let enhanced_k_to_10_id = list_versions(&conn)
             .unwrap()
             .into_iter()
-            .find(|v| v.name == "MATATAG Curriculum")
+            .find(|v| v.name == "Enhanced K to 10 Curriculum")
             .unwrap()
             .id;
 
-        assert!(version_exists(&conn, &matatag_id).unwrap());
+        assert!(version_exists(&conn, &enhanced_k_to_10_id).unwrap());
         assert!(!version_exists(&conn, "does-not-exist").unwrap());
     }
 }

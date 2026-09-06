@@ -25,6 +25,39 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
     }
     return this.resetPasswordResult;
   }
+
+  removeMemberCalls: string[] = [];
+  removeMemberResult: boolean | "reject" = true;
+
+  async removeMember(targetUserId: string): Promise<boolean> {
+    this.removeMemberCalls.push(targetUserId);
+    if (this.removeMemberResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.removeMemberResult;
+  }
+
+  grantRoleCalls: Array<{ targetUserId: string; role: string }> = [];
+  grantRoleResult: boolean | "reject" = true;
+
+  async grantRole(targetUserId: string, role: string): Promise<boolean> {
+    this.grantRoleCalls.push({ targetUserId, role });
+    if (this.grantRoleResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.grantRoleResult;
+  }
+
+  revokeRoleCalls: Array<{ targetUserId: string; role: string }> = [];
+  revokeRoleResult: boolean | "reject" = true;
+
+  async revokeRole(targetUserId: string, role: string): Promise<boolean> {
+    this.revokeRoleCalls.push({ targetUserId, role });
+    if (this.revokeRoleResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.revokeRoleResult;
+  }
 }
 
 describe("SchoolMemberApplicationService", () => {
@@ -76,5 +109,105 @@ describe("SchoolMemberApplicationService", () => {
 
     await expect(service.resetPassword("u-1", "short")).rejects.toThrow(ValidationError);
     expect(repo.resetPasswordCalls).toHaveLength(0);
+  });
+
+  it("removes a member, trimming the target id", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.removeMember(" u-1 ");
+
+    expect(result).toBe(true);
+    expect(repo.removeMemberCalls).toEqual(["u-1"]);
+  });
+
+  it("propagates a false removal result (target not found, wrong school, or last School Head) without throwing", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.removeMemberResult = false;
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.removeMember("u-1");
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty target id before ever calling the repository for removal", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.removeMember("  ")).rejects.toThrow(ValidationError);
+    expect(repo.removeMemberCalls).toHaveLength(0);
+  });
+
+  it("grants a role, trimming the target id", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.grantRole(" u-1 ", "registrar");
+
+    expect(result).toBe(true);
+    expect(repo.grantRoleCalls).toEqual([{ targetUserId: "u-1", role: "registrar" }]);
+  });
+
+  it("propagates a false grant result without throwing", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.grantRoleResult = false;
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.grantRole("u-1", "registrar");
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty target id before ever calling the repository for a grant", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.grantRole("  ", "registrar")).rejects.toThrow(ValidationError);
+    expect(repo.grantRoleCalls).toHaveLength(0);
+  });
+
+  it("rejects an unrecognized role before ever calling the repository for a grant", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.grantRole("u-1", "principal")).rejects.toThrow(ValidationError);
+    expect(repo.grantRoleCalls).toHaveLength(0);
+  });
+
+  it("revokes a role, trimming the target id", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.revokeRole(" u-1 ", "teacher");
+
+    expect(result).toBe(true);
+    expect(repo.revokeRoleCalls).toEqual([{ targetUserId: "u-1", role: "teacher" }]);
+  });
+
+  it("propagates a false revoke result (target not found, wrong school, role never held, or last School Head) without throwing", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.revokeRoleResult = false;
+    const service = new SchoolMemberApplicationService(repo);
+
+    const result = await service.revokeRole("u-1", "school_head");
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty target id before ever calling the repository for a revoke", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.revokeRole("  ", "teacher")).rejects.toThrow(ValidationError);
+    expect(repo.revokeRoleCalls).toHaveLength(0);
+  });
+
+  it("rejects an unrecognized role before ever calling the repository for a revoke", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const service = new SchoolMemberApplicationService(repo);
+
+    await expect(service.revokeRole("u-1", "principal")).rejects.toThrow(ValidationError);
+    expect(repo.revokeRoleCalls).toHaveLength(0);
   });
 });
