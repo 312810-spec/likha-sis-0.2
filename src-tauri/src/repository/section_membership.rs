@@ -3205,6 +3205,101 @@ mod tests {
     }
 
     #[test]
+    fn dependent_records_stranded_ignores_a_forged_cross_school_grading_period() {
+        // Regression test for the ADR-0066 audit's tenant-isolation fix
+        // (`cr.school_id = ?2` / `gp.school_id = ?2` on the grades
+        // subquery) -- docs/VERIFICATION-DEBT.md flagged this specific
+        // hardening as having "no dedicated test" when it landed. Without
+        // those two predicates, a hand-forged `class_records` row
+        // belonging to *another* school, but reusing this school's real
+        // `section_id`, would be pooled into the grades-stranded check
+        // and could wrongly block an otherwise safe `end_membership` --
+        // an availability bug from a leaked cross-school JOIN, not a data
+        // leak, but exactly the bug class this fix closed.
+        //
+        // `class_record::create` itself validates every FK is in-school
+        // (a cross-school `section_id` can never arise through the app),
+        // so the forged row is inserted directly, matching the technique
+        // `class_record.rs`'s own `forge_cross_school_class_record` helper
+        // uses for the same audit.
+        let mut conn = open_test_db();
+        let (school_id, section_id) = setup(&conn);
+        let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
+        let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
+            .unwrap()
+            .unwrap();
+
+        // A second, unrelated school with its own real subject/grading
+        // period, then a hand-forged `class_records` row that belongs to
+        // that other school but whose `section_id` is hand-set to *this*
+        // school's real section -- the only way such a row could exist
+        // is a forged/corrupted row, which is exactly the threat model
+        // the audit targeted.
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_sub = subject::create(&conn, &other_school.id, "Science").unwrap();
+        let other_period = grading::create(
+            &conn,
+            &other_school.id,
+            "2026-2027",
+            TERM_1,
+            "2025-09-01",
+            "2025-10-01",
+        )
+        .unwrap()
+        .unwrap();
+        conn.execute(
+            "INSERT INTO class_records \
+                 (id, school_id, section_id, subject_id, grading_period_id, weight_policy_id) \
+             VALUES ('cr-forged-cross-school', ?1, ?2, ?3, ?4, ?5)",
+            (
+                &other_school.id,
+                &section_id,
+                &other_sub.id,
+                &other_period.id,
+                K10_POLICY,
+            ),
+        )
+        .unwrap();
+        let other_item = assessment_item::create(
+            &conn,
+            &other_school.id,
+            "cr-forged-cross-school",
+            WRITTEN_WORKS,
+            "Quiz 1",
+            10.0,
+        )
+        .unwrap()
+        .unwrap();
+        let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
+        // The scored row itself is correctly attributed to *this* school
+        // (this school's own learner, scored by this school's own
+        // teacher) -- only the class-record/grading-period it hangs off
+        // of belong to the other school, which is the forged part.
+        conn.execute(
+            "INSERT INTO learner_scores \
+                 (id, school_id, assessment_item_id, learner_id, status, score, recorded_by_user_id) \
+             VALUES ('score-forged-cross-school', ?1, ?2, ?3, 'scored', 9.0, ?4)",
+            (&school_id, &other_item.id, &l.id, &teacher.id),
+        )
+        .unwrap();
+
+        // Ending this school's membership on 2025-08-15 would strand the
+        // forged score (its grading period, 2025-09-01..2025-10-01, starts
+        // after the resulting interval ends) *if* the grades subquery
+        // failed to scope `class_records`/`grading_periods` to this
+        // school. It must not: the class record and grading period belong
+        // to another school entirely, so the end must succeed cleanly.
+        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-15").unwrap();
+
+        assert!(
+            matches!(outcome, EndMembershipOutcome::Ended { .. }),
+            "a scored row hanging off another school's class_record/grading_period \
+             (even one reusing this school's section id) must never block this school's \
+             membership change: got {outcome:?}"
+        );
+    }
+
+    #[test]
     fn correct_same_day_placement_rejects_a_malformed_as_of_date() {
         let mut conn = open_test_db();
         let (school_id, section_a) = setup(&conn);

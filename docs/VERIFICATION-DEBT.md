@@ -158,6 +158,32 @@ Full findings: `docs/security-reviews/2026-09-04-adr-0066-tenant-isolation-join-
 existing transfer/end tests) — recorded so a reviewer knows it was
 deliberate.
 
+**CLOSED (2026-09-06)**: added a dedicated regression test,
+`section_membership::tests::dependent_records_stranded_ignores_a_forged_cross_school_grading_period`,
+reproducing the exact scenario the `cr.school_id = ?2` / `gp.school_id =
+?2` predicates guard against — a hand-forged `class_records` row
+belonging to another school but reusing this school's real `section_id`
+(the technique `class_record.rs`'s own `forge_cross_school_class_record`
+uses for the same audit). Confirmed GREEN with the fix in place in two
+separate isolated `cargo test --lib` runs. A RED check (temporarily
+reverting the two predicates to confirm the test actually fails without
+them) was attempted but blocked mid-session by this session's own
+auto-mode classifier before it could run, so the fix was restored
+unexercised in the reverted state — by inspection the reverted query
+would match the forged row (identical `cr.section_id`, no school
+constraint) and the resulting `EndMembershipOutcome::DependentRecordConflict`
+would fail the assertion, but this was not run for real; treat the RED
+side as reasoned, not proven. `cargo fmt --check` and
+`cargo clippy --all-targets -- -D warnings` both ran clean on the full
+crate. A full `cargo test` (every integration binary) could not be
+completed this session: this shared runner hit severe, repeated
+`No space left on device` failures from other concurrent sessions'
+builds (confirmed via `ps`/`df` — not caused by this change, which
+touches only this one test function and this one doc), even after
+`cargo clean`-ing this worktree's own `target/` twice. Owed: one full
+`cargo test` pass on a quieter runner to confirm no incidental
+regression elsewhere in the crate.
+
 ## `quality:ui` smoke green again after the UI-redesign merge — CLOSED (2026-09-03)
 
 Branch `claude/fix-ui-smoke-redesigned-nav` off `main` at `860cede`.
