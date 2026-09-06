@@ -981,6 +981,63 @@ Attendance, Subject Monitor, Teacher Load, Teaching Assignments,
 Schedule Meetings, SF1 Import — tracked here as retained debt, not
 assumed covered by this session's work.
 
+## Dev-preview fixture coverage for Adviser View / Subject Attendance / Subject Monitor / Teacher Load / Teaching Assignments / Schedule Meetings — closed (2026-09-06)
+
+Six of the seven gaps recorded immediately above are now closed,
+following the exact existing dev-preview fixture pattern (a `Fixture*Repository`
+class in `src/dev-preview/fixtures.ts` implementing the same port
+production's `TauriXRepository` classes do, constructed once at module
+scope in `src/dev-preview/DevPreviewApp.tsx` and passed into the real
+screen component — no new fixture mechanism invented):
+
+- Added `FixtureTeachingAssignmentRepository` (`TeachingAssignmentRepository`
+  port) — seeds three teaching assignments (`teacher-ana` teaches Mabini/
+  Mathematics and Rizal/Science; `teacher-bayani` teaches Bonifacio/MAPEH
+  with no schedule yet, covering the "0 weekly instructional minutes"/
+  empty-schedule state) and two weekly meetings, with genuinely mutable
+  `create`/`remove`/`createMeeting`/`removeMeeting` (including the same
+  teacher/section/room conflict and duplicate detection the real backend
+  enforces) and a derived `getLoad`.
+- Added `FixtureSubjectAttendanceRepository` (`SubjectAttendanceRepository`
+  port) — seeds held/no-class sessions for `ta-1` with a genuine
+  consecutive-absence streak for one learner (so Subject Monitor has a
+  real streak to show) and a `no_class` day (so Subject Attendance's own
+  no-class state is reachable), plus `listAdviserViewSections`/
+  `adviserOverview` built from the same seeded data and the existing
+  Section Adviser fixture's advisory (`teacher-ana` advises
+  `sec-not-started`) so Adviser View, Subject Attendance, Subject
+  Monitor, and Teacher Load all agree on who "my" refers to.
+- Wired `src/dev-preview/DevPreviewApp.tsx`'s `subject-attendance`,
+  `subject-monitor`, `adviser-view`, and `teacher-load` sidebar
+  destinations (previously falling through to the unwired-destination
+  message) to the real `SubjectAttendanceScreen`/`SubjectMonitorScreen`/
+  `AdviserViewScreen`/`TeacherLoadScreen`, and `sections`' "Manage
+  assignments" action through new `teaching-assignments` and
+  `schedule-meetings` tabs to the real `TeachingAssignmentsScreen`/
+  `ScheduleMeetingsScreen`.
+- Verified via `src/dev-preview/DevPreviewApp.render.test.tsx` (new) —
+  a Testing-Library render of `DevPreviewApp` that clicks through the
+  sidebar/Sections handoff to each of the six destinations and asserts
+  the real screen's own heading renders — proving the fixtures actually
+  load through the full service→port→screen chain, not just typecheck.
+  `npm run test`: 951/951 passed (was 946); `npm run typecheck`,
+  `eslint .`, and `prettier --check .` all clean.
+
+**Not closed by this session**: SF1 Import (`Sf1ImportScreen`) remains
+unwired. Its `Sf1ImportApplicationService` needs both an
+`Sf1ImportRepository` fixture (preview/commit/history — feasible) and a
+`FilePicker` fixture (`pickWorkbookFile`) — but this dev-preview is a
+plain browser page with no real OS file dialog to stand in for, so a
+fixture `FilePicker` can only ever return a synthetic, hard-coded path,
+never let a person actually choose a file the way every other screen in
+this fixture lets them genuinely interact with real (fixture) state.
+That's a materially different, weaker kind of "fixture coverage" than
+the other six gaps just closed, and was deliberately not rushed into
+this session. Retained as debt for a future session to design
+deliberately (e.g. a fixture `FilePicker` that offers a small fixed
+menu of synthetic "files" to pick from, each mapped to a canned
+`Sf1ImportPreview`).
+
 ## Wave 3E/3F/3G individual review debt — closed (2026-08-31)
 
 A `security-reviewer` was dispatched specifically for the three

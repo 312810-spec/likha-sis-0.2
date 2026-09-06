@@ -12,14 +12,22 @@ import { SchoolMemberApplicationService } from "../application/school-member-ser
 import { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
+import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
+import { AdviserViewScreen } from "../ui/AdviserViewScreen";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
 import { AuditLogScreen } from "../ui/AuditLogScreen";
 import { ClassRecordsScreen } from "../ui/ClassRecordsScreen";
 import { MonthlySummaryScreen } from "../ui/MonthlySummaryScreen";
 import { LearnerListScreen } from "../ui/LearnerListScreen";
+import { ScheduleMeetingsScreen } from "../ui/ScheduleMeetingsScreen";
 import { SectionAdviserScreen } from "../ui/SectionAdviserScreen";
 import { SectionsScreen } from "../ui/SectionsScreen";
+import { SubjectAttendanceScreen } from "../ui/SubjectAttendanceScreen";
+import { SubjectMonitorScreen } from "../ui/SubjectMonitorScreen";
+import { TeacherLoadScreen } from "../ui/TeacherLoadScreen";
 import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
+import { TeachingAssignmentsScreen } from "../ui/TeachingAssignmentsScreen";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
 import { AppLayout } from "../ui/shell/AppLayout";
 import { ModeProvider } from "../ui/theme/ModeContext";
@@ -38,8 +46,21 @@ import {
   FixtureSchoolMemberRepository,
   FixtureSectionAdvisoryRepository,
   FixtureSectionRepository,
+  FixtureSubjectAttendanceRepository,
   FixtureSubjectRepository,
+  FixtureTeachingAssignmentRepository,
 } from "./fixtures";
+
+/** The fixture's own acting teacher for the Subject Attendance/Teaching
+ * Assignment slice -- already `FIXTURE_SCHOOL_MEMBERS`' "Ana Cruz" and
+ * already the seeded adviser of `sec-not-started`
+ * (`FixtureSectionAdvisoryRepository`), so Adviser View, Subject
+ * Attendance, Subject Monitor, and Teacher Load all agree on who "my"
+ * refers to. Deliberately not `FIXTURE_SESSION.userId`
+ * ("fixture-user") -- that id exists only for the signed-in-session
+ * prop shown in `AppLayout`, never as a school member/teacher id in any
+ * of this file's other fixture data. */
+const FIXTURE_TEACHER_USER_ID = "teacher-ana";
 
 /**
  * Development-only visual fixture. See `docs/adr/0032-teacher-workspace-polish.md`
@@ -59,10 +80,12 @@ import {
  * destinations have grown with each milestone that needed real
  * browser-rendered verification (see each screen's own git history for
  * which wave added it) -- still a narrow verification tool, not a full
- * second app shell: several `SignedInTab` destinations (e.g. Subject
- * Attendance, Teacher Load, Adviser View) remain unwired and fall
- * through to the catch-all message below, tracked as retained debt in
- * `docs/VERIFICATION-DEBT.md` rather than assumed covered.
+ * second app shell: `sf1-import` (SF1 bulk import — needs a `FilePicker`
+ * fixture this dev-preview does not yet have, since there is no real OS
+ * file dialog in a browser-hosted preview) is the one `SignedInTab`
+ * destination that remains unwired and falls through to the catch-all
+ * message below, tracked as retained debt in `docs/VERIFICATION-DEBT.md`
+ * rather than assumed covered.
  */
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
@@ -83,6 +106,14 @@ const schoolMemberService = new SchoolMemberApplicationService(new FixtureSchool
 const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new FixtureSectionAdvisoryRepository(),
 );
+const teachingAssignmentRepository = new FixtureTeachingAssignmentRepository();
+const teachingAssignmentService = new TeachingAssignmentApplicationService(
+  teachingAssignmentRepository,
+);
+const subjectAttendanceService = new SubjectAttendanceApplicationService(
+  new FixtureSubjectAttendanceRepository(),
+  teachingAssignmentRepository,
+);
 
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
@@ -94,6 +125,15 @@ export function DevPreviewApp() {
   } | null>(null);
   const [sectionAdviserSection, setSectionAdviserSection] = useState<{
     sectionId: string;
+    sectionName: string;
+  } | null>(null);
+  const [assignmentsSection, setAssignmentsSection] = useState<{
+    sectionId: string;
+    sectionName: string;
+  } | null>(null);
+  const [scheduleContext, setScheduleContext] = useState<{
+    teachingAssignmentId: string;
+    subjectName: string;
     sectionName: string;
   } | null>(null);
 
@@ -174,7 +214,10 @@ export function DevPreviewApp() {
             learnerService={learnerService}
             exportService={exportService}
             onOpenRoster={() => {}}
-            onManageAssignments={() => {}}
+            onManageAssignments={(sectionId, sectionName) => {
+              setAssignmentsSection({ sectionId, sectionName });
+              setActiveTab("teaching-assignments");
+            }}
             onManageAdviser={(sectionId, sectionName) => {
               setSectionAdviserSection({ sectionId, sectionName });
               setActiveTab("section-adviser");
@@ -187,6 +230,50 @@ export function DevPreviewApp() {
             sectionId={sectionAdviserSection?.sectionId ?? "sec-not-started"}
             sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
             onBack={() => setActiveTab("sections")}
+          />
+        ) : activeTab === "teaching-assignments" ? (
+          <TeachingAssignmentsScreen
+            teachingAssignmentService={teachingAssignmentService}
+            subjectService={subjectService}
+            schoolMemberService={schoolMemberService}
+            sectionId={assignmentsSection?.sectionId ?? "sec-not-started"}
+            sectionName={assignmentsSection?.sectionName ?? "Mabini"}
+            onBack={() => setActiveTab("sections")}
+            onManageSchedule={(teachingAssignmentId, subjectName) => {
+              setScheduleContext({
+                teachingAssignmentId,
+                subjectName,
+                sectionName: assignmentsSection?.sectionName ?? "Mabini",
+              });
+              setActiveTab("schedule-meetings");
+            }}
+          />
+        ) : activeTab === "schedule-meetings" ? (
+          <ScheduleMeetingsScreen
+            teachingAssignmentService={teachingAssignmentService}
+            teachingAssignmentId={scheduleContext?.teachingAssignmentId ?? "ta-1"}
+            subjectName={scheduleContext?.subjectName ?? "Mathematics"}
+            sectionName={scheduleContext?.sectionName ?? "Mabini"}
+            onBack={() => setActiveTab("teaching-assignments")}
+          />
+        ) : activeTab === "subject-attendance" ? (
+          <SubjectAttendanceScreen
+            subjectAttendanceService={subjectAttendanceService}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
+          />
+        ) : activeTab === "subject-monitor" ? (
+          <SubjectMonitorScreen
+            subjectAttendanceService={subjectAttendanceService}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
+          />
+        ) : activeTab === "adviser-view" ? (
+          <AdviserViewScreen subjectAttendanceService={subjectAttendanceService} />
+        ) : activeTab === "teacher-load" ? (
+          <TeacherLoadScreen
+            teachingAssignmentService={teachingAssignmentService}
+            subjectAttendanceService={subjectAttendanceService}
+            schoolMemberService={schoolMemberService}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
           />
         ) : (
           <div className="alert alert-info" role="status">
