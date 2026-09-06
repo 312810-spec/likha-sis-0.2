@@ -21,6 +21,10 @@ const MEMBERS: SchoolMember[] = [
 class FakeSchoolMemberRepository implements SchoolMemberRepository {
   removeResult: boolean | "reject" = true;
   removeCalls: string[] = [];
+  grantResult: boolean | "reject" = true;
+  grantCalls: Array<[string, string]> = [];
+  revokeResult: boolean | "reject" = true;
+  revokeCalls: Array<[string, string]> = [];
   /** When set, `removeMember` never resolves on its own -- proves the
    * in-flight guard, matching `DeviceManagementScreen.test.tsx`'s
    * established convention. */
@@ -45,6 +49,22 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
       throw new Error("unauthorized");
     }
     return this.removeResult;
+  }
+
+  async grantRole(targetUserId: string, role: string): Promise<boolean> {
+    this.grantCalls.push([targetUserId, role]);
+    if (this.grantResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.grantResult;
+  }
+
+  async revokeRole(targetUserId: string, role: string): Promise<boolean> {
+    this.revokeCalls.push([targetUserId, role]);
+    if (this.revokeResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    return this.revokeResult;
   }
 }
 
@@ -204,5 +224,91 @@ describe("SchoolMembershipScreen", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Remove member" }).at(1)!);
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("grants an additional role via the picker without a heavy confirmation step", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Ana Cruz");
+
+    await user.click(screen.getAllByRole("button", { name: "Grant a role" }).at(1)!);
+    await user.click(screen.getByRole("button", { name: "Grant role" }));
+
+    expect(repo.grantCalls).toEqual([["u-teacher", "registrar"]]);
+    expect(await screen.findByText("Ana Cruz was granted the Registrar role.")).toBeInTheDocument();
+  });
+
+  it("shows a generic failure message when a role grant fails", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.grantResult = false;
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Ana Cruz");
+
+    await user.click(screen.getAllByRole("button", { name: "Grant a role" }).at(1)!);
+    await user.click(screen.getByRole("button", { name: "Grant role" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not grant this role/i);
+  });
+
+  it("revokes one of several roles immediately, without a heavy confirmation step", async () => {
+    const repo = new FakeSchoolMemberRepository([
+      {
+        id: "u-multi",
+        username: "bo.reyes",
+        displayName: "Bo Reyes",
+        roles: ["teacher", "registrar"],
+      },
+    ]);
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Bo Reyes");
+
+    await user.click(screen.getByRole("button", { name: "Remove Teacher role from Bo Reyes" }));
+
+    await waitFor(() => expect(repo.revokeCalls).toEqual([["u-multi", "teacher"]]));
+    expect(await screen.findByText("Teacher was removed from Bo Reyes.")).toBeInTheDocument();
+  });
+
+  it("requires a plain-language confirmation before revoking a member's only role", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Ana Cruz");
+
+    await user.click(screen.getByRole("button", { name: "Remove Teacher role from Ana Cruz" }));
+
+    expect(screen.getByText("Remove this role?")).toBeInTheDocument();
+    expect(repo.revokeCalls).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(repo.revokeCalls).toHaveLength(0);
+  });
+
+  it("revokes a member's only role after the confirmation step is accepted", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Ana Cruz");
+
+    await user.click(screen.getByRole("button", { name: "Remove Teacher role from Ana Cruz" }));
+    await user.click(screen.getByRole("button", { name: "Yes, remove this role" }));
+
+    expect(repo.revokeCalls).toEqual([["u-teacher", "teacher"]]);
+    expect(await screen.findByText("Teacher was removed from Ana Cruz.")).toBeInTheDocument();
+  });
+
+  it("shows a generic failure message when a role revoke fails", async () => {
+    const repo = new FakeSchoolMemberRepository();
+    repo.revokeResult = false;
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Ana Cruz");
+
+    await user.click(screen.getByRole("button", { name: "Remove Teacher role from Ana Cruz" }));
+    await user.click(screen.getByRole("button", { name: "Yes, remove this role" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not remove this role/i);
   });
 });

@@ -55,6 +55,12 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
   async removeMember(): Promise<boolean> {
     throw new Error("not used in this test");
   }
+  async grantRole(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
+  async revokeRole(): Promise<boolean> {
+    throw new Error("not used in this test");
+  }
 }
 
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {

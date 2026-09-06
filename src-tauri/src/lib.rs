@@ -80,6 +80,8 @@ pub fn run() {
             commands::user::list_school_members,
             commands::user::admin_reset_teacher_password,
             commands::user::remove_school_member,
+            commands::user::grant_school_member_role,
+            commands::user::revoke_school_member_role,
             commands::setup::installation_status,
             commands::setup::bootstrap_installation,
             commands::auth::login,

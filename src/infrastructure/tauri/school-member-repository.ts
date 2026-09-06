@@ -17,4 +17,12 @@ export class TauriSchoolMemberRepository implements SchoolMemberRepository {
   removeMember(targetUserId: string): Promise<boolean> {
     return invoke<boolean>("remove_school_member", { targetUserId });
   }
+
+  grantRole(targetUserId: string, role: string): Promise<boolean> {
+    return invoke<boolean>("grant_school_member_role", { targetUserId, role });
+  }
+
+  revokeRole(targetUserId: string, role: string): Promise<boolean> {
+    return invoke<boolean>("revoke_school_member_role", { targetUserId, role });
+  }
 }

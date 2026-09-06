@@ -720,6 +720,139 @@ pub fn remove_school_member(
     }
 }
 
+/// School-Member Role Management (grant half): a School Head grants a
+/// colleague in their own school an ADDITIONAL role, on top of whatever
+/// they already hold -- e.g. promoting a Teacher to also hold Registrar.
+/// Reuses `ManageSchoolMembership` exactly like `add_user_to_school`/
+/// `remove_school_member` -- granting authority is the same authority
+/// class as onboarding or removing someone. `school_id` comes only from
+/// the caller's own session, never a client-supplied parameter.
+///
+/// Deliberately no destructive-confirmation-shaped guard here: granting
+/// an additional role is additive and reversible (a mistaken grant is
+/// simply revoked again), unlike losing access entirely or losing the
+/// school's last School Head. `role_repo::grant`'s own no-op-on-already-
+/// held and reject-unrecognized-role behavior applies unchanged.
+///
+/// Returns `Ok(false)` -- not an error, the same enumeration-safety shape
+/// `remove_school_member` already uses -- when `target_user_id` does not
+/// exist or is not a member of `school_id`. `Err(Unauthorized)` is
+/// reserved for the capability check itself; an unrecognized `role`
+/// string still surfaces as a real `Err` from `role_repo::grant`, since
+/// that is a caller programming error, not a target-enumeration concern.
+pub fn grant_school_member_role(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    role: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_member_role_grant")?;
+    let outcome = (|| -> AppResult<bool> {
+        role_repo::grant(conn, &target.id, &school_id, role)?;
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMemberRoleGranted,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(granted) => {
+            conn.execute_batch("RELEASE school_member_role_grant")?;
+            Ok(granted)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_member_role_grant; RELEASE school_member_role_grant",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// School-Member Role Management (revoke half): a School Head revokes
+/// one role from a colleague in their own school, while leaving their
+/// membership (and any other role they hold) intact -- e.g. demoting a
+/// Registrar back to Teacher-only, or stepping someone down from School
+/// Head. Gated identically to `grant_school_member_role`.
+///
+/// Fails closed -- returns `Ok(false)`, not an error, matching
+/// `remove_school_membership`'s own enumeration-safety shape -- when
+/// revoking `role::SCHOOL_HEAD` would leave `school_id` with zero School
+/// Heads (`role_repo::count_holders`, the exact same building block
+/// `user_repo::remove_school_membership`'s guard already uses, so the
+/// two guards can never silently drift apart). Revoking `TEACHER` or
+/// `REGISTRAR` carries no such guard -- a school may have zero
+/// Registrars, and Teacher is not a privileged role. Whether a Teacher
+/// still holds active teaching assignments is out of scope here.
+///
+/// Returns `Ok(false)` also when `target_user_id` does not exist, is not
+/// a member of `school_id`, or never held `role` there in the first
+/// place (matching `role_repo::revoke`'s own no-op contract).
+/// `Err(Unauthorized)` is reserved for the capability check itself.
+pub fn revoke_school_member_role(
+    conn: &Connection,
+    sessions: &SessionManager,
+    target_user_id: &str,
+    role: &str,
+) -> AppResult<bool> {
+    let (school_id, actor_user_id) =
+        authorize_capability_with_actor(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let target = match user_repo::find_by_id(conn, target_user_id)? {
+        Some(user) => user,
+        None => return Ok(false),
+    };
+    if !user_repo::is_member_of_school(conn, &target.id, &school_id)? {
+        return Ok(false);
+    }
+    if role == role_repo::SCHOOL_HEAD && role_repo::count_holders(conn, &school_id, role)? <= 1 {
+        return Ok(false);
+    }
+
+    conn.execute_batch("SAVEPOINT school_member_role_revoke")?;
+    let outcome = (|| -> AppResult<bool> {
+        if !role_repo::revoke(conn, &target.id, &school_id, role)? {
+            return Ok(false);
+        }
+        audit_log_repo::record_admin_action(
+            conn,
+            &school_id,
+            &actor_user_id,
+            &target.id,
+            &target.username,
+            AuditEventType::SchoolMemberRoleRevoked,
+        )?;
+        Ok(true)
+    })();
+    match outcome {
+        Ok(revoked) => {
+            conn.execute_batch("RELEASE school_member_role_revoke")?;
+            Ok(revoked)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO school_member_role_revoke; RELEASE school_member_role_revoke",
+            );
+            Err(error)
+        }
+    }
+}
+
 /// Device Sync Enrollment (ADR-0067, first slice): the trusted-boundary
 /// ceremony an implementation's future enrollment surface will use to
 /// issue a per-device sync credential. Reuses exactly the same
@@ -2522,6 +2655,295 @@ mod tests {
             .unwrap()
             .iter()
             .all(|entry| entry.event_type != AuditEventType::SchoolMembershipRemoved));
+    }
+
+    // ---- School-Member Role Management ----
+
+    #[test]
+    fn grant_school_member_role_succeeds_for_a_school_head_granting_a_same_school_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+
+        let result = grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR);
+
+        assert!(result.unwrap());
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "granting an additional role must not remove the existing one"
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let grant_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMemberRoleGranted)
+            .expect("a school_member_role_granted event must be recorded");
+        assert_eq!(grant_entry.user_id, Some(teacher.id));
+        assert_eq!(grant_entry.username, "ana.cruz");
+        assert_eq!(grant_entry.actor_user_id, Some(head_id));
+        assert_eq!(
+            grant_entry.actor_username,
+            Some("corazon.santos".to_string())
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, &teacher_b.id, role_repo::REGISTRAR);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(
+            !role_repo::has_any_role(&conn, &teacher_b.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+    }
+
+    #[test]
+    fn grant_school_member_role_denies_a_registrar_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let registrar = user::create_user(&conn, "reg.one", "password", "Reg One").unwrap();
+        user::add_school_membership(&conn, &registrar.id, &s.id).unwrap();
+        role_repo::grant(&conn, &registrar.id, &s.id, role_repo::REGISTRAR).unwrap();
+        login(&conn, &sessions, "reg.one", "password", &s.id).unwrap();
+        let teacher = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, &teacher.id, role_repo::SCHOOL_HEAD);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn grant_school_member_role_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result =
+            grant_school_member_role(&conn, &sessions, "some-user-id", role_repo::REGISTRAR);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn grant_school_member_role_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+
+        let not_found_result =
+            grant_school_member_role(&conn, &sessions, "does-not-exist", role_repo::REGISTRAR);
+        let wrong_school_result =
+            grant_school_member_role(&conn, &sessions, &outsider.id, role_repo::REGISTRAR);
+
+        assert_eq!(not_found_result.unwrap(), wrong_school_result.unwrap());
+        assert!(
+            !role_repo::has_any_role(
+                &conn,
+                &outsider.id,
+                &other_school.id,
+                &[role_repo::REGISTRAR]
+            )
+            .unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_removes_only_the_targeted_role() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::REGISTRAR);
+
+        assert!(result.unwrap());
+        assert!(
+            !role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::REGISTRAR]).unwrap()
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "revoking one role must leave the member's other roles and membership intact"
+        );
+        assert!(user::is_member_of_school(&conn, &teacher.id, &s.id).unwrap());
+    }
+
+    #[test]
+    fn revoke_school_member_role_records_a_distinct_attributable_audit_event() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let head_id = sessions.current().unwrap().user_id;
+
+        revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::TEACHER).unwrap();
+
+        let entries = audit_log_repo::list_for_school(&conn, &s.id, 10).unwrap();
+        let revoke_entry = entries
+            .iter()
+            .find(|e| e.event_type == AuditEventType::SchoolMemberRoleRevoked)
+            .expect("a school_member_role_revoked event must be recorded");
+        assert_eq!(revoke_entry.user_id, Some(teacher.id));
+        assert_eq!(revoke_entry.actor_user_id, Some(head_id));
+    }
+
+    #[test]
+    fn revoke_school_member_role_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher_a = user::create_user(&conn, "teacher.a", "password", "Teacher A").unwrap();
+        user::add_school_membership(&conn, &teacher_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_a.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.a", "password", &s.id).unwrap();
+        let teacher_b = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &teacher_b.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher_b.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher_b.id, role_repo::TEACHER);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(
+            role_repo::has_any_role(&conn, &teacher_b.id, &s.id, &[role_repo::TEACHER]).unwrap()
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result =
+            revoke_school_member_role(&conn, &sessions, "some-user-id", role_repo::TEACHER);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn revoke_school_member_role_returns_false_for_a_target_in_a_different_school_without_leaking_which_case_it_was(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let outsider = user::create_user(&conn, "outsider", "password", "Outsider").unwrap();
+        user::add_school_membership(&conn, &outsider.id, &other_school.id).unwrap();
+        role_repo::grant(&conn, &outsider.id, &other_school.id, role_repo::TEACHER).unwrap();
+
+        let not_found_result =
+            revoke_school_member_role(&conn, &sessions, "does-not-exist", role_repo::TEACHER);
+        let wrong_school_result =
+            revoke_school_member_role(&conn, &sessions, &outsider.id, role_repo::TEACHER);
+
+        assert_eq!(not_found_result.unwrap(), wrong_school_result.unwrap());
+        assert!(
+            role_repo::has_any_role(&conn, &outsider.id, &other_school.id, &[role_repo::TEACHER])
+                .unwrap(),
+            "a School Head's authority must not extend to a different school's member"
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_refuses_to_strip_the_sole_school_heads_school_head_role() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &head.id, role_repo::SCHOOL_HEAD);
+
+        assert!(
+            !result.unwrap(),
+            "a School Head must not be able to strip the school's last School Head role, \
+             even their own"
+        );
+        assert!(
+            role_repo::has_any_role(&conn, &head.id, &s.id, &[role_repo::SCHOOL_HEAD]).unwrap()
+        );
+    }
+
+    #[test]
+    fn revoke_school_member_role_allows_revoking_one_of_several_school_heads() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let head_a =
+            user::create_user(&conn, "corazon.santos", "head-password", "Corazon Santos").unwrap();
+        user::add_school_membership(&conn, &head_a.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head_a.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "corazon.santos", "head-password", &s.id).unwrap();
+        let head_b = user::create_user(&conn, "bo.reyes", "password", "Bo Reyes").unwrap();
+        user::add_school_membership(&conn, &head_b.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head_b.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        role_repo::grant(&conn, &head_b.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result =
+            revoke_school_member_role(&conn, &sessions, &head_b.id, role_repo::SCHOOL_HEAD);
+
+        assert!(result.unwrap());
+        assert!(
+            !role_repo::has_any_role(&conn, &head_b.id, &s.id, &[role_repo::SCHOOL_HEAD]).unwrap()
+        );
+        assert!(role_repo::has_any_role(&conn, &head_b.id, &s.id, &[role_repo::TEACHER]).unwrap());
+    }
+
+    #[test]
+    fn revoke_school_member_role_rolls_back_revoke_and_audit_together() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher) = setup_school_head_and_teacher(&conn, &sessions);
+        conn.execute_batch(
+            "CREATE TRIGGER reject_role_revoke_audit \
+             BEFORE INSERT ON audit_log \
+             WHEN NEW.event_type = 'school_member_role_revoked' \
+             BEGIN SELECT RAISE(ABORT, 'injected audit failure'); END;",
+        )
+        .unwrap();
+
+        let result = revoke_school_member_role(&conn, &sessions, &teacher.id, role_repo::TEACHER);
+
+        assert!(result.is_err());
+        assert!(
+            role_repo::has_any_role(&conn, &teacher.id, &s.id, &[role_repo::TEACHER]).unwrap(),
+            "a rolled-back revoke must leave the role grant intact"
+        );
+        assert!(audit_log_repo::list_for_school(&conn, &s.id, 10)
+            .unwrap()
+            .iter()
+            .all(|entry| entry.event_type != AuditEventType::SchoolMemberRoleRevoked));
     }
 
     // ---- Device Sync Enrollment (ADR-0067, first slice) ----

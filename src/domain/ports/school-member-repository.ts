@@ -33,4 +33,27 @@ export interface SchoolMemberRepository {
    * see `auth::remove_school_member`'s doc comment.
    */
   removeMember(targetUserId: string): Promise<boolean>;
+  /**
+   * Grants `targetUserId` an ADDITIONAL role in the caller's own
+   * school, on top of whatever they already hold -- e.g. promoting a
+   * Teacher to also hold Registrar. Returns `false` (not a thrown
+   * error) when `targetUserId` doesn't exist or isn't a member of the
+   * caller's school, matching `removeMember`'s enumeration-safety
+   * shape. A thrown `Unauthorized` means the caller itself lacks the
+   * `ManageSchoolMembership` capability -- see
+   * `auth::grant_school_member_role`'s doc comment.
+   */
+  grantRole(targetUserId: string, role: string): Promise<boolean>;
+  /**
+   * Revokes one role from `targetUserId` in the caller's own school,
+   * leaving their membership and any other role intact. Returns
+   * `false` (not a thrown error) when `targetUserId` doesn't exist,
+   * isn't a member of the caller's school, never held `role` there, or
+   * when revoking `school_head` would leave the school with zero
+   * School Heads -- the same fail-closed shape `removeMember` already
+   * uses for the analogous case. A thrown `Unauthorized` means the
+   * caller itself lacks the `ManageSchoolMembership` capability -- see
+   * `auth::revoke_school_member_role`'s doc comment.
+   */
+  revokeRole(targetUserId: string, role: string): Promise<boolean>;
 }

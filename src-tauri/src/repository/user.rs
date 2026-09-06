@@ -278,15 +278,9 @@ pub fn remove_school_membership(
     user_id: &str,
     school_id: &str,
 ) -> AppResult<bool> {
-    let would_strip_last_school_head: bool = conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM user_school_roles \
-                       WHERE user_id = ?1 AND school_id = ?2 AND role = ?3) \
-                AND (SELECT count(*) FROM user_school_roles \
-                     WHERE school_id = ?2 AND role = ?3) <= 1",
-        (user_id, school_id, role::SCHOOL_HEAD),
-        |row| row.get(0),
-    )?;
-    if would_strip_last_school_head {
+    if role::has_any_role(conn, user_id, school_id, &[role::SCHOOL_HEAD])?
+        && role::count_holders(conn, school_id, role::SCHOOL_HEAD)? <= 1
+    {
         return Ok(false);
     }
 

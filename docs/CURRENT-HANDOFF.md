@@ -1,5 +1,119 @@
 # CURRENT HANDOFF
 
+## School-Member Role Management (2026-09-06), committed locally, NOT pushed
+
+Worktree `agent-a6cf2007ab44b5a0d`, branch
+`claude/repo-priority-automation-8h96zx` (fast-forward-merged onto its
+current tip, commit `18fcf29`, before starting). Closes the next
+concrete gap after School Membership Removal: a School Head could add a
+member (always Teacher, `add_user_to_school`'s own doc comment) or
+remove a member entirely, but had no way to grant an ADDITIONAL role to
+an existing member (e.g. promote a Teacher to also hold Registrar) or
+revoke a single role while keeping their membership (e.g. demote a
+Registrar back to Teacher-only, or step someone down from School Head).
+
+**What shipped**:
+
+- `repository/role::revoke(conn, user_id, school_id, role)` (new):
+  deletes the specific `(user_id, school_id, role)` row only, leaving
+  every other role the user holds untouched. Returns `Ok(bool)` -- did a
+  row actually exist and get removed -- matching `user::
+remove_school_membership`'s established convention. Deliberately no
+  last-School-Head guard inside this function itself (a plain,
+  unconditional delete, exactly like `grant` is a plain, unconditional
+  insert) -- the guard lives one layer up.
+- `repository/role::count_holders(conn, school_id, role)` (new): the
+  shared building block behind the last-School-Head guard. `user::
+remove_school_membership`'s own guard was refactored to call this
+  (it previously duplicated the same COUNT/EXISTS SQL inline) so the two
+  guards -- "losing membership loses every role at once" and "losing
+  just the School Head role" -- can never silently drift apart.
+- **Last-School-Head-role guard (auth-layer, fail-closed)**: revoking a
+  user's `SCHOOL_HEAD` role is refused (`Ok(false)`, not an error) when
+  `role_repo::count_holders(school_id, SCHOOL_HEAD) <= 1` for that user.
+  Revoking `TEACHER` or `REGISTRAR` carries no such guard -- a school may
+  have zero Registrars, and Teacher is not a privileged role (whether a
+  Teacher still holds active teaching assignments is explicitly out of
+  scope for this slice). Proven by dedicated tests: revoking the sole
+  School Head's own role is refused; revoking one of two School Heads'
+  role succeeds; revoking a non-privileged role never trips the guard.
+- `auth::grant_school_member_role` / `auth::revoke_school_member_role`
+  (new): both gated by `Capability::ManageSchoolMembership` via
+  `authorize_capability_with_actor` (School-Head-only, the same gate
+  `add_user_to_school`/`remove_school_member` already use), `school_id`/
+  `actor_user_id` from the session only, never client-supplied. Same
+  SAVEPOINT-wrapped shape as `remove_school_member`: on success, records
+  a distinct-actor audit event (`audit_log_repo::record_admin_action`)
+  in the same transaction; a mid-transaction failure (audit trigger
+  proven via an injected-failure test) rolls back the role change too.
+  Grant has no destructive-confirmation-shaped guard (additive/
+  reversible); revoke's fail-closed enumeration-safety return (`false`
+  for unknown target, wrong school, role never held, or the
+  last-School-Head-role case) matches `remove_school_member`'s
+  established shape -- `Err(Unauthorized)` is reserved for the
+  capability check itself.
+- Two new audit event types, `SchoolMemberRoleGranted` /
+  `SchoolMemberRoleRevoked` (migration 37, the same 12-step
+  CHECK-widening rebuild as migrations 24/26/36 -- SQLite cannot ALTER a
+  CHECK constraint in place).
+- Two new Tauri commands, `grant_school_member_role` /
+  `revoke_school_member_role` (`commands/user.rs`, registered in
+  `lib.rs`), wired through `SchoolMemberRepository`'s port
+  (`grantRole`/`revokeRole`), `SchoolMemberApplicationService`
+  (validates target id + recognized-role-string before calling the
+  port, matching this codebase's established application-layer
+  validation pattern), and `SchoolMembershipScreen.tsx`: a per-member
+  role list with a "Remove role" action per role (immediate for a
+  member with other roles remaining; a plain-language two-step
+  confirmation, matching the existing member-removal pattern, when
+  revoking would leave the member with no role at all -- including the
+  school's own last School Head role, as defense in depth alongside the
+  backend's real guard) and a "Grant a role" picker + confirm button per
+  member (no heavy confirmation -- additive and reversible).
+- `FixtureSchoolMemberRepository` (dev-preview) and every other
+  `SchoolMemberRepository` fake in the test suite
+  (`AdminPasswordResetScreen.test.tsx`, `SectionAdviserScreen.test.tsx`,
+  `TeacherLoadScreen.test.tsx`, `TeachingAssignmentsScreen.test.tsx`)
+  updated with the two new port methods.
+
+**Verified** (this session, real runs, not claimed):
+
+- `cargo fmt --check` -- clean.
+- `cargo clippy --all-targets -- -D warnings` -- clean, no warnings.
+- `cargo test --lib` -- 968 passed, 0 failed.
+- `npm run typecheck`, `npm run lint`, `npm run format:check`,
+  `npm run check:architecture` -- all clean.
+- `npm run check:deadcode` (knip) -- exits 1, but confirmed via
+  `git stash` that the exact same failure (2 unused devDependencies,
+  8 unlisted binaries) exists unchanged on the branch tip before this
+  slice's changes -- pre-existing repo debt, not introduced by this
+  work. No new knip findings from this slice.
+- `npm run test` (vitest) -- 1030 passed (100 files), 0 failed.
+- `npm run quality`'s own aggregate exit code is therefore misleading
+  when piped through `tail` in this sandbox (pipe swallows the real
+  exit code) -- the individual steps above were each re-run and checked
+  directly for their own exit code to get a trustworthy result.
+
+**Not run / cannot verify from this sandbox**: `npm run quality:ui`
+(Playwright), any native Windows/WebView2 visual pass, Android. Same
+standing limitation as every other slice in this project -- see
+`docs/VERIFICATION-DEBT.md`.
+
+**Push status**: commits are LOCAL ONLY. This session could not confirm
+via GitHub MCP tools that no other CI run is currently in progress on
+`claude/repo-priority-automation-8h96zx` (no GitHub MCP tool calls were
+made this session), so per this task's explicit instruction the commit
+was made locally and NOT pushed. A human or a future session with
+confirmed CI status must push.
+
+**Exact next slice**: none pre-selected by this session -- the task
+that dispatched this work was scoped to exactly this role-management
+gap. The next candidate would need fresh evidence-based selection per
+`.claude/rules/autonomous-development.md`'s wave/next-slice-selection
+process (e.g. teaching-assignment interaction with a revoked Teacher
+role was explicitly noted as out of scope here and could be a candidate
+to investigate).
+
 ## School Membership Removal (2026-09-06), committed and pushed, CI in flight
 
 Branch `claude/repo-priority-automation-8h96zx`, worktree

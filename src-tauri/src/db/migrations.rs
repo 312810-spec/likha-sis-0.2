@@ -1682,6 +1682,44 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- M37: School-member role management (`auth::grant_school_member_role`/
+        -- `auth::revoke_school_member_role`) needs its own auditable event
+        -- types, the same class as migration 36's
+        -- `school_membership_removed` -- a School Head granting or revoking
+        -- an additional role for a colleague, actor-distinct from its
+        -- subject. Same 12-step CHECK-widening rebuild as migrations 24, 26,
+        -- and 36 (SQLite cannot ALTER a CHECK constraint in place);
+        -- audit_log still has no incoming foreign keys from any other
+        -- table, so this is safe with foreign_keys enforcement on.
+        CREATE TABLE audit_log_new (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            username TEXT NOT NULL,
+            actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN (
+                'login_success', 'login_failed', 'account_locked', 'logout',
+                'password_reset_by_admin', 'device_enrolled', 'device_revoked',
+                'school_membership_removed', 'school_member_role_granted',
+                'school_member_role_revoked'
+            )),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO audit_log_new
+            (id, school_id, user_id, username, actor_user_id, event_type, created_at)
+        SELECT
+            id, school_id, user_id, username, actor_user_id, event_type, created_at
+        FROM audit_log;
+
+        DROP TABLE audit_log;
+        ALTER TABLE audit_log_new RENAME TO audit_log;
+
+        CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
+        "#,
+        ),
     ])
 }
 

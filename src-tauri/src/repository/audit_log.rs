@@ -33,6 +33,14 @@ pub enum AuditEventType {
     /// Actor-distinct from its subject, same as `PasswordResetByAdmin` --
     /// see migration 36.
     SchoolMembershipRemoved,
+    /// A School Head granted a colleague an additional role via
+    /// `auth::grant_school_member_role`. Actor-distinct from its subject,
+    /// same as `SchoolMembershipRemoved` -- see migration 37.
+    SchoolMemberRoleGranted,
+    /// A School Head revoked one role from a colleague (who otherwise
+    /// keeps their membership) via `auth::revoke_school_member_role`.
+    /// Actor-distinct from its subject -- see migration 37.
+    SchoolMemberRoleRevoked,
 }
 
 impl AuditEventType {
@@ -46,6 +54,8 @@ impl AuditEventType {
             AuditEventType::DeviceEnrolled => "device_enrolled",
             AuditEventType::DeviceRevoked => "device_revoked",
             AuditEventType::SchoolMembershipRemoved => "school_membership_removed",
+            AuditEventType::SchoolMemberRoleGranted => "school_member_role_granted",
+            AuditEventType::SchoolMemberRoleRevoked => "school_member_role_revoked",
         }
     }
 
@@ -59,6 +69,8 @@ impl AuditEventType {
             "device_enrolled" => Ok(AuditEventType::DeviceEnrolled),
             "device_revoked" => Ok(AuditEventType::DeviceRevoked),
             "school_membership_removed" => Ok(AuditEventType::SchoolMembershipRemoved),
+            "school_member_role_granted" => Ok(AuditEventType::SchoolMemberRoleGranted),
+            "school_member_role_revoked" => Ok(AuditEventType::SchoolMemberRoleRevoked),
             other => Err(rusqlite::Error::FromSqlConversionFailure(
                 0,
                 rusqlite::types::Type::Text,
