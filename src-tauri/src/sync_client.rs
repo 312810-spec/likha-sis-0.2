@@ -29,7 +29,10 @@
 //! (see `commands::assessment_item`'s own doc comment -- create-only,
 //! matching `Section`), and, added in a later addendum,
 //! `EntityKind::Subject` (see `commands::subject`'s own doc comment --
-//! create-only, matching `Section`/`AssessmentItem`); every other
+//! create-only, matching `Section`/`AssessmentItem`), and, added in a
+//! later addendum, `EntityKind::TeachingAssignment` (see
+//! `commands::teaching_assignment`'s own doc comment -- also create-only,
+//! matching `Section`/`AssessmentItem`/`Subject`); every other
 //! `EntityKind` variant has no producing write path yet, so
 //! decrypting one here is unreachable in practice and is
 //! treated as a rejection rather than a silent no-op success. A change
@@ -49,7 +52,7 @@ use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, device_credential, device_sync_client_credential, learner,
     learner_score, section, subject, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
-    sync_version_cache,
+    sync_version_cache, teaching_assignment,
 };
 use crate::sync::{EntityKind, PendingChange};
 
@@ -501,13 +504,14 @@ pub fn pull_once(
 /// repository boundary, not by omission).
 ///
 /// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`/
-/// `AssessmentItem`/`Subject` are deliberately left unhandled here -- no
-/// domain write path for them is enqueued anywhere yet (see
-/// `commands::learner`'s, `commands::attendance`'s, `commands::section`'s,
-/// `commands::learner_score`'s, `commands::assessment_item`'s, and
-/// `commands::subject`'s own doc comments: these are the only six
-/// entities wired to `sync_outbox` so far), so decrypting one is
-/// unreachable in practice. Rather than silently accepting an unknown
+/// `AssessmentItem`/`Subject`/`TeachingAssignment` are deliberately left
+/// unhandled here -- no domain write path for them is enqueued anywhere
+/// yet (see `commands::learner`'s, `commands::attendance`'s,
+/// `commands::section`'s, `commands::learner_score`'s,
+/// `commands::assessment_item`'s, `commands::subject`'s, and
+/// `commands::teaching_assignment`'s own doc comments: these are the
+/// only seven entities wired to `sync_outbox` so far), so decrypting one
+/// is unreachable in practice. Rather than silently accepting an unknown
 /// kind as a no-op success (which would look identical to "applied" to a
 /// future caller), it is treated the same as any other rejection -- fail
 /// closed on anything this slice does not yet know how to materialize,
@@ -566,6 +570,14 @@ pub(crate) fn apply_decrypted_change(
                 return Err(());
             }
             subject::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        EntityKind::TeachingAssignment => {
+            let incoming: teaching_assignment::TeachingAssignment =
+                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            teaching_assignment::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
         _ => Err(()),
     }
@@ -905,6 +917,75 @@ mod tests {
         let mut change = make_change(fixture, entity_id, base_version);
         change.entity_kind = EntityKind::Subject;
         let plaintext = serde_json::to_vec(&synthetic_subject(fixture, entity_id)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    /// Builds a section + subject + teacher user (no teaching assignment)
+    /// in the CLIENT's own local db -- the minimum fixture
+    /// `synthetic_teaching_assignment`'s three FKs (`section_id`,
+    /// `subject_id`, `teacher_user_id`) need. `teaching_assignments.
+    /// teacher_user_id` is `REFERENCES users(id)`, so `fixture.user_id`
+    /// (which only exists on the HUB's own separate database, per
+    /// `setup`'s own doc comment) cannot be reused here -- a genuinely
+    /// separate user row is created directly on the client conn.
+    /// Mirrors `setup_class_record`'s shape one step earlier, since a
+    /// teaching assignment has no grading-period FK.
+    fn setup_section_subject_and_teacher(fixture: &TestFixture) -> (String, String, String) {
+        let conn = &fixture.conn;
+        let sec = crate::repository::section::create(
+            conn,
+            &fixture.school_id,
+            "2026-2027",
+            "7",
+            "Mabini",
+        )
+        .unwrap();
+        let sub =
+            crate::repository::subject::create(conn, &fixture.school_id, "Mathematics").unwrap();
+        let teacher =
+            crate::repository::user::create_user(conn, "teacher.a", "password", "Teacher A")
+                .unwrap();
+        (sec.id, sub.id, teacher.id)
+    }
+
+    fn synthetic_teaching_assignment(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        teacher_user_id: &str,
+        section_id: &str,
+        subject_id: &str,
+    ) -> teaching_assignment::TeachingAssignment {
+        teaching_assignment::TeachingAssignment {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            teacher_user_id: teacher_user_id.to_string(),
+            section_id: section_id.to_string(),
+            subject_id: subject_id.to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_subject_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` teaching-assignment payload.
+    fn make_teaching_assignment_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        teacher_user_id: &str,
+        section_id: &str,
+        subject_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::TeachingAssignment;
+        let plaintext = serde_json::to_vec(&synthetic_teaching_assignment(
+            fixture,
+            entity_id,
+            teacher_user_id,
+            section_id,
+            subject_id,
+        ))
+        .unwrap();
         change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
         change
     }
@@ -1845,6 +1926,187 @@ mod tests {
             let count: i64 = conn
                 .query_row(
                     "SELECT COUNT(*) FROM subjects WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_teaching_assignment_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let (section_id, subject_id, teacher_user_id) = setup_section_subject_and_teacher(&fixture);
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_teaching_assignment_change(
+                    &fixture,
+                    entity_id,
+                    &teacher_user_id,
+                    &section_id,
+                    &subject_id,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT teacher_user_id FROM teaching_assignments WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, teacher_user_id);
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::TeachingAssignment,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_teaching_assignment_payload_without_applying_or_advancing_past_it(
+    ) {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let (section_id, subject_id, teacher_user_id) = setup_section_subject_and_teacher(&fixture);
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_teaching_assignment_change(
+                &fixture,
+                entity_id,
+                &teacher_user_id,
+                &section_id,
+                &subject_id,
+                0,
+            );
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM teaching_assignments WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_teaching_assignment_conflict_when_this_device_has_an_unsynced_local_edit()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's teaching-assignment change lands at the hub.
+        {
+            let conn = &fixture.conn;
+            let mut other_device_change = make_change(&fixture, entity_id, 0);
+            other_device_change.entity_kind = EntityKind::TeachingAssignment;
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently edited the SAME entity and has not
+        // pushed it yet.
+        {
+            let conn = &fixture.conn;
+            let mut local_change = make_change(&fixture, entity_id, 0);
+            local_change.entity_kind = EntityKind::TeachingAssignment;
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM teaching_assignments WHERE id = ?1",
                     [entity_id.to_string()],
                     |row| row.get(0),
                 )
