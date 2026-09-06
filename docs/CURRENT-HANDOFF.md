@@ -1,5 +1,91 @@
 # CURRENT HANDOFF
 
+## Creation Studio — assessment-item authoring workspace (2026-09-06), committed locally, not pushed
+
+Worktree `agent-abefa29caf14c9130`, branch
+`claude/repo-priority-automation-8h96zx`. Product owner explicitly
+confirmed scope: "Creation Studio" is the first of three confirmed
+sub-scopes, built one at a time. This slice is ONLY sub-scope 1 — a
+dedicated assessment-item authoring workspace UI, distinct from the
+existing in-gradebook quick-add flow inside `ClassRecordWorkspace`, for
+building out a whole set of assessment items (e.g. a full quiz) in one
+focused sitting. **The other two confirmed sub-scopes — report/output
+templates and the lesson-plan builder — remain unbuilt, separate future
+slices, not started.**
+
+**What shipped**:
+
+- `src/ui/AssessmentAuthoringScreen.tsx` (new): a focused authoring
+  screen for one class record's assessment items — category-set/category
+  picker, a name + max-score form that stays open and clears only the
+  name field after each add (so a teacher can add a whole item set
+  without leaving the screen or reopening a modal; Enter in the name
+  field also submits), a running "N items added this session" counter,
+  and the full existing item list with inline Edit (rename-only once
+  scored, full edit/category/max-score while unscored) and two-step
+  Delete (blocked once scored) — same rules the Rust layer already
+  enforces. No roster/score-entry UI on this screen; that stays in
+  `ClassRecordWorkspace`.
+- `src/ui/ClassRecordsScreen.tsx`: added a "Creation Studio" button per
+  class-record row (alongside the existing "Open workspace" button),
+  wiring a new local `authoringClassRecordId` selection state — same
+  narrowly-typed, non-global-router navigation convention this screen
+  already uses for `selectedClassRecordId`. No new global nav tab was
+  added; this is reached the same way the existing workspace is.
+- **No new backend capability.** Confirmed by inspecting
+  `src-tauri/src/repository/assessment_item.rs` and
+  `commands/assessment_item.rs` first: `create`/`rename`/`update`/
+  `delete`/`list_by_class_record` already exist, are already wired to
+  Tauri commands, and are already exposed through
+  `AssessmentApplicationService` (`src/application/assessment-service.ts`)
+  and `AssessmentRepository`. The new screen calls exactly these same
+  application-service methods `ClassRecordWorkspace` already uses — no
+  new repository function, Tauri command, or validation logic was
+  added or duplicated.
+
+**Verified this session** (all commands actually run):
+
+- `npm run typecheck` — pass.
+- `npm run lint` — pass.
+- `npm run format:check` — pass.
+- `npm run check:architecture` — pass (no restricted imports; the new
+  screen only imports `application`/`domain` types and existing UI
+  components, matching the layering rule).
+- `npm run check:deadcode` (`knip`) — **fails**, but confirmed
+  pre-existing and unrelated: stashing this slice's changes and
+  re-running `npm run check:deadcode` reproduces the exact same failure
+  (`Unused devDependencies (2)`: `@tauri-apps/cli`, `prettier`; 8
+  "Unlisted binaries" findings) with this slice's two new files absent.
+  Not introduced or worsened by this change; not fixed here (out of
+  scope for this slice — a maintenance item for whoever last touched
+  those devDependencies/binaries).
+- `npm run test` (vitest) — **1045/1045 passed**, 103 test files,
+  including the 7 new tests in
+  `src/ui/AssessmentAuthoringScreen.test.tsx` (render + label check,
+  add-keeps-form-open with only name cleared, Enter-to-submit, rename,
+  delete with two-step confirm, `onBack` navigation, and an
+  `expectNoAccessibilityViolations` axe-core structural check).
+- No Rust code was touched, so `cargo fmt --check`/`cargo clippy`/
+  `cargo test` were not run for this slice (nothing to verify there).
+- `npm run quality:ui` (Playwright) and a native Tauri visual/
+  screen-reader pass were **not run** — same standing limitation as
+  every other UI slice in this repo (no browser/screenshot tool for the
+  native binary in this environment); this is pre-existing verification
+  debt, not new debt from this slice.
+
+**Held locally, not pushed**: this session could not confirm via the
+GitHub MCP tools whether another CI run is currently in progress on
+`claude/repo-priority-automation-8h96zx` / PR #54, so per this task's
+git constraint the commit was made locally only. A user/session with
+GitHub MCP access should confirm CI is idle on this branch before
+pushing.
+
+**Exact next action**: push this commit once CI is confirmed idle on
+this branch, then let CI run. Do not start sub-scope 2 (report/output
+templates) or sub-scope 3 (lesson-plan builder) without a new
+instruction — each is its own wave per the product owner's confirmed
+one-at-a-time sequencing.
+
 ## My Day teacher screen (2026-09-06), committed locally, not pushed
 
 Worktree `agent-ab05593d27a378050`, branch
