@@ -533,22 +533,23 @@ pub fn pull_once(
 /// silently (`.claude/rules/security-privacy.md`: enforce at the
 /// repository boundary, not by omission).
 ///
-/// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`/
-/// `AssessmentItem`/`Subject`/`TeachingAssignment`/`GradingPeriod`/
-/// `SubjectAttendance`/`SectionMembership` are deliberately left unhandled
-/// here -- no domain write path for them is enqueued anywhere yet (see
-/// `commands::learner`'s, `commands::attendance`'s, `commands::section`'s
-/// (both for `Section` and for `SectionMembership`),
+/// Every `EntityKind` variant now has an arm here (`Learner`/`Attendance`/
+/// `Section`/`LearnerScore`/`AssessmentItem`/`Subject`/
+/// `TeachingAssignment`/`GradingPeriod`/`SubjectAttendance`/
+/// `SectionMembership`), so the `match` below is exhaustive with no
+/// wildcard fallback -- see `commands::learner`'s, `commands::attendance`'s,
+/// `commands::section`'s (both for `Section` and for `SectionMembership`),
 /// `commands::learner_score`'s, `commands::assessment_item`'s,
 /// `commands::subject`'s, `commands::teaching_assignment`'s,
 /// `commands::grading`'s, and `commands::subject_attendance`'s own doc
-/// comments: these are the only ten entities wired to `sync_outbox` so
-/// far), so decrypting one
-/// is unreachable in practice. Rather than silently accepting an unknown
-/// kind as a no-op success (which would look identical to "applied" to a
-/// future caller), it is treated the same as any other rejection -- fail
-/// closed on anything this slice does not yet know how to materialize,
-/// rather than pretend success.
+/// comments for what each entity's write-path coverage actually is (some,
+/// like `TeachingAssignment`'s `create` verb or `SubjectAttendance`'s
+/// session-only scope, are narrower than "every write to this table
+/// syncs" -- the entity KIND is fully handled here even where only some
+/// of its VERBS enqueue a change). Adding an eleventh `EntityKind` variant
+/// in the future will make this `match` non-exhaustive again, which the
+/// compiler enforces -- there is no silent-no-op-success path to
+/// accidentally fall into.
 pub(crate) fn apply_decrypted_change(
     conn: &Connection,
     school_id: &str,
@@ -636,7 +637,6 @@ pub(crate) fn apply_decrypted_change(
             }
             section_membership::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
-        _ => Err(()),
     }
 }
 
