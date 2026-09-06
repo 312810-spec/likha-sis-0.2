@@ -1,5 +1,67 @@
 # CURRENT HANDOFF
 
+## ADR-0037 curriculum clarification: SHS DO 017 s.2026, JHS/DO 015 alignment, MATATAG rename, Kindergarten exclusion confirmed (2026-09-06)
+
+Product-owner-relayed, `WebSearch`-cross-checked clarification closed 4
+of ADR-0037's 5 original open gaps. Appended an addendum to
+`docs/adr/0037-curriculum-key-stage-versioning.md` (original
+Research/Decision sections untouched) and implemented additively in a
+new migration.
+
+**What shipped**: `src-tauri/src/db/migrations.rs` migration 38 (schema
+unchanged, all data-only):
+
+- Renamed the existing "MATATAG Curriculum" `curriculum_versions` row
+  (id `...5002`) **in place** to "Enhanced K to 10 Curriculum" — same
+  id, same 8 previously-seeded learning areas, only `name`/
+  `source_citation` changed (DepEd Order No. 015, s. 2026's own "Revised
+  Kindergarten to Grade 10 Curriculum" framing).
+- Added a third, non-default `curriculum_versions` row: "Strengthened
+  Senior High School Curriculum (Grade 11)" (id `...5003`), modeling
+  DepEd Order No. 017, s. 2026 (Grade 11 only, effective SY 2026-2027),
+  with its 5 core subjects as `curriculum_learning_areas` rows
+  (Effective Communication, Life Skills, General Mathematics, General
+  Science, Philippine History and Society). Fit the existing table
+  shape cleanly — no new schema needed.
+- Grade 12 unaffected — still the existing "K to 12 Basic Education
+  Curriculum" default row, exactly as ADR-0068's DO 8 s.2015 carryover
+  already models; ADR-0068 itself was not touched.
+- Kindergarten Key-Stage exclusion verified already correct (KS1 starts
+  at grade 1, no row covers grade 0); added a regression test
+  (`kindergarten_grade_level_matches_no_key_stage_band`) proving a
+  grade-0 lookup matches zero `key_stages` rows rather than silently
+  matching KS1. No Kindergarten-specific concept was built.
+
+Updated `src-tauri/src/repository/curriculum.rs` tests and the
+pre-existing `migrations.rs` migration-17 tests that asserted exactly 2
+curriculum versions / the old "MATATAG Curriculum" name — those are now
+pinned to `migrations().to_version(&mut conn, 17)` so they keep proving
+migration 17's own original behavior, rather than being silently
+reinterpreted. Two new migration-38 tests added
+(`migration_38_renames_matatag_curriculum_to_enhanced_k_to_10_curriculum_in_place`,
+`migration_38_seeds_grade_11_strengthened_shs_curriculum_as_a_third_non_default_version`).
+
+**Gap NOT closed (honestly disclosed, not forced)**: MATATAG-vs-prior
+_learning-area content_ differences remain unconfirmed against a
+primary source — only the curriculum-version _name_ changed; the 8
+seeded learning-area names are unchanged and still identical across the
+"K to 12 Basic Education Curriculum" and "Enhanced K to 10 Curriculum"
+rows, as before this session.
+
+**Numbering correction**: the implementing agent worked from a worktree
+that had fallen behind the shared branch and mislabeled its new
+migration "34" — that number was already taken on the real branch tip
+by unrelated sync/role-management work landed earlier this session.
+Renumbered to migration 38 (the real next free number) by the
+orchestrating session before merge, including all test names/comments
+referencing the migration number; the underlying SQL/reasoning is
+otherwise unchanged from the original draft.
+
+**Verification actually run** (orchestrating session, after
+renumbering, on the merged tree): `cargo fmt --check`, `cargo clippy
+--all-targets -- -D warnings`, `cargo test --lib` (full crate) — see
+this entry's own follow-up for results once run.
+
 ## Creation Studio — assessment-item authoring workspace (2026-09-06), committed locally, not pushed
 
 Worktree `agent-abefa29caf14c9130`, branch

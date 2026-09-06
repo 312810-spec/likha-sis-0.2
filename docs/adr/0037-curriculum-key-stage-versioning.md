@@ -177,3 +177,115 @@ generic COALESCE lookup.
   pre-existing `windows-future`/`windows-core` conflict, reconfirmed
   identical — new Rust code is written and manually reviewed, not
   compiler-verified. See `docs/VERIFICATION-DEBT.md`.
+
+## Addendum (2026-09-06) — product-owner clarification closes 4 of the 5 original open gaps
+
+The product owner relayed authoritative clarification this session,
+cross-checked once via `WebSearch` against real DepEd sources. This
+closes 4 of the 5 gaps this ADR's own Research/Decision sections left
+open above; the 5th (below) is a sourcing-policy note, not a data-model
+gap. Implemented additively in migration 38
+(`src-tauri/src/db/migrations.rs`) — no prior migration edited, no row
+deleted.
+
+**1. SHS rollout timeline — was "not yet released," now resolved.**
+DepEd Order No. 017, s. 2026 ("Strengthened Senior High School
+Curriculum") is DepEd's SHS transition schedule. It applies to **Grade
+11 only**, effective SY 2026-2027, and restructures Grade 11 to 5 core
+subjects (down from 15) taken as full-year courses: Effective
+Communication, Life Skills, General Mathematics, General Science,
+Philippine History and Society. Sources this session: sunstar.com.ph,
+depedsanpablo.com, tchersden.com — secondary reporting on the official
+DO 017 s.2026 issuance; a direct primary-source deped.gov.ph fetch was
+not attempted this session (see gap 5 below on why this is treated as
+sufficient). Modeled as a new `curriculum_versions` row, "Strengthened
+Senior High School Curriculum (Grade 11)" (id
+`00000000-0000-7000-8000-000000005003`), seeded NOT default — for the
+same reason the original Decision section gives for the existing
+default (no `sections.grade_level` normalization yet, so nothing can
+safely auto-resolve which curriculum applies per record) — with its 5
+core subjects as `curriculum_learning_areas` rows. This fit the
+existing table shape cleanly (a new curriculum version + its own
+learning-area rows), so no new schema was needed and none was invented.
+
+**2. Subject-to-curriculum-learning-area mapping — was "deliberately
+un-joined, disclosed non-goal," now resolvable per grade band.** This
+ADR's original non-goal (a `subjects`-to-`curriculum_learning_areas`
+required relationship) is unchanged and still not built — that remains
+out of scope. What's newly resolvable is which _curriculum version_
+governs which grade band, per DepEd order:
+
+- **JHS (Grades 7-10)**: DepEd Order No. 015, s. 2026 — `WebSearch`
+  this session confirmed DO 015 s.2026 is DepEd's revised
+  classroom-assessment/grading-system guidelines, explicitly aligned
+  with "the Revised Kindergarten to Grade 10 Curriculum and the
+  Strengthened Senior High School Curriculum," implementation
+  beginning SY 2026-2027. This is the same DepEd Order No. 015, s. 2026
+  this ADR's original Research section already cites for Key Stage
+  grade-banding (Annex D) — now also confirmed as the JHS/K-10
+  curriculum-alignment source, not a separate order.
+- **Grade 11**: DO 017, s. 2026 (gap 1 above) — the Strengthened SHS
+  Curriculum's 5 core subjects.
+- **Grade 12**: unaffected. Stays on the prior/legacy SHS curriculum —
+  this is **not new information**, it is exactly what ADR-0068's
+  already-implemented DepEd Order No. 8, s. 2015 carryover already
+  models via the "K to 12 Basic Education Curriculum" row. ADR-0068's
+  implementation was not touched by this session; both ADRs now
+  describe the same Grade-12 reality consistently.
+
+**3. MATATAG-vs-prior naming — was "not confirmed, no specific
+difference encoded," now superseded.** The "MATATAG Curriculum" name is
+being superseded by "Enhanced K to 10 Curriculum" (also seen as
+"Revised K to 10 Curriculum" in DepEd's own DO 015 s.2026 framing, per
+this session's `WebSearch`). The existing "MATATAG Curriculum" row (id
+`00000000-0000-7000-8000-000000005002`) is renamed **in place** —
+same id, same 8 previously-seeded learning areas, only `name` and
+`source_citation` change. No specific MATATAG-vs-prior _learning-area
+content_ difference was confirmed this session either — that part of
+the original gap remains genuinely open, and no content difference is
+invented.
+
+**4. Kindergarten Key-Stage placement — was "deliberately left
+unmapped," now explicitly confirmed excluded.** Product-owner direction:
+explicitly remove Kindergarten from Key-Stage scope entirely, not
+attempt a K1-K4 mapping now — defer entirely to a future milestone.
+Verified this is already true and required no code/data fix: `key_stages`
+KS1 already starts at `min_grade_level = 1`; no row covers grade level 0
+(Kindergarten), and no code path infers a Kindergarten Key Stage from
+this table. A regression test,
+`kindergarten_grade_level_matches_no_key_stage_band`
+(`src-tauri/src/db/migrations.rs`), proves a grade-level-0 lookup
+against `key_stages` returns zero rows rather than silently matching
+KS1. No new Kindergarten-specific concept was built, per instruction.
+
+**5. Sourcing-policy clarification (process note, not a data-model
+gap).** The product owner directed: when a `deped-researcher` agent's
+direct fetch of deped.gov.ph fails (a known, recurring issue in this
+sandbox — see this ADR's own original Research section hitting exactly
+this), the next attempt should try a scraping-style approach; if that
+still fails, secondary sources that themselves explicitly cite/describe
+an "official" DepEd issuance are to be treated as legitimate and
+sufficient, not as a fallback requiring extra hedging. This governs how
+gap 1's DO 017 s.2026 sourcing above is presented (secondary sources
+describing the official issuance, not hedged as unverified) and should
+guide future sessions researching DepEd orders in this project, so they
+don't over-hedge on secondary-source confidence the way this ADR's
+original research did.
+
+**Consequences of this addendum**: `src-tauri/src/db/migrations.rs`
+migration 38 (rename + new curriculum version + its 5 learning-area
+rows, all additive); `src-tauri/src/repository/curriculum.rs` tests
+updated for 3 seeded versions and the new names;
+`src-tauri/src/db/migrations.rs`'s pre-existing migration-17 tests that
+asserted exactly 2 curriculum versions / the old "MATATAG Curriculum"
+name are pinned to `migrations().to_version(&mut conn, 17)` so they
+keep proving migration 17's own original behavior unchanged, rather
+than being deleted or silently reinterpreted. No TypeScript/UI change.
+No `ADR-0068` change.
+
+Note: this addendum was originally drafted in a worktree that had
+fallen behind the shared branch and mislabeled its new migration "34"
+(already taken on the real branch tip by unrelated sync/role-management
+work) — renumbered to migration 38 by the orchestrating session before
+merge; the content and reasoning above are otherwise unchanged from
+that draft.

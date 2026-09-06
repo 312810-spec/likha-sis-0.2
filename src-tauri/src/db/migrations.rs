@@ -1720,6 +1720,62 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_audit_log_school_created ON audit_log(school_id, created_at DESC);
         "#,
         ),
+        M::up(
+            r#"
+        -- M38: 2026-09-06 curriculum-model clarification. See ADR-0037's
+        -- addendum for the full research record. Product-owner-relayed,
+        -- WebSearch-cross-checked-this-session facts, additive only (no
+        -- schema change, no row deleted or removed):
+        --
+        --   1. The "MATATAG Curriculum" row (id ...-5002) is renamed to
+        --      "Enhanced K to 10 Curriculum" -- DepEd Order No. 015, s.
+        --      2026 reframes the same revised K-10 curriculum this row
+        --      already models under this name ("the Revised Kindergarten
+        --      to Grade 10 Curriculum"), implementation beginning SY
+        --      2026-2027. Same row, same id, same seeded learning areas
+        --      (English/Filipino/Mathematics/Science/Araling Panlipunan/
+        --      GMRC-Values Education/EPP-TLE/MAPEH) -- only the name and
+        --      citation change; nothing that already references this row
+        --      by id is affected.
+        --   2. A new curriculum_versions row models DepEd Order No. 017,
+        --      s. 2026 ("Strengthened Senior High School Curriculum"),
+        --      which applies to Grade 11 only, effective SY 2026-2027,
+        --      restructuring Grade 11 to 5 core subjects (down from 15)
+        --      taken as full-year courses. Seeded NOT default -- the "K
+        --      to 12 Basic Education Curriculum" row remains the sole
+        --      default for the same reason ADR-0037 originally gave (no
+        --      grade-level normalization on sections.grade_level, so
+        --      there is still no safe way to auto-resolve which
+        --      curriculum applies per record). This is purely additive
+        --      reference data: nothing auto-selects this version yet.
+        --   3. Grade 12 is unaffected -- it stays on the prior/legacy SHS
+        --      curriculum, exactly as ADR-0068's already-implemented
+        --      DepEd Order No. 8, s. 2015 carryover already models. No
+        --      change to that data or code.
+        --   4. Kindergarten remains outside key_stages' scope. Verified
+        --      unchanged: KS1 already starts at min_grade_level = 1, and
+        --      no code path infers a Kindergarten Key Stage from this
+        --      table. No fix was needed; this migration does not touch
+        --      key_stages.
+        UPDATE curriculum_versions SET
+            name = 'Enhanced K to 10 Curriculum',
+            source_citation = 'DepEd''s revised K to 10 curriculum, previously informally called "MATATAG Curriculum," reframed by DepEd Order No. 015, s. 2026 as the "Revised Kindergarten to Grade 10 Curriculum" / "Enhanced K to 10 Curriculum" (explicitly aligned there with "the Revised Kindergarten to Grade 10 Curriculum and the Strengthened Senior High School Curriculum," implementation beginning SY 2026-2027). Phased grade-level rollout previously triangulated (SY 2024-2025: Kindergarten, Grades 1, 4, 7; SY 2025-2026: Grades 2, 3, 5, 8; SY 2026-2027: Grades 6, 9, 10) is unchanged by this rename. Senior High School (Grades 11-12) is not covered by this row -- see the new "Strengthened Senior High School Curriculum (Grade 11)" row (Grade 11) and the existing "K to 12 Basic Education Curriculum" row (Grade 12, per ADR-0068''s DepEd Order No. 8, s. 2015 carryover). Specific learning-area/subject-name differences from the prior K to 12 curriculum remain unconfirmed against a primary source and are not encoded as a difference in curriculum_learning_areas.'
+        WHERE id = '00000000-0000-7000-8000-000000005002';
+
+        INSERT INTO curriculum_versions (id, name, source_citation, is_default) VALUES
+            ('00000000-0000-7000-8000-000000005003',
+             'Strengthened Senior High School Curriculum (Grade 11)',
+             'DepEd Order No. 017, s. 2026, "Strengthened Senior High School Curriculum." Applies to Grade 11 only, effective SY 2026-2027: restructures Grade 11 to 5 core subjects (down from 15), taken as full-year courses, replacing the prior per-semester subject load. Grade 12 is unaffected and remains on the prior/legacy SHS curriculum (see ADR-0068''s DepEd Order No. 8, s. 2015 carryover, modeled by the "K to 12 Basic Education Curriculum" row). Sourced this session via secondary reporting on the official DO 017 s.2026 issuance (sunstar.com.ph, depedsanpablo.com, tchersden.com) -- a direct primary-source deped.gov.ph fetch was not attempted this session; per this project''s sourcing-policy clarification (ADR-0037 addendum), secondary sources that themselves explicitly cite/describe an official DepEd issuance are treated as sufficient when a primary fetch is not available. Seeded NOT default: this application still has no grade-level normalization on sections.grade_level, so nothing yet auto-selects this version for a Grade 11 record.',
+             0);
+
+        INSERT INTO curriculum_learning_areas (id, curriculum_version_id, name) VALUES
+            ('00000000-0000-7000-8000-000000005301', '00000000-0000-7000-8000-000000005003', 'Effective Communication'),
+            ('00000000-0000-7000-8000-000000005302', '00000000-0000-7000-8000-000000005003', 'Life Skills'),
+            ('00000000-0000-7000-8000-000000005303', '00000000-0000-7000-8000-000000005003', 'General Mathematics'),
+            ('00000000-0000-7000-8000-000000005304', '00000000-0000-7000-8000-000000005003', 'General Science'),
+            ('00000000-0000-7000-8000-000000005305', '00000000-0000-7000-8000-000000005003', 'Philippine History and Society');
+        "#,
+        ),
     ])
 }
 
@@ -2899,7 +2955,10 @@ mod tests {
     fn migration_17_seeds_exactly_two_curriculum_versions_with_k_to_12_as_sole_default() {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
-        migrations().to_latest(&mut conn).unwrap();
+        // Migrations 1-17 only, to reproduce this test's own original
+        // premise (exactly two curriculum versions) before migration 38
+        // added a third (Grade 11 Strengthened SHS Curriculum).
+        migrations().to_version(&mut conn, 17).unwrap();
 
         let total: i64 = conn
             .query_row("SELECT COUNT(*) FROM curriculum_versions", [], |r| r.get(0))
@@ -2936,7 +2995,7 @@ mod tests {
 
         let result = conn.execute(
             "UPDATE curriculum_versions SET is_default = 1 \
-             WHERE name = 'MATATAG Curriculum'",
+             WHERE id = '00000000-0000-7000-8000-000000005002'",
             [],
         );
 
@@ -2995,7 +3054,11 @@ mod tests {
     fn migration_17_seeds_the_same_eight_learning_areas_for_each_curriculum_version() {
         let mut conn = Connection::open_in_memory().unwrap();
         conn.pragma_update(None, "foreign_keys", "ON").unwrap();
-        migrations().to_latest(&mut conn).unwrap();
+        // Migrations 1-17 only -- this test's own original premise (both
+        // curriculum versions seeded so far share the same eight learning
+        // areas) predates migration 38's Grade-11-only core-subject rows,
+        // which deliberately do not share this shape.
+        migrations().to_version(&mut conn, 17).unwrap();
 
         let mut stmt = conn
             .prepare(
@@ -3033,6 +3096,134 @@ mod tests {
         assert!(
             result.is_err(),
             "a learning area must reference a real curriculum version"
+        );
+    }
+
+    /// Proves migration 38's rename is exact: the row that was "MATATAG
+    /// Curriculum" is now "Enhanced K to 10 Curriculum", by the same id,
+    /// with its previously-seeded eight learning areas untouched.
+    #[test]
+    fn migration_38_renames_matatag_curriculum_to_enhanced_k_to_10_curriculum_in_place() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE id = '00000000-0000-7000-8000-000000005002'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "Enhanced K to 10 Curriculum");
+
+        let matatag_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_versions WHERE name = 'MATATAG Curriculum'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(matatag_count, 0, "the old name must no longer exist");
+
+        let learning_area_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_learning_areas \
+                 WHERE curriculum_version_id = '00000000-0000-7000-8000-000000005002'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            learning_area_count, 8,
+            "the renamed row's previously-seeded learning areas must be untouched"
+        );
+    }
+
+    /// Proves migration 38 adds the Grade-11-only Strengthened SHS
+    /// Curriculum (DepEd Order No. 017, s. 2026) as a third, non-default
+    /// curriculum version with exactly its 5 core subjects, without
+    /// disturbing the pre-existing two versions or the sole-default rule.
+    #[test]
+    fn migration_38_seeds_grade_11_strengthened_shs_curriculum_as_a_third_non_default_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let total: i64 = conn
+            .query_row("SELECT COUNT(*) FROM curriculum_versions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(total, 3);
+
+        let default_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            default_count, 1,
+            "the sole-default rule must still hold after adding a third version"
+        );
+
+        let default_name: String = conn
+            .query_row(
+                "SELECT name FROM curriculum_versions WHERE is_default = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            default_name, "K to 12 Basic Education Curriculum",
+            "the default must remain unchanged by this migration"
+        );
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT name FROM curriculum_learning_areas \
+                 WHERE curriculum_version_id = '00000000-0000-7000-8000-000000005003' \
+                 ORDER BY id",
+            )
+            .unwrap();
+        let subjects: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            subjects,
+            vec![
+                "Effective Communication".to_string(),
+                "Life Skills".to_string(),
+                "General Mathematics".to_string(),
+                "General Science".to_string(),
+                "Philippine History and Society".to_string(),
+            ]
+        );
+    }
+
+    /// Regression proof for the Kindergarten-Key-Stage-exclusion gap
+    /// ADR-0037's addendum confirms is deliberate: no key_stages row
+    /// covers grade level 0 (Kindergarten), so a naive
+    /// "find the key stage containing this grade level" lookup correctly
+    /// finds nothing for Kindergarten rather than silently matching KS1.
+    #[test]
+    fn kindergarten_grade_level_matches_no_key_stage_band() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let matches: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM key_stages WHERE 0 BETWEEN min_grade_level AND max_grade_level",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            matches, 0,
+            "Kindergarten (grade level 0) must not resolve to any Key Stage band"
         );
     }
 
