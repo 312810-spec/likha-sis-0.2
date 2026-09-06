@@ -10,6 +10,7 @@ import { FormGenerationApplicationService } from "./application/form-generation-
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
+import { MyDayApplicationService } from "./application/my-day-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
 import { SchoolMemberApplicationService } from "./application/school-member-service";
@@ -35,6 +36,7 @@ import { TauriFormGenerationRepository } from "./infrastructure/tauri/form-gener
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
+import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
 import { TauriSchoolMemberRepository } from "./infrastructure/tauri/school-member-repository";
@@ -115,3 +117,4 @@ export const conflictReviewService = new ConflictReviewApplicationService(
   new TauriConflictReviewRepository(),
 );
 export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());
+export const myDayService = new MyDayApplicationService(new TauriMyDayRepository());
