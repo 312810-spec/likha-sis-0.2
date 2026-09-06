@@ -9,16 +9,20 @@
 //! this codebase; an unknown id, a revoked credential, and a wrong
 //! secret are all indistinguishable `Unauthorized` responses here too.
 //!
-//! `maybe_spawn_listener` wires this into real Tauri app startup, but
-//! **deliberately binds loopback only** (`127.0.0.1`), not a real LAN or
-//! Tailscale interface -- resolving the actual bind interface (never
-//! `0.0.0.0`, per ADR-0067's own "School-laptop operations gate") needs
-//! either a new interface-enumeration dependency or a documented manual-
-//! configuration decision, plus native Windows network verification this
-//! sandboxed development environment cannot perform. Not reachable from
-//! another device yet; see ADR-0067's network-listener addendum.
+//! `maybe_spawn_listener` wires this into real Tauri app startup and binds
+//! loopback (`127.0.0.1`, always, for same-machine tools/testing) PLUS any
+//! non-loopback interface address in a private range (RFC 1918, or
+//! Tailscale's CGNAT range 100.64.0.0/10) -- see
+//! `select_bindable_addresses` for the filtering logic and ADR-0067's
+//! "network-interface binding" addendum for the full decision record.
+//! Never binds `0.0.0.0` or a public address, per ADR-0067's own
+//! "School-laptop operations gate": this app does not opt a school laptop
+//! into direct internet exposure by default. Real LAN/Tailscale
+//! reachability from another physical device still cannot be verified in
+//! this sandboxed development environment -- only the selection logic and
+//! the wiring are provable here.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::{Query, State};
@@ -36,9 +40,67 @@ use crate::sync::{PendingChange, SyncCursor};
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
 
-/// Loopback-only until LAN/Tailscale interface resolution is implemented
-/// and verified on real hardware -- see this module's own doc comment.
-const LOOPBACK_BIND_ADDR: &str = "127.0.0.1:7878";
+/// Loopback is always bound, regardless of what interface enumeration
+/// finds -- same-machine tools/tests must keep working even if this
+/// installation somehow has no other bindable interface.
+const LOOPBACK_ADDR: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
+const HUB_PORT: u16 = 7878;
+
+/// True for a private-use (RFC 1918) or Tailscale CGNAT (100.64.0.0/10,
+/// RFC 6598) IPv4 address -- the only non-loopback ranges this app will
+/// ever bind, per ADR-0067's "School-laptop operations gate": a school
+/// LAN interface or a Tailscale interface, never a public address.
+fn is_bindable_private_range(addr: Ipv4Addr) -> bool {
+    let octets = addr.octets();
+    let is_rfc1918 = addr.is_private(); // 10/8, 172.16/12, 192.168/16
+    let is_cgnat = octets[0] == 100 && (64..=127).contains(&octets[1]);
+    is_rfc1918 || is_cgnat
+}
+
+/// Pure filtering logic, deliberately separated from real interface
+/// enumeration so it can be unit-tested with a fake/injected address list
+/// (no real network access needed to prove the security-relevant
+/// invariant: never selects `0.0.0.0` or a public/non-private address).
+/// IPv6 is deliberately out of scope for this slice -- ADR-0067's own
+/// examples (school LAN, Tailscale) are IPv4 in practice for this
+/// deployment, and adding IPv6 would double the range/allowlist surface
+/// to reason about for no currently-needed capability; every IPv6 input
+/// is filtered out here rather than silently mis-handled.
+///
+/// Always includes loopback (`127.0.0.1`) first, regardless of what else
+/// is found, followed by every distinct non-loopback address in `found`
+/// that is a private-use or Tailscale CGNAT IPv4 address. A public
+/// address, a link-local address, `0.0.0.0`, and any IPv6 address are all
+/// excluded.
+fn select_bindable_addresses(found: &[IpAddr]) -> Vec<Ipv4Addr> {
+    let mut selected = vec![LOOPBACK_ADDR];
+    for addr in found {
+        if let IpAddr::V4(v4) = addr {
+            if *v4 != LOOPBACK_ADDR && is_bindable_private_range(*v4) && !selected.contains(v4) {
+                selected.push(*v4);
+            }
+        }
+    }
+    selected
+}
+
+/// Real interface enumeration via `if-addrs` (see `Cargo.toml`'s doc
+/// comment for the crate choice). Never propagates an error up to
+/// `maybe_spawn_listener`/startup -- an enumeration failure (e.g. a
+/// transient OS-level permission issue) must degrade to loopback-only,
+/// never crash app startup, matching this codebase's "sync must never
+/// crash the app" discipline used elsewhere in this module.
+fn enumerate_local_addresses() -> Vec<IpAddr> {
+    match if_addrs::get_if_addrs() {
+        Ok(interfaces) => interfaces.into_iter().map(|iface| iface.ip()).collect(),
+        Err(error) => {
+            log::warn!(
+                "hub sync listener: interface enumeration failed, falling back to loopback only: {error}"
+            );
+            Vec::new()
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct HubServerState {
@@ -73,12 +135,14 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
     Ok(false)
 }
 
-/// Spawns the listener bound to `bind_addr`, reusing the `tokio` runtime
-/// Tauri already runs internally (`tauri::async_runtime::spawn`, not a
-/// second/parallel runtime). A bind failure (e.g. the port is already in
-/// use, perhaps by a second launch of this same app) is logged, never a
-/// panic -- a local-first desktop app must keep working even when sync
-/// is unavailable.
+/// Spawns one listener task bound to `bind_addr`, reusing the `tokio`
+/// runtime Tauri already runs internally (`tauri::async_runtime::spawn`,
+/// not a second/parallel runtime). A bind failure (e.g. the port is
+/// already in use, perhaps by a second launch of this same app, or an
+/// address that changed after enumeration ran) is logged, never a panic
+/// -- a local-first desktop app must keep working even when sync is
+/// unavailable, and a failure on one interface must never take down the
+/// others (each address gets its own independent task).
 pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
     let app_router = router(HubServerState { db });
     tauri::async_runtime::spawn(async move {
@@ -94,6 +158,18 @@ pub fn spawn(db: Arc<Mutex<Connection>>, bind_addr: SocketAddr) {
             }
         }
     });
+}
+
+/// Spawns one independent listener task per address `select_bindable_addresses`
+/// selected, all sharing the same underlying `db` connection (see `spawn`'s
+/// own doc comment for why one connection is safe here). Each address binds
+/// -- and can fail to bind -- completely independently: a taken port or a
+/// changed address on one interface never prevents the others (including
+/// loopback) from serving.
+pub fn spawn_all(db: Arc<Mutex<Connection>>, addresses: &[Ipv4Addr]) {
+    for &addr in addresses {
+        spawn(Arc::clone(&db), SocketAddr::new(IpAddr::V4(addr), HUB_PORT));
+    }
 }
 
 /// Starts the hub listener if (and only if) `should_listen` says this
@@ -112,10 +188,9 @@ pub fn maybe_spawn_listener(app: &tauri::AppHandle) -> AppResult<()> {
     if !should_listen(&conn)? {
         return Ok(());
     }
-    let bind_addr: SocketAddr = LOOPBACK_BIND_ADDR
-        .parse()
-        .expect("LOOPBACK_BIND_ADDR is a hardcoded valid address");
-    spawn(Arc::new(Mutex::new(conn)), bind_addr);
+    let found = enumerate_local_addresses();
+    let addresses = select_bindable_addresses(&found);
+    spawn_all(Arc::new(Mutex::new(conn)), &addresses);
     Ok(())
 }
 
@@ -293,6 +368,87 @@ mod tests {
             .header(DEVICE_SECRET_HEADER, secret_hex)
             .body(Body::from(body.to_string()))
             .unwrap()
+    }
+
+    #[test]
+    fn select_bindable_addresses_always_includes_loopback_even_with_no_interfaces() {
+        let selected = select_bindable_addresses(&[]);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_includes_rfc1918_ranges() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            IpAddr::V4(Ipv4Addr::new(172, 16, 4, 9)),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert!(selected.contains(&LOOPBACK_ADDR));
+        assert!(selected.contains(&Ipv4Addr::new(10, 0, 0, 5)));
+        assert!(selected.contains(&Ipv4Addr::new(172, 16, 4, 9)));
+        assert!(selected.contains(&Ipv4Addr::new(192, 168, 1, 20)));
+        assert_eq!(selected.len(), 4);
+    }
+
+    #[test]
+    fn select_bindable_addresses_includes_tailscale_cgnat_range() {
+        let found = [IpAddr::V4(Ipv4Addr::new(100, 90, 1, 2))];
+        let selected = select_bindable_addresses(&found);
+        assert!(selected.contains(&Ipv4Addr::new(100, 90, 1, 2)));
+    }
+
+    #[test]
+    fn select_bindable_addresses_excludes_cgnat_lookalikes_outside_the_real_range() {
+        // 100.63.x.x and 100.128.x.x are outside RFC 6598's 100.64.0.0/10.
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(100, 63, 1, 2)),
+            IpAddr::V4(Ipv4Addr::new(100, 128, 1, 2)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_never_selects_a_public_address() {
+        let found = [IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+        assert!(!selected.contains(&Ipv4Addr::new(8, 8, 8, 8)));
+    }
+
+    #[test]
+    fn select_bindable_addresses_never_selects_unspecified_or_link_local() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+            IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1)),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_excludes_ipv6() {
+        let found = [IpAddr::V6(std::net::Ipv6Addr::new(
+            0xfd00, 0, 0, 0, 0, 0, 0, 1,
+        ))];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(selected, vec![LOOPBACK_ADDR]);
+    }
+
+    #[test]
+    fn select_bindable_addresses_deduplicates_and_never_returns_zero_addr() {
+        let found = [
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20)),
+            IpAddr::V4(LOOPBACK_ADDR),
+        ];
+        let selected = select_bindable_addresses(&found);
+        assert_eq!(
+            selected,
+            vec![LOOPBACK_ADDR, Ipv4Addr::new(192, 168, 1, 20)]
+        );
+        assert!(!selected.contains(&Ipv4Addr::new(0, 0, 0, 0)));
     }
 
     #[test]
