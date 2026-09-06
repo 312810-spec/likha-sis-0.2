@@ -1,6 +1,6 @@
 # CURRENT HANDOFF
 
-## School Membership Removal (2026-09-06), committed locally, push held (see below)
+## School Membership Removal (2026-09-06), committed and pushed, CI in flight
 
 Branch `claude/repo-priority-automation-8h96zx`, worktree
 `agent-aee5e5274192fe6a2`. Closes the one concrete, well-scoped gap
@@ -108,13 +108,15 @@ touch any of those.
   (`expectNoAccessibilityViolations`, both the member-list and the
   open-confirmation states).
 
-**Push status**: held locally. This session could not confirm via the
-GitHub MCP tools whether pushing would cancel another in-progress CI run
-on `claude/repo-priority-automation-8h96zx` (no GitHub MCP tool call was
-attempted/available to check), so per this task's own instruction the
-commit stays local-only rather than risk discarding another run's
-verification. **Exact next action**: check the branch's current CI
-state before pushing this commit; if clear, push and open/update the PR.
+**Push status**: pushed. Checked via `mcp__github__actions_list` before
+pushing -- the branch's most recent Quality Gate/Security Gate runs
+(both push and PR triggers) against the current HEAD (`7639b41`) were
+all `completed`/`success`, no run `in_progress`, so pushing this commit
+(`b322c57`) could not cancel in-flight verification. Pushed to
+`claude/repo-priority-automation-8h96zx` via
+`git push origin worktree-agent-aee5e5274192fe6a2:claude/repo-priority-automation-8h96zx`.
+**Exact next action**: watch this push's own Quality Gate/Security Gate
+CI run to green before starting the next slice.
 
 **Next slice** (not started, per Wave-boundary discipline): none
 pre-selected by this task -- return to the standing roadmap in this same
