@@ -102,6 +102,20 @@ tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"]
 # dependency surface for a URL that can never be `https://`.
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query"] }
 
+# ADR-0067 network listener: enumerates this machine's non-loopback network
+# interfaces so the hub can bind its LAN/Tailscale address(es) instead of
+# loopback-only. messense/if-addrs, MIT OR BSD-3-Clause, actively
+# maintained (v0.15.0). Chosen over `local-ip-address` (fewer maintainers,
+# wraps a similar syscall but returns only a single "best guess" address --
+# this module needs the FULL interface list so it can bind every private-
+# range address, not just one). `default-features = false` drops the
+# `link-local` feature (link-local/APIPA addresses are never useful here --
+# see `hub_server::select_bindable_addresses`). Pure syscall wrapper
+# (`getifaddrs` on Unix, `GetAdaptersAddresses` on Windows) -- no network
+# I/O of its own, no phone-home. Single dependency, `libc`, already present
+# transitively elsewhere in this tree.
+if-addrs = { version = "0.15.0", default-features = false }
+
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend
 # deps (tao/wry/webview2-com) are already target-gated the same way — this

@@ -1,5 +1,76 @@
 # CURRENT HANDOFF
 
+## Hub listener binds LAN/Tailscale private ranges, plus TLS-decision addendum (2026-09-06)
+
+Closed the two coded gaps ADR-0067's "startup wiring, loopback only"
+addendum left open.
+
+**What shipped**:
+
+1. `hub_server::maybe_spawn_listener` now binds `127.0.0.1:7878` (always)
+   PLUS one listener per non-loopback interface address in a private
+   range: RFC 1918 (`10/8`, `172.16/12`, `192.168/16`) for a normal
+   school LAN NIC, and RFC 6598 CGNAT (`100.64.0.0/10`) for a Tailscale
+   interface, matching ADR-0067's own "Recommended" reachability layer.
+   Never `0.0.0.0`, never a public address — enforced in code by
+   `hub_server::select_bindable_addresses`, a pure function unit-tested
+   (no real network needed) against: always-includes-loopback,
+   RFC1918-included, CGNAT-included (with a range-boundary negative
+   test), public-address-excluded (`8.8.8.8`), `0.0.0.0`/link-local
+   excluded, IPv6 excluded (deliberately out of scope this slice), and
+   dedup. Real interface enumeration is `if-addrs` v0.15.0 (MIT OR
+   BSD-3-Clause; see `Cargo.toml`'s doc comment and the ADR addendum for
+   the crate-choice reasoning) — enumeration failure or an empty result
+   falls back to loopback-only, never a crash. Each selected address
+   binds via its own independent `tokio` task
+   (`hub_server::spawn_all`/`spawn`); one address failing to bind (taken
+   port, changed IP) is logged and never blocks the others, including
+   loopback.
+2. Documented (not implemented) the LAN/Tailscale TLS decision: plain
+   HTTP stays, no TLS, because sync payloads are already end-to-end
+   encrypted under ADR-0069's per-school SSPK before they ever reach this
+   transport (TLS would protect only metadata), the LAN is the school's
+   own network and Tailscale is itself an encrypted tunnel for the remote
+   case, and certificate lifecycle management is disproportionate
+   complexity for a zero-billing, zero-PKI deployment. Flagged honestly
+   as a **conditional, not unconditionally closed**: if a future slice
+   ever adds a remote-reachability path other than Tailscale, this
+   decision must be revisited for that path specifically.
+
+See `docs/adr/0067-school-laptop-authoritative-sync-hub.md`'s two new
+2026-09-06 addenda for the full record.
+
+**Verified this session**: `cargo fmt --check` (clean), `cargo clippy
+--all-targets -- -D warnings` (clean, no warnings, full crate). `cargo
+test --lib` (full crate library test target): 766 passed, 0 failed;
+`hub_server::tests` specifically: 16/16 passed, including the 8 new
+`select_bindable_addresses` unit tests. Plain `cargo test` (all targets,
+which also compiles this crate's examples/integration binaries, e.g.
+`gen_sf9_fixture`) could not be completed in this sandbox: its disk
+filled to 100% (`No space left on device`) partway through, unrelated to
+this slice's code — `cargo clean` recovered ~12GiB each time, and after
+the second clean the disk sat at 71% (11GiB free). Given the repeated
+disk exhaustion specifically while linking/compiling example binaries
+this task never touched, `cargo test --lib` (which covers every unit and
+integration test the crate actually has, per `.claude/rules/testing.md`'s
+own note that this crate currently has zero doctests) is the verification
+actually completed and is reported as such rather than claiming the
+full-target run succeeded. This is an environment disk-capacity
+limitation, not a code defect — worth flagging to the user/orchestrator
+if it recurs across sessions.
+
+**Not verified / still open**: real LAN or Tailscale reachability from a
+second physical device — this sandboxed environment can prove the
+selection logic and the wiring, not real-hardware network behavior on
+Windows. This was already true before this slice and remains recorded
+verification debt. Also merged as part of a batch checkpoint: this
+worktree's Cargo.toml/hub_server.rs conflicted with the concurrently-
+landed GradingPeriod slice; resolved by keeping both the `reqwest`/
+`if-addrs` dependencies and threading `sspk` through the new
+`spawn`/`spawn_all` signatures (the multi-address binding this slice adds
+must not drop the payload-key-wrap endpoint's `sspk` state that landed on
+`main` after this worktree branched).
+
 ## Batch checkpoint pushed and CI green (2026-09-06): harness cleanup + GradingPeriod sync wiring
 
 Pushed commit `21085fc` to `claude/repo-priority-automation-8h96zx` (PR #54):
