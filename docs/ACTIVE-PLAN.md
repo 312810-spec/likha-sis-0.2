@@ -1,5 +1,46 @@
 # ACTIVE PLAN
 
+## LearnerScore sync wiring (2026-09-06)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: fourth entity wired through ADR-0067/0069's sync
+encrypt/decrypt pattern, after Learner, Attendance, Section.
+`repository::learner_score::upsert_from_sync` (new, id-keyed upsert),
+`commands::learner_score::record_learner_score_with_optional_sync` (new,
+mirrors `attendance`'s SAVEPOINT + `sync_version_cache`-derived
+`base_version` shape), and a new `EntityKind::LearnerScore` arm in
+`sync_client::apply_decrypted_change`.
+
+Verification actually run this session:
+
+- `cargo test` (full crate): 864 lib tests passing, 0 failed; every
+  integration test binary passing; 0 doctests (none exist in this
+  crate).
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean (after one `cargo fmt` pass on this
+  slice's own new code; `cargo test` re-run afterward to confirm the
+  reformat was behavior-neutral).
+- `npm run quality:security`: gitleaks/`cargo deny check`/OSV-Scanner —
+  3 ok, 0 failed, 0 missing.
+- `npm run quality`/`npm run quality:ui` (TS/UI layers): not run — no
+  TS/UI files touched this slice.
+
+Independent review: no subagent-dispatch tool reachable this session;
+rigorous self-review performed instead (see
+`docs/VERIFICATION-DEBT.md`'s new entry for the exact checklist).
+Independent `security-reviewer` review remains owed.
+
+Environment note: this shared host hit disk exhaustion multiple times
+from a second worktree's concurrent build (that worktree has since
+removed itself); resolved each time by `cargo clean` scoped to this
+worktree's own `src-tauri/target`, and twice by clearing disposable
+shared caches (`npm`, `uv`, `osv-scalibr`, cargo registry download
+cache) — not a code defect, see `docs/VERIFICATION-DEBT.md`.
+
+Next candidate for the same pattern (not started): `SectionMembership`
+— has a mature write path and materially affects other devices'
+roster/attendance/gradebook views promptly.
+
 ## Stale outbox `base_version` after "keep local" fix (2026-09-05)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
