@@ -1,5 +1,71 @@
 # Verification Debt
 
+## LearnerScore sync wiring (2026-09-05/06) — independent security review owed
+
+`commands::learner_score::record_learner_score`,
+`repository::learner_score::upsert_from_sync`, and the
+`EntityKind::LearnerScore` arm in `sync_client::apply_decrypted_change`
+were added to close ADR-0067's next entity slot (see
+`docs/CURRENT-HANDOFF.md`'s matching entry for the full choice
+rationale and diff summary). No subagent-dispatch tool (`Task`/agent
+launch) was reachable in this session to obtain the independent
+`security-reviewer` this class of change requires per
+`.claude/rules/security-privacy.md` ("Milestones touching auth,
+persistence, or sync get an independent security/reliability review").
+A rigorous self-review was performed instead, per this project's
+documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id`
+  → reject) is present in the new `LearnerScore` arm, matching
+  Learner/Attendance/Section exactly — no cross-school pull can
+  materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id` (not the `(assessment_item_id, learner_id)` unique
+  constraint `record`'s own insert conflicts on), matching
+  `attendance::upsert_from_sync`'s established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`record_learner_score_with_optional_sync`) is enrollment-gated
+  (`sspk` only resolved via `resolve_sspk_if_enrolled`), atomic with the
+  domain write via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Attendance/Section, and never enqueues on a rejected domain write (a
+  score above `max_score`, an ineligible learner, etc. — covered by
+  `a_rejected_score_never_enqueues_an_outbox_row`).
+- Confirmed `base_version` is read from `sync_version_cache` (not
+  hardcoded `0`), matching Attendance's re-recordable-entity precedent,
+  not Learner/Section's create-only precedent.
+- No new PII surface: `LearnerScore` carries no learner-identifying
+  fields beyond the existing `learner_id`/`recorded_by_user_id`
+  references already present in the unwired struct.
+- No blocking issue found. A genuinely independent review of this diff
+  remains owed — retry when a reviewer subagent is reachable.
+
+**Verified this session (real output)**: `cargo test` (full crate,
+including the new `repository::learner_score::tests::upsert_from_sync_*`,
+`commands::learner_score::tests::*`, and
+`sync_client::tests::*_learner_score_*` tests) — 864 lib tests passing
+0 failed (rerun clean after `cargo fmt`), all integration test binaries
+passing, 0 doctests (none exist in this crate). `cargo clippy
+--all-targets -- -D warnings` — clean. `cargo fmt --check` — clean
+(after one `cargo fmt` pass fixing this slice's own formatting drift).
+`npm run quality:security` — gitleaks/`cargo deny check`/OSV-Scanner:
+3 ok, 0 failed, 0 missing. `npm run quality`/`quality:ui` (TS/UI layers)
+were not run — this slice touched only the Rust repository, command,
+and `sync_client` layers, no TS/UI files.
+
+**A real environment hazard hit and resolved this session**: the shared
+host repeatedly hit "No space left on device" from concurrent
+`cargo build`/`cargo test` activity in a second, unrelated worktree
+building at the same time (that worktree has since been removed by its
+own session). Resolved each time by `cargo clean` scoped to this
+worktree's own `src-tauri/target` (never touching the other worktree's
+or the main checkout's target dirs) and, twice, by clearing genuinely
+disposable shared caches unrelated to any worktree's own build state
+(`npm cache clean --force`, `/root/.cache/uv`, `/root/.cache/osv-scalibr`,
+`/root/.cargo/registry/cache` — all safely regenerable, none of them
+project source or another session's in-progress build output). Recorded
+here per this task's own guidance that this is a known host-sharing
+hazard, not a code defect.
+
 ## Stale outbox `base_version` after "keep local" (2026-09-05) — CLOSED
 
 **Closed.** Item 3 of the conflict-review screen entry below (the

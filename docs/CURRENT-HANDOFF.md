@@ -1,5 +1,145 @@
 # CURRENT HANDOFF
 
+## LearnerScore wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `LearnerScore` is now
+the fourth entity wired end to end (after Learner, Attendance, Section),
+using the exact same pattern each time — encrypt-on-enqueue at the
+existing domain write, an `upsert_from_sync`-shaped repository apply
+path, and the corresponding `EntityKind` arm in `sync_client`'s
+decrypt/apply switch.
+
+- **Entity chosen and why**: of the seven still-unwired kinds
+  (`SectionMembership`, `AssessmentItem`, `LearnerScore`,
+  `TeachingAssignment`, `Subject`, `GradingPeriod`,
+  `SubjectAttendance`), `LearnerScore` was picked because it already has
+  a mature, re-recordable write path (`repository::learner_score::record`,
+  an upsert keyed on `(assessment_item_id, learner_id)` — the same shape
+  as `attendance::record`'s `(learner_id, attendance_date)` key) AND is
+  genuinely high-value to sync promptly: a teacher's own gradebook
+  entries are exactly the kind of record that needs to reach a shared
+  school-laptop hub quickly (e.g. a grade adviser reviewing a subject
+  teacher's just-recorded scores on another device before computing a
+  term grade), unlike rarely-changing reference data
+  (`Subject`/`GradingPeriod`/`TeachingAssignment`) or an entity with no
+  FK relationship narrowing the choice further
+  (`SectionMembership`/`AssessmentItem`/`SubjectAttendance` were all
+  viable too, but `LearnerScore` was the clearest "changes constantly,
+  matters immediately" pick).
+- **What changed, mirroring the Attendance slice's shape exactly**:
+  - `repository/learner_score.rs`: `LearnerScore` now derives
+    `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, score)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, never re-validating
+    item/roster eligibility (that already happened on the originating
+    device, exactly like `attendance::upsert_from_sync`'s own
+    reasoning).
+  - `commands/learner_score.rs`: `record_learner_score` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::attendance`'s), and delegates to
+    `record_learner_score_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` read from `sync_version_cache` (not
+    hardcoded `0`, since this is a re-recordable entity like Attendance,
+    not create-only like Learner/Section).
+  - `sync_client.rs`: new `EntityKind::LearnerScore` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `learner_score::upsert_from_sync`; module doc comment and the
+    "entity kinds other than ..." comment both updated to name the
+    fourth wired entity.
+- **Tests added (TDD)**: `repository::learner_score::tests::
+upsert_from_sync_inserts_a_row_this_device_has_never_seen`,
+  `..._updates_an_existing_row_by_id_not_by_the_assessment_learner_pair`;
+  `commands::learner_score::tests::record_learner_score_with_no_sspk_behaves_exactly_like_a_plain_record`,
+  `..._with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+  `re_recording_the_same_entity_enqueues_with_the_known_base_version_not_zero`,
+  `record_learner_score_stamps_the_change_with_this_installations_own_device_id`,
+  `a_rejected_score_never_enqueues_an_outbox_row` (a score above
+  `max_score` must never reach the outbox); `sync_client::tests::
+pull_once_applies_a_non_conflicting_learner_score_change`,
+  `pull_once_rejects_a_tampered_learner_score_payload_without_applying_or_advancing_past_it`
+  (tampered ciphertext byte-flip → rejected, domain table untouched,
+  cursor doesn't advance), `pull_once_stages_a_learner_score_conflict_when_this_device_has_an_unsynced_local_edit`
+  (the existing generic conflict-staging path in `pull_once` needs no
+  entity-specific change — proven by this test passing unmodified
+  against the new entity kind). All pre-existing tests for these three
+  modules pass unmodified.
+- **A real bug caught and fixed during this slice's own TDD**: the
+  first version of `pull_once_applies_a_non_conflicting_learner_score_change`
+  used `fixture.user_id` (a user that exists only in the separate HUB
+  database `sync_client`'s own test harness spins up) as the synthetic
+  score's `recorded_by_user_id` — a real FK to `users(id)` in the
+  **client's** local db, which doesn't have that row. This failed
+  correctly (`summary.applied == 0`, not the expected `1`) rather than
+  silently miscounting, confirming `upsert_from_sync`'s FK enforcement
+  works as intended; fixed by creating a local teacher user in the
+  client's own db inside the new `setup_assessment_item_and_learner`
+  test fixture.
+- **Independent review**: no subagent-dispatch tool (`Task`/agent
+  launch) was reachable this session to obtain the
+  `security-reviewer` this class of change (persistence + sync) should
+  get per `.claude/rules/security-privacy.md`. A rigorous self-review
+  was performed instead, per this project's documented reviewer-failure
+  fallback — see `docs/VERIFICATION-DEBT.md`'s new entry for exactly
+  what was checked (school-scope isolation, FK/id-keyed upsert
+  correctness, enrollment gating, atomicity, rejected-write never
+  enqueuing). No blocking issue found; independent review remains owed.
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 864 lib tests passing, 0 failed (rerun clean after
+  `cargo fmt`); every integration test binary (`assessment_grading`,
+  `attendance_management`, `class_record_management`,
+  `export_and_reporting`, `formgen`, `learner_roster`,
+  `schedule_meeting_management`, `section_advisory`,
+  `section_membership_and_learner_management`, `sf1_import`,
+  `subject_attendance`, `teaching_assignment_management`, and others)
+  passing; `Doc-tests app_lib` — 0 tests (none exist in this crate, per
+  `.claude/rules/testing.md`'s own note that this isn't yet a real gap).
+  `cargo clippy --all-targets -- -D warnings` — clean, zero
+  warnings/errors. `cargo fmt --check` — clean (one `cargo fmt` pass
+  was needed first to fix this slice's own formatting drift; verified
+  clean afterward and `cargo test` re-run to confirm the reformat
+  changed nothing behaviorally). `npm run quality:security` —
+  gitleaks/`cargo deny check`/OSV-Scanner: 3 ok, 0 failed, 0 missing.
+  `npm run quality`/`quality:ui` (TS/UI layers) were not run — this
+  slice touched only Rust repository/command/`sync_client` layers, no
+  TS/UI files, matching the task's explicit "no UI changes" scope.
+- **A real environment hazard hit and resolved repeatedly this
+  session**: the shared host hit "No space left on device" several
+  times from a second, unrelated worktree (`agent-a9549b79e876242f9`)
+  running its own concurrent `cargo build`/`cargo test` — that worktree
+  has since removed itself. Each time, resolved by `cargo clean` scoped
+  to this worktree's own `src-tauri/target` only (per this task's own
+  documented guidance), and twice by clearing genuinely disposable
+  shared caches unrelated to any worktree's build state (`npm cache
+clean --force`, `/root/.cache/uv`, `/root/.cache/osv-scalibr`,
+  `/root/.cargo/registry/cache` — all safely regenerable download
+  caches, none of them source or another session's in-progress build
+  output). Not a code or config change; recorded in
+  `docs/VERIFICATION-DEBT.md` for a future session hitting the same
+  contention on this host.
+- **Explicitly out of scope, per the task, and not touched**: the other
+  six still-unwired entities; `db::rotate_sspk`; the rotating wrapper;
+  any UI change; any other entity's existing wiring.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new independent-review-owed
+  entry).
+
+**Next exact slice**: the two independent-review/native-accessibility
+items disclosed by the conflict-review and sync-status screen entries
+below remain the next owed non-implementation items (see
+`docs/VERIFICATION-DEBT.md` for both). For further ADR-0067/0069 sync
+rollout, the next viable entity to wire (by the same priority
+reasoning: mature write path + genuine promptness value) is
+`SectionMembership` — it has a mature write path
+(`section_membership::enroll`/`enroll_membership`/`transfer_membership`/
+`end_membership`/`correct_same_day_placement`) and, unlike the
+remaining reference-data kinds, materially affects another device's
+roster/attendance/gradebook views promptly after a mid-day enrollment
+change or correction. Not started; no code touched for it this
+session.
+
 ## Stale outbox `base_version` after "keep local" fixed (2026-09-05)
 
 **Closed.** The conflict-review screen entry below disclosed a real gap:
