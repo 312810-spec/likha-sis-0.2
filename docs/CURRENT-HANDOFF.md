@@ -1,5 +1,114 @@
 # CURRENT HANDOFF
 
+## My Day teacher screen (2026-09-06), committed locally, not pushed
+
+Worktree `agent-ab05593d27a378050`, branch
+`claude/repo-priority-automation-8h96zx`. Product owner explicitly
+confirmed scope for this slice in-session (superseding the prior
+handoff entry's "no product scoping exists, deliberately not
+attempted" note for "My Day" specifically): a Teacher-facing screen
+combining (1) today's schedule, derived from `TeachingAssignment` +
+`ScheduleMeeting`, and (2) a conservative, read-only-derived set of
+pending tasks for today. School-Head variant, task dismissal/"done"
+marking, and notifications/reminders were explicitly out of scope and
+not built. `SchoolHeadHome.tsx` already covers the School Head's own
+overview and was left untouched.
+
+**What shipped**:
+
+- `repository::subject_attendance::find_session_for_assignment_on_date`
+  (new): a read-only lookup for one assignment on one exact date --
+  unlike `open_or_get_session`, never creates a session as a side
+  effect (a dedicated test pins this: opening a check must never mutate
+  state). `count_entries_for_session` (new): count of recorded entries
+  for a session, without pulling the whole roster.
+- `repository::my_day::summary_for_teacher` (new module): the
+  aggregation. For each of the teacher's `TeachingAssignment`s, filters
+  `ScheduleMeeting`s to `weekday == today_weekday` (0 = Sunday … 6 =
+  Saturday, the convention `domain/schedule-meeting.ts` established) to
+  build the schedule list (sorted by start time), and flags
+  "attendance not yet checked" when today's session either doesn't
+  exist yet or exists with zero recorded entries -- never once flagged
+  after at least one entry is recorded or the session was explicitly
+  marked `NoClass` (an explicit decision, not a pending task). Also
+  narrows `sync_conflict_review::list_open_for_school` (school-wide) to
+  this teacher's own `actor_user_id`, surfacing their own unresolved
+  sync conflicts. Deliberately does NOT invent a new "task"/to-do
+  domain concept or table -- every field is computed fresh, read-only,
+  from data that already existed. Explicitly excluded from this slice:
+  "ungraded assessment items" -- assessment items carry no due-date
+  concept in this schema, so there is no reliable "today" anchor to
+  derive that signal from without inventing new state-tracking
+  machinery, which the task's own instructions ruled out. 9 repository
+  tests: today-vs-other-weekday filtering, all three
+  pending-attendance states (never opened / opened-empty / has an
+  entry / explicit No Class), cross-teacher and cross-school isolation
+  (including a forged-school-id case), conflict-review narrowing to
+  the caller's own `actor_user_id`, and multi-meeting same-day sort
+  order.
+- `commands::my_day::get_my_day_summary` (new Tauri command),
+  registered in `lib.rs`. Always self -- no `teacher_user_id`
+  parameter and no new `Capability`; gated by
+  `sessions.require_active_session` alone, the same always-self shape
+  `TeacherWorkspaceScreen`/`TodaysClassesScreen` already use.
+  `today_weekday`/`today_date` are caller-supplied (matching this
+  codebase's own established convention for "what day is it" --
+  `create_schedule_meeting`'s `weekday`, `open_subject_attendance_session`'s
+  `session_date` -- deliberately avoiding a new server-side clock
+  dependency for one command).
+- Frontend, full port/service/adapter stack mirroring
+  `SyncStatusRepository`'s single-method read-only shape:
+  `domain/my-day.ts`, `domain/ports/my-day-repository.ts`,
+  `infrastructure/tauri/my-day-repository.ts`,
+  `application/my-day-service.ts` (+ test). New `ui/MyDayScreen.tsx` (+
+  test, `expectNoAccessibilityViolations` a11y check): "Today's
+  schedule" list plus a "Needs your attention today" priority rail
+  (reusing `TeacherWorkspaceScreen`'s own `workspace-priority-rail`
+  styling) linking out to Subject Attendance / Review Sync Conflicts --
+  strictly read-only, nothing here can be marked done from this screen.
+  Wired into nav: new `my-day` tab (Daily Teaching group, first item,
+  ahead of Today's Classes), `composition.ts`, `App.tsx`.
+
+**Verified this session** (all commands actually run):
+
+- `cd src-tauri && cargo fmt --check` -- clean (one `cargo fmt` pass
+  needed first for the new files' long test lines).
+- `cd src-tauri && cargo clippy --all-targets -- -D warnings` -- clean,
+  two full runs (one caught+fixed a compile error in a new test file:
+  wrong `ChangeOperation` variant name and `SyncCursor`'s actual
+  tuple-struct shape; both fixed, re-run clean).
+- `cd src-tauri && cargo test --lib` -- 965 passed, 0 failed (includes
+  9 new `repository::my_day` tests and 6 new
+  `repository::subject_attendance` tests for the two new read-only
+  helper functions).
+- `npm run quality` (typecheck, lint, format:check,
+  check:architecture, knip, vitest) -- clean. One real knip finding
+  fixed: the three `MyDay*` element-type interfaces in `domain/my-day.ts`
+  are consumed only structurally (as `MyDaySummary`'s field types),
+  never imported by name -- marked `@public` per
+  `.claude/rules/testing.md`'s documented convention rather than
+  deleted. `npx vitest run` directly: 1024 passed (102 files), 0
+  failed -- includes 2 new `my-day-service` tests and 6 new
+  `MyDayScreen` tests (schedule + pending rendering, both button
+  callbacks, retryable error, empty state, a11y).
+- `npm run quality:full`'s Playwright/native-visual tier was NOT run
+  this session (out of scope for a UI-only addition to an
+  already-covered app shell) -- no new gap: this environment has no
+  browser/screenshot tool for the native Tauri binary regardless: see
+  `docs/VERIFICATION-DEBT.md`.
+
+**Not pushed**: verification is fully green, but a rate-limit
+interruption occurred mid-session; per the coordinating session's
+explicit instruction this slice was committed locally only, for the
+orchestrating session to merge/push.
+
+**Next slice** (recorded, not started): the previously-recorded
+candidate remains accurate -- "Creation Studio" has no product scoping
+anywhere in the docs; research/definition would be needed before any
+implementation. Branding was judged not urgent. No other well-scoped
+gap is currently known; re-derive from `docs/PROGRESS-MAP.md` and any
+newer owner instruction before picking up further work.
+
 ## School-Member Role Management (2026-09-06), committed locally, NOT pushed
 
 Worktree `agent-a6cf2007ab44b5a0d`, branch

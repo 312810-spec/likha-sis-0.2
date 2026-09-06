@@ -148,6 +148,7 @@ pub fn run() {
             commands::subject_attendance::list_subject_attendance_sessions,
             commands::subject_attendance::subject_attendance_monitor,
             commands::subject_attendance::adviser_subject_attendance_overview,
+            commands::my_day::get_my_day_summary,
             commands::section_advisory::assign_section_adviser,
             commands::section_advisory::end_section_adviser,
             commands::section_advisory::current_section_adviser,

@@ -12,6 +12,7 @@ pub mod grading_computation;
 pub mod installation;
 pub mod learner;
 pub mod learner_score;
+pub mod my_day;
 pub mod reference_geo;
 pub mod role;
 pub mod schedule_meeting;

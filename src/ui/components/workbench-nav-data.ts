@@ -7,6 +7,7 @@ export type SignedInTab =
   | "section-adviser"
   | "schedule-meetings"
   | "sf1-import"
+  | "my-day"
   | "today-classes"
   | "attendance"
   | "subject-attendance"
@@ -39,6 +40,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "section-adviser": "Section Adviser",
   "schedule-meetings": "Class Schedule",
   "sf1-import": "Import Learners (SF1)",
+  "my-day": "My Day",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
@@ -77,7 +79,7 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
-    tabs: [tab("today-classes"), tab("attendance"), tab("subject-attendance")],
+    tabs: [tab("my-day"), tab("today-classes"), tab("attendance"), tab("subject-attendance")],
   },
   {
     label: "Class Overview",

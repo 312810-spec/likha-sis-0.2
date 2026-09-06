@@ -12,6 +12,7 @@ import {
   gradingService,
   learnerScoreService,
   learnerService,
+  myDayService,
   onSessionExpired,
   schoolAttendanceService,
   schoolMemberService,
@@ -41,6 +42,7 @@ import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
+import { MyDayScreen } from "./ui/MyDayScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
 import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
@@ -383,6 +385,15 @@ function App() {
                 setMonthlySummaryContext({ sectionId, year, month });
                 setActiveTab("monthly-summary");
               }}
+            />
+          ) : activeTab === "my-day" ? (
+            <MyDayScreen
+              myDayService={myDayService}
+              onCheckAttendance={(teachingAssignmentId) => {
+                setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                setActiveTab("subject-attendance");
+              }}
+              onReviewConflicts={() => setActiveTab("conflict-review")}
             />
           ) : activeTab === "today-classes" ? (
             <TodaysClassesScreen

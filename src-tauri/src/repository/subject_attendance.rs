@@ -493,6 +493,46 @@ pub fn upsert_session_from_sync(
     Ok(())
 }
 
+/// Read-only lookup of a session for one assignment on one exact date —
+/// unlike `open_or_get_session`, this never creates one. Used by "My Day"
+/// (`repository::my_day`) to distinguish "not opened yet today" from "opened
+/// today but nothing entered" without the side effect of implicitly opening
+/// a session merely by checking on it.
+pub fn find_session_for_assignment_on_date(
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    session_date: &str,
+) -> AppResult<Option<SubjectAttendanceSession>> {
+    if !is_iso_date(session_date) {
+        return Ok(None);
+    }
+    conn.query_row(
+        &format!(
+            "{SESSION_SELECT} WHERE school_id = ?1 AND teaching_assignment_id = ?2 AND session_date = ?3"
+        ),
+        (school_id, teaching_assignment_id, session_date),
+        row_to_session,
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
+/// Count of recorded `subject_attendance_entries` rows for one session --
+/// used by "My Day" to tell "opened but nothing entered yet" from "at least
+/// one learner has been marked" without pulling the whole roster.
+pub fn count_entries_for_session(conn: &Connection, session_id: &str) -> AppResult<i64> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM subject_attendance_entries WHERE session_id = ?1",
+        (session_id,),
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
 pub fn find_session_by_id_in_school(
     conn: &Connection,
     school_id: &str,
@@ -1540,6 +1580,138 @@ mod tests {
                 .unwrap();
 
         assert!(overview.is_none());
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_returns_none_when_no_session_was_opened() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let result = find_session_for_assignment_on_date(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_never_creates_a_session_as_a_side_effect() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        find_session_for_assignment_on_date(&conn, &f.school_id, &f.assignment_id, "2026-08-29")
+            .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM subject_attendance_sessions",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0, "a read-only lookup must never open a session");
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_finds_an_already_opened_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let opened = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let found = find_session_for_assignment_on_date(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert_eq!(found, Some(opened));
+    }
+
+    #[test]
+    fn find_session_for_assignment_on_date_never_leaks_a_different_schools_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap();
+        let other_school = school::create(&conn, "Another School").unwrap();
+
+        let result = find_session_for_assignment_on_date(
+            &conn,
+            &other_school.id,
+            &f.assignment_id,
+            "2026-08-29",
+        )
+        .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn count_entries_for_session_is_zero_for_a_freshly_opened_session() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let count = count_entries_for_session(&conn, &session.id).unwrap();
+
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn count_entries_for_session_counts_recorded_entries() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        record_entry(
+            &conn,
+            &f.school_id,
+            &session.id,
+            &f.membership_id,
+            EntryStatus::Present,
+            None,
+            &f.teacher_id,
+        )
+        .unwrap();
+
+        let count = count_entries_for_session(&conn, &session.id).unwrap();
+
+        assert_eq!(count, 1);
     }
 
     #[test]
