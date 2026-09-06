@@ -1,5 +1,111 @@
 # CURRENT HANDOFF
 
+## TeachingAssignment wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `TeachingAssignment`
+is now the seventh entity wired end to end (after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject), using the exact same
+pattern each time — encrypt-on-enqueue at the existing domain write, an
+`upsert_from_sync`-shaped repository apply path, and the corresponding
+`EntityKind` arm in `sync_client`'s decrypt/apply switch.
+
+- **Scope decision**: `teaching_assignment` has three write verbs
+  (`create`, `replace_teacher`, `remove`) — a materially larger surface
+  than the create-only entities wired so far. Per this task's explicit
+  instruction ("encrypt-on-enqueue at its existing write command"),
+  only `create` (via `create_teaching_assignment`) is wired this slice,
+  matching `Section`/`AssessmentItem`/`Subject`'s own create-only
+  precedent. `replace_teacher`/`remove` remain unwired and untracked in
+  the outbox — recorded as retained debt below, the same way `Subject`'s
+  own still-missing `update`/`rename` command is tracked.
+- **What changed, mirroring the Subject slice's shape exactly**:
+  - `repository/teaching_assignment.rs`: `TeachingAssignment` now
+    derives `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, assignment)` — an
+    `INSERT ... ON CONFLICT(id) DO UPDATE` keyed on the row's own stable
+    `id`, bypassing `create`'s own school/section/subject/teacher-
+    membership validation and its `UNIQUE (section_id, subject_id)`
+    conflict path entirely (that validation already happened on the
+    originating device). Two new repository tests: insert-when-unseen,
+    update-in-place-without-a-duplicate-row.
+  - `commands/teaching_assignment.rs`: `create_teaching_assignment` now
+    takes an `AppHandle`, resolves the SSPK only if this school has
+    enrolled a device (`resolve_sspk_if_enrolled`, identical to
+    `commands::subject`'s), and delegates to
+    `create_teaching_assignment_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0`. Switched the
+    capability gate from `authorize_capability` to
+    `authorize_capability_with_actor` to obtain the actor's `user_id`
+    for `actor_user_id`. Four new command tests: no-sspk behaves like a
+    plain create (no outbox row), an sspk enqueues a correctly
+    encrypted+decryptable outbox entry, the enqueued change carries this
+    installation's own device id, and a rejected create (invalid
+    cross-school section reference) never enqueues a row.
+  - `sync_client.rs`: new `EntityKind::TeachingAssignment` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `teaching_assignment::upsert_from_sync`; module doc comment and the
+    "entity kinds handled here" doc comment both updated to name it as
+    the seventh wired entity. Three new integration-shaped tests
+    mirroring the Subject slice exactly: `pull_once` applies a
+    non-conflicting change end to end (real hub round trip over
+    loopback HTTP, real encrypt/decrypt), rejects a tampered payload
+    without applying it or advancing the pull cursor, and correctly
+    stages a conflict (never touching the domain table) when this
+    device has an unsynced local edit to the same entity. New test
+    helper `setup_section_subject_and_teacher` — unlike `Subject`'s own
+    fixture, `teaching_assignments.teacher_user_id` is a real FK to
+    `users(id)`, so `fixture.user_id` (which only exists on the
+    separate HUB database `spawn_test_hub` sets up) cannot be reused —
+    a genuinely local teacher user is created on the client's own
+    conn, mirroring `setup_assessment_item_and_learner`'s identical
+    precedent for `recorded_by_user_id`. A first draft of this test
+    reused `fixture.user_id` directly and failed with `rejected: 1`
+    (an FK violation surfacing as an upsert error, not a decrypt
+    failure) — caught immediately by the test itself before it could
+    hide a real bug behind a passing assertion.
+- **Verification actually run** (disk on this container is quota-limited
+  to roughly 37.5 GB total — a single unrestricted `cargo test`
+  invocation cannot fit every one of this crate's 18 integration test
+  binaries plus the lib test binary in target/debug/deps at once and hit
+  a linker "Bus error"/"No space left on device" partway through; this is
+  a pre-existing environment constraint, not something this slice
+  introduced or could resolve, and `cargo clean` on this worktree's own
+  `target/` was run repeatedly per the task's own disclosed workaround):
+  - `cargo test --lib` (`CARGO_INCREMENTAL=0`): **892 passed, 0 failed**
+    — full lib suite, including all new `teaching_assignment` and
+    `sync_client` tests.
+  - Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+    individually (`cargo test --test <name>`, deleting each binary
+    after it ran to keep the quota clear for the next one): **all 18
+    exited 0, no `FAILED` in any of them**, including
+    `teaching_assignment_management` (9 tests, unaffected by this
+    slice) and `class_record`/`schedule_meeting_management` (both
+    exercise `teaching_assignment` indirectly).
+  - `cargo clippy --all-targets -- -D warnings`: clean (after fixing one
+    genuine `unused_variables` finding this slice's own new test
+    introduced — `_section_id` in
+    `a_rejected_create_never_enqueues_an_outbox_row`).
+  - `cargo fmt --check`: clean (after running plain `cargo fmt` once to
+    fix this slice's own formatting drift — never hand-restyled).
+  - `npm run quality:security`: clean — gitleaks + `cargo deny check` +
+    OSV-Scanner all report 0 findings (3 ok, 0 failed, 0 missing); no
+    new dependency was added this slice.
+  - Not run this slice: `npm run quality` (TS/JS gate) — no TypeScript
+    changed; `npm run quality:full`'s TS-side portions likewise not
+    re-run since only Rust files changed.
+- **Retained debt**:
+  - `teaching_assignment::replace_teacher`/`::remove` are not wired to
+    the outbox. A reassignment or removal made on one device will not
+    propagate to another until these verbs are wired in a future slice
+    (their own `upsert_from_sync`/decrypt-arm groundwork is already in
+    place from this slice).
+  - `GradingPeriod` and `SubjectAttendance` remain the two entities with
+    no sync wiring at all.
+- **Not yet done**: push; PR (targets `main`) — batch mode, commit
+  local only per this task's explicit instruction.
+
 ## Subject wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
 
 Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice of

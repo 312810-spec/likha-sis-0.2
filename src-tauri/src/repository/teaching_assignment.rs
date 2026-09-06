@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -9,7 +9,7 @@ use crate::repository::{schedule_meeting, section, subject, user};
 /// its own -- derived from `sections.school_year` via `section_id`, the
 /// same single-source-of-truth reasoning `class_record` already uses
 /// (see `docs/adr/0039-teacher-load-class-schedule-foundation.md`).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TeachingAssignment {
     pub id: String,
@@ -119,6 +119,48 @@ pub fn remove(conn: &Connection, school_id: &str, id: &str) -> AppResult<bool> {
         (id, school_id),
     )?;
     Ok(affected > 0)
+}
+
+/// ADR-0067/0069 sync wiring: applies a pulled/decrypted
+/// `TeachingAssignment` exactly like `subject::upsert_from_sync` --
+/// `assignment` is already decrypted and authenticated,
+/// `sync_client::apply_decrypted_change` is responsible for having
+/// rejected a tampered payload before ever calling this. Deliberate
+/// `INSERT ... ON CONFLICT(id) DO UPDATE`, not a separate insert-or-update
+/// branch, for the same reason as the subject/section case: an
+/// assignment this device has never seen locally and one it has a stale
+/// copy of are the same write here, by design. This bypasses `create`'s
+/// own school/section/subject/teacher-membership validation and its
+/// `UNIQUE (section_id, subject_id)` conflict path entirely, writing
+/// keyed only on the row's own stable `id` -- matching how
+/// `learner_score::upsert_from_sync` never re-validates its originating
+/// device's own business-rule checks either (that validation already
+/// happened on the originating device before this row was ever
+/// encrypted and enqueued). Only `create` is wired to the outbox today
+/// (see `commands::teaching_assignment::create_teaching_assignment`'s own
+/// doc comment for why `replace_teacher`/`remove` are not); this still
+/// upserts rather than insert-only so a future push of either verb
+/// round-trips correctly without a second materializer needing to be
+/// written later.
+pub fn upsert_from_sync(conn: &Connection, assignment: &TeachingAssignment) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(id) DO UPDATE SET
+             school_id = excluded.school_id,
+             teacher_user_id = excluded.teacher_user_id,
+             section_id = excluded.section_id,
+             subject_id = excluded.subject_id",
+        (
+            &assignment.id,
+            &assignment.school_id,
+            &assignment.teacher_user_id,
+            &assignment.section_id,
+            &assignment.subject_id,
+            &assignment.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 pub fn find_by_id_in_school(
@@ -460,5 +502,50 @@ mod tests {
             load.weekly_instructional_minutes, 0,
             "no schedule_meetings exist yet"
         );
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_an_assignment_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        let incoming = TeachingAssignment {
+            id: Uuid::now_v7().to_string(),
+            school_id: school_id.clone(),
+            teacher_user_id: teacher_id,
+            section_id,
+            subject_id,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id_in_school(&conn, &school_id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found, incoming);
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        let original = create(&conn, &school_id, &teacher_id, &section_id, &subject_id)
+            .unwrap()
+            .unwrap();
+        let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
+
+        let updated = TeachingAssignment {
+            teacher_user_id: other_teacher.id.clone(),
+            ..original.clone()
+        };
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id_in_school(&conn, &school_id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.teacher_user_id, other_teacher.id);
+        let all = list_by_section_in_school(&conn, &school_id, &original.section_id).unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
     }
 }

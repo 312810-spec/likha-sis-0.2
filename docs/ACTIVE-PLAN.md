@@ -1,5 +1,49 @@
 # ACTIVE PLAN
 
+## TeachingAssignment sync wiring (2026-09-06)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: seventh entity wired through ADR-0067/0069's sync
+encrypt/decrypt pattern, after Learner, Attendance, Section,
+LearnerScore, AssessmentItem, Subject. `repository::teaching_assignment::
+upsert_from_sync` (new, id-keyed upsert bypassing `create`'s own
+validation), `commands::teaching_assignment::
+create_teaching_assignment_with_optional_sync` (new, mirrors `subject`'s
+SAVEPOINT + unconditional `base_version = 0` shape, wiring only the
+`create` verb), and a new `EntityKind::TeachingAssignment` arm in
+`sync_client::apply_decrypted_change`.
+
+`replace_teacher`/`remove` were deliberately NOT wired this slice — per
+the task's explicit instruction to wire only the entity's existing write
+command, matching the established create-only precedent
+(`Section`/`AssessmentItem`/`Subject`). `GradingPeriod` and
+`SubjectAttendance` remain the two entities with no sync wiring at all —
+recorded as the next candidates.
+
+Verification actually run this session:
+
+- `cargo test --lib` (`CARGO_INCREMENTAL=0`, from a clean `target/`
+  after `cargo clean`): 892 passed, 0 failed.
+- Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+  individually via `cargo test --test <name>` (deleting each linked
+  binary after it ran to stay under this container's ~37.5 GB disk
+  quota, which a single unrestricted `cargo test` cannot fit given 18+
+  large Tauri/GTK-linked test binaries): all 18 exited 0, no `FAILED`
+  anywhere. This is full-crate coverage achieved as N separate
+  invocations rather than one, because of a disk constraint intrinsic
+  to this container — disclosed here rather than silently substituted
+  for the literal single-command form the task named.
+- `cargo clippy --all-targets -- -D warnings`: found and fixed one
+  genuine `unused_variables` warning in this slice's own new test
+  (`_section_id`), then clean.
+- `cargo fmt --check`: found drift in this slice's own new code, fixed
+  with plain `cargo fmt`, re-ran `--check` clean.
+- `npm run quality:security`: gitleaks/`cargo deny check`/OSV-Scanner —
+  3 ok, 0 failed, 0 missing. No new dependency added.
+- `npm run quality`/`npm run quality:ui` (TS/UI layers): not run — no
+  TS/UI files touched this slice (Rust repository/command/`sync_client`
+  layers only), matching the task's explicit "no UI changes" scope.
+
 ## Subject sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
