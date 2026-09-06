@@ -1,5 +1,54 @@
 # Verification Debt
 
+## Subject sync wiring (2026-09-06) — independent security review owed
+
+`commands::subject::create_subject`, `repository::subject::
+upsert_from_sync`, and the `EntityKind::Subject` arm in
+`sync_client::apply_decrypted_change` were added to close ADR-0067's
+next entity slot (see `docs/CURRENT-HANDOFF.md`'s matching entry for the
+full choice rationale and diff summary). As with the
+`AssessmentItem`/`LearnerScore` slices immediately before it, no
+subagent-dispatch tool (`Task`/agent launch, or a reachable
+`security-reviewer`) was available in this session to obtain the
+independent review `.claude/rules/security-privacy.md` requires. A
+rigorous self-review was performed instead, per this project's
+documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `Subject` arm, matching
+  Learner/Attendance/Section/LearnerScore/AssessmentItem exactly — no
+  cross-school pull can materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, deliberately bypasses `subjects`' own `UNIQUE (school_id,
+name)` constraint (that check already ran on the originating device),
+  and never mutates `created_at` on a re-applied pull (covered by
+  `upsert_from_sync_updates_an_existing_row_in_place`) — matching
+  `section::upsert_from_sync`'s/`assessment_item::upsert_from_sync`'s
+  established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`create_subject_with_optional_sync`) is enrollment-gated (`sspk` only
+  resolved via `resolve_sspk_if_enrolled`), atomic with the domain write
+  via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Section/LearnerScore/AssessmentItem, and never enqueues on a rejected
+  domain write (a duplicate `(school_id, name)` hitting `subjects`' own
+  `UNIQUE` constraint — covered by
+  `a_rejected_create_never_enqueues_an_outbox_row`).
+- Confirmed `create_subject`'s switch from `require_active_school_scope`
+  to `require_active_session` is the same strict superset already
+  reviewed for the `AssessmentItem` slice (the former is implemented in
+  terms of the latter, discarding only the `user_id`) — no authorization
+  semantics changed.
+- Confirmed the conflict-review path
+  (`pull_once_stages_a_subject_conflict_when_this_device_has_an_unsynced_local_edit`)
+  passes unmodified against the new entity kind, proving the generic
+  `pull_once` conflict-staging logic needed no `Subject`-specific
+  change.
+- No blocking issue found. Independent review remains owed for
+  `Subject` (alongside the still-owed `AssessmentItem`/`LearnerScore`
+  reviews from prior slices) — periodically retry per
+  `.claude/rules/autonomous-development.md`'s reviewer-failure rule when
+  a subagent-dispatch tool is available again.
+
 ## AssessmentItem sync wiring (2026-09-06) — independent security review owed
 
 `commands::assessment_item::create_assessment_item`,

@@ -1,5 +1,53 @@
 # ACTIVE PLAN
 
+## Subject sync wiring (2026-09-06)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: sixth entity wired through ADR-0067/0069's sync
+encrypt/decrypt pattern, after Learner, Attendance, Section,
+LearnerScore, AssessmentItem. `repository::subject::upsert_from_sync`
+(new, id-keyed upsert), `commands::subject::create_subject_with_optional_sync`
+(new, mirrors `section`'s/`assessment_item`'s SAVEPOINT + unconditional
+`base_version = 0` create-only shape), and a new `EntityKind::Subject`
+arm in `sync_client::apply_decrypted_change`.
+
+`SectionMembership`, `TeachingAssignment`, and `SubjectAttendance` were
+all considered and deliberately NOT picked this slice — each has a
+multi-verb write surface (five temporal verbs, three verbs, and two
+tables with three writers respectively), so each needs its own
+dedicated multi-verb slice (see `docs/CURRENT-HANDOFF.md`'s entry for
+the full reasoning).
+
+Verification actually run this session:
+
+- `cargo test` (full crate, from a clean `target/` after this session's
+  own `cargo clean`): 883 lib tests passing, 0 failed; every integration
+  test binary passing; 0 doctests (none exist in this crate). Run with
+  `RUSTFLAGS="-C debuginfo=0"` to control this shared host's disk
+  footprint — a build-only flag, not a source change.
+- `cargo clippy --all-targets -- -D warnings`: clean (exit code 0, no
+  warnings/errors), run with the project's normal profile.
+- `cargo fmt --check`: found drift in this slice's own new code (two
+  multi-arg test calls, one `use` import wrap), fixed with plain
+  `cargo fmt`, re-ran `--check` clean.
+- `npm run quality:security`: gitleaks/`cargo deny check`/OSV-Scanner —
+  3 ok, 0 failed, 0 missing.
+- `npm run quality`/`npm run quality:ui` (TS/UI layers): not run — no
+  TS/UI files touched this slice (Rust repository/command/`sync_client`
+  layers only), matching the task's explicit "no UI changes" scope.
+
+Environment hazard hit and resolved: a `cargo test` retry hit the
+harness's own `/tmp` task-output mount at 0 bytes free mid-run (the
+documented hazard from the `AssessmentItem` slice recurred). Resolved by
+`cargo clean --manifest-path src-tauri/Cargo.toml` scoped to this
+worktree's own `target/` (freed 11.7GiB), then re-running from clean —
+not a code defect.
+
+Independent review: none obtained this session (no subagent-dispatch
+tool available); rigorous self-review performed instead per this
+project's documented reviewer-failure fallback. Debt recorded in
+`docs/VERIFICATION-DEBT.md`.
+
 ## AssessmentItem sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

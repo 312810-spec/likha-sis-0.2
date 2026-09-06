@@ -27,8 +27,10 @@
 //! comment -- a teacher's own gradebook data, re-recordable exactly like
 //! `Attendance`), and, added in a later addendum, `EntityKind::AssessmentItem`
 //! (see `commands::assessment_item`'s own doc comment -- create-only,
-//! matching `Section`); every other `EntityKind` variant has no producing write
-//! path yet, so
+//! matching `Section`), and, added in a later addendum,
+//! `EntityKind::Subject` (see `commands::subject`'s own doc comment --
+//! create-only, matching `Section`/`AssessmentItem`); every other
+//! `EntityKind` variant has no producing write path yet, so
 //! decrypting one here is unreachable in practice and is
 //! treated as a rejection rather than a silent no-op success. A change
 //! this device has its own unsynced local
@@ -46,7 +48,7 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, device_credential, device_sync_client_credential, learner,
-    learner_score, section, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
+    learner_score, section, subject, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
     sync_version_cache,
 };
 use crate::sync::{EntityKind, PendingChange};
@@ -499,16 +501,17 @@ pub fn pull_once(
 /// repository boundary, not by omission).
 ///
 /// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`/
-/// `AssessmentItem` are deliberately left unhandled here -- no domain
-/// write path for them is enqueued anywhere yet (see `commands::learner`'s,
-/// `commands::attendance`'s, `commands::section`'s,
-/// `commands::learner_score`'s, and `commands::assessment_item`'s own doc
-/// comments: these are the only five entities wired to `sync_outbox` so
-/// far), so decrypting one is unreachable in practice. Rather than
-/// silently accepting an unknown kind as a no-op success (which would
-/// look identical to "applied" to a future caller), it is treated the
-/// same as any other rejection -- fail closed on anything this slice does
-/// not yet know how to materialize, rather than pretend success.
+/// `AssessmentItem`/`Subject` are deliberately left unhandled here -- no
+/// domain write path for them is enqueued anywhere yet (see
+/// `commands::learner`'s, `commands::attendance`'s, `commands::section`'s,
+/// `commands::learner_score`'s, `commands::assessment_item`'s, and
+/// `commands::subject`'s own doc comments: these are the only six
+/// entities wired to `sync_outbox` so far), so decrypting one is
+/// unreachable in practice. Rather than silently accepting an unknown
+/// kind as a no-op success (which would look identical to "applied" to a
+/// future caller), it is treated the same as any other rejection -- fail
+/// closed on anything this slice does not yet know how to materialize,
+/// rather than pretend success.
 pub(crate) fn apply_decrypted_change(
     conn: &Connection,
     school_id: &str,
@@ -556,6 +559,13 @@ pub(crate) fn apply_decrypted_change(
                 return Err(());
             }
             assessment_item::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        EntityKind::Subject => {
+            let incoming: subject::Subject = serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            subject::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
         _ => Err(()),
     }
@@ -872,6 +882,29 @@ mod tests {
         let mut change = make_change(fixture, entity_id, base_version);
         change.entity_kind = EntityKind::Section;
         let plaintext = serde_json::to_vec(&synthetic_section(fixture, entity_id)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    fn synthetic_subject(fixture: &TestFixture, entity_id: Uuid) -> subject::Subject {
+        subject::Subject {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            name: format!("Subject-{entity_id}"),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_section_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` subject payload.
+    fn make_subject_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::Subject;
+        let plaintext = serde_json::to_vec(&synthetic_subject(fixture, entity_id)).unwrap();
         change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
         change
     }
@@ -1649,6 +1682,169 @@ mod tests {
             let count: i64 = conn
                 .query_row(
                     "SELECT COUNT(*) FROM sections WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_subject_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_subject_change(&fixture, entity_id, 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT name FROM subjects WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, format!("Subject-{entity_id}"));
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::Subject,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_subject_payload_without_applying_or_advancing_past_it() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_subject_change(&fixture, entity_id, 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM subjects WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_subject_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's subject change lands at the hub.
+        {
+            let conn = &fixture.conn;
+            let mut other_device_change = make_change(&fixture, entity_id, 0);
+            other_device_change.entity_kind = EntityKind::Subject;
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently edited the SAME entity and has not
+        // pushed it yet.
+        {
+            let conn = &fixture.conn;
+            let mut local_change = make_change(&fixture, entity_id, 0);
+            local_change.entity_kind = EntityKind::Subject;
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM subjects WHERE id = ?1",
                     [entity_id.to_string()],
                     |row| row.get(0),
                 )
