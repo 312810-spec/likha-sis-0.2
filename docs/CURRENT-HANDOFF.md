@@ -1,5 +1,28 @@
 # CURRENT HANDOFF
 
+## Batch checkpoint pushed and CI green (2026-09-06): harness cleanup + GradingPeriod sync wiring
+
+Pushed commit `21085fc` to `claude/repo-priority-automation-8h96zx` (PR #54):
+merges `367c949` (docs: close out three harness/process
+verification-debt items — tasks #10/#11) and `5ba822d` (GradingPeriod
+sync wiring — task #5, 8th of 9 entities). Local verification before
+push: `cargo test` (all lib + 18 integration binaries, all passing),
+`cargo clippy --all-targets -- -D warnings` (clean), `cargo fmt --check`
+(clean), `npm run quality` (typecheck, lint, format:check,
+check:architecture, knip — no findings, vitest 1000/1000 passing). All
+10 GitHub Actions checks (Quality Ubuntu/Windows ×2 job groups,
+Security gitleaks/cargo-deny/osv-scanner ×2 job groups) completed
+`success` on `21085fc` — verified via `get_check_runs`, not assumed.
+
+Task #5 remains **in_progress**: SubjectAttendance and SectionMembership
+(multi-verb: enroll/transfer/end — needs its own design, not a
+copy-paste of the create-only pattern) are still unwired, plus
+TeachingAssignment's `replace_teacher`/`remove` verbs.
+
+Per batch-mode rule, this is a genuine wave boundary: verification ran
+and CI is green. Next slice recorded below; stopping per
+`.claude/rules/autonomous-development.md`.
+
 ## GradingPeriod wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
 
 Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
