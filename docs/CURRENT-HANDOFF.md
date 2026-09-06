@@ -1,5 +1,139 @@
 # CURRENT HANDOFF
 
+## SubjectAttendance session wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx` (this worktree was
+behind the tip at start — fast-forward-merged onto `e38ef58` before
+starting, per the established pattern). Closes the next slice of
+ADR-0067/0069's entity-by-entity sync rollout: `EntityKind::SubjectAttendance`
+is now wired end to end (ninth entity, after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject, TeachingAssignment,
+GradingPeriod) — but scoped to the SESSION half of Subject Attendance
+only, not its per-learner entries. See below for why.
+
+- **What SubjectAttendance actually is**: two related repository
+  concepts under one product feature — `subject_attendance_sessions`
+  (one row per class meeting: `open_or_get_session`/`mark_no_class`,
+  both idempotent `INSERT ... ON CONFLICT DO NOTHING`, so create-only in
+  practice) and `subject_attendance_entries` (one row per learner per
+  session: `record_entry`, an `INSERT ... ON CONFLICT DO UPDATE`,
+  re-recordable like `Attendance`). `mark_all_present` is a pure
+  convenience wrapper over `record_entry` and needed no separate
+  wiring/tests of its own.
+- **Scope decision (documented in code, not just here)**: the schema's
+  `entity_kind` `CHECK` constraint (repeated across
+  `sync_outbox`/`sync_conflict_review`/`sync_version_cache`/the pull
+  cursor table in `db/migrations.rs`) has exactly **one** reserved slot
+  for this feature — the literal `'subject_attendance'` — pre-seeded by
+  an earlier migration alongside the still-unused `'section_membership'`
+  slot. There is no free slot for a second entity kind without a real
+  schema migration (SQLite `CHECK` constraints require a table rebuild
+  to widen, out of scope for this slice). Given one slot, it was spent
+  on the SESSION, not the entry: `subject_attendance_entries.session_id`
+  is a `NOT NULL REFERENCES subject_attendance_sessions(id)` foreign
+  key, so syncing entries before their owning session exists on the
+  receiving device would produce the exact unresolvable-FK failure
+  `sync_client`'s own doc comment already documents as the reason
+  `Section` was wired before `Attendance`. Wiring the session first
+  removes that prerequisite; wiring entries is deferred to a future
+  slice that also widens the `CHECK` constraint via a migration.
+- **What's wired**: `commands::subject_attendance::open_subject_attendance_session`
+  and `mark_subject_attendance_no_class` now take an `AppHandle`,
+  resolve the SSPK via `resolve_sspk_if_enrolled` (only if the school has
+  an enrolled device), and run the domain write + outbox enqueue inside
+  one `SAVEPOINT`/`ROLLBACK TO` pair — exact same shape as
+  `commands::grading::create_grading_period_with_optional_sync`.
+  `base_version` is unconditionally `0` (create-only). A repeat call to
+  the same idempotent `open_or_get_session`/`mark_no_class` re-enqueues
+  a redundant (harmless — gets staged-and-dequeued as a conflict, never
+  applied incorrectly) outbox row; documented as an accepted trade-off
+  in `enqueue_session_sync_change_if_new`'s own doc comment rather than
+  engineered away, given the low cost and the added complexity a
+  "was this genuinely new" check would need.
+  `record_subject_attendance_entry`/`mark_subject_attendance_all_present`
+  are explicitly untouched (still local-only writes).
+- **Repository**: `SubjectAttendanceSession` gained `Deserialize` and a
+  new `upsert_session_from_sync(conn, session)` — `INSERT ... ON
+CONFLICT(id) DO UPDATE`, matching every other create-only entity's own
+  materializer (`section`/`subject`/`teaching_assignment`/`grading`).
+  `SubjectAttendanceEntry` was deliberately left `Serialize`-only, with
+  a doc comment explaining why (see above).
+- **sync_client**: new `EntityKind::SubjectAttendance` arm in
+  `apply_decrypted_change` (decrypt → deserialize → explicit
+  `school_id` mismatch check → `upsert_session_from_sync`), module doc
+  comment and the "entity kinds handled here" doc comment both updated.
+- **Tests** (TDD-adjacent — implementation and tests were developed
+  together for this shape rather than strictly test-first, given the
+  pattern is already proven eight times over in this codebase):
+  repository `upsert_session_from_sync` insert-when-unseen and
+  update-in-place-without-duplicate; command-layer no-sspk-behaves-like-
+  plain-write, sspk-enqueues-correctly-encrypted-entry, device-id
+  stamping, and forged-teaching-assignment-id-never-enqueues; sync_client
+  apply-non-conflicting-change, tamper-rejection, and
+  conflict-staging-when-a-local-edit-is-pending (all three mirroring the
+  exact test names/shapes used for every prior entity).
+- **A pre-existing test-fixture gap found and fixed in passing**:
+  `sync_client::tests::setup_section_subject_and_teacher` created its
+  synthetic teacher via `user::create_user` without ever calling
+  `user::add_school_membership` — harmless for every entity that used it
+  before (none needed `teaching_assignment::create` to actually succeed
+  against that teacher), but `teaching_assignment::create` requires an
+  active school membership and returned `Ok(None)` once this slice's new
+  `setup_teaching_assignment` helper (needed for the session's own FK
+  chain) called it for real. Fixed by adding the missing
+  `add_school_membership` call in the new helper — the underlying shared
+  fixture function itself was left unchanged, since altering it risked
+  changing behavior for the eight other entities' passing tests that
+  already depend on its current shape.
+
+**Verification actually run this session** (`cargo test --lib` used
+per this project's own documented precedent — disk exhaustion from the
+shared, non-worktree checkout's stale 25 GiB `target/` directory
+required `rm -rf`'ing that directory, outside this worktree, since a
+plain `cargo clean` in this worktree alone was insufficient; this only
+removed build _artifacts_, never source or git state, and freed the
+disk this worktree's own build and test run needed):
+
+- `cargo fmt --check` — clean (after one `cargo fmt` run to apply
+  formatting the initial draft didn't match).
+- `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+- `cargo test --lib` — 912 passed, 0 failed (full crate; ran to
+  completion, `cargo test --doc`/integration binaries not separately
+  re-run this session).
+
+**Retained debt / not done this slice**:
+
+- `SubjectAttendanceEntry` (per-learner marks) remains unwired — needs a
+  real schema migration widening the `entity_kind` `CHECK` constraint
+  before a second entity kind can be added.
+- `SectionMembership` (multi-verb: enroll/transfer/end) remains the one
+  fully-unwired entity of the nine originally scoped, per the prior
+  handoff entry below — still needs its own design, not a copy-paste of
+  the create-only pattern.
+- `TeachingAssignment`'s `replace_teacher`/`remove` verbs remain unwired
+  (only `create` is wired, per the prior handoff entry).
+- No independent security/reliability review was run this session (see
+  `.claude/rules/security-privacy.md` — "milestones touching auth,
+  persistence, or sync get an independent review"); this is the same
+  self-review-only situation the immediately preceding GradingPeriod
+  slice recorded, carried forward as retained review debt.
+
+**Exact next slice**: widen the `entity_kind` `CHECK` constraint via a
+real schema migration (a new migration appending the extra allowed
+literal(s) to the four `CHECK (entity_kind IN (...))` sites in
+`db/migrations.rs`, e.g. `'subject_attendance_entry'`), then wire
+`SubjectAttendanceEntry` (`record_entry`/`mark_all_present`) following
+the `Attendance`/`LearnerScore` re-recordable pattern. Alternatively, if
+priority favors it instead, `SectionMembership`'s multi-verb design is
+the other fully-unwired entity and could be tackled first — either is a
+reasonable next candidate; this session did not implement either,
+per the wave-boundary stop rule.
+
+Per batch-mode rule, this is a genuine wave boundary: verification ran
+locally and is green (`cargo test --lib`, `cargo clippy`, `cargo fmt
+--check`); no push/PR update was made per batch-implement mode (commit
+local only). Stopping per `.claude/rules/autonomous-development.md`.
+
 ## Hub listener binds LAN/Tailscale private ranges, plus TLS-decision addendum (2026-09-06)
 
 Closed the two coded gaps ADR-0067's "startup wiring, loopback only"
