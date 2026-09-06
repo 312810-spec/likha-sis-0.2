@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::AppResult;
+use crate::export::class_summary::{self, ClassSummaryRow};
 use crate::export::learner_roster;
 use crate::export::report_card::{self, ReportCardRow};
 use crate::export::sanitize_filename_component;
@@ -216,6 +217,96 @@ pub fn export_class_record_report_card(
     std::fs::write(&file_path, export.csv)?;
 
     Ok(Some(ReportCardExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    }))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClassSummaryExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
+
+/// Writes a class-record-level, simple "at a glance" class summary export
+/// to `<Documents>/LIKHA-SIS/` -- one row per learner on the class
+/// record's section roster with their current computed average, or an
+/// explicit "No grade yet" row otherwise (a learner is never silently
+/// dropped from the export just because their grade isn't computable
+/// yet). `school_id` is derived from the session, never a parameter.
+/// `class_record_id` is client-supplied the same legitimate way it
+/// already is for `export_class_record_report_card`; isolation holds
+/// because `class_record::find_detail_by_id_in_school` resolves to `None`
+/// for a foreign class record, returning `None` here too. This is
+/// Creation Studio sub-scope 2's printable class summary output (see
+/// `docs/CURRENT-HANDOFF.md`) -- a teacher convenience report, not an
+/// official DepEd School Form.
+#[tauri::command]
+pub fn export_class_record_summary(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    class_record_id: String,
+) -> AppResult<Option<ClassSummaryExportResult>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+
+    let Some(school) = school::find_by_id(&conn, &school_id)? else {
+        return Ok(None);
+    };
+    let Some(detail) =
+        class_record::find_detail_by_id_in_school(&conn, &school_id, &class_record_id)?
+    else {
+        return Ok(None);
+    };
+    let Some((section_id, starts_on, ends_on)) =
+        class_record::section_and_period_range_in_school(&conn, &school_id, &class_record_id)?
+    else {
+        return Ok(None);
+    };
+
+    let roster = section_membership::roster_for_section_over_range(
+        &conn,
+        &school_id,
+        &section_id,
+        &starts_on,
+        &ends_on,
+    )?;
+    let mut rows = Vec::with_capacity(roster.len());
+    for member in roster {
+        let grade = grading_computation::compute_term_grade(
+            &conn,
+            &school_id,
+            &class_record_id,
+            &member.learner_id,
+        )?;
+        rows.push(ClassSummaryRow {
+            given_name: member.given_name,
+            family_name: member.family_name,
+            grade,
+        });
+    }
+
+    let export = class_summary::build_class_summary_export(&school, &detail, &rows);
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "ClassSummary_{}_{}_{}.csv",
+        sanitize_filename_component(&detail.section_name.replace(' ', "_")),
+        sanitize_filename_component(&detail.subject_name.replace(' ', "_")),
+        sanitize_filename_component(&detail.grading_period_label.replace(' ', "_")),
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(Some(ClassSummaryExportResult {
         file_path: file_path.to_string_lossy().to_string(),
         disclosure: export.disclosure,
     }))

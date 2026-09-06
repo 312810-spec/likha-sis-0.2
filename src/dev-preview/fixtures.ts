@@ -470,6 +470,14 @@ export class FixtureExportRepository implements ExportRepository {
     );
   }
 
+  async exportClassRecordSummary(): Promise<
+    import("../domain/export").ClassSummaryExportResult | null
+  > {
+    throw new Error(
+      "dev-preview fixture: exportClassRecordSummary() is not wired -- read-only fixture",
+    );
+  }
+
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("dev-preview fixture: exportLearnerRoster() is not wired -- read-only fixture");
   }

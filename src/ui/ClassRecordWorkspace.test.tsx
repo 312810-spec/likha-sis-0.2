@@ -11,6 +11,7 @@ import type {
   AssessmentItemDetail,
 } from "../domain/assessment";
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf2ExportResult,
@@ -244,6 +245,21 @@ class FakeExportRepository implements ExportRepository {
     this.reportCardCalls.push({ classRecordId });
     if (this.reportCardPending) return new Promise<ReportCardExportResult | null>(() => {});
     return this.reportCardResult;
+  }
+
+  classSummaryCalls: Array<{ classRecordId: string }> = [];
+  classSummaryResult: ClassSummaryExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ClassSummary_Mabini_Science_1st_Term.csv",
+    disclosure: {
+      populatedFields: ["Learner Name", "Current Average"],
+      omittedFields: [{ field: "Initial Grade", reason: "see the full report card" }],
+    },
+  };
+  classSummaryPending = false;
+  async exportClassRecordSummary(classRecordId: string): Promise<ClassSummaryExportResult | null> {
+    this.classSummaryCalls.push({ classRecordId });
+    if (this.classSummaryPending) return new Promise<ClassSummaryExportResult | null>(() => {});
+    return this.classSummaryResult;
   }
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
@@ -780,6 +796,44 @@ describe("ClassRecordWorkspace", () => {
     await waitFor(() =>
       expect(exportRepo.revealCalls).toEqual([
         "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ReportCard_Mabini_Science_1st_Term.csv",
+      ]),
+    );
+  });
+
+  it("exports a class summary for the class record and shows the saved path", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+
+    await waitFor(() => expect(exportRepo.classSummaryCalls).toEqual([{ classRecordId: "cr-1" }]));
+    expect(
+      await screen.findByText("ClassSummary_Mabini_Science_1st_Term.csv", { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Initial Grade", { exact: false })).toBeInTheDocument();
+  });
+
+  it("opens the folder for the exported class summary when Open folder is clicked", async () => {
+    const user = userEvent.setup();
+    const { exportRepo } = renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+    await user.click(screen.getByRole("button", { name: "Export class summary (CSV)" }));
+    await screen.findByText("ClassSummary_Mabini_Science_1st_Term.csv", { exact: false });
+
+    await user.click(screen.getByRole("button", { name: "Open folder" }));
+
+    await waitFor(() =>
+      expect(exportRepo.revealCalls).toEqual([
+        "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ClassSummary_Mabini_Science_1st_Term.csv",
       ]),
     );
   });

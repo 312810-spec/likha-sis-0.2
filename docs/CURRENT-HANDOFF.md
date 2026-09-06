@@ -1,5 +1,89 @@
 # CURRENT HANDOFF
 
+## Creation Studio sub-scope 2/3: printable class summary export (2026-09-06)
+
+Built the **printable class summary** — the first of the product owner's
+three confirmed Creation Studio sub-scope 2 outputs (class summary,
+certificate/recognition template, custom seating chart), built one at a
+time per the owner's own sequencing preference. Only the class summary
+was built this slice; the certificate and seating chart remain **unbuilt,
+separate future slices**.
+
+**What it is**: a one-page, read-only "section at a glance" report for
+one class record — section/subject/period header plus one row per
+learner with their current computed average (or "No grade yet" if
+scoring is incomplete). Not an official DepEd School Form (SF1/SF9/SF10),
+so DepEd's official-form branding/formatting restrictions (verified
+earlier this session to apply specifically to SF10) do not apply here.
+
+**Output-format decision**: CSV, following `export/`'s existing
+convention (`sf2.rs`, `learner_roster.rs`, `report_card.rs`), not
+`formgen/`'s richer templated/`.xlsx` engine. `formgen/` exists for
+higher-fidelity official-form reproduction (SF1/SF9) where a specific
+template/layout must be matched; this output has no such template to
+match and the product owner's own wording was "simple" — CSV keeps the
+implementation proportionate to that scope and reuses the exact
+`FieldDisclosure` pattern every other export in this codebase already
+uses, rather than introducing PDF/`.xlsx` generation for a first
+lightweight report.
+
+**Built**:
+
+- `src-tauri/src/export/class_summary.rs` — `build_class_summary_export`,
+  deliberately simpler than `report_card.rs` (no Initial Grade,
+  transmutation/flooring notes, or grading-basis column — those already
+  exist in the fuller report card export). Reuses
+  `repository::grading_computation::compute_term_grade` for every row;
+  no new grade-computation logic was added.
+- `src-tauri/src/commands/export.rs` — `export_class_record_summary`
+  Tauri command, mirroring `export_class_record_report_card`'s
+  authorization shape exactly: `school_id` derived from
+  `SessionManager::require_active_school_scope` (never client-supplied),
+  `class_record_id` resolved via
+  `class_record::find_detail_by_id_in_school` so a foreign class record
+  resolves to `None` rather than exporting anything. Registered in
+  `src-tauri/src/lib.rs`.
+- Frontend: `ExportRepository`/`TauriExportRepository`/
+  `ExportApplicationService`/`src/domain/export.ts` all extended with
+  `exportClassRecordSummary` following the exact `exportClassRecordReportCard`
+  pattern. `ClassRecordWorkspace.tsx` gained an "Export class summary
+  (CSV)" action next to the existing "Export report card (CSV)" button,
+  reusing the same save-path/Open-folder/disclosure-list UI pattern.
+
+**Tests added** (TDD, written before the Rust implementation): 6 new
+Rust unit tests in `class_summary.rs` (right learners/averages, "No
+grade yet" for a learner with no scores, disclosure completeness, no
+report-card-only wording leaking outside the disclosure block);
+repository-level cross-school isolation is inherited unmodified from
+`export_class_record_report_card`'s own established
+`find_detail_by_id_in_school` isolation (no new isolation code was
+introduced, so no new isolation test was needed beyond what the shared
+helper already covers); frontend: `export-repository.test.ts` (2),
+`export-service.test.ts` (3), `ClassRecordWorkspace.test.tsx` (2 new
+render/interaction tests: export shows the saved path and disclosure
+text, Open folder reveals the file) plus throwing stubs added to every
+other `ExportRepository` test fake so `npm run quality`'s typecheck
+stays green.
+
+**Verification actually run this session** (all green): `cargo fmt
+--check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --lib`
+(992 passed, 0 failed), `npm run quality` (typecheck, lint, format:check,
+architecture-boundary check, knip, `npm run test` — 1052 passed, 0
+failed, across 103 files).
+
+**Git**: merged the worktree onto
+`origin/claude/repo-priority-automation-8h96zx`'s current tip
+(`471ee1a`, fast-forward) before starting, per this task's instruction.
+Committed locally; push was **held** — see the commit message for
+exactly why (CI-in-progress could not be confirmed either way from this
+sandbox at commit time).
+
+**Exact next slice**: sub-scope 2's second confirmed output — the
+certificate/recognition template — per the product owner's own
+one-at-a-time sequencing. Not started this slice; do not build it
+without a new instruction to continue. (The third, custom seating
+chart, follows after that.)
+
 ## ADR-0037 curriculum clarification: SHS DO 017 s.2026, JHS/DO 015 alignment, MATATAG rename, Kindergarten exclusion confirmed (2026-09-06)
 
 Product-owner-relayed, `WebSearch`-cross-checked clarification closed 4

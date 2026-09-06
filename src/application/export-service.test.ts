@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ValidationError } from "../domain/errors";
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf10ExportResult,
@@ -76,6 +77,17 @@ class FakeExportRepository implements ExportRepository {
   async exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     this.reportCardCalls.push({ classRecordId });
     return this.reportCardResultToReturn;
+  }
+
+  classSummaryCalls: Array<{ classRecordId: string }> = [];
+  classSummaryResultToReturn: ClassSummaryExportResult | null = {
+    filePath: "C:\\Users\\teacher\\Documents\\LIKHA-SIS\\ClassSummary_Mabini_Science_1st_Term.csv",
+    disclosure: { populatedFields: [], omittedFields: [] },
+  };
+
+  async exportClassRecordSummary(classRecordId: string): Promise<ClassSummaryExportResult | null> {
+    this.classSummaryCalls.push({ classRecordId });
+    return this.classSummaryResultToReturn;
   }
 
   learnerRosterCalls = 0;
@@ -282,6 +294,34 @@ describe("ExportApplicationService", () => {
     const service = new ExportApplicationService(repo);
 
     const result = await service.exportClassRecordReportCard("cr-1");
+
+    expect(result).toBeNull();
+  });
+
+  it("exportClassRecordSummary delegates to the repository with a trimmed id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportClassRecordSummary(" cr-1 ");
+
+    expect(result).toEqual(repo.classSummaryResultToReturn);
+    expect(repo.classSummaryCalls).toEqual([{ classRecordId: "cr-1" }]);
+  });
+
+  it("exportClassRecordSummary rejects an empty class record id", async () => {
+    const repo = new FakeExportRepository();
+    const service = new ExportApplicationService(repo);
+
+    await expect(service.exportClassRecordSummary("  ")).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.classSummaryCalls).toEqual([]);
+  });
+
+  it("exportClassRecordSummary returns null when the class record could not be resolved", async () => {
+    const repo = new FakeExportRepository();
+    repo.classSummaryResultToReturn = null;
+    const service = new ExportApplicationService(repo);
+
+    const result = await service.exportClassRecordSummary("cr-1");
 
     expect(result).toBeNull();
   });

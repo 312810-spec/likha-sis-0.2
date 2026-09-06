@@ -1,6 +1,7 @@
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "./invoke";
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf10ExportResult,
@@ -47,6 +48,12 @@ export class TauriExportRepository implements ExportRepository {
 
   exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null> {
     return invoke<ReportCardExportResult | null>("export_class_record_report_card", {
+      classRecordId,
+    });
+  }
+
+  exportClassRecordSummary(classRecordId: string): Promise<ClassSummaryExportResult | null> {
+    return invoke<ClassSummaryExportResult | null>("export_class_record_summary", {
       classRecordId,
     });
   }

@@ -1,4 +1,5 @@
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf10ExportResult,
@@ -23,6 +24,11 @@ export interface ExportRepository {
   exportSectionEosySf5(sectionId: string, schoolYear: string): Promise<Sf5ExportResult | null>;
   exportSchoolEosySf6(schoolYear: string): Promise<Sf6ExportResult | null>;
   exportClassRecordReportCard(classRecordId: string): Promise<ReportCardExportResult | null>;
+  /** The simple, at-a-glance class summary (section roster + each
+   * learner's current computed average) -- Creation Studio sub-scope 2's
+   * printable class summary output, distinct from the fuller report card
+   * export above. */
+  exportClassRecordSummary(classRecordId: string): Promise<ClassSummaryExportResult | null>;
   exportLearnerRoster(): Promise<LearnerRosterExportResult | null>;
   /** The learner's whole cumulative Permanent Record (SF10) across every
    * school year they have ever been enrolled in -- no `schoolYear`

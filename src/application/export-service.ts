@@ -1,5 +1,6 @@
 import { ValidationError } from "../domain/errors";
 import type {
+  ClassSummaryExportResult,
   LearnerRosterExportResult,
   ReportCardExportResult,
   Sf10ExportResult,
@@ -88,6 +89,15 @@ export class ExportApplicationService {
     }
 
     return this.exports.exportClassRecordReportCard(trimmedRecordId);
+  }
+
+  async exportClassRecordSummary(classRecordId: string): Promise<ClassSummaryExportResult | null> {
+    const trimmedRecordId = classRecordId.trim();
+    if (trimmedRecordId.length === 0) {
+      throw new ValidationError("Class record is required.");
+    }
+
+    return this.exports.exportClassRecordSummary(trimmedRecordId);
   }
 
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {

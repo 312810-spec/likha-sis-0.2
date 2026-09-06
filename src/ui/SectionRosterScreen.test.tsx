@@ -282,6 +282,12 @@ class FakeExportRepository implements ExportRepository {
     throw new Error("not used in this test");
   }
 
+  async exportClassRecordSummary(): Promise<
+    import("../domain/export").ClassSummaryExportResult | null
+  > {
+    throw new Error("not used in this test");
+  }
+
   async exportLearnerRoster(): Promise<LearnerRosterExportResult | null> {
     throw new Error("not used in this test");
   }
