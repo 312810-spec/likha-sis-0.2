@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -33,7 +33,7 @@ pub struct GradingPolicyPeriod {
 /// period's fixed label, instantiated with school-entered dates. This
 /// app has no source for any individual school's real calendar, so
 /// `starts_on`/`ends_on` are never defaulted or guessed.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GradingPeriod {
     pub id: String,
@@ -129,6 +129,54 @@ pub fn create(
     )?;
 
     find_by_id_in_school(conn, school_id, &id)
+}
+
+/// ADR-0067/0069 sync wiring: applies a pulled/decrypted `GradingPeriod`
+/// exactly like `subject::upsert_from_sync` — `period` is already
+/// decrypted and authenticated, `sync_client::apply_decrypted_change` is
+/// responsible for having rejected a tampered payload before ever
+/// calling this. Deliberate `INSERT ... ON CONFLICT(id) DO UPDATE`, not a
+/// separate insert-or-update branch, for the same reason as the
+/// subject/teaching-assignment case: a period this device has never seen
+/// locally and one it has a stale copy of are the same write here, by
+/// design. Only the columns `grading_periods` actually stores are
+/// written — `period.label` is derived at read time via
+/// `find_by_id_in_school`'s join with `grading_policy_periods` and has no
+/// column of its own here, same as every other derived/joined field this
+/// codebase keeps out of its `upsert_from_sync` writes. This bypasses
+/// `create`'s own policy-period-existence check and the schema's
+/// `UNIQUE (school_id, school_year, policy_period_id)`/`CHECK (starts_on
+/// <= ends_on)` conflict paths entirely, writing keyed only on the row's
+/// own stable `id` — matching how `teaching_assignment::upsert_from_sync`
+/// never re-validates its originating device's own business-rule checks
+/// either (that validation already happened on the originating device
+/// before this row was ever encrypted and enqueued). Only `create` is
+/// wired to the outbox today (see
+/// `commands::grading::create_grading_period`'s own doc comment); this
+/// still upserts rather than insert-only so a future update pushed from
+/// another device round-trips correctly without a second materializer
+/// needing to be written later.
+pub fn upsert_from_sync(conn: &Connection, period: &GradingPeriod) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO grading_periods (id, school_id, school_year, policy_period_id, starts_on, ends_on, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+             school_id = excluded.school_id,
+             school_year = excluded.school_year,
+             policy_period_id = excluded.policy_period_id,
+             starts_on = excluded.starts_on,
+             ends_on = excluded.ends_on",
+        (
+            &period.id,
+            &period.school_id,
+            &period.school_year,
+            &period.policy_period_id,
+            &period.starts_on,
+            &period.ends_on,
+            &period.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 /// The school-scoped lookup safe to expose as a command: a caller can only
@@ -335,6 +383,60 @@ mod tests {
         let periods = list_by_school_year(&conn, &school_b.id, "2026-2027").unwrap();
 
         assert!(periods.is_empty());
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_grading_period_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let incoming = GradingPeriod {
+            id: Uuid::now_v7().to_string(),
+            school_id: s.id.clone(),
+            school_year: "2026-2027".to_string(),
+            policy_period_id: TERM_1.to_string(),
+            label: "ignored on write -- derived via join on read".to_string(),
+            starts_on: "2026-06-08".to_string(),
+            ends_on: "2026-09-15".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id_in_school(&conn, &s.id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.school_year, "2026-2027");
+        assert_eq!(found.starts_on, "2026-06-08");
+        assert_eq!(found.label, "1st Term", "label is always the joined value");
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let original = create(
+            &conn,
+            &s.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+
+        let updated = GradingPeriod {
+            ends_on: "2026-09-20".to_string(),
+            ..original.clone()
+        };
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id_in_school(&conn, &s.id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.ends_on, "2026-09-20");
+        let all = list_by_school_year(&conn, &s.id, "2026-2027").unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
     }
 
     #[test]

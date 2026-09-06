@@ -1,5 +1,119 @@
 # CURRENT HANDOFF
 
+## GradingPeriod wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `GradingPeriod` is
+now the eighth entity wired end to end (after Learner, Attendance,
+Section, LearnerScore, AssessmentItem, Subject, TeachingAssignment),
+using the exact same pattern each time — encrypt-on-enqueue at the
+existing domain write, an `upsert_from_sync`-shaped repository apply
+path, and the corresponding `EntityKind` arm in `sync_client`'s
+decrypt/apply switch.
+
+- **Starting-state correction**: this task's own briefing assumed
+  `sync_client.rs` etc. already existed on this worktree's branch tip.
+  In fact this worktree's branch (`worktree-agent-aae95051cd87c77b6`)
+  had fallen behind the shared integration branch
+  `claude/repo-priority-automation-8h96zx` (missing the entire
+  ADR-0067/0069 sync foundation plus the Learner through
+  TeachingAssignment wiring slices). Fast-forward-merged this worktree
+  onto that branch tip (`git merge --ff-only`, no conflicts, no rebase)
+  before starting — a pure catch-up, not a scope change.
+- **Only `create` is wired** (`commands::grading::create_grading_period`),
+  matching `Section`/`Subject`/`TeachingAssignment`'s own create-only
+  precedent — there is no `update`/`remove` command on grading periods
+  today.
+- **What changed, mirroring the TeachingAssignment/Subject slices'
+  shape exactly**:
+  - `repository/grading.rs`: `GradingPeriod` now derives `Deserialize`
+    (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, period)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, writing only the columns
+    `grading_periods` actually stores (`period.label` is derived at read
+    time via `find_by_id_in_school`'s join with
+    `grading_policy_periods` and has no column of its own). Bypasses
+    `create`'s own policy-period-existence check and the schema's
+    `UNIQUE (school_id, school_year, policy_period_id)`/`CHECK
+(starts_on <= ends_on)` constraints entirely (that validation
+    already happened on the originating device). Two new repository
+    tests: insert-when-unseen (asserts the label still resolves
+    correctly via the join), update-in-place-without-a-duplicate-row.
+  - `commands/grading.rs`: `create_grading_period` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::subject`'s), and delegates to
+    `create_grading_period_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0`. Uses
+    `sessions.require_active_session` to obtain `(actor_user_id,
+school_id)` (this command has no capability gate — any active
+    session may create a grading period, matching its pre-existing
+    behavior; `school_id` still comes only from the session). Four new
+    command tests: no-sspk behaves like a plain create (no outbox row),
+    an sspk enqueues a correctly encrypted+decryptable outbox entry, the
+    enqueued change carries this installation's own device id, and a
+    rejected create (unknown `policy_period_id`) never enqueues a row.
+  - `sync_client.rs`: new `EntityKind::GradingPeriod` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `grading::upsert_from_sync`; module doc comment and the "entity
+    kinds handled here" doc comment both updated to name it as the
+    eighth wired entity. Three new integration-shaped tests mirroring
+    the TeachingAssignment slice exactly: `pull_once` applies a
+    non-conflicting change end to end (real hub round trip over
+    loopback HTTP, real encrypt/decrypt), rejects a tampered payload
+    without applying it or advancing the pull cursor, and correctly
+    stages a conflict (never touching the domain table) when this
+    device has an unsynced local edit to the same entity. New fixture
+    constant `GRADING_TERM_1` — the three-term policy's first period id,
+    seeded by migration 6 in every fresh database (the same reference-
+    data id `repository::grading::tests` calls `TERM_1`), needed because
+    `grading_periods.policy_period_id` is a real FK to
+    `grading_policy_periods(id)`.
+- **Verification actually run** (same disk-quota constraint as the
+  TeachingAssignment slice's own entry below — `cargo clean` on this
+  worktree's `target/` was run twice this slice, once before `cargo
+test --lib` and once implicitly consumed by it, freeing ~12 GiB each
+  time):
+  - `cargo test --lib`: **901 passed, 0 failed** — full lib suite,
+    including all new `grading`/`commands::grading`/`sync_client` tests
+    (`repository::grading::tests::upsert_from_sync_*`,
+    `commands::grading::tests::*`,
+    `sync_client::tests::*_grading_period_*`).
+  - Every one of the 18 `src-tauri/tests/*.rs` integration binaries run
+    individually (`cargo test --test <name>`, deleting each binary
+    after it ran to keep the quota clear for the next one): **all 18
+    exited 0, no `FAILED` in any of them**, including `grading` (5
+    tests, unaffected by this slice's own additive changes) and a full
+    initial unrestricted `cargo test` attempt that hit the same known
+    disk-quota "Bus error"/"No space left on device" linker failure
+    documented below before falling back to the per-binary method.
+  - `cargo clippy --all-targets -- -D warnings`: clean.
+  - `cargo fmt --check`: clean (after running plain `cargo fmt` once to
+    fix this slice's own formatting drift in `commands/grading.rs` — a
+    single test-setup call reflowed to one line — never hand-restyled).
+  - `npm run quality:security`: clean — gitleaks + `cargo deny check` +
+    OSV-Scanner all report 0 findings (3 ok, 0 failed, 0 missing); no
+    new dependency was added this slice.
+  - `npm run quality` (fast gate) was run: `typecheck`, `lint`,
+    `format:check`, `check:architecture` all passed; `check:deadcode`
+    (`knip`) fails on **pre-existing, unrelated** findings (2 unused
+    devDependencies, 8 "unlisted binaries") that exist on the branch
+    tip this slice merged onto, before any change in this slice — this
+    slice touched only three Rust files (`git status` confirms), so the
+    TS-side `test` step in that chain never ran; not a regression this
+    slice introduced.
+- **Retained debt**:
+  - `GradingPeriod` has no `update`/`remove` command today, so nothing
+    beyond `create` needed wiring — no debt introduced by that scope
+    choice, unlike `TeachingAssignment`'s `replace_teacher`/`remove`.
+  - `SubjectAttendance` remains the one entity with no sync wiring at
+    all; `SectionMembership` remains deferred pending its own
+    multi-verb design (five temporal verbs — a materially larger slice
+    than "wire that ONE entity" TDD budget allows safely in one pass).
+- **Not yet done**: push; PR (targets `main`) — batch mode, commit
+  local only per this task's explicit instruction.
+
 ## TeachingAssignment wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
 
 Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
