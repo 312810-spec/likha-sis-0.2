@@ -35,14 +35,35 @@
 //! matching `Section`/`AssessmentItem`/`Subject`), and, added in a later
 //! addendum, `EntityKind::GradingPeriod` (see `commands::grading`'s own
 //! doc comment -- also create-only, matching
-//! `Section`/`AssessmentItem`/`Subject`/`TeachingAssignment`); every other
+//! `Section`/`AssessmentItem`/`Subject`/`TeachingAssignment`), and, added
+//! in a later addendum, `EntityKind::SectionMembership` (see
+//! `commands::section`'s own doc comment on
+//! `enqueue_section_membership_sync_change` -- re-recordable, matching
+//! `Attendance`/`LearnerScore`; unlike those two single-row entities, this
+//! is the first entity whose lifecycle verbs (enroll/transfer/end) can
+//! mutate MORE than one row per user action -- a transfer closes one row
+//! and opens another, each synced independently as its own
+//! `SectionMembership` id, never a combined "event" record. Wired only at
+//! the typed, roster-driven verbs (`enroll_membership`/
+//! `transfer_membership`/`end_membership`) the Section Roster screen
+//! actually drives, not the bulk create-and-place primitive `enroll` used
+//! by CSV import, matching this codebase's existing precedent of leaving
+//! bulk/import write paths unwired to sync); every other
 //! `EntityKind` variant has no producing write path yet, so
 //! decrypting one here is unreachable in practice and is
 //! treated as a rejection rather than a silent no-op success. A change
 //! this device has its own unsynced local
 //! edit for is still never decrypted-and-applied -- it is staged into the
 //! same conflict-review queue the push side already uses, exactly as
-//! before this addendum, never a silent last-write-wins.
+//! before this addendum, never a silent last-write-wins. This is
+//! `SectionMembership`'s own concrete instance of that rule: enrollment
+//! data never uses silent last-write-wins
+//! (`.claude/rules/architecture.md`), so a `base_version` mismatch on a
+//! pending local enroll/transfer/end always routes to
+//! `sync_conflict_review`, exactly like every other entity here --
+//! nothing new was added to `pull_once`'s conflict check itself, since it
+//! already dispatches on `entity_kind`/`entity_id` generically before this
+//! match is ever reached.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -54,8 +75,8 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, device_credential, device_sync_client_credential, grading,
-    learner, learner_score, section, subject, sync_conflict_review, sync_hub, sync_outbox,
-    sync_pull_cursor, sync_version_cache, teaching_assignment,
+    learner, learner_score, section, section_membership, subject, sync_conflict_review, sync_hub,
+    sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
 };
 use crate::sync::{EntityKind, PendingChange};
 
@@ -507,13 +528,14 @@ pub fn pull_once(
 /// repository boundary, not by omission).
 ///
 /// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`/
-/// `AssessmentItem`/`Subject`/`TeachingAssignment`/`GradingPeriod` are
-/// deliberately left unhandled here -- no domain write path for them is
-/// enqueued anywhere yet (see `commands::learner`'s, `commands::attendance`'s,
-/// `commands::section`'s, `commands::learner_score`'s,
+/// `AssessmentItem`/`Subject`/`TeachingAssignment`/`GradingPeriod`/
+/// `SectionMembership` are deliberately left unhandled here -- no domain
+/// write path for them is enqueued anywhere yet (see `commands::learner`'s,
+/// `commands::attendance`'s, `commands::section`'s (both for `Section` and
+/// for `SectionMembership`), `commands::learner_score`'s,
 /// `commands::assessment_item`'s, `commands::subject`'s,
 /// `commands::teaching_assignment`'s, and `commands::grading`'s own doc
-/// comments: these are the only eight entities wired to `sync_outbox` so
+/// comments: these are the only nine entities wired to `sync_outbox` so
 /// far), so decrypting one
 /// is unreachable in practice. Rather than silently accepting an unknown
 /// kind as a no-op success (which would look identical to "applied" to a
@@ -590,6 +612,14 @@ pub(crate) fn apply_decrypted_change(
                 return Err(());
             }
             grading::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        EntityKind::SectionMembership => {
+            let incoming: section_membership::SectionMembership =
+                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            section_membership::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
         _ => Err(()),
     }
@@ -1031,6 +1061,62 @@ mod tests {
         let mut change = make_change(fixture, entity_id, base_version);
         change.entity_kind = EntityKind::GradingPeriod;
         let plaintext = serde_json::to_vec(&synthetic_grading_period(fixture, entity_id)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    /// Builds a section + learner on the CLIENT's own local db -- the two
+    /// FK targets `synthetic_section_membership` needs
+    /// (`section_id`/`learner_id`), mirroring `synthetic_attendance_record`'s
+    /// own local-fixture pattern.
+    fn setup_section_and_learner(fixture: &TestFixture) -> (String, String) {
+        let sec = crate::repository::section::create(
+            &fixture.conn,
+            &fixture.school_id,
+            "2026-2027",
+            "7",
+            "Mabini",
+        )
+        .unwrap();
+        let learner =
+            learner::create(&fixture.conn, &fixture.school_id, "Ana", "Cruz", None, None).unwrap();
+        (sec.id, learner.id)
+    }
+
+    fn synthetic_section_membership(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        section_id: &str,
+        learner_id: &str,
+        ends_on: Option<&str>,
+    ) -> section_membership::SectionMembership {
+        section_membership::SectionMembership {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            section_id: section_id.to_string(),
+            learner_id: learner_id.to_string(),
+            starts_on: "2026-06-08".to_string(),
+            ends_on: ends_on.map(str::to_string),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_grading_period_change`, but with a REAL
+    /// encrypted-under-`fixture.sspk` section-membership payload.
+    fn make_section_membership_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        section_id: &str,
+        learner_id: &str,
+        ends_on: Option<&str>,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::SectionMembership;
+        let plaintext = serde_json::to_vec(&synthetic_section_membership(
+            fixture, entity_id, section_id, learner_id, ends_on,
+        ))
+        .unwrap();
         change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
         change
     }
@@ -2952,6 +3038,297 @@ mod tests {
             assert_eq!(
                 count, 0,
                 "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_section_membership_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_section_membership_change(
+                    &fixture,
+                    entity_id,
+                    &section_id,
+                    &learner_id,
+                    None,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let history = crate::repository::section_membership::list_by_learner_in_school(
+                conn,
+                &fixture.school_id,
+                &learner_id,
+            )
+            .unwrap();
+            assert_eq!(history.len(), 1, "pull_once must have materialized the row");
+            assert_eq!(history[0].id, entity_id.to_string());
+            assert_eq!(history[0].ends_on, None, "still open");
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::SectionMembership,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    /// Materializes an "end" pull for a membership id this device already
+    /// has an open local copy of -- `upsert_from_sync` must update the row
+    /// in place (never insert a duplicate), the way `end_membership` itself
+    /// updates in place on the originating device.
+    #[test]
+    fn pull_once_applies_an_end_pull_by_updating_the_existing_row_in_place() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // This device already has the OPEN membership materialized locally.
+        crate::repository::section_membership::upsert_from_sync(
+            &fixture.conn,
+            &synthetic_section_membership(&fixture, entity_id, &section_id, &learner_id, None),
+        )
+        .unwrap();
+
+        // Bring the HUB itself to version 1 for this entity first -- the
+        // hub has no history for this id yet, so its own first accepted
+        // change for it must be base_version 0, exactly like every other
+        // brand-new entity in this module's tests.
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_section_membership_change(
+                    &fixture,
+                    entity_id,
+                    &section_id,
+                    &learner_id,
+                    None,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+        };
+
+        // Another device ends it (same id, ends_on now set), pushed to the hub.
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_section_membership_change(
+                    &fixture,
+                    entity_id,
+                    &section_id,
+                    &learner_id,
+                    Some("2026-09-15"),
+                    1,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        // Both this device's own two pushes (the open, then the end) come
+        // back on pull -- pushing does not itself advance the pull cursor.
+        // Both apply cleanly since this device has no unsynced local edit
+        // for either (both were already pushed/acknowledged above).
+        assert_eq!(summary.received, 2);
+        assert_eq!(summary.applied, 2);
+        assert_eq!(summary.conflicted, 0);
+        {
+            let conn = &fixture.conn;
+            let history = crate::repository::section_membership::list_by_learner_in_school(
+                conn,
+                &fixture.school_id,
+                &learner_id,
+            )
+            .unwrap();
+            assert_eq!(history.len(), 1, "must update in place, never duplicate");
+            assert_eq!(history[0].ends_on.as_deref(), Some("2026-09-15"));
+        };
+    }
+
+    /// The entity-specific case this slice's task description calls out:
+    /// a `base_version` mismatch on a pending local enroll/transfer/end
+    /// must route to `sync_conflict_review`, never silently overwrite the
+    /// membership -- section membership IS enrollment data, so ADR-0067's
+    /// "never last-write-wins" rule applies exactly as it does for
+    /// `Learner`/`Attendance`/`AssessmentItem` above.
+    #[test]
+    fn pull_once_stages_a_section_membership_conflict_when_this_device_has_an_unsynced_local_edit()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's change (e.g. an "end") lands at the hub first.
+        {
+            let conn = &fixture.conn;
+            let mut other_device_change = make_change(&fixture, entity_id, 0);
+            other_device_change.entity_kind = EntityKind::SectionMembership;
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently has its own unsynced edit for the SAME
+        // membership id, still based on the now-stale version 0.
+        {
+            let conn = &fixture.conn;
+            let mut local_change = make_change(&fixture, entity_id, 0);
+            local_change.entity_kind = EntityKind::SectionMembership;
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(
+            summary.conflicted, 1,
+            "a base_version mismatch on a pending local edit must never be silently applied"
+        );
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let history = crate::repository::section_membership::list_by_learner_in_school(
+                conn,
+                &fixture.school_id,
+                &learner_id,
+            )
+            .unwrap();
+            assert!(
+                history.is_empty(),
+                "a staged conflict must never touch the domain table"
+            );
+            // The live version cache row must NOT have been overwritten --
+            // never last-write-wins.
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::SectionMembership,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                0
+            );
+        };
+        let _ = section_id;
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_section_membership_payload_without_applying_or_advancing_past_it(
+    ) {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_section_membership_change(
+                &fixture,
+                entity_id,
+                &section_id,
+                &learner_id,
+                None,
+                0,
+            );
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let history = crate::repository::section_membership::list_by_learner_in_school(
+                conn,
+                &fixture.school_id,
+                &learner_id,
+            )
+            .unwrap();
+            assert!(
+                history.is_empty(),
+                "a tampered payload must never be materialized"
+            );
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
             );
         };
     }

@@ -1,5 +1,151 @@
 # CURRENT HANDOFF
 
+## SectionMembership wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx` (via worktree
+`worktree-agent-a2ed03108d63656d3`). Closes the `SectionMembership` slice
+of task #5 (ADR-0067/0069's entity-by-entity sync rollout) that the
+prior GradingPeriod checkpoint above left explicitly open — the one
+entity that could not be a copy-paste of the create-only pattern because
+it has three distinct lifecycle verbs (enroll/transfer/end) rather than
+one. `docs/db/migrations.rs`'s `entity_kind` CHECK constraint and
+`sync::EntityKind::SectionMembership` already reserved the slot, so no
+schema migration was needed.
+
+**Design decided (not implemented as a new "event log" entity)**:
+
+- **Sync shape**: one evolving row keyed on `section_memberships.id`,
+  upserted on pull — matching `Attendance`/`LearnerScore`, not a
+  separate append-only "membership event" entity kind. The schema
+  supports this directly: a membership row has a stable `id` and mutable
+  `section_id`/`ends_on` fields, never deleted (only closed). `enroll`
+  mints a fresh row (`base_version` 0 for that new id);
+  `end_membership` sets `ends_on` on the existing row in place (its own
+  `base_version`, read from `sync_version_cache`, exactly as
+  `Attendance`'s own re-recordable pattern already does); `transfer`
+  closes the source row and opens a destination row — mirrored on the
+  wire as its two mutated rows, each its own independently-tracked
+  `SectionMembership` `PendingChange`, never a combined record. This
+  exactly mirrors what the local repository functions already do (see
+  `repository/section_membership.rs`) rather than inventing new
+  conflict rules the local write paths don't have.
+- **Conflict question**: confirmed explicitly, not merely assumed to
+  "fall out" of the generic pattern — section membership IS enrollment
+  data, so `.claude/rules/architecture.md`/ADR-0067's "never
+  last-write-wins for learner identity, enrollment, attendance, or
+  grading" rule applies. `sync_client::pull_once` already dispatches
+  the conflict check (via `sync_outbox::pending_for_school` /
+  `has_unsynced_local_edit`) generically on `entity_kind`/`entity_id`
+  _before_ `apply_decrypted_change`'s per-entity match is ever reached,
+  so nothing new needed adding to the conflict path itself — only a new
+  `EntityKind::SectionMembership` arm in that match, following every
+  other entity's exact tamper-check/school_id-check/upsert shape. Added
+  a dedicated test
+  (`sync_client::tests::pull_once_stages_a_section_membership_conflict_when_this_device_has_an_unsynced_local_edit`)
+  proving a `base_version` mismatch on a pending local edit routes to
+  `sync_conflict_review`, never silently applied, for this entity
+  specifically — not just relying on the generic assertion already
+  covering `Learner`/`AssessmentItem`.
+- **Scope**: wired only the three typed, roster-driven verbs the
+  Section Roster screen actually drives —
+  `enroll_learner_membership`→`enroll_membership`,
+  `transfer_learner_membership`→`transfer_membership`,
+  `end_learner_membership`→`end_membership`. Deliberately left the bulk
+  create-and-place primitive `enroll` (used by CSV import /
+  `import::commit`) and the one-time `correct_same_day_placement` verb
+  unwired, matching this codebase's existing precedent of not wiring
+  bulk/import write paths to sync, and to keep this slice's scope tight
+  per `.claude/rules/autonomous-development.md`'s scope-discipline
+  section. Retained as explicit debt below, not silently dropped.
+
+**Implemented**:
+
+- `repository/section_membership.rs`: `Deserialize` added to
+  `SectionMembership`; new `upsert_from_sync(conn, membership)` —
+  `INSERT ... ON CONFLICT(id) DO UPDATE`, mirroring
+  `attendance::upsert_from_sync` exactly. Two new repository tests
+  (insert-new, update-in-place).
+- `commands/section.rs`: new `enqueue_section_membership_sync_change`
+  shared helper (base_version from `sync_version_cache::known_version`,
+  never unconditionally 0) plus `*_with_optional_sync` wrappers for all
+  three verbs, following `commands::attendance`'s exact
+  no-sspk-passthrough / `Option<&sspk>` shape. **Documented, deliberate
+  trade-off**: unlike `Attendance`/`LearnerScore` (whose domain write and
+  outbox enqueue share one `SAVEPOINT`), these three enqueue calls are
+  NOT atomic with their domain write — `end_membership`/
+  `transfer_membership`/`enroll_membership` each own an internal
+  `Connection::transaction()` (needed for multi-step eligibility checks,
+  and for `transfer_membership`, two writes), and rusqlite transactions
+  do not nest inside an outer `SAVEPOINT` the way
+  `section_membership::enroll`'s own SAVEPOINT-based writer does.
+  Enqueue instead runs immediately after the domain write's own
+  transaction has already committed. The gap this leaves — a crash
+  between that commit and the enqueue's own commit — can lose a sync
+  signal for a write that already succeeded locally; it can never
+  enqueue a change for a write that didn't happen, and never send a
+  wrong base_version. Logged in `docs/VERIFICATION-DEBT.md` rather than
+  silently accepted. 9 new command-layer tests: no-sspk passthrough,
+  sspk-enqueues-correctly-encrypted-entry (enroll), a-rejected-write-
+  never-enqueues (enroll AlreadyEnrolled, end NotFound, transfer
+  MembershipNotFound), device-id stamping (via the enroll test), a known
+  base_version on the second write (end), and transfer's two-row
+  enqueue with each row's own correct base_version.
+- `sync_client.rs`: new `EntityKind::SectionMembership` arm in
+  `apply_decrypted_change`, identical tamper-check/school_id-check/
+  upsert shape to every other entity. Module doc comment updated to
+  describe the tenth wired entity and its two-rows-per-transfer shape.
+  5 new tests: apply-non-conflicting, apply-an-end-pull-updates-in-place
+  (proves `upsert_from_sync` never duplicates), the conflict-staging
+  test called out above, and a tampered-payload rejection test.
+
+**Verification actually run** (this session, worktree
+`worktree-agent-a2ed03108d63656d3`):
+
+- `cargo fmt --check` — clean (one intermediate run needed `cargo fmt`
+  to apply formatting to the new code; the final check afterward was
+  clean).
+- `cargo clippy --all-targets -- -D warnings` — clean, no warnings.
+- `cargo test --lib` — first run: **912 passed, 3 failed** (all three
+  new tests I wrote incorrectly: they assumed
+  `sync_version_cache`/`base_version` advances merely from _enqueueing_,
+  but it only advances when a push round is actually acknowledged —
+  the same setup `commands::attendance`'s own
+  `re_recording_the_same_entity_enqueues_with_the_known_base_version_not_zero`
+  test already establishes. Fixed by simulating the prior write's
+  push+acknowledge explicitly in each test, matching that precedent).
+  Second run after the fix: **915 passed, 0 failed**. Not claiming this
+  passed until it was rerun and genuinely green.
+- Did NOT run `npm run quality`/`quality:full` or a Windows-specific
+  check in this session — this slice touched Rust only (no
+  `src/`/TypeScript changes), so the frontend gate was not re-run; the
+  prior checkpoint above already recorded it clean before this slice.
+
+**Retained debt** (added to `docs/VERIFICATION-DEBT.md`):
+
+- The enqueue-after-domain-write-commit gap described above for all
+  three `SectionMembership` verbs (not atomic with the domain write, a
+  narrower risk window than the entities that do get one `SAVEPOINT`).
+- `section_membership::enroll` (the bulk create-and-place primitive used
+  by CSV import) and `correct_same_day_placement` remain unwired to
+  sync — a same-day correction or a bulk-imported enrollment stays
+  purely local until a future slice wires them, same as bulk/import
+  paths for other entities today.
+- Task #5's remaining open item: `TeachingAssignment`'s own
+  `replace_teacher`/`remove` verbs are still unwired (create-only was
+  already done in an earlier slice) — noted in the prior checkpoint
+  entry below and still true.
+
+**Next slice** (not implemented, per
+`.claude/rules/autonomous-development.md`'s "record without
+implementing" rule at a wave boundary): wire `TeachingAssignment`'s
+`replace_teacher`/`remove` verbs through the same
+encrypt-on-enqueue/`upsert_from_sync` pattern — the last open item under
+task #5's ADR-0067/0069 entity rollout before that task can be marked
+fully complete. This slice's commit is local only (batch mode, per
+`.claude/rules/autonomous-development.md`'s batch-implement section) —
+push and CI are still owed together with whatever slice completes the
+batch.
+
 ## Batch checkpoint pushed and CI green (2026-09-06): harness cleanup + GradingPeriod sync wiring
 
 Pushed commit `21085fc` to `claude/repo-priority-automation-8h96zx` (PR #54):
