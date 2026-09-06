@@ -1,11 +1,16 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
 use crate::repository::{class_record, section_membership};
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+/// `Deserialize` exists for `commands::assessment_item`'s ADR-0067/0069
+/// sync wiring, which round-trips an `AssessmentItem` through JSON as the
+/// (encrypted) outbox payload -- see `repository::learner::Learner`'s
+/// identical doc comment for why this is not needed by the Tauri IPC
+/// boundary itself.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AssessmentItem {
     pub id: String,
@@ -81,6 +86,50 @@ pub fn create(
     )?;
 
     find_by_id_in_school(conn, school_id, &id)
+}
+
+/// Applies a decrypted sync payload for this entity kind (ADR-0067/0069's
+/// pull-side materialization) -- same contract as
+/// `repository::section::upsert_from_sync`: `item` is already decrypted
+/// and authenticated, `sync_client::apply_decrypted_change` is
+/// responsible for having rejected a tampered payload before ever calling
+/// this. Deliberate `INSERT ... ON CONFLICT(id) DO UPDATE`, not a separate
+/// insert-or-update branch -- an item this device has never seen locally
+/// and one it has a stale copy of (e.g. renamed on another device) are the
+/// same write here, by design. Does not re-validate `category_id`
+/// leaf-ness or `class_record_id` school scope the way `create`/`update`
+/// do: this data already passed those checks on the device that
+/// originally wrote it (`create`/`rename`/`update`), and re-deriving them
+/// here would let a stale local `assessment_categories`/`class_records`
+/// row on THIS device silently reject a pull that is actually correct hub
+/// truth -- same reasoning as `learner_score::upsert_from_sync`'s doc
+/// comment. Only `create` is wired to `sync_outbox` in this slice (see
+/// `commands::assessment_item`'s own doc comment), so in practice every
+/// pulled change is a first-seen insert, but this still upserts rather
+/// than insert-only so a future wiring of `rename`/`update` round-trips
+/// correctly without a second materializer needing to be written later.
+pub fn upsert_from_sync(conn: &Connection, item: &AssessmentItem) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO assessment_items \
+             (id, school_id, class_record_id, category_id, name, max_score, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+         ON CONFLICT(id) DO UPDATE SET \
+             school_id = excluded.school_id, \
+             class_record_id = excluded.class_record_id, \
+             category_id = excluded.category_id, \
+             name = excluded.name, \
+             max_score = excluded.max_score",
+        (
+            &item.id,
+            &item.school_id,
+            &item.class_record_id,
+            &item.category_id,
+            &item.name,
+            item.max_score,
+            &item.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 /// True if `category_id` exists and is a leaf (no children) -- the same
@@ -332,6 +381,57 @@ mod tests {
         let found = find_by_id_in_school(&conn, &school_id, &created.id).unwrap();
 
         assert_eq!(found, Some(created));
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_an_item_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let (school_id, class_record_id) = setup(&conn);
+        let incoming = AssessmentItem {
+            id: Uuid::now_v7().to_string(),
+            school_id: school_id.clone(),
+            class_record_id: class_record_id.clone(),
+            category_id: WRITTEN_WORKS.to_string(),
+            name: "Quiz 1".to_string(),
+            max_score: 20.0,
+            created_at: "2026-08-24T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id_in_school(&conn, &school_id, &incoming.id).unwrap();
+        assert_eq!(found, Some(incoming));
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place() {
+        let conn = open_test_db();
+        let (school_id, class_record_id) = setup(&conn);
+        let created = create(
+            &conn,
+            &school_id,
+            &class_record_id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
+        let mut updated = created.clone();
+        updated.name = "Quiz 1 (revised)".to_string();
+        updated.max_score = 25.0;
+
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id_in_school(&conn, &school_id, &created.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.name, "Quiz 1 (revised)");
+        assert_eq!(found.max_score, 25.0);
+        assert_eq!(
+            found.created_at, created.created_at,
+            "created_at must not change on a re-applied pull"
+        );
     }
 
     #[test]

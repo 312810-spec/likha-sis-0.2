@@ -1,5 +1,54 @@
 # ACTIVE PLAN
 
+## AssessmentItem sync wiring (2026-09-06)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).
+Summary: fifth entity wired through ADR-0067/0069's sync
+encrypt/decrypt pattern, after Learner, Attendance, Section,
+LearnerScore. `repository::assessment_item::upsert_from_sync` (new,
+id-keyed upsert), `commands::assessment_item::create_assessment_item_with_optional_sync`
+(new, mirrors `section`'s SAVEPOINT + unconditional `base_version = 0`
+create-only shape), and a new `EntityKind::AssessmentItem` arm in
+`sync_client::apply_decrypted_change`.
+
+`SectionMembership` was re-evaluated and deliberately NOT picked this
+slice — its write surface is five separate temporal verbs, not one, so
+wiring it needs its own dedicated multi-verb slice (see
+`docs/CURRENT-HANDOFF.md`'s entry for the full reasoning).
+
+Verification actually run this session:
+
+- `cargo test` (full crate): 874 lib tests passing, 0 failed; every
+  integration test binary passing; 0 doctests (none exist in this
+  crate). Run with `RUSTFLAGS="-C debuginfo=0"` to control this shared
+  host's disk footprint — a build-only flag, not a source change.
+- `cargo clippy --all-targets -- -D warnings`: clean (exit code 0, no
+  warnings/errors), run with the project's normal profile.
+- `cargo fmt --check`: clean, no drift.
+- `npm run quality:security`: gitleaks/`cargo deny check`/OSV-Scanner —
+  3 ok, 0 failed, 0 missing.
+- `npm run quality`/`npm run quality:ui` (TS/UI layers): not run — no
+  TS/UI files touched this slice.
+
+Independent review: no subagent-dispatch tool reachable this session;
+rigorous self-review performed instead (see
+`docs/VERIFICATION-DEBT.md`'s new entry for the exact checklist).
+Independent `security-reviewer` review remains owed (alongside the
+still-owed `LearnerScore` review below).
+
+Environment note: this shared host hit disk exhaustion twice during
+this session's own `cargo test`/`cargo clippy` runs (root filesystem at
+100%, and separately the harness's own `/tmp` task-output mount at 0
+bytes free) — not a code defect. Resolved both times by `cargo clean
+--manifest-path src-tauri/Cargo.toml` scoped to this worktree's own
+`target/` (freed ~12.7GiB each time).
+
+Next candidate for the same pattern (not started): `SectionMembership`,
+now scoped correctly as a multi-verb slice (`enroll`/
+`enroll_membership`/`transfer_membership`/`end_membership`/
+`correct_same_day_placement`, one `upsert_from_sync`, one `EntityKind`
+arm) — see `docs/CURRENT-HANDOFF.md`'s top entry for the full reasoning.
+
 ## LearnerScore sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

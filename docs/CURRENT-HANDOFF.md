@@ -1,5 +1,148 @@
 # CURRENT HANDOFF
 
+## AssessmentItem wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
+
+Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice
+of ADR-0067/0069's entity-by-entity sync rollout: `AssessmentItem` is
+now the fifth entity wired end to end (after Learner, Attendance,
+Section, LearnerScore), using the exact same pattern each time —
+encrypt-on-enqueue at the existing domain write, an
+`upsert_from_sync`-shaped repository apply path, and the corresponding
+`EntityKind` arm in `sync_client`'s decrypt/apply switch.
+
+- **Entity chosen and why, including a deliberate deviation from the
+  prior session's recorded suggestion**: of the six still-unwired kinds
+  (`SectionMembership`, `AssessmentItem`, `TeachingAssignment`,
+  `Subject`, `GradingPeriod`, `SubjectAttendance`), the entry below
+  (this same file, previous slice) had provisionally named
+  `SectionMembership` as the likely next candidate. Re-inspecting its
+  actual repository module before committing to it
+  (`repository::section_membership.rs`) surfaced a real complication
+  that entry hadn't weighed: `SectionMembership`'s write surface is not
+  one mature verb but **five** separate temporal ones (`enroll`,
+  `enroll_membership`, `transfer_membership`, `end_membership`,
+  `correct_same_day_placement`), each with its own outcome enum and
+  half-open-interval invariants — wiring "the same pattern as the four
+  already-done entities" onto it would mean either enqueueing from only
+  one of the five verbs (silently under-syncing the other four teacher
+  actions) or a materially larger multi-verb slice than this task's
+  scope ("wire that ONE entity") and TDD budget allow safely in one
+  pass. `AssessmentItem` was chosen instead: it already has a mature
+  write path (`assessment_item::create`, existence-checked against both
+  `class_record_id` and a leaf `category_id` — see
+  `commands::assessment_item::create_assessment_item`'s own doc comment
+  for the full reasoning) AND is genuinely high-value to sync
+  promptly — a teacher's newly created quiz/task item must reach the
+  school-laptop hub before another teacher/adviser can record scores
+  against it (`learner_scores.assessment_item_id` is a hard FK) — unlike
+  the remaining once-a-term reference data (`Subject`, `GradingPeriod`,
+  `TeachingAssignment`). `SectionMembership` is recorded below as the
+  next candidate again, now correctly scoped as a multi-verb slice.
+- **What changed, mirroring the Section slice's shape exactly (create-only,
+  `base_version` unconditionally `0`)**:
+  - `repository/assessment_item.rs`: `AssessmentItem` now derives
+    `Deserialize` (needed to decode a pulled payload); new
+    `upsert_from_sync(conn, item)` — an `INSERT ... ON CONFLICT(id) DO
+UPDATE` keyed on the row's own stable `id`, never re-validating
+    `category_id` leaf-ness or `class_record_id` school scope (that
+    already happened on the originating device, exactly like
+    `learner_score::upsert_from_sync`'s own reasoning).
+  - `commands/assessment_item.rs`: `create_assessment_item` now takes an
+    `AppHandle`, resolves the SSPK only if this school has enrolled a
+    device (`resolve_sspk_if_enrolled`, identical to
+    `commands::section`'s), and delegates to
+    `create_assessment_item_with_optional_sync` — atomic
+    `SAVEPOINT`/`ROLLBACK TO` around the domain write plus the outbox
+    enqueue, `base_version` unconditionally `0` (create-only, like
+    Learner/Section, not re-recordable like Attendance/LearnerScore).
+    Also switched from `require_active_school_scope` to
+    `require_active_session` to obtain the actor's `user_id` for
+    `actor_user_id` — confirmed a strict superset (the former is
+    implemented in terms of the latter, discarding only `user_id`), so
+    no authorization semantics changed. `rename_assessment_item`/
+    `update_assessment_item`/`delete_assessment_item` are deliberately
+    left unwired — a later slice's scope, not this one's.
+  - `sync_client.rs`: new `EntityKind::AssessmentItem` arm in
+    `apply_decrypted_change` — decrypt, verify `school_id` matches, call
+    `assessment_item::upsert_from_sync`; module doc comment and the
+    "entity kinds other than ..." comment both updated to name the fifth
+    wired entity.
+- **Tests added (TDD)**: `repository::assessment_item::tests::
+upsert_from_sync_inserts_an_item_this_device_has_never_seen`,
+  `..._updates_an_existing_row_in_place`;
+  `commands::assessment_item::tests::create_assessment_item_with_no_sspk_behaves_exactly_like_a_plain_create`,
+  `..._with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+  `create_assessment_item_stamps_the_change_with_this_installations_own_device_id`,
+  `a_rejected_create_never_enqueues_an_outbox_row` (a cross-school
+  `class_record_id` must never reach the outbox); `sync_client::tests::
+pull_once_applies_a_non_conflicting_assessment_item_change`,
+  `pull_once_rejects_a_tampered_assessment_item_payload_without_applying_or_advancing_past_it`
+  (tampered ciphertext byte-flip → rejected, domain table untouched,
+  cursor doesn't advance), `pull_once_stages_an_assessment_item_conflict_when_this_device_has_an_unsynced_local_edit`
+  (the existing generic conflict-staging path in `pull_once` needs no
+  entity-specific change — proven by this test passing unmodified
+  against the new entity kind). All pre-existing tests for these three
+  modules pass unmodified.
+- **Independent review**: no subagent-dispatch tool (`Task`/agent
+  launch, or a reachable `security-reviewer`) was available this
+  session to obtain the independent review this class of change
+  (persistence + sync) should get per
+  `.claude/rules/security-privacy.md`. A rigorous self-review was
+  performed instead, per this project's documented reviewer-failure
+  fallback — see `docs/VERIFICATION-DEBT.md`'s new entry for exactly
+  what was checked (school-scope isolation, id-keyed upsert correctness,
+  enrollment gating, atomicity, rejected-write never enqueuing,
+  authorization-check equivalence, conflict-review path unaffected). No
+  blocking issue found; independent review remains owed (alongside the
+  still-owed `LearnerScore` review from the previous slice).
+- **Verified this session (real output, not assumed)**: `cargo test`
+  (full crate) — 874 lib tests passing, 0 failed, plus every integration
+  test binary passing (`assessment_grading`, `attendance_management`,
+  `class_record_management`, `export_and_reporting`, `formgen`,
+  `learner_roster`, `schedule_meeting_management`, `section_advisory`,
+  `sf1_import`, `subject_attendance`, `teaching_assignment_management`,
+  and others); `Doc-tests app_lib` — 0 tests (none exist in this crate).
+  `cargo clippy --all-targets -- -D warnings` — clean, zero
+  warnings/errors (exit code 0). `cargo fmt --check` — clean, no drift.
+  `npm run quality:security` — gitleaks/`cargo deny check`/OSV-Scanner:
+  3 ok, 0 failed, 0 missing (no dependency changes in this slice).
+  `npm run quality`/`quality:ui` (TS/UI layers) were not run — this
+  slice touched only Rust repository/command/`sync_client` layers, no
+  TS/UI files, matching the task's explicit "no UI changes" scope.
+- **A real environment hazard hit and resolved this session**: `cargo
+test`/`cargo clippy --all-targets` twice hit "No space left on
+  device" on this shared host (root filesystem at 100%, and separately
+  the harness's own `/tmp` task-output mount at 0 bytes free) — not a
+  code defect, per this task's own documented guidance. Resolved both
+  times by `cargo clean --manifest-path src-tauri/Cargo.toml` scoped to
+  this worktree's own `target/` only (freed ~12.7GiB each time); the
+  final full `cargo test`/`cargo clippy` runs that are reported above
+  were run with `RUSTFLAGS="-C debuginfo=0"` for `cargo test` specifically
+  to keep this worktree's disk footprint well under the observed ~12GiB
+  ceiling on this shared host — a build-only flag, not a source or
+  `Cargo.toml` change, and `cargo clippy`/`cargo fmt --check` were still
+  run with the project's normal (unmodified) profile.
+- **Explicitly out of scope, per the task, and not touched**: the other
+  five still-unwired entities; `rename`/`update`/`delete_assessment_item`
+  (only `create` is wired); `db::rotate_sspk`; the rotating wrapper; any
+  UI change; any other entity's existing wiring.
+- **Docs updated**: this entry; `docs/ACTIVE-PLAN.md` (verification
+  record); `docs/VERIFICATION-DEBT.md` (new independent-review-owed
+  entry).
+
+**Next exact slice**: the independent-review items disclosed by this
+entry, the `LearnerScore` entry below, and the conflict-review/
+sync-status screen entries further below remain the next owed
+non-implementation items (see `docs/VERIFICATION-DEBT.md` for all of
+them). For further ADR-0067/0069 sync rollout, the next viable entity is
+`SectionMembership` — now correctly scoped as a **multi-verb** slice
+(see this entry's own reasoning above): wiring `enroll`,
+`enroll_membership`, `transfer_membership`, `end_membership`, and
+`correct_same_day_placement` each to `sync_outbox`, plus one
+`upsert_from_sync` in `repository::section_membership` and one
+`EntityKind::SectionMembership` arm in `sync_client`. Not started; no
+code touched for it this session.
+
 ## LearnerScore wired through the sync encrypt/decrypt pattern (2026-09-06), commit local only (batch mode), PR owed
 
 Branch `claude/repo-priority-automation-8h96zx`. Closes the next slice

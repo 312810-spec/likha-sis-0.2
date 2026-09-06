@@ -1,5 +1,63 @@
 # Verification Debt
 
+## AssessmentItem sync wiring (2026-09-06) — independent security review owed
+
+`commands::assessment_item::create_assessment_item`,
+`repository::assessment_item::upsert_from_sync`, and the
+`EntityKind::AssessmentItem` arm in `sync_client::apply_decrypted_change`
+were added to close ADR-0067's next entity slot (see
+`docs/CURRENT-HANDOFF.md`'s matching entry for the full choice rationale
+and diff summary). As with the `LearnerScore` slice immediately before
+it, no subagent-dispatch tool (`Task`/agent launch, or a reachable
+`security-reviewer`) was available in this session to obtain the
+independent review `.claude/rules/security-privacy.md` requires
+("Milestones touching auth, persistence, or sync get an independent
+security/reliability review"). A rigorous self-review was performed
+instead, per this project's documented reviewer-failure fallback:
+
+- Confirmed the school-scope check (`incoming.school_id != school_id` →
+  reject) is present in the new `AssessmentItem` arm, matching
+  Learner/Attendance/Section/LearnerScore exactly — no cross-school pull
+  can materialize.
+- Confirmed `upsert_from_sync` keys its `ON CONFLICT` on the row's own
+  stable `id`, does not re-validate `category_id` leaf-ness or
+  `class_record_id` school scope (this data already passed those checks
+  on the originating device), and never mutates `created_at` on a
+  re-applied pull (covered by
+  `upsert_from_sync_updates_an_existing_row_in_place`) — matching
+  `section::upsert_from_sync`'s established, reviewed pattern.
+- Confirmed the encrypt-on-enqueue path
+  (`create_assessment_item_with_optional_sync`) is enrollment-gated
+  (`sspk` only resolved via `resolve_sspk_if_enrolled`), atomic with the
+  domain write via the same `SAVEPOINT`/`ROLLBACK TO` idiom as
+  Section/LearnerScore, and never enqueues on a rejected domain write (a
+  cross-school `class_record_id` — covered by
+  `a_rejected_create_never_enqueues_an_outbox_row`).
+- Confirmed `create_assessment_item`'s switch from
+  `require_active_school_scope` to `require_active_session` is a
+  strict superset (the former is implemented in terms of the latter,
+  discarding only the `user_id`) — no authorization semantics changed,
+  only the actor id needed to attribute the sync change is now also
+  captured.
+- Confirmed `base_version` is unconditionally `0` (create-only wiring,
+  matching Learner/Section's precedent, not Attendance/LearnerScore's
+  re-recordable one) — correct because only `create` is wired to the
+  outbox in this slice; `rename`/`update`/`delete` remain unwired and
+  therefore cannot desynchronize a `base_version` this slice never reads.
+- No new PII surface: `AssessmentItem` carries no learner-identifying
+  fields (`id`/`school_id`/`class_record_id`/`category_id`/`name`/
+  `max_score`/`created_at` only).
+- Confirmed the existing conflict-review path is entity-agnostic
+  (`sync_client::pull_once`'s conflict-staging branch runs before
+  `apply_decrypted_change` is ever called, keyed only on
+  `(school_id, entity_kind, entity_id)` version comparison) — adding a
+  new `EntityKind` arm to the decrypt/apply `match` cannot affect it,
+  confirmed directly by
+  `pull_once_stages_an_assessment_item_conflict_when_this_device_has_an_unsynced_local_edit`.
+- No blocking issue found. A genuinely independent review of this diff
+  remains owed — retry when a reviewer subagent is reachable, alongside
+  the still-owed `LearnerScore` review below.
+
 ## LearnerScore sync wiring (2026-09-05/06) — independent security review owed
 
 `commands::learner_score::record_learner_score`,

@@ -25,7 +25,9 @@
 //! `Section` left unresolvable on pull), and, added in a later addendum,
 //! `EntityKind::LearnerScore` (see `commands::learner_score`'s own doc
 //! comment -- a teacher's own gradebook data, re-recordable exactly like
-//! `Attendance`); every other `EntityKind` variant has no producing write
+//! `Attendance`), and, added in a later addendum, `EntityKind::AssessmentItem`
+//! (see `commands::assessment_item`'s own doc comment -- create-only,
+//! matching `Section`); every other `EntityKind` variant has no producing write
 //! path yet, so
 //! decrypting one here is unreachable in practice and is
 //! treated as a rejection rather than a silent no-op success. A change
@@ -43,8 +45,9 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
-    attendance, device_credential, device_sync_client_credential, learner, learner_score, section,
-    sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
+    assessment_item, attendance, device_credential, device_sync_client_credential, learner,
+    learner_score, section, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
+    sync_version_cache,
 };
 use crate::sync::{EntityKind, PendingChange};
 
@@ -495,13 +498,13 @@ pub fn pull_once(
 /// silently (`.claude/rules/security-privacy.md`: enforce at the
 /// repository boundary, not by omission).
 ///
-/// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`
-/// are deliberately left unhandled here -- no domain write path for them
-/// is enqueued anywhere yet (see `commands::learner`'s,
-/// `commands::attendance`'s, `commands::section`'s, and
-/// `commands::learner_score`'s own doc comments: these are the only four
-/// entities wired to `sync_outbox` so far), so decrypting one is
-/// unreachable in practice. Rather than
+/// Entity kinds other than `Learner`/`Attendance`/`Section`/`LearnerScore`/
+/// `AssessmentItem` are deliberately left unhandled here -- no domain
+/// write path for them is enqueued anywhere yet (see `commands::learner`'s,
+/// `commands::attendance`'s, `commands::section`'s,
+/// `commands::learner_score`'s, and `commands::assessment_item`'s own doc
+/// comments: these are the only five entities wired to `sync_outbox` so
+/// far), so decrypting one is unreachable in practice. Rather than
 /// silently accepting an unknown kind as a no-op success (which would
 /// look identical to "applied" to a future caller), it is treated the
 /// same as any other rejection -- fail closed on anything this slice does
@@ -545,6 +548,14 @@ pub(crate) fn apply_decrypted_change(
                 return Err(());
             }
             learner_score::upsert_from_sync(conn, &incoming).map_err(|_| ())
+        }
+        EntityKind::AssessmentItem => {
+            let incoming: assessment_item::AssessmentItem =
+                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            if incoming.school_id != school_id {
+                return Err(());
+            }
+            assessment_item::upsert_from_sync(conn, &incoming).map_err(|_| ())
         }
         _ => Err(()),
     }
@@ -2016,6 +2027,258 @@ mod tests {
             let count: i64 = conn
                 .query_row(
                     "SELECT COUNT(*) FROM learner_scores WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    /// Builds a class record (section + subject + grading period +
+    /// class record, no assessment item) in the CLIENT's own local db --
+    /// the minimum fixture `synthetic_assessment_item`'s FK
+    /// (`class_record_id`) needs. Mirrors
+    /// `setup_assessment_item_and_learner`'s chain but stops one step
+    /// earlier since the item itself is the entity under test here, not
+    /// a dependency of it.
+    fn setup_class_record(fixture: &TestFixture) -> String {
+        let conn = &fixture.conn;
+        let sec = crate::repository::section::create(
+            conn,
+            &fixture.school_id,
+            "2026-2027",
+            "7",
+            "Mabini",
+        )
+        .unwrap();
+        let sub =
+            crate::repository::subject::create(conn, &fixture.school_id, "Mathematics").unwrap();
+        let period = crate::repository::grading::create(
+            conn,
+            &fixture.school_id,
+            "2026-2027",
+            SYNC_TEST_TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        let cr = crate::repository::class_record::create(
+            conn,
+            &fixture.school_id,
+            &sec.id,
+            &sub.id,
+            &period.id,
+            SYNC_TEST_K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        cr.id
+    }
+
+    /// Like `synthetic_learner`, but an `AssessmentItem` -- the fifth
+    /// entity kind wired end to end (see `commands::assessment_item`'s
+    /// own doc comment for why it was chosen: a teacher's own
+    /// class-record setup data, created routinely through a grading
+    /// period). The referenced `class_record_id` is a real local row
+    /// (`assessment_items` has an FK to it), created via
+    /// `setup_class_record`.
+    fn synthetic_assessment_item(
+        entity_id: Uuid,
+        school_id: &str,
+        class_record_id: &str,
+    ) -> assessment_item::AssessmentItem {
+        assessment_item::AssessmentItem {
+            id: entity_id.to_string(),
+            school_id: school_id.to_string(),
+            class_record_id: class_record_id.to_string(),
+            category_id: SYNC_TEST_WRITTEN_WORKS.to_string(),
+            name: "Quiz 1".to_string(),
+            max_score: 20.0,
+            created_at: "2026-08-24T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_learner_score_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` assessment-item payload.
+    fn make_assessment_item_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        class_record_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::AssessmentItem;
+        let plaintext = serde_json::to_vec(&synthetic_assessment_item(
+            entity_id,
+            &fixture.school_id,
+            class_record_id,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_assessment_item_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let class_record_id = setup_class_record(&fixture);
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_assessment_item_change(&fixture, entity_id, &class_record_id, 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: (String, f64) = conn
+                .query_row(
+                    "SELECT name, max_score FROM assessment_items WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(stored, ("Quiz 1".to_string(), 20.0));
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::AssessmentItem,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_assessment_item_payload_without_applying_or_advancing_past_it()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let class_record_id = setup_class_record(&fixture);
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_assessment_item_change(&fixture, entity_id, &class_record_id, 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM assessment_items WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_an_assessment_item_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's assessment-item change lands at the hub.
+        {
+            let conn = &fixture.conn;
+            let mut other_device_change = make_change(&fixture, entity_id, 0);
+            other_device_change.entity_kind = EntityKind::AssessmentItem;
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently edited the SAME entity and has not
+        // pushed it yet.
+        {
+            let conn = &fixture.conn;
+            let mut local_change = make_change(&fixture, entity_id, 0);
+            local_change.entity_kind = EntityKind::AssessmentItem;
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM assessment_items WHERE id = ?1",
                     [entity_id.to_string()],
                     |row| row.get(0),
                 )
