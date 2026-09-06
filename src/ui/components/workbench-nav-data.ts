@@ -17,6 +17,7 @@ export type SignedInTab =
   | "monthly-summary"
   | "grading-periods"
   | "class-records"
+  | "lesson-plans"
   | "audit-log"
   | "admin-password-reset"
   | "school-members"
@@ -51,6 +52,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "monthly-summary": "Monthly Summary",
   "grading-periods": "Grading Periods",
   "class-records": "Class Records",
+  "lesson-plans": "Lesson Plans",
   "audit-log": "Sign-in Activity",
   "admin-password-reset": "Reset a Password",
   "school-members": "School Members",
@@ -99,6 +101,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Grading",
     tabs: [tab("grading-periods"), tab("class-records")],
+  },
+  {
+    label: "Creation Studio",
+    tabs: [tab("lesson-plans")],
   },
   {
     label: "Sync",

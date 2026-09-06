@@ -11,6 +11,7 @@ pub mod grading;
 pub mod import;
 pub mod learner;
 pub mod learner_score;
+pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;
 pub mod school;

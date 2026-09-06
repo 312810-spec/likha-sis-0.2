@@ -1,5 +1,121 @@
 # CURRENT HANDOFF
 
+## Creation Studio sub-scope 3/3: structured lesson-plan builder (2026-09-06)
+
+Built the **structured lesson-plan builder** — the third and final of the
+product owner's three confirmed Creation Studio sub-scopes (assessment-item
+authoring, class summary export, lesson-plan builder). This closes all
+three sub-scopes' _first_ confirmed outputs — but sub-scope 2 (report/output
+templates) still has two unbuilt outputs of its own (certificate/recognition
+template, custom seating chart), which remain separate future slices.
+
+**Research (this session, WebSearch, medium-high confidence)**: DepEd Order
+No. 16, s. 2026 introduces the "ILAW" lesson-plan format -- **I**ntentions,
+**L**earning Experiences, **A**ssessment, **W**ays Forward -- replacing the
+older Daily Lesson Log (DLL)/Detailed Lesson Plan (DLP) formats and the
+older MELC coding system, mandatory for all public elementary/secondary
+schools starting SY 2026-2027. Sources: depedclub.com, lessonplanph.com,
+ilawlessonplan.net, depedlibre.com -- all secondary sources describing an
+official DepEd issuance; no primary deped.gov.ph fetch was attempted this
+session (per this project's sourcing-policy addendum, ADR-0037, this is
+treated as sufficient when a primary fetch is unavailable). "Ways Forward"'s
+exact DepEd sub-structure could not be confirmed this session and was
+implemented conservatively as a free-text reflection/next-steps field.
+
+**What it is**: a teacher's own lesson-planning authoring tool -- NOT an
+official DepEd form submission and NOT exported to PDF in this slice (a
+future slice could add that if ever requested). One plan per
+`(teaching_assignment_id, plan_date)` -- `teaching_assignment_id` already
+encodes teacher+section+subject (migration 11), so this single FK plus a
+date is sufficient to scope one lesson plan, the same scoping shape
+`subject_attendance_sessions` (migration 24) already established for
+teacher-authored, per-meeting content.
+
+**Built**:
+
+- `src-tauri/src/db/migrations.rs` migration 40 -- new `lesson_plans`
+  table: `id, school_id, teaching_assignment_id, plan_date,
+learning_competency, learning_competency_code, learning_objectives,
+connection_to_previous_learning, learning_experiences, assessment,
+ways_forward, created_by_user_id, created_at, updated_at`, with
+  `UNIQUE (teaching_assignment_id, plan_date)`. `learning_competency_code`
+  is free text the teacher enters themselves -- deliberately NOT a foreign
+  key into `curriculum_learning_areas` (that table only models
+  learning-area names, not DepEd's competency-code catalog; building that
+  catalog is a separate, much larger undertaking, explicitly out of scope
+  here).
+- `src-tauri/src/repository/lesson_plan.rs` -- `create`/`update`/
+  `find_by_id_in_school`/`find_by_assignment_and_date`/`list_by_assignment`,
+  plus `authorize_own_assignment` (create/update: exactly the assignment's
+  own teacher, mirroring `subject_attendance::authorize_own_assignment`)
+  and `authorize_view` (read: the assignment's own teacher, or a School
+  Head in the same school -- matching this codebase's general "School Head
+  sees everything in their school" precedent). 15 unit tests: full ILAW
+  field round-trip, cross-school rejection, duplicate-date rejection,
+  full-field update, cross-school update rejection, ordered listing,
+  and both authorize functions' allow/deny/cross-school-denial cases.
+- `src-tauri/src/commands/lesson_plan.rs` -- `create_lesson_plan`/
+  `update_lesson_plan`/`list_lesson_plans_by_assignment`, session-authorized
+  (`school_id`/actor never client-supplied), gated on the repository's
+  `authorize_own_assignment`/`authorize_view`. Deliberately NOT wired to
+  sync in this slice -- a lesson plan is the teacher's own planning
+  content, not a cross-device coordination point another device's write
+  depends on (unlike `AssessmentItem`/`SubjectAttendance` sessions); a
+  future slice can widen the `entity_kind` CHECK constraint if cross-device
+  lesson planning is ever requested. Registered in `src-tauri/src/lib.rs`.
+- Frontend: `src/domain/lesson-plan.ts`, `src/domain/ports/
+lesson-plan-repository.ts`, `src/application/lesson-plan-service.ts`
+  (trims all 7 ILAW fields, requires competency/objectives/experiences/
+  assessment non-blank, allows competency-code/connection/ways-forward
+  blank), `src/infrastructure/tauri/lesson-plan-repository.ts`, and
+  `src/ui/LessonPlanScreen.tsx` -- a new "Creation Studio" nav group,
+  picks one of the teacher's own teaching assignments (reusing
+  `subjectAttendanceService.listMyAssignments`), a date, and one form per
+  ILAW section, then lists/edits previously saved plans for that class.
+  Wired into `src/composition.ts` and `src/App.tsx` as the new
+  `lesson-plans` tab.
+
+**Numbering correction**: the implementing agent worked from a worktree
+that branched before the in-app-branding slice merged, and picked
+migration "39" believing it was the next free number (verified by
+counting `M::up(...)` entries in its own stale copy of the file) — but
+"In-app school branding" had already claimed migration 39 on the real
+branch tip by the time this agent finished. Caught before merging
+(the same class of collision as an earlier curriculum-migration mix-up
+this session), renumbered to migration 40 by the orchestrating session,
+including the one in-code doc-comment reference to "migration 39"; the
+underlying SQL/reasoning is otherwise unchanged from the original draft.
+
+**Tests added** (TDD, written before the Rust implementation): 15 Rust
+unit tests (`repository::lesson_plan` + `commands::lesson_plan`, listed
+above); frontend: `lesson-plan-service.test.ts` (11 cases: trimming,
+per-field validation, blank-allowed fields), `lesson-plan-repository.test.ts`
+(4 cases: exact Tauri command name + argument shape for create/update/list),
+`LessonPlanScreen.test.tsx` (3 cases: all four ILAW section headings
+render, Save calls the application service with the entered field values,
+`expectNoAccessibilityViolations` structural check).
+
+**Not built / disclosed limitations**:
+
+- No PDF export -- out of scope per the confirmed spec (planning tool,
+  not a DepEd submission).
+- No native visual/screen-reader pass on the real Tauri binary --
+  `npm run quality:ui`/a human accessibility pass was not run this
+  session; only the jsdom-based structural axe-core check ran.
+  See `docs/VERIFICATION-DEBT.md`.
+- "Ways Forward"'s exact DepEd sub-structure is unconfirmed -- implemented
+  conservatively as free text; if a future session finds the real
+  DO 16 s.2026 primary-source structure, this field may need to split
+  into sub-fields.
+
+**Exact next task**: none pre-selected. All three confirmed Creation
+Studio sub-scopes now have their first shipped output; sub-scope 2's
+remaining two outputs (certificate/recognition template, custom seating
+chart) are the most direct next candidates if the product owner wants to
+continue Creation Studio, but per this project's autonomous-development
+rules the next slice is not implemented without a new instruction to
+continue.
+
 ## In-app school branding: logo upload (2026-09-06)
 
 Built the **in-app half only** of school branding: a School Head can

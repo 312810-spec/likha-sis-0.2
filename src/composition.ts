@@ -1,4 +1,5 @@
 import { AssessmentApplicationService } from "./application/assessment-service";
+import { LessonPlanApplicationService } from "./application/lesson-plan-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
@@ -25,6 +26,7 @@ import { SyncStatusApplicationService } from "./application/sync-status-service"
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
+import { TauriLessonPlanRepository } from "./infrastructure/tauri/lesson-plan-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
@@ -91,6 +93,7 @@ export const classRecordService = new ClassRecordApplicationService(
   new TauriClassRecordRepository(),
 );
 export const assessmentService = new AssessmentApplicationService(new TauriAssessmentRepository());
+export const lessonPlanService = new LessonPlanApplicationService(new TauriLessonPlanRepository());
 export const learnerScoreService = new LearnerScoreApplicationService(
   new TauriLearnerScoreRepository(),
 );

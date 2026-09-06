@@ -1796,6 +1796,66 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE schools ADD COLUMN logo_mime TEXT;
         "#,
         ),
+        M::up(
+            r#"
+        -- M40: Creation Studio sub-scope 3/3 -- structured lesson-plan
+        -- builder. Follows the "ILAW" format (Intentions, Learning
+        -- Experiences, Assessment, Ways Forward), researched this session
+        -- (medium-high confidence: multiple consistent secondary sources
+        -- describing an official DepEd Order No. 16, s. 2026 issuance
+        -- replacing DLL/DLP and MELC coding; no primary deped.gov.ph
+        -- fetch attempted -- see docs/CURRENT-HANDOFF.md for the full
+        -- research record). Scoped by (teaching_assignment_id, plan_date)
+        -- -- one plan per teacher/section/subject/day, the same
+        -- ownership+date scoping convention `subject_attendance_sessions`
+        -- already established (migration 24) for teacher-authored,
+        -- per-meeting content: `teaching_assignment_id` already encodes
+        -- teacher+section+subject together (see that table's own
+        -- definition), so a single FK plus a date is sufficient to scope
+        -- one lesson plan, without a separate teacher_user_id column that
+        -- could drift from the assignment's own teacher.
+        --
+        -- `learning_competency_code` is free text the teacher enters
+        -- themselves -- deliberately NOT a foreign key into
+        -- `curriculum_learning_areas` (see ADR-0037's addendum): that
+        -- table only models learning-area names, not DepEd's
+        -- competency-code catalog, and building that catalog is a much
+        -- larger, separate undertaking explicitly out of scope here.
+        --
+        -- `learning_objectives` is stored as a single TEXT column holding
+        -- newline-separated entries (2-3 short lines) rather than a
+        -- child table -- this is free-form teacher-authored text with no
+        -- downstream code ever needing to query a single objective row
+        -- (unlike, say, `assessment_items`, which grade computation must
+        -- address individually) -- the simplest storage that is still
+        -- correct for how this data is actually read (whole, on one
+        -- screen). If a future slice needs to reference one objective
+        -- individually, this can be normalized then.
+        CREATE TABLE lesson_plans (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            plan_date TEXT NOT NULL,
+            -- Intentions
+            learning_competency TEXT NOT NULL,
+            learning_competency_code TEXT NOT NULL DEFAULT '',
+            learning_objectives TEXT NOT NULL,
+            connection_to_previous_learning TEXT NOT NULL DEFAULT '',
+            -- Learning Experiences
+            learning_experiences TEXT NOT NULL,
+            -- Assessment
+            assessment TEXT NOT NULL,
+            -- Ways Forward
+            ways_forward TEXT NOT NULL DEFAULT '',
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (teaching_assignment_id, plan_date)
+        );
+
+        CREATE INDEX idx_lesson_plans_school_date ON lesson_plans(school_id, plan_date);
+        "#,
+        ),
     ])
 }
 

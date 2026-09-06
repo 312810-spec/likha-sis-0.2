@@ -11,6 +11,7 @@ import {
   formGenerationService,
   gradingService,
   learnerScoreService,
+  lessonPlanService,
   learnerService,
   myDayService,
   onSessionExpired,
@@ -43,6 +44,7 @@ import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
+import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
@@ -451,6 +453,12 @@ function App() {
               assessmentService={assessmentService}
               learnerScoreService={learnerScoreService}
               exportService={exportService}
+            />
+          ) : activeTab === "lesson-plans" ? (
+            <LessonPlanScreen
+              lessonPlanService={lessonPlanService}
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={session.userId}
             />
           ) : activeTab === "audit-log" ? (
             <AuditLogScreen authService={authService} />
