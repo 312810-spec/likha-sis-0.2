@@ -414,6 +414,20 @@ pub enum Capability {
     /// about not reusing `ManageSchoolMembership`), even though today
     /// both capabilities resolve to the same role.
     ManageSectionAdvisories,
+    /// Upload, replace, or remove the school's in-app branding logo
+    /// (`repository::school::set_logo`/`clear_logo`) -- see
+    /// `docs/CURRENT-HANDOFF.md`'s 2026-09-06 entry. School Head only,
+    /// deliberately its own variant rather than reusing
+    /// `ManageSchoolMembership`: who a school's identity/branding
+    /// represents is a distinct administrative concern from who its
+    /// members are, matching this codebase's own established precedent
+    /// (`ManageTeachingAssignments`/`ManageSectionAdvisories` reason the
+    /// same way), even though today all four capabilities resolve to
+    /// the same role. In-app display only -- official-form export was
+    /// explicitly dropped from this feature's scope after this
+    /// session's DepEd research found SF10 restricts official forms to
+    /// DepEd's own seal/logo.
+    ManageSchoolBranding,
 }
 
 impl Capability {
@@ -423,6 +437,7 @@ impl Capability {
             Capability::ManageSchoolMembership => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -2085,6 +2100,63 @@ mod tests {
         let result = authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    // ---- In-app school branding (2026-09-06) ----
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_registrar_for_manage_school_branding() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_school_heads_manage_school_branding_from_a_different_school() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        // A role held in one school must not authorize a capability
+        // resolved against a *different* school's data -- there is no
+        // separate school_id parameter to smuggle here (branding is
+        // always session-scoped), so this proves the same session
+        // cannot somehow pass for a school other than the one its own
+        // role was granted in.
+        let other_school = school::create(&conn, "Other School").unwrap();
+
+        let resolved_school =
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding).unwrap();
+
+        assert_eq!(resolved_school, s.id);
+        assert_ne!(resolved_school, other_school.id);
     }
 
     #[test]

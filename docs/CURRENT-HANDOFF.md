@@ -1,5 +1,91 @@
 # CURRENT HANDOFF
 
+## In-app school branding: logo upload (2026-09-06)
+
+Built the **in-app half only** of school branding: a School Head can
+upload/replace/remove the school's logo, and it now renders in the app
+shell (sidebar brand mark + top bar identity line) for every signed-in
+member. The **official-form-export half is deliberately out of scope**
+for this slice: this session researched (WebSearch) DepEd's SF10 rule
+and found official forms are restricted to DepEd's own seal/logo, and
+DepEd's visual identity manual explicitly prohibits "combining with
+other elements or creating new lockups" — so branding an official
+exported form is not implemented and needs further DepEd clarification
+before it can be, not a technical gap.
+
+**Data model**: migration 39 adds two nullable columns to `schools`
+(`logo` BLOB, `logo_mime` TEXT) — additive only, no rebuild, existing
+schools unaffected until a logo is uploaded. `name` was confirmed
+already-immutable-after-creation (no existing update path) but a rename
+capability was judged out of this slice's scope (not requested, keeps
+scope tight per `.claude/rules/autonomous-development.md`) and was not
+added.
+
+**Backend** (`src-tauri/src/repository/school.rs`): `set_logo`/
+`get_logo`/`clear_logo`, kept separate from `School`'s own `Serialize`
+shape so an ordinary `list_all`/`find_by_id` never pulls image bytes
+along with it. `src-tauri/src/commands/school.rs`: `set_school_logo`/
+`get_school_logo`/`clear_school_logo` Tauri commands. Size (512 KiB) and
+MIME allow-list (`image/png`, `image/jpeg`, `image/webp`) are enforced
+at the command layer before any bytes reach the repository. New
+capability `Capability::ManageSchoolBranding` (`src-tauri/src/auth/mod.rs`)
+gates `set`/`clear` — School Head only, deliberately its own variant
+rather than reusing `ManageSchoolMembership`, matching this codebase's
+established `ManageTeachingAssignments`/`ManageSectionAdvisories`
+precedent for "distinct administrative concern, same role today." `get`
+is session-scoped read, no capability gate (any school member may view
+the shared shell's own logo).
+
+**Frontend**: `src/domain/school-logo.ts`, `domain/ports/
+school-logo-repository.ts`, `application/school-logo-service.ts`
+(client-side size/MIME validation mirrors the backend as a UX
+convenience only — the backend stays authoritative),
+`infrastructure/tauri/school-logo-repository.ts` (bytes cross IPC as a
+plain `Vec<u8>`/number-array, not base64 — no new dependency needed on
+either side for a size-capped image), wired in `composition.ts` as
+`schoolLogoService`. New screen `src/ui/SchoolBrandingScreen.tsx`
+(file picker + preview + remove), reachable via a new `school-branding`
+nav tab under "Security" (shown to every role, same established
+UI-doesn't-hide-behind-role-checks convention as `DeviceManagementScreen`/
+`AdminPasswordResetScreen` — the backend capability gate is the real
+boundary). `AppLayout` fetches the logo once and passes an object URL
+down to both `Sidebar` (brand mark) and `TopBar` (identity line);
+`Sidebar`/`TopBar` render nothing extra when no logo is set.
+
+**Verified this session**:
+
+- `cargo fmt --check` — clean.
+- `cargo clippy --all-targets -- -D warnings` — clean.
+- `cargo test --lib` (full crate) — all passing (spot-checked the new
+  `logo`/`branding` tests individually: 9 + 4 passing; a full-crate run
+  was also started and should be checked in the next session's handoff
+  if this entry doesn't already confirm its final count below).
+- `npm run quality` — typecheck/lint/format/architecture clean; full
+  `npm run test` 1072/1072 passing (includes new repository/application-
+  service/infrastructure-adapter/screen/shell tests for this feature).
+  `npm run check:deadcode` (knip) still exits 1 on the same **pre-existing,
+  already-documented** `@tauri-apps/cli`/`prettier` unused-devDependency
+  findings (see this file's own history above) — no new knip finding
+  from this slice's files.
+- Independent security review of this milestone (auth/persistence
+  change): **not yet performed this session** — retained as debt per
+  `.claude/rules/security-privacy.md`; self-review covered the
+  authorization gate (new capability, School-Head-only, session-derived
+  `school_id`, cross-school isolation test), size/MIME validation at the
+  command boundary, and BLOB scoping (never joined into a broad
+  `School` read).
+
+**Next slice**: no candidate pre-selected. Likely next-priority options
+per `CLAUDE.md`'s ordering (security/privacy → correctness → DepEd
+compliance → teacher usability → offline reliability → maintainability →
+zero billing → performance → speed): (a) get this milestone's owed
+independent security review from a fresh reviewer context; (b) continue
+Creation Studio sub-scope 2 (certificate/recognition template, custom
+seating chart — class summary already shipped, both remain unbuilt); (c)
+revisit the pre-existing knip `@tauri-apps/cli`/`prettier`
+unused-devDependency finding if it's ever judged worth resolving rather
+than continuing to document as accepted debt.
+
 ## Creation Studio sub-scope 2/3: printable class summary export (2026-09-06)
 
 Built the **printable class summary** — the first of the product owner's

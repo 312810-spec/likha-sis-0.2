@@ -49,6 +49,17 @@ describe("TopBar", () => {
     expect(screen.getByText("Ana Cruz · Rizal Elementary")).toBeInTheDocument();
   });
 
+  it("renders no logo image by default (no logo uploaded)", () => {
+    const { container } = renderTopBar();
+    expect(container.querySelector(".app-topbar-logo")).not.toBeInTheDocument();
+  });
+
+  it("renders the school logo when logoUrl is provided", () => {
+    const { container } = renderTopBar({ logoUrl: "blob:mock-logo" });
+    const img = container.querySelector(".app-topbar-logo");
+    expect(img).toHaveAttribute("src", "blob:mock-logo");
+  });
+
   it("calls onLogout from the Log out button", async () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();

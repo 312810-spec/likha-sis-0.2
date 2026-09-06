@@ -1214,12 +1214,21 @@ label {
 }
 
 .app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
   margin: 0;
   padding: calc(var(--spacing-unit) * 1.25);
   font-size: var(--font-size-large);
   font-weight: 700;
   color: var(--color-primary);
   border-bottom: 1px solid var(--color-border-soft);
+}
+.app-sidebar-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
 }
 .app-sidebar-identity {
   display: none;
@@ -1402,7 +1411,43 @@ label {
 }
 
 .app-topbar-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
   color: var(--color-text-muted);
+}
+.app-topbar-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.school-branding-preview {
+  margin: calc(var(--spacing-unit) * 1.5) 0;
+}
+.school-branding-preview img {
+  border-radius: 8px;
+  border: 1px solid var(--color-border-soft);
+  object-fit: contain;
+  background: var(--color-surface);
+}
+.school-branding-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border: 1px dashed var(--color-border-soft);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+.school-branding-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--spacing-unit) * 0.75);
 }
 
 /* Redesign shell -- phone bottom tab bar (ADR-0057). Hidden until the

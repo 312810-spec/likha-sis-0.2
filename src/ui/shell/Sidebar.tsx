@@ -14,6 +14,10 @@ interface SidebarProps {
   session: CurrentSession;
   activeTab: SignedInTab;
   onNavigate: (tab: SignedInTab) => void;
+  /** Object URL for the school's uploaded branding logo, or `null` when
+   * none has been uploaded (or it hasn't loaded yet) -- see
+   * `SchoolBrandingScreen`. */
+  logoUrl?: string | null;
 }
 
 const STORAGE_KEY = "likha-sis:nav-collapsed";
@@ -56,7 +60,7 @@ function readCollapsed(): Set<string> {
   return new Set();
 }
 
-export function Sidebar({ session, activeTab, onNavigate }: SidebarProps) {
+export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProps) {
   const { mode, setMode } = useTeacherMode();
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
   const current = normalizeTab(activeTab);
@@ -83,7 +87,10 @@ export function Sidebar({ session, activeTab, onNavigate }: SidebarProps) {
 
   return (
     <nav aria-label="Primary" className="app-sidebar">
-      <h1 className="app-sidebar-brand">LIKHA-SIS</h1>
+      <h1 className="app-sidebar-brand">
+        {logoUrl && <img src={logoUrl} alt="" className="app-sidebar-logo" />}
+        LIKHA-SIS
+      </h1>
       <p className="app-sidebar-identity">
         <strong>{session.displayName}</strong>
         <span>{session.schoolName}</span>

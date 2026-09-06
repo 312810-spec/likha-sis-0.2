@@ -13,6 +13,7 @@ import { LearnerScoreApplicationService } from "./application/learner-score-serv
 import { MyDayApplicationService } from "./application/my-day-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
+import { SchoolLogoApplicationService } from "./application/school-logo-service";
 import { SchoolMemberApplicationService } from "./application/school-member-service";
 import { SectionApplicationService } from "./application/section-service";
 import { SectionAdvisoryApplicationService } from "./application/section-advisory-service";
@@ -39,6 +40,7 @@ import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-scor
 import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
+import { TauriSchoolLogoRepository } from "./infrastructure/tauri/school-logo-repository";
 import { TauriSchoolMemberRepository } from "./infrastructure/tauri/school-member-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
 import { TauriSectionAdvisoryRepository } from "./infrastructure/tauri/section-advisory-repository";
@@ -59,6 +61,7 @@ export { onSessionExpired } from "./infrastructure/tauri/invoke";
  */
 export const authService = new AuthApplicationService(new TauriAuthRepository());
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
+export const schoolLogoService = new SchoolLogoApplicationService(new TauriSchoolLogoRepository());
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
 /** @public — the `registerUser` capability is fully implemented and
  * tested end to end (application service, repository port, Tauri

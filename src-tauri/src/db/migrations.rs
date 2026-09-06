@@ -1776,6 +1776,26 @@ pub fn migrations() -> Migrations<'static> {
             ('00000000-0000-7000-8000-000000005305', '00000000-0000-7000-8000-000000005003', 'Philippine History and Society');
         "#,
         ),
+        M::up(
+            r#"
+        -- M39: In-app school branding (2026-09-06). The product owner
+        -- confirmed "school branding" covers both in-app display and
+        -- official-form export, but this session's DepEd research found
+        -- SF10's official-form rule restricts official forms to DepEd's
+        -- own seal/logo and DepEd's visual identity manual prohibits
+        -- combining it with other lockups -- so only the in-app half
+        -- ships here; official-form export stays out of scope pending
+        -- further DepEd clarification. Nullable, additive columns only:
+        -- a school with no logo uploaded is unaffected. `logo_mime` is a
+        -- small allow-listed set enforced in Rust at the command layer
+        -- (image/png, image/jpeg, image/webp), not a DB CHECK, so it can
+        -- change without another 12-step rebuild. Logo bytes are kept
+        -- small (command-layer size cap) -- this is a school-identity
+        -- icon, not a document store.
+        ALTER TABLE schools ADD COLUMN logo BLOB;
+        ALTER TABLE schools ADD COLUMN logo_mime TEXT;
+        "#,
+        ),
     ])
 }
 
@@ -4270,5 +4290,42 @@ mod tests {
              INSERT for the same triple must fail (the repository layer uses an upsert,\
              not a plain INSERT, to update it)"
         );
+    }
+
+    #[test]
+    fn migration_39_adds_nullable_logo_columns_that_default_to_absent() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        let (logo, logo_mime): (Option<Vec<u8>>, Option<String>) = conn
+            .query_row(
+                "SELECT logo, logo_mime FROM schools WHERE id = 's1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(logo, None, "an existing school has no logo until uploaded");
+        assert_eq!(logo_mime, None);
+
+        conn.execute(
+            "UPDATE schools SET logo = ?1, logo_mime = 'image/png' WHERE id = 's1'",
+            [vec![1u8, 2, 3]],
+        )
+        .unwrap();
+        let (logo, logo_mime): (Option<Vec<u8>>, Option<String>) = conn
+            .query_row(
+                "SELECT logo, logo_mime FROM schools WHERE id = 's1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(logo, Some(vec![1, 2, 3]));
+        assert_eq!(logo_mime, Some("image/png".to_string()));
     }
 }

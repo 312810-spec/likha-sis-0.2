@@ -15,6 +15,7 @@ import {
   myDayService,
   onSessionExpired,
   schoolAttendanceService,
+  schoolLogoService,
   schoolMemberService,
   schoolService,
   sectionAdvisoryService,
@@ -34,6 +35,7 @@ import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
+import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
 import { SchoolMembershipScreen } from "./ui/SchoolMembershipScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
@@ -192,6 +194,7 @@ function App() {
           activeTab={activeTab}
           onNavigate={setActiveTab}
           onLogout={handleLogout}
+          schoolLogoService={schoolLogoService}
         >
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
           {activeTab === "workspace" ? (
@@ -457,6 +460,8 @@ function App() {
             <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
           ) : activeTab === "devices" ? (
             <DeviceManagementScreen deviceSyncService={deviceSyncService} />
+          ) : activeTab === "school-branding" ? (
+            <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
           ) : activeTab === "conflict-review" ? (
             <ConflictReviewScreen conflictReviewService={conflictReviewService} />
           ) : activeTab === "sync-status" ? (

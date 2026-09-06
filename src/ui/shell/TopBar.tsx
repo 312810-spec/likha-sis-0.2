@@ -9,9 +9,13 @@ interface TopBarProps {
   activeTab: SignedInTab;
   onLogout: () => void;
   onOpenDrawer: () => void;
+  /** Object URL for the school's uploaded branding logo, or `null`/
+   * absent when none has been uploaded (or it hasn't loaded yet) --
+   * see `SchoolBrandingScreen`. */
+  logoUrl?: string | null;
 }
 
-export function TopBar({ session, activeTab, onLogout, onOpenDrawer }: TopBarProps) {
+export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: TopBarProps) {
   const { mode, setMode } = useTeacherMode();
   const group = groupLabelForTab(activeTab);
 
@@ -43,6 +47,7 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer }: TopBarPro
       </div>
 
       <span className="app-topbar-identity">
+        {logoUrl && <img src={logoUrl} alt="" className="app-topbar-logo" />}
         {session.displayName} · {session.schoolName}
       </span>
       <button type="button" onClick={onLogout}>

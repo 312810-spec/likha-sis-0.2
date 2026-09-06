@@ -22,7 +22,8 @@ export type SignedInTab =
   | "school-members"
   | "devices"
   | "conflict-review"
-  | "sync-status";
+  | "sync-status"
+  | "school-branding";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -56,6 +57,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   devices: "Devices",
   "conflict-review": "Review Sync Conflicts",
   "sync-status": "Sync Status",
+  "school-branding": "School Logo",
 };
 
 interface NavGroup {
@@ -104,7 +106,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Security",
-    tabs: [tab("audit-log"), tab("admin-password-reset"), tab("school-members"), tab("devices")],
+    tabs: [
+      tab("audit-log"),
+      tab("admin-password-reset"),
+      tab("school-members"),
+      tab("devices"),
+      tab("school-branding"),
+    ],
   },
 ];
 

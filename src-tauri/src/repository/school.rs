@@ -54,6 +54,69 @@ pub fn list_all(conn: &Connection) -> AppResult<Vec<School>> {
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// One school's in-app branding logo -- MIME type plus raw bytes. Never
+/// embedded in `School` itself (which is fetched broadly, e.g.
+/// `list_all`) so an ordinary school lookup never has to pull image
+/// bytes along with it; fetched only by `get_logo`, the one path that
+/// actually needs the image. `school_id` is caller-verified (command
+/// layer derives it from the session, never a client parameter) --
+/// this function itself simply scopes the `UPDATE`/`SELECT` to the id
+/// given, matching every other repository function in this codebase.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchoolLogo {
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
+/// Sets (or replaces) `school_id`'s branding logo. Size/MIME-type
+/// validation happens at the command layer, matching this codebase's
+/// convention that repository functions trust their caller for shape
+/// but never for tenant scope. Returns `Ok(())` even if `school_id`
+/// doesn't exist -- the command layer's session-derived `school_id` is
+/// always real, so this mirrors `UPDATE`'s own no-op-on-no-match
+/// semantics rather than adding a distinction no caller needs.
+pub fn set_logo(conn: &Connection, school_id: &str, mime: &str, bytes: &[u8]) -> AppResult<()> {
+    conn.execute(
+        "UPDATE schools SET logo = ?1, logo_mime = ?2 WHERE id = ?3",
+        (bytes, mime, school_id),
+    )?;
+    Ok(())
+}
+
+/// Reads back `school_id`'s branding logo, if one has been uploaded.
+/// `None` covers both "school has no logo yet" and "school_id doesn't
+/// exist" -- the command layer only ever calls this with a
+/// session-derived, therefore-real, `school_id`.
+pub fn get_logo(conn: &Connection, school_id: &str) -> AppResult<Option<SchoolLogo>> {
+    conn.query_row(
+        "SELECT logo, logo_mime FROM schools WHERE id = ?1 AND logo IS NOT NULL",
+        [school_id],
+        |row| {
+            Ok(SchoolLogo {
+                bytes: row.get(0)?,
+                mime: row.get(1)?,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
+/// Removes `school_id`'s branding logo, reverting to the default
+/// placeholder shown in the app shell. Idempotent -- clearing an
+/// already-absent logo succeeds silently, matching `set_logo`'s
+/// no-op-on-no-match semantics.
+pub fn clear_logo(conn: &Connection, school_id: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE schools SET logo = NULL, logo_mime = NULL WHERE id = ?1",
+        [school_id],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +171,54 @@ mod tests {
         let found = find_by_id(&conn, &created.id).unwrap();
         assert_eq!(found.map(|s| s.name), Some(adversarial_name.to_string()));
         assert_eq!(list_all(&conn).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn logo_round_trips_and_starts_absent() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+
+        assert_eq!(get_logo(&conn, &school.id).unwrap(), None);
+
+        let bytes = vec![0x89, b'P', b'N', b'G', 1, 2, 3, 4];
+        set_logo(&conn, &school.id, "image/png", &bytes).unwrap();
+
+        let logo = get_logo(&conn, &school.id).unwrap().unwrap();
+        assert_eq!(logo.mime, "image/png");
+        assert_eq!(logo.bytes, bytes);
+    }
+
+    #[test]
+    fn set_logo_replaces_a_previous_logo() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        set_logo(&conn, &school.id, "image/png", &[1, 2, 3]).unwrap();
+
+        set_logo(&conn, &school.id, "image/jpeg", &[4, 5, 6, 7]).unwrap();
+
+        let logo = get_logo(&conn, &school.id).unwrap().unwrap();
+        assert_eq!(logo.mime, "image/jpeg");
+        assert_eq!(logo.bytes, vec![4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn clear_logo_removes_it() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        set_logo(&conn, &school.id, "image/png", &[1, 2, 3]).unwrap();
+
+        clear_logo(&conn, &school.id).unwrap();
+
+        assert_eq!(get_logo(&conn, &school.id).unwrap(), None);
+    }
+
+    #[test]
+    fn logo_is_scoped_to_its_own_school() {
+        let conn = open_test_db();
+        let school_a = create(&conn, "School A").unwrap();
+        let school_b = create(&conn, "School B").unwrap();
+        set_logo(&conn, &school_a.id, "image/png", &[9, 9, 9]).unwrap();
+
+        assert_eq!(get_logo(&conn, &school_b.id).unwrap(), None);
     }
 }

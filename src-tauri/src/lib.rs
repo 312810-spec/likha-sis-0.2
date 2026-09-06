@@ -69,6 +69,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::school::list_schools,
             commands::school::create_school,
+            commands::school::set_school_logo,
+            commands::school::get_school_logo,
+            commands::school::clear_school_logo,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
             commands::learner::create_learner_with_duplicate_check,
