@@ -67,6 +67,21 @@ import type {
   EndAdvisoryOutcome,
   SectionAdvisory,
 } from "../domain/section-advisory";
+import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
+import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
+import type {
+  AdviserAttendanceOverview,
+  EntryStatus,
+  RecordEntryOutcome,
+  SubjectAttendanceMonitor,
+  SubjectAttendanceMonitorRow,
+  SubjectAttendanceRosterRow,
+  SubjectAttendanceSession,
+  TeachingAssignmentSummary,
+} from "../domain/subject-attendance";
+import type { CreateMeetingOutcome, ScheduleMeeting } from "../domain/schedule-meeting";
+import type { TeacherLoad } from "../domain/teacher-load";
+import type { TeachingAssignment, TeachingAssignmentDetail } from "../domain/teaching-assignment";
 
 /** A plain data object, not a real session -- see this file's own doc
  * comment. Rendered only as a prop to `AppLayout`/`TeacherWorkspaceScreen`
@@ -1165,5 +1180,563 @@ export class FixtureSectionAdvisoryRepository implements SectionAdvisoryReposito
     const ended: SectionAdvisory = { ...this.advisory, endsOn };
     this.advisory = null;
     return { kind: "ended", advisory: ended };
+  }
+}
+
+/*
+ * ==== Teaching Assignments / Class Schedule / Teacher Load / Subject
+ * Attendance / Subject Monitor / Adviser View ====
+ *
+ * A third slice of shared in-memory state, seeded consistently with the
+ * fixtures above: `teacher-ana` (already `FIXTURE_SCHOOL_MEMBERS`'
+ * adviser of `sec-not-started`, per `FixtureSectionAdvisoryRepository`)
+ * teaches two assignments, `teacher-bayani` teaches a third with no
+ * schedule yet -- so Teacher Load, Teaching Assignments, Class
+ * Schedule, Subject Attendance, Subject Monitor, and Adviser View all
+ * have real, mutually-consistent synthetic data to render, exactly the
+ * same "read-only where unwired, genuinely mutable where a teacher would
+ * actually interact" convention every fixture above already follows.
+ */
+
+interface TeachingAssignmentSeed {
+  id: string;
+  teacherUserId: string;
+  sectionId: string;
+  subjectId: string;
+}
+
+let TEACHING_ASSIGNMENTS: TeachingAssignmentSeed[] = [
+  { id: "ta-1", teacherUserId: "teacher-ana", sectionId: "sec-not-started", subjectId: "sub-math" },
+  {
+    id: "ta-2",
+    teacherUserId: "teacher-ana",
+    sectionId: "sec-partial",
+    subjectId: "sub-science",
+  },
+  {
+    id: "ta-3",
+    teacherUserId: "teacher-bayani",
+    sectionId: "sec-complete",
+    subjectId: "sub-mapeh",
+  },
+];
+
+let SCHEDULE_MEETINGS: ScheduleMeeting[] = [
+  {
+    id: "meet-1",
+    teachingAssignmentId: "ta-1",
+    weekday: 1,
+    startsAt: "08:00",
+    endsAt: "09:00",
+    room: "Room 1",
+  },
+  {
+    id: "meet-2",
+    teachingAssignmentId: "ta-1",
+    weekday: 3,
+    startsAt: "08:00",
+    endsAt: "09:00",
+    room: "Room 1",
+  },
+  {
+    id: "meet-3",
+    teachingAssignmentId: "ta-2",
+    weekday: 2,
+    startsAt: "09:00",
+    endsAt: "10:00",
+    room: "Room 2",
+  },
+  // ta-3 deliberately has no meetings yet -- covers Teacher Load's
+  // "0 weekly instructional minutes" state and Class Schedule's empty
+  // state, both real product states, not oversights.
+];
+
+let nextAssignmentId = TEACHING_ASSIGNMENTS.length + 1;
+let nextMeetingId = SCHEDULE_MEETINGS.length + 1;
+
+function teachingAssignmentDetailFor(
+  seed: TeachingAssignmentSeed,
+): TeachingAssignmentDetail | null {
+  const section = FIXTURE_SECTIONS.find((s) => s.id === seed.sectionId);
+  const subject = allSubjects.find((s) => s.id === seed.subjectId);
+  if (!section || !subject) return null;
+  return {
+    id: seed.id,
+    teacherUserId: seed.teacherUserId,
+    sectionId: section.id,
+    sectionName: section.name,
+    schoolYear: section.schoolYear,
+    subjectId: subject.id,
+    subjectName: subject.name,
+  };
+}
+
+function teachingAssignmentSummaryFor(
+  seed: TeachingAssignmentSeed,
+): TeachingAssignmentSummary | null {
+  const detail = teachingAssignmentDetailFor(seed);
+  if (!detail) return null;
+  return {
+    id: detail.id,
+    sectionId: detail.sectionId,
+    sectionName: detail.sectionName,
+    schoolYear: detail.schoolYear,
+    subjectId: detail.subjectId,
+    subjectName: detail.subjectName,
+  };
+}
+
+export class FixtureTeachingAssignmentRepository implements TeachingAssignmentRepository {
+  async listMine(teacherUserId: string): Promise<TeachingAssignmentSummary[]> {
+    return TEACHING_ASSIGNMENTS.filter((a) => a.teacherUserId === teacherUserId)
+      .map(teachingAssignmentSummaryFor)
+      .filter((s): s is TeachingAssignmentSummary => s !== null);
+  }
+
+  async listMeetings(teachingAssignmentId: string): Promise<ScheduleMeeting[]> {
+    return SCHEDULE_MEETINGS.filter((m) => m.teachingAssignmentId === teachingAssignmentId);
+  }
+
+  async listBySection(sectionId: string): Promise<TeachingAssignmentDetail[]> {
+    return TEACHING_ASSIGNMENTS.filter((a) => a.sectionId === sectionId)
+      .map(teachingAssignmentDetailFor)
+      .filter((d): d is TeachingAssignmentDetail => d !== null);
+  }
+
+  async create(
+    teacherUserId: string,
+    sectionId: string,
+    subjectId: string,
+  ): Promise<TeachingAssignment | null> {
+    const section = FIXTURE_SECTIONS.find((s) => s.id === sectionId);
+    const subjectExists = allSubjects.some((s) => s.id === subjectId);
+    const teacherExists = FIXTURE_SCHOOL_MEMBERS.some((m) => m.id === teacherUserId);
+    if (!section || !subjectExists || !teacherExists) return null;
+    const alreadyAssigned = TEACHING_ASSIGNMENTS.some(
+      (a) => a.sectionId === sectionId && a.subjectId === subjectId,
+    );
+    if (alreadyAssigned) return null;
+    const id = `ta-fixture-${nextAssignmentId++}`;
+    TEACHING_ASSIGNMENTS = [...TEACHING_ASSIGNMENTS, { id, teacherUserId, sectionId, subjectId }];
+    return { id, teacherUserId, sectionId, subjectId };
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const existed = TEACHING_ASSIGNMENTS.some((a) => a.id === id);
+    if (!existed) return false;
+    TEACHING_ASSIGNMENTS = TEACHING_ASSIGNMENTS.filter((a) => a.id !== id);
+    SCHEDULE_MEETINGS = SCHEDULE_MEETINGS.filter((m) => m.teachingAssignmentId !== id);
+    return true;
+  }
+
+  async createMeeting(
+    teachingAssignmentId: string,
+    weekday: number,
+    startsAt: string,
+    endsAt: string,
+    room: string | null,
+  ): Promise<CreateMeetingOutcome> {
+    const assignment = TEACHING_ASSIGNMENTS.find((a) => a.id === teachingAssignmentId);
+    if (!assignment) return { outcome: "unknownAssignment" };
+    if (weekday < 0 || weekday > 6) return { outcome: "invalidWeekday" };
+    if (startsAt >= endsAt) return { outcome: "invalidTime" };
+    const overlaps = (a: ScheduleMeeting, b: ScheduleMeeting) =>
+      a.weekday === b.weekday && a.startsAt < b.endsAt && b.startsAt < a.endsAt;
+    const candidate: ScheduleMeeting = {
+      id: "",
+      teachingAssignmentId,
+      weekday,
+      startsAt,
+      endsAt,
+      room,
+    };
+    for (const existing of SCHEDULE_MEETINGS) {
+      if (!overlaps(existing, candidate)) continue;
+      if (
+        existing.teachingAssignmentId === teachingAssignmentId &&
+        existing.startsAt === startsAt &&
+        existing.endsAt === endsAt &&
+        existing.room === room
+      ) {
+        return { outcome: "duplicate" };
+      }
+      const existingAssignment = TEACHING_ASSIGNMENTS.find(
+        (a) => a.id === existing.teachingAssignmentId,
+      );
+      if (existingAssignment?.teacherUserId === assignment.teacherUserId) {
+        return { outcome: "teacherConflict" };
+      }
+      if (existingAssignment?.sectionId === assignment.sectionId) {
+        return { outcome: "sectionConflict" };
+      }
+      if (room !== null && existing.room === room) {
+        return { outcome: "roomConflict" };
+      }
+    }
+    const meeting: ScheduleMeeting = { ...candidate, id: `meet-fixture-${nextMeetingId++}` };
+    SCHEDULE_MEETINGS = [...SCHEDULE_MEETINGS, meeting];
+    return { outcome: "created", meeting };
+  }
+
+  async removeMeeting(id: string): Promise<boolean> {
+    const existed = SCHEDULE_MEETINGS.some((m) => m.id === id);
+    if (!existed) return false;
+    SCHEDULE_MEETINGS = SCHEDULE_MEETINGS.filter((m) => m.id !== id);
+    return true;
+  }
+
+  async getLoad(teacherUserId: string): Promise<TeacherLoad> {
+    const assignments = TEACHING_ASSIGNMENTS.filter((a) => a.teacherUserId === teacherUserId);
+    const distinctSubjectCount = new Set(assignments.map((a) => a.subjectId)).size;
+    const weeklyInstructionalMinutes = SCHEDULE_MEETINGS.filter((m) =>
+      assignments.some((a) => a.id === m.teachingAssignmentId),
+    ).reduce((total, m) => {
+      const [sh = 0, sm = 0] = m.startsAt.split(":").map(Number);
+      const [eh = 0, em = 0] = m.endsAt.split(":").map(Number);
+      return total + (eh * 60 + em - (sh * 60 + sm));
+    }, 0);
+    return {
+      assignmentCount: assignments.length,
+      distinctSubjectCount,
+      weeklyInstructionalMinutes,
+    };
+  }
+}
+
+/** Which fixture learners are enrolled, roster-membership-id-keyed, per
+ * section -- reuses `l1`/`l2`/`l3` as both learner id and membership id
+ * (a simplification also used elsewhere in this file), matching each
+ * section's `FIXTURE_ROSTERS` composition above. */
+const SECTION_MEMBERSHIP_IDS: Record<string, string[]> = {
+  "sec-not-started": ["l1", "l2"],
+  "sec-partial": ["l1", "l2", "l3"],
+  "sec-complete": ["l3"],
+};
+
+function learnerName(learnerId: string): { givenName: string; familyName: string } {
+  const learner = FIXTURE_LEARNERS.find((l) => l.id === learnerId);
+  return { givenName: learner?.givenName ?? "", familyName: learner?.familyName ?? "" };
+}
+
+interface SubjectAttendanceSessionSeed {
+  session: SubjectAttendanceSession;
+  entries: Map<string, EntryStatus>;
+}
+
+let nextSessionSeq = 1;
+let nextEntrySeq = 1;
+
+/** `ta-1` (Mabini/Mathematics): two held sessions so Subject Monitor has
+ * a real consecutive-absence streak to show for Bayani (absent both
+ * times) while Ana stays present -- and a `no_class` day so Subject
+ * Attendance's own no-class state is reachable too. `ta-2`/`ta-3` start
+ * with no sessions at all, covering the "never opened yet" state. */
+const SUBJECT_ATTENDANCE_SESSIONS: Record<string, SubjectAttendanceSessionSeed[]> = {
+  "ta-1": [
+    {
+      session: {
+        id: "sa-session-1",
+        schoolId: "fixture-school",
+        teachingAssignmentId: "ta-1",
+        sectionId: "sec-not-started",
+        subjectId: "sub-math",
+        sessionDate: "2026-08-03",
+        status: "held",
+        createdByUserId: "teacher-ana",
+        createdAt: "2026-08-03T08:00:00.000Z",
+        updatedAt: "2026-08-03T08:00:00.000Z",
+      },
+      entries: new Map([
+        ["l1", "present"],
+        ["l2", "absent"],
+      ]),
+    },
+    {
+      session: {
+        id: "sa-session-2",
+        schoolId: "fixture-school",
+        teachingAssignmentId: "ta-1",
+        sectionId: "sec-not-started",
+        subjectId: "sub-math",
+        sessionDate: "2026-08-04",
+        status: "no_class",
+        createdByUserId: "teacher-ana",
+        createdAt: "2026-08-04T08:00:00.000Z",
+        updatedAt: "2026-08-04T08:00:00.000Z",
+      },
+      entries: new Map(),
+    },
+    {
+      session: {
+        id: "sa-session-3",
+        schoolId: "fixture-school",
+        teachingAssignmentId: "ta-1",
+        sectionId: "sec-not-started",
+        subjectId: "sub-math",
+        sessionDate: "2026-08-05",
+        status: "held",
+        createdByUserId: "teacher-ana",
+        createdAt: "2026-08-05T08:00:00.000Z",
+        updatedAt: "2026-08-05T08:00:00.000Z",
+      },
+      entries: new Map([
+        ["l1", "present"],
+        ["l2", "absent"],
+      ]),
+    },
+  ],
+  "ta-2": [],
+  "ta-3": [],
+};
+
+function findSession(
+  teachingAssignmentId: string,
+  sessionId: string,
+): SubjectAttendanceSessionSeed | null {
+  const seeds = SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? [];
+  return seeds.find((s) => s.session.id === sessionId) ?? null;
+}
+
+function rosterRowsFor(seed: SubjectAttendanceSessionSeed): SubjectAttendanceRosterRow[] {
+  const membershipIds = SECTION_MEMBERSHIP_IDS[seed.session.sectionId] ?? [];
+  return membershipIds.map((membershipId) => {
+    const { givenName, familyName } = learnerName(membershipId);
+    return {
+      membershipId,
+      learnerId: membershipId,
+      givenName,
+      familyName,
+      entryStatus: seed.entries.get(membershipId) ?? null,
+    };
+  });
+}
+
+export class FixtureSubjectAttendanceRepository implements SubjectAttendanceRepository {
+  async openSession(
+    teachingAssignmentId: string,
+    sessionDate: string,
+  ): Promise<SubjectAttendanceSession | null> {
+    const assignment = TEACHING_ASSIGNMENTS.find((a) => a.id === teachingAssignmentId);
+    if (!assignment) return null;
+    const existing = (SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? []).find(
+      (s) => s.session.sessionDate === sessionDate,
+    );
+    if (existing) return existing.session;
+    const now = new Date().toISOString();
+    const session: SubjectAttendanceSession = {
+      id: `sa-session-fixture-${nextSessionSeq++}`,
+      schoolId: "fixture-school",
+      teachingAssignmentId,
+      sectionId: assignment.sectionId,
+      subjectId: assignment.subjectId,
+      sessionDate,
+      status: "held",
+      createdByUserId: assignment.teacherUserId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] = [
+      ...(SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? []),
+      { session, entries: new Map() },
+    ];
+    return session;
+  }
+
+  async markNoClass(
+    teachingAssignmentId: string,
+    sessionDate: string,
+  ): Promise<SubjectAttendanceSession | null> {
+    const assignment = TEACHING_ASSIGNMENTS.find((a) => a.id === teachingAssignmentId);
+    if (!assignment) return null;
+    const seeds = SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? [];
+    const existing = seeds.find((s) => s.session.sessionDate === sessionDate);
+    const now = new Date().toISOString();
+    if (existing) {
+      existing.session = { ...existing.session, status: "no_class", updatedAt: now };
+      return existing.session;
+    }
+    const session: SubjectAttendanceSession = {
+      id: `sa-session-fixture-${nextSessionSeq++}`,
+      schoolId: "fixture-school",
+      teachingAssignmentId,
+      sectionId: assignment.sectionId,
+      subjectId: assignment.subjectId,
+      sessionDate,
+      status: "no_class",
+      createdByUserId: assignment.teacherUserId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] = [...seeds, { session, entries: new Map() }];
+    return session;
+  }
+
+  async recordEntry(
+    teachingAssignmentId: string,
+    sessionId: string,
+    membershipId: string,
+    status: EntryStatus,
+  ): Promise<RecordEntryOutcome> {
+    const found = findSession(teachingAssignmentId, sessionId);
+    if (!found) return { kind: "sessionNotFound" };
+    if (found.session.status === "no_class") return { kind: "sessionIsNoClass" };
+    const membershipIds = SECTION_MEMBERSHIP_IDS[found.session.sectionId] ?? [];
+    if (!membershipIds.includes(membershipId)) return { kind: "membershipNotInSession" };
+    found.entries.set(membershipId, status);
+    return {
+      kind: "recorded",
+      entry: {
+        id: `sa-entry-fixture-${nextEntrySeq++}`,
+        sessionId,
+        membershipId,
+        learnerId: membershipId,
+        status,
+        note: null,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  async markAllPresent(
+    teachingAssignmentId: string,
+    sessionId: string,
+  ): Promise<SubjectAttendanceRosterRow[] | null> {
+    const found = findSession(teachingAssignmentId, sessionId);
+    if (!found || found.session.status === "no_class") return null;
+    for (const membershipId of SECTION_MEMBERSHIP_IDS[found.session.sectionId] ?? []) {
+      if (!found.entries.has(membershipId)) found.entries.set(membershipId, "present");
+    }
+    return rosterRowsFor(found);
+  }
+
+  async rosterForSession(
+    teachingAssignmentId: string,
+    sessionId: string,
+  ): Promise<SubjectAttendanceRosterRow[] | null> {
+    const found = findSession(teachingAssignmentId, sessionId);
+    if (!found) return null;
+    return rosterRowsFor(found);
+  }
+
+  async listSessions(teachingAssignmentId: string): Promise<SubjectAttendanceSession[]> {
+    return (SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? []).map((s) => s.session);
+  }
+
+  async monitor(
+    teachingAssignmentId: string,
+    asOfDate: string,
+  ): Promise<SubjectAttendanceMonitor | null> {
+    const assignment = TEACHING_ASSIGNMENTS.find((a) => a.id === teachingAssignmentId);
+    if (!assignment) return null;
+    const seeds = (SUBJECT_ATTENDANCE_SESSIONS[teachingAssignmentId] ?? [])
+      .filter((s) => s.session.sessionDate <= asOfDate)
+      .sort((a, b) => a.session.sessionDate.localeCompare(b.session.sessionDate));
+    const heldSeeds = seeds.filter((s) => s.session.status === "held");
+    const membershipIds = SECTION_MEMBERSHIP_IDS[assignment.sectionId] ?? [];
+    const rows: SubjectAttendanceMonitorRow[] = membershipIds.map((membershipId) => {
+      const { givenName, familyName } = learnerName(membershipId);
+      let presentCount = 0;
+      let absentCount = 0;
+      let lateCount = 0;
+      let excusedCount = 0;
+      let currentConsecutiveAbsences = 0;
+      let streakBroken = false;
+      for (let i = heldSeeds.length - 1; i >= 0; i--) {
+        const status = heldSeeds[i]?.entries.get(membershipId) ?? null;
+        if (status === "present") presentCount++;
+        else if (status === "absent") absentCount++;
+        else if (status === "late") lateCount++;
+        else if (status === "excused") excusedCount++;
+        if (!streakBroken) {
+          if (status === "absent") currentConsecutiveAbsences++;
+          else streakBroken = true;
+        }
+      }
+      return {
+        membershipId,
+        learnerId: membershipId,
+        givenName,
+        familyName,
+        presentCount,
+        absentCount,
+        lateCount,
+        excusedCount,
+        currentConsecutiveAbsences,
+      };
+    });
+    return { heldSessionCount: heldSeeds.length, rows };
+  }
+
+  async listAdviserViewSections(): Promise<Section[]> {
+    // The fixture's sole seeded advisory (see
+    // `FixtureSectionAdvisoryRepository`) covers `sec-not-started` --
+    // Adviser View shows only that section, matching the real backend's
+    // "sections you currently advise" scope.
+    return FIXTURE_SECTIONS.filter((s) => s.id === "sec-not-started");
+  }
+
+  async adviserOverview(
+    sectionId: string,
+    asOfDate: string,
+  ): Promise<AdviserAttendanceOverview | null> {
+    const section = FIXTURE_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return null;
+    const assignments = TEACHING_ASSIGNMENTS.filter((a) => a.sectionId === sectionId);
+    const membershipIds = SECTION_MEMBERSHIP_IDS[sectionId] ?? [];
+    let heldSessionCount = 0;
+    const rows = membershipIds.map((membershipId) => {
+      const { givenName, familyName } = learnerName(membershipId);
+      let presentCount = 0;
+      let absentCount = 0;
+      let lateCount = 0;
+      let excusedCount = 0;
+      const subjectsWithAbsences = new Set<string>();
+      let highestCurrentSubjectAbsenceStreak = 0;
+      for (const assignment of assignments) {
+        const seeds = (SUBJECT_ATTENDANCE_SESSIONS[assignment.id] ?? [])
+          .filter((s) => s.session.status === "held" && s.session.sessionDate <= asOfDate)
+          .sort((a, b) => a.session.sessionDate.localeCompare(b.session.sessionDate));
+        if (assignment === assignments[0]) heldSessionCount += seeds.length;
+        let streak = 0;
+        let streakBroken = false;
+        for (let i = seeds.length - 1; i >= 0; i--) {
+          const status = seeds[i]?.entries.get(membershipId) ?? null;
+          if (status === "present") presentCount++;
+          else if (status === "absent") {
+            absentCount++;
+            subjectsWithAbsences.add(assignment.subjectId);
+          } else if (status === "late") lateCount++;
+          else if (status === "excused") excusedCount++;
+          if (!streakBroken) {
+            if (status === "absent") streak++;
+            else streakBroken = true;
+          }
+        }
+        highestCurrentSubjectAbsenceStreak = Math.max(highestCurrentSubjectAbsenceStreak, streak);
+      }
+      return {
+        membershipId,
+        learnerId: membershipId,
+        givenName,
+        familyName,
+        presentCount,
+        absentCount,
+        lateCount,
+        excusedCount,
+        subjectsWithAbsences: Array.from(subjectsWithAbsences).map(
+          (subjectId) => allSubjects.find((s) => s.id === subjectId)?.name ?? subjectId,
+        ),
+        highestCurrentSubjectAbsenceStreak,
+      };
+    });
+    return {
+      sectionId: section.id,
+      sectionName: section.name,
+      schoolYear: section.schoolYear,
+      asOfDate,
+      subjectCount: assignments.length,
+      heldSessionCount,
+      rows,
+    };
   }
 }
