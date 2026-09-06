@@ -186,6 +186,27 @@ which only works while `TeacherWorkspaceScreen` keeps its
 `<section aria-label="Workspace">` — it will need updating when the
 accepted-backlog work deletes that screen and rebuilds Home on `Page`.
 
+**Re-checked 2026-09-06**: confirmed this is still accurate, not stale.
+`TeacherWorkspaceScreen.tsx` line 256 still renders
+`<section aria-label="Workspace">` unchanged (`HomeScreen.tsx` still
+composes it directly), so `ui-smoke.mjs` line 42's
+`page.getByRole("region", { name: "Workspace" })` is not currently
+brittle — it targets a live selector, and the "accepted-backlog work"
+that would delete `TeacherWorkspaceScreen` has not landed. Re-ran the
+whole script this session (`node scripts/ui-smoke.mjs`, after installing
+the missing `chromium_headless_shell-1237` binary via
+`npx playwright install chromium-headless-shell` — not present in this
+worktree's environment beforehand): **PASS** — `quality:ui PASS —
+workflow, enrollment history, phone reflow, context handoff, and axe
+WCAG A/AA (0 non-blocking findings).` No code change made: the
+fragility is a documented forward-looking coupling to
+`TeacherWorkspaceScreen`'s markup, not a present bug, and speculatively
+rewriting the selector now (e.g. to something that wouldn't need
+updating post-deletion) without seeing the actual replacement Home
+markup would be guessing at an interface that doesn't exist yet. Revisit
+when the `TeacherWorkspaceScreen`-deletion/Home-on-`Page` rebuild
+actually starts — update this selector in that same slice, not before.
+
 ## Section-membership readers `l.school_id` JOIN predicate — CLOSED, independently reviewed (2026-09-03)
 
 Branch `claude/p1-roster-school-id-join-hardening`, off `main` at
@@ -538,6 +559,19 @@ own code. Revisit if it recurs with enough detail (which command, how
 long it ran, whether `run_in_background` or a manual `ScheduleWakeup`
 was used) to file upstream, or if it starts blocking a wave's
 verification step.
+
+**Re-checked 2026-09-06**: no new reproduction, no root-cause evidence
+found in this repository — there is nothing in `docs/`, ADRs, or
+`.claude/` to investigate further from inside the repo, because the
+mechanism in question (the scheduled-wakeup/timer delivery path) lives
+in the hosting platform, not in LIKHA's own source. This session used
+`run_in_background`-style waits for its own long-running commands
+(`npx playwright install`, the `ui-smoke.mjs` run) rather than a
+manually-scheduled timer, consistent with the recorded mitigation, and
+did not hit the failure mode described. Status unchanged: **open,
+unresolved, outside this repository's fix surface** — not stale, not
+resolved, nothing to correct. Continues to be tracked here only so a
+future session with a concrete reproduction has somewhere to record it.
 
 ## Section Adviser browser-rendered verification — partially closed (2026-08-31)
 
