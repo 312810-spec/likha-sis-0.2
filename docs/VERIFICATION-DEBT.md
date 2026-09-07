@@ -1,5 +1,33 @@
 # Verification Debt
 
+## First-ever native NVDA pass on the compiled Tauri binary (2026-09-07) — narrow but real
+
+Every prior "native NVDA/Narrator pass owed" entry in this file was
+written from a sandboxed environment with no way to run a screen reader
+at all. On the user's actual Windows laptop this session: installed
+NVDA (`NVAccess.NVDA`, free/open-source, zero-billing) via winget,
+pre-configured `nvda.conf` to auto-open the Speech Viewer transcript,
+and built + launched the real compiled `app.exe` (not the dev-preview
+web fixture) via `npm run tauri dev`'s native target. NVDA itself
+requires UAC elevation to run, which this automated shell cannot click
+through, so the live session was necessarily human-driven: the user
+launched NVDA and worked through a checklist covering main-nav
+announcement clarity, the Devices screen's "Remove device" confirmation
+panel (the first live test of this session's own focus-management fix
+— see the Device management screen entry), Sync Status/Conflict Review
+screen reachability and announcement sense, and Tab/Shift+Tab order
+through a form.
+
+**Result: reported as working correctly, no issues surfaced.** This is
+a real, human-verified pass, not automated axe-core — but it was a
+single brief walkthrough with a plain "everything works" report, not an
+exhaustive screen-by-screen audit with a saved Speech Viewer transcript.
+Treat this as meaningfully reducing (not fully retiring) the "no native
+screen-reader pass has ever been run" risk for the screens covered
+above. A more rigorous pass (saved transcripts, explicit per-screen
+sign-off, coverage of screens not in this checklist) remains valuable
+if a dedicated accessibility session is ever run.
+
 ## `npm run quality:ui` (Playwright/axe) CLOSED for real 2026-09-07 — browser binary now installable on the user's machine
 
 Every prior session recorded this as blocked ("no browser binary in
@@ -415,7 +443,7 @@ all OK). `npm run quality`/`quality:ui` (TS/UI layers) were not touched
 by this fix and were not re-run — this was a pure Rust repository/
 command-layer change.
 
-## Sync-status screen (2026-09-05) — whole-crate `cargo test` CLOSED 2026-09-07, independent review + native accessibility pass still owed
+## Sync-status screen (2026-09-05) — whole-crate `cargo test` CLOSED, narrow native NVDA pass done 2026-09-07, independent review still owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
 owed from this slice (`src/ui/SyncStatusScreen.tsx` +
@@ -429,10 +457,11 @@ layers):
    this project's documented fallback — see the handoff entry for
    exactly what was checked. No blocking issue was found, but a
    genuinely independent review of this diff remains owed.
-2. **Native NVDA/Narrator pass on the rendered Tauri binary not
-   performed.** This sandboxed environment has no browser/screenshot
-   tool for the compiled app. Automated axe-core results (structural
-   only) are not a substitute — see `.claude/rules/testing.md`.
+2. **Narrow pass done 2026-09-07** — see the "First-ever native NVDA
+   pass on the compiled Tauri binary" entry at the top of this file.
+   Covered this screen's reachability/announcement sense as part of a
+   brief human-driven checklist, reported working; not an exhaustive
+   dedicated audit with a saved transcript.
 3. **CLOSED 2026-09-07 — whole-crate `cargo test` run to completion, on
    the user's actual Windows machine (no shared-box disk-space
    constraint here).** First run showed 5 failures in
@@ -450,7 +479,7 @@ layers):
    recurs, consider a Windows Defender exclusion for
    `src-tauri/target/` before assuming a genuine regression.
 
-## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
+## Conflict-review screen (2026-09-05) — narrow native NVDA pass done 2026-09-07, independent review still owed, outbox limitation CLOSED
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
 owed from this slice (`src/ui/ConflictReviewScreen.tsx` + its supporting
@@ -465,16 +494,16 @@ Rust/TS layers):
    during self-review (a non-blocking `aria-disabled` button that could
    still be clicked). No other blocking issue was found, but a genuinely
    independent review of this diff remains owed.
-2. **Native NVDA/Narrator pass on the rendered Tauri binary not
-   performed.** This sandboxed environment has no browser/screenshot
-   tool for the compiled app. Automated axe-core results (structural
-   only) are not a substitute — see `.claude/rules/testing.md`.
+2. **Narrow pass done 2026-09-07** — see the "First-ever native NVDA
+   pass on the compiled Tauri binary" entry at the top of this file.
+   Reported working as part of a brief human-driven checklist; not an
+   exhaustive dedicated audit with a saved transcript.
 3. **CLOSED (2026-09-05).** "Keep local" leaving the stale outbox
    `base_version` uncorrected — see the "Stale outbox `base_version`
    after 'keep local'" entry at the top of this file for the fix and
    its verification.
 
-## Device management screen (2026-09-05) — focus-management gap CLOSED 2026-09-07, independent review + native accessibility pass still owed
+## Device management screen (2026-09-05) — focus-management gap CLOSED, narrow native NVDA pass done 2026-09-07, independent review still owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
 owed from this slice (`src/ui/DeviceManagementScreen.tsx` + its
@@ -488,10 +517,12 @@ supporting Rust/TS layers):
    generic failure message, `expectNoAccessibilityViolations` in both the
    closed and mid-confirmation states). No blocking issue was found, but
    a genuinely independent review of this diff remains owed.
-2. **Native NVDA/Narrator pass on the rendered Tauri binary not
-   performed.** This sandboxed environment has no browser/screenshot
-   tool for the compiled app. Automated axe-core results (structural
-   only) are not a substitute — see `.claude/rules/testing.md`.
+2. **Narrow pass done 2026-09-07, and specifically exercised the fix in
+   item 3 below** — see the "First-ever native NVDA pass on the compiled
+   Tauri binary" entry at the top of this file. The user opened this
+   exact confirmation panel with NVDA running immediately after the
+   focus-management fix shipped, and reported it working; not an
+   exhaustive dedicated audit with a saved transcript.
 3. **CLOSED 2026-09-07 — focus-management gap fixed without a shared
    dialog primitive.** `src/ui/DeviceManagementScreen.tsx`: the
    confirmation panel's `role="group"` container now takes `tabIndex={-1}`
