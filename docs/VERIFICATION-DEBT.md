@@ -1,5 +1,26 @@
 # Verification Debt
 
+## `npm run quality:ui` (Playwright/axe) CLOSED for real 2026-09-07 — browser binary now installable on the user's machine
+
+Every prior session recorded this as blocked ("no browser binary in
+this environment") — true for the sandboxed sessions that wrote this
+project's UI, but not a fundamental limitation, just an environment
+gap. On the user's actual Windows laptop: `npm run quality:ui` first
+failed with Playwright's own "Executable doesn't exist" error (expected
+— `npx playwright install` had never been run here); ran
+`npx playwright install chromium`, then re-ran the check. **Result:
+PASS** — "workflow, enrollment history, phone reflow, context handoff,
+and axe WCAG A/AA (0 non-blocking findings)."
+
+This closes the specific "`quality:ui` blocked, no browser binary"
+sub-item referenced in the Sync-status screen, Conflict-review screen,
+and Device management screen entries below, and in the "UI-redesign
+independent reviews" entry's accessibility-review note. It does **not**
+close the separately-tracked, genuinely distinct gap: a real native
+NVDA/Narrator pass on the compiled Tauri binary (WebView2), which
+automated axe-core structural checks were never a substitute for (see
+`.claude/rules/testing.md`) — that item stays open in each entry below.
+
 ## Reviewer-agent retrieval failure root-caused: not `SendMessage`, not config — a runtime turn-injection bug (2026-09-07)
 
 Investigated this project's long-recurring agent-resume/retrieval
@@ -394,7 +415,7 @@ all OK). `npm run quality`/`quality:ui` (TS/UI layers) were not touched
 by this fix and were not re-run — this was a pure Rust repository/
 command-layer change.
 
-## Sync-status screen (2026-09-05) — independent review, native accessibility pass, and a whole-crate `cargo test` re-run owed
+## Sync-status screen (2026-09-05) — whole-crate `cargo test` CLOSED 2026-09-07, independent review + native accessibility pass still owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
 owed from this slice (`src/ui/SyncStatusScreen.tsx` +
@@ -412,18 +433,22 @@ layers):
    performed.** This sandboxed environment has no browser/screenshot
    tool for the compiled app. Automated axe-core results (structural
    only) are not a substitute — see `.claude/rules/testing.md`.
-3. **Whole-crate `cargo test` did not run to completion this session.**
-   Multiple parallel worktree agents shared this box's filesystem and
-   repeatedly drove it to `No space left on device` mid-compile (`df -h
-/` observed at ~99–100% used more than once) — an environment-resource
-   condition, not a code defect. What DID run clean: every targeted new
-   test (`sync_outbox::`, `sync_pull_cursor::`, `commands::sync_status::`
-   — 10 tests, all passing), and `cargo clippy --all-targets -- -D
-warnings` across the whole workspace including every test target
-   (zero warnings) once brief headroom existed. Re-run plain `cargo
-test` once the shared box has stable free disk space, per
-   `.claude/rules/testing.md`'s own "still run plain `cargo test` at
-   least once" stable-checkpoint requirement.
+3. **CLOSED 2026-09-07 — whole-crate `cargo test` run to completion, on
+   the user's actual Windows machine (no shared-box disk-space
+   constraint here).** First run showed 5 failures in
+   `tests/section_advisory.rs` (`a_second_school_never_sees_the_first_schools_current_adviser`
+   and 4 others). Investigated rather than accepted at face value:
+   re-ran that binary alone with `--test-threads=1` — 9/9 passed. Ran
+   the full suite twice more (once default-parallel, once again) — both
+   fully clean, 0 failures anywhere, ~1024+ lib tests plus all
+   integration binaries each time. Concluded this was a one-off flake
+   under parallel execution (most likely Windows Defender real-time
+   scanning contending for file locks on freshly-built test binaries/
+   temp SQLite files on this newly-reset machine — a known source of
+   transient flakiness, not reproduced on any subsequent run) rather
+   than a real, reproducible defect. If this specific failure signature
+   recurs, consider a Windows Defender exclusion for
+   `src-tauri/target/` before assuming a genuine regression.
 
 ## Conflict-review screen (2026-09-05) — independent review, native accessibility pass, and a disclosed outbox re-conflict limitation owed
 
