@@ -225,13 +225,14 @@ replacing the standard 75–100 numerical scale used for Key Stages 2–4
 appears to be the same three-level descriptor scale, with matching
 abbreviations:
 
-| Code | Descriptor (English) | Described meaning |
-|------|----------------------|--------------------|
-| BG | Beginning | "The learner rarely demonstrates the expected competency and needs sustained guidance." |
-| DV | Developing | "The learner demonstrates the competency inconsistently and needs continued practice." (one source: "Demonstrates inconsistently; shows progress with practice") |
-| CO | Consistent | "The learner consistently demonstrates the expected competency and participates actively." (one source: "may exceed expectations") |
+| Code | Descriptor (English) | Described meaning                                                                                                                                                |
+| ---- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BG   | Beginning            | "The learner rarely demonstrates the expected competency and needs sustained guidance."                                                                          |
+| DV   | Developing           | "The learner demonstrates the competency inconsistently and needs continued practice." (one source: "Demonstrates inconsistently; shows progress with practice") |
+| CO   | Consistent           | "The learner consistently demonstrates the expected competency and participates actively." (one source: "may exceed expectations")                               |
 
 Sources for this table:
+
 - [tchersden.com — "The Grading System Under DepEd Order No. 015, s. 2026"](https://www.tchersden.com/2026/06/grading-system-deped-order-015-2026.html)
   (redirected from `tchersden.blogspot.com`) — gives the CO/DV/BG table
   with the descriptions quoted above, explicitly labeled a
@@ -242,8 +243,8 @@ Sources for this table:
   and [depedtambayanph.net](https://www.depedtambayanph.net/2026/06/deped-new-grading-system-2026-zero.html)
   gave a matching BG/DV/CO scheme with slightly different wording ("Beginning
   - Nagsisimula: Rarely demonstrate", "Developing - Umuusbong", "Consistent -
-  Palagiang Naipapakita"), including Filipino translations of the labels
-  ("Nagsisimula", "Umuusbong", "Palagiang Naipapakita").
+    Palagiang Naipapakita"), including Filipino translations of the labels
+    ("Nagsisimula", "Umuusbong", "Palagiang Naipapakita").
 
 A third phrasing found (also via WebSearch, less corroborated, possibly a
 different or paraphrased source) described the scale as "Advancing to
@@ -339,7 +340,7 @@ Per secondary sources (tsoktok.blogspot.com's explanation of the formula,
 and chedscholar.org's summary), the original DO 8 table:
 
 - Maps **raw/initial grades 60.00–100** onto **transmuted grades 75–100**
-  (i.e. raw 60 was the minimum *passing* raw score, transmuting to the
+  (i.e. raw 60 was the minimum _passing_ raw score, transmuting to the
   minimum passing report-card grade of 75).
 - Maps **raw/initial grades 0–59.99** (the failing range) onto **transmuted
   grades 60–74** — so even a raw score of 0 could not appear on a report
@@ -350,22 +351,22 @@ and chedscholar.org's summary), the original DO 8 table:
   rows like:
 
   | Initial Grade Range | Transmuted Grade |
-  |---|---|
-  | 100 | 100 |
-  | 98.40–99.99 | 99 |
-  | 96.80–98.39 | 98 |
-  | 95.20–96.79 | 97 |
-  | 93.60–95.19 | 96 |
-  | ... | ... |
-  | 60.00–61.59 | 75 |
+  | ------------------- | ---------------- |
+  | 100                 | 100              |
+  | 98.40–99.99         | 99               |
+  | 96.80–98.39         | 98               |
+  | 95.20–96.79         | 97               |
+  | 93.60–95.19         | 96               |
+  | ...                 | ...              |
+  | 60.00–61.59         | 75               |
 
 - The formula for the failing band divides the 0–59.99 raw range into 15
   units of ~4.0 points each (`(59.99-0)/15 ≈ 3.999`), producing the bottom
   of the table down to:
 
   | Initial Grade Range | Transmuted Grade |
-  |---|---|
-  | 0.00–3.99 | 60 |
+  | ------------------- | ---------------- |
+  | 0.00–3.99           | 60               |
 
 - A commonly-cited spreadsheet-formula equivalent given by a secondary
   source: `=FLOOR(IF(A1<60, 60+(A1/4), 75+(A1-60)/1.6), 1)`.
@@ -384,29 +385,29 @@ environment.
 A secondary source (depedtambayanph.net) reproduced what it presents as
 the **complete** SY 2026-2027 adjusted table:
 
-| Initial Grade | Transmuted | | Initial Grade | Transmuted |
-|---|---|---|---|---|
-| 99.50–100.00 | 100 | | 74.72–75.89 | 79 |
-| 98.32–99.49 | 99 | | 73.54–74.71 | 78 |
-| 97.14–98.31 | 98 | | 72.36–73.53 | 77 |
-| 95.96–97.13 | 97 | | 71.18–72.35 | 76 |
-| 94.78–95.95 | 96 | | 70.00–71.17 | 75 |
-| 93.60–94.77 | 95 | | 65.34–69.99 | 74 |
-| 92.42–93.59 | 94 | | 60.67–65.33 | 73 |
-| 91.24–92.41 | 93 | | 56.01–60.66 | 72 |
-| 90.06–91.23 | 92 | | 51.34–56.00 | 71 |
-| 88.88–90.05 | 91 | | 46.67–51.33 | 70 |
-| 87.70–88.87 | 90 | | 42.01–46.66 | 69 |
-| 86.52–87.69 | 89 | | 37.34–42.00 | 68 |
-| 85.34–86.51 | 88 | | 32.68–37.33 | 67 |
-| 84.16–85.33 | 87 | | 28.01–32.67 | 66 |
-| 82.98–84.15 | 86 | | 23.35–28.00 | 65 |
-| 81.80–82.97 | 85 | | 18.68–23.34 | 64 |
-| 80.62–81.79 | 84 | | 14.01–18.67 | 63 |
-| 79.44–80.61 | 83 | | 9.35–14.00 | 62 |
-| 78.26–79.43 | 82 | | 4.68–9.34 | 61 |
-| 77.08–78.25 | 81 | | 0.00–4.67 | 60 |
-| 75.90–77.07 | 80 | | | |
+| Initial Grade | Transmuted |     | Initial Grade | Transmuted |
+| ------------- | ---------- | --- | ------------- | ---------- |
+| 99.50–100.00  | 100        |     | 74.72–75.89   | 79         |
+| 98.32–99.49   | 99         |     | 73.54–74.71   | 78         |
+| 97.14–98.31   | 98         |     | 72.36–73.53   | 77         |
+| 95.96–97.13   | 97         |     | 71.18–72.35   | 76         |
+| 94.78–95.95   | 96         |     | 70.00–71.17   | 75         |
+| 93.60–94.77   | 95         |     | 65.34–69.99   | 74         |
+| 92.42–93.59   | 94         |     | 60.67–65.33   | 73         |
+| 91.24–92.41   | 93         |     | 56.01–60.66   | 72         |
+| 90.06–91.23   | 92         |     | 51.34–56.00   | 71         |
+| 88.88–90.05   | 91         |     | 46.67–51.33   | 70         |
+| 87.70–88.87   | 90         |     | 42.01–46.66   | 69         |
+| 86.52–87.69   | 89         |     | 37.34–42.00   | 68         |
+| 85.34–86.51   | 88         |     | 32.68–37.33   | 67         |
+| 84.16–85.33   | 87         |     | 28.01–32.67   | 66         |
+| 82.98–84.15   | 86         |     | 23.35–28.00   | 65         |
+| 81.80–82.97   | 85         |     | 18.68–23.34   | 64         |
+| 80.62–81.79   | 84         |     | 14.01–18.67   | 63         |
+| 79.44–80.61   | 83         |     | 9.35–14.00    | 62         |
+| 78.26–79.43   | 82         |     | 4.68–9.34     | 61         |
+| 77.08–78.25   | 81         |     | 0.00–4.67     | 60         |
+| 75.90–77.07   | 80         |     |               |            |
 
 Source: [depedtambayanph.net — "DepEd Order No. 015, s. 2026: Revised Grading System Guidelines & Electronic Class Record Download"](https://www.depedtambayanph.net/2026/06/deped-order-no-015-s-2026-revised.html)
 
@@ -424,13 +425,13 @@ The core, well-corroborated (2+ independent secondary sources) difference:
   passing grade of **75**. The passing band spans raw 60–100 → transmuted
   75–100 (40-point transmuted range compressed from a 40-point raw range —
   actually a 1:1-ish slope in that band, ~1.6 raw points per row above but
-  the compression is between the *failing* band, not passing). Below raw
+  the compression is between the _failing_ band, not passing). Below raw
   60, the transmuted grade compresses raw 0–59.99 into transmuted 60–74.
 
 - **DO 015 s.2026 (adjusted table)**: raw/initial grade **70.00** now
   transmutes to the minimum passing grade of **75** — i.e. the passing
   threshold on the raw scale was **raised from 60 to 70**. The failing
-  band now compresses a *wider* raw range (0–69.99, not 0–59.99) into the
+  band now compresses a _wider_ raw range (0–69.99, not 0–59.99) into the
   same transmuted 60–74 range. Concretely: under DO 015, a raw/initial
   grade in the high-60s (e.g. 65–69.99) — which under DO 8 would have
   transmuted to a **passing** grade around 79-83 — now transmutes to a
@@ -533,11 +534,11 @@ the scanned-PDF/no-OCR-tool limitation described in Section 0.
 
 ## Summary of confidence levels
 
-| Question | Confidence | Primary source reached? |
-|---|---|---|
-| Q1: MATATAG learning-area changes | **High** — primary DepEd page (Revised K to 10 Curriculum) directly fetched and used as the main source; corroborated by several secondary sources on specific structural changes (MAPEH split, Mother Tongue removal for G2-3, Makabansa). Pre-MATATAG "before" list is secondary-source only. | Yes, for the MATATAG side (`deped.gov.ph/k-to-12/revised-k-to-10-curriculum/`). No, for the pre-MATATAG "before" side. |
-| Q2: KS1 descriptive grading | **Medium** — the policy's existence, exact order number, title, and date are primary-source-confirmed (DepEd issuance page). The exact descriptor bands (BG/DV/CO) and phase-in schedule are secondary-source only, though corroborated by 2+ independent sources with matching Filipino terms. One conflicting secondary-source phrasing ("Advancing/Emerging") is unresolved. | Page yes; PDF no (unreadable scan). |
-| Q3: DO 8 vs DO 015 transmutation tables | **Medium** — both orders' existence, titles, dates, and the repeal relationship are primary-source-confirmed via DepEd issuance pages. The exact table values, the Grade 12/Paragraph 49 hybrid rule, and the Annex D reference are secondary-source only, though the Paragraph 49 wording is corroborated near-verbatim across 2 independently-written sources. | Pages yes; PDFs no (unreadable scans). |
+| Question                                | Confidence                                                                                                                                                                                                                                                                                                                                                                      | Primary source reached?                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Q1: MATATAG learning-area changes       | **High** — primary DepEd page (Revised K to 10 Curriculum) directly fetched and used as the main source; corroborated by several secondary sources on specific structural changes (MAPEH split, Mother Tongue removal for G2-3, Makabansa). Pre-MATATAG "before" list is secondary-source only.                                                                                 | Yes, for the MATATAG side (`deped.gov.ph/k-to-12/revised-k-to-10-curriculum/`). No, for the pre-MATATAG "before" side. |
+| Q2: KS1 descriptive grading             | **Medium** — the policy's existence, exact order number, title, and date are primary-source-confirmed (DepEd issuance page). The exact descriptor bands (BG/DV/CO) and phase-in schedule are secondary-source only, though corroborated by 2+ independent sources with matching Filipino terms. One conflicting secondary-source phrasing ("Advancing/Emerging") is unresolved. | Page yes; PDF no (unreadable scan).                                                                                    |
+| Q3: DO 8 vs DO 015 transmutation tables | **Medium** — both orders' existence, titles, dates, and the repeal relationship are primary-source-confirmed via DepEd issuance pages. The exact table values, the Grade 12/Paragraph 49 hybrid rule, and the Annex D reference are secondary-source only, though the Paragraph 49 wording is corroborated near-verbatim across 2 independently-written sources.                | Pages yes; PDFs no (unreadable scans).                                                                                 |
 
 ## Recommended follow-up if higher confidence is needed later
 

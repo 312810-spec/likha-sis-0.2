@@ -381,7 +381,7 @@ quality` 1099/1099. Source: this session's implementation,
     if a future session finds the real primary-source structure. Source:
     `docs/CURRENT-HANDOFF.md`'s lesson-plan-builder entry (2026-09-06).
 
-36. **NEW 2026-09-07 (legacy cross-reference, not yet implemented) —
+21. **NEW 2026-09-07 (legacy cross-reference, not yet implemented) —
     Formative Assessment (ESRU) isolated logging.** Confirmed via direct
     inspection of the actual legacy predecessor codebase
     (`E:\TNHS LIKHA-SIS\tnhs-likha-sis`, made available this session for

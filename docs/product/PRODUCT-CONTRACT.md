@@ -428,6 +428,7 @@ Full detail: `docs/product/2026-09-07-unbuilt-features-audit.md`'s
 Audited against `E:\likha-sis-master` per user direction. Note: `SF1 Fit Scaling` was explicitly excluded by user direction.
 
 ### A. UI Architecture, Layout Arrangement & Aesthetic Specification
+
 1. **Persistent Two-Tier Layout Shell (`DashboardShell.jsx`)**:
    - **Sidebar**: Fixed width (`w-64` expanded, collapsible to `w-20` icon-only drawer with zero-dependency CSS tooltips). School brand background (`bg-primary`). Grouped navigation under uppercase Ledger Gold labels (`text-accent-light`, `text-[11px] font-semibold tracking-wider`). Leading edge accent indicator bar (`1px` accent border + `bg-white/15`) for active nav.
    - **Sticky Translucent Header**: `backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-700`. Contains:
@@ -440,9 +441,9 @@ Audited against `E:\likha-sis-master` per user direction. Note: `SF1 Fit Scaling
    - **Tabular / Monospace Font**: [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) (`font-tabular`) for numeric clocks, dates, and column-aligned grades.
 3. **Dynamic Brand Palette & Theme Engine (`colorTheory.js`, `extractTheme.js`)**:
    - **ColorThief Logo Palette Extractor**: Automatically reads uploaded school logos, eliminates near-black/near-white noise, and computes WCAG AA compliant palette candidates:
-     - *Dominant*: Prominent brand colors.
-     - *Vibrant*: Highest saturation accent ink.
-     - *Alternate*: Re-ordered roles for versatile branding.
+     - _Dominant_: Prominent brand colors.
+     - _Vibrant_: Highest saturation accent ink.
+     - _Alternate_: Re-ordered roles for versatile branding.
    - **Dual Light/Dark Derivation**: Computes companion dark-surface variables (`--dm-*`) and legible text ink (`buildTextOnRoles`) dynamically from light logo colors.
 4. **Elevation & Card Depth System**:
    - Surfaces: Flat paper ground with 1px border (`border-gray-200 dark:border-gray-700`).
@@ -450,6 +451,7 @@ Audited against `E:\likha-sis-master` per user direction. Note: `SF1 Fit Scaling
    - Standard Radii: Uniform `8px` (`rounded-lg`) for inputs, buttons, and menus; `12px` (`rounded-xl`) for cards and containers; `rounded-full` for avatars and pill toggles.
 
 ### B. Functional Features from `likha-sis-master` (To Add to 0.2)
+
 1. **Interactive Class Program & Timetable Generator (`ClassProgramGenerator.jsx`)**:
    - Visual drag-and-drop / click-to-arm section timetable builder.
    - Real-time teacher double-booking, room overlap, and subject minute conflict detection (`scheduleConflicts.js`).
@@ -476,5 +478,3 @@ Audited against `E:\likha-sis-master` per user direction. Note: `SF1 Fit Scaling
    - Formal tracking log for incoming and outgoing student transfers, originating/destination schools, and document statuses.
 9. **Consolidated Grades Matrix (`ConsolidatedGrades.jsx`)**:
    - Cross-subject grade registry displaying all learning areas side-by-side per section across all terms.
-
-
