@@ -572,24 +572,23 @@ entry has full detail):
    enrolling — `school_id` cannot be used to join a school the
    authenticating user isn't actually a member of.
 
-## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
+## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — CLOSED 2026-09-07, independent review obtained, see BLOCKING finding below
 
-Owed from this slice (ADR-0069's newest addendum,
-`docs/CURRENT-HANDOFF.md`'s matching entry has full detail): no
-`security-reviewer` subagent was reachable in this session's toolset
-(same gap as the two prior ADR-0069 addenda). A rigorous self-review was
-performed instead per this project's documented reviewer-failure
-fallback, covering the new `GET /sync/payload-key-wrap` endpoint's
-credential-scoping, the fail-closed behavior on a missing wrap row or a
-rejected decrypted payload, and the `school_id` cross-check in
-`sync_client::apply_decrypted_change`. No blocking issue was found, but a
-genuinely independent review of this change (`hub_server`'s new
-endpoint, `repository::sync_payload_key::get_wrap_for_credential`,
-`sync_client::resolve_sspk`/`apply_decrypted_change`,
-`repository::learner::upsert_from_sync`) remains owed. Retry when a
-reviewer harness/subagent is confirmed healthy.
+**Genuinely independent review obtained 2026-09-07** — worked around the
+`SendMessage`/agent-retrieval bug by dispatching a `general-purpose`
+agent (which has `Write` access, unlike `security-reviewer`) with
+instructions to save its findings to
+`docs/reviews/2026-09-07-sync-payload-encryption-review.md` on disk
+instead of relying on its chat response. This is a real fix, not a
+workaround-in-name-only: the file exists and contains a substantive,
+independently-verified review that found **one BLOCKING issue two prior
+self-reviews both missed** — see the "Payload-key rotation on device
+revocation" entry immediately below for the finding itself, since it
+actually concerns that slice's rotation code, not this slice's
+encrypt/decrypt round trip in isolation (which the review found no
+issue with). Full report: `docs/reviews/2026-09-07-sync-payload-encryption-review.md`.
 
-## Payload-key rotation on device revocation (2026-09-05) — 2 of 3 owed items closed 2026-09-07, independent review still owed
+## Payload-key rotation on device revocation (2026-09-05) — BLOCKING finding 2026-09-07, fix required before this can close
 
 Three items were originally owed from this slice (ADR-0069's rotation
 addendum, `docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
@@ -603,8 +602,48 @@ addendum, `docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
 ensure_wrapped_for_credential, refresh_wrap_for_credential}`,
    `auth::revoke_device_sync_credential[_and_rotate_sspk]`, and
    `hub_server::authenticate`'s lazy-rewrap call site — no BLOCKING issue
-   found, but a genuinely independent review remains owed. Retry when a
-   reviewer harness/subagent is confirmed healthy.
+   found by self-review.
+
+   **Genuinely independent review obtained 2026-09-07 — found what two
+   self-reviews missed.** Full report:
+   `docs/reviews/2026-09-07-sync-payload-encryption-review.md`. **BLOCKING**:
+   `hub_server::HubServerState.sspk` is a plain, immutable
+   `[u8; PAYLOAD_KEY_LEN]` resolved exactly once at app startup
+   (`maybe_spawn_listener`, one call site, `lib.rs:54`) and baked into
+   every request handler via the cloned `HubServerState` — confirmed
+   directly by reading `hub_server.rs`'s `HubServerState`/`spawn`/
+   `spawn_all`/`maybe_spawn_listener` and grepping for `HubServerState`'s
+   absence from `app.manage(...)` in `lib.rs`. `db::rotate_sspk` correctly
+   overwrites the on-disk DPAPI file and `sync_payload_key::rotate_for_school`
+   correctly clears DB-side wraps, but **nothing re-reads the rotated key
+   into the already-running hub process** — every still-active device's
+   next `ensure_wrapped_for_credential` self-heals its wrap against
+   `state.sspk`, which is still the OLD key, so every device (including
+   the revoked one, which already had the old key cached) keeps
+   encrypting/decrypting under it for the rest of that process's
+   lifetime. This directly contradicts ADR-0069's stated guarantee that
+   "nothing encrypted under the new SSPK is ever reachable by a revoked
+   device" — in practice there effectively is no "after rotation" until
+   the app restarts. Not caught by existing tests because none of them
+   construct the real startup → long-running-process → later-revocation
+   sequence; unit-level rotation/self-healing logic is independently
+   verified correct, the gap is purely the missing live-refresh wiring.
+   **Fix required before this debt item can be marked resolved** — see
+   this session's fix below, or `docs/VERIFICATION-DEBT.md`'s next entry
+   if the fix hasn't landed yet when you're reading this.
+
+   A second, lower-severity SHOULD-FIX was also found: SSPK is minted/
+   rotated per-_installation_ (`db::load_or_mint_sspk`/`rotate_sspk` take
+   no `school_id`), not per-_school_ as ADR-0069 specifies — a single hub
+   serving multiple schools would encrypt all of them under the same key,
+   with cross-school isolation resting entirely on `pull_since`'s
+   query-level `WHERE school_id = ?1` filter rather than on cryptographic
+   separation. Not currently exploitable (no shipped code path mixes
+   ciphertext across schools, and single-school-per-hub is the plausible
+   real deployment shape), but a real design/implementation gap worth
+   fixing or explicitly superseding in ADR-0069 — not fixed this session,
+   recorded as its own follow-up.
+
 2. **CLOSED 2026-09-07 — `db::rotate_sspk` exists** (`src-tauri/src/db/mod.rs`,
    `#[cfg(windows)]`-gated, `#[cfg(not(windows))]` fails closed). Confirmed
    wired into the revocation path: `commands::device_sync`'s
