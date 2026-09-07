@@ -1,5 +1,53 @@
 # Verification Debt
 
+## Reviewer-agent retrieval failure root-caused: not `SendMessage`, not config — a runtime turn-injection bug (2026-09-07)
+
+Investigated this project's long-recurring agent-resume/retrieval
+failure (documented since M7) to see if it was fixable, since the user
+asked directly. Ruled out two hypotheses with direct evidence before
+concluding it is not fixable from inside this repository:
+
+1. **Not a background/resume artifact.** Every prior occurrence
+   dispatched the reviewer with `run_in_background: true` (the tool's
+   default) and then lost the findings trying to resume it via
+   `SendMessage` — sometimes because `SendMessage` itself was entirely
+   unavailable in the session's toolset (see the two entries above this
+   one, same day). Re-tested with `run_in_background: false` (foreground,
+   which returns the agent's complete final response directly, no
+   resume/`SendMessage` step at all) — the failure reproduced anyway, so
+   background dispatch was never the actual cause.
+2. **Not the agent's own tool choice.** Hypothesized the agent was
+   filing findings via `ReportFindings` (a structured UI-only channel
+   this orchestrating session can't read back) and then treating a
+   follow-up as a duplicate request. Re-tested with an explicit
+   instruction forbidding `ReportFindings` and requiring the full
+   findings as plain-text prose in the final response — the failure
+   reproduced identically.
+3. **Actual observed mechanism**: in both foreground retries, the
+   dispatched `security-reviewer` did real work on its first turn
+   (12-15 tool uses, ~120K tokens), then its final returned response was
+   not that work's findings at all — it was the agent pushing back on
+   "repeated identical system reminders" / "several turns [with] only a
+   repeated automated reminder," as if it had been re-invoked multiple
+   times with empty heartbeat turns after doing the real work, and only
+   its last (annoyed, contentless) turn was returned as the call's
+   result. This is a property of this session's/environment's
+   agent-orchestration runtime, not of `.claude/` project configuration,
+   the reviewer agent's own definition, or the dispatch prompt — nothing
+   in this repository controls it, and per this project's harness-freeze
+   rule (`docs/adr/0052`) a repo-level "fix" was never the right target
+   anyway once this was confirmed.
+
+**Conclusion**: this is a Claude Code product/runtime bug, out of this
+project's control to fix. **Do not re-attempt fixing it from inside this
+repository** — there is nothing here to change. Keep using this
+project's already-documented fallback (rigorous self-review, findings
+recorded honestly, debt retained) as the default, and periodically retry
+a real dispatch in a future session in case the underlying runtime
+behavior has changed — but do not spend a session's budget re-diagnosing
+this same root cause again if it recurs; this entry already establishes
+it is not fixable from here.
+
 ## Sync payload encryption/key-rotation: security-reviewer agent-resume/retrieval failure recurred, self-review substituted (2026-09-07)
 
 Dispatched an independent `security-reviewer` agent against the two
