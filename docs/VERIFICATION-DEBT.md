@@ -39,40 +39,41 @@ reviewer-failure fallback:
   `DependentRecordConflict`) enqueues nothing, covered by three
   dedicated "a rejected write never enqueues" tests (one per verb).
 
-**Known, deliberate trade-offs (not defects, but real limitations)**,
-recorded rather than silently accepted:
+**Both trade-offs below were closed in a later same-branch session
+(2026-09-07):**
 
-1. **Enqueue not atomic with the domain write.** Unlike
-   `Attendance`/`LearnerScore`/`Section` (one `SAVEPOINT` wraps both the
-   domain write and the outbox enqueue), the three
-   `SectionMembership` verbs each own an internal
-   `Connection::transaction()` for their own multi-step eligibility
-   checks, and rusqlite transactions do not nest inside an outer
-   `SAVEPOINT`. The enqueue call happens immediately after that
-   transaction has already committed, as a following step. A crash in
-   the narrow window between the domain commit and the enqueue commit
-   can leave a domain write that succeeded locally without a
-   corresponding outbox row — the change stays correct locally but does
-   not reach the hub until some other trigger re-syncs it (there isn't
-   one yet; this is genuinely a gap, not merely a delay). It can never
-   invert the failure mode (no enqueue for a write that didn't happen,
-   no wrong `base_version`). A future slice could close this by
-   converting `end_membership`/`transfer_membership`/`enroll_membership`
-   to the SAVEPOINT-based style `section_membership::enroll` already
-   uses (so an outer `SAVEPOINT` from the command layer could wrap both
-   steps), but that is a real refactor of the domain transaction
-   plumbing, out of scope for this slice.
-2. **Two of `SectionMembership`'s five write paths remain unwired.**
-   `section_membership::enroll` (the bulk create-and-place primitive
-   behind `enroll_learner_in_section`, used by CSV import via
-   `import::commit`) and `correct_same_day_placement` (the one-time
-   same-day data-entry fix) are not wired to sync at all — a
-   bulk-imported enrollment or a same-day correction stays purely local
-   on the device that made it until a future slice wires them. This
-   matches the existing precedent of bulk/import paths staying unwired
-   for other entities, but is recorded explicitly here since
-   `SectionMembership` uniquely has five distinct write paths where
-   every other entity has one or two.
+1. ~~**Enqueue not atomic with the domain write.**~~ **FIXED.**
+   `end_membership`/`transfer_membership`/`enroll_membership`/
+   `correct_same_day_placement` were converted to the SAVEPOINT-based
+   style `section_membership::enroll` already used (SQLite nests
+   savepoints natively; rusqlite's `Connection::transaction()` does
+   not). Each `*_with_optional_sync` command wrapper now opens one
+   outer `SAVEPOINT` around both the domain write and its sync-outbox
+   enqueue(s), so a crash between them can no longer leave a domain
+   write with no corresponding outbox row. Verified: `cargo test --lib`
+   (1016 passed), `cargo test --test enrollment_concurrency` (5 passed,
+   including the two-connection race tests unaffected by the SAVEPOINT
+   change), `cargo clippy --all-targets -- -D warnings` (clean).
+2. ~~**Two of `SectionMembership`'s five write paths remain
+   unwired.**~~ **PARTIALLY FIXED.** `enroll_learner_in_section` (the
+   command wrapping the bulk `enroll` primitive) and
+   `correct_same_day_placement` are now wired to sync, using the same
+   pattern as the other three verbs. **Still unwired**: the CSV
+   bulk-import path (`import::commit`, which calls this same
+   `section_membership::enroll` primitive) — threading a device's
+   sync-payload key through a batch import pipeline (potentially many
+   rows per call) is a separate, larger increment with its own
+   performance/atomicity design questions, not folded into this fix.
+   `SectionMembership` therefore still has one of its five write paths
+   unwired (down from two).
+
+**Independent security review of the SectionMembership/Subject/
+AssessmentItem/LearnerScore sync-wiring self-reviews above, plus the
+three sync-management UI screens and the repo-wide tenant-isolation
+JOIN audit, remains owed** — see the entries below for each. A fresh
+review pass of this session's SAVEPOINT-atomicity refactor and the two
+newly-wired write paths is also owed, for the same reason (no
+subagent-dispatch tool reliably reachable this session).
 
 ## Subject sync wiring (2026-09-06) — independent security review owed
 
