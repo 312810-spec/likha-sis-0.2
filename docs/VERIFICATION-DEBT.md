@@ -53,6 +53,29 @@ dispatch once `SendMessage`/agent-resume is confirmed reliably working
 in a future session — do not keep re-dispatching into the same known gap
 without first confirming `SendMessage` is actually loadable.
 
+## Cross-cutting reconfirmation: SectionMembership/Subject/AssessmentItem/LearnerScore sync wiring (2026-09-07)
+
+A second self-review (not the owed independent pass — `SendMessage`
+still unavailable this session, see the entry above) directly re-read
+every `sync_client::apply_decrypted_change` `EntityKind` arm
+side-by-side (`Learner`, `Attendance`, `Section`, `LearnerScore`,
+`AssessmentItem`, `Subject`, `SectionMembership`): all seven follow the
+byte-identical fail-closed shape with zero exceptions — a deserialize
+failure or an `incoming.school_id != school_id` mismatch both return
+`Err(())` before any repository write, for every entity, not just the
+ones already reviewed. Also directly confirmed
+`commands::{section,subject,assessment_item,learner_score}`'s enqueue-
+capable commands (`enroll_learner_membership`/
+`transfer_learner_membership`/`end_learner_membership`,
+`create_subject`, `record_learner_score`) all derive `school_id`/actor
+only from `sessions.require_active_session`/`authorize_capability_with_actor`
+— never a client-supplied parameter — matching this project's
+established session-derived-scope convention exactly. No new BLOCKING
+or SHOULD-FIX finding. The four entries immediately below remain open
+for a genuinely independent review; this reconfirmation narrows the
+risk that any one of them silently diverged from the others' pattern,
+it does not close the debt itself.
+
 ## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
 
 `commands::section`'s three new `*_with_optional_sync` wrappers
@@ -407,7 +430,7 @@ supporting Rust/TS layers):
    gains a shared dialog component, or sooner if the native accessibility
    pass above flags it as a real problem in practice.
 
-## Device sync enrollment/revocation Tauri commands (2026-09-05) — independent review + TS quality gate owed
+## Device sync enrollment/revocation Tauri commands (2026-09-05) — TS quality gate CLOSED 2026-09-07, independent review still owed
 
 Two items owed from this slice (`docs/CURRENT-HANDOFF.md`'s matching
 entry has full detail):
@@ -433,12 +456,16 @@ entry has full detail):
    underlying `auth::*` function directly. No blocking issue was found,
    but a genuinely independent review of this diff remains owed. Retry
    when a reviewer harness/subagent is confirmed healthy.
-2. **`npm run quality` (TS typecheck/lint/format/architecture/knip/vitest)
-   could not be run this session.** `node_modules` was empty (0
-   packages) in this environment — unrelated to this change, which
-   touched only `src-tauri/**` and `docs/**`, no TypeScript. Run it
-   before the next TS-touching slice ships, and ideally once here too
-   once `npm install` is available, to confirm no incidental drift.
+2. **CLOSED 2026-09-07 — `npm run quality` run for real**, on the
+   user's actual Windows machine after `npm install`: typecheck / eslint
+   / prettier / architecture / knip / vitest all green, **1098/1098**
+   tests passed. No incidental drift from this or any subsequent slice
+   found. Also independently confirmed this session (self-review, not
+   the owed independent pass): `enroll_device_sync_credential` verifies
+   real credentials via `user_repo::verify_credentials` (account-lockout
+   aware) and re-checks `is_member_of_school` server-side before
+   enrolling — `school_id` cannot be used to join a school the
+   authenticating user isn't actually a member of.
 
 ## Sync payload encrypt/decrypt round trip, learner entity (2026-09-05) — independent review owed
 
@@ -457,33 +484,44 @@ endpoint, `repository::sync_payload_key::get_wrap_for_credential`,
 `repository::learner::upsert_from_sync`) remains owed. Retry when a
 reviewer harness/subagent is confirmed healthy.
 
-## Payload-key rotation on device revocation (2026-09-05) — independent review + native DPAPI verification owed
+## Payload-key rotation on device revocation (2026-09-05) — 2 of 3 owed items closed 2026-09-07, independent review still owed
 
-Three items owed from this slice (ADR-0069's rotation addendum,
-`docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
+Three items were originally owed from this slice (ADR-0069's rotation
+addendum, `docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
 
-1. **Independent security review not obtained.** No `security-reviewer`
-   subagent tool was available in this session's toolset, and the
-   project's `security-review` skill could not run (its scripted `git
-diff origin/HEAD...` precondition fails in this sandbox — the ref does
-   not resolve here). A rigorous self-review was performed instead per
-   this project's documented fallback, but a genuinely independent review
-   of `repository::sync_payload_key::{rotate_for_school,
-ensure_wrapped_for_credential}`, `auth::revoke_device_sync_credential`'s
-   new rotation call, and `hub_server::authenticate`'s new lazy-rewrap
-   call site remains owed. Retry when a reviewer harness/subagent is
-   confirmed healthy.
-2. **`db::rotate_sspk` does not exist yet** — see this same gap recorded
-   in `docs/CURRENT-HANDOFF.md`'s "Exact next task". Until it exists and
-   is wired into the revocation path, a live revocation clears the
-   database-side wraps (real, tested) but does not yet produce a genuinely
-   new plaintext SSPK for devices to re-wrap against.
-3. **Native Windows DPAPI verification**, once `db::rotate_sspk` exists:
-   this sandboxed Linux environment cannot exercise `DpapiKeyStore` at
-   all (same pre-existing limitation `load_or_mint_sspk` itself already
-   carries — see that function's own doc comment) — a real overwrite/
-   reload round trip of `SSPK_KEY_FILE_NAME` on Windows has never been
-   demonstrated and cannot be demonstrated here.
+1. **Independent security review — still not obtained.** No
+   `security-reviewer` subagent was reachable this session either (see
+   the "Sync payload encryption/key-rotation" entry above — `SendMessage`
+   itself was unavailable, not merely a terse resume). A rigorous
+   self-review was performed instead, covering
+   `repository::sync_payload_key::{rotate_for_school,
+ensure_wrapped_for_credential, refresh_wrap_for_credential}`,
+   `auth::revoke_device_sync_credential[_and_rotate_sspk]`, and
+   `hub_server::authenticate`'s lazy-rewrap call site — no BLOCKING issue
+   found, but a genuinely independent review remains owed. Retry when a
+   reviewer harness/subagent is confirmed healthy.
+2. **CLOSED 2026-09-07 — `db::rotate_sspk` exists** (`src-tauri/src/db/mod.rs`,
+   `#[cfg(windows)]`-gated, `#[cfg(not(windows))]` fails closed). Confirmed
+   wired into the revocation path: `commands::device_sync`'s
+   `revoke_device_sync_credential` command calls
+   `auth::revoke_device_sync_credential_and_rotate_sspk(..., || db::rotate_sspk(&app).map(|_| ()))`
+   exclusively — the raw non-rotating `auth::revoke_device_sync_credential`
+   is never called from the command surface, per that function's own doc
+   comment warning against doing so. A live revocation now produces a
+   genuinely new plaintext SSPK, not just cleared DB-side wraps.
+3. **CLOSED 2026-09-07 — native Windows DPAPI verification, run for
+   real.** `cargo test --lib crypto::dpapi` executed directly on the
+   user's actual Windows laptop (not a sandboxed Linux environment,
+   which structurally cannot exercise `DpapiKeyStore` at all) — all 8
+   tests passed against real `CryptProtectData`/`CryptUnprotectData`:
+   `rotate_key_replaces_an_existing_key_with_a_genuinely_different_one`,
+   `rotate_key_never_leaves_a_temp_file_behind`,
+   `rotate_key_produces_a_file_that_still_round_trips_through_unprotect`,
+   `rotate_key_succeeds_even_when_no_key_file_exists_yet`,
+   `load_or_create_key_fails_closed_on_corrupted_key_file`,
+   `unprotect_rejects_tampered_data`, plus the two baseline round-trip/
+   persistence tests. This is the first time this exact verification has
+   ever been possible for this project.
 
 ## Client-side sync loop dependency addition (2026-09-05) — security scan tools missing this session — CLOSED same session
 
