@@ -1,5 +1,58 @@
 # Verification Debt
 
+## Sync payload encryption/key-rotation: security-reviewer agent-resume/retrieval failure recurred, self-review substituted (2026-09-07)
+
+Dispatched an independent `security-reviewer` agent against the two
+oldest open "independent security review owed" entries below ("Sync
+payload encrypt/decrypt round trip, learner entity" and "Payload-key
+rotation on device revocation"), now that a subagent-dispatch tool was
+actually available in this session's toolset (a gap every prior session
+touching this code lacked). The agent completed real work (41 tool
+uses, ~424s, ~147K tokens) but its findings text could not be retrieved
+afterward: `SendMessage` was not loadable in this session at all (not a
+transient failure — `ToolSearch` returned no match both before and
+after the agent finished), so the established fallback of asking a
+resumed agent to restate its findings in plain text was not available
+either. This is the same recurring agent-resume/retrieval failure
+documented since M7, now confirmed to also occur when `SendMessage`
+itself is entirely absent from a session's toolset, not just when a
+resumed agent responds tersely.
+
+**Self-review substituted, per this project's documented fallback**:
+read `hub_server::payload_key_wrap_handler`/`authenticate`,
+`repository::sync_payload_key::{get_wrap_for_credential,
+ensure_wrapped_for_credential, refresh_wrap_for_credential,
+rotate_for_school}`, and `sync_client::{resolve_sspk,
+apply_decrypted_change}` directly.
+
+- `get_wrap_for_credential` takes only `credential_id`, no `school_id`
+  check — but it is only ever called with `verified.credential_id`,
+  which `authenticate` derives strictly from the caller proving it holds
+  the credential's own secret (`device_credential::verify`), never from
+  a client-supplied lookup value. No cross-school/cross-device leak
+  found.
+- `apply_decrypted_change` fails closed twice per entity, for every
+  `EntityKind` arm: a decrypt failure and an `incoming.school_id !=
+school_id` mismatch both return `Err(())` before any repository write.
+- `ensure_wrapped_for_credential`'s self-healing check compares the
+  wrap's actual decrypted content against the `sspk` the current call
+  was given, not merely whether a wrap row exists — correctly closing
+  the DB/DPAPI-file non-atomic-commit race its own doc comment
+  describes, confirmed by reading the comparison logic directly rather
+  than trusting the comment.
+- `payload_key_wrap_handler` returns `ApiError::Internal` (not a
+  silent empty/default payload) if no wrap row exists after
+  `authenticate` already ran `ensure_wrapped_for_credential` — consistent
+  with this project's fail-closed convention elsewhere.
+
+**No new BLOCKING or SHOULD-FIX finding surfaced.** This does **not**
+close the underlying debt — it is a second self-review of the same
+scope, not a genuinely independent one. Both original "independent
+security review owed" entries below remain open. Retry with a subagent
+dispatch once `SendMessage`/agent-resume is confirmed reliably working
+in a future session — do not keep re-dispatching into the same known gap
+without first confirming `SendMessage` is actually loadable.
+
 ## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
 
 `commands::section`'s three new `*_with_optional_sync` wrappers
