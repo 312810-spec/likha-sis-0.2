@@ -474,7 +474,7 @@ Rust/TS layers):
    after 'keep local'" entry at the top of this file for the fix and
    its verification.
 
-## Device management screen (2026-09-05) — independent review, native accessibility pass, and a focus-management gap owed
+## Device management screen (2026-09-05) — focus-management gap CLOSED 2026-09-07, independent review + native accessibility pass still owed
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry. Three items
 owed from this slice (`src/ui/DeviceManagementScreen.tsx` + its
@@ -492,16 +492,17 @@ supporting Rust/TS layers):
    performed.** This sandboxed environment has no browser/screenshot
    tool for the compiled app. Automated axe-core results (structural
    only) are not a substitute — see `.claude/rules/testing.md`.
-3. **Focus-management gap, knowingly retained.** Opening the inline
-   "Remove device" confirmation panel does not move keyboard focus into
-   it — a keyboard/screen-reader user must continue tabbing forward from
-   the "Remove device" button to reach "Cancel"/"Yes, remove this
-   device," rather than focus landing there automatically the way a true
-   modal dialog would. No modal/dialog primitive exists yet in this
-   codebase (`src/ui/components/`) to reuse, and building one was judged
-   out of scope for a single-screen slice. Revisit if/when this codebase
-   gains a shared dialog component, or sooner if the native accessibility
-   pass above flags it as a real problem in practice.
+3. **CLOSED 2026-09-07 — focus-management gap fixed without a shared
+   dialog primitive.** `src/ui/DeviceManagementScreen.tsx`: the
+   confirmation panel's `role="group"` container now takes `tabIndex={-1}`
+   and a ref, focused via a `useEffect` keyed on `pendingRevokeId`
+   becoming non-null — no modal/dialog component needed, this focuses the
+   panel's own existing container. Proven with a new test
+   (`moves keyboard focus into the confirmation panel when it opens`,
+   `DeviceManagementScreen.test.tsx`) asserting the group has focus
+   immediately after clicking "Remove device." Full suite re-run clean:
+   `npm run quality` 1099/1099 (up from 1098), typecheck/lint/format/
+   architecture/knip all green.
 
 ## Device sync enrollment/revocation Tauri commands (2026-09-05) — TS quality gate CLOSED 2026-09-07, independent review still owed
 

@@ -105,6 +105,17 @@ describe("DeviceManagementScreen", () => {
     expect(repo.revokeCalls).toHaveLength(0);
   });
 
+  it("moves keyboard focus into the confirmation panel when it opens", async () => {
+    const repo = new FakeDeviceSyncRepository();
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Front Office PC");
+
+    await user.click(screen.getAllByRole("button", { name: "Remove device" }).at(0)!);
+
+    expect(screen.getByRole("group", { name: "Remove Front Office PC?" })).toHaveFocus();
+  });
+
   it("removes a device only after the confirmation step is accepted, and shows a plain-language success message", async () => {
     const repo = new FakeDeviceSyncRepository();
     const user = userEvent.setup();

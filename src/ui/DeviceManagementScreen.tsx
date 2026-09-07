@@ -71,6 +71,21 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
   const [revoking, setRevoking] = useState(false);
 
   const requestRef = useRef(0);
+  const confirmPanelRef = useRef<HTMLDivElement | null>(null);
+
+  // Moves keyboard/screen-reader focus into the inline confirmation panel
+  // when it opens -- previously a keyboard/screen-reader user had to keep
+  // tabbing forward from "Remove device" to reach "Cancel"/"Yes, remove
+  // this device," instead of focus landing there the way a true modal
+  // dialog would (see docs/VERIFICATION-DEBT.md's "Device management
+  // screen" entry). No shared dialog primitive exists in this codebase
+  // yet to reuse, so this focuses the panel's own `role="group"`
+  // container directly rather than building one for a single screen.
+  useEffect(() => {
+    if (pendingRevokeId !== null) {
+      confirmPanelRef.current?.focus();
+    }
+  }, [pendingRevokeId]);
 
   function load() {
     const requestId = ++requestRef.current;
@@ -181,6 +196,8 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
                     className="device-card-confirm"
                     role="group"
                     aria-label={`Remove ${deviceName(device)}?`}
+                    tabIndex={-1}
+                    ref={confirmPanelRef}
                   >
                     <p className="device-card-confirm-text">
                       Remove <strong>{deviceName(device)}</strong>? This device will stop syncing
