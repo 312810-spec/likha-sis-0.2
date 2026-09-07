@@ -1471,6 +1471,116 @@ mod tests {
     }
 
     #[test]
+    fn pull_once_converges_across_multiple_rounds_when_pending_changes_exceed_one_batch() {
+        // The "weeks-offline catch-up" scenario (docs/VERIFICATION-DEBT.md's
+        // ADR-0067 entry): a device with more pending changes than one
+        // `PULL_BATCH_LIMIT` batch must fully catch up over several
+        // consecutive `pull_once` calls, applying every change exactly
+        // once and advancing the cursor correctly across the batch
+        // boundary -- never losing, duplicating, or getting stuck on a
+        // change on either side of that boundary.
+        let fixture = setup();
+        let client = http_client();
+        let config = config_for(&fixture);
+        let total = PULL_BATCH_LIMIT as usize + 5;
+        let entity_ids: Vec<Uuid> = (0..total).map(|_| Uuid::now_v7()).collect();
+
+        {
+            let conn = &fixture.conn;
+            for (i, entity_id) in entity_ids.iter().enumerate() {
+                // Each learner needs its own unique LRN -- reusing
+                // `synthetic_learner`'s fixed LRN across many rows would
+                // trip the real `idx_learners_school_lrn` UNIQUE index on
+                // materialization, which `pull_once` treats identically to
+                // a tampered payload (halts the rest of the batch). That is
+                // a real, separate, intentional design property (see
+                // `pull_once`'s own doc comment) -- not what this test is
+                // checking, so it must be avoided here, not exercised.
+                let learner = learner::Learner {
+                    id: entity_id.to_string(),
+                    school_id: fixture.school_id.clone(),
+                    given_name: "Ana".to_string(),
+                    family_name: "Cruz".to_string(),
+                    lrn: Some(format!("{:012}", 100_000_000_000_u64 + i as u64)),
+                    sex: Some("F".to_string()),
+                    created_at: "2026-01-01T00:00:00.000Z".to_string(),
+                };
+                let plaintext = serde_json::to_vec(&learner).unwrap();
+                let mut change = make_change(&fixture, *entity_id, 0);
+                change.encrypted_payload =
+                    payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+                sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            }
+            // Drain the outbox to the hub across as many push rounds as
+            // needed (PUSH_BATCH_LIMIT matches PULL_BATCH_LIMIT, so two
+            // rounds for `total` changes).
+            loop {
+                let summary = push_once(conn, &client, &config).unwrap();
+                if summary.sent == 0 {
+                    break;
+                }
+            }
+            // Simulate every one of these having come from ANOTHER device,
+            // exactly like the single-change tests above do.
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let first = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+        assert_eq!(first.received, PULL_BATCH_LIMIT as usize);
+        assert_eq!(first.applied, PULL_BATCH_LIMIT as usize);
+        assert_eq!(first.rejected, 0);
+        assert!(!first.failed);
+        assert_eq!(
+            sync_pull_cursor::get_cursor(&fixture.conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            PULL_BATCH_LIMIT as u64
+        );
+
+        let remaining = total - PULL_BATCH_LIMIT as usize;
+        let second = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+        assert_eq!(second.received, remaining);
+        assert_eq!(second.applied, remaining);
+        assert_eq!(second.rejected, 0);
+        assert!(!second.failed);
+        assert_eq!(
+            sync_pull_cursor::get_cursor(&fixture.conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            total as u64
+        );
+
+        // A third round has nothing left to catch up on -- convergence,
+        // not an endless retry of already-applied changes.
+        let third = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+        assert_eq!(third.received, 0);
+        assert_eq!(third.applied, 0);
+
+        // Every entity across both rounds materialized exactly once --
+        // nothing lost or duplicated at the batch boundary.
+        let conn = &fixture.conn;
+        for entity_id in &entity_ids {
+            let materialized =
+                learner::find_by_id_in_school(conn, &fixture.school_id, &entity_id.to_string())
+                    .unwrap()
+                    .unwrap_or_else(|| {
+                        panic!("entity {entity_id} must be materialized after both pull rounds")
+                    });
+            assert_eq!(materialized.id, entity_id.to_string());
+        }
+    }
+
+    #[test]
     fn pull_once_stages_a_conflict_when_this_device_has_an_unsynced_local_edit() {
         let fixture = setup();
         let entity_id = Uuid::now_v7();

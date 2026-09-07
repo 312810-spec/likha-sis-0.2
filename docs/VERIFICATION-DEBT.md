@@ -707,6 +707,7 @@ gate directly against current source rather than trusting the old list:
 **Closed, confirmed by direct code/test read this session** (all built
 in sessions between 2026-09-04 and 2026-09-06, just never reflected
 back into this entry):
+
 - Domain mutations wired into the outbox — Section, Attendance,
   LearnerScore, AssessmentItem, Subject, SectionMembership all enqueue
   through `*_with_optional_sync` command wrappers.
@@ -737,20 +738,47 @@ enroll_device_sync_credential`/`revoke_device_sync_credential_and_rotate_sspk`.
   2026-09-05 (see that entry above).
 
 **Still genuinely open**:
-- **Weeks-offline catch-up has no test proving multi-round convergence.**
-  `pull_once` fetches at most `PULL_BATCH_LIMIT` (50) changes per call,
-  advancing the stored cursor by that batch only — a real "weeks
-  offline, hundreds of pending changes" scenario needs several
-  consecutive `pull_once` calls to fully catch up (via whatever periodic
-  loop calls `sync_once`), and nothing currently proves that repeated
-  calls converge correctly (no lost/duplicated/skipped changes across
-  the cursor boundary) rather than just working within a single batch.
-  `PULL_BATCH_LIMIT` is a private `u16` const, not currently overridable
-  for a test — writing this test needs either a way to shrink the batch
-  size for tests or enqueuing 51+ real changes on the test hub. Not
-  attempted this session (real TDD work, not a quick fix); flagging
-  precisely rather than leaving it folded into a vague "weeks-offline
-  catch-up" bullet.
+
+- **CLOSED 2026-09-07 — weeks-offline multi-round convergence now has a
+  real test.** Added
+  `pull_once_converges_across_multiple_rounds_when_pending_changes_exceed_one_batch`
+  (`src-tauri/src/sync_client.rs`): enqueues `PULL_BATCH_LIMIT + 5` (55)
+  real, individually-valid learner changes (each with its own unique
+  LRN — reusing the existing fixture's fixed LRN across many rows would
+  have tripped the real `idx_learners_school_lrn` UNIQUE index, which
+  `pull_once` treats identically to a tampered payload and halts the
+  rest of the batch; avoided deliberately, not exercised), drains them
+  to a real test hub across two `push_once` rounds, clears
+  `sync_version_cache` to simulate them coming from another device, then
+  proves: round one receives/applies exactly 50 and advances the cursor
+  to 50; round two receives/applies the remaining 5 and advances the
+  cursor to 55; a third round has nothing left (genuine convergence, not
+  an endless retry); and every one of the 55 entities materialized
+  exactly once with no loss or duplication across the batch boundary.
+  Verified: `cargo test --lib pull_once_converges` (isolated, passed),
+  full `cargo test` (1025 lib tests, 0 failed), `cargo clippy
+--all-targets -- -D warnings` (0 warnings), `cargo fmt --check` (clean
+  after one `cargo fmt` pass), `npm run quality` (1099/1099, unaffected
+  — Rust-only change).
+
+  **A related, separate observation surfaced while writing this test,
+  not itself a defect but worth flagging**: `pull_once` treats ANY
+  `apply_decrypted_change` failure — not just a genuine decrypt/tamper
+  failure, but also an ordinary database-constraint error on an
+  otherwise-valid, correctly-decrypted payload (e.g. two devices
+  independently registering the same LRN) — identically: reject and
+  `break` out of the whole batch loop. Per `pull_once`'s own doc
+  comment this is an intentional, documented choice ("never partially
+  applied... halts the rest of the batch rather than skipping past
+  it"), not a bug this session found — but it does mean a legitimate,
+  non-malicious data collision between two devices could stall a
+  school's entire pull queue indefinitely (every future pull re-fetches
+  and re-fails on the same stuck change, in front of everything behind
+  it) until a human intervenes. Worth a deliberate design review in a
+  future session (should a non-decrypt-related application error really
+  get the same treatment as a tampered payload?), not something to
+  silently change here.
+
 - Windows service/reboot behavior — does the hub relaunch automatically
   after a reboot/crash? Not yet designed or tested.
 - BitLocker/firewall/patch validation on the school-laptop hub itself —
