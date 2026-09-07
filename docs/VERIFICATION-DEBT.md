@@ -1,5 +1,94 @@
 # Verification Debt
 
+## SubjectAttendanceEntry (per-learner attendance marks) wired to sync via a real schema migration (2026-09-07)
+
+Closes the Tier-1 gap recorded in
+`docs/product/2026-09-07-unbuilt-features-audit.md`. Only the
+session-level `subject_attendance_sessions` row was previously wired
+(deliberately, per that slice's own doc comment: "`sync_version_cache`/
+`sync_outbox`/`sync_conflict_review`'s `entity_kind` `CHECK` constraint
+has exactly one reserved slot for this feature... a future slice that
+widens the `CHECK` constraint... can wire entries next"). This is that
+future slice.
+
+**Migration 41** widens the `entity_kind` `CHECK` allowlist on all FOUR
+tables that carry it — `sync_outbox`, `sync_hub_log`,
+`sync_conflict_review`, `sync_version_cache` — to add
+`'subject_attendance_entry'`. Each required a full recreate-and-copy
+rebuild (SQLite cannot `ALTER` a `CHECK` constraint in place; same
+12-step pattern as migrations 24, 26, and 36), verified none of the four
+has any incoming foreign key from another table (confirmed by grep
+before writing the migration, matching those same three precedents'
+own stated safety justification). New migration test
+(`migration_41_widens_entity_kind_to_accept_subject_attendance_entry_and_preserves_existing_rows`)
+proves: the new value is accepted on all four tables, a genuinely
+invalid value is still rejected (the rebuild widened the allowlist, it
+did not remove it), and a pre-existing row survives the rebuild
+untouched.
+
+**`EntityKind::SubjectAttendanceEntry`** added to the enum/wire-string
+mapping (`sync/mod.rs`).
+
+**`SubjectAttendanceEntry` struct gained two kinds of fields it didn't
+have before**, both required to actually wire this entity rather than
+just widen the protocol:
+
+1. `school_id` — `subject_attendance_entries` has no such column (an
+   entry's school is only known indirectly via its `session_id`); it is
+   populated from the owning session's own `school_id` at construction
+   time purely so the struct carries what
+   `sync_client::apply_decrypted_change`'s defense-in-depth
+   `incoming.school_id != school_id` check needs, matching every other
+   synced entity's payload shape. Verified low-risk before adding it:
+   the struct has exactly one construction site
+   (`repository::subject_attendance::record_entry`) and is not directly
+   returned by name to the frontend (only nested inside
+   `RecordEntryOutcome::Recorded`, and no TS code references
+   `SubjectAttendanceEntry` as a distinct type).
+2. `created_by_user_id`/`updated_by_user_id` — needed to populate the
+   table's `NOT NULL` audit columns when materializing a pulled change;
+   the struct previously carried neither field at all, matching
+   `SubjectAttendanceSession`'s own already-established
+   `created_by_user_id` field shape.
+
+**`subject_attendance::upsert_entry_from_sync`** (new) — re-recordable,
+`ON CONFLICT(id) DO UPDATE`, matching `record_entry`'s own
+`ON CONFLICT (session_id, membership_id)` behavior of keeping the same
+`id` stable across repeated local recordings, so a pulled change for an
+already-recorded entry carries the exact id this device would reuse
+too. Bypasses `record_entry`'s own session/roster-membership validation
+entirely — that validation already happened on the originating device,
+the same precedent every other `upsert_from_sync` in this codebase
+follows.
+
+**`commands::subject_attendance::record_subject_attendance_entry`**
+refactored into a testable `record_subject_attendance_entry_with_optional_sync`
+function (matching this session's own established pattern), enqueuing
+only on `RecordEntryOutcome::Recorded`. `base_version` reads from
+`sync_version_cache` (re-recordable), not hardcoded to `0`.
+
+**Clippy findings from widening `SubjectAttendanceEntry`**: the extra
+fields pushed `RecordEntryOutcome` over clippy's large-enum-variant
+threshold, and the command's new `app: AppHandle` parameter pushed it to
+8 arguments — both resolved with `#[allow(...)]` rather than boxing/
+restructuring (a lint-threshold concern, not a correctness one; boxing
+would have touched 8 existing match sites for no functional benefit).
+
+**New tests**: `migration_41_widens_entity_kind_...` (migrations);
+`upsert_entry_from_sync_inserts_an_entry_this_device_has_never_seen`,
+`upsert_entry_from_sync_updates_an_existing_row_in_place_without_a_duplicate`
+(repository); `record_subject_attendance_entry_with_no_sspk_behaves_exactly_like_a_plain_record`,
+`record_subject_attendance_entry_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`,
+`record_subject_attendance_entry_re_recording_uses_the_known_base_version_not_zero`
+(commands); `pull_once_applies_a_non_conflicting_subject_attendance_entry_change`,
+`pull_once_rejects_a_tampered_subject_attendance_entry_payload_without_applying_or_advancing_past_it`
+(sync_client, end-to-end through a real pull round).
+
+**Verified**: full `cargo test` (1054 lib tests, 0 failed, up from
+1046), `cargo clippy --all-targets -- -D warnings` (0 warnings),
+`cargo fmt --check` (clean after one `cargo fmt` pass), native
+`cargo build`, `npm run quality` (1099/1099).
+
 ## SectionsScreen direct enrollment + bulk SF1 import: sync wiring closed, wider than originally scoped (2026-09-07)
 
 Closes the Tier-1 gap recorded in

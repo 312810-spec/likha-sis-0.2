@@ -113,18 +113,31 @@ tier.
    platform statement. Source: PRODUCT-CONTRACT.md §16 (verified still
    accurate — no `android` target/code found in the repo).
 
-4. **`SubjectAttendanceEntry` (per-learner attendance marks) is not wired
-   to sync** — only the session-level `subject_attendance_sessions` row is
-   wired. A learner's actual per-meeting attendance entries recorded on
-   one device do not currently propagate to the school-laptop hub or to
-   other devices. This is a real cross-device data-consistency gap, not
-   just an architecture-completeness note, and needs a schema migration
-   (widening the `entity_kind` CHECK constraint) before it can be closed.
-   Source: `docs/CURRENT-HANDOFF.md`'s "SubjectAttendance session wired
-   through the sync encrypt/decrypt pattern" entry (2026-09-06);
-   confirmed by grep — no `SubjectAttendanceEntry`/`upsert_from_sync` for
-   entries exists in `src-tauri/src/repository/subject_attendance.rs`
-   beyond the session-level function.
+4. **CLOSED 2026-09-07 — `SubjectAttendanceEntry` (per-learner attendance
+   marks) is now wired to sync.** Required the schema migration this
+   audit item itself flagged as the real blocker: migration 41 widens
+   the `entity_kind` `CHECK` constraint (present on FOUR tables —
+   `sync_outbox`, `sync_hub_log`, `sync_conflict_review`,
+   `sync_version_cache` — each requiring its own full recreate-and-copy
+   rebuild, since SQLite cannot `ALTER` a `CHECK` constraint in place)
+   to add `'subject_attendance_entry'`, plus a new `EntityKind::
+SubjectAttendanceEntry` variant. `SubjectAttendanceEntry` gained
+   `school_id` (not a real column on the table — the entry's school is
+   only known indirectly via its session — populated from the owning
+   session at construction time purely so the struct carries what
+   `apply_decrypted_change`'s defense-in-depth school check needs, like
+   every other synced entity) and `created_by_user_id`/
+   `updated_by_user_id` (needed to populate the table's `NOT NULL`
+   audit columns on a pulled change; the struct previously lacked them
+   entirely). New `subject_attendance::upsert_entry_from_sync`
+   (re-recordable, `ON CONFLICT(id) DO UPDATE`, matching
+   `record_entry`'s own stable-id-across-re-recordings behavior).
+   `record_subject_attendance_entry` refactored into a testable
+   `*_with_optional_sync` function; its `base_version` correctly reads
+   from `sync_version_cache` (re-recordable), not hardcoded to `0`.
+   `cargo test` 1054 lib tests, 0 failed; `npm run quality` 1099/1099.
+   Source: this session's implementation,
+   `docs/VERIFICATION-DEBT.md`'s matching entry.
 
 5. **CLOSED 2026-09-07 — `SectionMembership::enroll`'s callers and
    `correct_same_day_placement` are now wired to sync.** Wider than

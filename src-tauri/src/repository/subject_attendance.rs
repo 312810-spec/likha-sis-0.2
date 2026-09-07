@@ -95,25 +95,29 @@ pub struct SubjectAttendanceSession {
     pub updated_at: String,
 }
 
-/// Not `Deserialize` -- unlike `SubjectAttendanceSession`, entries are not
-/// wired to sync in this slice (see `upsert_session_from_sync`'s own doc
-/// comment for why: `subject_attendance_entries.session_id` is a `NOT
-/// NULL` foreign key, and `sync_version_cache`/`sync_outbox`/
-/// `sync_conflict_review`'s `entity_kind` `CHECK` constraint has exactly
-/// one reserved slot for this feature -- `'subject_attendance'` -- which
-/// this slice spends on the session, its own FK prerequisite, exactly
-/// mirroring why `Section` was wired before `Attendance`). A future slice
-/// that widens the `CHECK` constraint (a real schema migration) can wire
-/// entries next.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+/// Now wired to sync (migration 41 widened the `entity_kind` `CHECK`
+/// constraint to add `'subject_attendance_entry'` -- see
+/// `upsert_entry_from_sync`'s own doc comment). `school_id` is not a
+/// real column on `subject_attendance_entries` itself (the table has no
+/// such column -- an entry's school is only ever known indirectly via
+/// its `session_id`); it is populated from the owning session's own
+/// `school_id` at construction time so this struct carries everything
+/// `sync_client::apply_decrypted_change`'s defense-in-depth
+/// `incoming.school_id != school_id` check needs, exactly like every
+/// other synced entity's payload shape, without adding a genuinely
+/// denormalized column to the table for a field only sync needs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectAttendanceEntry {
     pub id: String,
+    pub school_id: String,
     pub session_id: String,
     pub membership_id: String,
     pub learner_id: String,
     pub status: EntryStatus,
     pub note: Option<String>,
+    pub created_by_user_id: String,
+    pub updated_by_user_id: String,
     pub updated_at: String,
 }
 
@@ -281,6 +285,7 @@ pub fn mark_no_class(
 /// ordinary stale-roster or forged-id case.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)]
 pub enum RecordEntryOutcome {
     Recorded {
         entry: SubjectAttendanceEntry,
@@ -346,18 +351,22 @@ pub fn record_entry(
     )?;
 
     let entry = conn.query_row(
-        "SELECT id, session_id, membership_id, learner_id, status, note, updated_at \
+        "SELECT id, session_id, membership_id, learner_id, status, note, \
+                created_by_user_id, updated_by_user_id, updated_at \
          FROM subject_attendance_entries WHERE session_id = ?1 AND membership_id = ?2",
         (session_id, membership_id),
         |row| {
             Ok(SubjectAttendanceEntry {
                 id: row.get(0)?,
+                school_id: school_id.to_string(),
                 session_id: row.get(1)?,
                 membership_id: row.get(2)?,
                 learner_id: row.get(3)?,
                 status: EntryStatus::from_db_str(&row.get::<_, String>(4)?)?,
                 note: row.get(5)?,
-                updated_at: row.get(6)?,
+                created_by_user_id: row.get(6)?,
+                updated_by_user_id: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         },
     )?;
@@ -488,6 +497,53 @@ pub fn upsert_session_from_sync(
             &session.created_by_user_id,
             &session.created_at,
             &session.updated_at,
+        ),
+    )?;
+    Ok(())
+}
+
+/// ADR-0067/0069 sync wiring counterpart to `upsert_session_from_sync`,
+/// for the per-learner attendance mark (migration 41's newly-widened
+/// `entity_kind` slot). Keyed on the row's own stable `id` via
+/// `ON CONFLICT(id) DO UPDATE`, matching every other entity's
+/// `upsert_from_sync` -- `record_entry`'s own `ON CONFLICT
+/// (session_id, membership_id)` already keeps that `id` stable across
+/// repeated local recordings (see its own doc comment), so the SAME id
+/// this device would reuse locally is exactly what a pulled change for
+/// an already-recorded entry carries too. `entry.school_id` is never
+/// written to a column (the table has none -- see
+/// `SubjectAttendanceEntry`'s own doc comment for why it exists on the
+/// struct at all); this function only uses it implicitly via
+/// `sync_client::apply_decrypted_change`'s school-scope check having
+/// already run before this is ever called. Bypasses `record_entry`'s own
+/// `find_session_by_id_in_school`/roster-membership validation entirely
+/// -- that validation already happened on the originating device before
+/// this row was ever encrypted and enqueued, the same precedent every
+/// other `upsert_from_sync` in this codebase already follows.
+pub fn upsert_entry_from_sync(conn: &Connection, entry: &SubjectAttendanceEntry) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO subject_attendance_entries \
+             (id, session_id, membership_id, learner_id, status, note, \
+              created_by_user_id, updated_by_user_id, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+         ON CONFLICT(id) DO UPDATE SET \
+             session_id = excluded.session_id, \
+             membership_id = excluded.membership_id, \
+             learner_id = excluded.learner_id, \
+             status = excluded.status, \
+             note = excluded.note, \
+             updated_by_user_id = excluded.updated_by_user_id, \
+             updated_at = excluded.updated_at",
+        (
+            &entry.id,
+            &entry.session_id,
+            &entry.membership_id,
+            &entry.learner_id,
+            entry.status.as_db_str(),
+            &entry.note,
+            &entry.created_by_user_id,
+            &entry.updated_by_user_id,
+            &entry.updated_at,
         ),
     )?;
     Ok(())
@@ -1775,6 +1831,94 @@ mod tests {
                 [],
                 |r| r.get(0),
             )
+            .unwrap();
+        assert_eq!(count, 1, "an upsert must never insert a second row");
+    }
+
+    #[test]
+    fn upsert_entry_from_sync_inserts_an_entry_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let incoming = SubjectAttendanceEntry {
+            id: Uuid::now_v7().to_string(),
+            school_id: f.school_id.clone(),
+            session_id: session.id.clone(),
+            membership_id: f.membership_id.clone(),
+            learner_id: f.learner_id.clone(),
+            status: EntryStatus::Present,
+            note: None,
+            created_by_user_id: f.teacher_id.clone(),
+            updated_by_user_id: f.teacher_id.clone(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_entry_from_sync(&conn, &incoming).unwrap();
+
+        let stored: String = conn
+            .query_row(
+                "SELECT status FROM subject_attendance_entries WHERE id = ?1",
+                [&incoming.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "present");
+    }
+
+    #[test]
+    fn upsert_entry_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let session = open_or_get_session(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-08-29",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let RecordEntryOutcome::Recorded { entry: original } = record_entry(
+            &conn,
+            &f.school_id,
+            &session.id,
+            &f.membership_id,
+            EntryStatus::Present,
+            None,
+            &f.teacher_id,
+        )
+        .unwrap() else {
+            panic!("setup must record successfully");
+        };
+        let updated = SubjectAttendanceEntry {
+            status: EntryStatus::Absent,
+            note: Some("called in sick".to_string()),
+            ..original.clone()
+        };
+
+        upsert_entry_from_sync(&conn, &updated).unwrap();
+
+        let (status, note): (String, Option<String>) = conn
+            .query_row(
+                "SELECT status, note FROM subject_attendance_entries WHERE id = ?1",
+                [&original.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "absent");
+        assert_eq!(note.as_deref(), Some("called in sick"));
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM subject_attendance_entries", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(count, 1, "an upsert must never insert a second row");
     }

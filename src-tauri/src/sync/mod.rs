@@ -68,6 +68,7 @@ pub enum EntityKind {
     GradingPeriod,
     Subject,
     TeachingAssignment,
+    SubjectAttendanceEntry,
 }
 
 impl EntityKind {
@@ -87,6 +88,7 @@ impl EntityKind {
             EntityKind::GradingPeriod => "grading_period",
             EntityKind::Subject => "subject",
             EntityKind::TeachingAssignment => "teaching_assignment",
+            EntityKind::SubjectAttendanceEntry => "subject_attendance_entry",
         }
     }
 
@@ -102,6 +104,7 @@ impl EntityKind {
             "grading_period" => Some(EntityKind::GradingPeriod),
             "subject" => Some(EntityKind::Subject),
             "teaching_assignment" => Some(EntityKind::TeachingAssignment),
+            "subject_attendance_entry" => Some(EntityKind::SubjectAttendanceEntry),
             _ => None,
         }
     }

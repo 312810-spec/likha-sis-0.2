@@ -717,6 +717,15 @@ pub(crate) fn apply_decrypted_change(
             section_membership::upsert_from_sync(conn, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
+        EntityKind::SubjectAttendanceEntry => {
+            let incoming: subject_attendance::SubjectAttendanceEntry =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            subject_attendance::upsert_entry_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
     }
 }
 
@@ -2974,6 +2983,168 @@ mod tests {
                 1
             );
         };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_subject_attendance_entry_change() {
+        // Migration 41's newly-wired entity: the per-learner attendance
+        // mark, as opposed to the session-level row proven just above.
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let assignment = setup_teaching_assignment(&fixture);
+        let learner =
+            learner::create(&fixture.conn, &fixture.school_id, "Ana", "Cruz", None, None).unwrap();
+        let membership = section_membership::enroll(
+            &fixture.conn,
+            &fixture.school_id,
+            &assignment.section_id,
+            &learner.id,
+            "2026-06-01",
+        )
+        .unwrap()
+        .unwrap();
+        let session = subject_attendance::open_or_get_session(
+            &fixture.conn,
+            &fixture.school_id,
+            &assignment.id,
+            "2026-08-29",
+            &assignment.teacher_user_id,
+        )
+        .unwrap()
+        .unwrap();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        let incoming = subject_attendance::SubjectAttendanceEntry {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            session_id: session.id.clone(),
+            membership_id: membership.id.clone(),
+            learner_id: learner.id.clone(),
+            status: subject_attendance::EntryStatus::Present,
+            note: None,
+            created_by_user_id: assignment.teacher_user_id.clone(),
+            updated_by_user_id: assignment.teacher_user_id.clone(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+        let mut change = make_change(&fixture, entity_id, 0);
+        change.entity_kind = EntityKind::SubjectAttendanceEntry;
+        change.encrypted_payload =
+            payload_key::encrypt_payload(&fixture.sspk, &serde_json::to_vec(&incoming).unwrap())
+                .unwrap();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        let conn = &fixture.conn;
+        let stored: String = conn
+            .query_row(
+                "SELECT status FROM subject_attendance_entries WHERE id = ?1",
+                [entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "present");
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_subject_attendance_entry_payload_without_applying_or_advancing_past_it(
+    ) {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let assignment = setup_teaching_assignment(&fixture);
+        let learner =
+            learner::create(&fixture.conn, &fixture.school_id, "Ana", "Cruz", None, None).unwrap();
+        let membership = section_membership::enroll(
+            &fixture.conn,
+            &fixture.school_id,
+            &assignment.section_id,
+            &learner.id,
+            "2026-06-01",
+        )
+        .unwrap()
+        .unwrap();
+        let session = subject_attendance::open_or_get_session(
+            &fixture.conn,
+            &fixture.school_id,
+            &assignment.id,
+            "2026-08-29",
+            &assignment.teacher_user_id,
+        )
+        .unwrap()
+        .unwrap();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        let incoming = subject_attendance::SubjectAttendanceEntry {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            session_id: session.id.clone(),
+            membership_id: membership.id.clone(),
+            learner_id: learner.id.clone(),
+            status: subject_attendance::EntryStatus::Present,
+            note: None,
+            created_by_user_id: assignment.teacher_user_id.clone(),
+            updated_by_user_id: assignment.teacher_user_id.clone(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+        let mut change = make_change(&fixture, entity_id, 0);
+        change.entity_kind = EntityKind::SubjectAttendanceEntry;
+        let mut tampered =
+            payload_key::encrypt_payload(&fixture.sspk, &serde_json::to_vec(&incoming).unwrap())
+                .unwrap();
+        let last = tampered.len() - 1;
+        tampered[last] ^= 0xFF;
+        change.encrypted_payload = tampered;
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        let conn = &fixture.conn;
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM subject_attendance_entries WHERE id = ?1)",
+                [entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!exists);
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            0,
+            "a tampered payload must never advance the cursor"
+        );
     }
 
     #[test]

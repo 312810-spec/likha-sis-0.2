@@ -10,10 +10,10 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::repository::subject_attendance::{
-    self, AdviserAttendanceOverview, EntryStatus, RecordEntryOutcome, SubjectAttendanceMonitor,
-    SubjectAttendanceRosterRow, SubjectAttendanceSession,
+    self, AdviserAttendanceOverview, EntryStatus, RecordEntryOutcome, SubjectAttendanceEntry,
+    SubjectAttendanceMonitor, SubjectAttendanceRosterRow, SubjectAttendanceSession,
 };
-use crate::repository::{device_credential, device_identity, sync_outbox};
+use crate::repository::{device_credential, device_identity, sync_outbox, sync_version_cache};
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
 /// Every assignment-owned command in this file gates on
@@ -296,7 +296,9 @@ fn parse_sync_uuid(value: &str, field_name: &str) -> AppResult<Uuid> {
 /// so a caller cannot pass a real assignment they own alongside a
 /// `session_id` belonging to a different one.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn record_subject_attendance_entry(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     teaching_assignment_id: String,
@@ -320,15 +322,90 @@ pub fn record_subject_attendance_entry(
             return Err(crate::error::AppError::Unauthorized);
         }
     }
-    subject_attendance::record_entry(
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    record_subject_attendance_entry_with_optional_sync(
         &conn,
         &school_id,
+        &user_id,
         &session_id,
         &membership_id,
         status,
         note.as_deref(),
-        &user_id,
+        sspk.as_ref(),
     )
+}
+
+/// Shared logic behind `record_subject_attendance_entry`, pulled out so
+/// it can be unit-tested without a real `AppHandle`/`State` -- same
+/// rationale as every other `*_with_optional_sync` function in this
+/// codebase.
+#[allow(clippy::too_many_arguments)]
+fn record_subject_attendance_entry_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    session_id: &str,
+    membership_id: &str,
+    status: EntryStatus,
+    note: Option<&str>,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<RecordEntryOutcome> {
+    let outcome = subject_attendance::record_entry(
+        conn,
+        school_id,
+        session_id,
+        membership_id,
+        status,
+        note,
+        actor_user_id,
+    )?;
+
+    if let (RecordEntryOutcome::Recorded { entry }, Some(sspk)) = (&outcome, sspk) {
+        enqueue_entry_sync_change(conn, school_id, actor_user_id, entry, sspk)?;
+    }
+
+    Ok(outcome)
+}
+
+/// ADR-0067/0069 sync wiring for the per-learner attendance mark
+/// (migration 41). Re-recordable, like `LearnerScore`/`SectionMembership`
+/// (`record_entry` amends an existing mark rather than minting a new row
+/// -- see its own doc comment), so `base_version` is read from
+/// `sync_version_cache`, not hardcoded to `0`, matching
+/// `commands::section::enqueue_section_membership_sync_change`'s exact
+/// rationale.
+fn enqueue_entry_sync_change(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    entry: &SubjectAttendanceEntry,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let base_version = sync_version_cache::known_version(
+        conn,
+        school_id,
+        EntityKind::SubjectAttendanceEntry,
+        &entry.id,
+    )?;
+    let plaintext = serde_json::to_vec(entry)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::SubjectAttendanceEntry,
+        entity_id: parse_sync_uuid(&entry.id, "subject attendance entry id")?,
+        base_version,
+        operation: ChangeOperation::Upsert,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -558,6 +635,164 @@ mod tests {
         let expected_device_id = device_identity::current_or_create(&conn).unwrap();
         let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
         assert_eq!(queued[0].change.device_id.to_string(), expected_device_id);
+    }
+
+    /// `setup()` enrolls exactly one learner -- their membership id is
+    /// what `record_subject_attendance_entry`'s own tests need.
+    fn only_membership_id(conn: &Connection) -> String {
+        conn.query_row("SELECT id FROM section_memberships", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn record_subject_attendance_entry_with_no_sspk_behaves_exactly_like_a_plain_record() {
+        let (conn, school_id, teacher_id, assignment_id) = setup();
+        let session = open_session_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            "2026-08-29",
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let membership_id = only_membership_id(&conn);
+
+        let outcome = record_subject_attendance_entry_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &session.id,
+            &membership_id,
+            EntryStatus::Present,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, RecordEntryOutcome::Recorded { .. }));
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn record_subject_attendance_entry_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry() {
+        let (conn, school_id, teacher_id, assignment_id) = setup();
+        let sspk = test_sspk();
+        let session = open_session_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            "2026-08-29",
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+        // The session's own enqueue is not what this test checks.
+        for entry in sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap() {
+            sync_outbox::acknowledge(&conn, &school_id, &entry.change.change_id.to_string())
+                .unwrap();
+        }
+        let membership_id = only_membership_id(&conn);
+
+        let outcome = record_subject_attendance_entry_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &session.id,
+            &membership_id,
+            EntryStatus::Present,
+            None,
+            Some(&sspk),
+        )
+        .unwrap();
+        let RecordEntryOutcome::Recorded { entry: recorded } = &outcome else {
+            panic!("expected Recorded, got {outcome:?}");
+        };
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        let entry = &queued[0];
+        assert_eq!(entry.change.entity_kind, EntityKind::SubjectAttendanceEntry);
+        assert_eq!(entry.change.entity_id.to_string(), recorded.id);
+        assert_eq!(entry.change.base_version, 0);
+        assert_eq!(entry.change.operation, ChangeOperation::Upsert);
+
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &entry.change.encrypted_payload).unwrap();
+        let round_tripped: SubjectAttendanceEntry = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(round_tripped, *recorded);
+    }
+
+    #[test]
+    fn record_subject_attendance_entry_re_recording_uses_the_known_base_version_not_zero() {
+        let (conn, school_id, teacher_id, assignment_id) = setup();
+        let sspk = test_sspk();
+        let session = open_session_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            "2026-08-29",
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let membership_id = only_membership_id(&conn);
+        let first = record_subject_attendance_entry_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &session.id,
+            &membership_id,
+            EntryStatus::Present,
+            None,
+            Some(&sspk),
+        )
+        .unwrap();
+        let RecordEntryOutcome::Recorded { entry: first_entry } = first else {
+            panic!("setup record must succeed");
+        };
+        // Simulate the first recording having already been pushed and
+        // acknowledged by the hub, exactly as `sync_client::push_once`
+        // does on acceptance.
+        sync_version_cache::record_known_version(
+            &conn,
+            &school_id,
+            EntityKind::SubjectAttendanceEntry,
+            &first_entry.id,
+            1,
+        )
+        .unwrap();
+        for entry in sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap() {
+            sync_outbox::acknowledge(&conn, &school_id, &entry.change.change_id.to_string())
+                .unwrap();
+        }
+
+        record_subject_attendance_entry_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &session.id,
+            &membership_id,
+            EntryStatus::Absent,
+            Some("called in sick"),
+            Some(&sspk),
+        )
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].change.entity_id.to_string(), first_entry.id);
+        assert_eq!(
+            queued[0].change.base_version, 1,
+            "a re-recording must use the known hub version, not 0"
+        );
     }
 
     #[test]
