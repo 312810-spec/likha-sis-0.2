@@ -1,5 +1,42 @@
 # Verification Debt
 
+## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
+
+Follow-up on the BLOCKING finding fixed earlier this session (see the
+"stop a legitimate data collision from wedging all sync forever" entry
+below): that fix's own dispatch is structurally generic —
+`sync_client::apply_decrypted_change` maps every `EntityKind` arm's
+repository-write failure through the identical `ApplyRejection::
+RepositoryRejected` path, and `pull_once`'s handling of that variant
+(skip, advance the cursor, don't set `failed`) is itself entity-agnostic
+— so the fix should already protect every wired entity with a
+natural-key `UNIQUE` constraint distinct from its own `id`, not only the
+three the original independent review happened to exercise (`Subject`,
+`LearnerScore`, `SectionMembership`).
+
+Verified this empirically, not just by re-reading the dispatch code:
+`sections` carries the identical shape (`UNIQUE (school_id, school_year,
+grade_level, name)`, `ON CONFLICT(id)` upsert). New test
+`pull_once_skips_past_a_section_natural_key_collision_too_not_just_subject`
+(`src-tauri/src/sync_client.rs`) proves the same collision-and-recovery
+behavior for this second, independently-checked entity: the colliding
+`Section` is skipped (never materialized), the pull cursor still
+advances past it, `summary.failed` stays `false`, and a later
+non-colliding `Section` change in the same batch still applies.
+
+**Not exhaustively re-verified for all ten entities** — `subject_attendance_sessions`
+(`UNIQUE (teaching_assignment_id, session_date)`) was identified as
+carrying the same natural-key shape but not separately test-proven; a
+future session could add that confirmation too if ever warranted. Given
+the mechanism itself is generic (confirmed by direct code read across
+all ten `apply_decrypted_change` arms), this is assessed as low
+residual risk, not an open gap requiring immediate action.
+
+**Verified**: `cargo test --lib pull_once_skips_past_a_section` in
+isolation, then full `cargo test` (1055 lib tests, 0 failed, up from
+1054), `cargo clippy --all-targets -- -D warnings` (0 warnings),
+`cargo fmt --check` (clean after one `cargo fmt` pass).
+
 ## SubjectAttendanceEntry (per-learner attendance marks) wired to sync via a real schema migration (2026-09-07)
 
 Closes the Tier-1 gap recorded in

@@ -2343,6 +2343,100 @@ mod tests {
     }
 
     #[test]
+    fn pull_once_skips_past_a_section_natural_key_collision_too_not_just_subject() {
+        // The BLOCKING fix's own generic dispatch (`ApplyRejection::
+        // RepositoryRejected` applies uniformly, regardless of which
+        // entity's `upsert_from_sync` rejects) means it should already
+        // cover every wired entity with a natural-key `UNIQUE` distinct
+        // from its own `id`, not only the entities the original review
+        // happened to exercise -- `sections` has exactly this shape
+        // (`UNIQUE (school_id, school_year, grade_level, name)`, `ON
+        // CONFLICT(id)` upsert). This proves that claim directly for a
+        // second entity, rather than leaving it as an inferred-from-the-
+        // mechanism assumption.
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        section::create(
+            &fixture.conn,
+            &fixture.school_id,
+            "2025-2026",
+            "7",
+            "Mabini",
+        )
+        .unwrap();
+
+        let colliding_entity_id = Uuid::now_v7();
+        let good_entity_id = Uuid::now_v7();
+        {
+            let conn = &fixture.conn;
+            let colliding_section = section::Section {
+                id: colliding_entity_id.to_string(),
+                school_id: fixture.school_id.clone(),
+                school_year: "2025-2026".to_string(),
+                grade_level: "7".to_string(),
+                name: "Mabini".to_string(),
+                created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            };
+            let mut colliding_change = make_change(&fixture, colliding_entity_id, 0);
+            colliding_change.entity_kind = EntityKind::Section;
+            colliding_change.encrypted_payload = payload_key::encrypt_payload(
+                &fixture.sspk,
+                &serde_json::to_vec(&colliding_section).unwrap(),
+            )
+            .unwrap();
+            sync_outbox::enqueue(conn, &fixture.school_id, &colliding_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_section_change(&fixture, good_entity_id, 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 2);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 1);
+        assert!(!summary.failed);
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            2,
+            "the cursor must advance past both changes"
+        );
+        let colliding_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sections WHERE id = ?1)",
+                [colliding_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!colliding_row_exists);
+        assert!(section::find_by_id_in_school(
+            conn,
+            &fixture.school_id,
+            &good_entity_id.to_string()
+        )
+        .unwrap()
+        .is_some());
+    }
+
+    #[test]
     fn pull_once_rejects_a_tampered_subject_payload_without_applying_or_advancing_past_it() {
         let fixture = setup();
         let entity_id = Uuid::now_v7();

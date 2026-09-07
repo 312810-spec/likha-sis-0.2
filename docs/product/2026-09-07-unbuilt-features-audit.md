@@ -231,17 +231,29 @@ quality` 1099/1099. Source: this session's implementation,
     items in Tier 1 above are a real, not theoretical, residual risk.
     Source: `docs/VERIFICATION-DEBT.md`, same-titled entry (2026-09-07).
 
-11. **`pull_once`'s "any repository-level rejection halts the whole pull
-    batch" design still applies to genuine, non-malicious database
-    conflicts on any entity not yet given the `RepositoryRejected` fix's
-    exact treatment** — the fix above was scoped to the four entities the
-    independent review actually exercised; whether every other wired
-    entity's own natural-key constraints (if any) got the same
-    "advance-past, don't wedge" treatment was not exhaustively re-verified
-    across all ten entities in this audit. Worth a follow-up sweep.
-    Source: inferred from the mechanism described in
-    `docs/VERIFICATION-DEBT.md`'s BLOCKING-finding entry; not independently
-    re-verified per-entity by this audit.
+11. **CLOSED 2026-09-07 (sweep performed, not exhaustive) — confirmed the
+    `RepositoryRejected` fix's "advance-past, don't wedge" treatment is
+    generic, not per-entity.** `sync_client::apply_decrypted_change`
+    maps every `EntityKind` arm's repository-write failure through the
+    identical `.map_err(|_| ApplyRejection::RepositoryRejected)`
+    dispatch (confirmed by direct code read across all 10 arms — this
+    was already true from how the original fix was written, not a new
+    change), and `pull_once`'s handling of that variant is itself
+    entity-agnostic. Verified this claim empirically for a SECOND entity
+    beyond `Subject`: `sections` carries the identical shape (`UNIQUE
+(school_id, school_year, grade_level, name)`, `ON CONFLICT(id)`
+    upsert) — new test
+    `pull_once_skips_past_a_section_natural_key_collision_too_not_just_subject`
+    proves the same collision is skipped, the cursor still advances past
+    it, and a later non-colliding change in the same batch still
+    applies. Not exhaustively re-verified for every one of the ten
+    entities individually (e.g. `subject_attendance_sessions`'s own
+    `UNIQUE (teaching_assignment_id, session_date)` was identified as
+    carrying the same shape but not separately test-proven) — the
+    mechanism's genericness makes this low-risk, not zero-risk, so a
+    future session could still add per-entity confirmation tests if ever
+    warranted. Source: this session's implementation,
+    `docs/VERIFICATION-DEBT.md`'s matching entry.
 
 12. **MATATAG-vs-prior curriculum learning-area _content_ differences
     remain unconfirmed against a primary source** — only the curriculum
