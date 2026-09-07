@@ -303,13 +303,13 @@ pub fn transfer_learner_membership(
     to_section_id: String,
     effective_on: String,
 ) -> AppResult<TransferOutcome> {
-    let mut conn = lock_db(&db);
+    let conn = lock_db(&db);
     let (school_id, actor_user_id) =
         auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     transfer_learner_membership_with_optional_sync(
-        &mut conn,
+        &conn,
         &school_id,
         &actor_user_id,
         &learner_id,
@@ -330,9 +330,16 @@ pub fn transfer_learner_membership(
 /// `list_by_learner_in_school` (the outcome only carries the new row), same
 /// convention as every other non-`Transferred` outcome: nothing is
 /// enqueued when the domain write itself did not happen.
+///
+/// The domain write and both enqueues are atomic together in one outer
+/// `SAVEPOINT` -- `section_membership::transfer_membership` opens its own
+/// nested `SAVEPOINT` internally, which SQLite supports natively (unlike
+/// rusqlite's `Connection::transaction()`, which cannot nest). Closes the
+/// non-atomicity gap `docs/VERIFICATION-DEBT.md` previously recorded for
+/// this function.
 #[allow(clippy::too_many_arguments)]
 fn transfer_learner_membership_with_optional_sync(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     actor_user_id: &str,
     learner_id: &str,
@@ -341,33 +348,66 @@ fn transfer_learner_membership_with_optional_sync(
     effective_on: &str,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<TransferOutcome> {
-    let outcome = section_membership::transfer_membership(
-        conn,
-        school_id,
-        learner_id,
-        from_membership_id,
-        to_section_id,
-        effective_on,
-    )?;
+    let Some(sspk) = sspk else {
+        return section_membership::transfer_membership(
+            conn,
+            school_id,
+            learner_id,
+            from_membership_id,
+            to_section_id,
+            effective_on,
+        );
+    };
 
-    if let (TransferOutcome::Transferred { membership }, Some(sspk)) = (&outcome, sspk) {
-        let closed_source =
-            section_membership::list_by_learner_in_school(conn, school_id, learner_id)?
-                .into_iter()
-                .find(|m| m.id == from_membership_id);
-        if let Some(closed_source) = closed_source {
+    conn.execute_batch("SAVEPOINT transfer_membership_with_sync")?;
+    let outcome = (|| -> AppResult<TransferOutcome> {
+        let outcome = section_membership::transfer_membership(
+            conn,
+            school_id,
+            learner_id,
+            from_membership_id,
+            to_section_id,
+            effective_on,
+        )?;
+
+        if let TransferOutcome::Transferred { membership } = &outcome {
+            let closed_source =
+                section_membership::list_by_learner_in_school(conn, school_id, learner_id)?
+                    .into_iter()
+                    .find(|m| m.id == from_membership_id);
+            if let Some(closed_source) = closed_source {
+                enqueue_section_membership_sync_change(
+                    conn,
+                    school_id,
+                    actor_user_id,
+                    &closed_source,
+                    sspk,
+                )?;
+            }
             enqueue_section_membership_sync_change(
                 conn,
                 school_id,
                 actor_user_id,
-                &closed_source,
+                membership,
                 sspk,
             )?;
         }
-        enqueue_section_membership_sync_change(conn, school_id, actor_user_id, membership, sspk)?;
-    }
 
-    Ok(outcome)
+        Ok(outcome)
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE transfer_membership_with_sync")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO transfer_membership_with_sync; RELEASE transfer_membership_with_sync",
+            );
+            Err(error)
+        }
+    }
 }
 
 /// Ends a currently-enrolled learner's specific open membership, effective
@@ -389,13 +429,13 @@ pub fn end_learner_membership(
     membership_id: String,
     effective_on: String,
 ) -> AppResult<EndMembershipOutcome> {
-    let mut conn = lock_db(&db);
+    let conn = lock_db(&db);
     let (school_id, actor_user_id) =
         auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     end_learner_membership_with_optional_sync(
-        &mut conn,
+        &conn,
         &school_id,
         &actor_user_id,
         &learner_id,
@@ -409,9 +449,11 @@ pub fn end_learner_membership(
 /// `transfer_learner_membership_with_optional_sync`. `sspk` is `None` when
 /// this school has never enrolled a device. Enqueues only on
 /// `EndMembershipOutcome::Ended` -- every other outcome means the domain
-/// write did not happen, so nothing is enqueued.
+/// write did not happen, so nothing is enqueued. Atomic with the domain
+/// write via one outer `SAVEPOINT` -- see
+/// `transfer_learner_membership_with_optional_sync`'s doc comment.
 fn end_learner_membership_with_optional_sync(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     actor_user_id: &str,
     learner_id: &str,
@@ -419,19 +461,51 @@ fn end_learner_membership_with_optional_sync(
     effective_on: &str,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<EndMembershipOutcome> {
-    let outcome = section_membership::end_membership(
-        conn,
-        school_id,
-        learner_id,
-        membership_id,
-        effective_on,
-    )?;
+    let Some(sspk) = sspk else {
+        return section_membership::end_membership(
+            conn,
+            school_id,
+            learner_id,
+            membership_id,
+            effective_on,
+        );
+    };
 
-    if let (EndMembershipOutcome::Ended { membership }, Some(sspk)) = (&outcome, sspk) {
-        enqueue_section_membership_sync_change(conn, school_id, actor_user_id, membership, sspk)?;
+    conn.execute_batch("SAVEPOINT end_membership_with_sync")?;
+    let outcome = (|| -> AppResult<EndMembershipOutcome> {
+        let outcome = section_membership::end_membership(
+            conn,
+            school_id,
+            learner_id,
+            membership_id,
+            effective_on,
+        )?;
+
+        if let EndMembershipOutcome::Ended { membership } = &outcome {
+            enqueue_section_membership_sync_change(
+                conn,
+                school_id,
+                actor_user_id,
+                membership,
+                sspk,
+            )?;
+        }
+
+        Ok(outcome)
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE end_membership_with_sync")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO end_membership_with_sync; RELEASE end_membership_with_sync",
+            );
+            Err(error)
+        }
     }
-
-    Ok(outcome)
 }
 
 /// Every learner in the session's school with their current open
@@ -474,13 +548,13 @@ pub fn enroll_learner_membership(
     section_id: String,
     starts_on: String,
 ) -> AppResult<EnrollOutcome> {
-    let mut conn = lock_db(&db);
+    let conn = lock_db(&db);
     let (school_id, actor_user_id) =
         auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     enroll_learner_membership_with_optional_sync(
-        &mut conn,
+        &conn,
         &school_id,
         &actor_user_id,
         &learner_id,
@@ -496,9 +570,11 @@ pub fn enroll_learner_membership(
 /// `0` via `sync_version_cache::known_version`'s own default) -- every
 /// other outcome (already enrolled, unknown learner/section, overlapping
 /// membership, invalid date, dependent-record conflict) means the domain
-/// write did not happen, so nothing is enqueued.
+/// write did not happen, so nothing is enqueued. Atomic with the domain
+/// write via one outer `SAVEPOINT` -- see
+/// `transfer_learner_membership_with_optional_sync`'s doc comment.
 fn enroll_learner_membership_with_optional_sync(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     actor_user_id: &str,
     learner_id: &str,
@@ -506,14 +582,43 @@ fn enroll_learner_membership_with_optional_sync(
     starts_on: &str,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<EnrollOutcome> {
-    let outcome =
-        section_membership::enroll_membership(conn, school_id, learner_id, section_id, starts_on)?;
+    let Some(sspk) = sspk else {
+        return section_membership::enroll_membership(
+            conn, school_id, learner_id, section_id, starts_on,
+        );
+    };
 
-    if let (EnrollOutcome::Enrolled { membership }, Some(sspk)) = (&outcome, sspk) {
-        enqueue_section_membership_sync_change(conn, school_id, actor_user_id, membership, sspk)?;
+    conn.execute_batch("SAVEPOINT enroll_membership_with_sync")?;
+    let outcome = (|| -> AppResult<EnrollOutcome> {
+        let outcome = section_membership::enroll_membership(
+            conn, school_id, learner_id, section_id, starts_on,
+        )?;
+
+        if let EnrollOutcome::Enrolled { membership } = &outcome {
+            enqueue_section_membership_sync_change(
+                conn,
+                school_id,
+                actor_user_id,
+                membership,
+                sspk,
+            )?;
+        }
+
+        Ok(outcome)
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE enroll_membership_with_sync")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO enroll_membership_with_sync; RELEASE enroll_membership_with_sync",
+            );
+            Err(error)
+        }
     }
-
-    Ok(outcome)
 }
 
 /// Corrects a same-day data-entry mistake: `membership_id` was placed in
@@ -540,10 +645,10 @@ pub fn correct_same_day_placement(
     to_section_id: String,
     as_of_date: String,
 ) -> AppResult<CorrectPlacementOutcome> {
-    let mut conn = lock_db(&db);
+    let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
     section_membership::correct_same_day_placement(
-        &mut conn,
+        &conn,
         &school_id,
         &learner_id,
         &membership_id,
@@ -690,10 +795,9 @@ mod tests {
     fn enroll_learner_membership_with_no_sspk_behaves_exactly_like_a_plain_enroll() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
 
         let outcome = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -715,11 +819,10 @@ mod tests {
     fn enroll_learner_membership_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let sspk = test_sspk();
 
         let outcome = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -754,11 +857,10 @@ mod tests {
     fn a_rejected_enroll_membership_never_enqueues_an_outbox_row() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let sspk = test_sspk();
         // First enrollment succeeds and leaves the learner actively enrolled.
         enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -770,7 +872,7 @@ mod tests {
 
         // A second attempt is rejected -- AlreadyEnrolled, nothing written.
         let outcome = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -793,10 +895,9 @@ mod tests {
     fn end_learner_membership_with_an_sspk_enqueues_the_closed_row_with_a_known_base_version() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let sspk = test_sspk();
         let enrolled = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -835,7 +936,7 @@ mod tests {
         .unwrap();
 
         let outcome = end_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -874,9 +975,8 @@ mod tests {
     fn end_learner_membership_with_no_sspk_never_enqueues() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let enrolled = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -890,7 +990,7 @@ mod tests {
         };
 
         end_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -908,12 +1008,11 @@ mod tests {
     fn a_rejected_end_membership_never_enqueues_an_outbox_row() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let sspk = test_sspk();
 
         // No membership exists yet with this id -- NotFound, nothing to enqueue.
         let outcome = end_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -938,10 +1037,9 @@ mod tests {
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal")
             .unwrap()
             .id;
-        let mut conn = conn;
         let sspk = test_sspk();
         let enrolled = enroll_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -975,7 +1073,7 @@ mod tests {
         .unwrap();
 
         let outcome = transfer_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,
@@ -1027,12 +1125,11 @@ mod tests {
     fn a_rejected_transfer_never_enqueues_an_outbox_row() {
         let (conn, school_id, actor_user_id) = setup();
         let (section_a, learner) = setup_section_and_learner(&conn, &school_id);
-        let mut conn = conn;
         let sspk = test_sspk();
 
         // No membership exists yet with this id -- MembershipNotFound.
         let outcome = transfer_learner_membership_with_optional_sync(
-            &mut conn,
+            &conn,
             &school_id,
             &actor_user_id,
             &learner.id,

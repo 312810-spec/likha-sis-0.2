@@ -89,8 +89,8 @@ fn total_membership_rows(conn: &rusqlite::Connection, learner_id: &str) -> i64 {
 #[test]
 fn two_connections_enrolling_the_same_unenrolled_learner_commit_exactly_one_membership() {
     let fx = fixture();
-    let mut conn_a = open_conn(&fx);
-    let mut conn_b = open_conn(&fx);
+    let conn_a = open_conn(&fx);
+    let conn_b = open_conn(&fx);
 
     // Both connections observe the learner as unenrolled.
     assert_eq!(open_membership_count(&conn_a, &fx.learner_id), 0);
@@ -98,7 +98,7 @@ fn two_connections_enrolling_the_same_unenrolled_learner_commit_exactly_one_memb
 
     // A wins the race and fully commits.
     let out_a = section_membership::enroll_membership(
-        &mut conn_a,
+        &conn_a,
         &fx.school_id,
         &fx.learner_id,
         &fx.section_a,
@@ -114,7 +114,7 @@ fn two_connections_enrolling_the_same_unenrolled_learner_commit_exactly_one_memb
     // Its SELECT sees A's committed row, so it loses *logically* with a
     // typed conflict — never a duplicate membership, never a raw error.
     let out_b = section_membership::enroll_membership(
-        &mut conn_b,
+        &conn_b,
         &fx.school_id,
         &fx.learner_id,
         &fx.section_b,
@@ -144,7 +144,7 @@ fn two_connections_enrolling_the_same_unenrolled_learner_commit_exactly_one_memb
 #[test]
 fn a_stale_snapshot_enrolment_fails_cleanly_and_retry_from_a_fresh_connection_is_deterministic() {
     let fx = fixture();
-    let mut conn_a = open_conn(&fx);
+    let conn_a = open_conn(&fx);
     let mut conn_b = open_conn(&fx);
 
     // B pins a read snapshot in which the learner is still unenrolled.
@@ -160,7 +160,7 @@ fn a_stale_snapshot_enrolment_fails_cleanly_and_retry_from_a_fresh_connection_is
 
     // A enrols and commits while B holds its snapshot.
     section_membership::enroll_membership(
-        &mut conn_a,
+        &conn_a,
         &fx.school_id,
         &fx.learner_id,
         &fx.section_a,
@@ -189,7 +189,7 @@ fn a_stale_snapshot_enrolment_fails_cleanly_and_retry_from_a_fresh_connection_is
     // Retry from a refreshed connection: deterministic typed outcome, not
     // a busy error.
     let retry = section_membership::enroll_membership(
-        &mut conn_b,
+        &conn_b,
         &fx.school_id,
         &fx.learner_id,
         &fx.section_b,
@@ -217,12 +217,12 @@ fn two_connections_transferring_the_same_membership_commit_exactly_one_transfer(
     .unwrap();
     drop(setup);
 
-    let mut conn_a = open_conn(&fx);
-    let mut conn_b = open_conn(&fx);
+    let conn_a = open_conn(&fx);
+    let conn_b = open_conn(&fx);
 
     // A transfers A -> B and commits.
     let out_a = section_membership::transfer_membership(
-        &mut conn_a,
+        &conn_a,
         &fx.school_id,
         &fx.learner_id,
         &m_a.id,
@@ -238,7 +238,7 @@ fn two_connections_transferring_the_same_membership_commit_exactly_one_transfer(
     // B, in a fresh transaction, tries to transfer the *same* source
     // membership A -> C. Its SELECT sees `m_a` already closed → NotCurrent.
     let out_b = section_membership::transfer_membership(
-        &mut conn_b,
+        &conn_b,
         &fx.school_id,
         &fx.learner_id,
         &m_a.id,
@@ -283,7 +283,7 @@ fn the_guarded_close_update_writes_nothing_once_the_row_is_already_closed() {
     // some other writer has closed the row, which the functions map to
     // `NotCurrent` rather than clobbering a closed span.
     let fx = fixture();
-    let mut setup = open_conn(&fx);
+    let setup = open_conn(&fx);
     let m_a = section_membership::enroll(
         &setup,
         &fx.school_id,
@@ -294,7 +294,7 @@ fn the_guarded_close_update_writes_nothing_once_the_row_is_already_closed() {
     .unwrap()
     .unwrap();
     section_membership::end_membership(
-        &mut setup,
+        &setup,
         &fx.school_id,
         &fx.learner_id,
         &m_a.id,

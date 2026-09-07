@@ -310,7 +310,7 @@ fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<SectionMembership
 /// `ends_on IS NULL` and its affected-row count is checked, so two
 /// concurrent submissions cannot both succeed.
 pub fn end_membership(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     learner_id: &str,
     membership_id: &str,
@@ -320,69 +320,87 @@ pub fn end_membership(
         return Ok(EndMembershipOutcome::InvalidEffectiveDate);
     }
 
-    let tx = conn.transaction()?;
+    // A `SAVEPOINT` rather than `Connection::transaction()` -- same
+    // rationale as `enroll`'s own comment -- so the command layer can wrap
+    // this call and its sync-outbox enqueue in one outer `SAVEPOINT`
+    // together (SQLite nests savepoints natively; rusqlite's
+    // `Connection::transaction()` does not nest). Every early `return`
+    // below happens before any write, so releasing this savepoint on any
+    // `Ok(..)` -- write or no-op alike -- is always correct.
+    conn.execute_batch("SAVEPOINT sm_end")?;
+    let outcome = (|| -> AppResult<EndMembershipOutcome> {
+        // Defense in depth, matching `enroll`: a `section_memberships` row
+        // that matched the `(id, school_id, learner_id)` triple normally
+        // guarantees the learner belongs to this school, but a hand-forged
+        // row could pair this school with a foreign learner. Constrain the
+        // learner too, and report it as an ordinary `NotFound`.
+        if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
+            return Ok(EndMembershipOutcome::NotFound);
+        }
 
-    // Defense in depth, matching `enroll`: a `section_memberships` row that
-    // matched the `(id, school_id, learner_id)` triple normally guarantees
-    // the learner belongs to this school, but a hand-forged row could pair
-    // this school with a foreign learner. Constrain the learner too, and
-    // report it as an ordinary `NotFound`.
-    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
-        return Ok(EndMembershipOutcome::NotFound);
-    }
+        let existing: Option<(String, String, Option<String>)> = conn
+            .query_row(
+                "SELECT section_id, starts_on, ends_on FROM section_memberships \
+                 WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
+                (membership_id, school_id, learner_id),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                e => Err(e),
+            })?;
 
-    let existing: Option<(String, String, Option<String>)> = tx
-        .query_row(
-            "SELECT section_id, starts_on, ends_on FROM section_memberships \
-             WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
-            (membership_id, school_id, learner_id),
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e),
-        })?;
+        let (section_id, starts_on, ends_on) = match existing {
+            None => return Ok(EndMembershipOutcome::NotFound),
+            Some(row) => row,
+        };
+        if ends_on.is_some() {
+            return Ok(EndMembershipOutcome::NotCurrent);
+        }
+        if effective_on < starts_on.as_str() {
+            return Ok(EndMembershipOutcome::InvalidEffectiveDate);
+        }
+        if effective_on == starts_on.as_str() {
+            // `[starts_on, starts_on)` — a zero-length interval. Rejected
+            // under the Wave 2Q policy (`starts_on` strictly before `ends_on`).
+            return Ok(EndMembershipOutcome::ZeroLengthInterval);
+        }
+        if let Some(record) = dependent_records_stranded(
+            conn,
+            school_id,
+            learner_id,
+            &section_id,
+            membership_id,
+            &starts_on,
+            Some(effective_on),
+        )? {
+            return Ok(EndMembershipOutcome::DependentRecordConflict { record });
+        }
 
-    let (section_id, starts_on, ends_on) = match existing {
-        None => return Ok(EndMembershipOutcome::NotFound),
-        Some(row) => row,
-    };
-    if ends_on.is_some() {
-        return Ok(EndMembershipOutcome::NotCurrent);
-    }
-    if effective_on < starts_on.as_str() {
-        return Ok(EndMembershipOutcome::InvalidEffectiveDate);
-    }
-    if effective_on == starts_on.as_str() {
-        // `[starts_on, starts_on)` — a zero-length interval. Rejected
-        // under the Wave 2Q policy (`starts_on` strictly before `ends_on`).
-        return Ok(EndMembershipOutcome::ZeroLengthInterval);
-    }
-    if let Some(record) = dependent_records_stranded(
-        &tx,
-        school_id,
-        learner_id,
-        &section_id,
-        membership_id,
-        &starts_on,
-        Some(effective_on),
-    )? {
-        return Ok(EndMembershipOutcome::DependentRecordConflict { record });
-    }
+        let affected = conn.execute(
+            "UPDATE section_memberships SET ends_on = ?1 WHERE id = ?2 AND ends_on IS NULL",
+            (effective_on, membership_id),
+        )?;
+        if affected != 1 {
+            // Lost a race: the row was closed between the SELECT and here.
+            return Ok(EndMembershipOutcome::NotCurrent);
+        }
 
-    let affected = tx.execute(
-        "UPDATE section_memberships SET ends_on = ?1 WHERE id = ?2 AND ends_on IS NULL",
-        (effective_on, membership_id),
-    )?;
-    if affected != 1 {
-        // Lost a race: the row was closed between the SELECT and here.
-        return Ok(EndMembershipOutcome::NotCurrent);
-    }
+        let membership = find_by_id(conn, membership_id)?.expect("row just updated must exist");
+        Ok(EndMembershipOutcome::Ended { membership })
+    })();
 
-    let membership = find_by_id(&tx, membership_id)?.expect("row just updated must exist");
-    tx.commit()?;
-    Ok(EndMembershipOutcome::Ended { membership })
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE sm_end")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK TO sm_end; RELEASE sm_end");
+            Err(error)
+        }
+    }
 }
 
 /// Moves one *specific* open membership to `to_section_id`, effective
@@ -406,7 +424,7 @@ pub fn end_membership(
 /// structurally backstops the one-open-membership invariant.
 #[allow(clippy::too_many_arguments)]
 pub fn transfer_membership(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     learner_id: &str,
     from_membership_id: &str,
@@ -417,80 +435,94 @@ pub fn transfer_membership(
         return Ok(TransferOutcome::InvalidEffectiveDate);
     }
 
-    let tx = conn.transaction()?;
+    // SAVEPOINT, not `Connection::transaction()` -- same rationale as
+    // `end_membership`'s own comment (lets the command layer nest this
+    // inside one outer SAVEPOINT together with the sync-outbox enqueue).
+    conn.execute_batch("SAVEPOINT sm_transfer")?;
+    let outcome = (|| -> AppResult<TransferOutcome> {
+        // Defense in depth, matching `enroll`: constrain the learner to this
+        // school independently of the membership row, so a forged row pairing
+        // this school with a foreign learner cannot be moved. Reported as an
+        // ordinary `MembershipNotFound`.
+        if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
+            return Ok(TransferOutcome::MembershipNotFound);
+        }
 
-    // Defense in depth, matching `enroll`: constrain the learner to this
-    // school independently of the membership row, so a forged row pairing
-    // this school with a foreign learner cannot be moved. Reported as an
-    // ordinary `MembershipNotFound`.
-    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
-        return Ok(TransferOutcome::MembershipNotFound);
-    }
+        let existing: Option<(String, String, Option<String>)> = conn
+            .query_row(
+                "SELECT section_id, starts_on, ends_on FROM section_memberships \
+                 WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
+                (from_membership_id, school_id, learner_id),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                e => Err(e),
+            })?;
 
-    let existing: Option<(String, String, Option<String>)> = tx
-        .query_row(
-            "SELECT section_id, starts_on, ends_on FROM section_memberships \
-             WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
-            (from_membership_id, school_id, learner_id),
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e),
-        })?;
+        let (from_section_id, starts_on, ends_on) = match existing {
+            None => return Ok(TransferOutcome::MembershipNotFound),
+            Some(row) => row,
+        };
+        if ends_on.is_some() {
+            return Ok(TransferOutcome::NotCurrent);
+        }
+        if section::find_by_id_in_school(conn, school_id, to_section_id)?.is_none() {
+            return Ok(TransferOutcome::DestinationNotFound);
+        }
+        if from_section_id == to_section_id {
+            return Ok(TransferOutcome::SameSection);
+        }
+        if effective_on < starts_on.as_str() {
+            return Ok(TransferOutcome::InvalidEffectiveDate);
+        }
+        if effective_on == starts_on.as_str() {
+            // Source would become `[starts_on, starts_on)` — a zero-length
+            // interval, rejected under the Wave 2Q policy.
+            return Ok(TransferOutcome::ZeroLengthInterval);
+        }
+        if let Some(record) = dependent_records_stranded(
+            conn,
+            school_id,
+            learner_id,
+            &from_section_id,
+            from_membership_id,
+            &starts_on,
+            Some(effective_on),
+        )? {
+            return Ok(TransferOutcome::DependentRecordConflict { record });
+        }
 
-    let (from_section_id, starts_on, ends_on) = match existing {
-        None => return Ok(TransferOutcome::MembershipNotFound),
-        Some(row) => row,
-    };
-    if ends_on.is_some() {
-        return Ok(TransferOutcome::NotCurrent);
-    }
-    if section::find_by_id_in_school(&tx, school_id, to_section_id)?.is_none() {
-        return Ok(TransferOutcome::DestinationNotFound);
-    }
-    if from_section_id == to_section_id {
-        return Ok(TransferOutcome::SameSection);
-    }
-    if effective_on < starts_on.as_str() {
-        return Ok(TransferOutcome::InvalidEffectiveDate);
-    }
-    if effective_on == starts_on.as_str() {
-        // Source would become `[starts_on, starts_on)` — a zero-length
-        // interval, rejected under the Wave 2Q policy.
-        return Ok(TransferOutcome::ZeroLengthInterval);
-    }
-    if let Some(record) = dependent_records_stranded(
-        &tx,
-        school_id,
-        learner_id,
-        &from_section_id,
-        from_membership_id,
-        &starts_on,
-        Some(effective_on),
-    )? {
-        return Ok(TransferOutcome::DependentRecordConflict { record });
-    }
+        let affected = conn.execute(
+            "UPDATE section_memberships SET ends_on = ?1 WHERE id = ?2 AND ends_on IS NULL",
+            (effective_on, from_membership_id),
+        )?;
+        if affected != 1 {
+            return Ok(TransferOutcome::NotCurrent);
+        }
 
-    let affected = tx.execute(
-        "UPDATE section_memberships SET ends_on = ?1 WHERE id = ?2 AND ends_on IS NULL",
-        (effective_on, from_membership_id),
-    )?;
-    if affected != 1 {
-        return Ok(TransferOutcome::NotCurrent);
+        let new_id = Uuid::now_v7().to_string();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            (&new_id, school_id, to_section_id, learner_id, effective_on),
+        )?;
+
+        let membership = find_by_id(conn, &new_id)?.expect("row just inserted must exist");
+        Ok(TransferOutcome::Transferred { membership })
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE sm_transfer")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK TO sm_transfer; RELEASE sm_transfer");
+            Err(error)
+        }
     }
-
-    let new_id = Uuid::now_v7().to_string();
-    tx.execute(
-        "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&new_id, school_id, to_section_id, learner_id, effective_on),
-    )?;
-
-    let membership = find_by_id(&tx, &new_id)?.expect("row just inserted must exist");
-    tx.commit()?;
-    Ok(TransferOutcome::Transferred { membership })
 }
 
 /// Returns `Some(kind)` when a membership change that leaves the learner's
@@ -655,7 +687,7 @@ pub enum EnrollOutcome {
 /// `INSERT` either all commit or all roll back. `school_id` is the
 /// session-derived scope from the command layer, never client-supplied.
 pub fn enroll_membership(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     learner_id: &str,
     section_id: &str,
@@ -665,62 +697,78 @@ pub fn enroll_membership(
         return Ok(EnrollOutcome::InvalidStartDate);
     }
 
-    let tx = conn.transaction()?;
+    // SAVEPOINT, not `Connection::transaction()` -- same rationale as
+    // `end_membership`'s own comment. Named distinctly from `enroll`'s own
+    // `sm_enroll` savepoint (a different function, never called from
+    // within this one, but kept distinct for clarity).
+    conn.execute_batch("SAVEPOINT sm_enroll_membership")?;
+    let outcome = (|| -> AppResult<EnrollOutcome> {
+        if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
+            return Ok(EnrollOutcome::LearnerNotFound);
+        }
+        if section::find_by_id_in_school(conn, school_id, section_id)?.is_none() {
+            return Ok(EnrollOutcome::SectionNotFound);
+        }
 
-    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
-        return Ok(EnrollOutcome::LearnerNotFound);
-    }
-    if section::find_by_id_in_school(&tx, school_id, section_id)?.is_none() {
-        return Ok(EnrollOutcome::SectionNotFound);
-    }
+        let current_open: Option<(String, String)> = conn
+            .query_row(
+                "SELECT id, section_id FROM section_memberships \
+                 WHERE learner_id = ?1 AND school_id = ?2 AND ends_on IS NULL",
+                (learner_id, school_id),
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                e => Err(e),
+            })?;
+        if let Some((current_membership_id, current_section_id)) = current_open {
+            return Ok(EnrollOutcome::AlreadyEnrolled {
+                current_membership_id,
+                current_section_id,
+            });
+        }
 
-    let current_open: Option<(String, String)> = tx
-        .query_row(
-            "SELECT id, section_id FROM section_memberships \
-             WHERE learner_id = ?1 AND school_id = ?2 AND ends_on IS NULL",
-            (learner_id, school_id),
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e),
-        })?;
-    if let Some((current_membership_id, current_section_id)) = current_open {
-        return Ok(EnrollOutcome::AlreadyEnrolled {
-            current_membership_id,
-            current_section_id,
-        });
-    }
+        let overlaps: bool = conn.query_row(
+            "SELECT EXISTS ( \
+               SELECT 1 FROM section_memberships \
+               WHERE learner_id = ?1 AND school_id = ?2 \
+                 AND ends_on IS NOT NULL AND ends_on > ?3 \
+             )",
+            (learner_id, school_id, starts_on),
+            |row| row.get(0),
+        )?;
+        if overlaps {
+            return Ok(EnrollOutcome::OverlappingMembership);
+        }
 
-    let overlaps: bool = tx.query_row(
-        "SELECT EXISTS ( \
-           SELECT 1 FROM section_memberships \
-           WHERE learner_id = ?1 AND school_id = ?2 \
-             AND ends_on IS NOT NULL AND ends_on > ?3 \
-         )",
-        (learner_id, school_id, starts_on),
-        |row| row.get(0),
-    )?;
-    if overlaps {
-        return Ok(EnrollOutcome::OverlappingMembership);
-    }
+        if let Some(record) = dependent_records_stranded(
+            conn, school_id, learner_id, section_id, "", starts_on, None,
+        )? {
+            return Ok(EnrollOutcome::DependentRecordConflict { record });
+        }
 
-    if let Some(record) =
-        dependent_records_stranded(&tx, school_id, learner_id, section_id, "", starts_on, None)?
-    {
-        return Ok(EnrollOutcome::DependentRecordConflict { record });
-    }
+        let id = Uuid::now_v7().to_string();
+        conn.execute(
+            "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            (&id, school_id, section_id, learner_id, starts_on),
+        )?;
+        let membership = find_by_id(conn, &id)?.expect("row just inserted must exist");
+        Ok(EnrollOutcome::Enrolled { membership })
+    })();
 
-    let id = Uuid::now_v7().to_string();
-    tx.execute(
-        "INSERT INTO section_memberships (id, school_id, section_id, learner_id, starts_on) \
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        (&id, school_id, section_id, learner_id, starts_on),
-    )?;
-    let membership = find_by_id(&tx, &id)?.expect("row just inserted must exist");
-    tx.commit()?;
-    Ok(EnrollOutcome::Enrolled { membership })
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE sm_enroll_membership")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn
+                .execute_batch("ROLLBACK TO sm_enroll_membership; RELEASE sm_enroll_membership");
+            Err(error)
+        }
+    }
 }
 
 /// Outcome of [`correct_same_day_placement`]. A non-`Corrected` variant
@@ -795,7 +843,7 @@ pub enum CorrectPlacementOutcome {
 /// is checked, so two concurrent corrections cannot both succeed and a
 /// double-submit is a no-op past the first.
 pub fn correct_same_day_placement(
-    conn: &mut Connection,
+    conn: &Connection,
     school_id: &str,
     learner_id: &str,
     membership_id: &str,
@@ -806,79 +854,92 @@ pub fn correct_same_day_placement(
         return Ok(CorrectPlacementOutcome::NotEnteredToday);
     }
 
-    let tx = conn.transaction()?;
+    // SAVEPOINT, not `Connection::transaction()` -- same rationale as
+    // `end_membership`'s own comment.
+    conn.execute_batch("SAVEPOINT sm_correct")?;
+    let outcome = (|| -> AppResult<CorrectPlacementOutcome> {
+        // Defense in depth, matching `end_membership`/`transfer_membership`: a
+        // forged row could pair this school with a foreign learner.
+        if learner::find_by_id_in_school(conn, school_id, learner_id)?.is_none() {
+            return Ok(CorrectPlacementOutcome::NotFound);
+        }
 
-    // Defense in depth, matching `end_membership`/`transfer_membership`: a
-    // forged row could pair this school with a foreign learner.
-    if learner::find_by_id_in_school(&tx, school_id, learner_id)?.is_none() {
-        return Ok(CorrectPlacementOutcome::NotFound);
-    }
+        let existing: Option<(String, String, Option<String>, Option<String>)> = conn
+            .query_row(
+                "SELECT section_id, starts_on, ends_on, corrected_at FROM section_memberships \
+                 WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
+                (membership_id, school_id, learner_id),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                e => Err(e),
+            })?;
 
-    let existing: Option<(String, String, Option<String>, Option<String>)> = tx
-        .query_row(
-            "SELECT section_id, starts_on, ends_on, corrected_at FROM section_memberships \
-             WHERE id = ?1 AND school_id = ?2 AND learner_id = ?3",
-            (membership_id, school_id, learner_id),
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            e => Err(e),
-        })?;
+        let (current_section_id, starts_on, ends_on, corrected_at) = match existing {
+            None => return Ok(CorrectPlacementOutcome::NotFound),
+            Some(row) => row,
+        };
+        if ends_on.is_some() {
+            return Ok(CorrectPlacementOutcome::NotCurrent);
+        }
+        if starts_on != as_of_date {
+            return Ok(CorrectPlacementOutcome::NotEnteredToday);
+        }
+        if corrected_at.is_some() {
+            return Ok(CorrectPlacementOutcome::AlreadyCorrected);
+        }
+        if section::find_by_id_in_school(conn, school_id, to_section_id)?.is_none() {
+            return Ok(CorrectPlacementOutcome::DestinationNotFound);
+        }
+        if to_section_id == current_section_id {
+            return Ok(CorrectPlacementOutcome::SameSection);
+        }
+        // Zero-width interval: since the row is leaving `current_section_id`
+        // entirely, any dependent record in that section (on any date) counts
+        // as stranded unless some *other* retained membership already covers
+        // it -- `dependent_records_stranded` already checks that.
+        if let Some(record) = dependent_records_stranded(
+            conn,
+            school_id,
+            learner_id,
+            &current_section_id,
+            membership_id,
+            &starts_on,
+            Some(&starts_on),
+        )? {
+            return Ok(CorrectPlacementOutcome::DependentRecordConflict { record });
+        }
 
-    let (current_section_id, starts_on, ends_on, corrected_at) = match existing {
-        None => return Ok(CorrectPlacementOutcome::NotFound),
-        Some(row) => row,
-    };
-    if ends_on.is_some() {
-        return Ok(CorrectPlacementOutcome::NotCurrent);
-    }
-    if starts_on != as_of_date {
-        return Ok(CorrectPlacementOutcome::NotEnteredToday);
-    }
-    if corrected_at.is_some() {
-        return Ok(CorrectPlacementOutcome::AlreadyCorrected);
-    }
-    if section::find_by_id_in_school(&tx, school_id, to_section_id)?.is_none() {
-        return Ok(CorrectPlacementOutcome::DestinationNotFound);
-    }
-    if to_section_id == current_section_id {
-        return Ok(CorrectPlacementOutcome::SameSection);
-    }
-    // Zero-width interval: since the row is leaving `current_section_id`
-    // entirely, any dependent record in that section (on any date) counts
-    // as stranded unless some *other* retained membership already covers
-    // it -- `dependent_records_stranded` already checks that.
-    if let Some(record) = dependent_records_stranded(
-        &tx,
-        school_id,
-        learner_id,
-        &current_section_id,
-        membership_id,
-        &starts_on,
-        Some(&starts_on),
-    )? {
-        return Ok(CorrectPlacementOutcome::DependentRecordConflict { record });
-    }
+        let affected = conn.execute(
+            "UPDATE section_memberships \
+             SET section_id = ?1, \
+                 original_section_id = COALESCE(original_section_id, section_id), \
+                 corrected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             WHERE id = ?2 AND ends_on IS NULL AND corrected_at IS NULL",
+            (to_section_id, membership_id),
+        )?;
+        if affected != 1 {
+            // Lost a race: another correction (or an end/transfer) committed
+            // between the SELECT above and here.
+            return Ok(CorrectPlacementOutcome::NotCurrent);
+        }
 
-    let affected = tx.execute(
-        "UPDATE section_memberships \
-         SET section_id = ?1, \
-             original_section_id = COALESCE(original_section_id, section_id), \
-             corrected_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
-         WHERE id = ?2 AND ends_on IS NULL AND corrected_at IS NULL",
-        (to_section_id, membership_id),
-    )?;
-    if affected != 1 {
-        // Lost a race: another correction (or an end/transfer) committed
-        // between the SELECT above and here.
-        return Ok(CorrectPlacementOutcome::NotCurrent);
-    }
+        let membership = find_by_id(conn, membership_id)?.expect("row just updated must exist");
+        Ok(CorrectPlacementOutcome::Corrected { membership })
+    })();
 
-    let membership = find_by_id(&tx, membership_id)?.expect("row just updated must exist");
-    tx.commit()?;
-    Ok(CorrectPlacementOutcome::Corrected { membership })
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE sm_correct")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK TO sm_correct; RELEASE sm_correct");
+            Err(error)
+        }
+    }
 }
 
 /// A candidate for the Section Roster "Enroll learner" picker: a learner
@@ -1698,14 +1759,14 @@ mod tests {
 
     #[test]
     fn end_membership_sets_ends_on_without_deleting_the_row_or_the_learner() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
             .unwrap()
             .unwrap();
 
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-10-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-10-01").unwrap();
 
         match outcome {
             EndMembershipOutcome::Ended { membership } => {
@@ -1733,7 +1794,7 @@ mod tests {
 
     #[test]
     fn end_membership_rejects_a_same_day_end_as_a_zero_length_interval() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -1743,7 +1804,7 @@ mod tests {
         // effective_on == starts_on would make `[2025-08-01, 2025-08-01)` —
         // a zero-length interval. Rejected under the Wave 2Q policy; no
         // historical row is deleted to make it fit.
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-08-01").unwrap();
 
         assert_eq!(outcome, EndMembershipOutcome::ZeroLengthInterval);
         assert_eq!(
@@ -1755,14 +1816,14 @@ mod tests {
 
     #[test]
     fn end_membership_rejects_an_effective_date_before_the_placement_began() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
             .unwrap()
             .unwrap();
 
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-07-31").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-07-31").unwrap();
 
         assert_eq!(outcome, EndMembershipOutcome::InvalidEffectiveDate);
         assert_eq!(
@@ -1774,7 +1835,7 @@ mod tests {
 
     #[test]
     fn end_membership_is_not_current_when_the_membership_is_already_closed() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -1784,7 +1845,7 @@ mod tests {
         // Transfer out via `enroll`, closing m_a.
         enroll(&conn, &school_id, &section_b.id, &l.id, "2025-09-01").unwrap();
 
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m_a.id, "2025-10-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m_a.id, "2025-10-01").unwrap();
 
         assert_eq!(
             outcome,
@@ -1795,13 +1856,13 @@ mod tests {
 
     #[test]
     fn end_membership_not_found_for_an_unknown_or_cross_school_membership_id() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, _section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
 
         // Unknown id.
         assert_eq!(
-            end_membership(&mut conn, &school_id, &l.id, "no-such-id", "2025-10-01").unwrap(),
+            end_membership(&conn, &school_id, &l.id, "no-such-id", "2025-10-01").unwrap(),
             EndMembershipOutcome::NotFound
         );
 
@@ -1821,7 +1882,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            end_membership(&mut conn, &school_id, &l.id, &other_m.id, "2025-10-01").unwrap(),
+            end_membership(&conn, &school_id, &l.id, &other_m.id, "2025-10-01").unwrap(),
             EndMembershipOutcome::NotFound,
             "another school's membership id must be indistinguishable from an unknown one"
         );
@@ -1834,7 +1895,7 @@ mod tests {
 
     #[test]
     fn end_membership_not_found_when_the_learner_id_does_not_match_the_membership() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let other_l = learner::create(&conn, &school_id, "Ben", "Reyes", None, None).unwrap();
@@ -1843,8 +1904,7 @@ mod tests {
             .unwrap();
 
         // Right school, right (existing) membership id, wrong learner.
-        let outcome =
-            end_membership(&mut conn, &school_id, &other_l.id, &m.id, "2025-10-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &other_l.id, &m.id, "2025-10-01").unwrap();
 
         assert_eq!(outcome, EndMembershipOutcome::NotFound);
         assert_eq!(open_membership_count(&conn, &l.id), 1);
@@ -1854,7 +1914,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_closes_the_source_and_opens_the_destination_on_the_effective_day() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -1863,7 +1923,7 @@ mod tests {
             .unwrap();
 
         let outcome = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -1918,7 +1978,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_double_submit_produces_exactly_one_transfer() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -1927,7 +1987,7 @@ mod tests {
             .unwrap();
 
         let first = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -1936,7 +1996,7 @@ mod tests {
         )
         .unwrap();
         let second = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -1962,22 +2022,16 @@ mod tests {
 
     #[test]
     fn transfer_membership_rejects_the_section_the_learner_is_already_in() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m_a = enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01")
             .unwrap()
             .unwrap();
 
-        let outcome = transfer_membership(
-            &mut conn,
-            &school_id,
-            &l.id,
-            &m_a.id,
-            &section_a,
-            "2025-10-01",
-        )
-        .unwrap();
+        let outcome =
+            transfer_membership(&conn, &school_id, &l.id, &m_a.id, &section_a, "2025-10-01")
+                .unwrap();
 
         assert_eq!(outcome, TransferOutcome::SameSection);
         assert_eq!(
@@ -1992,7 +2046,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_destination_not_found_for_unknown_or_cross_school_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m_a = enroll(&conn, &school_id, &section_a, &l.id, "2025-08-01")
@@ -2001,7 +2055,7 @@ mod tests {
 
         assert_eq!(
             transfer_membership(
-                &mut conn,
+                &conn,
                 &school_id,
                 &l.id,
                 &m_a.id,
@@ -2017,7 +2071,7 @@ mod tests {
             section::create(&conn, &other.id, "2025-2026", "7", "Bonifacio").unwrap();
         assert_eq!(
             transfer_membership(
-                &mut conn,
+                &conn,
                 &school_id,
                 &l.id,
                 &m_a.id,
@@ -2037,14 +2091,14 @@ mod tests {
 
     #[test]
     fn transfer_membership_membership_not_found_for_unknown_or_cross_school_source() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, _section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
 
         assert_eq!(
             transfer_membership(
-                &mut conn,
+                &conn,
                 &school_id,
                 &l.id,
                 "no-such-membership",
@@ -2072,7 +2126,7 @@ mod tests {
 
         assert_eq!(
             transfer_membership(
-                &mut conn,
+                &conn,
                 &school_id,
                 &l.id,
                 &other_m.id,
@@ -2091,7 +2145,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_rejects_an_effective_date_before_the_source_began() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2100,7 +2154,7 @@ mod tests {
             .unwrap();
 
         let outcome = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -2117,7 +2171,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_rejects_a_same_day_transfer_as_a_zero_length_interval() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2129,7 +2183,7 @@ mod tests {
         // `[2025-08-01, 2025-08-01)` — a zero-length interval. Rejected
         // under the Wave 2Q policy; the learner stays in section A.
         let outcome = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -2148,7 +2202,7 @@ mod tests {
 
     #[test]
     fn end_membership_rejects_a_malformed_effective_date() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -2163,7 +2217,7 @@ mod tests {
             "not-a-date",
             "",
         ] {
-            let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, bad).unwrap();
+            let outcome = end_membership(&conn, &school_id, &l.id, &m.id, bad).unwrap();
             assert_eq!(
                 outcome,
                 EndMembershipOutcome::InvalidEffectiveDate,
@@ -2179,7 +2233,7 @@ mod tests {
 
     #[test]
     fn transfer_membership_rejects_a_malformed_effective_date() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2195,8 +2249,7 @@ mod tests {
             "20251001",
         ] {
             let outcome =
-                transfer_membership(&mut conn, &school_id, &l.id, &m_a.id, &section_b.id, bad)
-                    .unwrap();
+                transfer_membership(&conn, &school_id, &l.id, &m_a.id, &section_b.id, bad).unwrap();
             assert_eq!(outcome, TransferOutcome::InvalidEffectiveDate);
         }
         assert_eq!(open_membership_count(&conn, &l.id), 1);
@@ -2211,7 +2264,7 @@ mod tests {
         // create. The `(id, school_id, learner_id)` triple matches, so the
         // independent `learner::find_by_id_in_school` guard is what catches
         // it.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let other_school = school::create(&conn, "Other School").unwrap();
@@ -2225,7 +2278,7 @@ mod tests {
 
         assert_eq!(
             transfer_membership(
-                &mut conn,
+                &conn,
                 &school_id,
                 &foreign.id,
                 "m-forged",
@@ -2236,7 +2289,7 @@ mod tests {
             TransferOutcome::MembershipNotFound
         );
         assert_eq!(
-            end_membership(&mut conn, &school_id, &foreign.id, "m-forged", "2025-10-01").unwrap(),
+            end_membership(&conn, &school_id, &foreign.id, "m-forged", "2025-10-01").unwrap(),
             EndMembershipOutcome::NotFound
         );
     }
@@ -2251,7 +2304,7 @@ mod tests {
         // row and pinned that it still appeared in the range roster; the
         // Wave 2Q addendum to ADR-0042 records the evidence and the
         // decision to reverse it.)
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2260,7 +2313,7 @@ mod tests {
             .unwrap();
 
         let outcome = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -2332,12 +2385,12 @@ mod tests {
 
     #[test]
     fn enroll_membership_places_an_unenrolled_learner_and_returns_the_open_row() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_id, "2025-08-01").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_id, "2025-08-01").unwrap();
 
         match outcome {
             EnrollOutcome::Enrolled { membership } => {
@@ -2359,19 +2412,13 @@ mod tests {
 
     #[test]
     fn enroll_membership_rejects_a_learner_from_another_school() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let other = school::create(&conn, "Other School").unwrap();
         let foreign = learner::create(&conn, &other.id, "Ana", "Cruz", None, None).unwrap();
 
-        let outcome = enroll_membership(
-            &mut conn,
-            &school_id,
-            &foreign.id,
-            &section_id,
-            "2025-08-01",
-        )
-        .unwrap();
+        let outcome =
+            enroll_membership(&conn, &school_id, &foreign.id, &section_id, "2025-08-01").unwrap();
 
         assert_eq!(outcome, EnrollOutcome::LearnerNotFound);
         assert_eq!(open_membership_count(&conn, &foreign.id), 0);
@@ -2379,21 +2426,15 @@ mod tests {
 
     #[test]
     fn enroll_membership_rejects_a_section_from_another_school() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, _section_id) = setup(&conn);
         let other = school::create(&conn, "Other School").unwrap();
         let other_section =
             section::create(&conn, &other.id, "2025-2026", "7", "Bonifacio").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
 
-        let outcome = enroll_membership(
-            &mut conn,
-            &school_id,
-            &l.id,
-            &other_section.id,
-            "2025-08-01",
-        )
-        .unwrap();
+        let outcome =
+            enroll_membership(&conn, &school_id, &l.id, &other_section.id, "2025-08-01").unwrap();
 
         assert_eq!(outcome, EnrollOutcome::SectionNotFound);
         assert_eq!(open_membership_count(&conn, &l.id), 0);
@@ -2401,7 +2442,7 @@ mod tests {
 
     #[test]
     fn enroll_membership_refuses_a_learner_already_enrolled_elsewhere_transfer_is_required() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2410,7 +2451,7 @@ mod tests {
             .unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_b.id, "2025-10-01").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_b.id, "2025-10-01").unwrap();
 
         assert_eq!(
             outcome,
@@ -2429,7 +2470,7 @@ mod tests {
 
     #[test]
     fn enroll_membership_reports_already_enrolled_when_the_target_is_the_current_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -2437,7 +2478,7 @@ mod tests {
             .unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_id, "2025-09-01").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_id, "2025-09-01").unwrap();
 
         assert_eq!(
             outcome,
@@ -2450,7 +2491,7 @@ mod tests {
 
     #[test]
     fn enroll_membership_rejects_an_overlap_with_a_retained_historical_membership() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2458,10 +2499,10 @@ mod tests {
         let m_a = enroll(&conn, &school_id, &section_a, &l.id, "2025-06-01")
             .unwrap()
             .unwrap();
-        end_membership(&mut conn, &school_id, &l.id, &m_a.id, "2025-10-01").unwrap();
+        end_membership(&conn, &school_id, &l.id, &m_a.id, "2025-10-01").unwrap();
 
         // Re-enrol starting 2025-09-15 — before the old stint's end date.
-        let overlap = enroll_membership(&mut conn, &school_id, &l.id, &section_b.id, "2025-09-15");
+        let overlap = enroll_membership(&conn, &school_id, &l.id, &section_b.id, "2025-09-15");
         assert_eq!(
             overlap.unwrap(),
             EnrollOutcome::OverlappingMembership,
@@ -2469,23 +2510,23 @@ mod tests {
         );
 
         // Re-enrol starting exactly on the old end date is fine (half-open).
-        let ok = enroll_membership(&mut conn, &school_id, &l.id, &section_b.id, "2025-10-01");
+        let ok = enroll_membership(&conn, &school_id, &l.id, &section_b.id, "2025-10-01");
         assert!(matches!(ok.unwrap(), EnrollOutcome::Enrolled { .. }));
     }
 
     #[test]
     fn enroll_membership_allows_re_enrollment_after_a_prior_stint_fully_ended() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "8", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m_a = enroll(&conn, &school_id, &section_a, &l.id, "2024-06-01")
             .unwrap()
             .unwrap();
-        end_membership(&mut conn, &school_id, &l.id, &m_a.id, "2025-04-01").unwrap();
+        end_membership(&conn, &school_id, &l.id, &m_a.id, "2025-04-01").unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_b.id, "2025-06-02").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_b.id, "2025-06-02").unwrap();
 
         assert!(matches!(outcome, EnrollOutcome::Enrolled { .. }));
         assert_eq!(open_membership_count(&conn, &l.id), 1);
@@ -2500,13 +2541,13 @@ mod tests {
 
     #[test]
     fn enroll_membership_rejects_a_malformed_starts_on() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
 
         for bad in ["06/02/2025", "2025-6-2", "2025-13-40", "", "20250602"] {
             assert_eq!(
-                enroll_membership(&mut conn, &school_id, &l.id, &section_id, bad).unwrap(),
+                enroll_membership(&conn, &school_id, &l.id, &section_id, bad).unwrap(),
                 EnrollOutcome::InvalidStartDate
             );
         }
@@ -2520,7 +2561,7 @@ mod tests {
         // (simulating a concurrent writer that committed after this
         // transaction's SELECTs). The whole transaction must roll back:
         // no partial history, exactly one open membership.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2535,7 +2576,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = enroll_membership(&mut conn, &school_id, &l.id, &section_b.id, "2025-09-01");
+        let result = enroll_membership(&conn, &school_id, &l.id, &section_b.id, "2025-09-01");
 
         // The competing row makes this an AlreadyEnrolled case now — the
         // check catches it before the INSERT, so nothing is written.
@@ -2577,7 +2618,7 @@ mod tests {
 
     #[test]
     fn end_membership_blocks_a_backdate_that_would_strand_an_attendance_record() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -2587,7 +2628,7 @@ mod tests {
 
         // Backdate the end to 2025-09-01 — the 2025-09-10 mark would fall
         // outside `[2025-08-01, 2025-09-01)` and no other membership covers it.
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
 
         assert_eq!(
             outcome,
@@ -2604,7 +2645,7 @@ mod tests {
 
     #[test]
     fn end_membership_allows_a_backdate_that_keeps_every_attendance_record_covered() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -2614,14 +2655,14 @@ mod tests {
 
         // End on 2025-09-01 — the 2025-08-20 mark is still inside
         // `[2025-08-01, 2025-09-01)`.
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
 
         assert!(matches!(outcome, EndMembershipOutcome::Ended { .. }));
     }
 
     #[test]
     fn transfer_membership_blocks_a_backdate_that_would_strand_source_attendance() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -2631,7 +2672,7 @@ mod tests {
         mark_attendance(&conn, &school_id, &section_a, &l.id, "2025-09-10");
 
         let outcome = transfer_membership(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m_a.id,
@@ -2661,7 +2702,7 @@ mod tests {
         // Migration 12 left pre-section-scoping attendance rows with
         // section_id = NULL. Those are not attributable to any membership,
         // so they must not wedge a backdated end/transfer.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -2674,7 +2715,7 @@ mod tests {
         )
         .unwrap();
 
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-09-01").unwrap();
 
         assert!(
             matches!(outcome, EndMembershipOutcome::Ended { .. }),
@@ -2688,7 +2729,7 @@ mod tests {
         // membership covering it (an orphan, e.g. left by a prior backdated
         // end that this same guard now prevents — constructed directly
         // here). Re-enrolling with a start *after* the orphan strands it.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         conn.execute(
@@ -2699,7 +2740,7 @@ mod tests {
         .unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_id, "2025-08-01").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_id, "2025-08-01").unwrap();
 
         assert_eq!(
             outcome,
@@ -2716,17 +2757,17 @@ mod tests {
         // is retained and covers its own attendance. A new stint that
         // starts after it must NOT be false-flagged as a dependent-record
         // conflict.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m_old = enroll(&conn, &school_id, &section_id, &l.id, "2024-06-01")
             .unwrap()
             .unwrap();
         mark_attendance(&conn, &school_id, &section_id, &l.id, "2024-09-10");
-        end_membership(&mut conn, &school_id, &l.id, &m_old.id, "2025-04-01").unwrap();
+        end_membership(&conn, &school_id, &l.id, &m_old.id, "2025-04-01").unwrap();
 
         let outcome =
-            enroll_membership(&mut conn, &school_id, &l.id, &section_id, "2025-06-02").unwrap();
+            enroll_membership(&conn, &school_id, &l.id, &section_id, "2025-06-02").unwrap();
 
         assert!(
             matches!(outcome, EnrollOutcome::Enrolled { .. }),
@@ -2789,13 +2830,13 @@ mod tests {
 
     #[test]
     fn enrollable_learners_excludes_ended_memberships_and_other_schools() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
             .unwrap()
             .unwrap();
-        end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-10-01").unwrap();
+        end_membership(&conn, &school_id, &l.id, &m.id, "2025-10-01").unwrap();
 
         let other = school::create(&conn, "Other School").unwrap();
         let other_section =
@@ -2831,7 +2872,7 @@ mod tests {
     const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
 
     fn enroll_via_membership(
-        conn: &mut Connection,
+        conn: &Connection,
         school_id: &str,
         section_id: &str,
         learner_id: &str,
@@ -2845,14 +2886,14 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_updates_the_section_in_place() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -2903,15 +2944,15 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_membership_from_a_different_learner() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let other = learner::create(&conn, &school_id, "Ben", "Reyes", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &other.id,
             &m.id,
@@ -2930,18 +2971,18 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_membership_from_a_different_school() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let other_school = school::create(&conn, "Other School").unwrap();
         let other_section =
             section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         // A forged/cross-school call: right membership id and learner id,
         // but claiming a different school.
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &other_school.id,
             &l.id,
             &m.id,
@@ -2955,13 +2996,13 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_forged_membership_id() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             "not-a-real-membership-id",
@@ -2975,16 +3016,16 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_stale_already_ended_membership() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
         // Ended on a later day, so this is no longer the open row.
-        end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-10").unwrap();
+        end_membership(&conn, &school_id, &l.id, &m.id, "2025-08-10").unwrap();
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -2998,15 +3039,15 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_placement_not_entered_today() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         // Called with a later "today" -- the placement is no longer today's.
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3020,15 +3061,15 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_second_correction_double_submit() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let section_c = section::create(&conn, &school_id, "2025-2026", "7", "Luna").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let first = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3042,7 +3083,7 @@ mod tests {
         // correction must both be refused identically -- a correction is a
         // one-time fix, not a repeatable edit.
         let retry = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3053,7 +3094,7 @@ mod tests {
         assert_eq!(retry, CorrectPlacementOutcome::AlreadyCorrected);
 
         let second_attempt = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3073,13 +3114,13 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_an_unknown_destination_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3093,16 +3134,16 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_destination_from_another_school() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let other_school = school::create(&conn, "Other School").unwrap();
         let other_section =
             section::create(&conn, &other_school.id, "2025-2026", "7", "Bonifacio").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3116,37 +3157,31 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_correcting_to_the_same_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
-        let outcome = correct_same_day_placement(
-            &mut conn,
-            &school_id,
-            &l.id,
-            &m.id,
-            &section_a,
-            "2025-08-01",
-        )
-        .unwrap();
+        let outcome =
+            correct_same_day_placement(&conn, &school_id, &l.id, &m.id, &section_a, "2025-08-01")
+                .unwrap();
 
         assert_eq!(outcome, CorrectPlacementOutcome::SameSection);
     }
 
     #[test]
     fn correct_same_day_placement_blocks_an_existing_attendance_record_in_the_current_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
         // Attendance was already taken today, in the section being
         // corrected away from.
         mark_attendance(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3175,7 +3210,7 @@ mod tests {
         // the old attendance is explained by the *prior* stint, not this
         // one, so correcting today's mistaken placement must not be
         // falsely blocked by it.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
@@ -3183,11 +3218,11 @@ mod tests {
             .unwrap()
             .unwrap();
         mark_attendance(&conn, &school_id, &section_a, &l.id, "2024-09-10");
-        end_membership(&mut conn, &school_id, &l.id, &m_old.id, "2025-04-01").unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        end_membership(&conn, &school_id, &l.id, &m_old.id, "2025-04-01").unwrap();
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3201,11 +3236,11 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_blocks_a_scored_grade_in_the_current_section() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         // A scored grade in section A, in a grading period wholly before
         // today -- constructed directly (bypassing `learner_score::record`'s
@@ -3242,7 +3277,7 @@ mod tests {
         .unwrap();
 
         let outcome = correct_same_day_placement(
-            &mut conn,
+            &conn,
             &school_id,
             &l.id,
             &m.id,
@@ -3277,7 +3312,7 @@ mod tests {
         // so the forged row is inserted directly, matching the technique
         // `class_record.rs`'s own `forge_cross_school_class_record` helper
         // uses for the same audit.
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_id) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
         let m = enroll(&conn, &school_id, &section_id, &l.id, "2025-08-01")
@@ -3344,7 +3379,7 @@ mod tests {
         // failed to scope `class_records`/`grading_periods` to this
         // school. It must not: the class record and grading period belong
         // to another school entirely, so the end must succeed cleanly.
-        let outcome = end_membership(&mut conn, &school_id, &l.id, &m.id, "2025-08-15").unwrap();
+        let outcome = end_membership(&conn, &school_id, &l.id, &m.id, "2025-08-15").unwrap();
 
         assert!(
             matches!(outcome, EndMembershipOutcome::Ended { .. }),
@@ -3356,14 +3391,14 @@ mod tests {
 
     #[test]
     fn correct_same_day_placement_rejects_a_malformed_as_of_date() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let (school_id, section_a) = setup(&conn);
         let l = learner::create(&conn, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn, &school_id, &section_a, &l.id, "2025-08-01");
 
         for bad in ["08/01/2025", "2025-8-1", "not-a-date", ""] {
             let outcome =
-                correct_same_day_placement(&mut conn, &school_id, &l.id, &m.id, &section_a, bad)
+                correct_same_day_placement(&conn, &school_id, &l.id, &m.id, &section_a, bad)
                     .unwrap();
             assert_eq!(outcome, CorrectPlacementOutcome::NotEnteredToday);
         }
@@ -3379,17 +3414,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("race.sqlite3");
         let key = crate::crypto::generate_key();
-        let mut conn_a = db::open(&db_path, &key).unwrap();
-        let mut conn_b = db::open(&db_path, &key).unwrap();
+        let conn_a = db::open(&db_path, &key).unwrap();
+        let conn_b = db::open(&db_path, &key).unwrap();
 
         let (school_id, section_a) = setup(&conn_a);
         let section_b = section::create(&conn_a, &school_id, "2025-2026", "7", "Rizal").unwrap();
         let section_c = section::create(&conn_a, &school_id, "2025-2026", "7", "Luna").unwrap();
         let l = learner::create(&conn_a, &school_id, "Ana", "Cruz", None, None).unwrap();
-        let m = enroll_via_membership(&mut conn_a, &school_id, &section_a, &l.id, "2025-08-01");
+        let m = enroll_via_membership(&conn_a, &school_id, &section_a, &l.id, "2025-08-01");
 
         let outcome_a = correct_same_day_placement(
-            &mut conn_a,
+            &conn_a,
             &school_id,
             &l.id,
             &m.id,
@@ -3398,7 +3433,7 @@ mod tests {
         )
         .unwrap();
         let outcome_b = correct_same_day_placement(
-            &mut conn_b,
+            &conn_b,
             &school_id,
             &l.id,
             &m.id,

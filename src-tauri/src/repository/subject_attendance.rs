@@ -1451,12 +1451,12 @@ mod tests {
 
     #[test]
     fn monitor_for_assignment_excludes_a_learner_who_has_since_transferred_out() {
-        let mut conn = open_test_db();
+        let conn = open_test_db();
         let f = seed(&conn);
         open_and_mark(&conn, &f, "2026-08-25", EntryStatus::Absent);
 
         section_membership::end_membership(
-            &mut conn,
+            &conn,
             &f.school_id,
             &f.learner_id,
             &f.membership_id,
