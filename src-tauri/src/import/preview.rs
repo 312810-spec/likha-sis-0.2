@@ -183,6 +183,7 @@ mod tests {
             "test.teacher",
             "sf1_synthetic_main.xls",
             "test-fingerprint",
+            None,
         )
         .unwrap();
 

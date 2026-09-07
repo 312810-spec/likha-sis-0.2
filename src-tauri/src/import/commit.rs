@@ -8,10 +8,102 @@
 //! for this milestone. See `docs/adr/0043-sf1-bulk-import-engine.md`.
 
 use rusqlite::Connection;
+use uuid::Uuid;
 
+use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::{AppError, AppResult};
 use crate::import::sf1::{Sf1ImportSummary, Sf1RowAction, Sf1RowCommitPlan};
-use crate::repository::{learner, section_membership, sf1_import_history};
+use crate::repository::learner::Learner;
+use crate::repository::section_membership::SectionMembership;
+use crate::repository::{
+    device_identity, learner, section_membership, sf1_import_history, sync_outbox,
+    sync_version_cache,
+};
+use crate::sync::{ChangeOperation, EntityKind, PendingChange};
+
+fn parse_sync_uuid(value: &str, field_name: &str) -> AppResult<Uuid> {
+    Uuid::parse_str(value)
+        .map_err(|e| AppError::key_store(format!("invalid {field_name} for sync: {e}")))
+}
+
+/// ADR-0067/0069 sync wiring for the bulk SF1 import path -- previously
+/// entirely unsynced (neither the learner rows `CreateNewLearner`
+/// produces nor the `section_memberships` rows `enroll` produces ever
+/// reached the outbox), the widest gap this project's unbuilt-features
+/// audit found in the sync surface. `base_version` is unconditionally
+/// `0`: this `entity_id` has never existed before this exact row's
+/// `CreateNewLearner` action, matching every other create-only entity's
+/// enqueue helper in this codebase.
+fn enqueue_learner_sync_change(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    created: &Learner,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let plaintext = serde_json::to_vec(created)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::Learner,
+        entity_id: parse_sync_uuid(&created.id, "learner id")?,
+        base_version: 0,
+        operation: ChangeOperation::Upsert,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
+}
+
+/// Counterpart for the `section_memberships` row `enroll` returns.
+/// Unlike the learner enqueue above, `base_version` is read from
+/// `sync_version_cache` rather than hardcoded to `0`: `enroll` is
+/// idempotent for re-enrolling into the same section (re-importing the
+/// same file and resolving a row as `UseExisting` a second time returns
+/// the SAME existing row, not a fresh one -- see `enroll`'s own doc
+/// comment), so this entity_id may already be known to the hub. Reusing
+/// `commands::section::enqueue_section_membership_sync_change`'s exact
+/// rationale, duplicated here (not imported) to keep `import` from
+/// depending on `commands`, matching every other entity's own
+/// self-contained per-module enqueue helper in this codebase.
+fn enqueue_section_membership_sync_change(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    membership: &SectionMembership,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let base_version = sync_version_cache::known_version(
+        conn,
+        school_id,
+        EntityKind::SectionMembership,
+        &membership.id,
+    )?;
+    let plaintext = serde_json::to_vec(membership)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::SectionMembership,
+        entity_id: parse_sync_uuid(&membership.id, "section membership id")?,
+        base_version,
+        operation: ChangeOperation::Upsert,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
+}
 
 /// Commits every plan in `plans` as one atomic batch, scoped to
 /// `school_id`/`section_id`. Callers must only pass plans already
@@ -25,14 +117,20 @@ use crate::repository::{learner, section_membership, sf1_import_history};
 /// `UseExisting` a second time does not create a duplicate active
 /// membership (see ADR-0043's "Re-import / Idempotency" section).
 ///
-/// `actor_user_id`/`actor_username`/`source_filename`/`source_fingerprint`
-/// (Wave 2E) exist solely to write one `sf1_import_history` row —
-/// **inside this same transaction**, immediately before `tx.commit()` —
-/// so a history row exists if and only if the batch it describes actually
-/// committed (see migration 19's comment for why that removes the need
-/// for a `status` column entirely). None of these four values affect
-/// what gets written to `learners`/`section_memberships`; they are pure
-/// provenance for the history row.
+/// `actor_username`/`source_filename`/`source_fingerprint` (Wave 2E)
+/// exist solely to write one `sf1_import_history` row — **inside this
+/// same transaction**, immediately before `tx.commit()` — so a history
+/// row exists if and only if the batch it describes actually committed
+/// (see migration 19's comment for why that removes the need for a
+/// `status` column entirely). `actor_user_id` doubles as both that
+/// provenance value AND, together with `sspk`, the sync-enqueue actor:
+/// a row is only enqueued when BOTH `actor_user_id` and `sspk` are
+/// `Some` (matching every other entity's "no sspk, no outbox row"
+/// enrollment-gated contract) — see `enqueue_learner_sync_change`/
+/// `enqueue_section_membership_sync_change`'s own doc comments for why
+/// this bulk path needed its own enqueue helpers rather than reusing
+/// `commands::learner`'s/`commands::section`'s (kept `import` from
+/// depending on `commands`).
 #[allow(clippy::too_many_arguments)]
 pub fn commit_import(
     conn: &mut Connection,
@@ -44,6 +142,7 @@ pub fn commit_import(
     actor_username: &str,
     source_filename: &str,
     source_fingerprint: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<Sf1ImportSummary> {
     // The application-service layer already rejects an empty plan before
     // ever calling this command (see `Sf1ImportApplicationService.commitImport`
@@ -61,6 +160,11 @@ pub fn commit_import(
     let mut new_learners_created = 0usize;
     let mut existing_learners_enrolled = 0usize;
 
+    let enqueue_actor = match (actor_user_id, sspk) {
+        (Some(actor_user_id), Some(sspk)) => Some((actor_user_id, sspk)),
+        _ => None,
+    };
+
     for plan in plans {
         let learner_id = match &plan.action {
             Sf1RowAction::CreateNewLearner => {
@@ -73,6 +177,9 @@ pub fn commit_import(
                     plan.sex.as_deref(),
                 )?;
                 new_learners_created += 1;
+                if let Some((actor_user_id, sspk)) = enqueue_actor {
+                    enqueue_learner_sync_change(&tx, school_id, actor_user_id, &created, sspk)?;
+                }
                 created.id
             }
             Sf1RowAction::EnrollExistingLearner { learner_id } => {
@@ -81,12 +188,22 @@ pub fn commit_import(
             }
         };
 
-        section_membership::enroll(&tx, school_id, section_id, &learner_id, starts_on)?
-            .ok_or_else(|| {
-                AppError::Import(
-                    "section or learner could not be resolved for enrollment".to_string(),
-                )
-            })?;
+        let membership =
+            section_membership::enroll(&tx, school_id, section_id, &learner_id, starts_on)?
+                .ok_or_else(|| {
+                    AppError::Import(
+                        "section or learner could not be resolved for enrollment".to_string(),
+                    )
+                })?;
+        if let Some((actor_user_id, sspk)) = enqueue_actor {
+            enqueue_section_membership_sync_change(
+                &tx,
+                school_id,
+                actor_user_id,
+                &membership,
+                sspk,
+            )?;
+        }
     }
 
     let summary = Sf1ImportSummary {
@@ -142,6 +259,7 @@ mod tests {
             "test.teacher",
             "sf1_test.xlsx",
             "test-fingerprint",
+            None,
         )
     }
 
@@ -181,6 +299,120 @@ mod tests {
             section_membership::roster_for_section(&conn, &s.id, &section.id, "2026-06-01")
                 .unwrap();
         assert_eq!(roster.len(), 2);
+    }
+
+    fn test_sspk() -> [u8; PAYLOAD_KEY_LEN] {
+        [0x51; PAYLOAD_KEY_LEN]
+    }
+
+    #[test]
+    fn commit_with_an_sspk_enqueues_a_learner_and_a_membership_change_per_new_row() {
+        // The regression test for the widest sync gap this project's
+        // unbuilt-features audit found: before this fix, this entire bulk
+        // path enqueued nothing at all, for either the learner rows it
+        // creates or the section_memberships rows it produces.
+        let mut conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let section = section::create(&conn, &s.id, "2026-2027", "Grade 1", "Sampaguita").unwrap();
+        let actor = crate::repository::user::create_user(&conn, "ana.cruz", "password", "Ana Cruz")
+            .unwrap();
+        let sspk = test_sspk();
+        let plans = vec![new_learner_plan(
+            4,
+            "Ana",
+            "Dela Cruz",
+            Some("123456789012"),
+        )];
+
+        commit_import(
+            &mut conn,
+            &s.id,
+            &section.id,
+            "2026-06-01",
+            &plans,
+            Some(&actor.id),
+            "ana.cruz",
+            "sf1_grade1.xlsx",
+            "abc123fingerprint",
+            Some(&sspk),
+        )
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(
+            queued.len(),
+            2,
+            "one Learner change and one SectionMembership change"
+        );
+        assert!(queued
+            .iter()
+            .any(|entry| entry.change.entity_kind == EntityKind::Learner));
+        assert!(queued
+            .iter()
+            .any(|entry| entry.change.entity_kind == EntityKind::SectionMembership));
+        assert!(queued
+            .iter()
+            .all(|entry| entry.change.operation == ChangeOperation::Upsert));
+    }
+
+    #[test]
+    fn commit_with_no_sspk_enqueues_nothing() {
+        let mut conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let section = section::create(&conn, &s.id, "2026-2027", "Grade 1", "Sampaguita").unwrap();
+        let plans = vec![new_learner_plan(
+            4,
+            "Ana",
+            "Dela Cruz",
+            Some("123456789012"),
+        )];
+
+        commit(&mut conn, &s.id, &section.id, "2026-06-01", &plans).unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &s.id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn commit_for_an_existing_learner_enqueues_only_a_membership_change_not_a_learner_change() {
+        let mut conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let section = section::create(&conn, &s.id, "2026-2027", "Grade 1", "Sampaguita").unwrap();
+        let actor = crate::repository::user::create_user(&conn, "ana.cruz", "password", "Ana Cruz")
+            .unwrap();
+        let existing = learner::create(&conn, &s.id, "Cris", "Reyes", None, None).unwrap();
+        let sspk = test_sspk();
+        let plans = vec![Sf1RowCommitPlan {
+            row_number: 2,
+            given_name: "Cris".to_string(),
+            family_name: "Reyes".to_string(),
+            lrn: None,
+            sex: None,
+            action: Sf1RowAction::EnrollExistingLearner {
+                learner_id: existing.id.clone(),
+            },
+        }];
+
+        commit_import(
+            &mut conn,
+            &s.id,
+            &section.id,
+            "2026-06-01",
+            &plans,
+            Some(&actor.id),
+            "ana.cruz",
+            "sf1_grade1.xlsx",
+            "abc123fingerprint",
+            Some(&sspk),
+        )
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &s.id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].change.entity_kind, EntityKind::SectionMembership);
     }
 
     #[test]
@@ -340,6 +572,7 @@ mod tests {
             "ana.cruz",
             "sf1_grade1.xlsx",
             "abc123fingerprint",
+            None,
         )
         .unwrap();
 
@@ -411,6 +644,7 @@ mod tests {
                 "ana.cruz",
                 "sf1_grade1.xlsx",
                 "same-fingerprint",
+                None,
             )
             .unwrap();
         }

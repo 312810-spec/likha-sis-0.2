@@ -1,5 +1,67 @@
 # Verification Debt
 
+## SectionsScreen direct enrollment + bulk SF1 import: sync wiring closed, wider than originally scoped (2026-09-07)
+
+Closes the Tier-1 gap recorded in
+`docs/product/2026-09-07-unbuilt-features-audit.md`. Investigating
+"wire `SectionMembership::enroll`'s bulk-import caller" surfaced a wider
+gap than that item's own description: `enroll` has TWO live production
+callers, not one.
+
+1. **`commands::section::enroll_learner_in_section`**
+   (`SectionsScreen.tsx`'s own direct enrollment action) — a genuinely
+   separate write path from `enroll_learner_membership`/
+   `transfer_learner_membership`/`end_learner_membership` (the Section
+   Roster screen's roster-driven verbs, already wired). Neither this
+   command's UI nor its underlying `enroll` repository function had any
+   sync wiring before this session. Refactored into
+   `enroll_learner_in_section_with_optional_sync` (matching this
+   codebase's established `*_with_optional_sync` pattern) and now
+   enqueues via the existing `enqueue_section_membership_sync_change`
+   helper — no new enqueue mechanism needed.
+2. **`import::commit::commit_import`** (bulk SF1 import) — actually
+   unsynced for BOTH entities it writes, not only `SectionMembership` as
+   the original debt item described: the learner rows
+   `Sf1RowAction::CreateNewLearner` produces never reached the outbox
+   either. Gained its own self-contained `enqueue_learner_sync_change`/
+   `enqueue_section_membership_sync_change` helpers (deliberately
+   duplicated, not imported from `commands::learner`/`commands::section`,
+   to keep `import` from depending on `commands` — matching every other
+   entity's own per-module enqueue helper convention already established
+   in this codebase). `Learner`'s enqueue uses `base_version: 0`
+   (create-only, matching every other create-only entity); the
+   `SectionMembership` enqueue reads `base_version` from
+   `sync_version_cache` rather than hardcoding `0`, since `enroll` is
+   documented as idempotent for a repeat same-section enrollment (a
+   second `UseExisting` resolution on re-import returns the SAME
+   existing row, not a fresh one) — the entity id may already be known
+   to the hub.
+3. **`commands::section::correct_same_day_placement`** — a clean
+   update-in-place case (no delete/multi-row complication, unlike the
+   `TeachingAssignment` entry above): refactored into
+   `correct_same_day_placement_with_optional_sync`, enqueues only on the
+   `CorrectPlacementOutcome::Corrected` variant.
+
+**User decision recorded**: wire `enroll`'s existing callers directly,
+rather than migrating `SectionsScreen` onto the richer `enroll_membership`
+function (which would have changed its outcome/error shape and needed
+its own UI-level re-verification) or deferring `SectionsScreen`'s gap to
+a separate future session.
+
+**New tests**: `enroll_learner_in_section_with_no_sspk_behaves_exactly_like_a_plain_enroll`,
+`enroll_learner_in_section_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry`
+(`commands::section`); `correct_same_day_placement_with_an_sspk_enqueues_on_correction`,
+`correct_same_day_placement_with_no_sspk_enqueues_nothing`
+(`commands::section`); `commit_with_an_sspk_enqueues_a_learner_and_a_membership_change_per_new_row`,
+`commit_with_no_sspk_enqueues_nothing`,
+`commit_for_an_existing_learner_enqueues_only_a_membership_change_not_a_learner_change`
+(`import::commit`).
+
+**Verified**: full `cargo test` (1046 lib tests, 0 failed, up from
+1039), `cargo clippy --all-targets -- -D warnings` (0 warnings),
+`cargo fmt --check` (clean after one `cargo fmt` pass), native
+`cargo build`, `npm run quality` (1099/1099).
+
 ## TeachingAssignment reassignment/removal: real cross-device DELETE built and wired (2026-09-07)
 
 Closes the Tier-1 gap recorded in

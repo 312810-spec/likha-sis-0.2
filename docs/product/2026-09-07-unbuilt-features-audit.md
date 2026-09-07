@@ -126,13 +126,30 @@ tier.
    entries exists in `src-tauri/src/repository/subject_attendance.rs`
    beyond the session-level function.
 
-5. **`SectionMembership::enroll` (bulk CSV-import path) and
-   `correct_same_day_placement` remain unwired to sync.** A bulk-imported
-   enrollment or same-day correction stays purely local on the importing
-   device until a future slice wires them — meaning a school's SF1 bulk
-   import on one device would not currently replicate learner placements
-   to other devices/the hub. Source: `docs/CURRENT-HANDOFF.md`'s
-   SectionMembership sync-wiring entry (2026-09-06).
+5. **CLOSED 2026-09-07 — `SectionMembership::enroll`'s callers and
+   `correct_same_day_placement` are now wired to sync.** Wider than
+   originally described: `enroll` has TWO live production callers, not
+   one — `import::commit` (bulk CSV import) AND
+   `commands::section::enroll_learner_in_section`
+   (`SectionsScreen.tsx`'s own direct enrollment action, genuinely
+   separate from the roster-driven `enroll_membership` the Section
+   Roster screen already used), neither previously synced. The bulk
+   import path was actually unsynced for BOTH entities it writes, not
+   just memberships — the learner rows `CreateNewLearner` produces
+   never reached the outbox either. User decision recorded: wire
+   `enroll`'s existing callers directly (not migrate `SectionsScreen`
+   onto `enroll_membership`, and not defer). `import::commit` gained its
+   own self-contained enqueue helpers (kept `import` from depending on
+   `commands`, matching every other entity's per-module pattern) for
+   both `Learner` (base_version 0, create-only) and `SectionMembership`
+   (base_version from `sync_version_cache`, since `enroll` is idempotent
+   for a repeat same-section enrollment and may return an
+   already-synced id). `enroll_learner_in_section` and
+   `correct_same_day_placement` were refactored into testable
+   `*_with_optional_sync` functions, matching this codebase's
+   established pattern. `cargo test` 1046 lib tests, 0 failed; `npm run
+quality` 1099/1099. Source: this session's implementation,
+   `docs/VERIFICATION-DEBT.md`'s matching entry.
 
 6. **CLOSED 2026-09-07 — `TeachingAssignment.replace_teacher`/`.remove`
    are now wired to sync, including a real cross-device DELETE.** Both

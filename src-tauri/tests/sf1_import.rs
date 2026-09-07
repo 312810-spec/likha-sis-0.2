@@ -62,6 +62,7 @@ fn commit_sf1_import_as_current_session(
         &username,
         &source_filename,
         &source_fingerprint,
+        None,
     )
 }
 

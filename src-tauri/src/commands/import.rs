@@ -2,13 +2,15 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use rusqlite::Connection;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
+use crate::db;
 use crate::error::AppResult;
 use crate::import::sf1::{Sf1ImportPreview, Sf1ImportSummary, Sf1RowCommitPlan};
 use crate::import::{commit, fingerprint, preview};
+use crate::repository::device_credential;
 use crate::repository::sf1_import_history::{self, Sf1ImportHistoryEntry};
 use crate::repository::user;
 
@@ -57,6 +59,7 @@ pub fn preview_sf1_import(
 /// case (never fails the commit over it — see below).
 #[tauri::command]
 pub fn commit_sf1_import(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     section_id: String,
@@ -70,6 +73,11 @@ pub fn commit_sf1_import(
     let actor_username = user::find_by_id(&conn, &user_id)?
         .map(|u| u.username)
         .unwrap_or_else(|| "unknown".to_string());
+    let sspk = if device_credential::has_active_for_school(&conn, &school_id)? {
+        Some(db::load_or_mint_sspk(&app)?)
+    } else {
+        None
+    };
 
     let path = PathBuf::from(&file_path);
     let (source_filename, source_fingerprint) = match fingerprint::compute(&path) {
@@ -87,6 +95,7 @@ pub fn commit_sf1_import(
         &actor_username,
         &source_filename,
         &source_fingerprint,
+        sspk.as_ref(),
     )
 }
 
