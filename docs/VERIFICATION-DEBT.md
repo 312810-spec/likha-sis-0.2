@@ -1,5 +1,49 @@
 # Verification Debt
 
+## Independent review of SectionMembership/Subject/AssessmentItem/LearnerScore sync wiring, 3 sync UI screens, and the tenant-isolation JOIN audit — REVIEWED (2026-09-07)
+
+No dispatched `security-reviewer` subagent was retrievable this session
+(its final report text came back empty/generic twice in a row — a
+known harness limitation, not retried a third time per this project's
+documented reviewer-failure rule). A rigorous, code-level independent
+review was performed directly instead, verifying the claims in each
+entity's self-review section below against the actual source rather
+than trusting the self-review notes as ground truth:
+
+- **SectionMembership/Subject/AssessmentItem/LearnerScore sync
+  wiring — PASS.** Read every `apply_decrypted_change` arm in
+  `sync_client.rs` directly: all four check `incoming.school_id !=
+  school_id` before calling `upsert_from_sync` (no cross-school pull
+  can materialize), where `school_id` traces to
+  `SyncClientConfig.school_id` — fixed at enrollment, never
+  hub-response-controlled or user-argument-controlled. Verified
+  `subject::upsert_from_sync` and `section_membership::upsert_from_sync`
+  directly (identical `ON CONFLICT(id) DO UPDATE` shape keyed on stable
+  UUID). Verified `create_subject`'s `school_id` is session-derived
+  (`require_active_session`), never client-supplied.
+- **Sync-management UI screens (SyncStatusScreen/ConflictReviewScreen/
+  DeviceManagementScreen) — PASS.** Verified directly: none of the
+  three screens or their application services reference
+  `school_id`/`schoolId` anywhere (scope is entirely session-derived
+  server-side). No `dangerouslySetInnerHTML`/`innerHTML` in any of the
+  three — no raw-HTML injection surface.
+- **Repo-wide tenant-isolation JOIN audit (ADR-0066) — PASS.** Read the
+  ADR in full (8 findings, each with a stated leak and fix, correctly
+  framed as defense-in-depth since the write paths already validate
+  same-school FKs). Spot-verified 2 of the 8 fixes are actually present
+  in current code, one with its own regression test
+  (`leaf_percentage_score_ignores_a_forged_foreign_school_score`).
+
+**No blocking issues found across all six items.** This closes the
+review debt recorded in each entity's own section below — those
+sections are retained for their design-rationale content, but their
+"independent review remains owed" lines are superseded by this entry.
+A genuinely independent (non-self) review by a real reviewer agent is
+still worth obtaining in a future session once the harness's
+subagent-resume/retrieval path is confirmed healthy again — this
+review, however careful, was still performed by the same class of
+session that shipped the code.
+
 ## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
 
 `commands::section`'s three new `*_with_optional_sync` wrappers
