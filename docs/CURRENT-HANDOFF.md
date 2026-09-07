@@ -1,5 +1,93 @@
 # CURRENT HANDOFF
 
+## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
+
+The legacy pre-0.2 codebase, previously unavailable to any audit on this
+machine, is now accessible at `E:\TNHS LIKHA-SIS\tnhs-likha-sis`
+(Next.js/Supabase/Dexie.js, "Tingub National High School SIS"). This is a
+direct inspection follow-up to the earlier legacy-features audit already
+recorded in `docs/PROJECT-MEMORY.md` / `PRODUCT-CONTRACT.md` §17 (that
+pass had already listed 6 candidates from reading the legacy repo; this
+pass re-verified those 6 against the actual source and searched for
+anything missed). Full detail in
+`docs/product/2026-09-07-unbuilt-features-audit.md`'s "Addendum" section
+and PRODUCT-CONTRACT.md §17's updates. **No code changed — audit/research
+only, everything below is either corroboration or a new backlog entry.**
+
+**Corroboration (no conflict, no action needed)**: legacy's `PLAN.md`
+independently states the exact same DO 015 s.2026 component weights this
+project already implemented (JHS/SHS Core 20/50/30, Field Exposure
+15/70/15, Research Electives 40/60/0, Work Immersion 20/80/0 — matches
+`migrations.rs`/ADR-0016 verbatim), and independently describes the same
+transmutation-being-phased-out trajectory this project's `GradingMode`
+regime design already anticipated (ADR-0013). Two independent projects
+landing on the same DO 015 numbers raises confidence in both.
+
+**One new backlog item found**: Formative Assessment (ESRU) logging is
+not tracked anywhere in the unbuilt-features audit — added as new Tier 3
+item 36. Legacy's own schema never built any UI/logic against it (a
+`formative_logs` type definition only), so there is no working reference
+implementation, just a concrete field shape (`student_id`, `subject_id`,
+`quarter`, `activity_name`, `esru_rating: E|S|R|U`, `notes`) worth using
+as a starting point.
+
+**Two of the six previously-recorded candidates turned out to be UI
+mockups with no real logic to port** (this session's own prior 2026-09-07
+audit pass had not yet inspected the actual legacy source, only prior
+documentation about it): the certificate generator renders 4 hardcoded
+candidates with a pre-assigned honor label (no GA-threshold computation
+exists to reuse); the ID generator is a 3-line placeholder route (no
+card/QR/token logic exists to reuse). The Master Teacher review
+dashboard's validation logic, by contrast, is real and worth reusing as a
+design reference (three flag types, including a DO-015-expected-weight
+cross-check) independent of this project's different RBAC model.
+
+**Open questions for the owner, not yet resolved** (raised because these
+are irreducible product-policy or unverified-source calls, not ones this
+session should guess at):
+
+1. **ESRU rubric meaning is unverified.** This project's own
+   PRODUCT-CONTRACT.md §17 previously glossed ESRU as "Exploration,
+   Structured practice, Reflection, Understanding" — legacy's schema uses
+   the same four letters but never defines what they stand for anywhere
+   in its code, and no DepEd primary source for this rubric was checked
+   in either session. Should this be implemented from the existing
+   (unverified) gloss, held pending a dedicated DepEd-researcher pass
+   like the MATATAG/KS1/DO8 one just completed, or dropped from scope
+   until confirmed?
+2. **Awards & Recognition eligibility criteria are unverified against a
+   primary source** — legacy never actually implemented the "GA ≥ 90, no
+   grade < 80, zero disciplinary anecdotes" rule (it was hardcoded mock
+   data, not computed), so this project has no verified source for it
+   either. Worth a dedicated research pass before building an eligibility
+   engine, or is a Next-Best conservative rule (e.g. GA-only, no
+   disciplinary check) acceptable to ship first?
+3. **The Awards Engine and Certificate Generator both depend on the
+   Student Guidance/Anecdotal Records feature** (to check "zero
+   disciplinary anecdotes") — should Anecdotal Records be built first as
+   its own standalone slice (it also needs its own tighter,
+   guidance/adviser-scoped authorization boundary, similar in spirit to
+   the SF8 health-data tightening already flagged), or should the Awards
+   Engine ship first with a conservative rule that doesn't yet depend on
+   it?
+4. **The Multi-Tier Review & Approval Pipeline (Teacher → Master Teacher
+   → School Head lock) requires a "Master Teacher" role that does not
+   exist in this project's current RBAC** (Teacher/Registrar/School Head
+   only — expanding the role universe is already tracked as genuinely
+   undecided, Tier 4 item 24/28 of the unbuilt-features audit). Should
+   this pipeline wait until the RBAC role-universe decision is made, or
+   should an interim version be modeled using only existing roles (e.g.
+   School Head plays the approval role) until a real Master Teacher role
+   is decided?
+5. **ID card QR verification — cloud-dependent or fully offline?** Legacy
+   verified a printed ID's QR token via a live Supabase lookup
+   (`get_public_student_by_token`). This project is offline-first with no
+   public-facing verification endpoint of any kind. If this feature is
+   ever built, should QR verification stay fully local (e.g. an in-app
+   lookup screen usable only from within the school's own device), or is
+   some cloud-reachable verification actually wanted (which would be a
+   new, currently out-of-scope cloud-facing surface)?
+
 ## Tier 2 research: MATATAG learning areas, KS1 descriptive grading, DO 8 vs DO 015 transmutation (2026-09-07)
 
 Background research pass (per explicit owner instruction to attempt web

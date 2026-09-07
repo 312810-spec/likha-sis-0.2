@@ -381,6 +381,27 @@ quality` 1099/1099. Source: this session's implementation,
     if a future session finds the real primary-source structure. Source:
     `docs/CURRENT-HANDOFF.md`'s lesson-plan-builder entry (2026-09-06).
 
+36. **NEW 2026-09-07 (legacy cross-reference, not yet implemented) —
+    Formative Assessment (ESRU) isolated logging.** Confirmed via direct
+    inspection of the actual legacy predecessor codebase
+    (`E:\TNHS LIKHA-SIS\tnhs-likha-sis`, made available this session for
+    the first time — prior audits could not reach it). Legacy modeled a
+    `formative_logs` table (`student_id`, `subject_id`, `quarter`,
+    `activity_name`, `esru_rating: 'E'|'S'|'R'|'U'`, `notes`) as a
+    non-graded assessment log explicitly isolated from quarterly grade
+    computation — DepEd's own ESRU rubric (Exceeds/Satisfactory/
+    Reinforcement-needed/Unsatisfactory) for formative (as opposed to
+    summative Written-Work/Performance-Task/Exam) assessment. **Legacy
+    itself never built any UI or logic against this table** — it exists
+    only as a Supabase type definition, no page/component references it
+    — so there is no working reference implementation to port, only a
+    concrete, DepEd-aligned field shape worth using as a starting point.
+    This project has no formative/non-graded-assessment concept
+    anywhere in its schema today. Not in conflict with anything already
+    built — purely additive. Source: this session's direct inspection of
+    the legacy repo (`src/types/database.types.ts`); PLAN.md's "Formative
+    Data Isolation" policy passage.
+
 ### Tier 4 — Teacher usability
 
 21. **Teacher Load / Class Schedule chain remains narrower than the full
@@ -554,6 +575,49 @@ the audited docs as of this session.
 35. **Web/PWA target** — likewise entirely unstarted; no PWA manifest,
     service worker, or web-specific build config found. Source:
     PRODUCT-CONTRACT.md §1 (verified by absence).
+
+---
+
+## Addendum (2026-09-07, later same day): legacy codebase became accessible
+
+The "Hard limitation" stated above — that the actual legacy LIKHA codebase
+was not present on this machine — no longer holds. It is now available at
+`E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie.js, project name
+"Tingub National High School SIS"). A direct inspection was performed this
+session (not exhaustive — targeted at the six candidate features already
+recorded in `PRODUCT-CONTRACT.md` §17 from an earlier pass over this same
+legacy repo, plus a scan for anything those six missed). Findings:
+
+- **Corroboration, no conflict**: legacy's `PLAN.md` independently states
+  the exact DO 015, s. 2026 component weights this project already
+  implemented (JHS/SHS Core 20/50/30, Field Exposure 15/70/15, Research
+  Electives 40/60/0, Work Immersion 20/80/0) — matches
+  `src-tauri/src/db/migrations.rs` and ADR-0016 exactly. Also
+  independently states transmutation is being phased toward a "Zero-
+  Based / Raw Percentage" regime with transmutation as an optional legacy
+  mode — matching this project's own already-built `GradingMode`
+  regime-selection design (`grading_computation.rs`, ADR-0013) and this
+  session's earlier DO 8→DO 015 research. No action needed; recorded here
+  only as independent corroboration strengthening confidence in both.
+- **One new item found and added above**: Formative Assessment (ESRU)
+  logging — see item 36. Not previously listed anywhere in this audit.
+- **The other five §17 candidates were re-confirmed, not contradicted**,
+  and two are now known to be UI mockups with no real logic to port: the
+  legacy certificate generator (`src/sis-pages/certificate-generator/page.tsx`)
+  renders four hardcoded candidate rows with a pre-assigned honor label —
+  it does not compute eligibility from a GA threshold; and the legacy ID
+  generator (`src/app/ict/id-generator/page.tsx`) is a 3-line placeholder
+  route with no card layout, QR generation, or token logic at all. The
+  Master Teacher review dashboard (`src/lib/reviewValidation.ts`), by
+  contrast, has real, concrete validation logic worth using as a design
+  reference if this pipeline is ever built: three flag types
+  (`MISSING_SCORES`, `MISSING_PERFORMANCE_TASK`, `WEIGHT_MISMATCH`), the
+  last of which cross-checks a subject's configured component weights
+  against the DO 015 expected weights for its classification — a
+  reusable idea independent of this project's different RBAC model.
+- No item found in this pass conflicts with any current 0.2 decision,
+  ADR, or PRODUCT-CONTRACT entry — everything above is either pure
+  corroboration or purely additive.
 
 ---
 

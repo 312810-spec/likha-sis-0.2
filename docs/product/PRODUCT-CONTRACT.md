@@ -398,5 +398,28 @@ per user direction. Note: Stakeholder/Parent Portal was explicitly excluded by u
    - Master Teacher (MT) review workflow: teacher grade submission -> MT compliance/out-of-bounds audit flags -> Approve/Reject with feedback notes -> administrative record locking.
    - Principal/School Head overview dashboard: composite grades, submission statuses, official form sign-offs.
 6. **Formative Assessment Logging (DIRECTION SET / HYPOTHESIS)**:
-   - Non-graded formative assessment logs (ESRU model: Exploration, Structured practice, Reflection, Understanding) isolated from quarterly grade computations.
+   - Non-graded formative assessment logs (ESRU model) isolated from quarterly grade computations.
+   - **Re-inspected 2026-09-07**: legacy's own schema (`formative_logs`:
+     `student_id`, `subject_id`, `quarter`, `activity_name`,
+     `esru_rating: 'E'|'S'|'R'|'U'`, `notes`) never spells out what E/S/R/U
+     stand for anywhere in code or docs, and legacy never built any UI/logic
+     against this table — it is an unused type definition only. This
+     entry's own prior "Exploration, Structured practice, Reflection,
+     Understanding" gloss is **unverified against any DepEd source** and
+     should not be trusted as the real rubric — see the open question in
+     `docs/CURRENT-HANDOFF.md`'s legacy-integration entry (2026-09-07)
+     before implementing.
+
+**Re-inspected 2026-09-07** (legacy codebase became accessible, prior audit
+pass could not reach it): items 2 and 3's legacy "engines" are UI mockups
+only — the certificate generator renders four hardcoded candidates with a
+pre-assigned honor label (no GA-threshold computation), and the ID
+generator is a 3-line placeholder route with no card/QR/token logic. Item
+5's `reviewValidation.ts` does have real, portable validation logic worth
+reusing as a design reference: three flag types (`MISSING_SCORES`,
+`MISSING_PERFORMANCE_TASK`, `WEIGHT_MISMATCH`, the last cross-checking a
+subject's configured weights against DO 015's expected weights for its
+classification). None of items 1-6 conflict with any current 0.2 decision.
+Full detail: `docs/product/2026-09-07-unbuilt-features-audit.md`'s
+"Addendum" section.
 
