@@ -506,32 +506,81 @@ pub fn pull_once(
                 summary.applied += 1;
                 sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
             }
-            Err(()) => {
+            Err(ApplyRejection::Untrusted) => {
                 summary.rejected += 1;
                 summary.failed = true;
                 break;
+            }
+            Err(ApplyRejection::RepositoryRejected) => {
+                // See `ApplyRejection`'s own doc comment: this is a real,
+                // non-malicious data collision (e.g. two devices
+                // independently creating a same-named Subject offline),
+                // not a tampered/undecryptable payload -- advance PAST it
+                // so it cannot wedge every other device's every other
+                // change behind it forever. This one change is not
+                // retried automatically; a human resolves the underlying
+                // collision if it needs fixing.
+                log::warn!(
+                    "sync pull: repository rejected {:?} {} for school {} (likely a legitimate natural-key collision between two devices, e.g. a duplicate Subject name or LearnerScore/SectionMembership natural key) -- skipping without retry, resolve manually if needed",
+                    change.entity_kind,
+                    entity_id,
+                    config.school_id
+                );
+                summary.rejected += 1;
+                sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
             }
         }
     }
     Ok(summary)
 }
 
+/// Distinguishes why `apply_decrypted_change` failed, so `pull_once` can
+/// react differently -- see this project's first genuinely independent
+/// security review of this file's sibling entities
+/// (`docs/reviews/2026-09-07-sync-entity-wiring-review.md`), which found
+/// that treating every failure identically let one ordinary,
+/// non-malicious natural-key collision between two devices (e.g. both
+/// independently creating a `Subject` named "MAPEH" while offline, before
+/// either had synced) permanently wedge sync for the WHOLE SCHOOL, not
+/// just the one colliding entity, because `pull_once` never advanced the
+/// cursor past it and re-fetched the exact same poisoned change first on
+/// every future round, forever.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ApplyRejection {
+    /// A decrypt/auth-tag failure, malformed payload, or a declared
+    /// `school_id` mismatch -- possibly malicious or corrupted, not
+    /// merely a legitimate data collision. `pull_once` must never
+    /// advance past this: it is retried (and re-flagged) on every
+    /// future pull round, exactly as before this fix.
+    Untrusted,
+    /// The payload decrypted and validated successfully -- this is
+    /// definitely a genuine change from a trusted device -- but the
+    /// repository's own write failed for a legitimate, content-level
+    /// reason (e.g. a `UNIQUE` constraint on a natural key distinct
+    /// from the row's own `id`, which `ON CONFLICT(id) DO UPDATE` does
+    /// not suppress). Not evidence of tampering or a wrong key, so
+    /// `pull_once` advances PAST this one change (never retried
+    /// automatically -- a human must resolve the underlying collision)
+    /// instead of blocking every other device's every other change
+    /// behind it indefinitely.
+    RepositoryRejected,
+}
+
 /// Decrypts `change.encrypted_payload` under `sspk` and, for the one
 /// entity kind this slice wires end to end (`EntityKind::Learner`),
 /// applies it via the existing `repository::learner` write path -- never
 /// raw SQL here (`.claude/rules/architecture.md`: "All SQL lives in
-/// Rust ... repository"). `Err(())` on ANY failure (decrypt/auth-tag
-/// failure, malformed JSON, or a decrypted payload whose own `school_id`
-/// does not match this pull's school) -- deliberately a unit error, not
-/// `AppResult`, so `pull_once` cannot accidentally propagate a
-/// decrypt failure as a hard `?`-short-circuit that would abort the whole
-/// batch loop before recording `summary.rejected`/`failed` for the caller.
-/// A payload whose declared `school_id` mismatches `school_id` is treated
-/// exactly like a tampered payload -- decrypting successfully under this
-/// school's SSPK already strongly implies it, but this is defense in
-/// depth, not proof, so it is still checked explicitly rather than trusted
-/// silently (`.claude/rules/security-privacy.md`: enforce at the
-/// repository boundary, not by omission).
+/// Rust ... repository"). See `ApplyRejection`'s own doc comment for why
+/// this returns a two-variant error rather than a bare unit error --
+/// deliberately still not `AppResult`, so `pull_once` cannot accidentally
+/// propagate a decrypt failure as a hard `?`-short-circuit that would
+/// abort the whole batch loop before recording `summary.rejected`/`failed`
+/// for the caller. A payload whose declared `school_id` mismatches
+/// `school_id` is treated exactly like a tampered payload -- decrypting
+/// successfully under this school's SSPK already strongly implies it, but
+/// this is defense in depth, not proof, so it is still checked explicitly
+/// rather than trusted silently (`.claude/rules/security-privacy.md`:
+/// enforce at the repository boundary, not by omission).
 ///
 /// Every `EntityKind` variant now has an arm here (`Learner`/`Attendance`/
 /// `Section`/`LearnerScore`/`AssessmentItem`/`Subject`/
@@ -555,87 +604,100 @@ pub(crate) fn apply_decrypted_change(
     school_id: &str,
     change: &sync_hub::AcceptedChange,
     sspk: &[u8; PAYLOAD_KEY_LEN],
-) -> Result<(), ()> {
-    let plaintext =
-        payload_key::decrypt_payload(sspk, &change.encrypted_payload).map_err(|_| ())?;
+) -> Result<(), ApplyRejection> {
+    let plaintext = payload_key::decrypt_payload(sspk, &change.encrypted_payload)
+        .map_err(|_| ApplyRejection::Untrusted)?;
 
     match change.entity_kind {
         EntityKind::Learner => {
-            let incoming: learner::Learner = serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            let incoming: learner::Learner =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            learner::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            learner::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::Attendance => {
             let incoming: attendance::AttendanceRecord =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            attendance::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            attendance::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::Section => {
-            let incoming: section::Section = serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            let incoming: section::Section =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            section::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            section::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::LearnerScore => {
             let incoming: learner_score::LearnerScore =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            learner_score::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            learner_score::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::AssessmentItem => {
             let incoming: assessment_item::AssessmentItem =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            assessment_item::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            assessment_item::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::Subject => {
-            let incoming: subject::Subject = serde_json::from_slice(&plaintext).map_err(|_| ())?;
+            let incoming: subject::Subject =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            subject::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            subject::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::TeachingAssignment => {
             let incoming: teaching_assignment::TeachingAssignment =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            teaching_assignment::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            teaching_assignment::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::GradingPeriod => {
             let incoming: grading::GradingPeriod =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            grading::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            grading::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::SubjectAttendance => {
             let incoming: subject_attendance::SubjectAttendanceSession =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            subject_attendance::upsert_session_from_sync(conn, &incoming).map_err(|_| ())
+            subject_attendance::upsert_session_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
         EntityKind::SectionMembership => {
             let incoming: section_membership::SectionMembership =
-                serde_json::from_slice(&plaintext).map_err(|_| ())?;
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             if incoming.school_id != school_id {
-                return Err(());
+                return Err(ApplyRejection::Untrusted);
             }
-            section_membership::upsert_from_sync(conn, &incoming).map_err(|_| ())
+            section_membership::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }
 }
@@ -2149,6 +2211,108 @@ mod tests {
                 1
             );
         };
+    }
+
+    #[test]
+    fn pull_once_skips_past_a_natural_key_collision_instead_of_wedging_every_later_change() {
+        // The regression test for the BLOCKING finding in
+        // docs/reviews/2026-09-07-sync-entity-wiring-review.md: two
+        // devices independently create a `Subject` named "Mathematics"
+        // while both offline, each minting its own `id`. When this
+        // device pulls the OTHER device's row, it collides with its own
+        // existing "Mathematics" row on `UNIQUE (school_id, name)` --
+        // a real, non-malicious, content-level rejection, not a
+        // tampered payload. Before this fix, `pull_once` treated that
+        // identically to a tampered payload and `break`, permanently
+        // stuck re-fetching the same poisoned change forever, which
+        // silently blocked every OTHER entity's every other change
+        // behind it too. This proves: the colliding change is skipped
+        // (not applied, not retried), but a later, non-colliding change
+        // in the SAME pull round still applies normally.
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        subject::create(&fixture.conn, &fixture.school_id, "Mathematics").unwrap();
+
+        let colliding_entity_id = Uuid::now_v7();
+        let good_entity_id = Uuid::now_v7();
+        {
+            let conn = &fixture.conn;
+            let colliding_subject = subject::Subject {
+                id: colliding_entity_id.to_string(),
+                school_id: fixture.school_id.clone(),
+                name: "Mathematics".to_string(),
+                created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            };
+            let mut colliding_change = make_change(&fixture, colliding_entity_id, 0);
+            colliding_change.entity_kind = EntityKind::Subject;
+            colliding_change.encrypted_payload = payload_key::encrypt_payload(
+                &fixture.sspk,
+                &serde_json::to_vec(&colliding_subject).unwrap(),
+            )
+            .unwrap();
+            sync_outbox::enqueue(conn, &fixture.school_id, &colliding_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_subject_change(&fixture, good_entity_id, 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 2);
+        assert_eq!(
+            summary.applied, 1,
+            "only the non-colliding change should apply"
+        );
+        assert_eq!(
+            summary.rejected, 1,
+            "the colliding change is rejected, not silently dropped"
+        );
+        assert_eq!(summary.conflicted, 0);
+        assert!(
+            !summary.failed,
+            "a legitimate data collision must not be reported as a request failure"
+        );
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            2,
+            "the cursor must advance past BOTH changes, not get stuck on the colliding one"
+        );
+        let colliding_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM subjects WHERE id = ?1)",
+                [colliding_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            !colliding_row_exists,
+            "the colliding change must never be materialized"
+        );
+        let good_materialized =
+            subject::find_by_id_in_school(conn, &fixture.school_id, &good_entity_id.to_string())
+                .unwrap();
+        assert!(
+            good_materialized.is_some(),
+            "the later, non-colliding change must still apply despite the earlier rejection"
+        );
     }
 
     #[test]

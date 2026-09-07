@@ -349,7 +349,7 @@ pub fn resolve_conflict_review(
             };
 
             sync_client::apply_decrypted_change(&conn, &school_id, &change, &sspk).map_err(
-                |()| {
+                |_rejection| {
                     AppError::key_store(
                         "the incoming change could not be applied -- it may be corrupted or encrypted under a different key"
                             .to_string(),

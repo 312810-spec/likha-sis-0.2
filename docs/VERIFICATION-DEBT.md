@@ -173,7 +173,89 @@ for a genuinely independent review; this reconfirmation narrows the
 risk that any one of them silently diverged from the others' pattern,
 it does not close the debt itself.
 
-## SectionMembership sync wiring (2026-09-06) — independent security review owed, plus known atomicity/scope trade-offs
+## SectionMembership/Subject/AssessmentItem/LearnerScore sync wiring: independent review obtained, BLOCKING finding FIXED (2026-09-07)
+
+**Genuinely independent review obtained**, using the same file-based
+workaround as the sibling payload-key review (dispatched a
+`general-purpose` agent — has `Write`, unlike `security-reviewer` — with
+instructions to save findings to
+`docs/reviews/2026-09-07-sync-entity-wiring-review.md` instead of relying
+on its chat response). Found **one BLOCKING issue no self-review had
+caught**, of a different mechanism than the sibling review's stale-SSPK
+bug but the same underlying category: a design that looked correct in
+every existing unit test but was never exercised against the one
+production scenario that breaks it.
+
+**BLOCKING (FIXED same session): a legitimate, non-malicious concurrent
+write on two devices to `Subject`, `LearnerScore`, or `SectionMembership`
+could permanently wedge sync for the ENTIRE SCHOOL, not just the
+colliding entity.** All three tables carry a genuine business-level
+`UNIQUE` constraint on a column set other than the row's own `id`
+(`subjects(school_id, name)`, `learner_scores(assessment_item_id,
+learner_id)`, `section_memberships`'s "at most one open membership per
+learner" partial index). Each entity's `upsert_from_sync` — the function
+that materializes a _pulled_ change from another device — is a plain
+`INSERT ... ON CONFLICT(id) DO UPDATE`, which does **not** suppress a
+different unique index's violation. Two devices independently creating
+the same-named `Subject`, or recording a score for the same learner+item,
+or enrolling the same learner, while both offline before either had
+synced, each mint their own fresh `id` for what the schema treats as the
+same logical row — pulling the other device's version then hits the
+_other_ unique constraint and fails. `sync_client::pull_once` treated
+that identically to a tampered payload: reject, `break`, never advance
+the cursor — so the very next pull round re-fetched the **same** poisoned
+change **first** and failed again, **forever**, silently blocking every
+subsequent change of every entity kind from ever reaching that device
+again, with no distinguishing operator signal. Not present for
+`AssessmentItem` (no `UNIQUE` constraint beyond its own `id`).
+
+**Fix**: `sync_client::apply_decrypted_change` now returns a two-variant
+`ApplyRejection` (`Untrusted` for decrypt/tamper/school_id-mismatch —
+must never be skipped, retried forever exactly as before; vs.
+`RepositoryRejected` for a legitimate content-level database error — the
+payload was genuinely decrypted and validated, the write itself failed).
+`pull_once` reacts differently: `Untrusted` still halts the batch exactly
+as before (safety-critical, unchanged); `RepositoryRejected` logs a clear
+warning identifying the entity/id, advances the cursor PAST it, and
+continues — so one real data collision no longer wedges every other
+device's every other change behind it. The colliding change itself is
+simply never applied on that device until a human resolves the
+underlying collision, which is a vastly better failure mode than
+"sync permanently frozen with no signal." New regression test
+(`pull_once_skips_past_a_natural_key_collision_instead_of_wedging_every_later_change`,
+`src-tauri/src/sync_client.rs`) constructs exactly this scenario for
+`Subject` (a local row named "Mathematics", then a pulled change with a
+different id and the same name) inside a single pull batch alongside a
+second, non-colliding change, and proves: the collision is rejected
+(not applied), the cursor advances past both, `summary.failed` stays
+`false` (a legitimate collision is not a request-level failure), and
+the later non-colliding change still applies normally. Verified: full
+`cargo test` (1027 lib tests, 0 failed, up from 1026), `cargo clippy
+--all-targets -- -D warnings` (0 warnings), `cargo fmt --check` (clean),
+native `cargo build` (confirms the app still builds).
+
+**SHOULD-FIX (not fixed, tracked as one item with the sibling review's
+matching finding)**: none of the four `upsert_from_sync` functions
+independently re-validate that a foreign id embedded in the payload
+(`section_id`/`learner_id`/`class_record_id`/`category_id`/
+`assessment_item_id`) actually belongs to the declared `school_id` — they
+rely on the SQLite `FOREIGN KEY` constraint proving the row exists
+_somewhere_, not that it exists _in the right school_. Inert under the
+realistic single-school-per-hub deployment; same root cause as the
+sibling review's SSPK-per-installation finding (see below), recommend
+fixing both together rather than four more times independently.
+
+**Confirmed NOT present in this scope**: every `*_with_optional_sync`
+wrapper enqueues only on its own success variant (re-verified directly,
+not merely trusted from prior self-review prose); `resolve_sspk_if_enrolled`
+re-reads the SSPK from disk on every command call, so the sibling
+review's stale-live-value bug class does not recur here; the school-scope
+check is present and correctly positioned in all four `apply_decrypted_change`
+arms; `SectionMembership::upsert_from_sync` never deletes, only updates
+via `ends_on`. Full report:
+`docs/reviews/2026-09-07-sync-entity-wiring-review.md`.
+
+## SectionMembership sync wiring (2026-09-06) — see the consolidated entry above for the independent review and BLOCKING fix
 
 `commands::section`'s three new `*_with_optional_sync` wrappers
 (`enroll_learner_membership`/`transfer_learner_membership`/
@@ -247,7 +329,7 @@ recorded rather than silently accepted:
    `SectionMembership` uniquely has five distinct write paths where
    every other entity has one or two.
 
-## Subject sync wiring (2026-09-06) — independent security review owed
+## Subject sync wiring (2026-09-06) — see the consolidated entry above for the independent review and BLOCKING fix
 
 `commands::subject::create_subject`, `repository::subject::
 upsert_from_sync`, and the `EntityKind::Subject` arm in
@@ -296,7 +378,7 @@ name)` constraint (that check already ran on the originating device),
   `.claude/rules/autonomous-development.md`'s reviewer-failure rule when
   a subagent-dispatch tool is available again.
 
-## AssessmentItem sync wiring (2026-09-06) — independent security review owed
+## AssessmentItem sync wiring (2026-09-06) — see the consolidated entry above; independent review found no issue for this entity specifically
 
 `commands::assessment_item::create_assessment_item`,
 `repository::assessment_item::upsert_from_sync`, and the
@@ -354,7 +436,7 @@ instead, per this project's documented reviewer-failure fallback:
   remains owed — retry when a reviewer subagent is reachable, alongside
   the still-owed `LearnerScore` review below.
 
-## LearnerScore sync wiring (2026-09-05/06) — independent security review owed
+## LearnerScore sync wiring (2026-09-05/06) — see the consolidated entry above for the independent review and BLOCKING fix
 
 `commands::learner_score::record_learner_score`,
 `repository::learner_score::upsert_from_sync`, and the
