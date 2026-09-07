@@ -667,7 +667,75 @@ and an independent check of the carryover _applicability_ logic (which
 real learners/subjects fall into each of the five groups, as opposed to
 the weight figures themselves) is still owed.
 
-## ADR-0067 school-laptop sync hub (2026-09-04) — OPEN
+## ADR-0067 school-laptop sync hub (2026-09-04) — re-audited 2026-09-07, most gates already closed by later work
+
+The original entry (below, preserved for history) was written when this
+was brand new and almost nothing existed yet. Re-checked every claimed
+gate directly against current source rather than trusting the old list:
+
+**Closed, confirmed by direct code/test read this session** (all built
+in sessions between 2026-09-04 and 2026-09-06, just never reflected
+back into this entry):
+- Domain mutations wired into the outbox — Section, Attendance,
+  LearnerScore, AssessmentItem, Subject, SectionMembership all enqueue
+  through `*_with_optional_sync` command wrappers.
+- Hub persistence — `hub_server.rs` (`/sync/push`, `/sync/pull`,
+  `/sync/payload-key-wrap`), `repository::sync_hub`.
+- Hub-side replay/idempotency tests —
+  `replaying_the_same_change_id_after_acceptance_is_idempotent`,
+  `replaying_an_already_staged_conflicts_change_id_does_not_duplicate_it`.
+- Hub-side forged-scope tests —
+  `a_change_claiming_a_different_device_than_the_verified_one_is_rejected`,
+  `a_change_claiming_a_different_actor_than_the_verified_one_is_rejected`,
+  `pull_since_never_returns_another_schools_changes`. The design itself
+  makes forgery structurally hard, not just tested: `push_change` derives
+  `school_id`/`device_id`/`actor_user_id` from the authenticated
+  `verified` credential, never from the request body, and rejects on any
+  claimed-vs-verified mismatch.
+- Device enrollment/revocation — `commands::device_sync`, `auth::
+enroll_device_sync_credential`/`revoke_device_sync_credential_and_rotate_sspk`.
+- Payload key lifecycle — enrollment wrap, lazy re-wrap on
+  authentication, rotation on revocation; `db::rotate_sspk` closed this
+  session (see the payload-key-rotation entry above), native DPAPI
+  round-trip verified for real this session too.
+- LAN and optional Tailscale transport — `hub_server::select_bindable_addresses`
+  filters to private-use (RFC 1918) and Tailscale CGNAT
+  (100.64.0.0/10) ranges only, never a public address; covered by
+  `select_bindable_addresses_includes_tailscale_cgnat_range`.
+- Conflict-review UI — `src/ui/ConflictReviewScreen.tsx`, shipped
+  2026-09-05 (see that entry above).
+
+**Still genuinely open**:
+- **Weeks-offline catch-up has no test proving multi-round convergence.**
+  `pull_once` fetches at most `PULL_BATCH_LIMIT` (50) changes per call,
+  advancing the stored cursor by that batch only — a real "weeks
+  offline, hundreds of pending changes" scenario needs several
+  consecutive `pull_once` calls to fully catch up (via whatever periodic
+  loop calls `sync_once`), and nothing currently proves that repeated
+  calls converge correctly (no lost/duplicated/skipped changes across
+  the cursor boundary) rather than just working within a single batch.
+  `PULL_BATCH_LIMIT` is a private `u16` const, not currently overridable
+  for a test — writing this test needs either a way to shrink the batch
+  size for tests or enqueuing 51+ real changes on the test hub. Not
+  attempted this session (real TDD work, not a quick fix); flagging
+  precisely rather than leaving it folded into a vague "weeks-offline
+  catch-up" bullet.
+- Windows service/reboot behavior — does the hub relaunch automatically
+  after a reboot/crash? Not yet designed or tested.
+- BitLocker/firewall/patch validation on the school-laptop hub itself —
+  operational, not code; needs the actual hub laptop to check against.
+- Two-copy encrypted backup and witnessed restore, and a real outage/
+  recovery exercise — operational procedures, not yet run.
+- Native NVDA/Narrator pass — see the cross-referenced entries above;
+  needs a human at a real screen reader.
+- **Written School Head / DepEd-DPO approval** — a genuine human-approval
+  gate (per `.claude/rules/autonomous-development.md`'s gate list), not
+  something to push past autonomously.
+
+Synthetic data only until all production gates are closed.
+
+<details>
+<summary>Original 2026-09-04 entry (preserved for history)</summary>
 
 The provider-neutral contract and local outbox have authored unit coverage, but
 those Rust tests have not run on this runner and no end-to-end sync exists.
@@ -679,6 +747,8 @@ Windows service/reboot behavior; BitLocker/firewall/patch validation; two-copy
 encrypted backup and witnessed restore; outage/recovery exercise; native
 NVDA/Narrator pass; and written school-head/DepEd-DPO approval. Synthetic data
 only until all production gates are closed.
+
+</details>
 
 ## UI-redesign independent reviews + Wave 5 governance gate (2026-09-04)
 
