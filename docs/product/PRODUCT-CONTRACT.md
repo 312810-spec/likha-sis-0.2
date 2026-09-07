@@ -423,3 +423,58 @@ classification). None of items 1-6 conflict with any current 0.2 decision.
 Full detail: `docs/product/2026-09-07-unbuilt-features-audit.md`'s
 "Addendum" section.
 
+## 18. UI Design System & Features from `E:\likha-sis-master` (recorded 2026-09-07)
+
+Audited against `E:\likha-sis-master` per user direction. Note: `SF1 Fit Scaling` was explicitly excluded by user direction.
+
+### A. UI Architecture, Layout Arrangement & Aesthetic Specification
+1. **Persistent Two-Tier Layout Shell (`DashboardShell.jsx`)**:
+   - **Sidebar**: Fixed width (`w-64` expanded, collapsible to `w-20` icon-only drawer with zero-dependency CSS tooltips). School brand background (`bg-primary`). Grouped navigation under uppercase Ledger Gold labels (`text-accent-light`, `text-[11px] font-semibold tracking-wider`). Leading edge accent indicator bar (`1px` accent border + `bg-white/15`) for active nav.
+   - **Sticky Translucent Header**: `backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border-b border-gray-200 dark:border-gray-700`. Contains:
+     - Left: Page title rendered in warm editorial serif (`font-display`). Breadcrumb identity line: "Welcome, [User] — LIKHA-SIS, [School Name]".
+     - Right: Live Date/Time widget with tabular aligned numerals (`font-tabular`, IBM Plex Mono), 3-way sliding pill theme toggle (`Light`, `System`, `Dark`), Notification bell with unread badge counter and slide-out panel, and circular profile avatar with initials badge + account dropdown.
+   - **Content Canvas**: `p-4 md:p-6` with no artificial max-width constraints so data tables and form sheets utilize full screen real-estate.
+2. **"Ledger Pairing" Typography Engine**:
+   - **Display Heading Font**: [Fraunces](https://fonts.google.com/specimen/Fraunces) serif reserved strictly for top-level `<h1>`/`<h2>` page titles (`font-display`).
+   - **Interface & Body Font**: Public Sans (`font-normal` to `font-medium`, 14-16px) for form controls, buttons, table data, and badges.
+   - **Tabular / Monospace Font**: [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) (`font-tabular`) for numeric clocks, dates, and column-aligned grades.
+3. **Dynamic Brand Palette & Theme Engine (`colorTheory.js`, `extractTheme.js`)**:
+   - **ColorThief Logo Palette Extractor**: Automatically reads uploaded school logos, eliminates near-black/near-white noise, and computes WCAG AA compliant palette candidates:
+     - *Dominant*: Prominent brand colors.
+     - *Vibrant*: Highest saturation accent ink.
+     - *Alternate*: Re-ordered roles for versatile branding.
+   - **Dual Light/Dark Derivation**: Computes companion dark-surface variables (`--dm-*`) and legible text ink (`buildTextOnRoles`) dynamically from light logo colors.
+4. **Elevation & Card Depth System**:
+   - Surfaces: Flat paper ground with 1px border (`border-gray-200 dark:border-gray-700`).
+   - Interactive Card Lift: Soft ambient card shadow at rest (`shadow-card`), lifting on hover (`shadow-card-hover` paired with `-translate-y-0.5`).
+   - Standard Radii: Uniform `8px` (`rounded-lg`) for inputs, buttons, and menus; `12px` (`rounded-xl`) for cards and containers; `rounded-full` for avatars and pill toggles.
+
+### B. Functional Features from `likha-sis-master` (To Add to 0.2)
+1. **Interactive Class Program & Timetable Generator (`ClassProgramGenerator.jsx`)**:
+   - Visual drag-and-drop / click-to-arm section timetable builder.
+   - Real-time teacher double-booking, room overlap, and subject minute conflict detection (`scheduleConflicts.js`).
+   - One-click timetable auto-seeder wand (`scheduleSeeding.js`).
+   - Dynamic derivation of Teacher's Load sheets on read from section timetables (`teacherLoadDerivation.js`).
+2. **SF8 Health & Nutrition Engine (`NutritionStatus.jsx`, `NutritionConsolidator.jsx`)**:
+   - WHO/DepEd BMI-for-Age and Height-for-Age exact decimal age calculators and lookup tables (`nutritionComputations.js`).
+   - Full school-wide nutritional baseline (BOSY) and endline (EOSY) consolidation report (`nutritionConsolidation.js`).
+3. **DO 006, s. 2026 Learner Rights & Protection (LRP) & SARDO/LARDO Tracker (`LardoTracking.jsx`)**:
+   - 3-tier behavioral incident classification under DepEd child protection policy.
+   - Multi-silo automated risk triggers (`autoFlagTriggers.js`): auto-flags learners when initial grade $< 70$, general average $< 75$, attendance $< 80\%$, or nutrition status is Wasted/Obese.
+   - Append-only intervention history with automated remediation check (`lardoAutoResolve.js`).
+4. **SMEA 3-Term Indicator & Discrepancy Rollup (`SMEAEnrollment.jsx`, `smeaIndicators.js`)**:
+   - Consolidated 3-term monitoring of enrollment, promotion, dropout, and nutritional status.
+   - Automated discrepancy detector catching unassigned learners or un-synced class records.
+5. **School Calendar, Philippine Holidays & Hazard Alerts (`SchoolCalendar.jsx`, `weather.js`)**:
+   - Offline database of Philippine regular, non-working, and Islamic holidays (`philippineHolidays.js`).
+   - Hyper-local Open-Meteo weather integration using school coordinates; flags severe weather suspension warnings ($>30\text{ mm}$ rain, $>50\text{ kph}$ wind).
+6. **PBKDF2 School Settings Secondary Security Key (`settingsLock.js`)**:
+   - Secondary Web Crypto PBKDF2-SHA256 (150k iterations) PIN lock protecting critical school identity, curriculum tracks, and calendar structures against accidental edits or borrowed workstations.
+7. **Comprehensive First-Run School Setup Wizard (`SetupWizard.jsx`)**:
+   - Multi-step interactive setup wizard with DepEd hierarchy auto-fill (Division, Region, School ID from `depedHierarchy.js`), instant logo theme extraction, and key stage initialization.
+8. **Transfers In/Out Documentation Registry (`TransfersLog.jsx`)**:
+   - Formal tracking log for incoming and outgoing student transfers, originating/destination schools, and document statuses.
+9. **Consolidated Grades Matrix (`ConsolidatedGrades.jsx`)**:
+   - Cross-subject grade registry displaying all learning areas side-by-side per section across all terms.
+
+

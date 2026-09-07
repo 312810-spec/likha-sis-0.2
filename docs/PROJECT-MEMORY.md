@@ -1,16 +1,25 @@
 # PROJECT MEMORY
 
-## Legacy LIKHA-SIS features audit (2026-09-07)
+## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
-- Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie).
-- User explicitly excluded the Parent/Stakeholder Portal from porting/scope.
-- Captured unbuilt candidate features in `docs/product/PRODUCT-CONTRACT.md` §17:
-  1. Student Guidance, Anecdotal Records, and SARDO/intervention tracking.
-  2. Automated Awards & Recognition eligibility engine + Certificate generator.
-  3. Student ID card printable generator with tokenized QR verification.
-  4. `.xlsx` SheetJS spreadsheet importer for SF10 multi-year scholastic histories.
-  5. Multi-tier Review & Approval pipeline (Teacher -> Master Teacher audit -> School Head lock).
-  6. Formative Assessment (ESRU model) isolated logging.
+- Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie) and full reference repository at `E:\likha-sis-master` (React/Firebase/Tailwind).
+- Excluded Parent/Stakeholder Portal and SF1 Fit Scaling per explicit user direction.
+- Recorded comprehensive UI layout specifications and unbuilt features in `docs/product/PRODUCT-CONTRACT.md` (§17 & §18):
+  1. **UI & Theme Engine Replication**:
+     - Two-tier persistent shell (`DashboardShell.jsx`): Collapsible sidebar with zero-dep CSS tooltips, sticky translucent backdrop-blur header with 3-way sliding pill theme toggle (Light/System/Dark), live tabular clock, and notification panel.
+     - "Ledger Pairing" Typography: Fraunces editorial serif for `<h1>`/`<h2>` page titles, Public Sans for interface/tables, IBM Plex Mono for tabular numerals.
+     - Dynamic ColorThief logo palette extractor (Dominant, Vibrant, Alternate candidate sets) + dual-surface dark-mode variant generator.
+     - Card depth & elevation: `rounded-lg` (8px) buttons/inputs, `rounded-xl` (12px) cards with hover lift (`-translate-y-0.5`).
+  2. **Core Unbuilt Features**:
+     - Visual Timetable Builder, conflict detection, auto-seeding wand, and derived teacher load.
+     - DepEd/WHO SF8 Health & Nutrition calculator (decimal age, BMI/HFA tables, BOSY vs EOSY consolidation).
+     - DO 006 LRP 3-tier behavioral incident logging and automated SARDO/LARDO risk triggers.
+     - SMEA 3-term indicator rollup and enrollment discrepancy engine.
+     - School Calendar, Philippine holiday database, and Open-Meteo hyper-local weather/suspension warnings.
+     - Secondary PBKDF2 Web Crypto School Settings PIN lock.
+     - Multi-step first-run setup wizard with DepEd hierarchy auto-fill.
+     - Transfers In/Out learner movement log and Consolidated Grades cross-subject matrix.
+- Full unified prioritization inventory created and maintained at `docs/product/MASTER-TASK-INVENTORY.md` ordered by LIKHA priority.
 
 ## Grade 12 legacy SHS grading closure (2026-09-04)
 
