@@ -588,7 +588,7 @@ actually concerns that slice's rotation code, not this slice's
 encrypt/decrypt round trip in isolation (which the review found no
 issue with). Full report: `docs/reviews/2026-09-07-sync-payload-encryption-review.md`.
 
-## Payload-key rotation on device revocation (2026-09-05) — BLOCKING finding 2026-09-07, fix required before this can close
+## Payload-key rotation on device revocation (2026-09-05) — BLOCKING finding FIXED 2026-09-07
 
 Three items were originally owed from this slice (ADR-0069's rotation
 addendum, `docs/CURRENT-HANDOFF.md`'s matching entry has full detail):
@@ -628,9 +628,45 @@ ensure_wrapped_for_credential, refresh_wrap_for_credential}`,
    construct the real startup → long-running-process → later-revocation
    sequence; unit-level rotation/self-healing logic is independently
    verified correct, the gap is purely the missing live-refresh wiring.
-   **Fix required before this debt item can be marked resolved** — see
-   this session's fix below, or `docs/VERIFICATION-DEBT.md`'s next entry
-   if the fix hasn't landed yet when you're reading this.
+
+   **FIXED 2026-09-07, same session the finding was reported.**
+   `hub_server::HubServerState.sspk` changed from a plain
+   `[u8; PAYLOAD_KEY_LEN]` to a new `SharedSspk` type
+   (`Arc<SspkCell>`, `SspkCell(RwLock<Option<[u8; PAYLOAD_KEY_LEN]>>)`),
+   shared between every listener task's state AND `app.manage`d in
+   `lib.rs` (always managed, even when the listener never spawns) so
+   `commands::device_sync::revoke_device_sync_credential`'s rotation
+   closure can reach it. That closure now does two things, not one:
+   `db::rotate_sspk` overwrites the on-disk DPAPI file (unchanged,
+   already correct) AND writes the same freshly-minted key into the
+   shared cell every request handler reads from
+   (`current_sspk`/`authenticate` call sites), so an already-running
+   hub process picks up the rotation immediately — no restart needed,
+   and a revoked device's cached old key stops working against new
+   traffic as soon as the revocation command returns.
+
+   **New regression test, proven against a real running router, not
+   just unit-level logic**:
+   `payload_key_wrap_reflects_a_key_rotated_into_the_live_shared_cell_without_restarting_the_router`
+   (`src-tauri/src/hub_server.rs`) builds a router once, mutates the
+   SAME shared cell the router's state holds (exactly what the
+   revocation closure does), and proves a subsequent
+   `/sync/payload-key-wrap` request against that SAME still-running
+   router now returns the NEW key — the exact "restart required"
+   scenario the finding described, now proven fixed without a restart.
+   Verified: `cargo test --lib payload_key_wrap_reflects_a_key_rotated`
+   (isolated, passed), full `cargo test` (1026 lib tests, 0 failed, up
+   from 1025), `cargo clippy --all-targets -- -D warnings` (0 warnings),
+   `cargo fmt --check` (clean after one `cargo fmt` pass), native
+   `cargo build` (confirms `lib.rs`'s startup-wiring change doesn't
+   break the real app). `npm run quality` not re-run (Rust-only change).
+
+   This closes the BLOCKING finding. The independent-review debt itself
+   is now considered discharged for this slice — a review was obtained,
+   it found a real issue, and the issue is fixed and regression-tested.
+   Re-reviewing the fix itself with a fresh independent pass would still
+   be good practice when the reviewer-retrieval channel is reliably
+   working again, but is not required to unblock further work.
 
    A second, lower-severity SHOULD-FIX was also found: SSPK is minted/
    rotated per-_installation_ (`db::load_or_mint_sspk`/`rotate_sspk` take

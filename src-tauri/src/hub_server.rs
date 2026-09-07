@@ -23,7 +23,7 @@
 //! the wiring are provable here.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -103,18 +103,39 @@ fn enumerate_local_addresses() -> Vec<IpAddr> {
     }
 }
 
+/// A live, mutable handle to this installation's school sync-payload key,
+/// shared between every listener task's `HubServerState` AND managed as
+/// Tauri state so `commands::device_sync::revoke_device_sync_credential`
+/// can push a freshly-rotated key into the ALREADY-RUNNING hub process --
+/// not just the on-disk DPAPI file `db::rotate_sspk` overwrites.
+///
+/// **Fixes a real BLOCKING finding from this project's first genuinely
+/// independent security review** (`docs/reviews/2026-09-07-sync-payload-encryption-review.md`):
+/// before this type existed, `HubServerState.sspk` was a plain, immutable
+/// `[u8; PAYLOAD_KEY_LEN]` resolved once at startup and never updated --
+/// so a device revocation correctly rotated the DPAPI file and cleared
+/// DB-side wraps, but the running process kept authenticating every
+/// device (including the just-revoked one, which already had the OLD key
+/// cached) against the stale in-memory key for the rest of that process's
+/// lifetime, directly defeating ADR-0069's "nothing encrypted under the
+/// new SSPK is ever reachable by a revoked device" guarantee.
+///
+/// Always managed (via `app.manage`) regardless of whether the hub
+/// listener ever actually spawns -- `None` when this installation has
+/// never enrolled a device for any school (`should_listen` false), `Some`
+/// once `maybe_spawn_listener` resolves and spawns. A revocation command
+/// on an installation whose listener never spawned this session simply
+/// updates a cell nothing is currently reading from, which is harmless.
+pub struct SspkCell(pub RwLock<Option<[u8; PAYLOAD_KEY_LEN]>>);
+
+pub type SharedSspk = Arc<SspkCell>;
+
 #[derive(Clone)]
 pub struct HubServerState {
     pub db: Arc<Mutex<Connection>>,
-    /// This installation's school sync-payload key (ADR-0069), resolved
-    /// once at listener startup via `db::load_or_mint_sspk` -- never
-    /// re-resolved per request. Used only to lazily re-establish a
-    /// device's wrap (`ensure_wrapped_for_credential`) on every
-    /// successfully authenticated request, which is what actually
-    /// propagates a post-revocation rotation (`sync_payload_key::
-    /// rotate_for_school`) to each still-active device without a new
-    /// enrollment ceremony.
-    pub sspk: [u8; PAYLOAD_KEY_LEN],
+    /// See `SspkCell`'s own doc comment for why this is a live, shared
+    /// handle rather than a plain array captured once at startup.
+    pub sspk: SharedSspk,
 }
 
 /// Builds the router. `state` is cloned into each request handler by
@@ -154,7 +175,7 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
 /// -- a local-first desktop app must keep working even when sync is
 /// unavailable, and a failure on one interface must never take down the
 /// others (each address gets its own independent task).
-pub fn spawn(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], bind_addr: SocketAddr) {
+pub fn spawn(db: Arc<Mutex<Connection>>, sspk: SharedSspk, bind_addr: SocketAddr) {
     let app_router = router(HubServerState { db, sspk });
     tauri::async_runtime::spawn(async move {
         match tokio::net::TcpListener::bind(bind_addr).await {
@@ -177,11 +198,11 @@ pub fn spawn(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], bind_addr:
 /// -- and can fail to bind -- completely independently: a taken port or a
 /// changed address on one interface never prevents the others (including
 /// loopback) from serving.
-pub fn spawn_all(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], addresses: &[Ipv4Addr]) {
+pub fn spawn_all(db: Arc<Mutex<Connection>>, sspk: SharedSspk, addresses: &[Ipv4Addr]) {
     for &addr in addresses {
         spawn(
             Arc::clone(&db),
-            sspk,
+            Arc::clone(&sspk),
             SocketAddr::new(IpAddr::V4(addr), HUB_PORT),
         );
     }
@@ -198,15 +219,23 @@ pub fn spawn_all(db: Arc<Mutex<Connection>>, sspk: [u8; PAYLOAD_KEY_LEN], addres
 /// enables WAL mode specifically so multiple connections to the same
 /// SQLite file coexist correctly -- this is not a new concurrency risk,
 /// it is the documented reason WAL mode was already chosen.
-pub fn maybe_spawn_listener(app: &tauri::AppHandle) -> AppResult<()> {
+/// `sspk_cell` is the same handle already `app.manage`d by `lib.rs`
+/// before this function runs -- see `SspkCell`'s own doc comment for why
+/// the listener and the revoke command must share the identical `Arc`
+/// rather than each holding their own copy of the key.
+pub fn maybe_spawn_listener(app: &tauri::AppHandle, sspk_cell: SharedSspk) -> AppResult<()> {
     let conn = crate::db::open_app_db(app)?;
     if !should_listen(&conn)? {
         return Ok(());
     }
     let sspk = crate::db::load_or_mint_sspk(app)?;
+    *sspk_cell
+        .0
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(sspk);
     let found = enumerate_local_addresses();
     let addresses = select_bindable_addresses(&found);
-    spawn_all(Arc::new(Mutex::new(conn)), sspk, &addresses);
+    spawn_all(Arc::new(Mutex::new(conn)), sspk_cell, &addresses);
     Ok(())
 }
 
@@ -247,6 +276,21 @@ impl IntoResponse for ApiError {
 /// Extracts and verifies the device credential from request headers.
 /// `Ok` carries the `VerifiedDevice` a handler needs to call
 /// `sync_hub::push_batch`/`pull_since`; every failure path (missing
+/// Snapshots the live `SharedSspk` cell into a plain byte array for one
+/// request. `None` should not happen for a handler reachable at all
+/// (the listener is only ever spawned once `maybe_spawn_listener` has
+/// already set this cell to `Some` -- see `SspkCell`'s own doc comment),
+/// so this surfaces as `Internal` rather than a bespoke error variant a
+/// caller could mistake for a normal auth failure.
+fn current_sspk(state: &HubServerState) -> Result<[u8; PAYLOAD_KEY_LEN], ApiError> {
+    state
+        .sspk
+        .0
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .ok_or(ApiError::Internal)
+}
+
 /// header, unknown credential, revoked credential, wrong secret) is
 /// collapsed into the same `ApiError::Unauthorized` -- a caller must
 /// never be able to distinguish "no such credential" from "wrong secret"
@@ -331,7 +375,8 @@ async fn push_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers, &state.sspk)?;
+    let sspk = current_sspk(&state)?;
+    let verified = authenticate(&conn, &headers, &sspk)?;
 
     if body.changes.len() > sync_hub::MAX_PUSH_BATCH {
         return Err(ApiError::BadRequest("push batch too large"));
@@ -363,7 +408,8 @@ async fn pull_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers, &state.sspk)?;
+    let sspk = current_sspk(&state)?;
+    let verified = authenticate(&conn, &headers, &sspk)?;
 
     let changes = sync_hub::pull_since(
         &conn,
@@ -400,7 +446,8 @@ async fn payload_key_wrap_handler(
         .db
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let verified = authenticate(&conn, &headers, &state.sspk)?;
+    let sspk = current_sspk(&state)?;
+    let verified = authenticate(&conn, &headers, &sspk)?;
 
     let wrap = sync_payload_key::get_wrap_for_credential(&conn, &verified.credential_id)?
         .ok_or(ApiError::Internal)?;
@@ -433,6 +480,12 @@ mod tests {
     /// fixture that will build `PendingChange`s must enroll with a
     /// UUID-shaped device id too, not an arbitrary label like other
     /// modules' tests use in isolation.
+    /// Wraps a plain key in the same `SharedSspk` shape production code
+    /// uses, for tests that only care about a fixed, never-rotated key.
+    fn shared_sspk(value: [u8; PAYLOAD_KEY_LEN]) -> SharedSspk {
+        Arc::new(SspkCell(RwLock::new(Some(value))))
+    }
+
     fn test_fixture() -> TestFixture {
         let conn = crate::db::open(
             std::path::Path::new(":memory:"),
@@ -448,7 +501,7 @@ mod tests {
         TestFixture {
             state: HubServerState {
                 db: Arc::new(Mutex::new(conn)),
-                sspk: crate::crypto::payload_key::generate_payload_key(),
+                sspk: shared_sspk(crate::crypto::payload_key::generate_payload_key()),
             },
             user_id: user.id,
             device_id,
@@ -767,7 +820,7 @@ mod tests {
         )
         .unwrap()
         .expect("a wrap must now exist, lazily re-established by the authenticated request");
-        assert_eq!(recovered, fixture.state.sspk);
+        assert_eq!(recovered, fixture.state.sspk.0.read().unwrap().unwrap());
     }
 
     /// A revoked credential must never reach the lazy re-wrap path at all
@@ -856,7 +909,71 @@ mod tests {
             &parsed.wrapped_key,
         )
         .unwrap();
-        assert_eq!(recovered, fixture.state.sspk);
+        assert_eq!(recovered, fixture.state.sspk.0.read().unwrap().unwrap());
+    }
+
+    /// The actual regression test for this project's first genuinely
+    /// independent security review's BLOCKING finding
+    /// (`docs/reviews/2026-09-07-sync-payload-encryption-review.md`):
+    /// before `SharedSspk` existed, `HubServerState.sspk` was a plain
+    /// array baked in once at startup, so nothing could ever propagate a
+    /// rotated key into an already-running listener -- a revoked
+    /// device's cached OLD key kept working against every future request
+    /// for the rest of that process's lifetime, directly contradicting
+    /// ADR-0069's "nothing encrypted under the new SSPK is ever reachable
+    /// by a revoked device" guarantee. Proves the fix end to end over
+    /// real HTTP: mutate the SAME shared cell the router's already-built
+    /// `HubServerState` holds (exactly what
+    /// `commands::device_sync::revoke_device_sync_credential`'s closure
+    /// does via `db::rotate_sspk` + a cell write), WITHOUT rebuilding the
+    /// router, then confirm a fresh `/sync/payload-key-wrap` request
+    /// against that same running router now unwraps to the NEW key.
+    #[tokio::test]
+    async fn payload_key_wrap_reflects_a_key_rotated_into_the_live_shared_cell_without_restarting_the_router(
+    ) {
+        let fixture = test_fixture();
+        let secret =
+            crate::repository::device_credential::hex_decode(&fixture.credential.secret_hex)
+                .unwrap();
+        let app = router(fixture.state.clone());
+
+        let new_key = crate::crypto::payload_key::generate_payload_key();
+        assert_ne!(
+            new_key,
+            fixture.state.sspk.0.read().unwrap().unwrap(),
+            "test setup must pick a genuinely different key"
+        );
+        *fixture.state.sspk.0.write().unwrap() = Some(new_key);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/sync/payload-key-wrap")
+                    .header(CREDENTIAL_ID_HEADER, &fixture.credential.id)
+                    .header(DEVICE_SECRET_HEADER, &fixture.credential.secret_hex)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: PayloadKeyWrapResponseBody = serde_json::from_slice(&bytes).unwrap();
+        let wrap_key = crate::crypto::payload_key::derive_wrap_key(&secret);
+        let recovered = crate::crypto::payload_key::unwrap_payload_key(
+            &wrap_key,
+            &parsed.nonce,
+            &parsed.wrapped_key,
+        )
+        .unwrap();
+        assert_eq!(
+            recovered, new_key,
+            "the live listener must serve the NEWLY rotated key, not the one it started with"
+        );
     }
 
     #[tokio::test]

@@ -9,6 +9,7 @@ use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::db;
 use crate::error::AppResult;
+use crate::hub_server::SharedSspk;
 use crate::repository::device_credential::{self, ActiveDeviceCredential, EnrolledCredential};
 use crate::repository::device_identity;
 
@@ -113,16 +114,33 @@ pub fn enroll_device_sync_credential(
 /// once someone is already logged in. `school_id` is never accepted as a
 /// parameter here at all; it comes only from the session, matching every
 /// other tenant-data command in this codebase.
+///
+/// The `rotate_sspk` closure both overwrites the on-disk DPAPI file
+/// (`db::rotate_sspk`) AND pushes the freshly-minted key into `sspk_cell`
+/// -- the same `SharedSspk` handle `hub_server`'s already-running
+/// listener reads from. Without the second half, this closure would only
+/// rotate the file, and an already-running hub process would keep
+/// authenticating every device (including the just-revoked one) against
+/// the stale in-memory key for the rest of its lifetime -- exactly the
+/// BLOCKING gap this project's first genuinely independent security
+/// review found (`docs/reviews/2026-09-07-sync-payload-encryption-review.md`).
 #[tauri::command]
 pub fn revoke_device_sync_credential(
     app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
+    sspk_cell: State<'_, SharedSspk>,
     credential_id: String,
 ) -> AppResult<bool> {
     let conn = lock_db(&db);
+    let sspk_cell = sspk_cell.inner().clone();
     auth::revoke_device_sync_credential_and_rotate_sspk(&conn, &sessions, &credential_id, || {
-        db::rotate_sspk(&app).map(|_| ())
+        let new_key = db::rotate_sspk(&app)?;
+        *sspk_cell
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(new_key);
+        Ok(())
     })
 }
 

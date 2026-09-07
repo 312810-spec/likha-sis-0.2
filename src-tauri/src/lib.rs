@@ -51,7 +51,19 @@ pub fn run() {
             // Bind failures are logged, not fatal -- see
             // `hub_server::spawn`'s own doc comment for why sync must
             // never be able to crash app startup.
-            if let Err(error) = hub_server::maybe_spawn_listener(app.handle()) {
+            //
+            // The shared SSPK cell is always managed, regardless of
+            // whether the listener actually spawns -- see `SspkCell`'s
+            // own doc comment. This is what lets
+            // `commands::device_sync::revoke_device_sync_credential` push
+            // a freshly-rotated key into an ALREADY-RUNNING hub process,
+            // not just the on-disk DPAPI file (the BLOCKING gap this
+            // project's first genuinely independent security review
+            // found: `docs/reviews/2026-09-07-sync-payload-encryption-review.md`).
+            let sspk_cell: hub_server::SharedSspk =
+                std::sync::Arc::new(hub_server::SspkCell(std::sync::RwLock::new(None)));
+            app.manage(sspk_cell.clone());
+            if let Err(error) = hub_server::maybe_spawn_listener(app.handle(), sspk_cell) {
                 log::error!("hub sync listener setup failed: {error}");
             }
 
