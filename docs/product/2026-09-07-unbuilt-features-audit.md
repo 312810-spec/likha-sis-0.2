@@ -77,8 +77,8 @@ tier.
      genuinely unverified, not merely a paperwork gap.
    - In-app school branding (logo upload, 2026-09-06) — explicitly recorded
      as "not yet performed this session," self-review only.
-   Source: `docs/VERIFICATION-DEBT.md` (multiple 2026-09-07 entries),
-   `docs/CURRENT-HANDOFF.md`'s branding entry.
+     Source: `docs/VERIFICATION-DEBT.md` (multiple 2026-09-07 entries),
+     `docs/CURRENT-HANDOFF.md`'s branding entry.
 
 2. **Sync production-readiness gates not yet closed** (ADR-0067). Verified
    directly against source as of 2026-09-07 — most of ADR-0067's original
@@ -94,7 +94,7 @@ tier.
      operational, needs real hardware.
    - Two-copy encrypted backup + witnessed restore drill — not run.
    - A real outage/recovery exercise — not run.
-   - A more rigorous native NVDA/Narrator pass — a first real one *was*
+   - A more rigorous native NVDA/Narrator pass — a first real one _was_
      run this session (2026-09-07, human-driven, "no issues surfaced") but
      was a single brief walkthrough, not an exhaustive per-screen audit
      with saved transcripts.
@@ -102,8 +102,8 @@ tier.
      approval gate per this project's own autonomous-development rules;
      production learner use cannot proceed without it regardless of how
      much code exists.
-   Source: `docs/VERIFICATION-DEBT.md`, "ADR-0067 school-laptop sync hub
-   (2026-09-04) — re-audited 2026-09-07" entry; `docs/adr/0067-*.md`.
+     Source: `docs/VERIFICATION-DEBT.md`, "ADR-0067 school-laptop sync hub
+     (2026-09-04) — re-audited 2026-09-07" entry; `docs/adr/0067-*.md`.
 
 3. **Android secure key storage** — not started. Android as a platform has
    not been begun at all (see Tier 4/5 below for the platform gap
@@ -134,14 +134,26 @@ tier.
    to other devices/the hub. Source: `docs/CURRENT-HANDOFF.md`'s
    SectionMembership sync-wiring entry (2026-09-06).
 
-6. **`TeachingAssignment.replace_teacher`/`.remove` are not wired to
-   sync** — only `create` is. A teacher reassignment or assignment removal
-   made on one device will not currently propagate; a different device
-   would still show the old/stale assignment until some other mechanism
-   corrects it. Source: `docs/CURRENT-HANDOFF.md`'s TeachingAssignment
-   sync-wiring entry (2026-09-06); `docs/VERIFICATION-DEBT.md`'s "Batch
-   checkpoint" and "SubjectAttendance session" entries confirm this is
-   still open as of the most recent sync-debt sweep.
+6. **CLOSED 2026-09-07 — `TeachingAssignment.replace_teacher`/`.remove`
+   are now wired to sync, including a real cross-device DELETE.** Both
+   commands intentionally delete the assignment row (never merely close
+   it), and this codebase's sync protocol had a `ChangeOperation::Delete`
+   variant defined since its earliest design but never actually
+   implemented anywhere — this closes that gap for the first time.
+   `replace_teacher_assignment` now enqueues a `Delete` for the OLD
+   assignment (if one existed) and an `Upsert` for the new one in the
+   same call; `remove_teaching_assignment` enqueues a `Delete`.
+   `apply_decrypted_change` gained a `ChangeOperation`-aware dispatch for
+   `TeachingAssignment` plus a defensive guard rejecting an unexpected
+   `Delete` for any other entity as untrusted (none of the other nine
+   entities support it). New tests prove: a pulled delete actually
+   removes the local row and cascades to `schedule_meetings`; the
+   command layer enqueues both a delete and an upsert for a
+   reassignment, and only an upsert for a first assignment; the
+   defensive guard rejects a `Delete` claimed for `Subject`. `cargo test`
+   1039 lib tests, 0 failed; `cargo clippy`/`cargo fmt`/native
+   `cargo build` all clean. Source: this session's implementation,
+   `docs/VERIFICATION-DEBT.md`'s matching entry.
 
 7. **SHOULD-FIX cross-school foreign-key validation gap in `upsert_from_sync`
    materializers** (Subject, LearnerScore, SectionMembership,
@@ -150,7 +162,7 @@ tier.
    payload (`section_id`/`learner_id`/`class_record_id`/`category_id`/
    `assessment_item_id`) actually belongs to the declared `school_id` —
    they rely on the SQLite `FOREIGN KEY` constraint proving the row exists
-   *somewhere*, not that it exists *in the right school*. Assessed as
+   _somewhere_, not that it exists _in the right school_. Assessed as
    inert under the realistic single-school-per-hub deployment model, but
    explicitly recorded as not yet fixed. Source:
    `docs/VERIFICATION-DEBT.md`, "SectionMembership/Subject/AssessmentItem/
@@ -201,9 +213,9 @@ tier.
     `docs/VERIFICATION-DEBT.md`'s BLOCKING-finding entry; not independently
     re-verified per-entity by this audit.
 
-12. **MATATAG-vs-prior curriculum learning-area *content* differences
+12. **MATATAG-vs-prior curriculum learning-area _content_ differences
     remain unconfirmed against a primary source** — only the curriculum
-    version's *name* changed (to "Enhanced K to 10 Curriculum"); the 8
+    version's _name_ changed (to "Enhanced K to 10 Curriculum"); the 8
     seeded learning-area names are still identical to the prior "K to 12
     Basic Education Curriculum" row. If DepEd's actual MATATAG rollout
     changed subject/learning-area content (not just naming), that has not
@@ -217,7 +229,7 @@ tier.
     re-attempted from a web search alone. Source: PRODUCT-CONTRACT.md §4
     (verified — no KS1 descriptive-grading code path or DO 8-specific
     transmutation table found beyond the already-shipped Grade 12 DO 8
-    *weighting* carryover, ADR-0068, which is a narrower, already-closed
+    _weighting_ carryover, ADR-0068, which is a narrower, already-closed
     sub-piece).
 
 ### Tier 3 — DepEd compliance
@@ -237,9 +249,9 @@ tier.
       "My Day" (further down that same chain) already shipped
       (`MyDayScreen.tsx`, 2026-09-06). Source: PRODUCT-CONTRACT.md §6, §5.
     - **SF8** (Health & Nutrition) — not built. Notable because this is
-      one of only two places in the whole repo where a *legacy LIKHA*
-      concept is explicitly invoked as a starting point for a *still
-      unbuilt* 0.2 feature (see the cross-reference section below) —
+      one of only two places in the whole repo where a _legacy LIKHA_
+      concept is explicitly invoked as a starting point for a _still
+      unbuilt_ 0.2 feature (see the cross-reference section below) —
       "keep the legacy conceptual split (learner/section-level data;
       Baseline/Pretest consolidation; Endline/Posttest consolidation) as
       a starting point, but revalidate formulas/templates before
@@ -253,7 +265,7 @@ tier.
     files are real, but they are only the **domain-contract type
     definitions** (`Sf1GenerationRequest`/`Sf9GenerationRequest`/result
     structs) proving the generalized Tauri → `umya-spreadsheet` (OOXML)
-    architecture can accept two differently-shaped forms — *not* a
+    architecture can accept two differently-shaped forms — _not_ a
     populated real DepEd form. `template.rs`'s own doc comments are
     explicit: `SF1_SYNTHETIC_V1` is "a synthetic fixture, not an official
     DepEd document; official SF1 fidelity is NOT_VERIFIED," and
@@ -264,7 +276,7 @@ tier.
     this "must never be presented to a user as an official DepEd SF9."
     So the accurate current status for every form (SF1, SF4, SF5, SF6,
     SF9, SF10) is: **disclosed CSV export is real and shipped; the
-    authoritative-*template* half of the architecture is proven end to end
+    authoritative-_template_ half of the architecture is proven end to end
     against synthetic fixtures, but zero forms have a real, obtained,
     fidelity-verified DepEd template behind them.** This is a more precise
     (and more work-remaining) status than either "not built" (too
@@ -318,9 +330,9 @@ tier.
     built: personnel/qualifications/position/designation, advisory/
     ancillary-duty tracking (deliberately excluded per DepEd's own
     non-instructional classification), availability/constraints modeling,
-    an actual schedule *generator* (explicitly flagged HYPOTHESIS — "a
+    an actual schedule _generator_ (explicitly flagged HYPOTHESIS — "a
     real constraint-solver is a substantial build"), and relief/substitute
-    *suggestion* logic (must always require human confirmation, never
+    _suggestion_ logic (must always require human confirmation, never
     auto-assign). Source: PRODUCT-CONTRACT.md §6 (verified — no
     schedule-generator or relief-suggestion code found in
     `src-tauri/src/repository/teaching_assignment.rs` or
@@ -372,7 +384,7 @@ tier.
     blocked on external material only the school/owner can supply
     (confirming an org-managed Microsoft 365 tenant, Graph/site-consent
     grantor, and a completed privacy review) before any implementation —
-    this is one of the few items in this whole audit that is *correctly*
+    this is one of the few items in this whole audit that is _correctly_
     gated rather than merely unscheduled. Source: PRODUCT-CONTRACT.md
     §16.5, `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`.
 
@@ -386,7 +398,7 @@ tier.
     restrict official forms to DepEd's own seal/logo and explicitly
     prohibit "combining with other elements or creating new lockups" — so
     this is a DepEd-compliance blocker, not an engineering gap. Also
-    still not built: an accessibility-safe theme *derived* from the
+    still not built: an accessibility-safe theme _derived_ from the
     uploaded logo (primary/secondary/accent/selected-state colors) — only
     the raw logo upload/display shipped; the derived-theme half of §8's
     original direction is not yet implemented. Also not built: a
@@ -496,39 +508,42 @@ answer to "what legacy features were not carried into 0.2," given the
 actual legacy code isn't accessible from this audit.
 
 1. **Product identity / general reference-only status.**
+
    > "Legacy LIKHA may be inspected as reference material only."
-   — `docs/product/PRODUCT-CONTRACT.md`, line 16 (under "Product
-   identity: LIKHA-SIS 0.2 — never '2.0,' never 'LIKHA 2.0.'")
+   > — `docs/product/PRODUCT-CONTRACT.md`, line 16 (under "Product
+   > identity: LIKHA-SIS 0.2 — never '2.0,' never 'LIKHA 2.0.'")
 
 2. **SF8 Health & Nutrition — the one place a specific legacy conceptual
    structure is invoked as a starting point for a still-unbuilt 0.2
    feature.**
+
    > "Keep the legacy conceptual split (learner/section-level data;
-   Baseline/Pretest consolidation; Endline/Posttest consolidation) as a
-   *starting point*, but revalidate formulas/templates before
-   implementing — do not assume legacy figures remain authoritative.
-   Tighter authorization needed (health data)."
-   — `docs/product/PRODUCT-CONTRACT.md`, §5's School Forms table, SF8 row.
+   > Baseline/Pretest consolidation; Endline/Posttest consolidation) as a
+   > _starting point_, but revalidate formulas/templates before
+   > implementing — do not assume legacy figures remain authoritative.
+   > Tighter authorization needed (health data)."
+   > — `docs/product/PRODUCT-CONTRACT.md`, §5's School Forms table, SF8 row.
 
 3. **Grade 12 SHS curriculum carryover — "prior/legacy SHS curriculum,"
    used generically for the DepEd curriculum LIKHA-SIS 0.2 must still
    support for Grade 12, not a reference to legacy-LIKHA-the-application.**
+
    > "Grade 12: unaffected. Stays on the prior/legacy SHS curriculum —"
-   — `docs/adr/0037-curriculum-key-stage-versioning.md`, line 229.
-   (Included for completeness/transparency, but this "legacy" refers to a
-   DepEd curriculum generation, not to legacy LIKHA the product — flagged
-   here explicitly so it is not mistaken for a legacy-application
-   reference.)
+   > — `docs/adr/0037-curriculum-key-stage-versioning.md`, line 229.
+   > (Included for completeness/transparency, but this "legacy" refers to a
+   > DepEd curriculum generation, not to legacy LIKHA the product — flagged
+   > here explicitly so it is not mistaken for a legacy-application
+   > reference.)
 
 4. **DO 8 s.2015 Grade 12 weighting carryover — same generic-curriculum
    sense, not legacy-LIKHA-the-application.**
    > "...five Grade 12 legacy applicability groups in DO 8 Table 5,"
-   "...those legacy weights, rather than Table 10's Strengthened-SHS
-   weights...," "...the legacy DO 8 assessment structure and the
-   applicable legacy subject-group..."
-   — `docs/adr/0068-grade12-do8-weighting-carryover.md` (multiple lines).
-   Same caveat as item 3: this is DepEd policy vintage, not the prior
-   LIKHA application.
+   > "...those legacy weights, rather than Table 10's Strengthened-SHS
+   > weights...," "...the legacy DO 8 assessment structure and the
+   > applicable legacy subject-group..."
+   > — `docs/adr/0068-grade12-do8-weighting-carryover.md` (multiple lines).
+   > Same caveat as item 3: this is DepEd policy vintage, not the prior
+   > LIKHA application.
 
 No other distinct "legacy LIKHA" (the product) reference was found
 anywhere in `docs/` beyond items 1 and 2 above. Every other "legacy" hit
@@ -549,7 +564,7 @@ Exactly one item in this audit satisfies this: **SF8 Health & Nutrition**.
 - **As a legacy artifact**: PRODUCT-CONTRACT.md's SF8 row explicitly
   instructs keeping "the legacy conceptual split (learner/section-level
   data; Baseline/Pretest consolidation; Endline/Posttest consolidation)"
-  from legacy LIKHA as a *starting point*.
+  from legacy LIKHA as a _starting point_.
 - **As a current 0.2 DIRECTION-SET item**: SF8 is listed in
   PRODUCT-CONTRACT.md's §5 School Forms table as "not built," with an
   explicit instruction that when it is eventually built, it should
@@ -558,7 +573,7 @@ Exactly one item in this audit satisfies this: **SF8 Health & Nutrition**.
   authorization... (health data)."
 
 This is the one confirmed case where a legacy-LIKHA structural decision is
-carried forward as a *starting point* for still-unbuilt 0.2 work, with an
+carried forward as a _starting point_ for still-unbuilt 0.2 work, with an
 explicit instruction not to trust the legacy figures without
 revalidation. No other item in this audit's unbuilt-feature list was found
 referenced in both a legacy-LIKHA passage and a current 0.2 planning
@@ -584,7 +599,7 @@ Studio), this audit found and corrected:
   rail), though the School-Head variant and task-dismissal/notifications
   remain genuinely unbuilt as disclosed above.
 - Sync (§12): PRODUCT-CONTRACT.md frames this section primarily as a
-  *decision* ("SCHOOL-LAPTOP HUB SELECTED"); as of 2026-09-07, sync is
+  _decision_ ("SCHOOL-LAPTOP HUB SELECTED"); as of 2026-09-07, sync is
   substantially **implemented**, not merely decided — 10 entities wired
   end-to-end through outbox/hub/pull with encryption, conflict review UI,
   device management UI, and sync-status UI all real and shipped. The
@@ -596,7 +611,7 @@ Studio), this audit found and corrected:
   pass).
 - SF1/SF9 formgen: corrected in the opposite direction from the task's own
   framing — the files exist, but reading them shows they are proven
-  *architecture* against *synthetic, non-authoritative* templates, not a
+  _architecture_ against _synthetic, non-authoritative_ templates, not a
   built authoritative-template output as the mere existence of
   `sf1.rs`/`sf9.rs` might suggest at a glance. See Tier 3, item 15 above
   for the precise, source-verified status.

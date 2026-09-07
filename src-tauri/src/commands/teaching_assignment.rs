@@ -13,7 +13,7 @@ use crate::repository::schedule_meeting::{self, CreateMeetingOutcome, ScheduleMe
 use crate::repository::teaching_assignment::{
     self, TeacherLoad, TeachingAssignment, TeachingAssignmentDetail,
 };
-use crate::repository::{device_credential, device_identity, sync_outbox};
+use crate::repository::{device_credential, device_identity, sync_outbox, sync_version_cache};
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
 /// `section_id`/`subject_id`/`teacher_user_id` are client-supplied the
@@ -28,14 +28,11 @@ use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 /// `Learner`/`Attendance`/`Section`/`LearnerScore`/`AssessmentItem`/
 /// `Subject`): the exact same enrollment-gated encrypt-on-enqueue pattern
 /// as `commands::subject::create_subject` -- see that command's own doc
-/// comment. Only `create` is wired here, matching `Section`/`Subject`'s
-/// own create-only precedent: `teaching_assignment::replace_teacher` and
-/// `::remove` remain unwired (this task's own scope is "wire that ONE
-/// entity", not every verb on it), tracked the same way `Subject`'s own
-/// still-missing `update`/`rename` command is -- `upsert_from_sync`
-/// already tolerates a future push of either verb without changes (see
-/// its own doc comment). `GradingPeriod` and `SubjectAttendance` remain
-/// the next unwired entities.
+/// comment. `replace_teacher_assignment`/`remove_teaching_assignment` are
+/// now wired too (see their own doc comments) -- `TeachingAssignment` is
+/// the first entity in this codebase with a real cross-device `Delete`
+/// propagated over sync, since a reassignment/removal genuinely deletes
+/// the row rather than merely closing it.
 #[tauri::command]
 pub fn create_teaching_assignment(
     app: AppHandle,
@@ -173,12 +170,64 @@ fn parse_sync_uuid(value: &str, field_name: &str) -> AppResult<Uuid> {
         .map_err(|e| AppError::key_store(format!("invalid {field_name} for sync: {e}")))
 }
 
+/// Enqueues a `ChangeOperation::Delete` for an assignment this device
+/// just removed locally -- the counterpart to
+/// `enqueue_teaching_assignment_sync_change`'s `Upsert`. `base_version`
+/// is read from `sync_version_cache`, not hardcoded to `0`: unlike a
+/// brand-new create, a delete targets an id that (if this school is
+/// enrolled) was very likely already pushed and accepted by the hub at
+/// version 1, so a stale `0` would look like a conflict rather than a
+/// legitimate next write. Encrypts the removed row's own last-known
+/// content (not a placeholder) so a receiving device's
+/// `apply_decrypted_change` can still validate `school_id` before acting
+/// on it, exactly like every `Upsert` payload does -- `delete_from_sync`
+/// itself only actually uses the row's `id`.
+fn enqueue_teaching_assignment_delete(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    removed: &TeachingAssignment,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let base_version = sync_version_cache::known_version(
+        conn,
+        school_id,
+        EntityKind::TeachingAssignment,
+        &removed.id,
+    )?;
+    let plaintext = serde_json::to_vec(removed)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::TeachingAssignment,
+        entity_id: parse_sync_uuid(&removed.id, "teaching assignment id")?,
+        base_version,
+        operation: ChangeOperation::Delete,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
+}
+
 /// Removes any existing assignment for `(section_id, subject_id)` and
 /// creates a new one for `new_teacher_user_id` -- an explicit
 /// reassignment, never a silent overwrite (see
-/// `teaching_assignment::replace_teacher`'s doc comment).
+/// `teaching_assignment::replace_teacher`'s doc comment). ADR-0067/0069
+/// sync wiring: the first command in this codebase to enqueue BOTH a
+/// `Delete` (the old assignment, if one existed) and an `Upsert` (the
+/// new one) for a single user action -- see
+/// `enqueue_teaching_assignment_delete`'s own doc comment for why a real
+/// delete is propagated here rather than reusing the create-only
+/// precedent every other entity's first wiring slice established.
 #[tauri::command]
 pub fn replace_teacher_assignment(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     section_id: String,
@@ -186,27 +235,111 @@ pub fn replace_teacher_assignment(
     new_teacher_user_id: String,
 ) -> AppResult<Option<TeachingAssignment>> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
-    teaching_assignment::replace_teacher(
+    let (school_id, actor_user_id) = auth::authorize_capability_with_actor(
+        &conn,
+        &sessions,
+        Capability::ManageTeachingAssignments,
+    )?;
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    replace_teacher_assignment_with_optional_sync(
         &conn,
         &school_id,
+        &actor_user_id,
         &section_id,
         &subject_id,
         &new_teacher_user_id,
+        sspk.as_ref(),
     )
 }
 
+/// Shared logic behind `replace_teacher_assignment`, pulled out (matching
+/// `create_teaching_assignment_with_optional_sync`'s own shape) so it can
+/// be unit-tested without a real `AppHandle`/`State`.
+fn replace_teacher_assignment_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    section_id: &str,
+    subject_id: &str,
+    new_teacher_user_id: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<Option<TeachingAssignment>> {
+    let outcome = teaching_assignment::replace_teacher(
+        conn,
+        school_id,
+        section_id,
+        subject_id,
+        new_teacher_user_id,
+    )?;
+    let Some(outcome) = outcome else {
+        return Ok(None);
+    };
+
+    if let Some(sspk) = sspk {
+        if let Some(previous) = &outcome.previous {
+            enqueue_teaching_assignment_delete(conn, school_id, actor_user_id, previous, sspk)?;
+        }
+        enqueue_teaching_assignment_sync_change(
+            conn,
+            school_id,
+            actor_user_id,
+            &outcome.assignment,
+            sspk,
+        )?;
+    }
+
+    Ok(Some(outcome.assignment))
+}
+
+/// ADR-0067/0069 sync wiring: enqueues a `Delete` for the removed
+/// assignment, propagating it to every other device the same way
+/// `replace_teacher_assignment` does for a reassignment's old row -- see
+/// `enqueue_teaching_assignment_delete`'s own doc comment.
 #[tauri::command]
 pub fn remove_teaching_assignment(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     id: String,
 ) -> AppResult<bool> {
     let conn = lock_db(&db);
-    let school_id =
-        auth::authorize_capability(&conn, &sessions, Capability::ManageTeachingAssignments)?;
-    teaching_assignment::remove(&conn, &school_id, &id)
+    let (school_id, actor_user_id) = auth::authorize_capability_with_actor(
+        &conn,
+        &sessions,
+        Capability::ManageTeachingAssignments,
+    )?;
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    remove_teaching_assignment_with_optional_sync(
+        &conn,
+        &school_id,
+        &actor_user_id,
+        &id,
+        sspk.as_ref(),
+    )
+}
+
+/// Shared logic behind `remove_teaching_assignment`, pulled out so it can
+/// be unit-tested without a real `AppHandle`/`State` -- same rationale as
+/// `replace_teacher_assignment_with_optional_sync`.
+fn remove_teaching_assignment_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    id: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<bool> {
+    let removed = teaching_assignment::remove(conn, school_id, id)?;
+    let Some(removed) = removed else {
+        return Ok(false);
+    };
+
+    if let Some(sspk) = sspk {
+        enqueue_teaching_assignment_delete(conn, school_id, actor_user_id, &removed, sspk)?;
+    }
+
+    Ok(true)
 }
 
 /// Reference data any authenticated school member may read -- matching
@@ -457,5 +590,194 @@ mod tests {
             queued.is_empty(),
             "a rejected create must never enqueue an outbox row"
         );
+    }
+
+    #[test]
+    fn replace_teacher_assignment_with_an_sspk_enqueues_both_a_delete_and_an_upsert() {
+        let (conn, school_id, actor_id, teacher_id, section_id, subject_id) = setup();
+        let sspk = test_sspk();
+        let original = create_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &teacher_id,
+            &section_id,
+            &subject_id,
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+        // The create's own enqueue is not what this test is checking --
+        // drain it so only the replace's enqueues are asserted below.
+        sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        for entry in sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap() {
+            sync_outbox::acknowledge(&conn, &school_id, &entry.change.change_id.to_string())
+                .unwrap();
+        }
+        let other_teacher =
+            user_repo::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user_repo::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
+
+        let replaced = replace_teacher_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &section_id,
+            &subject_id,
+            &other_teacher.id,
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 2, "must enqueue both a delete and an upsert");
+        let delete_entry = queued
+            .iter()
+            .find(|entry| entry.change.operation == ChangeOperation::Delete)
+            .expect("a delete change must be enqueued for the old assignment");
+        assert_eq!(delete_entry.change.entity_id.to_string(), original.id);
+        let upsert_entry = queued
+            .iter()
+            .find(|entry| entry.change.operation == ChangeOperation::Upsert)
+            .expect("an upsert change must be enqueued for the new assignment");
+        assert_eq!(upsert_entry.change.entity_id.to_string(), replaced.id);
+        assert_ne!(
+            delete_entry.change.entity_id, upsert_entry.change.entity_id,
+            "the old and new assignment must be genuinely different rows"
+        );
+    }
+
+    #[test]
+    fn replace_teacher_assignment_with_no_prior_assignment_enqueues_only_an_upsert() {
+        let (conn, school_id, actor_id, teacher_id, section_id, subject_id) = setup();
+        let sspk = test_sspk();
+
+        replace_teacher_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &section_id,
+            &subject_id,
+            &teacher_id,
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(
+            queued.len(),
+            1,
+            "a first assignment is not a reassignment -- no delete to enqueue"
+        );
+        assert_eq!(queued[0].change.operation, ChangeOperation::Upsert);
+    }
+
+    #[test]
+    fn replace_teacher_assignment_with_no_sspk_enqueues_nothing() {
+        let (conn, school_id, actor_id, teacher_id, section_id, subject_id) = setup();
+
+        replace_teacher_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &section_id,
+            &subject_id,
+            &teacher_id,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn remove_teaching_assignment_with_an_sspk_enqueues_a_delete() {
+        let (conn, school_id, actor_id, teacher_id, section_id, subject_id) = setup();
+        let sspk = test_sspk();
+        let created = create_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &teacher_id,
+            &section_id,
+            &subject_id,
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+        for entry in sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap() {
+            sync_outbox::acknowledge(&conn, &school_id, &entry.change.change_id.to_string())
+                .unwrap();
+        }
+
+        let removed = remove_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &created.id,
+            Some(&sspk),
+        )
+        .unwrap();
+
+        assert!(removed);
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].change.operation, ChangeOperation::Delete);
+        assert_eq!(queued[0].change.entity_id.to_string(), created.id);
+    }
+
+    #[test]
+    fn remove_teaching_assignment_for_an_unknown_id_enqueues_nothing() {
+        let (conn, school_id, actor_id, ..) = setup();
+        let sspk = test_sspk();
+
+        let removed = remove_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &Uuid::now_v7().to_string(),
+            Some(&sspk),
+        )
+        .unwrap();
+
+        assert!(!removed);
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(queued.is_empty());
+    }
+
+    #[test]
+    fn remove_teaching_assignment_with_no_sspk_enqueues_nothing() {
+        let (conn, school_id, actor_id, teacher_id, section_id, subject_id) = setup();
+        let created = create_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &teacher_id,
+            &section_id,
+            &subject_id,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        let removed = remove_teaching_assignment_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_id,
+            &created.id,
+            None,
+        )
+        .unwrap();
+
+        assert!(removed);
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(queued.is_empty());
     }
 }

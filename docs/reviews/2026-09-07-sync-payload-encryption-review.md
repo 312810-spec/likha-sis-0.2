@@ -4,10 +4,12 @@ Date: 2026-09-07
 Reviewer: independent read-only security-review agent (fresh context, no
 prior involvement in this feature's implementation).
 Closes review debt recorded in `docs/VERIFICATION-DEBT.md`:
+
 - "Sync payload encrypt/decrypt round trip, learner entity (2026-09-05)"
 - "Payload-key rotation on device revocation (2026-09-05)"
 
 Scope reviewed (read-only, adversarial):
+
 1. `src-tauri/src/hub_server.rs` — `GET /sync/payload-key-wrap`, `authenticate`
 2. `src-tauri/src/repository/sync_payload_key.rs` — `get_wrap_for_credential`,
    `rotate_for_school`, `ensure_wrapped_for_credential`,
@@ -29,10 +31,13 @@ no-issue-found areas.
 ---
 
 ## BLOCKING — SSPK rotation on device revocation does not take effect in the
+
 ## running hub process; a revoked device retains decrypt access to all new
+
 ## sync traffic until the app is restarted
 
 **Files/lines:**
+
 - `src-tauri/src/hub_server.rs:106-118` (`HubServerState.sspk` field),
   `:157-172` (`spawn`), `:180-188` (`spawn_all`), `:201-211`
   (`maybe_spawn_listener`)
@@ -113,12 +118,12 @@ point of ADR-0069's rotation design:
    keeps running.**
 
 This directly and specifically contradicts ADR-0069's own stated security
-guarantee for this feature (`docs/adr/0069-*.md` line ~329): *"nothing
-encrypted under the new SSPK is ever reachable by a revoked device"* and
+guarantee for this feature (`docs/adr/0069-*.md` line ~329): _"nothing
+encrypted under the new SSPK is ever reachable by a revoked device"_ and
 the revocation addendum's explicit design goal that a revoked device
 "can decrypt only data encrypted under the now-retired key, never anything
 encrypted after rotation." In the current implementation, as long as the
-app is not restarted, there effectively *is* no "after rotation" — the
+app is not restarted, there effectively _is_ no "after rotation" — the
 retired key keeps being used in practice regardless of what the DPAPI file
 says.
 
@@ -151,13 +156,15 @@ priority order).
 
 ---
 
-## SHOULD-FIX — SSPK is minted/rotated per *installation*, not per *school*,
+## SHOULD-FIX — SSPK is minted/rotated per _installation_, not per _school_,
+
 ## despite ADR-0069 explicitly specifying "one SSPK per school"
 
 **Files/lines:**
-- `docs/adr/0069-*.md` (design intent, quote: *"The hub mints the school
-  sync-payload key (SSPK) once per school"* / *"one 256-bit AES-256-GCM key
-  per school"*)
+
+- `docs/adr/0069-*.md` (design intent, quote: _"The hub mints the school
+  sync-payload key (SSPK) once per school"_ / _"one 256-bit AES-256-GCM key
+  per school"_)
 - `src-tauri/src/db/mod.rs:103-126` (`load_or_mint_sspk`) and `:138-156`
   (`rotate_sspk`) — both take only `app: &AppHandle`, no `school_id`
   parameter, anywhere in the codebase (confirmed by grepping every call
@@ -176,7 +183,7 @@ priority order).
 **Evidence:** every call site of `load_or_mint_sspk`/`rotate_sspk`
 resolves a single DPAPI file (`SSPK_KEY_FILE_NAME`, a fixed filename with
 no per-school suffix) scoped to the whole app-data directory — i.e. to the
-whole *installation*, not to an individual school. `load_or_mint_sspk`'s
+whole _installation_, not to an individual school. `load_or_mint_sspk`'s
 own doc comment even conflates the two ("this school's very first device
 enrollment... for this single-installation architecture"), treating
 "school" and "installation" as synonyms, whereas
@@ -226,7 +233,7 @@ claim that ADR-0069 currently makes and the code does not deliver.
 correctly collapse every failure mode (missing header, unknown credential,
 revoked credential, wrong secret) into an indistinguishable `Unauthorized`,
 matching `device_credential::verify`'s own enumeration-safety contract.
-`ensure_wrapped_for_credential` is only ever invoked after a *successful*
+`ensure_wrapped_for_credential` is only ever invoked after a _successful_
 `verify()`, so a revoked credential genuinely never reaches the re-wrap
 code path (confirmed directly by the
 `a_revoked_credential_never_gets_a_lazy_rewrap` test, which asserts no wrap
@@ -255,7 +262,7 @@ authenticates — **checks out against the actual code**: it doesn't just
 check row existence, it unwraps and byte-compares
 (`unwrap_for_credential(...) == *sspk`), and refreshes via
 `refresh_wrap_for_credential`'s `ON CONFLICT ... DO UPDATE` when they
-differ. This logic is sound *given a correct `sspk` input* — but per the
+differ. This logic is sound _given a correct `sspk` input_ — but per the
 BLOCKING finding above, the real defect is one layer up: the `sspk` value
 `hub_server::authenticate` actually passes in is never updated after
 rotation, so this correct self-healing mechanism keeps faithfully healing
@@ -292,7 +299,7 @@ holds two schools' data, but by the time this function is called,
 `school_id` doesn't match the pull's own `config.school_id` — so this
 function can only ever be reached with a `school_id` matching what the
 caller already validated. Given the BLOCKING and SHOULD-FIX findings
-above concern the *key* layer rather than this validation, I did not find
+above concern the _key_ layer rather than this validation, I did not find
 an additional issue specific to this function. One residual note (not a
 new finding, just flagging for future readers): this function does not
 itself re-validate `school_id`, relying entirely on its caller — consistent
@@ -309,8 +316,8 @@ SAVEPOINT/ROLLBACK-on-error transaction wrapping around
 documented to fail toward the safer inconsistency (credential durably
 revoked even if the filesystem rotation subsequently fails) rather than
 the reverse. No blocking issue found in this ordering/transaction logic
-itself — the defect is what happens (or doesn't happen) to the *live
-process's* key material after this function successfully returns, covered
+itself — the defect is what happens (or doesn't happen) to the _live
+process's_ key material after this function successfully returns, covered
 above.
 
 **`db::rotate_sspk` / `crypto::dpapi::rotate_key`.** File-level rotation
@@ -362,16 +369,16 @@ key, secret, or wrap byte, only error variants/counts and fixed strings).
 
 ## Summary
 
-| # | Finding | Severity |
-|---|---------|----------|
-| 1 | Live hub process never picks up a rotated SSPK; revoked device retains decrypt access to all new sync traffic until app restart | **BLOCKING** |
-| 2 | SSPK is per-installation, not per-school as ADR-0069 specifies; cross-school crypto isolation currently rests entirely on one query-level filter | SHOULD-FIX |
-| 3 | `hub_server::authenticate`/`payload-key-wrap` endpoint scoping, wrap-row isolation | No issue found |
-| 4 | `sync_payload_key` self-healing TOCTOU claim | Verified true (but doesn't help against finding #1) |
-| 5 | `sync_client::resolve_sspk`/`apply_decrypted_change` fail-closed behavior | No issue found |
-| 6 | `learner::upsert_from_sync` | No issue found (relies on caller's school_id check, which is present) |
-| 7 | `auth::revoke_device_sync_credential[_and_rotate_sspk]` transaction/authz | No issue found |
-| 8 | `db::rotate_sspk` / `crypto::dpapi::rotate_key` file-level mechanics | No issue found |
+| #   | Finding                                                                                                                                          | Severity                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| 1   | Live hub process never picks up a rotated SSPK; revoked device retains decrypt access to all new sync traffic until app restart                  | **BLOCKING**                                                          |
+| 2   | SSPK is per-installation, not per-school as ADR-0069 specifies; cross-school crypto isolation currently rests entirely on one query-level filter | SHOULD-FIX                                                            |
+| 3   | `hub_server::authenticate`/`payload-key-wrap` endpoint scoping, wrap-row isolation                                                               | No issue found                                                        |
+| 4   | `sync_payload_key` self-healing TOCTOU claim                                                                                                     | Verified true (but doesn't help against finding #1)                   |
+| 5   | `sync_client::resolve_sspk`/`apply_decrypted_change` fail-closed behavior                                                                        | No issue found                                                        |
+| 6   | `learner::upsert_from_sync`                                                                                                                      | No issue found (relies on caller's school_id check, which is present) |
+| 7   | `auth::revoke_device_sync_credential[_and_rotate_sspk]` transaction/authz                                                                        | No issue found                                                        |
+| 8   | `db::rotate_sspk` / `crypto::dpapi::rotate_key` file-level mechanics                                                                             | No issue found                                                        |
 
 This closes the two independent-review debts recorded in
 `docs/VERIFICATION-DEBT.md` with **one genuine BLOCKING finding** that both

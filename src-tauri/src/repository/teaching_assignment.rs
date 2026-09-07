@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -86,6 +86,31 @@ pub fn create(
     find_by_id_in_school(conn, school_id, &id)
 }
 
+/// The outcome of `replace_teacher` -- carries the OLD assignment (if one
+/// existed) alongside the newly-created one, since a caller that wants to
+/// propagate this reassignment over sync needs both: a full DELETE
+/// payload for the old row (this device's own local delete already
+/// happened) and an UPSERT for the new one. `previous` is `None` when no
+/// assignment existed yet for this `(section_id, subject_id)` -- i.e.
+/// this call was really a first assignment, not a reassignment, and no
+/// delete needs to be propagated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TeacherReplacementOutcome {
+    pub previous: Option<TeachingAssignment>,
+    pub assignment: TeachingAssignment,
+}
+
+fn row_to_teaching_assignment(row: &rusqlite::Row) -> rusqlite::Result<TeachingAssignment> {
+    Ok(TeachingAssignment {
+        id: row.get(0)?,
+        school_id: row.get(1)?,
+        teacher_user_id: row.get(2)?,
+        section_id: row.get(3)?,
+        subject_id: row.get(4)?,
+        created_at: row.get(5)?,
+    })
+}
+
 /// Removes an existing assignment for `(section_id, subject_id)` (if
 /// any) and creates a new one for `new_teacher_user_id` -- an explicit
 /// reassignment, never a silent overwrite. Not wrapped in an explicit
@@ -99,26 +124,63 @@ pub fn replace_teacher(
     section_id: &str,
     subject_id: &str,
     new_teacher_user_id: &str,
-) -> AppResult<Option<TeachingAssignment>> {
+) -> AppResult<Option<TeacherReplacementOutcome>> {
+    let previous: Option<TeachingAssignment> = conn
+        .query_row(
+            "DELETE FROM teaching_assignments \
+             WHERE school_id = ?1 AND section_id = ?2 AND subject_id = ?3 \
+             RETURNING id, school_id, teacher_user_id, section_id, subject_id, created_at",
+            (school_id, section_id, subject_id),
+            row_to_teaching_assignment,
+        )
+        .optional()?;
+    let assignment = create(conn, school_id, new_teacher_user_id, section_id, subject_id)?;
+    Ok(assignment.map(|assignment| TeacherReplacementOutcome {
+        previous,
+        assignment,
+    }))
+}
+
+/// ADR-0067/0069 sync wiring counterpart to `upsert_from_sync`: the first
+/// entity in this codebase where a genuine cross-device DELETE is wired
+/// end to end, since `replace_teacher`/`remove` both intentionally
+/// delete the assignment row (never merely close it via a status flag,
+/// unlike `SectionMembership`'s `ends_on` pattern) -- pulling that change
+/// must delete it here too, not upsert a phantom row back into
+/// existence. School-scoped: only ever deletes a row this exact
+/// `school_id` owns. Cascades to `schedule_meetings` via the existing
+/// `ON DELETE CASCADE` FK, matching this same device's own local
+/// `remove`/`replace_teacher` behavior exactly. Idempotent: deleting an
+/// id that doesn't exist (already deleted by an earlier pull, or never
+/// existed) is a silent no-op, not an error -- a delete's whole point is
+/// "this row should not exist," which a missing row already satisfies.
+pub fn delete_from_sync(conn: &Connection, school_id: &str, id: &str) -> AppResult<()> {
     conn.execute(
-        "DELETE FROM teaching_assignments \
-         WHERE school_id = ?1 AND section_id = ?2 AND subject_id = ?3",
-        (school_id, section_id, subject_id),
+        "DELETE FROM teaching_assignments WHERE id = ?1 AND school_id = ?2",
+        (id, school_id),
     )?;
-    create(conn, school_id, new_teacher_user_id, section_id, subject_id)
+    Ok(())
 }
 
 /// Removes an assignment, scoped to `school_id` -- a caller can only
 /// ever remove their own school's assignment. Cascades to any
-/// `schedule_meetings` for it (`ON DELETE CASCADE`). Returns whether a
-/// row was actually removed, so a caller can distinguish "already gone"
-/// from "removed just now" if it matters.
-pub fn remove(conn: &Connection, school_id: &str, id: &str) -> AppResult<bool> {
-    let affected = conn.execute(
-        "DELETE FROM teaching_assignments WHERE id = ?1 AND school_id = ?2",
+/// `schedule_meetings` for it (`ON DELETE CASCADE`). Returns the removed
+/// row (not just whether one was removed) so a caller can propagate a
+/// full DELETE payload over sync -- see `delete_from_sync`'s own doc
+/// comment for why a bare bool wasn't enough once that wiring existed.
+pub fn remove(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+) -> AppResult<Option<TeachingAssignment>> {
+    conn.query_row(
+        "DELETE FROM teaching_assignments WHERE id = ?1 AND school_id = ?2 \
+         RETURNING id, school_id, teacher_user_id, section_id, subject_id, created_at",
         (id, school_id),
-    )?;
-    Ok(affected > 0)
+        row_to_teaching_assignment,
+    )
+    .optional()
+    .map_err(Into::into)
 }
 
 /// ADR-0067/0069 sync wiring: applies a pulled/decrypted
@@ -403,9 +465,12 @@ mod tests {
     fn replace_teacher_reassigns_without_leaving_a_duplicate() {
         let conn = open_test_db();
         let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
-        create(&conn, &school_id, &teacher_id, &section_id, &subject_id).unwrap();
         let other_teacher = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
         user::add_school_membership(&conn, &other_teacher.id, &school_id).unwrap();
+
+        let original = create(&conn, &school_id, &teacher_id, &section_id, &subject_id)
+            .unwrap()
+            .unwrap();
 
         let replaced = replace_teacher(
             &conn,
@@ -417,13 +482,89 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        assert_eq!(replaced.teacher_user_id, other_teacher.id);
+        assert_eq!(replaced.assignment.teacher_user_id, other_teacher.id);
+        assert_eq!(
+            replaced.previous.as_ref().map(|p| p.id.as_str()),
+            Some(original.id.as_str()),
+            "the outcome must carry the OLD assignment so a caller can propagate its deletion"
+        );
         let all = list_by_section_in_school(&conn, &school_id, &section_id).unwrap();
         assert_eq!(
             all.len(),
             1,
             "reassigning must not leave the old assignment behind"
         );
+    }
+
+    #[test]
+    fn replace_teacher_reports_no_previous_assignment_when_none_existed() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+
+        let replaced = replace_teacher(&conn, &school_id, &section_id, &subject_id, &teacher_id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            replaced.previous, None,
+            "a first assignment is not a reassignment -- nothing to delete"
+        );
+    }
+
+    #[test]
+    fn delete_from_sync_removes_the_row_and_cascades_to_schedule_meetings() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        let assignment = create(&conn, &school_id, &teacher_id, &section_id, &subject_id)
+            .unwrap()
+            .unwrap();
+        schedule_meeting::create(&conn, &school_id, &assignment.id, 0, "08:00", "08:50", None)
+            .unwrap();
+
+        delete_from_sync(&conn, &school_id, &assignment.id).unwrap();
+
+        assert_eq!(
+            find_by_id_in_school(&conn, &school_id, &assignment.id).unwrap(),
+            None
+        );
+        let meeting_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM schedule_meetings WHERE teaching_assignment_id = ?1",
+                [&assignment.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            meeting_count, 0,
+            "deleting the assignment must cascade to its schedule meetings"
+        );
+    }
+
+    #[test]
+    fn delete_from_sync_is_scoped_to_the_callers_school() {
+        let conn = open_test_db();
+        let (school_id, teacher_id, section_id, subject_id) = setup(&conn);
+        let assignment = create(&conn, &school_id, &teacher_id, &section_id, &subject_id)
+            .unwrap()
+            .unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+
+        delete_from_sync(&conn, &other_school.id, &assignment.id).unwrap();
+
+        assert!(
+            find_by_id_in_school(&conn, &school_id, &assignment.id)
+                .unwrap()
+                .is_some(),
+            "a delete claiming the wrong school must never remove another school's row"
+        );
+    }
+
+    #[test]
+    fn delete_from_sync_is_a_no_op_for_an_id_that_does_not_exist() {
+        let conn = open_test_db();
+        let (school_id, ..) = setup(&conn);
+
+        delete_from_sync(&conn, &school_id, &Uuid::now_v7().to_string()).unwrap();
     }
 
     #[test]
@@ -436,13 +577,13 @@ mod tests {
         let other_school = school::create(&conn, "Other School").unwrap();
 
         let removed_from_wrong_school = remove(&conn, &other_school.id, &created.id).unwrap();
-        assert!(!removed_from_wrong_school);
+        assert_eq!(removed_from_wrong_school, None);
         assert!(find_by_id_in_school(&conn, &school_id, &created.id)
             .unwrap()
             .is_some());
 
         let removed = remove(&conn, &school_id, &created.id).unwrap();
-        assert!(removed);
+        assert_eq!(removed, Some(created.clone()));
         assert!(find_by_id_in_school(&conn, &school_id, &created.id)
             .unwrap()
             .is_none());

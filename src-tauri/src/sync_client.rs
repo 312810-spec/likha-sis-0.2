@@ -84,7 +84,7 @@ use crate::repository::{
     sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
     teaching_assignment,
 };
-use crate::sync::{EntityKind, PendingChange};
+use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
@@ -608,6 +608,18 @@ pub(crate) fn apply_decrypted_change(
     let plaintext = payload_key::decrypt_payload(sspk, &change.encrypted_payload)
         .map_err(|_| ApplyRejection::Untrusted)?;
 
+    // Only `TeachingAssignment` has a real `Delete` handler wired below --
+    // every other entity kind's arm only ever calls `upsert_from_sync`. A
+    // `Delete` operation claimed for any other entity is unsupported and
+    // therefore untrustworthy: reject it explicitly rather than silently
+    // treating it as an upsert (which would materialize a phantom row
+    // from a delete's payload) or falling through unnoticed.
+    if change.operation == ChangeOperation::Delete
+        && change.entity_kind != EntityKind::TeachingAssignment
+    {
+        return Err(ApplyRejection::Untrusted);
+    }
+
     match change.entity_kind {
         EntityKind::Learner => {
             let incoming: learner::Learner =
@@ -669,8 +681,14 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            teaching_assignment::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            match change.operation {
+                ChangeOperation::Upsert => teaching_assignment::upsert_from_sync(conn, &incoming)
+                    .map_err(|_| ApplyRejection::RepositoryRejected),
+                ChangeOperation::Delete => {
+                    teaching_assignment::delete_from_sync(conn, school_id, &incoming.id)
+                        .map_err(|_| ApplyRejection::RepositoryRejected)
+                }
+            }
         }
         EntityKind::GradingPeriod => {
             let incoming: grading::GradingPeriod =
@@ -2484,6 +2502,141 @@ mod tests {
                 1
             );
         };
+    }
+
+    #[test]
+    fn pull_once_applies_a_teaching_assignment_delete_and_cascades_to_schedule_meetings() {
+        // The regression test for building real delete-propagation
+        // (docs/VERIFICATION-DEBT.md, "TeachingAssignment.replace_teacher/
+        // .remove are not wired to sync"): this device already has the
+        // assignment locally (as if it created it, or pulled it earlier),
+        // plus a schedule meeting attached to it. Another device deletes
+        // the assignment (a reassignment or removal) and pushes a
+        // `ChangeOperation::Delete`; pulling it must actually remove the
+        // row here too, cascading to the schedule meeting, not upsert a
+        // phantom row back into existence.
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let (section_id, subject_id, teacher_user_id) = setup_section_subject_and_teacher(&fixture);
+
+        {
+            let conn = &fixture.conn;
+            conn.execute(
+                "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                (
+                    entity_id.to_string(),
+                    &fixture.school_id,
+                    &teacher_user_id,
+                    &section_id,
+                    &subject_id,
+                ),
+            )
+            .unwrap();
+            crate::repository::schedule_meeting::create(
+                conn,
+                &fixture.school_id,
+                &entity_id.to_string(),
+                0,
+                "08:00",
+                "08:50",
+                None,
+            )
+            .unwrap();
+
+            let mut delete_change = make_change(&fixture, entity_id, 0);
+            delete_change.entity_kind = EntityKind::TeachingAssignment;
+            delete_change.operation = ChangeOperation::Delete;
+            let plaintext = serde_json::to_vec(&synthetic_teaching_assignment(
+                &fixture,
+                entity_id,
+                &teacher_user_id,
+                &section_id,
+                &subject_id,
+            ))
+            .unwrap();
+            delete_change.encrypted_payload =
+                payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+            sync_outbox::enqueue(conn, &fixture.school_id, &delete_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            teaching_assignment::find_by_id_in_school(
+                conn,
+                &fixture.school_id,
+                &entity_id.to_string()
+            )
+            .unwrap(),
+            None,
+            "the pulled delete must actually remove the local row"
+        );
+        let meeting_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM schedule_meetings WHERE teaching_assignment_id = ?1",
+                [entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            meeting_count, 0,
+            "the delete must cascade to this assignment's schedule meetings"
+        );
+    }
+
+    #[test]
+    fn pull_once_rejects_a_delete_operation_for_an_entity_that_does_not_support_it() {
+        // Defensive guard: only TeachingAssignment has a real Delete
+        // handler. A Delete claimed for any other entity kind (here,
+        // Subject) must never be silently treated as an upsert.
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_subject_change(&fixture, entity_id, 0);
+            change.operation = ChangeOperation::Delete;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(
+            summary.failed,
+            "an unsupported Delete must be treated as untrusted, not silently ignored"
+        );
+
+        let conn = &fixture.conn;
+        let subject_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM subjects WHERE id = ?1)",
+                [entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!subject_exists);
     }
 
     #[test]

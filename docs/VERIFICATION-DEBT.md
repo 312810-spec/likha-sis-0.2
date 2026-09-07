@@ -1,5 +1,81 @@
 # Verification Debt
 
+## TeachingAssignment reassignment/removal: real cross-device DELETE built and wired (2026-09-07)
+
+Closes the Tier-1 gap recorded in
+`docs/product/2026-09-07-unbuilt-features-audit.md`: `replace_teacher`/
+`remove` intentionally delete the assignment row (never merely close it
+via a status flag, unlike `SectionMembership`'s `ends_on` pattern), so
+they were incompatible with the sync mechanism every other entity's
+first wiring slice established (`upsert_from_sync`, update-only). This
+codebase's sync protocol has carried a `ChangeOperation::Delete` variant
+since its earliest design (`sync/mod.rs`) but never actually implemented
+handling for it anywhere — this is the first entity with a real,
+end-to-end delete propagated over sync.
+
+**User decision recorded**: asked directly whether to (a) build real
+delete-propagation, (b) change `replace_teacher` to update-in-place
+(sacrificing its deliberate "wipe the old teacher's schedule on
+reassignment" behavior), or (c) skip for now. Chose (a).
+
+**Built**:
+
+- `repository::teaching_assignment::delete_from_sync(conn, school_id, id)`
+  — school-scoped `DELETE`, cascades to `schedule_meetings` via the
+  existing `ON DELETE CASCADE` FK, idempotent (deleting an already-gone
+  id is a silent no-op, matching a delete's own "this should not exist"
+  semantics).
+- `replace_teacher` now returns `TeacherReplacementOutcome { previous:
+Option<TeachingAssignment>, assignment }` (previously just the new row)
+  so a caller can propagate a full DELETE payload for the OLD row, not
+  only its id — needed so a receiving device's `apply_decrypted_change`
+  can still validate `school_id` before acting, exactly like every
+  `Upsert` payload does.
+- `remove` now returns `Option<TeachingAssignment>` (previously `bool`)
+  for the same reason.
+- `sync_client::apply_decrypted_change` gained a `ChangeOperation`-aware
+  dispatch for the `TeachingAssignment` arm (`Upsert` → existing
+  `upsert_from_sync`; `Delete` → new `delete_from_sync`), plus a
+  defensive guard at the top of the function: a `Delete` claimed for any
+  entity kind OTHER than `TeachingAssignment` is rejected as
+  `ApplyRejection::Untrusted` rather than silently treated as an upsert
+  (closes a latent gap — every other entity's arm previously ignored
+  `change.operation` entirely).
+- `commands::teaching_assignment::replace_teacher_assignment` now
+  enqueues a `Delete` for the old assignment (if one existed) AND an
+  `Upsert` for the new one, in the same call — the first command in this
+  codebase to enqueue two different operations for one user action.
+  `remove_teaching_assignment` enqueues a `Delete`. Both were refactored
+  into testable `*_with_optional_sync` pure functions, matching this
+  codebase's established pattern (previously the logic lived directly in
+  the `#[tauri::command]` body, untestable without a real `AppHandle`).
+- New delete's `base_version` is read from `sync_version_cache`, not
+  hardcoded to `0` — a delete targets an id that (if enrolled) was very
+  likely already pushed and accepted by the hub, so a stale `0` would
+  look like a conflict rather than a legitimate next write.
+
+**New tests**: `delete_from_sync_removes_the_row_and_cascades_to_schedule_meetings`,
+`delete_from_sync_is_scoped_to_the_callers_school`,
+`delete_from_sync_is_a_no_op_for_an_id_that_does_not_exist`,
+`replace_teacher_reports_no_previous_assignment_when_none_existed`
+(repository layer); `pull_once_applies_a_teaching_assignment_delete_and_cascades_to_schedule_meetings`,
+`pull_once_rejects_a_delete_operation_for_an_entity_that_does_not_support_it`
+(sync_client, end-to-end through a real pull round);
+`replace_teacher_assignment_with_an_sspk_enqueues_both_a_delete_and_an_upsert`,
+`replace_teacher_assignment_with_no_prior_assignment_enqueues_only_an_upsert`,
+`replace_teacher_assignment_with_no_sspk_enqueues_nothing`,
+`remove_teaching_assignment_with_an_sspk_enqueues_a_delete`,
+`remove_teaching_assignment_for_an_unknown_id_enqueues_nothing`,
+`remove_teaching_assignment_with_no_sspk_enqueues_nothing` (command
+layer).
+
+**Verified**: full `cargo test` (1039 lib tests, 0 failed, up from
+1027), `cargo clippy --all-targets -- -D warnings` (0 warnings),
+`cargo fmt --check` (clean after one `cargo fmt` pass), native
+`cargo build` (confirms the app still builds), `npm run quality`
+(1099/1099, unaffected — no TS-visible change; the Tauri command's own
+IPC signature/return shape is unchanged).
+
 ## First-ever native NVDA pass on the compiled Tauri binary (2026-09-07) — narrow but real
 
 Every prior "native NVDA/Narrator pass owed" entry in this file was

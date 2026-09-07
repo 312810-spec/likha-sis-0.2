@@ -4,6 +4,7 @@ Date: 2026-09-07
 Reviewer: independent read-only security-review agent (fresh context, no
 prior involvement in implementing this feature).
 Closes review debt recorded in `docs/VERIFICATION-DEBT.md`:
+
 - "SectionMembership sync wiring (2026-09-06)"
 - "Subject sync wiring (2026-09-06)"
 - "AssessmentItem sync wiring (2026-09-06)"
@@ -17,6 +18,7 @@ check whether the same class of bug — a live-process value never refreshed
 after a DB/file-level change — recurs in this scope.
 
 Scope reviewed (read-only, adversarial):
+
 1. `src-tauri/src/commands/section.rs` — `enroll_learner_membership`,
    `transfer_learner_membership`, `end_learner_membership` and their
    `*_with_optional_sync` wrappers, `enqueue_section_membership_sync_change`,
@@ -38,11 +40,15 @@ Scope reviewed (read-only, adversarial):
 ---
 
 ## BLOCKING — a legitimate (non-malicious) concurrent write on two devices to
+
 ## `Subject`, `LearnerScore`, or `SectionMembership` can permanently wedge
+
 ## sync for the ENTIRE SCHOOL, not just that one entity, with no automatic
+
 ## recovery
 
 **Files/lines:**
+
 - `src-tauri/src/repository/subject.rs:16-23` (`create`), `:42-57`
   (`upsert_from_sync`) and `src-tauri/src/db/migrations.rs:245-251`
   (`subjects` table: `UNIQUE (school_id, name)`)
@@ -53,7 +59,7 @@ Scope reviewed (read-only, adversarial):
   (`upsert_from_sync`) and `src-tauri/src/db/migrations.rs:92-111`
   (`section_memberships` table:
   `CREATE UNIQUE INDEX idx_one_active_membership_per_learner ON
-  section_memberships(learner_id) WHERE ends_on IS NULL`)
+section_memberships(learner_id) WHERE ends_on IS NULL`)
 - `src-tauri/src/sync_client.rs:490-514` (`pull_once`'s batch loop: `break`
   on any `Err(())`, cursor never advances past the failing change)
 
@@ -69,20 +75,20 @@ correctly conflicts on that natural key so a single device's own repeated
 writes update in place rather than duplicate.
 
 But every one of these entities' `upsert_from_sync` (the function that
-materializes a *pulled* change from another device) is a plain
+materializes a _pulled_ change from another device) is a plain
 `INSERT ... ON CONFLICT(id) DO UPDATE` keyed **only** on the row's own
 `id` — deliberately, per each function's own doc comment, so that a change
 originating on another device (which necessarily has a different, freshly
 minted `id` for what is semantically the same natural-key entity) round-trips
 without needing a second materializer. This is fine as long as no two
-devices independently create a competing row for the *same natural key*
+devices independently create a competing row for the _same natural key_
 before either device has synced. But nothing prevents that:
 
 - **Subject**: two devices, each offline, each running `create_subject` for
   the same subject name (e.g. two teachers separately adding "MAPEH" for the
   same school before either has completed an initial sync) each get their
   own fresh `Uuid::now_v7()` id, both succeed locally (`subjects(school_id,
-  name)` only conflicts against rows the *local* DB already has). Both push
+name)` only conflicts against rows the _local_ DB already has). Both push
   successfully to the hub (`push_change`, `sync_hub.rs:91`, only checks
   `base_version` against the hub's own per-entity-id version counter — it has
   no idea two different `entity_id`s collide on `name`, since the payload is
@@ -91,17 +97,17 @@ before either device has synced. But nothing prevents that:
   device A pulls device B's `Subject` row, `upsert_from_sync` issues
   `INSERT (id=B's-id, school_id, name=...)`, which is a **brand-new** `id` as
   far as SQLite's `ON CONFLICT(id)` target is concerned, but it collides with
-  device A's own existing row on the *separate* `UNIQUE (school_id, name)`
+  device A's own existing row on the _separate_ `UNIQUE (school_id, name)`
   index — a constraint an `INSERT ... ON CONFLICT(id) DO UPDATE` clause does
   **not** suppress (SQLite only resolves the conflict target actually named
   in the `ON CONFLICT` clause; any other violated unique index still raises
   a hard constraint-violation error). This is a real inaccuracy in the
   function's own doc comment, which claims "This bypasses `create`'s own
   `UNIQUE (school_id, name)` conflict path entirely" — it does not bypass
-  the constraint, it still hits it; it only bypasses `create`'s *code path*.
+  the constraint, it still hits it; it only bypasses `create`'s _code path_.
 - **LearnerScore**: identical shape. `record`'s own insert conflicts on
   `(assessment_item_id, learner_id)`, deliberately reusing the same `id`
-  across repeated *local* recordings. But if two devices each record a score
+  across repeated _local_ recordings. But if two devices each record a score
   for the same learner on the same assessment item while both are offline
   (plausible: a co-teacher, a substitute, or the same teacher entering
   corrections on two devices before either has completed an initial sync),
@@ -176,8 +182,11 @@ them) for each of the three affected entities.
 ---
 
 ## SHOULD-FIX — `upsert_from_sync` for `SectionMembership`/`Subject`/
+
 ## `AssessmentItem`/`LearnerScore` never re-validates that a referenced
+
 ## foreign id (`section_id`, `learner_id`, `class_record_id`, `category_id`,
+
 ## `assessment_item_id`) actually belongs to the incoming `school_id`
 
 **Files/lines:** all four `upsert_from_sync` functions listed above; the
@@ -188,13 +197,13 @@ REFERENCES sections(id)` — no `school_id` cross-check in the FK itself).
 declared `school_id` field matches the pulling device's configured school
 (defense in depth, correctly implemented, confirmed identical across all
 four new arms — see "Reviewed with NO issue found" below). None of the four
-`upsert_from_sync` functions independently confirm that the *other* ids
+`upsert_from_sync` functions independently confirm that the _other_ ids
 embedded in the payload (`section_id`/`learner_id` for `SectionMembership`,
 `class_record_id`/`category_id` for `AssessmentItem`,
 `assessment_item_id`/`learner_id` for `LearnerScore`) actually belong to
 that same `school_id` — they rely entirely on the SQLite `FOREIGN KEY`
-constraint merely proving the referenced row *exists somewhere*, not that it
-exists *in the right school*. This is the same root cause the sibling
+constraint merely proving the referenced row _exists somewhere_, not that it
+exists _in the right school_. This is the same root cause the sibling
 review's SHOULD-FIX #2 already flagged for the SSPK itself (multi-school-per-
 installation is a schema-supported, code-accommodated case — see
 `hub_server::should_listen` iterating "any school known to this
@@ -218,6 +227,7 @@ join-verify `school_id` on every foreign id it writes).
 **Every `*_with_optional_sync` wrapper enqueues only on its own success
 variant.** Directly re-read (not merely trusted from the self-review's own
 prose):
+
 - `enroll_learner_membership_with_optional_sync` — enqueues only on
   `EnrollOutcome::Enrolled` (`commands/section.rs:512`).
 - `transfer_learner_membership_with_optional_sync` — enqueues only inside
@@ -272,7 +282,7 @@ stage_pull_conflict`, never touches the domain table) and the
 advance_cursor`. Confirmed this holds for all four new entity kinds, not
 just the ones with dedicated tests. (The one caveat is the BLOCKING finding
 above: `failed = true` is technically correct — the change genuinely was
-rejected, not treated as success — but the *permanence* and *blast radius*
+rejected, not treated as success — but the _permanence_ and _blast radius_
 of that rejection is worse than the summary communicates.)
 
 **`SectionMembership::upsert_from_sync` never deletes a row, only updates in
@@ -283,7 +293,7 @@ reachable from it.
 
 **`idx_one_active_membership_per_learner` (the "at most one open membership
 per learner" unique partial index) does provide a real structural backstop**
-against the *within-normal-ordering* version of the transfer/enroll race —
+against the _within-normal-ordering_ version of the transfer/enroll race —
 if a pulled "opened destination" change somehow arrived before its paired
 "closed source" change (e.g. split across two paginated pull pages), the
 `INSERT` of the still-open destination row while the source row is also
@@ -320,7 +330,7 @@ row for any of these four entities (confirmed by each entity's own
   `enqueue_section_membership_sync_change`'s own doc comment
   (`commands/section.rs:188-202`) against the actual call sites in
   `enroll_learner_membership_with_optional_sync`/`transfer_learner_membership_
-  with_optional_sync`/`end_learner_membership_with_optional_sync`: each calls
+with_optional_sync`/`end_learner_membership_with_optional_sync`: each calls
   the domain function first (which internally commits its own
   `Connection::transaction()`), then calls the enqueue function as a
   separate, later step. A crash in that window loses a sync signal for an
@@ -372,17 +382,17 @@ row for any of these four entities (confirmed by each entity's own
 
 ## Summary
 
-| # | Finding | Severity |
-|---|---------|----------|
-| 1 | A legitimate concurrent write on two devices to `Subject`/`LearnerScore`/`SectionMembership` (colliding on a natural-key `UNIQUE` constraint distinct from `id`) permanently wedges ALL further sync for the whole school on the receiving device, with no automatic recovery and no distinguishing operator signal | **BLOCKING** |
-| 2 | `upsert_from_sync` for these four entities never re-validates that a foreign id in the payload belongs to the declared `school_id` — inert under single-school-per-installation, same root cause as the sibling review's SSPK-per-installation finding | SHOULD-FIX |
-| 3 | Every `*_with_optional_sync` wrapper enqueues only on its own success variant, for all four entities | No issue found |
-| 4 | `resolve_sspk_if_enrolled` re-reads the SSPK from disk per call — the sibling review's stale-live-value bug class does not recur in this scope | No issue found |
-| 5 | School-scope (`incoming.school_id != school_id`) check present and correctly positioned in all four new `apply_decrypted_change` arms | No issue found |
-| 6 | No rejection/conflict path is silently treated as success | No issue found (see caveat folded into finding #1) |
-| 7 | `SectionMembership::upsert_from_sync` never deletes, only updates via `ends_on` | No issue found |
-| 8 | Base-version handling (`0` for create-only entities, `sync_version_cache`-derived for re-recordable ones) matches documented precedent | No issue found |
-| 9 | `SectionMembership`'s enqueue-not-atomic-with-domain-write and two unwired write paths | Already documented, re-confirmed, nothing new |
+| #   | Finding                                                                                                                                                                                                                                                                                                             | Severity                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | A legitimate concurrent write on two devices to `Subject`/`LearnerScore`/`SectionMembership` (colliding on a natural-key `UNIQUE` constraint distinct from `id`) permanently wedges ALL further sync for the whole school on the receiving device, with no automatic recovery and no distinguishing operator signal | **BLOCKING**                                       |
+| 2   | `upsert_from_sync` for these four entities never re-validates that a foreign id in the payload belongs to the declared `school_id` — inert under single-school-per-installation, same root cause as the sibling review's SSPK-per-installation finding                                                              | SHOULD-FIX                                         |
+| 3   | Every `*_with_optional_sync` wrapper enqueues only on its own success variant, for all four entities                                                                                                                                                                                                                | No issue found                                     |
+| 4   | `resolve_sspk_if_enrolled` re-reads the SSPK from disk per call — the sibling review's stale-live-value bug class does not recur in this scope                                                                                                                                                                      | No issue found                                     |
+| 5   | School-scope (`incoming.school_id != school_id`) check present and correctly positioned in all four new `apply_decrypted_change` arms                                                                                                                                                                               | No issue found                                     |
+| 6   | No rejection/conflict path is silently treated as success                                                                                                                                                                                                                                                           | No issue found (see caveat folded into finding #1) |
+| 7   | `SectionMembership::upsert_from_sync` never deletes, only updates via `ends_on`                                                                                                                                                                                                                                     | No issue found                                     |
+| 8   | Base-version handling (`0` for create-only entities, `sync_version_cache`-derived for re-recordable ones) matches documented precedent                                                                                                                                                                              | No issue found                                     |
+| 9   | `SectionMembership`'s enqueue-not-atomic-with-domain-write and two unwired write paths                                                                                                                                                                                                                              | Already documented, re-confirmed, nothing new      |
 
 This closes the four independent-review debts recorded in
 `docs/VERIFICATION-DEBT.md` with **one genuine BLOCKING finding** (a

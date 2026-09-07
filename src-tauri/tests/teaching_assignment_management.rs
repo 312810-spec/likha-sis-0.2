@@ -70,7 +70,7 @@ fn remove_assignment_as_current_session(
 ) -> app_lib::error::AppResult<bool> {
     let school_id =
         auth::authorize_capability(conn, sessions, Capability::ManageTeachingAssignments)?;
-    teaching_assignment::remove(conn, &school_id, id)
+    Ok(teaching_assignment::remove(conn, &school_id, id)?.is_some())
 }
 
 /// Standing in for `commands::teaching_assignment::list_teaching_assignments_by_section`.
