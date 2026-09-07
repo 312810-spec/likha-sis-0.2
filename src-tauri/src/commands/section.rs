@@ -243,8 +243,22 @@ fn enqueue_section_membership_sync_change(
 /// Previously ungated beyond an active session (any role) -- closed as a
 /// real authorization gap during Wave 2A, see
 /// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`.
+///
+/// ADR-0067/0069 sync wiring: closes the first of the two `SectionMembership`
+/// write paths `docs/VERIFICATION-DEBT.md` recorded as unwired. Uses the
+/// same enrollment-gated encrypt-on-enqueue pattern as
+/// `enroll_learner_membership` -- see `enqueue_section_membership_sync_change`'s
+/// doc comment. `enroll` can return `Some` either for a genuine write or an
+/// idempotent same-section no-op (see its own doc comment); this enqueues on
+/// either, which is harmless -- the payload content is identical either way,
+/// so a redundant upsert is at worst a no-op sync entry, never a wrong one.
+/// The CSV bulk-import path (`import::commit`, calling this same `enroll`
+/// primitive) remains unwired -- threading a device's sync-payload key
+/// through a batch import pipeline is a separate, larger increment, not
+/// folded into this single-row command's fix.
 #[tauri::command]
 pub fn enroll_learner_in_section(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     section_id: String,
@@ -252,8 +266,72 @@ pub fn enroll_learner_in_section(
     starts_on: String,
 ) -> AppResult<Option<SectionMembership>> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
-    section_membership::enroll(&conn, &school_id, &section_id, &learner_id, &starts_on)
+    let (school_id, actor_user_id) =
+        auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    enroll_learner_in_section_with_optional_sync(
+        &conn,
+        &school_id,
+        &actor_user_id,
+        &section_id,
+        &learner_id,
+        &starts_on,
+        sspk.as_ref(),
+    )
+}
+
+/// Shared logic behind `enroll_learner_in_section`, kept separate so it can
+/// be exercised directly in this module's own tests without a real Tauri
+/// `AppHandle` -- same reason as the other `*_with_optional_sync` helpers.
+/// `sspk` is `None` when this school has never enrolled a device: behaves
+/// exactly as it did before ADR-0067 existed. Atomic with the domain write
+/// via one outer `SAVEPOINT` -- see
+/// `transfer_learner_membership_with_optional_sync`'s doc comment.
+#[allow(clippy::too_many_arguments)]
+fn enroll_learner_in_section_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    section_id: &str,
+    learner_id: &str,
+    starts_on: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<Option<SectionMembership>> {
+    let Some(sspk) = sspk else {
+        return section_membership::enroll(conn, school_id, section_id, learner_id, starts_on);
+    };
+
+    conn.execute_batch("SAVEPOINT enroll_in_section_with_sync")?;
+    let outcome = (|| -> AppResult<Option<SectionMembership>> {
+        let membership =
+            section_membership::enroll(conn, school_id, section_id, learner_id, starts_on)?;
+
+        if let Some(membership) = &membership {
+            enqueue_section_membership_sync_change(
+                conn,
+                school_id,
+                actor_user_id,
+                membership,
+                sspk,
+            )?;
+        }
+
+        Ok(membership)
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE enroll_in_section_with_sync")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO enroll_in_section_with_sync; RELEASE enroll_in_section_with_sync",
+            );
+            Err(error)
+        }
+    }
 }
 
 /// The current roster for the Section Roster screen. `section_id` is
@@ -636,8 +714,15 @@ fn enroll_learner_membership_with_optional_sync(
 /// dependent-record conflict -- see
 /// `docs/adr/0042-learner-core-enrollment-domain-foundation.md`'s Wave 2S
 /// addendum for the full decision record.
+///
+/// ADR-0067/0069 sync wiring: closes the second of the two `SectionMembership`
+/// write paths `docs/VERIFICATION-DEBT.md` recorded as unwired. Enqueues
+/// only on `CorrectPlacementOutcome::Corrected` -- every other outcome means
+/// the domain write did not happen. Same enrollment-gated encrypt-on-enqueue
+/// pattern as the other membership-change commands.
 #[tauri::command]
 pub fn correct_same_day_placement(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     learner_id: String,
@@ -646,15 +731,86 @@ pub fn correct_same_day_placement(
     as_of_date: String,
 ) -> AppResult<CorrectPlacementOutcome> {
     let conn = lock_db(&db);
-    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
-    section_membership::correct_same_day_placement(
+    let (school_id, actor_user_id) =
+        auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    correct_same_day_placement_with_optional_sync(
         &conn,
         &school_id,
+        &actor_user_id,
         &learner_id,
         &membership_id,
         &to_section_id,
         &as_of_date,
+        sspk.as_ref(),
     )
+}
+
+/// Shared logic behind `correct_same_day_placement`, kept separate so it
+/// can be exercised directly in this module's own tests without a real
+/// Tauri `AppHandle` -- same reason as the other `*_with_optional_sync`
+/// helpers. `sspk` is `None` when this school has never enrolled a device.
+/// Atomic with the domain write via one outer `SAVEPOINT` -- see
+/// `transfer_learner_membership_with_optional_sync`'s doc comment.
+#[allow(clippy::too_many_arguments)]
+fn correct_same_day_placement_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    learner_id: &str,
+    membership_id: &str,
+    to_section_id: &str,
+    as_of_date: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<CorrectPlacementOutcome> {
+    let Some(sspk) = sspk else {
+        return section_membership::correct_same_day_placement(
+            conn,
+            school_id,
+            learner_id,
+            membership_id,
+            to_section_id,
+            as_of_date,
+        );
+    };
+
+    conn.execute_batch("SAVEPOINT correct_placement_with_sync")?;
+    let outcome = (|| -> AppResult<CorrectPlacementOutcome> {
+        let outcome = section_membership::correct_same_day_placement(
+            conn,
+            school_id,
+            learner_id,
+            membership_id,
+            to_section_id,
+            as_of_date,
+        )?;
+
+        if let CorrectPlacementOutcome::Corrected { membership } = &outcome {
+            enqueue_section_membership_sync_change(
+                conn,
+                school_id,
+                actor_user_id,
+                membership,
+                sspk,
+            )?;
+        }
+
+        Ok(outcome)
+    })();
+
+    match outcome {
+        Ok(outcome) => {
+            conn.execute_batch("RELEASE correct_placement_with_sync")?;
+            Ok(outcome)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO correct_placement_with_sync; RELEASE correct_placement_with_sync",
+            );
+            Err(error)
+        }
+    }
 }
 
 /// A learner's full enrollment (section-placement) history -- ungated
@@ -1141,6 +1297,182 @@ mod tests {
         .unwrap();
 
         assert!(matches!(outcome, TransferOutcome::MembershipNotFound));
+        assert!(sync_outbox::pending_for_school(&conn, &school_id, 10)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn enroll_learner_in_section_with_no_sspk_behaves_exactly_like_a_plain_enroll() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
+
+        let membership = enroll_learner_in_section_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &section_id,
+            &learner.id,
+            "2026-06-08",
+            None,
+        )
+        .unwrap();
+
+        assert!(membership.is_some());
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn enroll_learner_in_section_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_id, learner) = setup_section_and_learner(&conn, &school_id);
+        let sspk = test_sspk();
+
+        let membership = enroll_learner_in_section_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &section_id,
+            &learner.id,
+            "2026-06-08",
+            Some(&sspk),
+        )
+        .unwrap()
+        .expect("expected a membership to be created");
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        let entry = &queued[0];
+        assert_eq!(entry.change.entity_kind, EntityKind::SectionMembership);
+        assert_eq!(entry.change.entity_id.to_string(), membership.id);
+        assert_eq!(entry.change.actor_user_id.to_string(), actor_user_id);
+        assert_eq!(entry.change.base_version, 0);
+        assert_eq!(entry.change.operation, ChangeOperation::Upsert);
+
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &entry.change.encrypted_payload).unwrap();
+        let round_tripped: SectionMembership = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(round_tripped, membership);
+    }
+
+    #[test]
+    fn a_rejected_enroll_learner_in_section_never_enqueues_an_outbox_row() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_id, _learner) = setup_section_and_learner(&conn, &school_id);
+        let sspk = test_sspk();
+
+        // Unknown learner id -- `enroll` returns `None`, nothing written.
+        let membership = enroll_learner_in_section_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &section_id,
+            &Uuid::now_v7().to_string(),
+            "2026-06-08",
+            Some(&sspk),
+        )
+        .unwrap();
+
+        assert!(membership.is_none());
+        assert!(sync_outbox::pending_for_school(&conn, &school_id, 10)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn correct_same_day_placement_with_no_sspk_behaves_exactly_like_a_plain_correction() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_a, learner) = setup_section_and_learner(&conn, &school_id);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let membership =
+            section_membership::enroll(&conn, &school_id, &section_a, &learner.id, "2026-06-08")
+                .unwrap()
+                .unwrap();
+
+        let outcome = correct_same_day_placement_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &learner.id,
+            &membership.id,
+            &section_b.id,
+            "2026-06-08",
+            None,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, CorrectPlacementOutcome::Corrected { .. }));
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn correct_same_day_placement_with_an_sspk_enqueues_a_correctly_encrypted_outbox_entry() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_a, learner) = setup_section_and_learner(&conn, &school_id);
+        let section_b = section::create(&conn, &school_id, "2025-2026", "7", "Rizal").unwrap();
+        let membership =
+            section_membership::enroll(&conn, &school_id, &section_a, &learner.id, "2026-06-08")
+                .unwrap()
+                .unwrap();
+        let sspk = test_sspk();
+
+        let outcome = correct_same_day_placement_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &learner.id,
+            &membership.id,
+            &section_b.id,
+            "2026-06-08",
+            Some(&sspk),
+        )
+        .unwrap();
+        let CorrectPlacementOutcome::Corrected { membership } = &outcome else {
+            panic!("expected Corrected, got {outcome:?}");
+        };
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        let entry = &queued[0];
+        assert_eq!(entry.change.entity_kind, EntityKind::SectionMembership);
+        assert_eq!(entry.change.entity_id.to_string(), membership.id);
+        assert_eq!(entry.change.actor_user_id.to_string(), actor_user_id);
+        assert_eq!(entry.change.operation, ChangeOperation::Upsert);
+
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &entry.change.encrypted_payload).unwrap();
+        let round_tripped: SectionMembership = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(&round_tripped, membership);
+    }
+
+    #[test]
+    fn a_rejected_correct_same_day_placement_never_enqueues_an_outbox_row() {
+        let (conn, school_id, actor_user_id) = setup();
+        let (section_a, learner) = setup_section_and_learner(&conn, &school_id);
+        let sspk = test_sspk();
+
+        // No membership exists yet with this id -- NotFound.
+        let outcome = correct_same_day_placement_with_optional_sync(
+            &conn,
+            &school_id,
+            &actor_user_id,
+            &learner.id,
+            &Uuid::now_v7().to_string(),
+            &section_a,
+            "2026-06-08",
+            Some(&sspk),
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, CorrectPlacementOutcome::NotFound));
         assert!(sync_outbox::pending_for_school(&conn, &school_id, 10)
             .unwrap()
             .is_empty());
