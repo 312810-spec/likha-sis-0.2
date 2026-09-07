@@ -376,3 +376,27 @@ exposure behavior, logout behavior, device-loss behavior, authorization,
 school isolation, recovery. Authorization must never rely on UI hiding
 a control alone — already this project's standing rule
 (`.claude/rules/security-privacy.md`), reconfirmed here, not new.
+
+## 17. Unbuilt features from legacy LIKHA-SIS (recorded 2026-09-07)
+
+Audited against `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie predecessor)
+per user direction. Note: Stakeholder/Parent Portal was explicitly excluded by user direction.
+
+1. **Student Guidance & Anecdotal Records Log (DIRECTION SET / HYPOTHESIS)**:
+   - Dedicated schema and UI for logging behavioral, academic, disciplinary, and socio-emotional observations.
+   - SARDO / at-risk learner tracking and intervention notes.
+   - Stricter access/authorization boundary needed (guidance/adviser-scoped).
+2. **Awards & Recognition Engine (DIRECTION SET)**:
+   - Deterministic awards evaluation engine (DO 015 criteria: General Average >= 90, no grade < 80, zero disciplinary anecdotes for the awarding term).
+   - Printable certificate generator (aligned with Creation Studio sub-scope 2 unbuilt deliverables).
+3. **Student Identification (ID) & Verification Engine (DIRECTION SET / HYPOTHESIS)**:
+   - Front/back printable student ID card generator with photos and barcodes/QR tokens.
+   - Tokenized QR verification mechanism for student enrollment status.
+4. **Excel (`.xlsx`) Import & Multi-Year Scholastic Record Extraction (DIRECTION SET)**:
+   - Spreadsheet parser (`.xlsx` SheetJS) to ingest official DepEd workbooks directly into learner enrollment and past academic records (beyond current CSV-only SF1 import).
+5. **Multi-Tier Review & Approval Pipeline (DIRECTION SET / HYPOTHESIS)**:
+   - Master Teacher (MT) review workflow: teacher grade submission -> MT compliance/out-of-bounds audit flags -> Approve/Reject with feedback notes -> administrative record locking.
+   - Principal/School Head overview dashboard: composite grades, submission statuses, official form sign-offs.
+6. **Formative Assessment Logging (DIRECTION SET / HYPOTHESIS)**:
+   - Non-graded formative assessment logs (ESRU model: Exploration, Structured practice, Reflection, Understanding) isolated from quarterly grade computations.
+

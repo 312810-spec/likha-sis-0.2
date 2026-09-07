@@ -1,5 +1,17 @@
 # PROJECT MEMORY
 
+## Legacy LIKHA-SIS features audit (2026-09-07)
+
+- Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie).
+- User explicitly excluded the Parent/Stakeholder Portal from porting/scope.
+- Captured unbuilt candidate features in `docs/product/PRODUCT-CONTRACT.md` §17:
+  1. Student Guidance, Anecdotal Records, and SARDO/intervention tracking.
+  2. Automated Awards & Recognition eligibility engine + Certificate generator.
+  3. Student ID card printable generator with tokenized QR verification.
+  4. `.xlsx` SheetJS spreadsheet importer for SF10 multi-year scholastic histories.
+  5. Multi-tier Review & Approval pipeline (Teacher -> Master Teacher audit -> School Head lock).
+  6. Formative Assessment (ESRU model) isolated logging.
+
 ## Grade 12 legacy SHS grading closure (2026-09-04)
 
 - Owner decision: Grade 12 remains on the old curriculum and uses the old

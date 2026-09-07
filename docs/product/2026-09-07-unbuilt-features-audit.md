@@ -255,24 +255,41 @@ quality` 1099/1099. Source: this session's implementation,
     warranted. Source: this session's implementation,
     `docs/VERIFICATION-DEBT.md`'s matching entry.
 
-12. **MATATAG-vs-prior curriculum learning-area _content_ differences
-    remain unconfirmed against a primary source** — only the curriculum
-    version's _name_ changed (to "Enhanced K to 10 Curriculum"); the 8
-    seeded learning-area names are still identical to the prior "K to 12
-    Basic Education Curriculum" row. If DepEd's actual MATATAG rollout
-    changed subject/learning-area content (not just naming), that has not
-    been implemented. Source: `docs/CURRENT-HANDOFF.md`'s "ADR-0037
-    curriculum clarification" entry (2026-09-06), explicit "Gap NOT
-    closed" callout.
+12. **UPDATED 2026-09-07 (research, not yet implemented)** — MATATAG-vs-
+    prior curriculum learning-area _content_ differences, previously
+    "unconfirmed against a primary source," are now substantiated with
+    specific detail via a research pass that reached deped.gov.ph
+    directly: MATATAG appears to add a new "Makabansa" learning area
+    (Grades 1-3), drop Mother Tongue as a standalone subject for Grades
+    2-3, and split MAPEH grading from 4 components to 2 (Music & Arts;
+    PE & Health) for Grades 4-10. The 8 seeded learning-area names are
+    still identical across both `curriculum_versions` rows — **still not
+    implemented**, but the gap is no longer just "possible," it's
+    evidenced. Full detail:
+    `docs/research/2026-09-07-matatag-ks1-do8-sources.md` §1. Original
+    source: `docs/CURRENT-HANDOFF.md`'s "ADR-0037 curriculum
+    clarification" entry (2026-09-06), explicit "Gap NOT closed" callout.
 
-13. **Key Stage 1 descriptive grading and the Grade 12 DO 8 s.2015
-    transmutation-table difference from DO 015 remain blocked on missing
-    primary sources** — not implemented, and explicitly not to be
-    re-attempted from a web search alone. Source: PRODUCT-CONTRACT.md §4
-    (verified — no KS1 descriptive-grading code path or DO 8-specific
-    transmutation table found beyond the already-shipped Grade 12 DO 8
-    _weighting_ carryover, ADR-0068, which is a narrower, already-closed
-    sub-piece).
+13. **UPDATED 2026-09-07 (research, not yet implemented)** — Key Stage 1
+    descriptive grading and the Grade 12 DO 8 s.2015 vs. DO 015
+    transmutation-table difference are no longer fully source-blocked:
+    deped.gov.ph was reachable this session and both governing orders'
+    official issuance pages were fetched directly (DO 015 s.2026 exists,
+    titled "Revised Guidelines on Classroom Assessment, Grading System,
+    and Awards and Recognition..."; DO 8 s.2015 exists and is repealed by
+    DO 015 Paragraph 6). Exact table/paragraph text is still
+    secondary-source only (both PDFs are unreadable scans in this
+    sandbox). Two concrete findings not yet implemented: (a) KS1 uses a
+    3-band descriptor scale BG/DV/CO, phased in per-grade starting SY
+    2026-2027 (not a blanket KS1 change at once) — no code path exists
+    for this yet; (b) **Grade 12 SY 2026-2027, per DO 015 Paragraph 49,
+    should use DO 8's component weights together with DO 015's new
+    adjusted transmutation table, not DO 8's original transmutation
+    table** — this project's existing Grade 12 DO 8 carryover (ADR-0068)
+    has not been re-verified against this finding and may need a
+    correctness fix. Full detail:
+    `docs/research/2026-09-07-matatag-ks1-do8-sources.md` §2-3. Original
+    source: PRODUCT-CONTRACT.md §4.
 
 ### Tier 3 — DepEd compliance
 

@@ -1,5 +1,65 @@
 # CURRENT HANDOFF
 
+## Tier 2 research: MATATAG learning areas, KS1 descriptive grading, DO 8 vs DO 015 transmutation (2026-09-07)
+
+Background research pass (per explicit owner instruction to attempt web
+research despite this project's prior deped.gov.ph-unreachable block).
+Full detail: `docs/research/2026-09-07-matatag-ks1-do8-sources.md`.
+**Research only — no code changed.**
+
+**Reachability improvement**: `deped.gov.ph` WAS reachable this session
+(unlike prior sessions). The official DO 8 s.2015 and DO 015 s.2026
+issuance pages were fetched directly, confirming both orders' exact
+titles/dates and the live official PDF URLs. Both PDFs are scanned
+image-only documents (no text layer, no OCR tool available in this
+sandbox), so exact table/paragraph text still comes from corroborating
+secondary sources, not a direct primary read — confidence is marked
+per-question in the research doc (Medium-High), not treated as final.
+
+**Key findings requiring future attention, not acted on this session**:
+
+1. **The MATATAG-vs-prior learning-area gap flagged in the ADR-0037
+   session below is now substantiated with real detail**, not just
+   flagged as unconfirmed: MATATAG appears to add a new "Makabansa"
+   learning area (Grades 1-3), drop Mother Tongue as a standalone
+   subject for Grades 2-3, and split MAPEH's grading from 4 components
+   to 2 (Music & Arts; PE & Health) for Grades 4-10. This project's two
+   seeded `curriculum_versions` rows still have **identical**
+   learning-area name sets, which the research concludes is very likely
+   inaccurate for Grades 1-3 and for MAPEH grading structure. No schema
+   change made — this needs its own scoped slice.
+2. **KS1 (Kinder-Grade 3) descriptive grading is a real, named policy**
+   (DepEd Order No. 015, s. 2026): a 3-band descriptor scale BG
+   (Beginning) / DV (Developing) / CO (Consistent), no numeric grade at
+   all, phased in starting Kindergarten+Grade 1 in SY 2026-2027 (Grade 2
+   in SY 2027-2028, Grade 3 in SY 2028-2029 per secondary sources) —
+   i.e. NOT an immediate blanket change for all of KS1 at once. This
+   project has no descriptive-grading UI/schema yet (tracked as an
+   existing gap elsewhere in this file / the unbuilt-features audit).
+3. **DO 015 s.2026 explicitly repeals DO 8 s.2015** (its own Paragraph
+   6, per secondary source). The adjusted transmutation table raises the
+   passing raw-score floor from 60 (DO 8) to 70 (DO 015) — same floor
+   (0→60) and ceiling (100→100), different curve in between.
+4. **Grade 12 SY 2026-2027 correction needed to this file's own prior
+   phrasing**: "Grade 12 remains on the old curriculum and uses the old
+   grading format" (see ADR-0068 entry below, 2026-09-04) is likely
+   imprecise. Per DO 015 Paragraph 49 (per secondary source, corroborated
+   by two independently-written sources): Grade 12 keeps **DO 8's
+   component weights** but must use **DO 015's new adjusted transmutation
+   table**, not DO 8's original one. This is a hybrid, not a full DO 8
+   carryover. **This directly affects Grade 12 grading correctness and
+   should be verified against the primary PDF (or a clearer secondary
+   source) before the Grade 12 DO 8 carryover logic (ADR-0068,
+   migration 30/31) is treated as fully correct for SY 2026-2027.**
+
+**Recommendation, not yet actioned**: treat finding 4 (Grade 12
+transmutation table) as the highest-priority follow-up of the four —
+it's a correctness question about already-shipped grading logic, not a
+greenfield feature gap. Findings 1-2 are feature-gap confirmations,
+already tracked at Tier 1/Tier 3 elsewhere. No implementation was done
+against any of these four findings this session; this entry exists so a
+future session doesn't have to re-derive or re-search this.
+
 ## Creation Studio sub-scope 3/3: structured lesson-plan builder (2026-09-06)
 
 Built the **structured lesson-plan builder** — the third and final of the
