@@ -110,10 +110,12 @@ individually, plus a final full pass):
 
 - `cargo test --lib`: 1217 passed, 0 failed (after all five commits).
 - `cargo test` (full, including all `src-tauri/tests/*.rs` integration
-  binaries and doc-tests): 0 failed, run at the grade_submission
-  checkpoint and again expected clean at the final conflict-review
-  checkpoint (see the exact run this session's final verification
-  section, once recorded below).
+  binaries and doc-tests): 0 failed. Run at the grade_submission
+  checkpoint (clean) and again at the final
+  conflict-review-generalization/docs checkpoint -- also clean, exit
+  code 0, every one of the 18 integration binaries plus doc-tests
+  passed (see `docs/VERIFICATION-DEBT.md`'s now-resolved entry for
+  the full binary list).
 - `cargo clippy --all-targets -- -D warnings`: clean at every commit.
 - `cargo fmt --check`: clean at every commit (drift fixed with plain
   `cargo fmt`, never hand-restyled).
@@ -129,7 +131,8 @@ combined -- see that commit's own message for why: their migration/
 EntityKind/sync_client changes interleave in the same three shared
 files, and a manual git-hunk split across ~1100 changed lines was
 judged higher-risk than value), `f85d91d` (GradeSubmission +
-GradeSubmissionNote), `01d0ac7` (conflict-review generalization).
+GradeSubmissionNote), `01d0ac7` (conflict-review generalization),
+`8d84879` (this documentation).
 
 **Exact next task**: `SchoolLogo` sync wiring needs the payload-size
 architecture decision above resolved first (or an explicit decision to

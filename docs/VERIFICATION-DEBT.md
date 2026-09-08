@@ -12,18 +12,20 @@
   addition), not a new screen; `npm run quality` (vitest) covers its
   existing test suite, which passed, but no fresh Playwright
   accessibility/renderer pass was run specifically for this change.
-- **`cargo test` (full binary, including `src-tauri/tests/*.rs`
-  integration suites and doc-tests) was run once at the
-  `f85d91d` (GradeSubmission) checkpoint (clean) but the equivalent
-  full run for the final `01d0ac7` (conflict-review generalization)
-  checkpoint was still in flight when this batch's session context
-  needed to move to writing this documentation** — `cargo test --lib`
-  (1217 passed) and `npm run quality`'s own `vitest run` (1205 passed)
-  both did complete clean for that exact final commit, so the change
-  is covered by the fast/unit-level gates; the slower full-binary
-  integration run is the one piece not confirmed complete before this
-  entry was written. Re-run `cargo test` (no `--lib`) once to close
-  this out.
+- **RESOLVED**: `cargo test` (full binary, including every
+  `src-tauri/tests/*.rs` integration suite and doc-tests) was run
+  once at the `f85d91d` (GradeSubmission) checkpoint (clean), and the
+  equivalent full run for the final `01d0ac7`
+  (conflict-review-generalization)/`8d84879` (docs) checkpoint
+  finished after this entry was first written — also clean: every
+  integration binary (`assessment`, `attendance_management`, `auth`,
+  `bootstrap`, `class_record`, `enrollment`,
+  `enrollment_concurrency`, `export`, `formgen`, `grading`,
+  `learner_management`, `local_database`, `reference_geo`,
+  `schedule_meeting_management`, `section_advisory`, `sf1_import`,
+  `subject_attendance`, `teaching_assignment_management`) plus
+  doc-tests passed, exit code 0. No debt remaining for this batch's
+  Rust verification.
 
 ## Batch 5 (Tier 3.3-3.4): domain-only this batch, no Rust changes, holiday table needs periodic manual update (2026-09-08)
 
