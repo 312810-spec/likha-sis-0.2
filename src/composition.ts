@@ -7,6 +7,7 @@ import { ConflictReviewApplicationService } from "./application/conflict-review-
 import { DeviceSyncApplicationService } from "./application/device-sync-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
+import { FormativeAssessmentApplicationService } from "./application/formative-assessment-service";
 import { FormGenerationApplicationService } from "./application/form-generation-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
@@ -38,6 +39,7 @@ import { TauriDeviceSyncRepository } from "./infrastructure/tauri/device-sync-re
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
+import { TauriFormativeAssessmentRepository } from "./infrastructure/tauri/formative-assessment-repository";
 import { TauriFormGenerationRepository } from "./infrastructure/tauri/form-generation-repository";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
@@ -129,6 +131,9 @@ export const schoolMemberService = new SchoolMemberApplicationService(
 );
 export const transferRecordService = new TransferRecordApplicationService(
   new TauriTransferRecordRepository(),
+);
+export const formativeAssessmentService = new FormativeAssessmentApplicationService(
+  new TauriFormativeAssessmentRepository(),
 );
 export const schoolAttendanceService = new SchoolAttendanceApplicationService(
   new TauriSchoolAttendanceRepository(),

@@ -213,6 +213,8 @@ pub fn run() {
             commands::transfer_record::list_transfers_for_learner,
             commands::transfer_record::list_transfers_for_school,
             commands::transfer_record::update_transfer_status,
+            commands::formative_assessment::record_formative_assessment,
+            commands::formative_assessment::list_formative_assessment_logs_for_assignment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
