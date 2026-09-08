@@ -7,7 +7,7 @@ use tauri::State;
 use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::error::{AppError, AppResult};
-use crate::repository::school::{self, School};
+use crate::repository::school::{self, School, SchoolCoordinates};
 
 #[tauri::command]
 pub fn list_schools(db: State<'_, Mutex<Connection>>) -> AppResult<Vec<School>> {
@@ -165,6 +165,74 @@ pub fn clear_school_logo(
     school::clear_logo(&conn, &school_id)
 }
 
+/// Pure validation extracted from `set_school_coordinates` so it is
+/// directly unit-testable without a `State`-carrying command harness --
+/// same convention as `validate_logo_upload` above. Mirrors
+/// `WeatherApplicationService.getSuspensionAdvisory`'s TS-side range
+/// check exactly (-90..=90 / -180..=180) so an invalid value is rejected
+/// at whichever layer sees it first, never silently clamped or stored.
+fn validate_coordinates(latitude: f64, longitude: f64) -> AppResult<()> {
+    if !latitude.is_finite() || !(-90.0..=90.0).contains(&latitude) {
+        return Err(AppError::Database(rusqlite::Error::InvalidParameterName(
+            format!("latitude {latitude} is out of range (-90..=90)"),
+        )));
+    }
+    if !longitude.is_finite() || !(-180.0..=180.0).contains(&longitude) {
+        return Err(AppError::Database(rusqlite::Error::InvalidParameterName(
+            format!("longitude {longitude} is out of range (-180..=180)"),
+        )));
+    }
+    Ok(())
+}
+
+/// Sets (or replaces) the caller's own school's coordinates, for the
+/// Weather & Hazard Suspension Alerts advisory (ADR-0079). School Head
+/// only (`ManageSchoolCoordinates`) -- `school_id` is always
+/// session-derived, never a parameter, matching every other tenant-write
+/// command in this codebase.
+#[tauri::command]
+pub fn set_school_coordinates(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    latitude: f64,
+    longitude: f64,
+) -> AppResult<()> {
+    validate_coordinates(latitude, longitude)?;
+
+    let conn = lock_db(&db);
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates)?;
+    school::set_coordinates(&conn, &school_id, latitude, longitude)
+}
+
+/// Reads back the caller's own school's coordinates, if configured. Any
+/// authenticated member of the school may view it -- same
+/// no-dedicated-capability convention as `get_school_logo` (this is
+/// read-only reference data for an advisory shown to any teacher, not an
+/// administrative action).
+#[tauri::command]
+pub fn get_school_coordinates(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Option<SchoolCoordinates>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    school::get_coordinates(&conn, &school_id)
+}
+
+/// Clears the caller's own school's coordinates. School Head only, same
+/// `ManageSchoolCoordinates` gate as `set_school_coordinates`.
+#[tauri::command]
+pub fn clear_school_coordinates(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<()> {
+    let conn = lock_db(&db);
+    let school_id =
+        auth::authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates)?;
+    school::clear_coordinates(&conn, &school_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,5 +306,35 @@ mod tests {
         let result = validate_logo_upload("image/webp", &truncated);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn accepts_a_valid_coordinate() {
+        // Manila, roughly.
+        assert!(validate_coordinates(14.5995, 120.9842).is_ok());
+    }
+
+    #[test]
+    fn accepts_boundary_coordinates() {
+        assert!(validate_coordinates(90.0, 180.0).is_ok());
+        assert!(validate_coordinates(-90.0, -180.0).is_ok());
+    }
+
+    #[test]
+    fn rejects_a_latitude_outside_the_valid_range() {
+        assert!(validate_coordinates(90.1, 0.0).is_err());
+        assert!(validate_coordinates(-90.1, 0.0).is_err());
+    }
+
+    #[test]
+    fn rejects_a_longitude_outside_the_valid_range() {
+        assert!(validate_coordinates(0.0, 180.1).is_err());
+        assert!(validate_coordinates(0.0, -180.1).is_err());
+    }
+
+    #[test]
+    fn rejects_non_finite_coordinates() {
+        assert!(validate_coordinates(f64::NAN, 0.0).is_err());
+        assert!(validate_coordinates(0.0, f64::INFINITY).is_err());
     }
 }

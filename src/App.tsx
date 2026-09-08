@@ -16,6 +16,7 @@ import {
   myDayService,
   onSessionExpired,
   schoolAttendanceService,
+  schoolCoordinatesService,
   schoolLogoService,
   schoolMemberService,
   schoolService,
@@ -27,6 +28,7 @@ import {
   subjectService,
   syncStatusService,
   teachingAssignmentService,
+  weatherService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
@@ -48,6 +50,7 @@ import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdCardScreen } from "./ui/IdCardScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
+import { WeatherAdvisoryBanner } from "./ui/WeatherAdvisoryBanner";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
@@ -217,6 +220,10 @@ function App() {
             schoolLogoService={schoolLogoService}
           >
             <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
+            <WeatherAdvisoryBanner
+              schoolCoordinatesService={schoolCoordinatesService}
+              weatherService={weatherService}
+            />
             {activeTab === "workspace" ? (
               <HomeScreen
                 roles={session.roles}
@@ -567,7 +574,10 @@ function App() {
             ) : activeTab === "devices" ? (
               <DeviceManagementScreen deviceSyncService={deviceSyncService} />
             ) : activeTab === "school-branding" ? (
-              <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
+              <SchoolBrandingScreen
+                schoolLogoService={schoolLogoService}
+                schoolCoordinatesService={schoolCoordinatesService}
+              />
             ) : activeTab === "conflict-review" ? (
               <ConflictReviewScreen conflictReviewService={conflictReviewService} />
             ) : activeTab === "sync-status" ? (

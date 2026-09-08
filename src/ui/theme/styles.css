@@ -1621,6 +1621,13 @@ label {
   gap: calc(var(--spacing-unit) * 0.75);
 }
 
+/* School location / weather advisory (Batch 8 item 5, ADR-0079). */
+.school-coordinates-section {
+  margin-top: calc(var(--spacing-unit) * 2);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--color-border-soft);
+}
+
 /* Redesign shell -- phone bottom tab bar (ADR-0057). Hidden until the
    phone breakpoint (see the shell responsive block in Task 7 Step 5). */
 .app-bottomnav {

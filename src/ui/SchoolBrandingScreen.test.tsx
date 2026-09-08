@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { SchoolCoordinatesApplicationService } from "../application/school-coordinates-service";
 import { SchoolLogoApplicationService } from "../application/school-logo-service";
+import type { SchoolCoordinatesRepository } from "../domain/ports/school-coordinates-repository";
 import type { SchoolLogoRepository } from "../domain/ports/school-logo-repository";
+import type { SchoolCoordinates } from "../domain/school-coordinates";
 import type { SchoolLogo } from "../domain/school-logo";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
@@ -45,10 +48,38 @@ class FakeSchoolLogoRepository implements SchoolLogoRepository {
   }
 }
 
-function renderScreen(repo: FakeSchoolLogoRepository = new FakeSchoolLogoRepository()) {
+class FakeSchoolCoordinatesRepository implements SchoolCoordinatesRepository {
+  coordinates: SchoolCoordinates | null = null;
+  setCalls: Array<{ latitude: number; longitude: number }> = [];
+  clearCalls = 0;
+
+  async get(): Promise<SchoolCoordinates | null> {
+    return this.coordinates;
+  }
+
+  async set(latitude: number, longitude: number): Promise<void> {
+    this.setCalls.push({ latitude, longitude });
+    this.coordinates = { latitude, longitude };
+  }
+
+  async clear(): Promise<void> {
+    this.clearCalls += 1;
+    this.coordinates = null;
+  }
+}
+
+function renderScreen(
+  repo: FakeSchoolLogoRepository = new FakeSchoolLogoRepository(),
+  coordinatesRepo?: FakeSchoolCoordinatesRepository,
+) {
   return render(
     <ModeProvider>
-      <SchoolBrandingScreen schoolLogoService={new SchoolLogoApplicationService(repo)} />
+      <SchoolBrandingScreen
+        schoolLogoService={new SchoolLogoApplicationService(repo)}
+        schoolCoordinatesService={
+          coordinatesRepo ? new SchoolCoordinatesApplicationService(coordinatesRepo) : undefined
+        }
+      />
     </ModeProvider>,
   );
 }
@@ -130,5 +161,51 @@ describe("SchoolBrandingScreen", () => {
     await screen.findByText("No logo");
 
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("does not render the School location section when no coordinates service is given", async () => {
+    renderScreen();
+    await screen.findByText("No logo");
+
+    expect(screen.queryByText("School location")).not.toBeInTheDocument();
+  });
+
+  it("renders empty coordinate fields when no location is configured yet", async () => {
+    renderScreen(new FakeSchoolLogoRepository(), new FakeSchoolCoordinatesRepository());
+    await screen.findByText("School location");
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue(null);
+    expect(screen.getByLabelText("Longitude")).toHaveValue(null);
+    expect(screen.queryByRole("button", { name: "Remove location" })).not.toBeInTheDocument();
+  });
+
+  it("saving a location calls the application service and shows confirmation", async () => {
+    const user = userEvent.setup();
+    const coordinatesRepo = new FakeSchoolCoordinatesRepository();
+    renderScreen(new FakeSchoolLogoRepository(), coordinatesRepo);
+    await screen.findByText("School location");
+
+    await user.type(screen.getByLabelText("Latitude"), "14.5995");
+    await user.type(screen.getByLabelText("Longitude"), "120.9842");
+    await user.click(screen.getByRole("button", { name: "Save location" }));
+
+    await waitFor(() => expect(coordinatesRepo.setCalls).toHaveLength(1));
+    expect(coordinatesRepo.setCalls[0]).toEqual({ latitude: 14.5995, longitude: 120.9842 });
+    expect(await screen.findByText("School coordinates updated.")).toBeInTheDocument();
+  });
+
+  it("shows the current location and offers to remove it once configured", async () => {
+    const user = userEvent.setup();
+    const coordinatesRepo = new FakeSchoolCoordinatesRepository();
+    coordinatesRepo.coordinates = { latitude: 14.5995, longitude: 120.9842 };
+    renderScreen(new FakeSchoolLogoRepository(), coordinatesRepo);
+    await screen.findByText("School location");
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue(14.5995);
+
+    await user.click(screen.getByRole("button", { name: "Remove location" }));
+
+    await waitFor(() => expect(coordinatesRepo.clearCalls).toBe(1));
+    expect(await screen.findByText("School coordinates removed.")).toBeInTheDocument();
   });
 });

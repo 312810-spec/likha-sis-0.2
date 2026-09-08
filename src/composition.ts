@@ -14,6 +14,7 @@ import { LearnerScoreApplicationService } from "./application/learner-score-serv
 import { MyDayApplicationService } from "./application/my-day-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
+import { SchoolCoordinatesApplicationService } from "./application/school-coordinates-service";
 import { SchoolLogoApplicationService } from "./application/school-logo-service";
 import { SchoolMemberApplicationService } from "./application/school-member-service";
 import { SectionApplicationService } from "./application/section-service";
@@ -25,6 +26,7 @@ import { SubjectAttendanceApplicationService } from "./application/subject-atten
 import { SyncStatusApplicationService } from "./application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
+import { WeatherApplicationService } from "./application/weather-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
 import { TauriLessonPlanRepository } from "./infrastructure/tauri/lesson-plan-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
@@ -42,6 +44,7 @@ import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-scor
 import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
+import { TauriSchoolCoordinatesRepository } from "./infrastructure/tauri/school-coordinates-repository";
 import { TauriSchoolLogoRepository } from "./infrastructure/tauri/school-logo-repository";
 import { TauriSchoolMemberRepository } from "./infrastructure/tauri/school-member-repository";
 import { TauriSectionRepository } from "./infrastructure/tauri/section-repository";
@@ -53,6 +56,7 @@ import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject
 import { TauriSyncStatusRepository } from "./infrastructure/tauri/sync-status-repository";
 import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
+import { OpenMeteoWeatherClient } from "./infrastructure/open-meteo-weather-client";
 
 export { onSessionExpired } from "./infrastructure/tauri/invoke";
 
@@ -64,6 +68,15 @@ export { onSessionExpired } from "./infrastructure/tauri/invoke";
 export const authService = new AuthApplicationService(new TauriAuthRepository());
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
 export const schoolLogoService = new SchoolLogoApplicationService(new TauriSchoolLogoRepository());
+export const schoolCoordinatesService = new SchoolCoordinatesApplicationService(
+  new TauriSchoolCoordinatesRepository(),
+);
+/** Weather & Hazard Suspension Alerts (ADR-0077, ADR-0079) — the only
+ * client that ever imports `OpenMeteoWeatherClient` directly, matching
+ * that class's own doc comment. Every failure this dependency can throw
+ * is caught inside `WeatherApplicationService` and degraded to
+ * `{ status: "unavailable" }`, never surfaced as an app error. */
+export const weatherService = new WeatherApplicationService(new OpenMeteoWeatherClient());
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
 /** @public — the `registerUser` capability is fully implemented and
  * tested end to end (application service, repository port, Tauri

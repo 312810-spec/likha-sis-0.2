@@ -2804,6 +2804,24 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- M51 (Batch 8 item 5, ADR-0079): school latitude/longitude for
+        -- the Weather & Hazard Suspension Alerts advisory
+        -- (domain/weather-hazard.ts, ADR-0077). Nullable -- a school that
+        -- has never set its coordinates simply gets no weather advisory,
+        -- never an error (matching every other "optional, best-effort"
+        -- feature in this codebase). No CHECK range constraint here: the
+        -- application-layer WeatherApplicationService already validates
+        -- the -90..90 / -180..180 range before this column is ever
+        -- written, matching this codebase's established convention that
+        -- input validation lives at the command/application boundary,
+        -- not the schema (see commands::school's logo upload
+        -- validation for the same split).
+        ALTER TABLE schools ADD COLUMN latitude REAL;
+        ALTER TABLE schools ADD COLUMN longitude REAL;
+        "#,
+        ),
     ])
 }
 

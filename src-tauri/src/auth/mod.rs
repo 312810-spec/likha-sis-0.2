@@ -526,6 +526,16 @@ pub enum Capability {
     /// above, not a role-based capability, since it depends on which
     /// specific class record is being submitted.
     ManageGradeSubmissionReview,
+    /// Set or clear the school's latitude/longitude
+    /// (`repository::school::set_coordinates`/`clear_coordinates`), used
+    /// only by the Weather & Hazard Suspension Alerts advisory
+    /// (ADR-0079). School Head only, deliberately its own variant rather
+    /// than reusing `ManageSchoolBranding`: a school's physical location
+    /// is a distinct administrative fact from its visual identity, even
+    /// though today both capabilities resolve to the same role (the same
+    /// reasoning `ManageSchoolBranding`'s own doc comment gives for not
+    /// reusing `ManageSchoolMembership`).
+    ManageSchoolCoordinates,
 }
 
 impl Capability {
@@ -540,6 +550,7 @@ impl Capability {
             Capability::ManageHealthRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::ManageChildProtection => &[role_repo::SCHOOL_HEAD],
             Capability::ManageGradeSubmissionReview => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolCoordinates => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -2430,6 +2441,32 @@ mod tests {
 
         assert_eq!(resolved_school, s.id);
         assert_ne!(resolved_school, other_school.id);
+    }
+
+    // ---- School coordinates for weather advisory (ADR-0079) ----
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_school_coordinates() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates).is_ok()
+        );
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_school_coordinates() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 
     #[test]

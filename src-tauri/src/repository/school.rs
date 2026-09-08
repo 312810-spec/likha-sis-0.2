@@ -117,6 +117,66 @@ pub fn clear_logo(conn: &Connection, school_id: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// A school's latitude/longitude, for the Weather & Hazard Suspension
+/// Alerts advisory (ADR-0079). Both fields are always present together --
+/// there is no "only one set" state, matching `set_coordinates`'s
+/// contract below.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchoolCoordinates {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+/// Sets (or replaces) `school_id`'s coordinates. Range validation
+/// happens at the command layer (matching `set_logo`'s split above) --
+/// this function trusts its caller for shape but never for tenant scope.
+pub fn set_coordinates(
+    conn: &Connection,
+    school_id: &str,
+    latitude: f64,
+    longitude: f64,
+) -> AppResult<()> {
+    conn.execute(
+        "UPDATE schools SET latitude = ?1, longitude = ?2 WHERE id = ?3",
+        (latitude, longitude, school_id),
+    )?;
+    Ok(())
+}
+
+/// Clears `school_id`'s coordinates, reverting to "no weather advisory
+/// configured" -- idempotent, matching `clear_logo`'s no-op-on-no-match
+/// semantics.
+pub fn clear_coordinates(conn: &Connection, school_id: &str) -> AppResult<()> {
+    conn.execute(
+        "UPDATE schools SET latitude = NULL, longitude = NULL WHERE id = ?1",
+        [school_id],
+    )?;
+    Ok(())
+}
+
+/// Reads back `school_id`'s coordinates, if both are set. `None` covers
+/// "never configured," "school_id doesn't exist," and the (should-never-
+/// happen, but defensively handled) case of only one of the two columns
+/// being non-null.
+pub fn get_coordinates(conn: &Connection, school_id: &str) -> AppResult<Option<SchoolCoordinates>> {
+    conn.query_row(
+        "SELECT latitude, longitude FROM schools WHERE id = ?1 AND latitude IS NOT NULL AND longitude IS NOT NULL",
+        [school_id],
+        |row| {
+            Ok(SchoolCoordinates {
+                latitude: row.get(0)?,
+                longitude: row.get(1)?,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +280,53 @@ mod tests {
         set_logo(&conn, &school_a.id, "image/png", &[9, 9, 9]).unwrap();
 
         assert_eq!(get_logo(&conn, &school_b.id).unwrap(), None);
+    }
+
+    #[test]
+    fn coordinates_round_trip_and_start_absent() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+
+        assert_eq!(get_coordinates(&conn, &school.id).unwrap(), None);
+
+        set_coordinates(&conn, &school.id, 14.5995, 120.9842).unwrap();
+
+        let coords = get_coordinates(&conn, &school.id).unwrap().unwrap();
+        assert_eq!(coords.latitude, 14.5995);
+        assert_eq!(coords.longitude, 120.9842);
+    }
+
+    #[test]
+    fn set_coordinates_replaces_previous_coordinates() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        set_coordinates(&conn, &school.id, 14.5995, 120.9842).unwrap();
+
+        set_coordinates(&conn, &school.id, 10.3157, 123.8854).unwrap();
+
+        let coords = get_coordinates(&conn, &school.id).unwrap().unwrap();
+        assert_eq!(coords.latitude, 10.3157);
+        assert_eq!(coords.longitude, 123.8854);
+    }
+
+    #[test]
+    fn clear_coordinates_removes_them() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        set_coordinates(&conn, &school.id, 14.5995, 120.9842).unwrap();
+
+        clear_coordinates(&conn, &school.id).unwrap();
+
+        assert_eq!(get_coordinates(&conn, &school.id).unwrap(), None);
+    }
+
+    #[test]
+    fn coordinates_are_scoped_to_their_own_school() {
+        let conn = open_test_db();
+        let school_a = create(&conn, "School A").unwrap();
+        let school_b = create(&conn, "School B").unwrap();
+        set_coordinates(&conn, &school_a.id, 14.5995, 120.9842).unwrap();
+
+        assert_eq!(get_coordinates(&conn, &school_b.id).unwrap(), None);
     }
 }
