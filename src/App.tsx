@@ -46,6 +46,7 @@ import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { HomeScreen } from "./ui/HomeScreen";
+import { IdCardScreen } from "./ui/IdCardScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
@@ -550,6 +551,12 @@ function App() {
                 sectionService={sectionService}
                 classRecordService={classRecordService}
                 learnerScoreService={learnerScoreService}
+              />
+            ) : activeTab === "id-card" ? (
+              <IdCardScreen
+                sectionService={sectionService}
+                schoolId={session.schoolId}
+                schoolName={session.schoolName}
               />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
