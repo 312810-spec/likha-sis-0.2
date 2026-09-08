@@ -1,5 +1,122 @@
 # CURRENT HANDOFF
 
+## Batch 2 (Tier 2.1-2.2) closed out: SF1/SF9/SF10/Form 137-138 research + SF8 Health & Nutrition Engine (2026-09-08)
+
+Closed out Batch 2 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2
+(Correctness & Compliance). Branch `claude/pending-tasks-batch-vjy67v`,
+batch-implement mode — every commit is local, nothing pushed, no CI
+triggered.
+
+**Part A — SF1/SF9/SF10/Form 137-138 research (no code change; nothing
+safely alignable was found).** Re-searched via `WebSearch` (no
+`deped-researcher` agent available this session) on top of the
+extensive prior work in ADR-0048/0049/0051/0053/0063:
+
+- **SF1**: no new primary `deped.gov.ph` template found. Stays
+  `OFFICIAL_SF1_FIDELITY = NOT_VERIFIED`.
+- **SF9**: found a plausible lead (a `sites.google.com/deped.gov.ph/
+lsguide/budgets-of-work` page multiple 2026-dated secondary sources
+  describe as hosting a finalized SY2026-2027 three-term SF9), but this
+  session did not fetch/read the actual file — recorded as a lead, not
+  promoted. Stays `OFFICIAL_SF9_FIDELITY = NOT_VERIFIED`.
+- **SF10**: unchanged (SSHS provenance-confirmed/fidelity-unverified,
+  JHS MATATAG evidence-blocked); the shipped `export::sf10` CSV export
+  correctly continues to disclose non-byte-fidelity rather than
+  claiming otherwise.
+- **Form 137/138 reconciliation**: closed with medium confidence.
+  Multiple mutually consistent secondary sources confirm Form 137 → SF10,
+  Form 138 → SF9 — this project's existing naming/scope already matches;
+  this is corroboration, not a new finding requiring a code change.
+
+Full detail and exact confidence levels: `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 entry, `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2.1.
+
+**Part B — SF8 Health & Nutrition Engine, real TDD implementation**
+(`docs/adr/0071-sf8-health-nutrition-engine.md`). The legacy port
+target (`likha-sis-master`'s `nutritionComputations.js`/
+`nutritionConsolidation.js`) was not reachable locally; found and cloned
+read-only from its actual GitHub home, `312810-spec/likha-sis` (distinct
+from this project's own `312810-spec/likha-sis-0.2`), specifically to
+read those two files and their test suites before porting.
+
+- `src-tauri/src/health/nutrition.rs` (new): decimal-age-in-months
+  (pure calendar arithmetic, no new date-library dependency — follows
+  `repository::attendance`'s existing no-dependency precedent), BMI
+  computation, and BMI-for-Age/Height-for-Age classification _logic_
+  (given already-resolved cutoffs) — all fully ported, tested, and
+  correct today. 20 tests.
+- **The WHO 2007 numeric growth-standard reference tables themselves
+  were deliberately NOT hardcoded.** The legacy table's own source
+  comment attributes it to "the DepEd SF8 workbook's BMI Tables sheet,"
+  but that was never independently verified this session, and a
+  spot-check of several rows against general knowledge of the published
+  WHO 2007 5-19y reference did not reconcile with confidence (the
+  legacy table's cutoffs at 60 months read implausibly high).
+  `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` return `None`
+  unconditionally, with a regression test guarding against a future
+  silent flip. This is the task's own explicitly anticipated outcome
+  (gate #6: flag, don't guess) — recorded as open verification debt,
+  not silently skipped.
+- `src-tauri/src/health/consolidation.rs` (new): BOSY-vs-EOSY
+  school-wide grade-level consolidation (Enrolment/Weighed/BMI-category/
+  HFA-category counts split M/F/T, grand total, percentage derivation)
+  — ported from `nutritionConsolidation.js`, fully correct and tested
+  regardless of the table gap above (an unclassified record still
+  counts as "weighed," lands in no category bucket). 8 tests.
+- `src-tauri/src/db/migrations.rs` migration 43: `nutrition_records`
+  table — one row per learner per school year per BOSY/EOSY period,
+  `birth_date` captured per-record (not added to `learners`, which
+  ADR-0017 deliberately keeps birthdate off pending its own
+  verification — this migration scopes the field to SF8 only, it does
+  not reopen that decision). 6 tests.
+- `src-tauri/src/repository/nutrition.rs` (new): CRUD + tenant-scoped
+  queries, server-side age/BMI computation (never trusts a
+  caller-supplied computed value), new `AppError::InvalidInput` variant
+  for domain-validation failures the `CHECK` constraints alone
+  shouldn't be relied on to catch. 8 tests.
+- `src-tauri/src/auth/mod.rs`: new `Capability::ManageHealthRecords`
+  (Registrar, School Head — deliberately not Teacher yet; see ADR-0071
+  for the scoped-deferral reasoning). 4 new tests.
+- `src-tauri/src/commands/nutrition.rs` (new): 3 Tauri commands
+  (`record_nutrition_measurement`, `get_nutrition_record_for_learner`,
+  `get_nutrition_consolidation_report`), registered in `lib.rs`. The
+  consolidation command reuses `commands::export::
+export_school_eosy_sf6`'s exact section-roster-building pattern for
+  school-wide enrolment — no new query shape invented.
+- **Frontend UI, CSV/official-form export, and section-scoped Teacher
+  authorization are explicitly deferred** — see ADR-0071's "Scope
+  explicitly deferred" section.
+
+**Verification actually run this session:**
+
+- `cargo test` (whole crate, `--lib` + every `tests/*.rs` integration
+  binary): **1119 lib tests passed** (up from 1080), all integration
+  binaries green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean (after one `cargo fmt` pass).
+- `npm run quality`: typecheck/lint/format:check/architecture-check/
+  `knip`/vitest all passed (111 test files, 1099 tests — no frontend
+  file was touched by this slice, run to confirm no regression).
+  `knip` found 0 new dead-code findings.
+
+**No new dependency added** — `chrono` was considered for date math and
+explicitly rejected in favor of this project's existing no-date-library
+precedent (see ADR-0071).
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) source and independently verify a real
+WHO 2007 BMI-for-Age/Height-for-Age reference table from a primary
+`who.int` or `deped.gov.ph` document, then populate `lookup_bmi_cutoffs`/
+`lookup_hfa_cutoffs`, updating ADR-0071 and `docs/VERIFICATION-DEBT.md`
+together; (2) build the SF8 frontend UI (measurement-entry screen,
+consolidation report view) against the now-complete Rust command
+surface; (3) if/when a section-scoped Teacher authorization pattern is
+built for another feature, extend `Capability::ManageHealthRecords` the
+same way; (4) continue Tier 2.3 (DO 006 Child Protection & Automated
+At-Risk Triggers) per the master inventory's next-highest item.
+
 ## Batch 1 (Tier 1 Security & Privacy) closed out: three security reviews + Secondary PIN Lock (2026-09-08)
 
 Closed out Batch 1 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1

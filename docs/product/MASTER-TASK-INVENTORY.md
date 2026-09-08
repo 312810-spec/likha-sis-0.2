@@ -36,15 +36,15 @@
 
 ### 2.1 Authoritative School Forms (SF) Engine
 
-- **SF1 (School Register):** Current engine proven against synthetic templates; needs field-verified alignment against authoritative DepEd SF1 template.
-- **SF9 (Learner Progress Report Card):** Authoritative-template, 3-term-aware, duplex-printable SF9 layout (current export is CSV-inspired).
-- **SF10 (Learner's Permanent Academic Record):** Multi-year scholastic history export with controlled correction provenance (current is CSV-inspired).
-- **DepEd Form 137 / 138 Reconciliation:** Triangulate SF9/SF10 naming and layout with historical Form 137/138 requirements.
+- **SF1 (School Register):** Not closed — re-searched 2026-09-08 (WebSearch, no `deped-researcher` agent available), no new primary `deped.gov.ph` template found beyond ADR-0048/0051's prior work. `OFFICIAL_SF1_FIDELITY` stays `NOT_VERIFIED`; no safe alignment fix to make without guessing. See `docs/VERIFICATION-DEBT.md`'s 2026-09-08 entry.
+- **SF9 (Learner Progress Report Card):** Not closed — re-searched 2026-09-08; found a plausible 2026-2027 finalized-release lead (`sites.google.com/deped.gov.ph/lsguide/budgets-of-work`) but did not fetch/read its actual file this session, so it does not raise `OFFICIAL_SF9_FIDELITY` past `NOT_VERIFIED`. Recorded as a lead for a future session in `docs/VERIFICATION-DEBT.md`.
+- **SF10 (Learner's Permanent Academic Record):** Unchanged from ADR-0053/Wave 2N (SSHS provenance-confirmed/fidelity-unverified, JHS MATATAG evidence-blocked); this project's shipped export (`export::sf10`, ADR-0063) remains a deliberate content-based CSV, correctly not claiming byte-level template fidelity. No new gap, no regression.
+- [x] **DepEd Form 137 / 138 Reconciliation:** Researched 2026-09-08 — multiple mutually consistent secondary sources confirm Form 137 → SF10 (permanent academic record), Form 138 → SF9 (progress report card); this project's existing SF9/SF10 naming and scope already match. Medium confidence (no single primary DepEd issuance fetched, but consistent across every independent secondary source checked). See `docs/VERIFICATION-DEBT.md`.
 
 ### 2.2 SF8 Health & Nutrition Engine (Port from `likha-sis-master`)
 
-- **WHO/DepEd BMI & HFA Calculator:** Decimal age in months calculator + WHO/DepEd BMI-for-Age and Height-for-Age lookup tables (`nutritionComputations.js`).
-- **BOSY vs. EOSY Consolidation:** School-wide baseline vs. endline nutritional consolidation report (`nutritionConsolidation.js`).
+- [x] **WHO/DepEd BMI & HFA Calculator:** Decimal-age-in-months, BMI computation, and BMI-for-Age/Height-for-Age classification _logic_ ported and fully tested (`src-tauri/src/health/nutrition.rs`, `repository::nutrition`, migration 43, `docs/adr/0071-sf8-health-nutrition-engine.md`). The WHO 2007 numeric growth-standard reference tables themselves are **not sourced with confidence** and were deliberately NOT hardcoded — `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` return `None` pending a verified primary source; see `docs/VERIFICATION-DEBT.md`. Real per-learner classification cannot run until that table lands.
+- [x] **BOSY vs. EOSY Consolidation:** School-wide baseline vs. endline nutritional consolidation report ported and fully tested (`src-tauri/src/health/consolidation.rs`), independent of the table gap above — a record with no classification yet still counts as "weighed," correctly landing in no BMI/HFA bucket.
 
 ### 2.3 DO 006, s. 2026 Child Protection & Automated At-Risk Triggers
 

@@ -1,5 +1,99 @@
 # Verification Debt
 
+## Batch 2 (Tier 2.1-2.2): SF1/SF9/SF10/Form 137-138 research, WHO growth-standard table not sourced (2026-09-08)
+
+**SF1/SF9/SF10/Form 137-138 research — no new authoritative template
+found, existing gaps unchanged.** Re-searched this session (WebSearch;
+`deped-researcher` agent not available in this sandbox) on top of the
+extensive prior work in ADR-0048/0049/0051/0053/0063:
+
+- **SF1**: no new primary `deped.gov.ph`-hosted SF1 template found.
+  `OFFICIAL_SF1_FIDELITY` remains `NOT_VERIFIED` (`formgen::evidence`,
+  ADR-0051). Every hit remains third-party (Scribd, teacher blogs, SEO
+  aggregator sites) — COMMUNITY tier, never promotable to authoritative
+  per this project's own evidence-gate discipline.
+- **SF9**: no new primary source found either. Multiple 2026-dated
+  secondary sources (deped-click.com, depedtambayanph.net,
+  edufilesph.com) describe a finalized "SF9 Grades 1-12 SY 2026-2027"
+  three-term-aware release and point at
+  `sites.google.com/deped.gov.ph/lsguide/budgets-of-work` as the access
+  point — a real lead, genuinely stronger than prior sessions' complete
+  blank, but this session did not fetch that page's actual file (a
+  Google Sites page behind DepEd's domain, not itself a direct
+  `.xlsx` — no confirmed byte-level content this session). Recorded as
+  a lead for a future session with fetch tooling for that URL;
+  `OFFICIAL_SF9_FIDELITY` stays `NOT_VERIFIED` — a URL that plausibly
+  hosts the real file is not the same as having read it. **No code
+  changed for SF9/SF1 this session** — nothing safely alignable was
+  found, per this project's "do not guess" rule.
+- **SF10**: unchanged from ADR-0053/Wave 2N — SSHS SF10
+  `AuthoritativeSourceConfirmed`/render-fidelity `NotVerified`; JHS
+  MATATAG SF10 still evidence-blocked; pre-MATATAG templates
+  unconfirmed. This project's actual shipped SF10 export
+  (`export::sf10`, ADR-0063) is deliberately a content-based CSV, not a
+  byte-faithful `.xlsx` reproduction, exactly because of this gap — no
+  change needed or made this session.
+- **Form 137/138 reconciliation**: multiple mutually consistent 2026
+  secondary sources (smarteskwela.com, bayaniguro.com, depedph.com,
+  filipinobusinesshub.com) confirm Form 137 was renamed SF10 (permanent
+  academic record) and Form 138 was renamed SF9 (progress report card/
+  card sa magulang) — this project's existing SF9/SF10 naming and
+  scope already match this mapping correctly. Medium confidence (no
+  single primary DepEd issuance fetched, but the mapping is old,
+  well-established, and consistent across every independent secondary
+  source checked, unlike the disputed SF1 layout question above). No
+  code change required — this is a corroboration of an already-correct
+  decision, not a new gap.
+
+**WHO 2007 BMI-for-Age / Height-for-Age numeric growth-standard tables —
+NOT sourced, NOT hardcoded (ADR-0071).** `likha-sis-master`'s
+`bmiForAgeTable.js`/`hfaForAgeTable.js` (the legacy port target) ship a
+full numeric table self-attributed in a comment to "the DepEd School
+Form 8 (SF8) workbook's BMI Tables sheet" — but that attribution was
+never independently verified this session (no primary WHO/DepEd document
+fetched and read), and a spot-check of several rows against this
+session's general knowledge of the published WHO 2007 5-19y BMI-for-age
+reference did not reconcile with confidence (the legacy table's
+normal/overweight cutoffs at 60 months read implausibly high). Per this
+project's own gate #6 (`.claude/rules/autonomous-development.md`) and
+the explicit task instruction not to invent plausible-looking numbers,
+**this table was deliberately NOT ported**. `src-tauri/src/health/
+nutrition.rs`'s `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` return `None`
+unconditionally, with a regression test guarding against a future silent
+flip. Everything else in the SF8 engine (decimal-age-in-months, BMI
+computation, the classification _logic_ given already-resolved cutoffs,
+the BOSY/EOSY consolidation aggregation, persistence, and authorization)
+is fully implemented and tested — only the numeric reference table
+itself is missing. **Owed**: source the real WHO 2007 Growth Reference
+(5-19 years) BMI-for-Age and Height-for-Age tables from a primary
+`who.int` or `deped.gov.ph` document, independently verify a
+representative sample of rows against this project's own general
+knowledge or a second independent source, then populate
+`lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` and update ADR-0071 and this
+entry together. Until then, no real nutrition classification can be
+computed by this feature — a captured measurement's `nutritional_status`/
+`height_for_age_status` will stay `NULL`, which the BOSY/EOSY
+consolidation report already tolerates correctly (a measurement counts
+as "weighed" but lands in no BMI/HFA category bucket).
+
+**SF8 section-scoped Teacher authorization — deferred, by design
+(open)**: `Capability::ManageHealthRecords` currently allows only
+Registrar/School Head, not Teacher, even though DepEd's real workflow
+has a class adviser measure their own section. This project's role
+model has no per-section restriction analog to reuse yet (the
+`authorize_adviser_of_section`/`authorize_own_assignment` pattern other
+features use) — see ADR-0071's "Authorization" section for the full
+reasoning. Revisit once either a real need surfaces or a section-scoped
+health-recording pattern is built for another feature first.
+
+**SF8 frontend UI and CSV/official-form export — not built this
+session**: `docs/adr/0071-sf8-health-nutrition-engine.md` closes the
+Rust-side data model, classification logic, persistence, and
+authorization boundary; a measurement-entry screen, a consolidation
+report view, and any CSV/official-form export of the report remain
+future UI-layer/export-layer slices, matching this project's established
+split between a security/architecture ADR and its later UI slice.
+
 ## Batch 1 (Tier 1 Security & Privacy) closeout: reviewer-dispatch fallback, PIN-lock brute-force mitigation, operational/hardware gates (2026-09-08)
 
 **Independent-review debt retained (self-review fallback used, not

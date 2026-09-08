@@ -1,5 +1,33 @@
 # ACTIVE PLAN
 
+## SF8 Health & Nutrition Engine (2026-09-08)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file),
+`docs/adr/0071-sf8-health-nutrition-engine.md`. Summary: new
+`src-tauri/src/health/{nutrition,consolidation}.rs` domain modules,
+`repository::nutrition`, migration 43 (`nutrition_records`),
+`Capability::ManageHealthRecords`, and 3 new Tauri commands
+(`commands::nutrition`). Decimal-age-in-months/BMI/classification logic
+and the BOSY-vs-EOSY consolidation report are complete and tested; the
+WHO 2007 numeric growth-standard tables are deliberately unpopulated
+pending a verified source (open verification debt, not silently
+skipped). No frontend UI or export built this slice.
+
+Verification actually run this session:
+
+- `cargo test` (whole crate: `--lib` + every `tests/*.rs` integration
+  binary, from an existing `target/`): 1119 lib tests passed (39 new),
+  every integration binary exited green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings`: clean on the first run.
+- `cargo fmt --check`: found drift in this slice's own new files, fixed
+  with plain `cargo fmt`, re-ran `--check` clean.
+- `npm run quality`: typecheck/lint/format:check/architecture-check
+  passed; `check:deadcode` (`knip`) reported 0 findings; `vitest run`
+  passed (111 test files, 1099 tests, unchanged — no frontend file
+  touched by this slice).
+
+Not pushed; commit is local only per this task's batch-mode instruction.
+
 ## GradingPeriod sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

@@ -1,5 +1,33 @@
 # PROJECT MEMORY
 
+## SF8 Health & Nutrition Engine data model shipped; SF1/SF9/SF10/Form 137-138 research closed with no new fidelity change (2026-09-08)
+
+- ADR-0071: `src-tauri/src/health/{nutrition,consolidation}.rs` +
+  `repository::nutrition` + migration 43 (`nutrition_records`) +
+  `Capability::ManageHealthRecords` (Registrar/School Head) + 3 new
+  Tauri commands. Decimal-age-in-months, BMI computation, and
+  BMI-for-Age/Height-for-Age classification _logic_ are fully ported
+  from `likha-sis-master`'s `nutritionComputations.js` (found at its
+  real GitHub home `312810-spec/likha-sis`) and tested. The BOSY/EOSY
+  consolidation report (from `nutritionConsolidation.js`) is fully
+  ported and tested independently of the item below.
+- **The WHO 2007 BMI-for-Age/Height-for-Age numeric reference tables are
+  deliberately NOT hardcoded** — the legacy table's own DepEd-SF8-
+  workbook attribution was never independently verified, and a
+  spot-check did not reconcile confidently against general knowledge of
+  the published WHO reference. `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs`
+  return `None` until a future session sources and verifies a real
+  table — see `docs/VERIFICATION-DEBT.md`. Real per-learner nutrition
+  classification cannot run until then; everything else in the feature
+  (persistence, tenant isolation, authorization, consolidation
+  aggregation) works correctly today.
+- SF1/SF9/SF10/Form 137-138: re-searched, no new authoritative
+  byte-level template found for SF1 or SF9 (both stay
+  `NOT_VERIFIED`); SF10 unchanged from ADR-0053/Wave 2N; Form 137→SF10/
+  Form 138→SF9 naming reconciliation confirmed at medium confidence
+  (multiple consistent secondary sources) — this project's existing
+  naming already matches, no code change needed.
+
 ## Secondary Structural-Lock PIN shipped; Tier 1.1 reviews closed (2026-09-08)
 
 - ADR-0070: a per-school, opt-in structural-lock PIN (PBKDF2-SHA256,
