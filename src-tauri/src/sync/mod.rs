@@ -69,6 +69,7 @@ pub enum EntityKind {
     Subject,
     TeachingAssignment,
     SubjectAttendanceEntry,
+    LessonPlan,
 }
 
 impl EntityKind {
@@ -89,6 +90,7 @@ impl EntityKind {
             EntityKind::Subject => "subject",
             EntityKind::TeachingAssignment => "teaching_assignment",
             EntityKind::SubjectAttendanceEntry => "subject_attendance_entry",
+            EntityKind::LessonPlan => "lesson_plan",
         }
     }
 
@@ -105,6 +107,7 @@ impl EntityKind {
             "subject" => Some(EntityKind::Subject),
             "teaching_assignment" => Some(EntityKind::TeachingAssignment),
             "subject_attendance_entry" => Some(EntityKind::SubjectAttendanceEntry),
+            "lesson_plan" => Some(EntityKind::LessonPlan),
             _ => None,
         }
     }

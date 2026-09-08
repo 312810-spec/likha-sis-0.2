@@ -1,5 +1,109 @@
 # CURRENT HANDOFF
 
+## LessonPlan wired through the sync encrypt/decrypt pattern (2026-09-08), Batch 6 slice 1 of N, commit local only (batch mode), PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. Closes the
+`LessonPlan` slice of Batch 6 (`docs/product/MASTER-TASK-INVENTORY.md`
+§4.1's "wire remaining entities to sync" list), following the exact
+established ADR-0067/0069 pattern used for every prior entity
+(`Learner` through `SubjectAttendanceEntry`).
+
+**What changed**, mirroring `commands::grading`'s create-only slice
+where applicable, but wiring BOTH `create` and `update` since this
+entity really has both verbs:
+
+- `db/migrations.rs`: migration 47 widens the `entity_kind` `CHECK`
+  allowlist (4 tables: `sync_outbox`, `sync_hub_log`,
+  `sync_conflict_review`, `sync_version_cache`) to add `'lesson_plan'`,
+  the same 12-step rebuild as migrations 24/26/36/41. New test
+  `migration_47_widens_entity_kind_to_accept_lesson_plan_and_preserves_existing_rows`.
+- `sync/mod.rs`: new `EntityKind::LessonPlan` variant, `as_db_str`/
+  `from_db_str` arms.
+- `repository/lesson_plan.rs`: `LessonPlan` now derives `Deserialize`;
+  new `upsert_from_sync(conn, plan)` -- `INSERT ... ON CONFLICT(id) DO
+UPDATE`, mirroring `grading::upsert_from_sync`. Three new tests:
+  insert-unseen, update-in-place-without-a-duplicate, and a dedicated
+  **natural-key-collision** test
+  (`upsert_from_sync_returns_an_error_on_a_natural_key_collision_distinct_from_id`)
+  proving the schema's own `UNIQUE (teaching_assignment_id, plan_date)`
+  constraint (distinct from `id`) surfaces as an ordinary `Err`, never a
+  panic or silent drop -- the precondition the generic
+  `ApplyRejection::RepositoryRejected` skip-and-advance mechanism
+  depends on.
+- `commands/lesson_plan.rs`: `create_lesson_plan`/`update_lesson_plan`
+  now take an `AppHandle`, resolve the SSPK only if this school has
+  enrolled a device, and delegate to
+  `create_lesson_plan_with_optional_sync`/
+  `update_lesson_plan_with_optional_sync` -- atomic `SAVEPOINT`/
+  `ROLLBACK TO` around the domain write plus the outbox enqueue, exactly
+  as `commands::grading`'s. `update`'s `base_version` is read from
+  `sync_version_cache::known_version` (never unconditionally 0),
+  matching `commands::attendance`'s re-recordable pattern, since a plan
+  can be revised more than once. **Authorization preserved unchanged**:
+  both commands still call `lesson_plan::authorize_own_assignment`
+  before the sync-aware write path is ever reached -- sync wiring adds
+  encryption/enqueue only, it does not touch or bypass the existing
+  teacher-owns-this-assignment gate. 8 new command tests: no-sspk
+  passthrough, sspk-enqueues-correctly-encrypted-entry, device-id
+  stamping, a-rejected-create-never-enqueues, update's known
+  base_version, and a create-side duplicate-date rejection test.
+- `sync_client.rs`: new `EntityKind::LessonPlan` arm in
+  `apply_decrypted_change`, identical tamper-check/school_id-check/
+  upsert shape to every other entity. 4 new integration-shaped tests
+  (real hub round trip over loopback HTTP, real encrypt/decrypt): applies
+  a non-conflicting change, rejects a tampered payload without applying
+  or advancing the cursor, stages a conflict when this device has an
+  unsynced local edit, and
+  **`pull_once_skips_past_a_lesson_plan_natural_key_collision_too`** --
+  the natural-key-collision test matrix item for this entity, proving
+  the generic `RepositoryRejected` skip-and-advance mechanism (confirmed
+  generic for `Subject`/`Section` in `docs/VERIFICATION-DEBT.md`) also
+  protects `LessonPlan` as a third, independently-checked entity.
+
+**Verification actually run** (this session):
+
+- `cargo build --lib`: clean, both before and after the `cargo fmt`
+  pass below.
+- `cargo test --lib`: **1174 passed, 0 failed** (full lib suite,
+  including all new `lesson_plan`/`commands::lesson_plan`/
+  `sync_client`/`migrations` tests). Also ran filtered
+  `cargo test --lib lesson_plan` in isolation first (29 passed) before
+  the full run.
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo fmt --check`: found drift on first run (this slice's own new
+  code, standard rustfmt line-wrapping); ran plain `cargo fmt` to fix it
+  (never hand-restyled), then `cargo fmt --check` was clean.
+- `npm run quality` not yet run this slice (deferred to the batch's
+  final documentation/verification commit per the batch-implement
+  workflow) -- this slice touched Rust only, no `src/`/TypeScript
+  changes.
+
+**Authorization/tenant-isolation verification for this entity**: the
+sync path never bypasses `lesson_plan::authorize_own_assignment` --
+that check runs in the Tauri command handler before
+`create_lesson_plan_with_optional_sync`/`update_lesson_plan_with_optional_sync`
+is ever called, and those functions have no code path that skips it.
+On the PULL side, `apply_decrypted_change`'s `EntityKind::LessonPlan`
+arm checks the decrypted payload's `school_id` against the pulling
+device's own `school_id` before calling `upsert_from_sync` -- a plan
+from a different school (even if somehow encrypted correctly, which
+requires that school's own SSPK) is rejected as `Untrusted`. There is
+no separate read-side authorization gate on pulled sync data for any
+already-wired entity in this codebase (the same is true for `Learner`,
+`Attendance`, etc.) -- `authorize_view`'s School-Head-inclusive read
+gate applies only to the Tauri `list_lesson_plans_by_assignment`/query
+commands, unaffected by this slice.
+
+**Retained debt / deferred** (Batch 6's remaining entities, not yet
+started this slice): school logo/branding bytes, `nutrition_records`,
+`behavioral_incidents`+`incident_interventions`, `scholastic_history_records`,
+`grade_submissions`+`grade_submission_notes`; the conflict-review-screen
+generalization check. Each is its own separate commit per the batch's
+explicit instruction -- see later entries above this one (prepended in
+chronological order) for what was completed after this slice, or this
+remains the latest state if no later entry exists.
+
 ## Batch 5 (Tier 3.3-3.4) — domain-first, honestly scoped: eligibility/certificate, seating chart, holidays, weather (ADR-0076), ID-card token (ADR-0077), consolidated matrix; transfers deferred (2026-09-08)
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode — every

@@ -80,7 +80,7 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, device_credential, device_sync_client_credential, grading,
-    learner, learner_score, section, section_membership, subject, subject_attendance,
+    learner, learner_score, lesson_plan, section, section_membership, subject, subject_attendance,
     sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
     teaching_assignment,
 };
@@ -726,6 +726,15 @@ pub(crate) fn apply_decrypted_change(
             subject_attendance::upsert_entry_from_sync(conn, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
+        EntityKind::LessonPlan => {
+            let incoming: lesson_plan::LessonPlan =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            lesson_plan::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
     }
 }
 
@@ -1195,6 +1204,49 @@ mod tests {
         )
         .unwrap()
         .unwrap()
+    }
+
+    fn synthetic_lesson_plan(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        assignment: &teaching_assignment::TeachingAssignment,
+        plan_date: &str,
+    ) -> lesson_plan::LessonPlan {
+        lesson_plan::LessonPlan {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            teaching_assignment_id: assignment.id.clone(),
+            plan_date: plan_date.to_string(),
+            learning_competency: "Add fractions".to_string(),
+            learning_competency_code: "M7NS-Ig-1".to_string(),
+            learning_objectives: "Add fractions with unlike denominators".to_string(),
+            connection_to_previous_learning: "Builds on like denominators".to_string(),
+            learning_experiences: "Think-pair-share".to_string(),
+            assessment: "Exit ticket".to_string(),
+            ways_forward: "Reteach if needed".to_string(),
+            created_by_user_id: assignment.teacher_user_id.clone(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_grading_period_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` lesson-plan payload.
+    fn make_lesson_plan_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        assignment: &teaching_assignment::TeachingAssignment,
+        plan_date: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::LessonPlan;
+        let plaintext = serde_json::to_vec(&synthetic_lesson_plan(
+            fixture, entity_id, assignment, plan_date,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
     }
 
     fn synthetic_subject_attendance_session(
@@ -4272,6 +4324,266 @@ mod tests {
                 "a rejected change must never advance the cursor past it"
             );
         };
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_lesson_plan_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let assignment = setup_teaching_assignment(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_lesson_plan_change(&fixture, entity_id, &assignment, "2026-09-07", 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT learning_competency FROM lesson_plans WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "Add fractions");
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::LessonPlan,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_lesson_plan_payload_without_applying_or_advancing_past_it() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let assignment = setup_teaching_assignment(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change =
+                make_lesson_plan_change(&fixture, entity_id, &assignment, "2026-09-07", 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM lesson_plans WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_lesson_plan_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let assignment = setup_teaching_assignment(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // Another device's lesson-plan change lands at the hub.
+        {
+            let conn = &fixture.conn;
+            let other_device_change =
+                make_lesson_plan_change(&fixture, entity_id, &assignment, "2026-09-07", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        // This device independently edited the SAME entity and has not
+        // pushed it yet.
+        {
+            let conn = &fixture.conn;
+            let local_change =
+                make_lesson_plan_change(&fixture, entity_id, &assignment, "2026-09-07", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM lesson_plans WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    /// Natural-key-collision test matrix (per `docs/CURRENT-HANDOFF.md`'s
+    /// 2026-09-06 entry): `lesson_plans` carries `UNIQUE
+    /// (teaching_assignment_id, plan_date)` distinct from its own `id` --
+    /// two devices, both offline, each authoring a plan for the same
+    /// assignment/date. Proves the generic `ApplyRejection::
+    /// RepositoryRejected` skip-and-advance mechanism (confirmed generic
+    /// for `Subject`/`Section` in `docs/VERIFICATION-DEBT.md`) also
+    /// protects this THIRD, independently-checked entity, rather than
+    /// assuming it holds without a per-entity test.
+    #[test]
+    fn pull_once_skips_past_a_lesson_plan_natural_key_collision_too() {
+        let fixture = setup();
+        let assignment = setup_teaching_assignment(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // A local plan already exists for this assignment/date.
+        lesson_plan::create(
+            &fixture.conn,
+            &fixture.school_id,
+            &assignment.id,
+            "2026-09-07",
+            &assignment.teacher_user_id,
+            &lesson_plan::LessonPlanFields {
+                learning_competency: "Local competency",
+                learning_competency_code: "M7NS-Ig-1",
+                learning_objectives: "Local objectives",
+                connection_to_previous_learning: "Local connection",
+                learning_experiences: "Local experiences",
+                assessment: "Local assessment",
+                ways_forward: "Local ways forward",
+            },
+        )
+        .unwrap();
+
+        let colliding_entity_id = Uuid::now_v7();
+        let good_entity_id = Uuid::now_v7();
+        {
+            let conn = &fixture.conn;
+            let colliding_change = make_lesson_plan_change(
+                &fixture,
+                colliding_entity_id,
+                &assignment,
+                "2026-09-07",
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &colliding_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            let good_change =
+                make_lesson_plan_change(&fixture, good_entity_id, &assignment, "2026-09-14", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &good_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 2);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 1);
+        assert!(!summary.failed);
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            2,
+            "the cursor must advance past both changes"
+        );
+        let colliding_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM lesson_plans WHERE id = ?1)",
+                [colliding_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!colliding_row_exists);
+        assert!(lesson_plan::find_by_id_in_school(
+            conn,
+            &fixture.school_id,
+            &good_entity_id.to_string()
+        )
+        .unwrap()
+        .is_some());
     }
 
     #[test]
