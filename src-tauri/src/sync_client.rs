@@ -79,10 +79,10 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
-    assessment_item, attendance, device_credential, device_sync_client_credential, grading,
-    learner, learner_score, lesson_plan, section, section_membership, subject, subject_attendance,
-    sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
-    teaching_assignment,
+    assessment_item, attendance, child_protection, device_credential,
+    device_sync_client_credential, grading, learner, learner_score, lesson_plan, nutrition,
+    section, section_membership, subject, subject_attendance, sync_conflict_review, sync_hub,
+    sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -733,6 +733,36 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             lesson_plan::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::NutritionRecord => {
+            let incoming: nutrition::NutritionRecord =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            nutrition::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::BehavioralIncident => {
+            let incoming: child_protection::BehavioralIncident =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            child_protection::upsert_incident_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::IncidentIntervention => {
+            // `InterventionLogEntry` carries no `school_id` field of its
+            // own (see `child_protection::upsert_intervention_from_sync`'s
+            // doc comment) -- `school_id` here is the pulling device's
+            // own already-authenticated tenant scope, the same trust
+            // boundary every other arm checks the payload's OWN
+            // `school_id` against.
+            let incoming: child_protection::InterventionLogEntry =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            child_protection::upsert_intervention_from_sync(conn, school_id, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }
@@ -4584,6 +4614,661 @@ mod tests {
         )
         .unwrap()
         .is_some());
+    }
+
+    /// Builds a learner on the CLIENT's own local db -- the FK target
+    /// `synthetic_nutrition_record` needs.
+    fn setup_learner(fixture: &TestFixture) -> String {
+        learner::create(&fixture.conn, &fixture.school_id, "Ana", "Cruz", None, None)
+            .unwrap()
+            .id
+    }
+
+    fn synthetic_nutrition_record(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        learner_id: &str,
+        school_year: &str,
+    ) -> nutrition::NutritionRecord {
+        nutrition::NutritionRecord {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            learner_id: learner_id.to_string(),
+            school_year: school_year.to_string(),
+            period: "BOSY".to_string(),
+            grade_level: "5".to_string(),
+            sex: "M".to_string(),
+            birth_date: "2020-06-15".to_string(),
+            measurement_date: "2026-06-20".to_string(),
+            height_m: 1.10,
+            weight_kg: 18.5,
+            age_in_months: 72,
+            bmi: 15.29,
+            nutritional_status: None,
+            height_for_age_status: None,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    /// Like `make_lesson_plan_change`, but with a REAL encrypted-under-
+    /// `fixture.sspk` nutrition-record payload.
+    fn make_nutrition_record_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        learner_id: &str,
+        school_year: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::NutritionRecord;
+        let plaintext = serde_json::to_vec(&synthetic_nutrition_record(
+            fixture,
+            entity_id,
+            learner_id,
+            school_year,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_nutrition_record_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let learner_id = setup_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_nutrition_record_change(&fixture, entity_id, &learner_id, "2026-2027", 0),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: f64 = conn
+                .query_row(
+                    "SELECT bmi FROM nutrition_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert!((stored - 15.29).abs() < f64::EPSILON);
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::NutritionRecord,
+                    &entity_id.to_string()
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_nutrition_record_payload_without_applying_or_advancing_past_it()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let learner_id = setup_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change =
+                make_nutrition_record_change(&fixture, entity_id, &learner_id, "2026-2027", 0);
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nutrition_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+            assert_eq!(
+                sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                    .unwrap()
+                    .0,
+                0,
+                "a rejected change must never advance the cursor past it"
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_nutrition_record_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let learner_id = setup_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let other_device_change =
+                make_nutrition_record_change(&fixture, entity_id, &learner_id, "2026-2027", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        {
+            let conn = &fixture.conn;
+            let local_change =
+                make_nutrition_record_change(&fixture, entity_id, &learner_id, "2026-2027", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM nutrition_records WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    /// Natural-key-collision test matrix: `nutrition_records` carries
+    /// `UNIQUE (learner_id, school_year, period)` distinct from its own
+    /// `id` -- two devices, both offline, each recording the same
+    /// learner's BOSY measurement for the same school year. Proves the
+    /// generic `ApplyRejection::RepositoryRejected` skip-and-advance
+    /// mechanism also protects this entity.
+    #[test]
+    fn pull_once_skips_past_a_nutrition_record_natural_key_collision_too() {
+        let fixture = setup();
+        let learner_id = setup_learner(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        nutrition::record_measurement(
+            &fixture.conn,
+            &fixture.school_id,
+            &learner_id,
+            "2026-2027",
+            nutrition::Period::Bosy,
+            "5",
+            "M",
+            "2020-06-15",
+            "2026-06-20",
+            1.10,
+            18.5,
+        )
+        .unwrap();
+
+        let colliding_entity_id = Uuid::now_v7();
+        let good_entity_id = Uuid::now_v7();
+        {
+            let conn = &fixture.conn;
+            let colliding_change = make_nutrition_record_change(
+                &fixture,
+                colliding_entity_id,
+                &learner_id,
+                "2026-2027",
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &colliding_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            let good_change =
+                make_nutrition_record_change(&fixture, good_entity_id, &learner_id, "2027-2028", 0);
+            sync_outbox::enqueue(conn, &fixture.school_id, &good_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 2);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 1);
+        assert!(!summary.failed);
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            2,
+            "the cursor must advance past both changes"
+        );
+        let colliding_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM nutrition_records WHERE id = ?1)",
+                [colliding_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!colliding_row_exists);
+        let good_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM nutrition_records WHERE id = ?1)",
+                [good_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(good_row_exists);
+    }
+
+    /// Behavioral incidents/interventions carry a real FK to `users(id)`
+    /// (`reported_by_user_id`/`author_user_id`), unlike `LessonPlan`'s own
+    /// `teaching_assignment_id`-derived teacher -- `fixture.user_id` is
+    /// only a row on the HUB's own database (see `setup`'s own doc
+    /// comment), not the CLIENT's local one, so a synthetic incident must
+    /// mint its own local user, mirroring
+    /// `setup_section_subject_and_teacher`'s own local-fixture pattern.
+    fn setup_local_reporter(fixture: &TestFixture) -> String {
+        crate::repository::user::create_user(&fixture.conn, "reporter.a", "password", "Reporter A")
+            .unwrap()
+            .id
+    }
+
+    fn synthetic_behavioral_incident(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        learner_id: &str,
+        section_id: &str,
+        reporter_user_id: &str,
+    ) -> child_protection::BehavioralIncident {
+        child_protection::BehavioralIncident {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            learner_id: learner_id.to_string(),
+            section_id: section_id.to_string(),
+            reported_by_user_id: Some(reporter_user_id.to_string()),
+            severity_tier: child_protection::SeverityTier::Level2,
+            category: "bullying".to_string(),
+            description: "Synthetic incoming description.".to_string(),
+            incident_date: "2026-09-01".to_string(),
+            resolved_at: None,
+            resolved_by_user_id: None,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    fn make_behavioral_incident_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        learner_id: &str,
+        section_id: &str,
+        reporter_user_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::BehavioralIncident;
+        let plaintext = serde_json::to_vec(&synthetic_behavioral_incident(
+            fixture,
+            entity_id,
+            learner_id,
+            section_id,
+            reporter_user_id,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_behavioral_incident_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let reporter_user_id = setup_local_reporter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_behavioral_incident_change(
+                    &fixture,
+                    entity_id,
+                    &learner_id,
+                    &section_id,
+                    &reporter_user_id,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT category FROM behavioral_incidents WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "bullying");
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_behavioral_incident_payload_without_applying_or_advancing_past_it(
+    ) {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let reporter_user_id = setup_local_reporter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_behavioral_incident_change(
+                &fixture,
+                entity_id,
+                &learner_id,
+                &section_id,
+                &reporter_user_id,
+                0,
+            );
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM behavioral_incidents WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_behavioral_incident_conflict_when_this_device_has_an_unsynced_local_edit()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let reporter_user_id = setup_local_reporter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let other_device_change = make_behavioral_incident_change(
+                &fixture,
+                entity_id,
+                &learner_id,
+                &section_id,
+                &reporter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        {
+            let conn = &fixture.conn;
+            let local_change = make_behavioral_incident_change(
+                &fixture,
+                entity_id,
+                &learner_id,
+                &section_id,
+                &reporter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM behavioral_incidents WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    // No natural-key-collision test is written for `BehavioralIncident`
+    // or `IncidentIntervention` -- both tables carry no `UNIQUE`
+    // constraint besides their own `id` primary key (confirmed against
+    // migration 44's own `CREATE TABLE`, and stated explicitly in
+    // `repository::child_protection`'s own doc comments), so there is no
+    // distinct natural key for two offline devices to collide on the way
+    // `LessonPlan`/`NutritionRecord` can. This is a deliberate scope
+    // decision, not an oversight.
+
+    fn synthetic_intervention_entry(
+        entity_id: Uuid,
+        incident_id: &str,
+        author_user_id: &str,
+    ) -> child_protection::InterventionLogEntry {
+        child_protection::InterventionLogEntry {
+            id: entity_id.to_string(),
+            incident_id: incident_id.to_string(),
+            author_user_id: Some(author_user_id.to_string()),
+            entry_type: child_protection::InterventionEntryType::Intervention,
+            note: "Synthetic incoming intervention note.".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    fn make_incident_intervention_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        incident_id: &str,
+        author_user_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::IncidentIntervention;
+        let plaintext = serde_json::to_vec(&synthetic_intervention_entry(
+            entity_id,
+            incident_id,
+            author_user_id,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_incident_intervention_change() {
+        let fixture = setup();
+        let incident_entity_id = Uuid::now_v7();
+        let entry_entity_id = Uuid::now_v7();
+        let (section_id, learner_id) = setup_section_and_learner(&fixture);
+        let reporter_user_id = setup_local_reporter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            // The parent incident must already exist locally -- this
+            // entity's own FK target -- before pulling its intervention.
+            child_protection::upsert_incident_from_sync(
+                conn,
+                &synthetic_behavioral_incident(
+                    &fixture,
+                    incident_entity_id,
+                    &learner_id,
+                    &section_id,
+                    &reporter_user_id,
+                ),
+            )
+            .unwrap();
+
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_incident_intervention_change(
+                    &fixture,
+                    entry_entity_id,
+                    &incident_entity_id.to_string(),
+                    &reporter_user_id,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entry_entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT note FROM incident_interventions WHERE id = ?1",
+                    [entry_entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "Synthetic incoming intervention note.");
+        };
     }
 
     #[test]

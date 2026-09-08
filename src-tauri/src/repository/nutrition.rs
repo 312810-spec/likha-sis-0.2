@@ -7,7 +7,7 @@
 //! `commands::nutrition`).
 
 use rusqlite::{Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -40,7 +40,7 @@ impl Period {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NutritionRecord {
     pub id: String,
@@ -174,6 +174,60 @@ pub fn record_measurement(
     find_by_id(conn, school_id, &id)?.ok_or_else(|| {
         AppError::InvalidInput("nutrition record vanished immediately after insert".to_string())
     })
+}
+
+/// Materializes a pulled sync change: an `INSERT ... ON CONFLICT(id) DO
+/// UPDATE` keyed on the row's own stable `id`, mirroring
+/// `lesson_plan::upsert_from_sync` exactly. Bypasses `record_measurement`'s
+/// own age/BMI computation and validation entirely (that already happened
+/// on the originating device, and the incoming payload already carries
+/// the computed `age_in_months`/`bmi` values) -- a collision on the
+/// schema's own `UNIQUE (learner_id, school_year, period)` natural key
+/// (distinct from `id`; two devices independently recording the same
+/// learner's BOSY/EOSY measurement while both offline) surfaces as an
+/// ordinary `rusqlite::Error` here, which the caller
+/// (`sync_client::apply_decrypted_change`) maps to
+/// `ApplyRejection::RepositoryRejected` so it never wedges the rest of
+/// the pull batch -- same generic mechanism already confirmed for
+/// `Subject`/`Section`/`LessonPlan` (`docs/VERIFICATION-DEBT.md`).
+pub fn upsert_from_sync(conn: &Connection, record: &NutritionRecord) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO nutrition_records \
+            (id, school_id, learner_id, school_year, period, grade_level, sex, \
+             birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi, \
+             nutritional_status, height_for_age_status, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) \
+         ON CONFLICT(id) DO UPDATE SET \
+             grade_level = excluded.grade_level, \
+             sex = excluded.sex, \
+             birth_date = excluded.birth_date, \
+             measurement_date = excluded.measurement_date, \
+             height_m = excluded.height_m, \
+             weight_kg = excluded.weight_kg, \
+             age_in_months = excluded.age_in_months, \
+             bmi = excluded.bmi, \
+             nutritional_status = excluded.nutritional_status, \
+             height_for_age_status = excluded.height_for_age_status",
+        rusqlite::params![
+            &record.id,
+            &record.school_id,
+            &record.learner_id,
+            &record.school_year,
+            &record.period,
+            &record.grade_level,
+            &record.sex,
+            &record.birth_date,
+            &record.measurement_date,
+            record.height_m,
+            record.weight_kg,
+            record.age_in_months,
+            record.bmi,
+            &record.nutritional_status,
+            &record.height_for_age_status,
+            &record.created_at,
+        ],
+    )?;
+    Ok(())
 }
 
 fn row_to_record(row: &rusqlite::Row) -> rusqlite::Result<NutritionRecord> {
@@ -479,5 +533,114 @@ mod tests {
         assert!(to_enrollment_row("5", Some("Other")).is_none());
         assert!(to_enrollment_row("5", None).is_none());
         assert!(to_enrollment_row("5", Some("M")).is_some());
+    }
+
+    fn sample_incoming(id: &str, period: Period) -> NutritionRecord {
+        NutritionRecord {
+            id: id.to_string(),
+            school_id: "s1".to_string(),
+            learner_id: "l1".to_string(),
+            school_year: "2026-2027".to_string(),
+            period: period.as_db_str().to_string(),
+            grade_level: "5".to_string(),
+            sex: "M".to_string(),
+            birth_date: "2020-06-15".to_string(),
+            measurement_date: "2026-06-20".to_string(),
+            height_m: 1.10,
+            weight_kg: 18.5,
+            age_in_months: 72,
+            bmi: 15.29,
+            nutritional_status: None,
+            height_for_age_status: None,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_record_this_device_has_never_seen() {
+        let conn = setup();
+        let incoming = sample_incoming("n1", Period::Bosy);
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id(&conn, "s1", "n1").unwrap().unwrap();
+        assert_eq!(found.bmi, incoming.bmi);
+        assert_eq!(found.period, "BOSY");
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let conn = setup();
+        let original = record_measurement(
+            &conn,
+            "s1",
+            "l1",
+            "2026-2027",
+            Period::Bosy,
+            "5",
+            "M",
+            "2020-06-15",
+            "2026-06-20",
+            1.10,
+            18.5,
+        )
+        .unwrap();
+
+        let updated = NutritionRecord {
+            weight_kg: 20.0,
+            bmi: 16.5,
+            ..original.clone()
+        };
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id(&conn, "s1", &original.id).unwrap().unwrap();
+        assert_eq!(found.weight_kg, 20.0);
+        let all = list_for_school_year_period(&conn, "s1", "2026-2027", Period::Bosy).unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
+    }
+
+    /// The natural-key-collision scenario this entity is actually exposed
+    /// to: two devices, both offline, each recording a measurement for
+    /// the SAME `(learner_id, school_year, period)` before either has
+    /// synced. Each mints its own `id`, so pulling the other device's row
+    /// can never collide on `id` (the `ON CONFLICT(id)` target) -- it
+    /// instead trips the schema's own `UNIQUE (learner_id, school_year,
+    /// period)` constraint. Proves `upsert_from_sync` surfaces this as an
+    /// ordinary `Err`, never panics and never silently drops one
+    /// measurement's data.
+    #[test]
+    fn upsert_from_sync_returns_an_error_on_a_natural_key_collision_distinct_from_id() {
+        let conn = setup();
+        let existing = record_measurement(
+            &conn,
+            "s1",
+            "l1",
+            "2026-2027",
+            Period::Bosy,
+            "5",
+            "M",
+            "2020-06-15",
+            "2026-06-20",
+            1.10,
+            18.5,
+        )
+        .unwrap();
+
+        let colliding = NutritionRecord {
+            id: "n-colliding".to_string(),
+            ..sample_incoming("n-colliding", Period::Bosy)
+        };
+        assert_ne!(colliding.id, existing.id);
+
+        let result = upsert_from_sync(&conn, &colliding);
+
+        assert!(
+            result.is_err(),
+            "a natural-key collision must surface as an Err, not silently succeed or panic"
+        );
+        let all = list_for_school_year_period(&conn, "s1", "2026-2027", Period::Bosy).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, existing.id);
+        assert!(find_by_id(&conn, "s1", &colliding.id).unwrap().is_none());
     }
 }

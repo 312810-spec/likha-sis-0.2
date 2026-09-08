@@ -48,7 +48,7 @@ impl SeverityTier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BehavioralIncident {
     pub id: String,
@@ -89,7 +89,7 @@ impl InterventionEntryType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InterventionLogEntry {
     pub id: String,
@@ -165,6 +165,88 @@ pub fn create_incident(
         ),
     )?;
     find_incident_by_id(conn, school_id, &id).map(|opt| opt.expect("just inserted"))
+}
+
+/// Materializes a pulled sync change: an `INSERT ... ON CONFLICT(id) DO
+/// UPDATE` keyed on the row's own stable `id`, mirroring
+/// `lesson_plan::upsert_from_sync` exactly. `behavioral_incidents` has no
+/// `UNIQUE` constraint besides its own `id` primary key (unlike
+/// `LessonPlan`/`NutritionRecord`), so there is no distinct-natural-key
+/// collision scenario to guard against here -- see this module's own
+/// sync-wiring doc comment for that explicit statement, rather than
+/// silently assuming one exists.
+pub fn upsert_incident_from_sync(
+    conn: &Connection,
+    incident: &BehavioralIncident,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO behavioral_incidents \
+            (id, school_id, learner_id, section_id, reported_by_user_id, \
+             severity_tier, category, description, incident_date, \
+             resolved_at, resolved_by_user_id, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) \
+         ON CONFLICT(id) DO UPDATE SET \
+             severity_tier = excluded.severity_tier, \
+             category = excluded.category, \
+             description = excluded.description, \
+             incident_date = excluded.incident_date, \
+             resolved_at = excluded.resolved_at, \
+             resolved_by_user_id = excluded.resolved_by_user_id",
+        (
+            &incident.id,
+            &incident.school_id,
+            &incident.learner_id,
+            &incident.section_id,
+            &incident.reported_by_user_id,
+            incident.severity_tier.as_db_str(),
+            &incident.category,
+            &incident.description,
+            &incident.incident_date,
+            &incident.resolved_at,
+            &incident.resolved_by_user_id,
+            &incident.created_at,
+        ),
+    )?;
+    Ok(())
+}
+
+/// Materializes a pulled sync change for an intervention/resolution log
+/// entry. `incident_interventions` is append-only (see this module's own
+/// doc comment) and has no `UNIQUE` constraint besides `id` -- same
+/// "no distinct natural key to collide on" note as
+/// `upsert_incident_from_sync` above. This never re-runs the
+/// resolution-marks-the-incident-resolved side effect `add_intervention`
+/// performs -- the incoming `BehavioralIncident` change (pushed
+/// alongside this one, see
+/// `commands::child_protection::enqueue_intervention_sync_change`)
+/// already carries that state directly. `InterventionLogEntry` itself
+/// carries no `school_id` field (it always resolves through its parent
+/// incident), so `school_id` comes from the caller's own
+/// already-checked tenant scope -- matching every other entity's
+/// `incoming.school_id != school_id` check, just supplied directly
+/// rather than read back out of the payload.
+pub fn upsert_intervention_from_sync(
+    conn: &Connection,
+    school_id: &str,
+    entry: &InterventionLogEntry,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO incident_interventions \
+            (id, incident_id, school_id, author_user_id, entry_type, note, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+         ON CONFLICT(id) DO UPDATE SET \
+             note = excluded.note",
+        (
+            &entry.id,
+            &entry.incident_id,
+            school_id,
+            &entry.author_user_id,
+            entry.entry_type.as_db_str(),
+            &entry.note,
+            &entry.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 pub fn find_incident_by_id(
@@ -561,5 +643,165 @@ mod tests {
 
         let all = list_for_learner(&conn, "s1", "l1").unwrap();
         assert_eq!(all.len(), 2);
+    }
+
+    fn sample_incoming_incident(id: &str) -> BehavioralIncident {
+        BehavioralIncident {
+            id: id.to_string(),
+            school_id: "s1".to_string(),
+            learner_id: "l1".to_string(),
+            section_id: "sec1".to_string(),
+            reported_by_user_id: Some("u1".to_string()),
+            severity_tier: SeverityTier::Level2,
+            category: "bullying".to_string(),
+            description: "Synthetic incoming description.".to_string(),
+            incident_date: "2026-09-01".to_string(),
+            resolved_at: None,
+            resolved_by_user_id: None,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn upsert_incident_from_sync_inserts_an_incident_this_device_has_never_seen() {
+        let conn = setup();
+        let incoming = sample_incoming_incident("bi1");
+
+        upsert_incident_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_incident_by_id(&conn, "s1", "bi1").unwrap().unwrap();
+        assert_eq!(found.category, "bullying");
+    }
+
+    #[test]
+    fn upsert_incident_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let conn = setup();
+        let original = create_incident(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            SeverityTier::Level1,
+            "tardiness",
+            "Original synthetic description.",
+            "2026-09-01",
+        )
+        .unwrap();
+
+        let updated = BehavioralIncident {
+            resolved_at: Some("2026-09-05T00:00:00.000Z".to_string()),
+            resolved_by_user_id: Some("u1".to_string()),
+            ..original.clone()
+        };
+        upsert_incident_from_sync(&conn, &updated).unwrap();
+
+        let found = find_incident_by_id(&conn, "s1", &original.id)
+            .unwrap()
+            .unwrap();
+        assert!(found.resolved_at.is_some());
+        let all = list_for_section(&conn, "s1", "sec1").unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
+    }
+
+    /// Unlike `LessonPlan`/`NutritionRecord`, `behavioral_incidents` has
+    /// no `UNIQUE` constraint besides its own `id` primary key (confirmed
+    /// against migration 44's own `CREATE TABLE`) -- so there is no
+    /// distinct-natural-key collision scenario for this entity to guard
+    /// against, and no such test is written here. This is stated
+    /// explicitly, not silently assumed: an `ON CONFLICT(id) DO UPDATE`
+    /// against a table whose only uniqueness IS `id` can never trip a
+    /// second constraint the way `LessonPlan`'s
+    /// `UNIQUE (teaching_assignment_id, plan_date)` or
+    /// `NutritionRecord`'s `UNIQUE (learner_id, school_year, period)` can.
+    #[test]
+    fn behavioral_incidents_has_no_unique_constraint_besides_id_so_no_collision_scenario_exists() {
+        let conn = setup();
+        let first = create_incident(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            SeverityTier::Level1,
+            "tardiness",
+            "First synthetic incident.",
+            "2026-09-01",
+        )
+        .unwrap();
+        // A second incident for the exact same learner/section/date is
+        // accepted without error -- there is nothing to collide on.
+        let second = create_incident(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            SeverityTier::Level1,
+            "tardiness",
+            "Second synthetic incident, same day.",
+            "2026-09-01",
+        )
+        .unwrap();
+        assert_ne!(first.id, second.id);
+    }
+
+    fn sample_incoming_intervention(id: &str, incident_id: &str) -> InterventionLogEntry {
+        InterventionLogEntry {
+            id: id.to_string(),
+            incident_id: incident_id.to_string(),
+            author_user_id: Some("u1".to_string()),
+            entry_type: InterventionEntryType::Intervention,
+            note: "Synthetic incoming intervention note.".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn upsert_intervention_from_sync_inserts_an_entry_this_device_has_never_seen() {
+        let conn = setup();
+        let incident = create_incident(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            SeverityTier::Level2,
+            "bullying",
+            "Synthetic description.",
+            "2026-09-01",
+        )
+        .unwrap();
+        let incoming = sample_incoming_intervention("ii1", &incident.id);
+
+        upsert_intervention_from_sync(&conn, "s1", &incoming).unwrap();
+
+        let log = list_interventions_for_incident(&conn, "s1", &incident.id).unwrap();
+        assert_eq!(log.len(), 1);
+        assert_eq!(log[0].note, "Synthetic incoming intervention note.");
+    }
+
+    #[test]
+    fn upsert_intervention_from_sync_is_idempotent_on_the_same_id() {
+        let conn = setup();
+        let incident = create_incident(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            SeverityTier::Level2,
+            "bullying",
+            "Synthetic description.",
+            "2026-09-01",
+        )
+        .unwrap();
+        let incoming = sample_incoming_intervention("ii1", &incident.id);
+
+        upsert_intervention_from_sync(&conn, "s1", &incoming).unwrap();
+        upsert_intervention_from_sync(&conn, "s1", &incoming).unwrap();
+
+        let log = list_interventions_for_incident(&conn, "s1", &incident.id).unwrap();
+        assert_eq!(log.len(), 1, "re-applying the same id must never duplicate");
     }
 }
