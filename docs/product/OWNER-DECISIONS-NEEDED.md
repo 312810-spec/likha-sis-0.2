@@ -44,4 +44,16 @@ Consolidated list of items this session deliberately did **not** decide unilater
 
 ---
 
+---
+
+## 5. School logo sync size limit (FYI, already decided — not blocking)
+
+**Status:** Decided and implemented (Batch 10, `docs/adr/0081-school-logo-sync-byte-budget.md`). `MAX_LOGO_BYTES` was shrunk from 512 KiB to 48 KiB so a school-branding logo upload's encrypted sync payload fits under `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB); `SchoolLogo` is now fully wired to the sync protocol.
+
+**Why this is here anyway:** per your instruction to use best judgment on self-contained, reversible sizing calls like this one rather than blocking a wave on them, this was decided and shipped without waiting for you — but it does trade away upload headroom you might want back. 48 KiB is generous for a compressed sidebar/header-sized PNG/JPEG/WebP icon, but if you'd prefer schools to be able to upload a noticeably larger or higher-resolution logo, the alternative not taken (a dedicated binary-safe sync payload path instead of shrinking to fit the existing JSON-then-encrypt envelope, or a hand-rolled base64 encoder that would raise the safe ceiling to roughly 140–150 KiB without a new payload path) is fully documented in the ADR's "Not chosen" section, ready to implement if you'd rather have that instead.
+
+**No action needed** unless you want the larger-logo alternative — this is a disclosure, not a question blocking anything.
+
+---
+
 _This file is additive — new entries get appended as later batches surface more genuine decision points. Nothing in this file should be treated as already decided; it's the opposite._

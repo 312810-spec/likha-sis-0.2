@@ -1,5 +1,140 @@
 # CURRENT HANDOFF
 
+## Batch 10 (complete): SchoolLogo sync byte-budget shrink + full sync wiring (2026-09-08, ADR-0081), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. Two checkpoints, each its own local commit.
+
+**Checkpoint 1 -- byte-budget math + shrink `MAX_LOGO_BYTES`:**
+`MAX_LOGO_BYTES` (`commands::school`) shrunk from `512 * 1024` to
+`48 * 1024` (49,152 bytes) so a max-size logo's encrypted sync payload
+fits safely under `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB). Full
+math in `docs/adr/0081-school-logo-sync-byte-budget.md`:
+
+```
+encrypted_blob_len(X) = 4·X (worst-case JSON-array-of-numbers encoding
+                              of the raw bytes -- serde_json's DEFAULT
+                              Vec<u8> encoding, since base64 is only a
+                              transitive dependency here, not a direct
+                              one, and this batch may not add one)
+                       + 256 (JSON field wrapper: schoolId/mime/braces)
+                       + 28  (AES-256-GCM: 12-byte nonce + 16-byte tag)
+
+Solved against a 200 KiB (204,800-byte) safety-margin target:
+    4·X + 284 ≤ 204,800  =>  X ≤ 51,129 bytes
+
+Chosen: MAX_LOGO_BYTES = 48 * 1024 = 49,152 bytes (under the solved
+ceiling; worst-case encrypted payload = 196,892 bytes, ~24.9% headroom
+under the real 262,144-byte cap).
+```
+
+New regression test ties the two constants together permanently:
+`commands::school::tests::max_logo_bytes_leaves_headroom_under_the_sync_encrypted_change_cap`.
+Updated every reference to the old 512 KiB figure: the constant's own
+doc comment/error message, the Rust test that asserted the old value
+symbolically (`MAX_LOGO_BYTES + 1`, needed no literal change), the
+frontend mirror (`src/domain/school-logo.ts`'s `MAX_LOGO_BYTES`), and
+its test (`src/application/school-logo-service.test.ts`). No frontend
+display string hardcoded the old figure (the error message computes
+`Math.floor(MAX_LOGO_BYTES / 1024)` dynamically).
+
+**Checkpoint 2 -- sync wiring**, following the exact Batch 6/9 pattern:
+
+- **Migration 54**: widens `entity_kind`'s allowlist (all four sync
+  tables, the same 12-step CHECK-widening rebuild) to add
+  `'school_logo'`.
+- **`sync::EntityKind::SchoolLogo`** (`"school_logo"` wire string).
+- **`repository::school::SchoolLogoSyncRecord`** (`schoolId`, `mime`,
+  `bytes`) + `upsert_logo_from_sync` + `find_logo_by_id`. A logo has no
+  `id` column of its own (it lives as two columns on the `schools` row
+  itself) -- this entity's sync `entity_id` **is** `school_id`, a
+  school-scoped singleton; `find_logo_by_id` fails closed on a
+  mismatched `(school_id, entity_id)` pair.
+- **`commands::school`**: `set_school_logo`/`clear_school_logo` now
+  take `AppHandle`, resolve the SSPK only if this school has enrolled a
+  device (`resolve_sspk_if_enrolled`, identical contract to
+  `commands::nutrition`'s), and enqueue through
+  `set_school_logo_with_optional_sync`/`clear_school_logo_with_optional_sync`
+  -- same enrollment-gated encrypt-on-enqueue `SAVEPOINT` pattern as
+  every prior entity. `clear_school_logo` enqueues a
+  `ChangeOperation::Delete` (carrying the last-known content, matching
+  `commands::teaching_assignment`'s own delete-payload precedent) only
+  when a logo actually existed to clear; clearing an already-absent
+  logo stays a true no-op.
+- **`sync_client::apply_decrypted_change`**: `EntityKind::SchoolLogo`
+  arm, the second entity kind (after `TeachingAssignment`) with a real
+  `Delete` handler -- the "any other kind's Delete is untrusted" guard
+  was widened to allow both.
+- **`ConflictEntityPreview::SchoolLogo { mime, byte_len }`** --
+  deliberately omits the raw bytes (a text/JSON preview screen, not an
+  `<img>`); `byte_len` still shows "this changed."
+
+**Structural-lock-PIN gate (ADR-0070) survival -- verified explicitly,
+same rigor as Batch 6's `LessonPlan::authorize_own_assignment` check**:
+in both `set_school_logo` and `clear_school_logo`,
+`auth::authorize_capability_with_actor` then
+`auth::require_structural_lock_unlocked` run first, using `?` (early
+return on `Err`); `resolve_sspk_if_enrolled` and the
+`*_with_optional_sync` sync-aware write functions are only ever reached
+after both gates already succeeded, and take an already-authorized
+`school_id`/`actor_user_id` as plain parameters -- they perform no
+authorization of their own and have no code path that bypasses either
+gate.
+
+**New tests this batch**: 5 `commands::school::tests::sync_tests`
+(no-sspk passthrough, sspk-enqueues-correctly-encrypted-upsert, a
+no-op-clear-enqueues-nothing case, a delete-enqueues-last-known-content
+case, device-id stamping), 5 `repository::school::tests` (sync-record
+round trip, `find_logo_by_id` fail-closed on a mismatched id, round
+trip when ids match, `None` when no logo is set), 2
+`sync_client::tests` full push/pull integration round trips (`Upsert`
+and `Delete`), 1 `commands::conflict_review::tests` typed-preview test.
+No natural-key-collision test -- like `TransferRecord` (ADR-0080), this
+entity's sync identity is `entity_id` alone (here, always `school_id`),
+resolved by a singleton `UPDATE` with no separate uniqueness rule to
+violate.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate) -- all tests passed (see the commit for
+  the exact count at HEAD).
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` -- typecheck, lint, format:check,
+  check:architecture, check:deadcode, `vitest run` (138 test files,
+  1273 tests) all passed -- run for the Checkpoint 1 frontend
+  `MAX_LOGO_BYTES` mirror change.
+
+**Owner disclosure**: `docs/product/OWNER-DECISIONS-NEEDED.md` item 5
+records the shrink-vs-new-payload-path decision as an FYI (not
+blocking) -- the owner can revisit toward a larger logo ceiling later
+via the documented alternative (a hand-rolled base64 encoder, or a
+dedicated binary-safe sync payload path) if 48 KiB proves too small in
+practice.
+
+**Files touched**: `src-tauri/src/commands/school.rs`,
+`src-tauri/src/repository/school.rs`, `src-tauri/src/sync/mod.rs`,
+`src-tauri/src/sync_client.rs`, `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/school-logo.ts`,
+`src/application/school-logo-service.test.ts`,
+`docs/adr/0081-school-logo-sync-byte-budget.md`,
+`docs/product/OWNER-DECISIONS-NEEDED.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: `scholastic_history_records` (DepEd `.xlsx`
+multi-year importer) and Anecdotal Records/Schedule Grids sync wiring
+remain deliberately deferred per `docs/product/MASTER-TASK-INVENTORY.md`'s
+existing notes (bulk-import paths stay unwired to sync by established
+precedent; the latter two have no persisted entity yet). No further
+sync-wiring candidate is currently outstanding among existing entities
+-- the next slice is either building one of those un-built entities, or
+a different priority area entirely per `CLAUDE.md`'s priority order.
+Per this batch's own instructions, stopping here: both checkpoints
+shipped, nothing left half-wired.
+
 ## Batch 9 (complete): Transfers In/Out Documentation Registry, full vertical slice (2026-09-08, ADR-0080), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

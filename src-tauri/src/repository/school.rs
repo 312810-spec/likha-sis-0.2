@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -115,6 +115,60 @@ pub fn clear_logo(conn: &Connection, school_id: &str) -> AppResult<()> {
         [school_id],
     )?;
     Ok(())
+}
+
+/// The wire/sync shape of a school's branding logo (Batch 10, ADR-0081).
+/// Unlike every other synced entity, a logo has no `id` column of its
+/// own -- it lives as two columns (`logo`/`logo_mime`) directly on the
+/// `schools` row, one logo per school. Rather than invent a synthetic
+/// row id, this entity's sync `entity_id` IS `school_id`: a school-scoped
+/// singleton, the same way `SchoolCoordinates` would be if it were wired
+/// to sync (it isn't, see ADR-0079). `school_id` is carried in the
+/// payload itself (unlike `repository::school::SchoolLogo`, which omits
+/// it since its callers already have it) so `sync_client::apply_decrypted_change`
+/// can check it against the receiving device's own tenant scope, exactly
+/// like every other entity kind's arm does.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchoolLogoSyncRecord {
+    pub school_id: String,
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
+/// Sync-pull counterpart to `set_logo` -- materializes a logo this device
+/// received from another device in the same school. `school_id` is
+/// trusted here (the caller, `sync_client::apply_decrypted_change`,
+/// already checked `record.school_id` against its own tenant scope
+/// before calling this, matching every other entity's `upsert_from_sync`
+/// contract). A singleton `UPDATE` rather than an `INSERT ... ON
+/// CONFLICT`, matching `set_logo`'s own shape -- there is no separate
+/// row to insert, only the `schools` row's two columns to overwrite.
+pub fn upsert_logo_from_sync(conn: &Connection, record: &SchoolLogoSyncRecord) -> AppResult<()> {
+    set_logo(conn, &record.school_id, &record.mime, &record.bytes)
+}
+
+/// Sync-conflict-preview counterpart to `get_logo` -- same signature
+/// shape as every other entity's `find_by_id(conn, school_id, entity_id)`
+/// so `commands::conflict_review` can call it uniformly, even though this
+/// entity's `entity_id` is always identical to `school_id` (see
+/// `SchoolLogoSyncRecord`'s doc comment). A mismatched pair (which should
+/// never occur -- this device is the only source of `entity_id` for its
+/// own logo changes) is treated as "not found" rather than trusted,
+/// fail-closed like every other tenant-scoped lookup in this codebase.
+pub fn find_logo_by_id(
+    conn: &Connection,
+    school_id: &str,
+    entity_id: &str,
+) -> AppResult<Option<SchoolLogoSyncRecord>> {
+    if entity_id != school_id {
+        return Ok(None);
+    }
+    Ok(get_logo(conn, school_id)?.map(|l| SchoolLogoSyncRecord {
+        school_id: school_id.to_string(),
+        mime: l.mime,
+        bytes: l.bytes,
+    }))
 }
 
 /// A school's latitude/longitude, for the Weather & Hazard Suspension
@@ -280,6 +334,66 @@ mod tests {
         set_logo(&conn, &school_a.id, "image/png", &[9, 9, 9]).unwrap();
 
         assert_eq!(get_logo(&conn, &school_b.id).unwrap(), None);
+    }
+
+    #[test]
+    fn upsert_logo_from_sync_writes_the_singleton_row() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        let record = SchoolLogoSyncRecord {
+            school_id: school.id.clone(),
+            mime: "image/webp".to_string(),
+            bytes: vec![1, 2, 3, 4],
+        };
+
+        upsert_logo_from_sync(&conn, &record).unwrap();
+
+        let logo = get_logo(&conn, &school.id).unwrap().unwrap();
+        assert_eq!(logo.mime, "image/webp");
+        assert_eq!(logo.bytes, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn find_logo_by_id_returns_none_when_entity_id_does_not_match_school_id() {
+        let conn = open_test_db();
+        let school_a = create(&conn, "School A").unwrap();
+        let school_b = create(&conn, "School B").unwrap();
+        set_logo(&conn, &school_a.id, "image/png", &[1, 2, 3]).unwrap();
+
+        // A logo's `entity_id` IS its `school_id` (see
+        // `SchoolLogoSyncRecord`'s doc comment) -- a mismatched pair
+        // should never legitimately occur, and must fail closed as "not
+        // found" rather than trusted.
+        assert_eq!(
+            find_logo_by_id(&conn, &school_a.id, &school_b.id).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn find_logo_by_id_round_trips_when_ids_match() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+        set_logo(&conn, &school.id, "image/png", &[1, 2, 3]).unwrap();
+
+        let found = find_logo_by_id(&conn, &school.id, &school.id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(found.school_id, school.id);
+        assert_eq!(found.mime, "image/png");
+        assert_eq!(found.bytes, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn find_logo_by_id_returns_none_when_no_logo_is_set() {
+        let conn = open_test_db();
+        let school = create(&conn, "Mabini Elementary").unwrap();
+
+        assert_eq!(
+            find_logo_by_id(&conn, &school.id, &school.id).unwrap(),
+            None
+        );
     }
 
     #[test]

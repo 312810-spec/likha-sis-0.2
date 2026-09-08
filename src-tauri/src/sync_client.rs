@@ -81,9 +81,9 @@ use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, child_protection, device_credential,
     device_sync_client_credential, grade_submission, grading, learner, learner_score, lesson_plan,
-    nutrition, section, section_membership, subject, subject_attendance, sync_conflict_review,
-    sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
-    transfer_record,
+    nutrition, school, section, section_membership, subject, subject_attendance,
+    sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
+    teaching_assignment, transfer_record,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -609,14 +609,16 @@ pub(crate) fn apply_decrypted_change(
     let plaintext = payload_key::decrypt_payload(sspk, &change.encrypted_payload)
         .map_err(|_| ApplyRejection::Untrusted)?;
 
-    // Only `TeachingAssignment` has a real `Delete` handler wired below --
-    // every other entity kind's arm only ever calls `upsert_from_sync`. A
-    // `Delete` operation claimed for any other entity is unsupported and
-    // therefore untrustworthy: reject it explicitly rather than silently
-    // treating it as an upsert (which would materialize a phantom row
-    // from a delete's payload) or falling through unnoticed.
+    // Only `TeachingAssignment` and `SchoolLogo` have a real `Delete`
+    // handler wired below -- every other entity kind's arm only ever
+    // calls `upsert_from_sync`. A `Delete` operation claimed for any
+    // other entity is unsupported and therefore untrustworthy: reject it
+    // explicitly rather than silently treating it as an upsert (which
+    // would materialize a phantom row from a delete's payload) or
+    // falling through unnoticed.
     if change.operation == ChangeOperation::Delete
         && change.entity_kind != EntityKind::TeachingAssignment
+        && change.entity_kind != EntityKind::SchoolLogo
     {
         return Err(ApplyRejection::Untrusted);
     }
@@ -793,6 +795,19 @@ pub(crate) fn apply_decrypted_change(
             }
             transfer_record::upsert_from_sync(conn, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::SchoolLogo => {
+            let incoming: school::SchoolLogoSyncRecord =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            match change.operation {
+                ChangeOperation::Upsert => school::upsert_logo_from_sync(conn, &incoming)
+                    .map_err(|_| ApplyRejection::RepositoryRejected),
+                ChangeOperation::Delete => school::clear_logo(conn, school_id)
+                    .map_err(|_| ApplyRejection::RepositoryRejected),
+            }
         }
     }
 }
@@ -4951,6 +4966,133 @@ mod tests {
             )
             .unwrap();
         assert!(good_row_exists);
+    }
+
+    /// A logo's `entity_id` is `school_id` itself -- see
+    /// `repository::school::SchoolLogoSyncRecord`'s doc comment.
+    fn synthetic_school_logo(
+        fixture: &TestFixture,
+        mime: &str,
+        bytes: &[u8],
+    ) -> school::SchoolLogoSyncRecord {
+        school::SchoolLogoSyncRecord {
+            school_id: fixture.school_id.clone(),
+            mime: mime.to_string(),
+            bytes: bytes.to_vec(),
+        }
+    }
+
+    fn make_school_logo_change(
+        fixture: &TestFixture,
+        mime: &str,
+        bytes: &[u8],
+        base_version: u64,
+        operation: ChangeOperation,
+    ) -> PendingChange {
+        let entity_id = Uuid::parse_str(&fixture.school_id).unwrap();
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::SchoolLogo;
+        change.operation = operation;
+        let plaintext = serde_json::to_vec(&synthetic_school_logo(fixture, mime, bytes)).unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_school_logo_change() {
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_school_logo_change(
+                    &fixture,
+                    "image/webp",
+                    &[1, 2, 3, 4],
+                    0,
+                    ChangeOperation::Upsert,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [fixture.school_id.clone()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let logo = school::get_logo(conn, &fixture.school_id).unwrap().unwrap();
+            assert_eq!(logo.mime, "image/webp");
+            assert_eq!(logo.bytes, vec![1, 2, 3, 4]);
+            assert_eq!(
+                sync_version_cache::known_version(
+                    conn,
+                    &fixture.school_id,
+                    EntityKind::SchoolLogo,
+                    &fixture.school_id
+                )
+                .unwrap(),
+                1
+            );
+        };
+    }
+
+    #[test]
+    fn pull_once_applies_a_school_logo_delete_change() {
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+        school::set_logo(&fixture.conn, &fixture.school_id, "image/png", &[9, 9, 9]).unwrap();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_school_logo_change(
+                    &fixture,
+                    "image/png",
+                    &[9, 9, 9],
+                    0,
+                    ChangeOperation::Delete,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [fixture.school_id.clone()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 1);
+        assert!(!summary.failed);
+        assert!(school::get_logo(&fixture.conn, &fixture.school_id)
+            .unwrap()
+            .is_none());
     }
 
     /// Behavioral incidents/interventions carry a real FK to `users(id)`

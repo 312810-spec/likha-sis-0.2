@@ -13,8 +13,8 @@ use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::repository::sync_hub::AcceptedChange;
 use crate::repository::{
-    attendance, child_protection, grade_submission, learner, lesson_plan, nutrition, section,
-    transfer_record,
+    attendance, child_protection, grade_submission, learner, lesson_plan, nutrition, school,
+    section, transfer_record,
 };
 use crate::repository::{
     sync_conflict_review::{self, ConflictResolution, ConflictReviewRow},
@@ -114,6 +114,14 @@ pub enum ConflictEntityPreview {
         other_school_name: String,
         status: String,
     },
+    /// Deliberately omits the raw logo bytes -- a conflict-review preview
+    /// is rendered as text/JSON on screen, not an `<img>`, and the whole
+    /// point of `MAX_LOGO_BYTES` being small (Batch 10, ADR-0081) doesn't
+    /// license shipping the full binary blob through a preview payload
+    /// meant for a size-vs-size, mime-vs-mime glance. `byte_len` lets a
+    /// teacher still see "this changed" (a different size) without
+    /// needing to see the image itself.
+    SchoolLogo { mime: String, byte_len: usize },
     /// Fallback for any entity kind wired to sync that has no dedicated
     /// typed preview above (every currently-wired kind has one as of
     /// this commit; this stays in place for a future kind added before
@@ -218,6 +226,13 @@ fn transfer_record_preview(r: &transfer_record::TransferRecord) -> ConflictEntit
     }
 }
 
+fn school_logo_preview(r: &school::SchoolLogoSyncRecord) -> ConflictEntityPreview {
+    ConflictEntityPreview::SchoolLogo {
+        mime: r.mime.clone(),
+        byte_len: r.bytes.len(),
+    }
+}
+
 /// This device's own currently-live version of the conflicting entity --
 /// read straight from the domain table, never from the staged conflict
 /// row itself, because the staged row never captured it (staging never
@@ -268,6 +283,9 @@ fn local_preview(
         EntityKind::TransferRecord => transfer_record::find_by_id(conn, school_id, entity_id)?
             .as_ref()
             .map(transfer_record_preview),
+        EntityKind::SchoolLogo => school::find_logo_by_id(conn, school_id, entity_id)?
+            .as_ref()
+            .map(school_logo_preview),
         _ => None,
     })
 }
@@ -340,6 +358,10 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
                 .as_ref()
                 .map(transfer_record_preview)
         }
+        EntityKind::SchoolLogo => serde_json::from_slice::<school::SchoolLogoSyncRecord>(plaintext)
+            .ok()
+            .as_ref()
+            .map(school_logo_preview),
         _ => Some(ConflictEntityPreview::Unknown),
     }
 }
@@ -1155,6 +1177,51 @@ mod tests {
             summary.local,
             Some(ConflictEntityPreview::LessonPlan { ref learning_objectives, .. })
                 if learning_objectives == "Add fractions with like denominators"
+        ));
+    }
+
+    #[test]
+    fn to_summary_shows_typed_school_logo_previews() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let sspk = test_sspk();
+        school::set_logo(&conn, &s.id, "image/png", &[1, 2, 3]).unwrap();
+
+        let incoming = school::SchoolLogoSyncRecord {
+            school_id: s.id.clone(),
+            mime: "image/webp".to_string(),
+            bytes: vec![9, 9, 9, 9, 9],
+        };
+        let plaintext = serde_json::to_vec(&incoming).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::SchoolLogo,
+            entity_id: Uuid::parse_str(&s.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::SchoolLogo { ref mime, byte_len })
+                if mime == "image/webp" && byte_len == 5
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::SchoolLogo { ref mime, byte_len })
+                if mime == "image/png" && byte_len == 3
         ));
     }
 
