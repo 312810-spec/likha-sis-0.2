@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  anecdotalRecordService,
   assessmentService,
   attendanceService,
   authService,
@@ -36,6 +37,7 @@ import type { CurrentSession } from "./domain/session";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
+import { GuidanceRecordsScreen } from "./ui/GuidanceRecordsScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { CalendarScreen } from "./ui/CalendarScreen";
 import { CertificateAwardScreen } from "./ui/CertificateAwardScreen";
@@ -471,6 +473,12 @@ function App() {
               <TransfersScreen
                 transferRecordService={transferRecordService}
                 learnerService={learnerService}
+              />
+            ) : activeTab === "guidance-records" ? (
+              <GuidanceRecordsScreen
+                anecdotalRecordService={anecdotalRecordService}
+                subjectAttendanceService={subjectAttendanceService}
+                sectionService={sectionService}
               />
             ) : activeTab === "attendance" ? (
               <AttendanceScreen
