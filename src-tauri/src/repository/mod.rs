@@ -9,6 +9,7 @@ pub mod curriculum;
 pub mod device_credential;
 pub mod device_identity;
 pub mod device_sync_client_credential;
+pub mod formative_assessment;
 pub mod grade_submission;
 pub mod grading;
 pub mod grading_computation;
