@@ -1,5 +1,150 @@
 # CURRENT HANDOFF
 
+## Batch 8 (complete, items 1-7): all 7 remaining domain-module UI screens shipped (2026-09-08), commit local only, PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. This session resumed Batch 8 exactly where the prior session
+(item 8 only, commit `5832205`) left off and shipped all 7 remaining
+items in the original prompt's order, one commit per item, `npm run
+quality` passing after every single commit:
+
+1. `707e541` -- Certificate/Award screen (`CertificateAwardScreen.tsx`).
+2. `e0bd2c7` -- Seating Chart screen (`SeatingChartScreen.tsx`).
+3. `f05944d` -- School Calendar screen (`CalendarScreen.tsx`).
+4. `7fab054` -- Consolidated Grades Matrix screen (`ConsolidatedGradesScreen.tsx`).
+5. `df79ded` -- Weather composition wiring (school-coordinate migration
+   51 + repository + commands + `composition.ts` + `WeatherAdvisoryBanner`,
+   ADR-0079).
+6. `c735ec7` -- Live logo palette wiring (`useLivePalette.ts`, ADR-0078).
+7. `5abf7f7` -- ID card printable layout (`IdCardScreen.tsx`).
+
+All 7 domain modules from Batch 5 (`award-eligibility.ts`,
+`certificate.ts`, `seating-chart.ts`, `ph-holidays.ts`,
+`consolidated-grades.ts`, `palette.ts`, `id-card-token.ts`,
+`weather-hazard.ts`/`weather-service.ts`) now have real, tested UI/
+composition wiring -- none is domain-only-with-zero-UI any more.
+
+**What shipped, per item:**
+
+- **Item 1 (Certificate/Award)**: loops a section roster through
+  `LearnerScoreApplicationService.computeTermGrade` per subject/grading-
+  period into `award-eligibility.ts`, then `certificate.ts` for eligible
+  learners. Both domain-layer disclosures (unverified/configurable GA
+  threshold; disciplinary anecdotes not checked, no such feature exists)
+  render visibly on the eligibility list AND on the printed certificate
+  itself, not just in code comments. Printable via a new shared
+  `.certificate-printable` `@media print` CSS block (reusable by future
+  printable screens).
+- **Item 2 (Seating Chart)**: click-to-place over an existing section
+  roster (`seating-chart.ts`), session-local per that module's own
+  design (no persistence, no save action) -- a banner says so plainly.
+  Consistent with Batch 4's established precedent of avoiding native
+  drag-and-drop for accessibility/keyboard-navigation reasons.
+- **Item 3 (Calendar)**: `ph-holidays.ts`'s SY 2025-2026 table, sorted,
+  with the Malacañang Proclamation No. 727/665 source citation (and the
+  Islamic-holiday-dates-are-approximate caveat) visible in the UI, not
+  only the module's code comment.
+- **Item 4 (Consolidated Grades Matrix)**: section x subject x term grid
+  with a general-average column, built by looping the roster through
+  `computeTermGrade` for every class record in the section and reshaping
+  via `consolidated-grades.ts`. Read-only; horizontally scrollable so a
+  large subject/term count never scrolls the page itself sideways.
+- **Item 5 (Weather composition wiring, ADR-0079)**: migration 51 adds
+  nullable `schools.latitude`/`longitude`; a new `ManageSchoolCoordinates`
+  capability (School Head only, deliberately its own variant rather than
+  reusing `ManageSchoolBranding` -- same reasoning this codebase already
+  applies to every prior capability split); `set`/`get`/`clear_school_coordinates`
+  commands with range validation mirrored on both sides; new
+  `SchoolCoordinatesApplicationService`/repository/Tauri adapter;
+  `composition.ts` now instantiates `weatherService` (the only caller of
+  `OpenMeteoWeatherClient`); a "School location" section on
+  `SchoolBrandingScreen` (School Head only); `WeatherAdvisoryBanner`
+  mounted once in `App.tsx` that renders literally nothing for
+  no-coordinates/fetch-failure/normal-conditions, only a genuine
+  advisory, and never claims a suspension decision.
+- **Item 6 (Live palette wiring, ADR-0078)**: `useLivePalette` draws the
+  already-fetched school logo (same object URL `AppLayout` uses for the
+  sidebar/topbar image) to an offscreen canvas, samples it via
+  `palette.ts`'s `derivePaletteTokens`, and -- only when the derived pair
+  clears WCAG AA -- injects a single `<style id="live-palette-tokens">`
+  overriding `--color-primary`/`--color-surface`/`--color-text` for dark
+  mode only (mirroring `styles.css`'s own dark-mode selectors exactly so
+  light mode is never touched). Falls back cleanly (style element
+  removed) for no logo, decode failure, no canvas context, or a pair
+  that fails AA.
+- **Item 7 (ID card)**: `id-card-token.ts`'s offline HMAC token on a
+  front/back printable layout. Two deliberate scope limits, both flagged
+  in the UI itself: photo storage is NOT decided (placeholder box only,
+  explicit deferral note); the token renders as plain monospace text,
+  not a QR code -- checked `docs/SOURCE-REGISTRY.md` first, confirmed
+  nothing QR-related is adopted, and added no new dependency (flagged
+  for the record). The signing key is a random, session-local,
+  non-persisted `CryptoKey` -- real device/school-bound secret sourcing
+  stays out of `id-card-token.ts`'s own stated scope, unresolved
+  next-slice work.
+
+**New nav entries** (all under existing groups in
+`workbench-nav-data.ts`, no new top-level structure): `certificates`,
+`seating-chart`, `calendar`, `consolidated-grades`, `id-card`.
+
+**New ADRs**: `docs/adr/0078-live-palette-composition-wiring.md` (item 6),
+`docs/adr/0079-weather-composition-wiring.md` (item 5).
+
+**Verification actually run, real output:**
+
+- `npm run quality` run fresh after EVERY commit (7 separate full runs,
+  not one run at the end) -- typecheck, lint, format:check,
+  check:architecture, check:deadcode, vitest, all clean every time. Test
+  count grew from 1206 (start of this session) to **1255 tests across
+  135 files** by the final commit.
+- Item 5's Rust changes: full `cargo test --lib` -- **1233 passed, 0
+  failed** (whole crate, not a targeted filter) -- plus `cargo fmt
+--check` and `cargo clippy --all-targets -- -D warnings`, both clean.
+- `npm run quality:ui` (Playwright renderer/accessibility smoke)
+  attempted once at the end -- **failed for an environment reason, not a
+  code defect**: this sandbox's network egress does not allowlist
+  `cdn.playwright.dev`, so neither the pre-installed browser nor
+  `npx playwright install` can obtain a Chromium binary. See
+  `docs/VERIFICATION-DEBT.md`'s new entry for the exact error and what a
+  future session with different network access should retry.
+- Native visual/screen-reader inspection of all 7 new/changed screens:
+  **not done**, same disclosed limitation as every prior batch (no
+  browser/screenshot tool for the compiled native Tauri binary, no
+  Windows screen reader in this sandbox) -- only jsdom/`axe-core`
+  structural checks ran. Recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Deferred / explicitly out of scope this batch** (all pre-existing,
+not newly discovered):
+
+- Transfers In/Out Documentation Registry (`docs/product/MASTER-TASK-INVENTORY.md`
+  §3.4) -- still the one remaining Tier 3.3/3.4 item needing a
+  brand-new persisted tenant-scoped entity from scratch; not part of
+  this batch's 7 named items, unchanged.
+- A dedicated "School Settings" screen consolidating logo + coordinates
+  -- explicitly deferred in ADR-0079, not needed yet at two settings.
+  Item 5's coordinate field lives on the existing `SchoolBrandingScreen`.
+- Extending derived palette tokens beyond
+  `--color-primary`/`--color-surface`/`--color-text`, or to light mode
+  -- explicitly deferred in ADR-0078, known aesthetic (not correctness)
+  limitation.
+- Real photo capture/storage for ID cards, real QR-code rendering, and
+  real device/school-bound signing-key sourcing -- all explicitly NOT
+  decided by item 7, per the original task's own instruction not to
+  decide the photo-storage question.
+
+**Exact next task**: resume the batch-round wave-boundary protocol --
+run `npm run quality:full` (or at least a fresh `npm run quality:ui`
+once Playwright's CDN is reachable) as the stable checkpoint gate before
+considering this batch's own PR-push step, then push the accumulated
+local commits (`707e541` through `df79ded`, 8 commits total with item
+8's `5832205`) to PR #55 and let its CI run for real, per the batch-
+implement mode's "one push at the end" contract in
+`.claude/rules/autonomous-development.md`. Next feature candidate after
+that: Transfers In/Out Documentation Registry (the one remaining
+Tier 3.3/3.4 item), or continue down `docs/product/MASTER-TASK-INVENTORY.md`
+in priority order.
+
 ## Batch 8 (partial, item 8 only): conflict-review typed field-level previews for the six remaining entity kinds (2026-09-08), commit local only, PR owed
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

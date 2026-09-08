@@ -1,5 +1,50 @@
 # Verification Debt
 
+## Batch 8 (items 1-7): 7 new/wired screens — `quality:ui` unavailable in this sandbox, native visual/screen-reader pass still owed (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. This batch shipped
+all 7 remaining Batch 8 items (Certificate/Award, Seating Chart,
+Calendar, Consolidated Grades Matrix, weather composition wiring, live
+palette wiring, ID card printable layout), each with real
+typecheck/lint/format/architecture/deadcode/vitest coverage (`npm run
+quality` run and passing after every single commit) and, for item 5's
+Rust changes, a full `cargo test --lib` (1233 passed), `cargo fmt
+--check`, and `cargo clippy --all-targets -- -D warnings`, all clean.
+
+Two things this batch could NOT verify, disclosed here rather than
+implied as covered:
+
+1. **`npm run quality:ui` (Playwright renderer/accessibility smoke)** --
+   attempted once at the end of this batch and failed for an
+   environment reason, not a code defect: `browserType.launch` reports
+   no Chromium executable at
+   `/opt/pw-browsers/chromium_headless_shell-1237/...`, and
+   `npx playwright install chromium-headless-shell` fails with
+   `403 request blocked: no rule or allowlist entry allows host
+"cdn.playwright.dev"` -- this sandbox's network egress does not
+   allowlist Playwright's browser-download CDN. This is a sandbox
+   limitation, confirmed by attempting the actual fix the tool itself
+   suggests, not a code problem in any of the 7 screens shipped this
+   batch. Retry `npm run quality:ui` in an environment with that host
+   allowlisted (or Playwright browsers pre-installed).
+2. **Native visual / screen-reader inspection** of all 7 new/changed
+   screens (`CertificateAwardScreen`, `SeatingChartScreen`,
+   `CalendarScreen`, `ConsolidatedGradesScreen`, `IdCardScreen`, the
+   `SchoolBrandingScreen` "School location" addition,
+   `WeatherAdvisoryBanner`, and the live-palette dark-mode token
+   override) -- unchanged from every prior batch's disclosed limitation:
+   this sandbox has no browser/screenshot tool for the compiled native
+   Tauri binary and no Windows screen reader. Only jsdom/`axe-core`
+   structural checks ran (every new component's own `*.test.tsx`). Adds
+   8 more screens to the existing native-pass backlog described under
+   "Native Visual & Screen-Reader Inspection" below -- does not newly
+   discover the gap, just grows its scope.
+
+Everything else in this batch's own completion bar (unit/component
+tests, architecture boundary, dead-code, Rust test/clippy/fmt) is real,
+not disclosed debt.
+
 ## Batch 7 (Tier 5) — audit/documentation pass only, no feature work; Tier 5's three items confirmed still genuinely blocked (2026-09-08)
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

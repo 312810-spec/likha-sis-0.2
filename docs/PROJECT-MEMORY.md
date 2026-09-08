@@ -1,5 +1,52 @@
 # PROJECT MEMORY
 
+## Batch 8 (items 1-7): UI wiring for all 7 Batch 5 domain modules; 2 new composition ADRs; migration 51 (2026-09-08)
+
+- All 7 Batch 5 domain-only modules now have real, tested UI/composition
+  wiring: `CertificateAwardScreen`, `SeatingChartScreen`,
+  `CalendarScreen`, `ConsolidatedGradesScreen`, weather composition
+  wiring, live palette wiring, `IdCardScreen`. Commits `707e541`
+  (cert), `e0bd2c7` (seating), `f05944d` (calendar), `7fab054`
+  (consolidated grades), `df79ded` (weather), `c735ec7` (palette),
+  `5abf7f7` (ID card).
+- **Migration 51**: `schools.latitude`/`longitude`, both nullable, no
+  `CHECK` (range validation lives at command/application boundary, not
+  schema — matches `set_logo`'s established split). New
+  `Capability::ManageSchoolCoordinates` (School Head only, its own
+  variant — deliberately not reusing `ManageSchoolBranding`, matching
+  every prior capability-split precedent). New commands
+  `set/get/clear_school_coordinates`. See ADR-0079.
+- **`composition.ts` now instantiates `weatherService`**
+  (`WeatherApplicationService` + `OpenMeteoWeatherClient`) and
+  `schoolCoordinatesService` — both were built in Batch 5 but never
+  wired until this batch.
+- **ADR-0078**: live logo palette wiring — `useLivePalette` derives
+  WCAG-AA dark-mode `--color-primary`/`--color-surface`/`--color-text`
+  from the school logo via a single injected `<style>` scoped to dark
+  mode only (never touches light mode); falls back cleanly to the
+  static palette for no logo/decode failure/no canvas context/failed AA.
+- **ADR-0079**: weather composition wiring — coordinates on `schools`
+  (not a new table), new capability (not reused), settings field on the
+  existing `SchoolBrandingScreen` (not a new screen), `WeatherAdvisoryBanner`
+  mounted once app-wide in `App.tsx` (not per-screen) that renders
+  nothing except for a genuine advisory.
+- ID card (`IdCardScreen`): photo storage explicitly NOT decided
+  (placeholder only); no QR-rendering dependency added (checked
+  `docs/SOURCE-REGISTRY.md` first); signing key is a random,
+  session-local, non-persisted `CryptoKey` — real secret-key sourcing
+  still deferred, per `id-card-token.ts`'s own stated scope.
+- No new npm dependency. `npm run quality` clean after every one of the
+  7 commits (grew from 1206 to 1255 tests, 135 files). Rust: full
+  `cargo test --lib` 1233 passed, `cargo fmt --check`/`cargo clippy -D
+warnings` both clean.
+- `npm run quality:ui` could not run in this sandbox this batch —
+  network egress does not allowlist `cdn.playwright.dev`, so neither the
+  pre-installed browser nor `playwright install` could obtain a
+  Chromium binary. See `docs/VERIFICATION-DEBT.md`.
+- Still deferred, unchanged from Batch 5: Transfers In/Out
+  Documentation Registry (needs a brand-new persisted tenant-scoped
+  entity from scratch, not one of this batch's 7 named items).
+
 ## Batch 5 (Tier 3.3-3.4): domain foundations for 7 items shipped; 2 policy-scope ADRs; Transfers persistence deferred (2026-09-08)
 
 - **Award eligibility is explicitly unverified/configurable, not DepEd

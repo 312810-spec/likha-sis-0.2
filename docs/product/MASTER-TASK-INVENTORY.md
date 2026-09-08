@@ -97,10 +97,15 @@
   - [x] Dependency-light dominant-color extraction + WCAG-AA-verified
         dark-surface/text token derivation, with a passing contrast test
         -- `src/domain/palette.ts` (ADR-0075 §1), in place of `ColorThief`.
-  - [ ] Wired to a live screen (drawing the uploaded logo to a canvas and
-        theming the app from it) -- not done this batch; the pure
-        extraction/derivation pipeline is complete and tested, the UI
-        glue is the recorded next slice.
+  - [x] Wired to a live screen (Batch 8 item 6, 2026-09-08, ADR-0078):
+        `useLivePalette` draws the current school logo to an offscreen
+        canvas, samples it, and -- only when the derived pair clears
+        WCAG AA -- overrides `--color-primary`/`--color-surface`/
+        `--color-text` for dark mode only via a single injected
+        `<style>`, falling back cleanly to the existing static dark
+        palette otherwise. Mounted once in `AppLayout` (reuses the logo
+        object URL already fetched there). Tested without a real image
+        decode (`useLivePalette.test.ts`, 9 tests).
 - **Card Elevation & Depth:**
   - [x] Three-tier elevation scale (`--elevation-small/medium/pressed`)
         plus `--radius-medium`/`--radius-card`, applied to `.card` (hover
@@ -134,16 +139,16 @@
 
 ### 3.3 Teacher Creation Studio Remaining Deliverables
 
-- [ ] **Sub-scope 2.2: Certificate & Recognition Template:** Printable DepEd Academic Excellence Award certificate generator with automated DO 015 honors qualification engine. **Batch 5 (2026-09-08):** eligibility engine + certificate content builder shipped and tested (`src/domain/award-eligibility.ts`, `src/domain/certificate.ts`) with the GA threshold explicitly flagged as unverified/configurable and the disciplinary-anecdotes check explicitly not implemented (no Anecdotal Records feature exists); printable UI screen deferred to next slice — data plumbing already exists via `computeTermGrade`.
-- [ ] **Sub-scope 2.3: Custom Seating Chart:** Drag-and-drop section seating arrangement tool reusing class rosters. **Batch 5:** arrangement validation logic shipped and tested (`src/domain/seating-chart.ts`), session-local by design, click-to-place per Batch 4's precedent (not drag-and-drop — flagged deviation from this line item's own wording); UI screen deferred to next slice.
+- [x] **Sub-scope 2.2: Certificate & Recognition Template:** Printable DepEd Academic Excellence Award certificate generator with automated DO 015 honors qualification engine. **Batch 5 (2026-09-08):** eligibility engine + certificate content builder shipped and tested (`src/domain/award-eligibility.ts`, `src/domain/certificate.ts`) with the GA threshold explicitly flagged as unverified/configurable and the disciplinary-anecdotes check explicitly not implemented (no Anecdotal Records feature exists). **Batch 8 item 1 (2026-09-08):** printable `CertificateAwardScreen` shipped and wired — loops a section roster through `computeTermGrade` per subject/grading-period, both disclosures render visibly on the eligibility list and on the printed certificate itself, eligible-only "Print certificate" gating, tested (`CertificateAwardScreen.test.tsx`, axe-clean).
+- [x] **Sub-scope 2.3: Custom Seating Chart:** Drag-and-drop section seating arrangement tool reusing class rosters. **Batch 5:** arrangement validation logic shipped and tested (`src/domain/seating-chart.ts`), session-local by design, click-to-place per Batch 4's precedent (not drag-and-drop — flagged deviation from this line item's own wording). **Batch 8 item 2 (2026-09-08):** `SeatingChartScreen` shipped and wired — click a learner then a seat (or click a filled seat to clear it), session-local banner shown, tested (`SeatingChartScreen.test.tsx`, axe-clean).
 
 ### 3.4 Operational Classroom & School Productivity Tools
 
-- [ ] **School Calendar & Philippine Holidays:** Offline database of regular, non-working, and Islamic holidays (`philippineHolidays.js`). **Batch 5:** hardcoded, sourced SY 2025-2026 table shipped and tested (`src/domain/ph-holidays.ts`); calendar UI screen deferred to next slice.
-- [ ] **Weather & Hazard Suspension Alerts:** Hyper-local Open-Meteo integration via school coordinates; flags severe weather suspension warnings ($>30\text{ mm}$ rain, $>50\text{ kph}$ wind). **Batch 5:** full port/adapter/service slice shipped and tested, ADR-0076; fail-safe degrade-to-unavailable proven in tests; not yet wired into `composition.ts` or a UI screen (no school-coordinate field exists yet) — next slice.
+- [x] **School Calendar & Philippine Holidays:** Offline database of regular, non-working, and Islamic holidays (`philippineHolidays.js`). **Batch 5:** hardcoded, sourced SY 2025-2026 table shipped and tested (`src/domain/ph-holidays.ts`). **Batch 8 item 3 (2026-09-08):** `CalendarScreen` shipped and wired — sorted holiday table with the Proclamation No. 727/665 source citation visible in the UI itself (not just a code comment), tested (`CalendarScreen.test.tsx`, axe-clean).
+- [x] **Weather & Hazard Suspension Alerts:** Hyper-local Open-Meteo integration via school coordinates; flags severe weather suspension warnings ($>30\text{ mm}$ rain, $>50\text{ kph}$ wind). **Batch 5:** full port/adapter/service slice shipped and tested, ADR-0076; fail-safe degrade-to-unavailable proven in tests. **Batch 8 item 5 (2026-09-08, ADR-0079):** wired end to end — migration 51 (`schools.latitude`/`longitude`), new `ManageSchoolCoordinates` capability + commands, `SchoolCoordinatesApplicationService`/repository, `composition.ts` now instantiates `weatherService`, a "School location" section on `SchoolBrandingScreen`, and `WeatherAdvisoryBanner` mounted app-wide that renders nothing unless a genuine advisory exists (never an error state). `cargo test --lib` 1233 passed; `npm run quality` full pass.
 - [ ] **Transfers In/Out Documentation Registry:** Formal ledger tracking student transfer dates, receiving/originating schools, and document statuses. **Batch 5:** deferred entirely except domain validation (`src/domain/transfer-record.ts`) — the only Tier 3.3/3.4 item needing a brand-new persisted tenant-scoped entity (migration/repository/commands), judged out of scope for this batch's time budget; top candidate for the next slice.
-- [ ] **Consolidated Grades Matrix:** Cross-subject grade registry displaying all learning areas side-by-side per section across all terms. **Batch 5:** pure aggregation over already-computed grades shipped and tested (`src/domain/consolidated-grades.ts`), no new grade storage; UI screen deferred to next slice.
-- [ ] **Student ID Card Generator:** Front/back printable student ID cards with photos, emergency contacts, and tokenized QR verification codes. **Batch 5:** offline-only HMAC token generate/verify engine shipped and tested (`src/domain/id-card-token.ts`), ADR-0077 resolves the cloud-vs-offline audit question conservatively as offline-only; printable card layout, real QR image rendering (needs a new dependency, not yet evaluated), and real secret-key sourcing all deferred to next slice.
+- [x] **Consolidated Grades Matrix:** Cross-subject grade registry displaying all learning areas side-by-side per section across all terms. **Batch 5:** pure aggregation over already-computed grades shipped and tested (`src/domain/consolidated-grades.ts`), no new grade storage. **Batch 8 item 4 (2026-09-08):** `ConsolidatedGradesScreen` shipped and wired — section x subject x term grid with a general-average column, horizontally scrollable, tested (`ConsolidatedGradesScreen.test.tsx`, axe-clean).
+- [x] **Student ID Card Generator:** Front/back printable student ID cards with photos, emergency contacts, and tokenized QR verification codes. **Batch 5:** offline-only HMAC token generate/verify engine shipped and tested (`src/domain/id-card-token.ts`), ADR-0077 resolves the cloud-vs-offline audit question conservatively as offline-only. **Batch 8 item 7 (2026-09-08):** `IdCardScreen` shipped and wired — front/back printable layout, explicit photo-placeholder (real photo storage deliberately NOT decided here, flagged in the UI), token shown as plain text (no QR-rendering dependency added — checked `docs/SOURCE-REGISTRY.md` first, nothing added), session-local non-persisted signing key (real device/school-bound secret sourcing still deferred, per `id-card-token.ts`'s own scope note). Tested (`IdCardScreen.test.tsx`, axe-clean).
 
 ---
 
