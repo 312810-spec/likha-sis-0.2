@@ -28,7 +28,8 @@ export type SignedInTab =
   | "school-branding"
   | "certificates"
   | "seating-chart"
-  | "calendar";
+  | "calendar"
+  | "consolidated-grades";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -68,6 +69,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   certificates: "Certificates & Awards",
   "seating-chart": "Seating Chart",
   calendar: "School Calendar",
+  "consolidated-grades": "Consolidated Grades Matrix",
 };
 
 interface NavGroup {
@@ -108,7 +110,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Grading",
-    tabs: [tab("grading-periods"), tab("class-records")],
+    tabs: [tab("grading-periods"), tab("class-records"), tab("consolidated-grades")],
   },
   {
     label: "Creation Studio",

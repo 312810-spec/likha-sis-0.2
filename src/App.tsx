@@ -36,6 +36,7 @@ import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { CalendarScreen } from "./ui/CalendarScreen";
 import { CertificateAwardScreen } from "./ui/CertificateAwardScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
+import { ConsolidatedGradesScreen } from "./ui/ConsolidatedGradesScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
 import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
@@ -544,6 +545,12 @@ function App() {
               <SeatingChartScreen sectionService={sectionService} />
             ) : activeTab === "calendar" ? (
               <CalendarScreen />
+            ) : activeTab === "consolidated-grades" ? (
+              <ConsolidatedGradesScreen
+                sectionService={sectionService}
+                classRecordService={classRecordService}
+                learnerScoreService={learnerScoreService}
+              />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
             ) : activeTab === "admin-password-reset" ? (
