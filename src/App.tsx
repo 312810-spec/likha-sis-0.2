@@ -49,6 +49,7 @@ import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
+import { SeatingChartScreen } from "./ui/SeatingChartScreen";
 import { SectionTimetableScreen } from "./ui/SectionTimetableScreen";
 import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
@@ -538,6 +539,8 @@ function App() {
                 learnerScoreService={learnerScoreService}
                 schoolName={session.schoolName}
               />
+            ) : activeTab === "seating-chart" ? (
+              <SeatingChartScreen sectionService={sectionService} />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
             ) : activeTab === "admin-password-reset" ? (
