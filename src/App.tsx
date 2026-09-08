@@ -8,6 +8,7 @@ import {
   deviceSyncService,
   enrollmentHistoryService,
   exportService,
+  formativeAssessmentService,
   formGenerationService,
   gradingService,
   learnerScoreService,
@@ -45,6 +46,7 @@ import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
 import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
 import { SchoolMembershipScreen } from "./ui/SchoolMembershipScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
+import { FormativeAssessmentScreen } from "./ui/FormativeAssessmentScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
@@ -503,6 +505,14 @@ function App() {
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
                 initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
+              />
+            ) : activeTab === "formative-assessment" ? (
+              <FormativeAssessmentScreen
+                formativeAssessmentService={formativeAssessmentService}
+                subjectAttendanceService={subjectAttendanceService}
+                sectionService={sectionService}
+                gradingService={gradingService}
+                teacherUserId={session.userId}
               />
             ) : activeTab === "subject-monitor" ? (
               <SubjectMonitorScreen
