@@ -2071,6 +2071,132 @@ pub fn migrations() -> Migrations<'static> {
             ON nutrition_records(school_id, school_year, period, grade_level);
         "#,
         ),
+        M::up(
+            r#"
+        -- M44: DO 006, s. 2026 Child Protection module (ADR-0072). Tier
+        -- naming ("level_1"/"level_2"/"level_3") is deliberately generic,
+        -- NOT DepEd-specific vocabulary -- this session could not
+        -- confidently source DO 006's exact tier names/thresholds from a
+        -- primary deped.gov.ph document, so a defensible generic 3-level
+        -- severity scale is used instead of guessing at official
+        -- terminology (see ADR-0072 and docs/VERIFICATION-DEBT.md).
+        -- `resolved_at`/`resolved_by_user_id` mark a status transition on
+        -- the incident row itself, never a content edit -- the narrative
+        -- content of an incident is set once at INSERT and never UPDATEd
+        -- by any repository function; corrections/progress are new rows
+        -- in `incident_interventions` below, matching this project's
+        -- established audit-log append-only precedent.
+        CREATE TABLE behavioral_incidents (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            reported_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            severity_tier TEXT NOT NULL CHECK (severity_tier IN ('level_1', 'level_2', 'level_3')),
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            incident_date TEXT NOT NULL,
+            resolved_at TEXT,
+            resolved_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_behavioral_incidents_school_section
+            ON behavioral_incidents(school_id, section_id, incident_date DESC);
+        CREATE INDEX idx_behavioral_incidents_school_learner
+            ON behavioral_incidents(school_id, learner_id, incident_date DESC);
+
+        -- Append-only: every intervention/resolution-progress entry is an
+        -- INSERT only. No repository function in
+        -- `repository::child_protection` issues an UPDATE or DELETE
+        -- against this table -- a correction is a new row referencing the
+        -- same incident, never an edit of a past one.
+        CREATE TABLE incident_interventions (
+            id TEXT PRIMARY KEY,
+            incident_id TEXT NOT NULL REFERENCES behavioral_incidents(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            entry_type TEXT NOT NULL CHECK (entry_type IN ('intervention', 'resolution')),
+            note TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_incident_interventions_incident
+            ON incident_interventions(incident_id, created_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M45: Multi-Tier Review & Audit Pipeline, interim version
+        -- (ADR-0073). No "Master Teacher" role exists yet (a recorded,
+        -- undecided RBAC gap -- see the 2026-09-07 unbuilt-features
+        -- audit) -- School Head plays the approval role for this interim
+        -- version, an explicit recorded decision, not a silent
+        -- role-substitution. `grade_submission_notes` is append-only,
+        -- same discipline as `incident_interventions` above: an
+        -- automated-check finding or a reviewer's feedback is a new row,
+        -- never an edit of a past one.
+        CREATE TABLE grade_submissions (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_record_id TEXT NOT NULL REFERENCES class_records(id) ON DELETE CASCADE,
+            submitted_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            status TEXT NOT NULL CHECK (status IN ('submitted', 'approved', 'rejected'))
+                DEFAULT 'submitted',
+            submitted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            decided_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            decided_at TEXT,
+            UNIQUE (class_record_id, submitted_at)
+        );
+
+        CREATE INDEX idx_grade_submissions_school_status
+            ON grade_submissions(school_id, status, submitted_at DESC);
+        CREATE INDEX idx_grade_submissions_class_record
+            ON grade_submissions(class_record_id, submitted_at DESC);
+
+        CREATE TABLE grade_submission_notes (
+            id TEXT PRIMARY KEY,
+            submission_id TEXT NOT NULL REFERENCES grade_submissions(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            note_type TEXT NOT NULL CHECK (note_type IN ('automated_check', 'feedback')),
+            note TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_grade_submission_notes_submission
+            ON grade_submission_notes(submission_id, created_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M46: DepEd `.xlsx` multi-year scholastic importer (ADR-0074).
+        -- One row per learner per prior school year per subject, ingested
+        -- from an external DepEd workbook (a transferee's history earned
+        -- at a school/system outside this app's own grading tables) --
+        -- distinct from this app's own `class_records`/`learner_scores`,
+        -- which only ever cover work actually recorded in THIS app.
+        -- `final_grade` is stored as given by the workbook (already a
+        -- DepEd-rounded whole-number transmutation, not recomputed here).
+        CREATE TABLE scholastic_history_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            school_year TEXT NOT NULL,
+            grade_level TEXT NOT NULL,
+            subject_name TEXT NOT NULL,
+            final_grade INTEGER NOT NULL CHECK (final_grade BETWEEN 60 AND 100),
+            remarks TEXT,
+            source_school_name TEXT,
+            imported_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (learner_id, school_year, subject_name)
+        );
+
+        CREATE INDEX idx_scholastic_history_school_learner
+            ON scholastic_history_records(school_id, learner_id, school_year);
+        "#,
+        ),
     ])
 }
 
@@ -4812,5 +4938,122 @@ mod tests {
             )
             .unwrap();
         assert_eq!(status, None);
+    }
+
+    fn seed_section(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2026-2027', '5', 'Section A')",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_44_rejects_an_unrecognized_severity_tier() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+        seed_section(&conn);
+
+        let bad = conn.execute(
+            "INSERT INTO behavioral_incidents \
+                (id, school_id, learner_id, section_id, severity_tier, category, description, incident_date) \
+             VALUES ('bi1', 's1', 'l1', 'sec1', 'critical', 'fighting', 'synthetic test row', '2026-09-01')",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_44_stores_an_incident_and_an_append_only_intervention_chain() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+        seed_section(&conn);
+
+        conn.execute(
+            "INSERT INTO behavioral_incidents \
+                (id, school_id, learner_id, section_id, severity_tier, category, description, incident_date) \
+             VALUES ('bi1', 's1', 'l1', 'sec1', 'level_2', 'bullying', 'synthetic test row', '2026-09-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO incident_interventions (id, incident_id, school_id, entry_type, note) \
+             VALUES ('ii1', 'bi1', 's1', 'intervention', 'synthetic note one')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO incident_interventions (id, incident_id, school_id, entry_type, note) \
+             VALUES ('ii2', 'bi1', 's1', 'resolution', 'synthetic note two')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM incident_interventions WHERE incident_id = 'bi1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn migration_45_rejects_an_unrecognized_submission_status() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let bad = conn.execute(
+            "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+             VALUES ('gs1', 's1', 'cr1', 'pending_review')",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_46_rejects_a_final_grade_outside_the_deped_passing_scale() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        let bad = conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh1', 's1', 'l1', '2024-2025', '4', 'Mathematics', 59)",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_46_rejects_a_duplicate_subject_for_the_same_learner_and_school_year() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh1', 's1', 'l1', '2024-2025', '4', 'Mathematics', 88)",
+            [],
+        )
+        .unwrap();
+        let dup = conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh2', 's1', 'l1', '2024-2025', '4', 'Mathematics', 90)",
+            [],
+        );
+        assert!(dup.is_err());
     }
 }

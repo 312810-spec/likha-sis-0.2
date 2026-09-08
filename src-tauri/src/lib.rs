@@ -194,6 +194,18 @@ pub fn run() {
             commands::nutrition::record_nutrition_measurement,
             commands::nutrition::get_nutrition_record_for_learner,
             commands::nutrition::get_nutrition_consolidation_report,
+            commands::child_protection::record_behavioral_incident,
+            commands::child_protection::list_behavioral_incidents_for_section,
+            commands::child_protection::add_incident_intervention,
+            commands::child_protection::list_incident_interventions,
+            commands::child_protection::get_at_risk_flags_for_section,
+            commands::grade_submission::submit_grades_for_review,
+            commands::grade_submission::decide_grade_submission,
+            commands::grade_submission::list_grade_submissions_for_school,
+            commands::grade_submission::list_grade_submission_notes,
+            commands::grade_submission::get_principal_overview_dashboard,
+            commands::import::preview_scholastic_import,
+            commands::import::commit_scholastic_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

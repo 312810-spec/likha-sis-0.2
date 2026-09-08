@@ -11,11 +11,12 @@ use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    audit_log as audit_log_repo, device_credential as device_credential_repo,
-    installation as installation_repo, role as role_repo, school as school_repo,
-    section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
+    audit_log as audit_log_repo, class_record as class_record_repo,
+    device_credential as device_credential_repo, installation as installation_repo,
+    role as role_repo, school as school_repo, section as section_repo,
+    section_advisory as section_advisory_repo, session as session_repo,
     structural_lock as structural_lock_repo, sync_payload_key as sync_payload_key_repo,
-    user as user_repo,
+    teaching_assignment as teaching_assignment_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -503,6 +504,28 @@ pub enum Capability {
     /// deliberate, disclosed deferral -- see
     /// `docs/adr/0071-sf8-health-nutrition-engine.md` -- not an oversight.
     ManageHealthRecords,
+    /// School-Head-only half of the DO 006 Child Protection module
+    /// (ADR-0072): school-wide read/write over every section's
+    /// behavioral incidents. A section adviser's equally valid access to
+    /// their OWN section's incidents is deliberately NOT expressed as
+    /// this capability's `allowed_roles` (that would grant blanket
+    /// school-wide access to any Teacher role, which the task explicitly
+    /// forbids) -- it is instead a per-section carve-out checked by
+    /// `authorize_child_protection_access_for_section`, mirroring
+    /// `authorize_adviser_of_section`'s established self-or-School-Head
+    /// shape exactly.
+    ManageChildProtection,
+    /// School-Head-as-interim-approver half of the Multi-Tier Review &
+    /// Audit Pipeline (ADR-0073) -- deciding (approve/reject) a
+    /// submitted grade submission, and reading the school-wide
+    /// submission-status matrix / Principal Overview Dashboard. Does NOT
+    /// gate a teacher *submitting* their own class record's grades --
+    /// that is a self-or-School-Head check
+    /// (`authorize_grade_submission_owner`), the same shape as
+    /// `ManageChildProtection`/`authorize_child_protection_access_for_section`
+    /// above, not a role-based capability, since it depends on which
+    /// specific class record is being submitted.
+    ManageGradeSubmissionReview,
 }
 
 impl Capability {
@@ -515,6 +538,8 @@ impl Capability {
             Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
             Capability::ManageStructuralLock => &[role_repo::SCHOOL_HEAD],
             Capability::ManageHealthRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::ManageChildProtection => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageGradeSubmissionReview => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -596,6 +621,78 @@ pub fn authorize_adviser_of_section(
         &user_id,
         &school_id,
         Capability::ManageSectionAdvisories.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// DO 006 Child Protection module (ADR-0072): only the section's current
+/// adviser, or a School Head, may read/write that section's behavioral
+/// incidents and intervention log. This is child-protection PII --
+/// tighter than ordinary tenant scoping -- so a general Teacher with no
+/// adviser relationship to `section_id` must never pass this, matching
+/// the task's explicit requirement. Mirrors
+/// `authorize_adviser_of_section`'s exact self-or-School-Head shape and
+/// its same cross-school forged-id guard (a School Head's role holds
+/// only within their own school; `section_id` must independently be
+/// verified to belong to it).
+pub fn authorize_child_protection_access_for_section(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if section_repo::find_by_id_in_school(conn, &school_id, section_id)?.is_none() {
+        return Err(AppError::Unauthorized);
+    }
+    if section_advisory_repo::is_current_adviser(
+        conn, &school_id, section_id, &user_id, as_of_date,
+    )? {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageChildProtection.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// Multi-Tier Review & Audit Pipeline (ADR-0073): only the teacher
+/// actually assigned to teach `class_record_id`'s section+subject, or a
+/// School Head, may submit its grades for review. Mirrors
+/// `authorize_child_protection_access_for_section`'s exact
+/// self-or-School-Head shape, substituting "is the assigned teacher" for
+/// "is the current adviser" -- a different relationship, the same
+/// authorization pattern.
+pub fn authorize_grade_submission_owner(
+    conn: &Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let Some(record) = class_record_repo::find_by_id_in_school(conn, &school_id, class_record_id)?
+    else {
+        return Err(AppError::Unauthorized);
+    };
+    let assignments =
+        teaching_assignment_repo::list_by_section_in_school(conn, &school_id, &record.section_id)?;
+    let is_assigned_teacher = assignments
+        .iter()
+        .any(|a| a.subject_id == record.subject_id && a.teacher_user_id == user_id);
+    if is_assigned_teacher {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageGradeSubmissionReview.allowed_roles(),
     )? {
         return Ok((user_id, school_id));
     }
@@ -2476,6 +2573,146 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority in their own school must not extend to a different school's section"
         );
+    }
+
+    // ---- ADR-0072: authorize_child_protection_access_for_section ----
+
+    #[test]
+    fn authorize_child_protection_access_allows_the_sections_current_adviser() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &u.id, "2026-06-01").unwrap();
+
+        assert!(authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &sec.id,
+            "2026-08-29"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_child_protection_access_denies_a_teacher_who_does_not_advise_the_section() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = user::create_user(&conn, "adviser", "password", "The Adviser").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &s.id).unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &adviser.id, "2026-06-01").unwrap();
+
+        let result =
+            authorize_child_protection_access_for_section(&conn, &sessions, &sec.id, "2026-08-29");
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a bare Teacher role must not get blanket read access to another section's incidents"
+        );
+    }
+
+    #[test]
+    fn authorize_child_protection_access_allows_a_school_head_even_without_advising_it() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+
+        assert!(authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &sec.id,
+            "2026-08-29"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_child_protection_access_denies_a_school_head_for_a_different_schools_section() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_sec =
+            section::create(&conn, &other_school.id, "2026-2027", "7", "Rizal").unwrap();
+
+        let result = authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &other_sec.id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    // ---- ADR-0073: authorize_grade_submission_owner ----
+
+    fn setup_class_record_with_teacher(
+        conn: &Connection,
+    ) -> (crate::repository::school::School, user::User, String) {
+        use crate::repository::{class_record, grading, subject};
+        const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+        const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+        let s = school::create(conn, "Rizal Elementary").unwrap();
+        let teacher = user::create_user(conn, "teacher.one", "password", "Teacher One").unwrap();
+        user::add_school_membership(conn, &teacher.id, &s.id).unwrap();
+        let sec = section::create(conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let sub = subject::create(conn, &s.id, "Mathematics").unwrap();
+        let period = grading::create(conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
+            .unwrap()
+            .unwrap();
+        let record =
+            class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
+                .unwrap()
+                .unwrap();
+        crate::repository::teaching_assignment::create(conn, &s.id, &teacher.id, &sec.id, &sub.id)
+            .unwrap();
+        (s, teacher, record.id)
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_allows_the_assigned_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, teacher, record_id) = setup_class_record_with_teacher(&conn);
+        login(&conn, &sessions, "teacher.one", "password", &_s.id).unwrap();
+        let _ = teacher;
+
+        assert!(authorize_grade_submission_owner(&conn, &sessions, &record_id).is_ok());
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_denies_a_teacher_not_assigned_to_the_class_record() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher, record_id) = setup_class_record_with_teacher(&conn);
+        let other_teacher =
+            user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &s.id).unwrap();
+        login(&conn, &sessions, "other.teacher", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_owner(&conn, &sessions, &record_id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_allows_a_school_head_as_the_interim_approver() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher, record_id) = setup_class_record_with_teacher(&conn);
+        let head = user::create_user(&conn, "head.one", "password", "Head One").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "head.one", "password", &s.id).unwrap();
+
+        assert!(authorize_grade_submission_owner(&conn, &sessions, &record_id).is_ok());
     }
 
     // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----
