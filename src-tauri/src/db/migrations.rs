@@ -2022,6 +2022,55 @@ pub fn migrations() -> Migrations<'static> {
         );
         "#,
         ),
+        M::up(
+            r#"
+        -- M43: SF8 Health & Nutrition Engine (ADR-0071). One record per
+        -- learner per school year per BOSY (Beginning of School Year) /
+        -- EOSY (End of School Year) measurement period, matching DepEd's
+        -- own twice-yearly Nutritional Status Report cadence. `birth_date`
+        -- is captured per-record here (NOT added to `learners`) --
+        -- `docs/adr/0017-learner-reference-number-and-sex.md` deliberately
+        -- kept birthdate off the learner profile until verified against an
+        -- official template; SF8 needs it for age computation but this
+        -- migration does not reopen that decision, it scopes the field to
+        -- this table only. `nutritional_status`/`height_for_age_status`
+        -- are nullable: `health::nutrition`'s WHO 2007 BMI-for-Age/
+        -- Height-for-Age cutoff tables are NOT YET POPULATED (unverified
+        -- numeric source -- see docs/VERIFICATION-DEBT.md), so a record
+        -- can be captured (age/BMI computed, both real arithmetic) with
+        -- its classification left NULL until a verified table lands; the
+        -- BOSY/EOSY consolidation report already tolerates a NULL
+        -- classification (it simply is not counted in any category
+        -- bucket) exactly like the ported legacy `nutritionConsolidation.js`
+        -- does. One row per learner per school year per period.
+        CREATE TABLE nutrition_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            school_year TEXT NOT NULL,
+            period TEXT NOT NULL CHECK (period IN ('BOSY', 'EOSY')),
+            grade_level TEXT NOT NULL,
+            sex TEXT NOT NULL CHECK (sex IN ('M', 'F')),
+            birth_date TEXT NOT NULL,
+            measurement_date TEXT NOT NULL,
+            height_m REAL NOT NULL CHECK (height_m > 0),
+            weight_kg REAL NOT NULL CHECK (weight_kg > 0),
+            age_in_months INTEGER NOT NULL CHECK (age_in_months >= 0),
+            bmi REAL NOT NULL CHECK (bmi > 0),
+            nutritional_status TEXT
+                CHECK (nutritional_status IS NULL OR nutritional_status IN
+                    ('SEVERELY_WASTED', 'WASTED', 'NORMAL', 'OVERWEIGHT', 'OBESE')),
+            height_for_age_status TEXT
+                CHECK (height_for_age_status IS NULL OR height_for_age_status IN
+                    ('SEVERELY_STUNTED', 'STUNTED', 'NORMAL', 'TALL')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (learner_id, school_year, period)
+        );
+
+        CREATE INDEX idx_nutrition_records_school_period
+            ON nutrition_records(school_id, school_year, period, grade_level);
+        "#,
+        ),
     ])
 }
 
@@ -4627,5 +4676,141 @@ mod tests {
             )
             .unwrap();
         assert_eq!(preserved, "l1");
+    }
+
+    fn seed_school_and_learner(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO learners (id, school_id, given_name, family_name) \
+             VALUES ('l1', 's1', 'Juan', 'Dela Cruz')",
+            [],
+        )
+        .unwrap();
+    }
+
+    fn insert_nutrition_record(conn: &Connection, period: &str) -> rusqlite::Result<usize> {
+        let id = format!("n-{period}");
+        conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES (?2, 's1', 'l1', '2026-2027', ?1, '5', 'M', \
+                     '2020-06-15', '2026-06-20', 1.10, 18.5, 72, 15.29)",
+            [period, &id],
+        )
+    }
+
+    #[test]
+    fn migration_43_enforces_the_nutrition_record_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+
+        let (age, bmi): (i64, f64) = conn
+            .query_row(
+                "SELECT age_in_months, bmi FROM nutrition_records WHERE id = 'n-BOSY'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(age, 72);
+        assert!((bmi - 15.29).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn migration_43_rejects_an_unrecognized_period() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        assert!(insert_nutrition_record(&conn, "MIDYEAR").is_err());
+    }
+
+    #[test]
+    fn migration_43_rejects_a_second_record_for_the_same_learner_school_year_and_period() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        let dup = conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES ('n2', 's1', 'l1', '2026-2027', 'BOSY', '5', 'M', \
+                     '2020-06-15', '2026-06-21', 1.11, 18.6, 72, 15.09)",
+            [],
+        );
+        assert!(dup.is_err());
+    }
+
+    #[test]
+    fn migration_43_allows_one_bosy_and_one_eosy_record_for_the_same_learner_and_school_year() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        insert_nutrition_record(&conn, "EOSY").unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nutrition_records WHERE learner_id = 'l1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn migration_43_rejects_a_nonpositive_height_or_weight() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        let bad_height = conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES ('n1', 's1', 'l1', '2026-2027', 'BOSY', '5', 'M', \
+                     '2020-06-15', '2026-06-20', 0.0, 18.5, 72, 15.29)",
+            [],
+        );
+        assert!(bad_height.is_err());
+    }
+
+    #[test]
+    fn migration_43_allows_a_null_classification_pending_verified_who_tables() {
+        // See docs/VERIFICATION-DEBT.md: the WHO 2007 BMI-for-Age /
+        // Height-for-Age cutoff tables are not yet sourced with
+        // confidence, so a real captured measurement must be storable
+        // with its classification left unset rather than blocked or
+        // guessed.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        let status: Option<String> = conn
+            .query_row(
+                "SELECT nutritional_status FROM nutrition_records WHERE id = 'n-BOSY'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, None);
     }
 }

@@ -488,6 +488,21 @@ pub enum Capability {
     /// attempt to unlock, exactly like knowing a door's combination
     /// doesn't require a special role, only knowing the combination).
     ManageStructuralLock,
+    /// Record or view a learner's SF8 nutrition status measurement
+    /// (`repository::nutrition`) -- real learner health PII. Deliberately
+    /// its own variant, conservatively scoped to the same two roles as
+    /// `ManageLearners` (Registrar, School Head) rather than also
+    /// including Teacher: this project's role model has no per-section
+    /// "class adviser measures their own section" restriction yet (the
+    /// pattern `authorize_adviser_of_section`/`authorize_own_assignment`
+    /// establish for other features), and granting a bare Teacher role
+    /// unrestricted read/write over every learner's health data
+    /// school-wide would be broader than the real DepEd workflow (a
+    /// section adviser records only their own section's measurements).
+    /// Widening this to a section-scoped Teacher capability is a
+    /// deliberate, disclosed deferral -- see
+    /// `docs/adr/0071-sf8-health-nutrition-engine.md` -- not an oversight.
+    ManageHealthRecords,
 }
 
 impl Capability {
@@ -499,6 +514,7 @@ impl Capability {
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
             Capability::ManageStructuralLock => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageHealthRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -3981,5 +3997,49 @@ mod tests {
         // School B never configured a PIN, so it is unenforced regardless
         // of what happened in School A.
         assert!(require_structural_lock_unlocked(&conn, &sessions_b).is_ok());
+    }
+
+    // ---- SF8 Health & Nutrition Engine (ADR-0071, 2026-09-08) ----
+
+    #[test]
+    fn authorize_capability_allows_a_registrar_session_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageHealthRecords).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageHealthRecords).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageHealthRecords);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_manage_health_records_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageHealthRecords);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 }

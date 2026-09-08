@@ -5,6 +5,7 @@ pub mod db;
 pub mod error;
 pub mod export;
 pub mod formgen;
+pub mod health;
 pub mod hub_server;
 pub mod import;
 pub mod repository;
@@ -190,6 +191,9 @@ pub fn run() {
             commands::conflict_review::list_conflict_reviews,
             commands::conflict_review::resolve_conflict_review,
             commands::sync_status::get_sync_status,
+            commands::nutrition::record_nutrition_measurement,
+            commands::nutrition::get_nutrition_record_for_learner,
+            commands::nutrition::get_nutrition_consolidation_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

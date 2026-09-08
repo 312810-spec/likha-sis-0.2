@@ -14,6 +14,7 @@ pub mod learner;
 pub mod learner_score;
 pub mod lesson_plan;
 pub mod my_day;
+pub mod nutrition;
 pub mod reference_geo;
 pub mod role;
 pub mod schedule_meeting;
