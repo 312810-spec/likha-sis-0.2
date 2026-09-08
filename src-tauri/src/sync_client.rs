@@ -80,10 +80,10 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, child_protection, device_credential,
-    device_sync_client_credential, grade_submission, grading, learner, learner_score, lesson_plan,
-    nutrition, school, section, section_membership, subject, subject_attendance,
-    sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
-    teaching_assignment, transfer_record,
+    device_sync_client_credential, formative_assessment, grade_submission, grading, learner,
+    learner_score, lesson_plan, nutrition, school, section, section_membership, subject,
+    subject_attendance, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
+    sync_version_cache, teaching_assignment, transfer_record,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -808,6 +808,15 @@ pub(crate) fn apply_decrypted_change(
                 ChangeOperation::Delete => school::clear_logo(conn, school_id)
                     .map_err(|_| ApplyRejection::RepositoryRejected),
             }
+        }
+        EntityKind::FormativeAssessmentLog => {
+            let incoming: formative_assessment::FormativeAssessmentLog =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            formative_assessment::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }
 }

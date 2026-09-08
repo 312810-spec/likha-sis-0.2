@@ -77,6 +77,7 @@ pub enum EntityKind {
     GradeSubmissionNote,
     TransferRecord,
     SchoolLogo,
+    FormativeAssessmentLog,
 }
 
 impl EntityKind {
@@ -105,6 +106,7 @@ impl EntityKind {
             EntityKind::GradeSubmissionNote => "grade_submission_note",
             EntityKind::TransferRecord => "transfer_record",
             EntityKind::SchoolLogo => "school_logo",
+            EntityKind::FormativeAssessmentLog => "formative_assessment_log",
         }
     }
 
@@ -129,6 +131,7 @@ impl EntityKind {
             "grade_submission_note" => Some(EntityKind::GradeSubmissionNote),
             "transfer_record" => Some(EntityKind::TransferRecord),
             "school_logo" => Some(EntityKind::SchoolLogo),
+            "formative_assessment_log" => Some(EntityKind::FormativeAssessmentLog),
             _ => None,
         }
     }

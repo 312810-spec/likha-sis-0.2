@@ -13,8 +13,8 @@ use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::repository::sync_hub::AcceptedChange;
 use crate::repository::{
-    attendance, child_protection, grade_submission, learner, lesson_plan, nutrition, school,
-    section, transfer_record,
+    attendance, child_protection, formative_assessment, grade_submission, learner, lesson_plan,
+    nutrition, school, section, transfer_record,
 };
 use crate::repository::{
     sync_conflict_review::{self, ConflictResolution, ConflictReviewRow},
@@ -122,6 +122,15 @@ pub enum ConflictEntityPreview {
     /// teacher still see "this changed" (a different size) without
     /// needing to see the image itself.
     SchoolLogo { mime: String, byte_len: usize },
+    /// The `esruRating` field is always the bare literal letter
+    /// (`E`/`S`/`R`/`U`) -- never the gloss word (see
+    /// `repository::formative_assessment`'s doc comment).
+    FormativeAssessmentLog {
+        learner_id: String,
+        activity_name: String,
+        esru_rating: String,
+        grading_period_id: String,
+    },
     /// Fallback for any entity kind wired to sync that has no dedicated
     /// typed preview above (every currently-wired kind has one as of
     /// this commit; this stays in place for a future kind added before
@@ -233,6 +242,17 @@ fn school_logo_preview(r: &school::SchoolLogoSyncRecord) -> ConflictEntityPrevie
     }
 }
 
+fn formative_assessment_log_preview(
+    log: &formative_assessment::FormativeAssessmentLog,
+) -> ConflictEntityPreview {
+    ConflictEntityPreview::FormativeAssessmentLog {
+        learner_id: log.learner_id.clone(),
+        activity_name: log.activity_name.clone(),
+        esru_rating: log.esru_rating.clone(),
+        grading_period_id: log.grading_period_id.clone(),
+    }
+}
+
 /// This device's own currently-live version of the conflicting entity --
 /// read straight from the domain table, never from the staged conflict
 /// row itself, because the staged row never captured it (staging never
@@ -286,6 +306,11 @@ fn local_preview(
         EntityKind::SchoolLogo => school::find_logo_by_id(conn, school_id, entity_id)?
             .as_ref()
             .map(school_logo_preview),
+        EntityKind::FormativeAssessmentLog => {
+            formative_assessment::find_by_id_in_school(conn, school_id, entity_id)?
+                .as_ref()
+                .map(formative_assessment_log_preview)
+        }
         _ => None,
     })
 }
@@ -362,6 +387,12 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
             .ok()
             .as_ref()
             .map(school_logo_preview),
+        EntityKind::FormativeAssessmentLog => {
+            serde_json::from_slice::<formative_assessment::FormativeAssessmentLog>(plaintext)
+                .ok()
+                .as_ref()
+                .map(formative_assessment_log_preview)
+        }
         _ => Some(ConflictEntityPreview::Unknown),
     }
 }
@@ -1517,5 +1548,98 @@ mod tests {
                 if note == "Reviewed and cleared"
         ));
         assert!(summary.local.is_some());
+    }
+
+    #[test]
+    fn to_summary_shows_typed_formative_assessment_log_previews_with_the_bare_letter_only() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher = crate::repository::user::create_user(
+            &conn,
+            "teacher.a",
+            "correct horse battery staple",
+            "Teacher A",
+        )
+        .unwrap();
+        crate::repository::user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let subject = crate::repository::subject::create(&conn, &s.id, "Mathematics").unwrap();
+        let assignment = crate::repository::teaching_assignment::create(
+            &conn,
+            &s.id,
+            &teacher.id,
+            &section.id,
+            &subject.id,
+        )
+        .unwrap()
+        .unwrap();
+        let learner_row = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
+        let policy_period_id: String = conn
+            .query_row("SELECT id FROM grading_policy_periods LIMIT 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let grading_period_id = Uuid::now_v7().to_string();
+        conn.execute(
+            "INSERT INTO grading_periods \
+                (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
+             VALUES (?1, ?2, '2026-2027', ?3, '2026-06-01', '2026-08-31')",
+            (&grading_period_id, &s.id, &policy_period_id),
+        )
+        .unwrap();
+        let sspk = test_sspk();
+
+        let local_log = formative_assessment::create(
+            &conn,
+            &s.id,
+            &assignment.id,
+            &learner_row.id,
+            &grading_period_id,
+            "Quiz 1",
+            "E",
+            None,
+            &teacher.id,
+        )
+        .unwrap();
+
+        // The incoming change carries a different bare letter -- the
+        // preview must show only the letter itself, never a gloss word,
+        // for either side.
+        let incoming_log = formative_assessment::FormativeAssessmentLog {
+            esru_rating: "U".to_string(),
+            ..local_log.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming_log).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::FormativeAssessmentLog,
+            entity_id: Uuid::parse_str(&incoming_log.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::FormativeAssessmentLog { ref esru_rating, .. })
+                if esru_rating == "U"
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::FormativeAssessmentLog { ref esru_rating, .. })
+                if esru_rating == "E"
+        ));
     }
 }

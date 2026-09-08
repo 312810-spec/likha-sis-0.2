@@ -1,5 +1,161 @@
 # CURRENT HANDOFF
 
+## Batch 11 (complete): Formative Assessment (ESRU) logging, full vertical slice (2026-09-08, ADR-0082), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. All 4 checkpoints shipped, each its own local commit.
+
+**Checkpoint 1 -- migration + repository:** migration 55
+(`formative_assessment_logs` table -- `teaching_assignment_id` as the
+authorization anchor, `grading_period_id` as the "quarter" identifier,
+`esru_rating` `CHECK`-constrained to the four bare literal letters
+E/S/R/U only, never the gloss word) + migration 56 (entity_kind `CHECK`
+widening, bundled here for schema-file locality rather than deferred to
+checkpoint 4 -- the Rust-side `EntityKind` enum and sync command wiring
+still landed in checkpoint 4, only the SQL allowlist widening moved
+earlier). `repository::formative_assessment` provides tenant-scoped
+CRUD reusing `subject_attendance::authorize_own_assignment` unchanged --
+"Teacher owns this assignment," not a school-wide `Capability` -- see
+ADR-0082 Decision 1 for the explicit analogy against
+`ManageChildProtection`'s tighter per-section-adviser shape and why ESRU
+logs are closer to an ordinary attendance mark or quiz score than to
+incident/health data. No natural key beyond `id` (a learner may
+accumulate many logs per subject/quarter), matching the `TransferRecord`
+precedent (ADR-0080).
+
+**Storage decision (do not relitigate without re-reading
+`docs/product/OWNER-DECISIONS-NEEDED.md` item 3 first)**: the ESRU
+rubric's real meaning is unverified against any DepEd primary source --
+neither this project nor the legacy `likha-sis` codebase it was ported
+from ever cited one. The schema and every persisted value store **only
+the bare letter**; the full gloss word (Exploration/Structured
+practice/Reflection/Understanding) exists purely as a UI-display label
+(`src/domain/formative-assessment.ts`'s `ESRU_GLOSS`/
+`formatEsruRatingLabel`), always rendered with an explicit "meaning
+unverified" flag. If the gloss is later found wrong, fixing it is a
+one-line label change -- no migration, no data rewrite.
+
+**Checkpoint 2 -- commands + TS service:** `commands::formative_assessment`
+(`record_formative_assessment`/`list_formative_assessment_logs_for_assignment`),
+gating on `formative_assessment::authorize_own_assignment`, `school_id`
+always session-derived. TS: `src/domain/formative-assessment.ts`
+(`EsruRating`, `validateFormativeAssessmentLog`, `formatEsruRatingLabel`),
+`FormativeAssessmentRepository` port,
+`FormativeAssessmentApplicationService`, `TauriFormativeAssessmentRepository`,
+wired into `composition.ts` (`formativeAssessmentService`).
+
+**Checkpoint 3 -- UI screen:** `FormativeAssessmentScreen` -- class/
+quarter/learner pickers (reusing
+`subjectAttendanceService.listMyAssignments`, `sectionService.roster`,
+`gradingService.listPeriodsBySchoolYear` rather than adding new backend
+reads), an activity-name field, an ESRU rating button group always shown
+as the bare letter with `formatEsruRatingLabel`'s explicit
+"meaning unverified" flag as a tooltip/hint, an optional notes field,
+and a read-only log table for the selected class. Reachable from the
+"Daily Teaching" nav group next to Subject Attendance
+(`workbench-nav-data.ts`, `App.tsx`). Efficient/Comfortable/Guided mode
+parity (only the guided-mode intro hint differs); axe-clean.
+
+**Checkpoint 4 -- sync wiring**, following the exact Batch 6/9/10 pattern:
+
+- `EntityKind::FormativeAssessmentLog` (`"formative_assessment_log"`
+  wire string).
+- `repository::formative_assessment::upsert_from_sync` (`INSERT ...
+ON CONFLICT(id) DO UPDATE`, matching every other create-only entity).
+- `commands::formative_assessment::record_formative_assessment` now
+  takes `AppHandle`, resolves the SSPK only if this school has enrolled
+  a device, and enqueues through `record_with_optional_sync` -- the
+  same enrollment-gated, `SAVEPOINT`-atomic-with-the-write pattern as
+  `commands::transfer_record::record_transfer`. The authorization gate
+  (`authorize_own_assignment`) runs first and unchanged, using `?` --
+  `record_with_optional_sync` takes an already-authorized
+  `teaching_assignment_id`/`actor_user_id` as plain parameters and
+  performs no authorization of its own.
+- `sync_client::apply_decrypted_change`: `EntityKind::FormativeAssessmentLog`
+  arm, school-scope-checked like every other tenant-scoped entity's arm.
+- `ConflictEntityPreview::FormativeAssessmentLog { learner_id,
+activity_name, esru_rating, grading_period_id }` -- `esru_rating` is
+  always the bare letter, matching the storage discipline above.
+- No natural-key-collision test -- like `TransferRecord` (ADR-0080),
+  this entity's sync identity is `id` alone, resolved by `ON
+CONFLICT(id)` with no separate uniqueness rule to violate.
+
+**New tests this batch**: 13 `repository::formative_assessment::tests`
+(CRUD, authorization, tenant isolation, sync round-trip, gloss-word
+rejection), 8 `commands::formative_assessment::tests` (authorization,
+create+list round trip, gloss rejection, sync enqueue/no-enqueue,
+rejected-create-never-enqueues), 1 `db::migrations::tests` (migration 55
+CHECK constraint rejects the gloss word / accepts the bare letter), 1
+`db::migrations::tests` (migration 56 entity_kind widening), 1
+`commands::conflict_review::tests` (typed preview shows the bare letter
+on both the incoming and local sides), 17 TS tests (domain validation +
+gloss-format invariant, application service, Tauri adapter), 4 UI tests
+(picker loading, ESRU rating group + unverified flag, record-with-bare-
+letter, accessibility).
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate) -- all tests passed, including the 21 new
+  formative-assessment tests plus the new conflict-review preview test.
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest run) -- 142 test files, 1294 tests passed, 0
+  architecture violations, 0 dead-code findings.
+
+**Tenant isolation / authorization verification**: every
+`repository::formative_assessment` query takes `school_id` as an
+explicit parameter and filters on it in the SQL itself;
+`list_for_assignment_never_leaks_a_different_schools_logs` and
+`create_rejects_a_learner_from_a_different_school` prove a
+cross-school probe returns nothing/an error rather than leaking or
+mutating another school's row. Every Tauri command derives `school_id`
+from `sessions.require_active_session` and then gates on
+`formative_assessment::authorize_own_assignment` -- never a
+client-supplied parameter -- matching
+`docs/adr/0004-authentication-and-local-session.md`.
+`authorize_own_assignment_denies_a_different_teacher` proves the
+own-assignment boundary holds.
+
+**Deferred/out of scope (see ADR-0082)**: no cross-subject "every ESRU
+log for a learner across all their subjects" command or UI (only
+per-assignment listing is exposed; the repository function exists and
+is tested for an eventual use); no edit/delete of an existing log
+(create-and-list only, matching Subject Attendance's own first-slice
+precedent); no configurable per-school ESRU-pattern threshold or
+automatic flagging; no new `SignedInTab`-level role gating in the UI
+shell (this project never hides a tab by role -- the real gate is
+server-side).
+
+**Files touched**: `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/repository/formative_assessment.rs` (new),
+`src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/formative_assessment.rs` (new),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs`,
+`src-tauri/src/sync/mod.rs`, `src-tauri/src/sync_client.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/formative-assessment.ts` (new),
+`src/domain/ports/formative-assessment-repository.ts` (new),
+`src/application/formative-assessment-service.ts` (new),
+`src/infrastructure/tauri/formative-assessment-repository.ts` (new),
+`src/composition.ts`, `src/ui/FormativeAssessmentScreen.tsx` (new),
+`src/ui/components/workbench-nav-data.ts`, `src/App.tsx`,
+`docs/adr/0082-formative-assessment-esru-logging.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: no specific next candidate pre-selected this
+session -- consult `docs/product/MASTER-TASK-INVENTORY.md` for the
+next-highest-priority unchecked item per
+`.claude/rules/autonomous-development.md`'s selection order
+(privacy/security → correctness → DepEd compliance → teacher usability
+→ offline reliability → maintainability → zero billing → performance →
+speed) before starting a new wave. `scholastic_history_records` (DepEd
+`.xlsx` multi-year importer) and Anecdotal Records/Schedule Grids sync
+wiring remain deliberately deferred per
+`docs/product/MASTER-TASK-INVENTORY.md`'s existing notes.
+
 ## Batch 10 (complete): SchoolLogo sync byte-budget shrink + full sync wiring (2026-09-08, ADR-0081), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
