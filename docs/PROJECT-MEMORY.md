@@ -1,5 +1,30 @@
 # PROJECT MEMORY
 
+## Theme-token extensions, logo palette extraction, and Visual Timetable shipped (2026-09-08)
+
+- ADR-0075: extends (not replaces) the existing Wave 1-6 shell/token
+  system. New: `src/domain/palette.ts` (dependency-light dominant-color
+  extraction + WCAG-AA-verified dark-token derivation, no `ColorThief`),
+  a 3-way Light/System/Dark theme toggle (`ColorThemeContext`, mirrors
+  `TeacherMode`'s pattern), a 3-tier card/control elevation scale
+  extending ADR-0057's tokens, a sidebar whole-rail collapse, and
+  `src/domain/timetable.ts` (pure conflict-detection + auto-seed logic)
+  backing the new `SectionTimetableScreen`.
+- **No new Rust migration/repository/command** — the timetable screen
+  reuses Wave 2Y/2Z's existing `schedule_meetings`
+  persistence/`TeachingAssignmentApplicationService` unchanged.
+- **Deliberately deferred, flagged (not silently dropped):** real
+  Fraunces/IBM Plex Mono webfonts (system-stack tokens shipped instead);
+  a real drag-and-drop library for the timetable (click-to-arm/place
+  shipped instead — zero new dependency, keyboard-operable); a
+  `curriculum_subject_requirements` persistence table (subject-hours
+  validation takes required-minutes as a caller-supplied parameter);
+  wiring `derivePaletteTokens` to a live logo-upload screen (the pure
+  pipeline is complete and tested, integration is not).
+- Teacher Load remains derived-on-read from `schedule_meetings`
+  (ADR-0039/Wave 3A) — confirmed unchanged, not duplicated into a new
+  stored table.
+
 ## SF8 Health & Nutrition Engine data model shipped; SF1/SF9/SF10/Form 137-138 research closed with no new fidelity change (2026-09-08)
 
 - ADR-0071: `src-tauri/src/health/{nutrition,consolidation}.rs` +

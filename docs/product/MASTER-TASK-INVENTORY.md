@@ -76,24 +76,61 @@
 ### 3.1 UI & Theme Engine Replication (Replicating `likha-sis-master`)
 
 - **Persistent Two-Tier Layout Shell (`DashboardShell`):**
-  - Brand-filled collapsible sidebar (`w-64` expanded, `w-20` collapsed with CSS tooltips) with Ledger Gold section labels.
-  - Sticky translucent header (`backdrop-blur-sm bg-white/90 dark:bg-gray-900/90`) featuring Fraunces serif page title, live tabular clock, 3-way theme toggle (`Light`/`System`/`Dark`), notification bell with unread badge counter, and user profile avatar.
+  - [x] Collapsible sidebar (expanded ~16.5rem / collapsed ~5rem icon
+        rail) with native `title`-attribute tooltips on collapsed icons
+        -- Batch 4, `Sidebar.tsx`.
+  - [x] Sticky translucent/blurred header (`backdrop-filter`, with a
+        non-transparent `@supports` fallback), live tabular clock, 3-way
+        theme toggle (Light/System/Dark), notification bell with unread
+        badge affordance, and a user avatar (initials) -- Batch 4,
+        `TopBar.tsx`. Reason not "Ledger Gold section labels": that is
+        the reference project's own visual styling, not adopted per
+        ADR-0064's existing "structural yes, visual no" decision.
 - **"Ledger Pairing" Typography System:**
-  - Page-level `<h1>`/`<h2>` in [Fraunces](https://fonts.google.com/specimen/Fraunces) editorial serif (`font-display`).
-  - Interface controls and tables in Public Sans.
-  - Aligned numbers, clocks, and grade columns in [IBM Plex Mono](https://fonts.google.com/specimen/IBM+Plex+Mono) (`font-tabular`).
-- **Dynamic Logo Palette Extractor (`ColorThief`):**
-  - Auto-extracts Dominant, Vibrant, and Alternate palette sets from uploaded school logos.
-  - Auto-derives WCAG AA-compliant dark surface variables (`--dm-*`) and legible text ink (`buildTextOnRoles`).
+  - [x] Token-level pairing shipped this batch (`--font-serif` on page
+        `<h2>`, `--font-mono`/`.font-tabular` on the clock and timetable
+        time column) using system font stacks.
+  - [ ] Real Fraunces/IBM Plex Mono webfonts -- deliberately deferred,
+        flagged as a new-dependency decision needing explicit approval
+        (ADR-0075 §2), not silently added or silently dropped.
+- **Dynamic Logo Palette Extractor:**
+  - [x] Dependency-light dominant-color extraction + WCAG-AA-verified
+        dark-surface/text token derivation, with a passing contrast test
+        -- `src/domain/palette.ts` (ADR-0075 §1), in place of `ColorThief`.
+  - [ ] Wired to a live screen (drawing the uploaded logo to a canvas and
+        theming the app from it) -- not done this batch; the pure
+        extraction/derivation pipeline is complete and tested, the UI
+        glue is the recorded next slice.
 - **Card Elevation & Depth:**
-  - `8px` (`rounded-lg`) inputs/buttons, `12px` (`rounded-xl`) cards with soft ambient shadow and hover lift (`-translate-y-0.5`).
+  - [x] Three-tier elevation scale (`--elevation-small/medium/pressed`)
+        plus `--radius-medium`/`--radius-card`, applied to `.card` (hover
+        lift) and buttons (`:active` press) -- Batch 4.
 
 ### 3.2 Visual Timetable & Class Program Builder (from `likha-sis-master`)
 
-- **Visual Schedule Grid:** Interactive drag-and-drop / click-to-arm timetable builder.
-- **Real-Time Conflict Detection:** Double-booking, room overlap, and subject hours validation (`scheduleConflicts.js`).
-- **One-Click Auto-Seed Wand:** Auto-distribute subject minutes into section slots (`scheduleSeeding.js`).
-- **Derived Teacher Load:** Automatically compute individual Teacher's Load sheets on read from section timetables (`teacherLoadDerivation.js`).
+- [x] **Visual Schedule Grid:** `SectionTimetableScreen.tsx` -- a
+      section-wide weekly grid over the existing `schedule_meetings`
+      persistence (no new Rust migration). Click-to-arm/click-to-place,
+      not drag-and-drop -- flagged and justified in ADR-0075 §6 (a
+      drag-and-drop library is a new dependency this batch's
+      constraints require flagging, and click-to-arm needs none while
+      staying keyboard-operable).
+- [x] **Real-Time Conflict Detection:** `src/domain/timetable.ts`'s
+      `detectTimetableConflicts` (teacher/section/room double-booking,
+      pure + tested) and `validateSubjectWeeklyMinutes` (subject-hours
+      check). The curriculum-required-minutes figure is a caller-
+      supplied parameter this batch, not sourced from a new persisted
+      curriculum-requirements table -- flagged in ADR-0075 §7 as a
+      deliberate scope decision (an authoritative DepEd per-subject
+      weekly-minutes table needs its own sourcing/verification pass, not
+      invented here).
+- [x] **One-Click Auto-Seed Wand:** `autoSeedWeeklySlots`
+      (`src/domain/timetable.ts`), pure + tested, wired into
+      `SectionTimetableScreen`'s "Auto-seed" action.
+- [x] **Derived Teacher Load:** already computed live from
+      `schedule_meetings` since ADR-0039/Wave 3A (`teacher-load.ts`) --
+      confirmed unchanged and un-duplicated by this batch, not a new
+      deliverable.
 
 ### 3.3 Teacher Creation Studio Remaining Deliverables
 

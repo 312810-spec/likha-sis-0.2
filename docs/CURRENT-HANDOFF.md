@@ -1,5 +1,157 @@
 # CURRENT HANDOFF
 
+## Batch 4 (Tier 3.1-3.2) closed out: theme-token extensions, logo palette extraction, Visual Timetable / Class Program Builder (2026-09-08)
+
+Closed out Batch 4 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 3
+(§3.1-3.2). Branch `claude/pending-tasks-batch-vjy67v`, batch-implement
+mode -- every commit is local, nothing pushed, no CI triggered, PR #55
+untouched. This batch **extends** the existing Wave 1-6 UI redesign
+shell (ADR-0064's `AppLayout`/`Sidebar`/`TopBar`, ADR-0057's `Page`/
+`Card`/token system) rather than building a parallel one -- confirmed by
+reading those ADRs and the existing components before touching them.
+Full detail and rationale for every dependency/scope decision below is
+in `docs/adr/0075-visual-timetable-and-theme-tokens.md`.
+
+**1. Theme token extensions & logo palette extraction**
+(ADR-0075 §1-5):
+
+- `src/domain/palette.ts` (new): dependency-light dominant-color
+  extraction (color-bucket quantization over raw RGBA pixel data, no
+  `ColorThief`/`node-vibrant` added), WCAG contrast-ratio math, and
+  `derivePaletteTokens` -- a full pipeline that derives a dark-mode
+  surface/text pair from a logo's dominant color and **programmatically
+  verifies** it against real WCAG AA thresholds before claiming
+  `meetsAa: true`. 16 tests, all passing, including a cross-check
+  against this project's own already-verified primary/bg contrast pair.
+  **Not yet wired to a live screen** -- no UI component this batch draws
+  an uploaded logo to a canvas and feeds pixels through it; that glue is
+  the recorded next slice.
+- Two new CSS tokens, `--font-serif` (system serif stack) and
+  `--font-mono` (system monospace stack), applied to page `<h2>`
+  headings and a new `.font-tabular` utility (used by the shell's live
+  clock and the timetable grid's time column). Real Fraunces/IBM Plex
+  Mono webfonts are **deliberately deferred** -- flagged per this
+  batch's "no new font without flagging" constraint, not silently added.
+- 3-way Light/System/Dark theme toggle: `src/ui/theme/color-theme.ts` +
+  `ColorThemeContext.tsx` + `useColorTheme.ts`, mirroring the existing
+  `TeacherMode` pattern exactly (per-device `localStorage`, never app
+  data). Wired into `TopBar`, `App.tsx`, and `DevPreviewApp.tsx`. New
+  `[data-theme="light"|"dark"]` CSS blocks let an explicit choice win
+  over `prefers-color-scheme`; "System" (default) writes no attribute,
+  so the existing media-query behavior is byte-for-byte unchanged.
+- Three-tier card/control elevation scale (`--elevation-small/medium/
+pressed`) plus `--radius-medium`/`--radius-card`, both with dark-mode
+  overrides -- extends, not replaces, the existing `--elevation-1/2`
+  chrome-separation tokens from ADR-0057. `.card` lifts on
+  `@media (hover: hover)`; `button:active` (non-disabled) presses.
+- `Sidebar.tsx` gains a whole-rail collapse (independent from the
+  existing per-group collapse), shrinking to a ~5rem icon rail with
+  native `title`-attribute tooltips on the collapsed icons, remembered
+  in `localStorage`. Driven by a `:has()` CSS selector so the collapse
+  state stays local to `Sidebar`, not lifted into `AppLayout`.
+- `TopBar.tsx` gains a live clock (`useLiveClock`, per-minute tick, not
+  per-second), a notification-bell affordance with an unread-count badge
+  (defaults to 0 -- no notification-producing backend exists yet, UI
+  affordance only, honestly disclosed as such), and a user-initials
+  avatar.
+
+**2. Visual Timetable / Class Program Builder** (ADR-0075 §6-7):
+
+- `src/domain/timetable.ts` (new, pure domain logic, zero UI/persistence
+  import): `detectTimetableConflicts` (teacher/section/room double-
+  booking over half-open time intervals, matching the server's existing
+  `CreateMeetingOutcome` overlap convention exactly),
+  `validateSubjectWeeklyMinutes` (subject-hours check against a caller-
+  supplied required-minutes figure -- **no new
+  `curriculum_subject_requirements` persistence table this batch**,
+  flagged in the ADR as a deliberate scope decision pending real DepEd
+  curriculum-hours sourcing), and `autoSeedWeeklySlots` (greedy weekly-
+  minutes distribution into open slots, skipping conflicts including
+  against its own already-chosen candidates in the same run). 22 tests,
+  including a real bug caught by TDD: an early draft's "don't conflict
+  with itself" guard compared by `teachingAssignmentId`, which wrongly
+  let two _different_ new weekly meetings of the same subject overlap
+  each other during auto-seed; fixed by comparing an optional
+  `meetingId` instead (only a persisted meeting being edited in place
+  carries one).
+- `SectionTimetableScreen.tsx` (new): a Monday-Friday x hourly grid for
+  one section, reusing the _existing_ `TeachingAssignmentApplicationService.
+listBySection`/`listMeetings`/`createMeeting`/`removeMeeting` (Wave
+  2Y/2Z) -- **no new Rust migration, repository, or command**.
+  Click-to-arm/click-to-place, not drag-and-drop -- flagged and
+  justified in the ADR (no new dependency, fully keyboard-operable,
+  trivial Efficient/Comfortable/Guided parity). Live client-side
+  conflict preview via `detectTimetableConflicts` before a placement is
+  committed; the server's `CreateMeetingOutcome` remains the real
+  authority. Wired into `SectionsScreen` (`onManageTimetable`, optional
+  prop, existing tests unaffected) and `App.tsx` (new
+  `section-timetable` tab, same narrowly-typed per-screen state handoff
+  pattern as `schedule-meetings`). 5 tests, including an axe-clean
+  render and a genuine time-overlap-across-grid-cells conflict scenario
+  (a 90-minute meeting spilling into a neighboring hour cell it doesn't
+  visually occupy).
+- **Derived Teacher Load**: confirmed already computed live from
+  `schedule_meetings` since ADR-0039/Wave 3A (`teacher-load.ts`) -- this
+  batch changed nothing here; recorded as "already done," not
+  reimplemented or duplicated into a new stored table.
+
+**Verification actually run this session:**
+
+- `npm run quality` (typecheck + lint + format:check + architecture-
+  boundary + knip + vitest): **PASS**. 115 test files, 1146 tests
+  passed, 0 failed. Typecheck clean, lint clean, Prettier clean,
+  architecture-boundary check clean (`src/ui/**`/`src/domain/**` import
+  no `@tauri-apps/*`/`src/infrastructure/**`), knip clean (one
+  structurally-referenced type marked `@public` per the established
+  convention, one genuinely-unused internal helper un-exported rather
+  than deleted since it's still used inside its own module).
+- `npm run quality:ui` (Playwright CLI checks): **attempted, could not
+  run** -- `chrome-headless-shell` is not installed in this sandbox
+  (`browserType.launch: Executable doesn't exist`). This is an
+  environment limitation, not a result -- disclosed here rather than
+  omitted. **Native visual/screen-reader verification of the compiled
+  Tauri binary was NOT performed** -- this sandbox has no browser or
+  device to render it; every new/changed screen was verified only via
+  jsdom-based component tests (including axe-core structural checks via
+  `expectNoAccessibilityViolations`), which is necessary but not
+  sufficient. Recorded as retained verification debt in
+  `docs/VERIFICATION-DEBT.md`.
+- `cargo test`/`cargo clippy`/`cargo fmt --check`: not run this session
+  -- this batch touched no Rust code (no new migration, repository, or
+  command was needed; see ADR-0075 for why). The prior session's Rust
+  checkpoint (1160 lib tests) is unaffected and not re-claimed here.
+
+**Deferred / retained debt** (see ADR-0075's Consequences section and
+`docs/VERIFICATION-DEBT.md`'s Batch 4 entry): real Fraunces/IBM Plex Mono
+webfonts (flagged, approval-gated); the palette extractor's UI wiring to
+`SchoolBrandingScreen` (pipeline complete and tested, glue not built);
+`curriculum_subject_requirements` persistence (subject-hours validation
+works only with a manually-entered required-minutes figure today); a
+real drag-and-drop interaction (click-to-arm/place shipped instead, by
+deliberate choice, not as a stopgap); native visual/screen-reader
+verification of the compiled Windows binary; independent security/
+reliability review not requested for this batch (no auth/persistence/
+sync surface was touched -- this batch is UI + pure domain logic only,
+so the "milestones touching auth, persistence, or sync" review trigger
+in `.claude/rules/security-privacy.md` does not apply).
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) wire `derivePaletteTokens` to a real screen
+(most naturally `SchoolBrandingScreen`'s logo upload flow) so a school's
+actual theme derives from its uploaded logo, not just the pipeline
+existing in isolation; (2) decide (owner approval gate -- new
+dependency/font) whether to adopt real Fraunces/IBM Plex Mono webfonts
+now that the token-level pairing structure is in place; (3) source and
+verify an authoritative DepEd per-subject weekly-instructional-minutes
+table so `validateSubjectWeeklyMinutes` can be driven by real curriculum
+data instead of a manually-entered figure; (4) continue Batch 3's
+still-open next tasks (DO 006 tier-vocabulary verification, xlsx
+scholastic-importer template verification, frontend UI for Batch 3's
+three features, the owed independent security review) -- unaffected and
+un-superseded by this batch.
+
 ## Batch 3 (Tier 2.3-2.5) closed out: DO 006 Child Protection, xlsx Scholastic Importer, interim Grade Review Pipeline (2026-09-08)
 
 Closed out Batch 3 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2

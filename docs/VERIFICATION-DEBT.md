@@ -1,5 +1,52 @@
 # Verification Debt
 
+## Batch 4 (Tier 3.1-3.2): no native visual/screen-reader pass, Playwright unavailable in sandbox, palette extractor not wired to a screen (2026-09-08)
+
+- **`npm run quality:ui` could not run.** `chrome-headless-shell` is not
+  installed in this sandbox
+  (`browserType.launch: Executable doesn't exist at
+/opt/pw-browsers/chromium_headless_shell-1237/...`). Not attempted to
+  work around by installing browsers (out of scope, and this sandbox may
+  not have the needed network/OS access). A future session with a
+  working Playwright install should run it against the new/changed
+  screens (`SectionTimetableScreen`, `Sidebar`, `TopBar`).
+- **No native visual/screen-reader verification of the compiled Tauri
+  binary.** This sandbox has no browser or Windows device. Every new/
+  changed screen this batch (`SectionTimetableScreen`, the collapsible
+  sidebar rail, the theme toggle, the live clock/notification bell/
+  avatar) was verified only via jsdom component tests, including
+  `expectNoAccessibilityViolations` (axe-core) structural checks. That
+  is necessary but not sufficient — a human/screen-reader pass on the
+  actual Windows binary is still owed, per `.claude/rules/testing.md`.
+- **`derivePaletteTokens` (`src/domain/palette.ts`) is fully implemented
+  and unit-tested but not wired to any live screen.** No UI component
+  this batch draws an uploaded school logo to a `<canvas>`, reads its
+  pixels, and feeds them through the pipeline to actually theme the app.
+  The function itself is correct and AA-verified in isolation
+  (`palette.test.ts`); the _integration_ — and therefore any real-logo
+  visual confirmation of the derived tokens — has not happened yet. See
+  ADR-0075.
+- **`curriculum_subject_requirements` (per-subject weekly-minutes
+  requirement) does not exist as persisted data.**
+  `validateSubjectWeeklyMinutes` is correct and tested against whatever
+  `requiredMinutes` figure is passed in, but today that figure comes
+  from a manually-typed number in `SectionTimetableScreen`'s auto-seed
+  form, not from a sourced, verified DepEd curriculum table. Building
+  that table is a DepEd-compliance research task in its own right (the
+  same sourcing-confidence bar this project already applies to SF8's
+  WHO BMI cutoffs) — not attempted this batch.
+- **Real Fraunces/IBM Plex Mono webfonts not adopted.** Token-level
+  serif/mono pairing shipped using system font stacks
+  (`--font-serif`/`--font-mono`); the real webfonts are a flagged,
+  approval-gated follow-up (new `@fontsource` dependency), not silently
+  substituted or silently dropped. See ADR-0075 §2.
+- **No independent security/reliability review requested this batch** —
+  this batch touched no auth/persistence/sync surface (pure UI +
+  `src/domain/timetable.ts`/`palette.ts` pure functions only, reusing
+  existing Rust commands unchanged), so `.claude/rules/security-privacy.md`'s
+  "milestones touching auth, persistence, or sync" review trigger does
+  not apply. Recorded here only for completeness, not as owed debt.
+
 ## Batch 3 (Tier 2.3-2.5): DO 006 tier naming unverified, xlsx column layout unverified, no frontend UI (2026-09-08)
 
 - **DO 006, s. 2026 tier naming — LOW confidence.** ADR-0072's
