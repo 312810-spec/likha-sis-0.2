@@ -52,7 +52,7 @@ cross-check against this project's own already-verified primary/bg pair
 from `styles.css`), and the full derivation pipeline (bright-source,
 dark-source, and no-pixel-data fallback cases).
 
-### 2. Typography pairing: token-level pairing now, Fraunces/IBM Plex Mono deferred
+### 2. Typography pairing: CSS custom properties applied now, Fraunces/IBM Plex Mono webfonts deferred
 
 The reference project's "Ledger Pairing" typography uses Fraunces (serif
 headings) and IBM Plex Mono (tabular numerals) as real Google Fonts
