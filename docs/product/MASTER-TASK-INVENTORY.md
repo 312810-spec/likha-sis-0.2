@@ -151,12 +151,16 @@
 
 ### 4.1 Sync Scope Expansion
 
-- **Remaining Unwired Sync Entities:**
-  - `LessonPlan` (currently local only).
-  - `SchoolLogo` / Branding bytes.
-  - New incoming entities (Anecdotal, Nutrition/SF8, Schedule Grids).
+- [x] `LessonPlan` -- wired end to end (migration 47, `EntityKind::LessonPlan`, `upsert_from_sync`, sync-aware `create`/`update` commands, natural-key-collision test). Commit `1fab715`.
+- [x] `NutritionRecord` (SF8) -- wired end to end (migration 48, create-only, natural-key-collision test on `UNIQUE (learner_id, school_year, period)`). Commit `b6ad48e`.
+- [x] `BehavioralIncident` + `IncidentIntervention` (DO 006 Child Protection) -- wired end to end (migration 49, both create-only; no distinct natural key beyond `id` on either table, stated explicitly and tested; `authorize_child_protection_access_for_section` verified to survive unchanged through the sync path). Commit `b6ad48e`.
+- [x] `GradeSubmission` + `GradeSubmissionNote` (interim Multi-Tier Review & Audit Pipeline) -- wired end to end (migration 50; `submit`=create, `decide`=update+optional note, both atomic with their note enqueues; natural-key-collision test on `UNIQUE (class_record_id, submitted_at)`). Commit `f85d91d`.
+- [x] Conflict-review screen generalization -- proved the resolution mechanism was already generic across every `EntityKind`; found and fixed a real gap in the PREVIEW half (`decrypt_preview` returned `None` for every entity kind added after the screen shipped, which the frontend's own gating treated as "cannot resolve" -- the "use incoming" button was silently disabled for all six entities above). Fixed with a `ConflictEntityPreview::Unknown` fallback (Rust) and a matching `{ kind: "unknown" }` TS variant, so every wired entity is now resolvable via the UI, even before it gets a dedicated field-level preview. Commit `01d0ac7`.
+- [ ] `SchoolLogo` / Branding bytes -- **deferred, real architectural mismatch, not scope pressure**: the command-layer logo cap (`MAX_LOGO_BYTES`, 512 KiB) is larger than `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB), and JSON-encoding raw image bytes (no base64 layer exists in the sync payload path today) would balloon further past that cap for any logo anywhere near the current size limit. Wiring this needs a real decision first -- shrink `MAX_LOGO_BYTES` to fit safely under the sync cap, or add a base64/binary-safe payload path -- not a rushed fit. Next slice candidate.
+- [ ] `scholastic_history_records` (DepEd `.xlsx` multi-year importer) -- **deferred, matches an established precedent, not an oversight**: `scholastic_history::insert` has exactly one caller, `import::scholastic::commit_scholastic_import`, a bulk-import transaction over potentially many rows. `sync_client.rs`'s own module doc comment already establishes that this codebase deliberately leaves bulk/import write paths unwired to sync (e.g. the SF1 CSV `enroll` primitive) in favor of the typed, single-row verbs a screen actually drives. There is no other write path for this entity to wire instead.
+- Anecdotal Records and Schedule Grids: no persisted entity exists yet for either (Anecdotal Records was confirmed not built in the 2026-09-07 audit, referenced in the Batch 5 Certificate & Recognition entry above) -- nothing to wire until the entity itself is built.
 - **Sync Resiliency & Edge Cases:**
-  - Natural key collision handling is generic but needs systematic testing across all remaining entities.
+  - Natural key collision handling confirmed generic and now tested across nine entities total (`Subject`/`Section` originally, plus `LessonPlan`, `NutritionRecord`, `GradeSubmission` this batch) -- `BehavioralIncident`/`IncidentIntervention`/`GradeSubmissionNote` were confirmed to have NO distinct natural key to collide on (their only uniqueness is `id`), so no collision test applies to those three; this is stated explicitly in each's own repository doc comment rather than left implicit.
   - Multi-device simultaneous conflict resolution UX.
 
 ---

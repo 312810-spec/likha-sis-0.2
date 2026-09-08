@@ -1,5 +1,30 @@
 # Verification Debt
 
+## Batch 6 sync scope expansion continued (2026-09-08): quality:security/quality:ui not run, integration-test checkpoint pending
+
+- **`npm run quality:security` (gitleaks + `cargo deny check` +
+  OSV-Scanner) was not run this batch** — no new dependency and no
+  secret-shaped fixture was added, but this is not yet independently
+  confirmed against the actual scan output for this batch's commits.
+- **`npm run quality:ui` (Playwright) was not run** — the only `src/`
+  changes this batch were to `ConflictReviewScreen.tsx`'s existing
+  render logic (a new `case "unknown":` branch and a labels-map
+  addition), not a new screen; `npm run quality` (vitest) covers its
+  existing test suite, which passed, but no fresh Playwright
+  accessibility/renderer pass was run specifically for this change.
+- **`cargo test` (full binary, including `src-tauri/tests/*.rs`
+  integration suites and doc-tests) was run once at the
+  `f85d91d` (GradeSubmission) checkpoint (clean) but the equivalent
+  full run for the final `01d0ac7` (conflict-review generalization)
+  checkpoint was still in flight when this batch's session context
+  needed to move to writing this documentation** — `cargo test --lib`
+  (1217 passed) and `npm run quality`'s own `vitest run` (1205 passed)
+  both did complete clean for that exact final commit, so the change
+  is covered by the fast/unit-level gates; the slower full-binary
+  integration run is the one piece not confirmed complete before this
+  entry was written. Re-run `cargo test` (no `--lib`) once to close
+  this out.
+
 ## Batch 5 (Tier 3.3-3.4): domain-only this batch, no Rust changes, holiday table needs periodic manual update (2026-09-08)
 
 - **`src/domain/ph-holidays.ts`'s holiday table covers SY 2025-2026

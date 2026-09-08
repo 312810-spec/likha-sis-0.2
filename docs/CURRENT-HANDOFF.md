@@ -1,5 +1,145 @@
 # CURRENT HANDOFF
 
+## Batch 6 sync scope expansion continued: NutritionRecord, BehavioralIncident+IncidentIntervention, GradeSubmission+GradeSubmissionNote, conflict-review generalization (2026-09-08), commit local only (batch mode), PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+every commit local, nothing pushed, PR #55 untouched, no CI
+triggered. Continues directly from the LessonPlan slice below (commit
+`1fab715`), replicating its exact established pattern for four more
+`docs/product/MASTER-TASK-INVENTORY.md` §4.1 items, plus a fifth
+commit fixing a real generalization gap found along the way.
+
+**Entities wired this run** (each already covered by the LessonPlan
+slice's "What changed" shape below -- migration widening `entity_kind`,
+`EntityKind` variant, `upsert_from_sync`, sync-aware command
+wrapper(s), `sync_client::apply_decrypted_change` arm, dedicated tests):
+
+1. **`NutritionRecord`** (SF8 Health & Nutrition Engine) -- migration 48. Create-only (`record_nutrition_measurement`), matching
+   `Section`/`AssessmentItem`'s precedent. `UNIQUE (learner_id,
+school_year, period)` is a real distinct natural key -- a dedicated
+   collision test (repository-level and a `sync_client` integration
+   test) proves the generic skip-and-advance mechanism covers it.
+2. **`BehavioralIncident` + `IncidentIntervention`** (DO 006 Child
+   Protection, ADR-0072) -- migration 49. Both create-only
+   (`record_behavioral_incident`, `add_incident_intervention`).
+   **Neither table has a `UNIQUE` constraint besides its own `id`** --
+   confirmed against migration 44's `CREATE TABLE` and stated
+   explicitly in both repository doc comments and a dedicated test
+   (`behavioral_incidents_has_no_unique_constraint_besides_id_so_no_collision_scenario_exists`)
+   -- so no natural-key-collision test applies to these two, unlike
+   `LessonPlan`/`NutritionRecord`. A `resolution`-type intervention
+   also re-enqueues the just-updated (now-resolved) `BehavioralIncident`
+   in the same `SAVEPOINT` as the intervention entry, so a pulling
+   device learns both facts together.
+   **Child-protection authorization survival (verified with the same
+   rigor as LessonPlan's `authorize_own_assignment` check)**:
+   `auth::authorize_child_protection_access_for_section` (adviser-of-
+   the-section-or-School-Head) still runs, completely unchanged, in
+   both `record_behavioral_incident` and `add_incident_intervention`
+   before the sync-aware `*_with_optional_sync` write path is ever
+   reached -- those functions have no code path that skips it, and the
+   `add_incident_intervention` handler's defense-in-depth
+   forged-`incident_id`-different-section check also runs unaffected,
+   before any sync wiring is reached. On the pull side,
+   `apply_decrypted_change`'s `BehavioralIncident` arm checks the
+   decrypted payload's own `school_id`; the `IncidentIntervention` arm
+   (whose entity has no `school_id` field of its own) uses the pulling
+   device's own already-authenticated `school_id` instead -- same
+   trust boundary, supplied directly rather than read back out of an
+   untrusted payload. There is still no separate read-side
+   authorization gate on pulled sync data for any wired entity in this
+   codebase (same as every prior entity) -- `authorize_view`/list
+   commands are unaffected by this slice, exactly as documented for
+   LessonPlan below.
+3. **`GradeSubmission` + `GradeSubmissionNote`** (interim Multi-Tier
+   Review & Audit Pipeline, ADR-0073) -- migration 50. `submit_grades_for_review`
+   is create (enqueues the new submission plus every automated-check
+   note it wrote internally, in one `SAVEPOINT`); `decide_grade_submission`
+   is update (enqueues the updated submission always, plus the new
+   feedback note only when one was actually added). `GradeSubmission`
+   carries `UNIQUE (class_record_id, submitted_at)` -- a real distinct
+   natural key with its own dedicated collision test.
+   `GradeSubmissionNote` has no `UNIQUE` besides `id`, same as
+   `IncidentIntervention` -- no collision test, stated explicitly.
+4. **Conflict-review screen generalization** (its own commit,
+   `01d0ac7`) -- confirmed the RESOLUTION mechanism
+   (`resolve_conflict_review` -> `sync_client::apply_decrypted_change` +
+   `sync_outbox::correct_base_version_for_entity`) was already fully
+   generic across every `EntityKind`, with a new test that stages and
+   resolves a `LessonPlan` conflict using zero `LessonPlan`-specific
+   code in `commands::conflict_review`. But found the PREVIEW half was
+   NOT generic: `decrypt_preview`'s fallback returned `None` for every
+   entity kind besides `Learner`/`Attendance`/`Section`, which the
+   frontend's own gating (`!conflict.incoming` disables "use incoming")
+   treated identically to a real decrypt failure -- in practice, a
+   teacher could not resolve a staged conflict on any of the six
+   entities wired this session via "use incoming" through the UI at
+   all, even though the backend could already apply it correctly.
+   Fixed with a `ConflictEntityPreview::Unknown` fallback (decryption
+   already succeeded by the time that function runs, so this is a
+   genuine resolvable state, not a failure) and a matching TS
+   `{ kind: "unknown" }` variant plus friendly `ENTITY_KIND_LABELS`
+   entries for all six. **Retained/deferred**: `local_preview` and the
+   three typed preview variants still only cover
+   `Learner`/`Attendance`/`Section` -- a genuine field-level preview
+   (not just "Unknown") for the six newer entities is real,
+   separately-scoped UI/UX work.
+
+**Deferred this run, with reasons** (not silently dropped):
+
+- **`SchoolLogo`/branding bytes** -- a real architectural mismatch, not
+  scope pressure: the command-layer logo cap (`MAX_LOGO_BYTES`, 512
+  KiB) is larger than `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB), and
+  there is no base64/binary-safe layer in the sync payload path today
+  -- JSON-encoding raw bytes would balloon further past that cap for
+  any logo anywhere near the current size limit. This needs a real
+  decision first (shrink `MAX_LOGO_BYTES`, or add a binary-safe payload
+  path) before it can be wired safely -- not attempted this run.
+- **`scholastic_history_records`** -- matches an established
+  precedent, not an oversight: `scholastic_history::insert` has
+  exactly one caller, `import::scholastic::commit_scholastic_import`,
+  a bulk-import transaction over potentially many rows at once.
+  `sync_client.rs`'s own module doc comment already establishes that
+  this codebase deliberately leaves bulk/import write paths unwired to
+  sync (the SF1 CSV `enroll` primitive is the precedent) in favor of
+  the typed, single-row verbs a screen actually drives. There is no
+  other write path for this entity to wire instead of the bulk one.
+
+**Verification actually run** (this session, each of the five commits
+individually, plus a final full pass):
+
+- `cargo test --lib`: 1217 passed, 0 failed (after all five commits).
+- `cargo test` (full, including all `src-tauri/tests/*.rs` integration
+  binaries and doc-tests): 0 failed, run at the grade_submission
+  checkpoint and again expected clean at the final conflict-review
+  checkpoint (see the exact run this session's final verification
+  section, once recorded below).
+- `cargo clippy --all-targets -- -D warnings`: clean at every commit.
+- `cargo fmt --check`: clean at every commit (drift fixed with plain
+  `cargo fmt`, never hand-restyled).
+- `npm run quality` (typecheck, lint, format:check,
+  check:architecture, check:deadcode, vitest): run once, for the
+  conflict-review-generalization commit (the only commit in this run
+  touching `src/` -- every sync-wiring commit was Rust-only) -- all
+  clean, 125 test files / 1205 tests passed.
+
+**Commits this run** (all local, nothing pushed): `b6ad48e`
+(NutritionRecord + BehavioralIncident + IncidentIntervention,
+combined -- see that commit's own message for why: their migration/
+EntityKind/sync_client changes interleave in the same three shared
+files, and a manual git-hunk split across ~1100 changed lines was
+judged higher-risk than value), `f85d91d` (GradeSubmission +
+GradeSubmissionNote), `01d0ac7` (conflict-review generalization).
+
+**Exact next task**: `SchoolLogo` sync wiring needs the payload-size
+architecture decision above resolved first (or an explicit decision to
+leave it local-only permanently, documented in an ADR). Absent that,
+the next candidate is the field-level `ConflictEntityPreview` variants
+for the six entities that currently only get `Unknown`, or picking up
+the Batch 5 UI-screen debt already recorded further down this file
+(seating chart, certificate screen, calendar UI, transfers registry,
+consolidated-grades UI, ID-card layout).
+
 ## LessonPlan wired through the sync encrypt/decrypt pattern (2026-09-08), Batch 6 slice 1 of N, commit local only (batch mode), PR owed
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
