@@ -1,5 +1,32 @@
 # Verification Debt
 
+## Batch 5 (Tier 3.3-3.4): domain-only this batch, no Rust changes, holiday table needs periodic manual update (2026-09-08)
+
+- **`src/domain/ph-holidays.ts`'s holiday table covers SY 2025-2026
+  only** and must be refreshed for each new school year and whenever a
+  new Malacañang proclamation adds/removes a special non-working day —
+  see the module's own doc comment for the sourced proclamations. Islamic
+  holiday dates (Eid'l Fitr, Eid'l Adha) are marked approximate pending
+  each year's specific confirming proclamation.
+- **No Rust/`src-tauri` files were touched this batch** — `cargo fmt
+--check`, `cargo test`, and `cargo clippy` were not run because there
+  was nothing there to verify, not because they were skipped under time
+  pressure. The next slice (Transfers Registry persistence) will need a
+  full `npm run quality:full` pass including these.
+- **`npm run quality:security` and `npm run quality:ui` were not run**
+  this batch — no new dependency was added and no new UI screen exists
+  yet to Playwright-check. Both apply once the next slice's UI screens
+  and (if approved) a QR-rendering dependency land.
+- **Weather integration (`src/infrastructure/open-meteo-weather-client.ts`)
+  has never made a real network call against the live Open-Meteo API in
+  this session** — only its response-parsing/error-handling logic is
+  tested, against a mocked `fetch`. Confirm the real response shape
+  against the live API before wiring a UI screen to it.
+- **ID-card token engine (`src/domain/id-card-token.ts`) has no real
+  secret-key source wired up yet** — tests use an arbitrary imported
+  key. Do not treat the token as production-ready until a real
+  device/school-bound secret is sourced (see ADR-0077).
+
 ## Batch 4 (Tier 3.1-3.2): no native visual/screen-reader pass, Playwright unavailable in sandbox, palette extractor not wired to a screen (2026-09-08)
 
 - **`npm run quality:ui` could not run.** `chrome-headless-shell` is not

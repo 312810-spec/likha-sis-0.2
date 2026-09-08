@@ -134,16 +134,16 @@
 
 ### 3.3 Teacher Creation Studio Remaining Deliverables
 
-- **Sub-scope 2.2: Certificate & Recognition Template:** Printable DepEd Academic Excellence Award certificate generator with automated DO 015 honors qualification engine.
-- **Sub-scope 2.3: Custom Seating Chart:** Drag-and-drop section seating arrangement tool reusing class rosters.
+- [ ] **Sub-scope 2.2: Certificate & Recognition Template:** Printable DepEd Academic Excellence Award certificate generator with automated DO 015 honors qualification engine. **Batch 5 (2026-09-08):** eligibility engine + certificate content builder shipped and tested (`src/domain/award-eligibility.ts`, `src/domain/certificate.ts`) with the GA threshold explicitly flagged as unverified/configurable and the disciplinary-anecdotes check explicitly not implemented (no Anecdotal Records feature exists); printable UI screen deferred to next slice — data plumbing already exists via `computeTermGrade`.
+- [ ] **Sub-scope 2.3: Custom Seating Chart:** Drag-and-drop section seating arrangement tool reusing class rosters. **Batch 5:** arrangement validation logic shipped and tested (`src/domain/seating-chart.ts`), session-local by design, click-to-place per Batch 4's precedent (not drag-and-drop — flagged deviation from this line item's own wording); UI screen deferred to next slice.
 
 ### 3.4 Operational Classroom & School Productivity Tools
 
-- **School Calendar & Philippine Holidays:** Offline database of regular, non-working, and Islamic holidays (`philippineHolidays.js`).
-- **Weather & Hazard Suspension Alerts:** Hyper-local Open-Meteo integration via school coordinates; flags severe weather suspension warnings ($>30\text{ mm}$ rain, $>50\text{ kph}$ wind).
-- **Transfers In/Out Documentation Registry:** Formal ledger tracking student transfer dates, receiving/originating schools, and document statuses.
-- **Consolidated Grades Matrix:** Cross-subject grade registry displaying all learning areas side-by-side per section across all terms.
-- **Student ID Card Generator:** Front/back printable student ID cards with photos, emergency contacts, and tokenized QR verification codes.
+- [ ] **School Calendar & Philippine Holidays:** Offline database of regular, non-working, and Islamic holidays (`philippineHolidays.js`). **Batch 5:** hardcoded, sourced SY 2025-2026 table shipped and tested (`src/domain/ph-holidays.ts`); calendar UI screen deferred to next slice.
+- [ ] **Weather & Hazard Suspension Alerts:** Hyper-local Open-Meteo integration via school coordinates; flags severe weather suspension warnings ($>30\text{ mm}$ rain, $>50\text{ kph}$ wind). **Batch 5:** full port/adapter/service slice shipped and tested, ADR-0076; fail-safe degrade-to-unavailable proven in tests; not yet wired into `composition.ts` or a UI screen (no school-coordinate field exists yet) — next slice.
+- [ ] **Transfers In/Out Documentation Registry:** Formal ledger tracking student transfer dates, receiving/originating schools, and document statuses. **Batch 5:** deferred entirely except domain validation (`src/domain/transfer-record.ts`) — the only Tier 3.3/3.4 item needing a brand-new persisted tenant-scoped entity (migration/repository/commands), judged out of scope for this batch's time budget; top candidate for the next slice.
+- [ ] **Consolidated Grades Matrix:** Cross-subject grade registry displaying all learning areas side-by-side per section across all terms. **Batch 5:** pure aggregation over already-computed grades shipped and tested (`src/domain/consolidated-grades.ts`), no new grade storage; UI screen deferred to next slice.
+- [ ] **Student ID Card Generator:** Front/back printable student ID cards with photos, emergency contacts, and tokenized QR verification codes. **Batch 5:** offline-only HMAC token generate/verify engine shipped and tested (`src/domain/id-card-token.ts`), ADR-0077 resolves the cloud-vs-offline audit question conservatively as offline-only; printable card layout, real QR image rendering (needs a new dependency, not yet evaluated), and real secret-key sourcing all deferred to next slice.
 
 ---
 

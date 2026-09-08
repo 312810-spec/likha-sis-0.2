@@ -1,5 +1,130 @@
 # CURRENT HANDOFF
 
+## Batch 5 (Tier 3.3-3.4) — domain-first, honestly scoped: eligibility/certificate, seating chart, holidays, weather (ADR-0076), ID-card token (ADR-0077), consolidated matrix; transfers deferred (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode — every
+commit local, nothing pushed, PR #55 untouched, no CI triggered. Covers
+`docs/product/MASTER-TASK-INVENTORY.md` §3.3-3.4 (7 items).
+
+**Scope decision made up front, and kept honest throughout**: given this
+batch's own explicit permission ("ship fewer items well-tested rather
+than all seven rushed") and the two flagged policy-uncertain items
+(award eligibility, ID-card verification) needing real rigor, this batch
+prioritized **tested pure domain logic for all 7 items** plus full
+architecture (port/adapter/service) for the one item needing a new
+external dependency (weather), over rushing UI screens and a brand-new
+persisted entity (transfers) that would not have gotten proper TDD
+treatment in the time available. UI screens and the Transfers registry's
+persistence layer are the recorded next slice, not silently dropped.
+
+**1. Certificate & Recognition (Academic Excellence)** —
+`src/domain/award-eligibility.ts` + `src/domain/certificate.ts` (12
+tests total). `DEFAULT_UNVERIFIED_GA_THRESHOLD` (90) and
+`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE` (80) are explicitly named and
+doc-commented as an unverified, school-overridable default — the
+2026-09-07 audit found legacy never actually implemented this rule (it
+was hardcoded mock data) and no primary DepEd source was ever checked.
+The "zero disciplinary anecdotes" leg is **not implemented** — there is
+no Anecdotal Records feature to check against — and
+`AwardEligibilityResult.anecdotalRecordsChecked` is hardcoded `false`
+and asserted so in tests, so nothing downstream can silently treat it as
+passed. `buildAcademicExcellenceCertificate` refuses to build a
+certificate for an ineligible learner and always includes a printed
+disclosure of both caveats. **UI (printable certificate screen)
+deferred** — the underlying per-learner grade data (`computeTermGrade`)
+already exists via `LearnerScoreApplicationService`; wiring a screen
+that loops a section roster through it is the next slice.
+
+**2. Custom Seating Chart** — `src/domain/seating-chart.ts` (9 tests):
+click-to-place (not drag-and-drop, per Batch 4's precedent), session-
+local by design (no persistence — matches the Batch 4 "session-local
+tool" pattern), no new learner field. **UI screen deferred** — the
+domain logic (place/remove/summarize) is ready for a screen to consume
+against the existing section roster.
+
+**3. School Calendar & Philippine Holidays** —
+`src/domain/ph-holidays.ts` (7 tests): hardcoded SY 2025-2026 table
+(regular/special-non-working/Islamic), sourced to Proclamation Nos. 727
+and 665 s. 2025 (Official Gazette) plus DepEd's SY 2025-2026 school
+calendar order, with Islamic-holiday dates flagged as approximate
+pending each year's specific proclamation. Flagged in this entry and in
+`docs/VERIFICATION-DEBT.md` as needing periodic manual update. **UI
+calendar screen deferred.**
+
+**4. Weather & Hazard Suspension Alerts** — full port/adapter/service
+slice, see **ADR-0076**
+(`docs/adr/0076-weather-hazard-alerts-open-meteo-scope.md`): a NEW
+external network dependency (Open-Meteo, free, no key) for an
+offline-first app, explicitly flagged despite zero cost. Every failure
+mode (offline, timeout, non-2xx, malformed response) degrades to
+`{status:"unavailable"}` and never throws — proven in
+`src/application/weather-service.test.ts` and
+`src/infrastructure/open-meteo-weather-client.test.ts` (19 tests total
+across the three weather files). `>30mm rain / >50kph wind` thresholds
+are the inventory doc's own figures, explicitly flagged as an
+unverified-against-a-specific-PAGASA/DepEd-circular heuristic, worded as
+advisory only. **Not yet wired into `composition.ts` or a UI screen**
+(no school-coordinate field exists yet either) — kept out of
+`composition.ts` this batch specifically so `knip` doesn't carry a
+dead top-level export; the next slice adds both the coordinate field (if
+a screen is built) and the composition wiring together.
+
+**5. Transfers In/Out Documentation Registry** — **deferred**, domain
+validation only shipped (`src/domain/transfer-record.ts`, 6 tests). This
+is the one item needing a genuinely new tenant-scoped persisted entity
+(migration + repository + narrow commands + TS port + application
+service + `authorize_*` wiring, both-sides tests) — a full vertical
+slice in its own right that this batch chose not to rush alongside the
+two policy-sensitive items above. Recorded as the top candidate for the
+next slice.
+
+**6. Consolidated Grades Matrix** — `src/domain/consolidated-grades.ts`
+(6 tests): pure aggregation over already-computed
+`ComputedTermGrade`/`computeTermGrade` values (the same source
+`export-service.ts`'s Rust SF9/SF10 exports already use) — no new grade
+storage, no new source of truth, per this batch's own constraint.
+Produces a section x subject x term matrix plus a per-row general
+average (feeding directly into item 1's eligibility engine). **UI screen
+deferred** — the aggregation is ready for a screen to loop a roster
+through existing services and feed the result in.
+
+**7. Student ID Card Generator** — full offline-verification token
+engine, see **ADR-0077**
+(`docs/adr/0077-id-card-qr-offline-verification-scope.md`): resolves
+audit open question #5 conservatively as **offline-only, no cloud
+endpoint, ever without explicit approval**. `src/domain/id-card-token.ts` (8 tests)
+implements `HMAC-SHA256(secretKey, schoolId|learnerId|lrn)` via Web
+Crypto (no new dependency), verified by local recomputation only — a
+test explicitly asserts verification never calls `fetch`. Real
+secret-key sourcing (wiring to `src-tauri/src/crypto/`) and the
+printable front/back card layout are deferred; **QR image rendering is
+deferred rather than faked** — no QR-rendering dependency exists in this
+project yet, and hand-rolling a correct QR encoder was judged too
+error-prone for this batch. A specific library (e.g. `qrcode`, MIT) is
+flagged for evaluation, not added, next slice.
+
+**Verification actually run**: `npm run quality` (typecheck, lint,
+format:check, architecture-boundary check, knip, vitest) — **1205 tests
+passed across 125 files**, no failures. No Rust/`src-tauri` files were
+touched this batch, so `cargo fmt --check`/`cargo test`/`cargo clippy`
+were not run (not applicable — nothing to verify there) and
+`npm run quality:security`/`npm run quality:ui` were not run either
+(no new dependency, no new UI screen this batch to Playwright-check).
+
+**New dependencies added: none.** Weather uses `fetch`/`AbortController`
+(already available); ID-card tokens use `crypto.subtle` (Web Crypto,
+already available). No npm/cargo package was added.
+
+**Exact next slice** (in priority order): (a) Transfers In/Out
+Documentation Registry full-stack persistence (migration + repository +
+commands + TS port + service + tests + UI) — the only item requiring
+new Rust; (b) wire the 6 domain-only modules above into UI screens,
+starting with Consolidated Grades Matrix and the Certificate screen
+since their data plumbing (`computeTermGrade`) already exists; (c)
+evaluate and, if approved, add a QR-rendering dependency for the ID
+card's visual layout; (d) source a real device/school-bound secret key
+for `id-card-token.ts` instead of a caller-supplied one.
+
 ## Batch 4 (Tier 3.1-3.2) closed out: theme-token extensions, logo palette extraction, Visual Timetable / Class Program Builder (2026-09-08)
 
 Closed out Batch 4 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 3

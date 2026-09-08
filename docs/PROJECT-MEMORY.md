@@ -1,5 +1,37 @@
 # PROJECT MEMORY
 
+## Batch 5 (Tier 3.3-3.4): domain foundations for 7 items shipped; 2 policy-scope ADRs; Transfers persistence deferred (2026-09-08)
+
+- **Award eligibility is explicitly unverified/configurable, not DepEd
+  law**: `DEFAULT_UNVERIFIED_GA_THRESHOLD`/`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE`
+  in `src/domain/award-eligibility.ts`; the "zero disciplinary
+  anecdotes" leg is not implemented (no Anecdotal Records feature
+  exists) and `anecdotalRecordsChecked` is hardcoded `false`.
+- **ADR-0076**: Weather & Hazard Suspension Alerts — Open-Meteo (free,
+  no key), the first third-party network call this codebase makes
+  directly from the device; every failure degrades to `"unavailable"`,
+  never blocks a workflow. Port/adapter/service shipped and tested, not
+  yet wired into `composition.ts` or a UI screen.
+- **ADR-0077**: Student ID Card QR — offline-only verification, no cloud
+  endpoint (resolves the 2026-09-07 audit's open question #5
+  conservatively). `src/domain/id-card-token.ts`: HMAC-SHA256 via Web
+  Crypto, no new dependency; a test asserts verification never calls
+  `fetch`. Real secret-key sourcing and QR image rendering (needs a new,
+  not-yet-evaluated dependency) both deferred.
+- Also shipped, domain-only, tested: `src/domain/seating-chart.ts`
+  (session-local click-to-place validation), `src/domain/ph-holidays.ts`
+  (hardcoded, sourced SY 2025-2026 table — needs periodic manual
+  update), `src/domain/consolidated-grades.ts` (pure aggregation over
+  already-computed `ComputedTermGrade` values, no new grade storage).
+- **Deferred entirely except domain validation**: Transfers In/Out
+  Documentation Registry (`src/domain/transfer-record.ts`) — the only
+  Tier 3.3/3.4 item needing a brand-new persisted tenant-scoped entity
+  (migration/repository/commands); judged out of this batch's time
+  budget rather than rushed. Top candidate for the next slice.
+- No npm/cargo dependency added. No Rust/`src-tauri` file touched.
+  `npm run quality`: 1205 tests passed, 125 files, clean typecheck/lint/
+  format/architecture/knip.
+
 ## Theme-token extensions, logo palette extraction, and Visual Timetable shipped (2026-09-08)
 
 - ADR-0075: extends (not replaces) the existing Wave 1-6 shell/token
