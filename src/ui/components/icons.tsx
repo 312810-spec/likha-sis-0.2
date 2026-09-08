@@ -12,7 +12,8 @@ export type IconName =
   | "grid"
   | "shield"
   | "menu"
-  | "chevron";
+  | "chevron"
+  | "bell";
 
 // Stroke-only 24x24 glyphs, drawn with currentColor so they inherit the
 // nav item's text colour (including the active/inverted state). Decorative:
@@ -61,6 +62,7 @@ const PATHS: Record<IconName, JSX.Element> = {
   shield: <path d="M12 3 5 6v6c0 4.4 3 8 7 9 4-1 7-4.6 7-9V6l-7-3Z" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   chevron: <path d="m6 9 6 6 6-6" />,
+  bell: <path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z M10 19a2 2 0 0 0 4 0" />,
 };
 
 export function Icon({ name }: { name: IconName }): JSX.Element {

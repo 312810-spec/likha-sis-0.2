@@ -21,6 +21,15 @@ interface SidebarProps {
 }
 
 const STORAGE_KEY = "likha-sis:nav-collapsed";
+const RAIL_STORAGE_KEY = "likha-sis:sidebar-rail-collapsed";
+
+function readRailCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 const GROUP_ICON: Record<string, IconName> = {
   "Daily Teaching": "today",
@@ -63,7 +72,16 @@ function readCollapsed(): Set<string> {
 export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProps) {
   const { mode, setMode } = useTeacherMode();
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
+  const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   const current = normalizeTab(activeTab);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(RAIL_STORAGE_KEY, String(railCollapsed));
+    } catch {
+      // Non-fatal: the rail state still applies for this session.
+    }
+  }, [railCollapsed]);
 
   useEffect(() => {
     try {
@@ -86,10 +104,10 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
   }
 
   return (
-    <nav aria-label="Primary" className="app-sidebar">
+    <nav aria-label="Primary" className="app-sidebar" data-collapsed={railCollapsed}>
       <h1 className="app-sidebar-brand">
         {logoUrl && <img src={logoUrl} alt="" className="app-sidebar-logo" />}
-        LIKHA-SIS
+        <span className="app-sidebar-brand-text">LIKHA-SIS</span>
       </h1>
       <p className="app-sidebar-identity">
         <strong>{session.displayName}</strong>
@@ -101,6 +119,7 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
           type="button"
           className="app-nav-item"
           aria-current={current === HOME_DESTINATION.id ? "page" : undefined}
+          title={railCollapsed ? HOME_DESTINATION.label : undefined}
           onClick={() => onNavigate(HOME_DESTINATION.id)}
         >
           <Icon name="home" />
@@ -115,6 +134,7 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
                 type="button"
                 className="app-nav-group-toggle"
                 aria-expanded={!isCollapsed}
+                title={railCollapsed ? group.label : undefined}
                 onClick={() => toggleGroup(group.label)}
               >
                 <Icon name={GROUP_ICON[group.label] ?? "grid"} />
@@ -131,6 +151,7 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
                         type="button"
                         className="app-nav-item"
                         aria-current={current === t.id ? "page" : undefined}
+                        title={railCollapsed ? t.label : undefined}
                         onClick={() => onNavigate(t.id)}
                       >
                         <Icon name={TAB_ICON[t.id] ?? "grid"} />
@@ -152,6 +173,19 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
           </button>
         ))}
       </div>
+
+      <button
+        type="button"
+        className="app-sidebar-collapse-toggle"
+        aria-pressed={railCollapsed}
+        title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={() => setRailCollapsed((prev) => !prev)}
+      >
+        <Icon name="chevron" />
+        <span className={railCollapsed ? "visually-hidden" : undefined}>
+          {railCollapsed ? "Expand" : "Collapse"}
+        </span>
+      </button>
     </nav>
   );
 }

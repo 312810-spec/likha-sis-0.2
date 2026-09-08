@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TopBar } from "./TopBar";
+import { ColorThemeProvider } from "../theme/ColorThemeContext";
 import { ModeProvider } from "../theme/ModeContext";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
@@ -20,15 +21,17 @@ const session: CurrentSession = {
 
 function renderTopBar(over: Partial<ComponentProps<typeof TopBar>> = {}) {
   return render(
-    <ModeProvider>
-      <TopBar
-        session={session}
-        activeTab="attendance"
-        onLogout={vi.fn()}
-        onOpenDrawer={vi.fn()}
-        {...over}
-      />
-    </ModeProvider>,
+    <ColorThemeProvider>
+      <ModeProvider>
+        <TopBar
+          session={session}
+          activeTab="attendance"
+          onLogout={vi.fn()}
+          onOpenDrawer={vi.fn()}
+          {...over}
+        />
+      </ModeProvider>
+    </ColorThemeProvider>,
   );
 }
 

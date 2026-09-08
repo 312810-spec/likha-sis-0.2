@@ -121,4 +121,20 @@ describe("Sidebar", () => {
     );
     spy.mockRestore();
   });
+
+  it("collapses to an icon rail, adds tooltips, and remembers the choice", async () => {
+    const user = userEvent.setup();
+    const { container } = renderSidebar();
+    const toggle = screen.getByRole("button", { name: "Collapse" });
+
+    await user.click(toggle);
+
+    expect(container.querySelector(".app-sidebar")).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByTitle("Home")).toBeInTheDocument();
+    expect(window.localStorage.getItem("likha-sis:sidebar-rail-collapsed")).toBe("true");
+
+    const { unmount } = renderSidebar();
+    expect(container.querySelector(".app-sidebar")).toHaveAttribute("data-collapsed", "true");
+    unmount();
+  });
 });

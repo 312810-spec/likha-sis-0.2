@@ -59,6 +59,21 @@
   /* Tabular figures for grades, LRNs, dates, and attendance counts --
      digits must align in a column, not just be legible individually. */
   --font-numeric: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Batch 4 (ADR-0075) typography pairing, page-title half: a system
+     serif stack, NOT the legacy reference project's Fraunces webfont --
+     adding a new Google Font is a flaggable dependency decision per
+     this batch's constraints, not a silent default, and is deferred
+     pending explicit approval (see the ADR and SOURCE-REGISTRY). This
+     gets the editorial serif/sans *pairing* effect immediately, at zero
+     new dependency cost; swapping in Fraunces later only means changing
+     this one token. */
+  --font-serif: Georgia, Cambria, "Times New Roman", serif;
+  /* Typography pairing, tabular half: a system monospace stack for
+     aligned numeric columns (grade tables, the shell's live clock) that
+     want fixed-width digits even more strictly than --font-numeric's
+     tabular-figure sans -- also deferred from a real webfont (e.g. IBM
+     Plex Mono) for the same reason as --font-serif above. */
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   --font-size-base: 15px;
   --font-size-large: 1.25rem;
   --font-size-small: 0.875rem;
@@ -75,6 +90,16 @@
   --elevation-1: 0 1px 2px rgba(27, 36, 48, 0.08);
   /* Second elevation level -- drawer / overlay only, never decoration. */
   --elevation-2: 0 8px 24px -12px rgba(27, 36, 48, 0.22);
+  /* Batch 4 (ADR-0075) card/elevation scale: small covers a resting
+     card/button/input, medium a hover-lifted card, pressed a sunken
+     look for an active/pressed control. Distinct from --elevation-1/2
+     above (chrome separation, e.g. the sticky header) -- these three
+     are for interactive surfaces (cards, buttons, inputs). */
+  --elevation-small: 0 1px 2px rgba(27, 36, 48, 0.06), 0 1px 1px rgba(27, 36, 48, 0.04);
+  --elevation-medium: 0 4px 12px -4px rgba(27, 36, 48, 0.18), 0 2px 4px rgba(27, 36, 48, 0.08);
+  --elevation-pressed: inset 0 1px 2px rgba(27, 36, 48, 0.16);
+  --radius-medium: 8px;
+  --radius-card: 12px;
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
@@ -119,8 +144,15 @@
   --control-height: 48px;
 }
 
+/* Batch 4 (ADR-0075): the manual Light/System/Dark toggle
+   (`ColorThemeContext`). "System" writes no `data-theme` attribute, so
+   the existing `prefers-color-scheme` query above stays the sole source
+   of truth for it -- guarding this block with
+   `:root:not([data-theme="light"])` means an explicit "dark" choice
+   still applies even on a light-preferring OS, and an explicit "light"
+   choice (below) always wins over both. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-bg: #14181d;
     --color-surface: #1c2129;
     --color-surface-2: #222932;
@@ -142,10 +174,51 @@
     --color-warning-surface: #3a2f14;
     --color-focus: #8fb4dd;
     --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    --elevation-small: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --elevation-medium: 0 4px 12px -4px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.3);
+    --elevation-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.5);
     /* Verified (dark): text/surface-2 12.09:1, muted/surface-2 6.48:1,
        text/primary-wash 11.99:1, border/surface-2 3.39:1. */
     color-scheme: dark;
   }
+}
+
+/* Same palette as the media-query block above, applied unconditionally
+   when the viewer explicitly chose "Dark" regardless of OS preference. */
+:root[data-theme="dark"] {
+  --color-bg: #14181d;
+  --color-surface: #1c2129;
+  --color-surface-2: #222932;
+  --color-border-soft: #333c47;
+  --color-primary-wash: #1e2a38;
+  --color-border: #6f7b87;
+  --color-text: #ece9e1;
+  --color-text-muted: #a6adb6;
+  --color-primary: #8fb4dd;
+  --color-primary-text: #0d1720;
+  --color-productive: #6fccb9;
+  --color-productive-surface: #163330;
+  --color-danger: #ff9c94;
+  --color-danger-surface: #3a1f1d;
+  --color-success: #8fd1a0;
+  --color-success-surface: #17332c;
+  --color-warning: #e8c07d;
+  --color-warning-surface: #3a2f14;
+  --color-focus: #8fb4dd;
+  --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --elevation-small: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elevation-medium: 0 4px 12px -4px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --elevation-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+/* An explicit "Light" choice always wins, even on a dark-preferring OS
+   -- the base :root values above already are the light palette, so this
+   only needs to restate color-scheme (the media query never applies
+   here since this selector requires the attribute the query doesn't
+   check). */
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {
@@ -190,6 +263,14 @@ button {
 
 button:hover {
   filter: brightness(0.97);
+}
+
+/* Batch 4 (ADR-0075): a control reads as "pressed" while actually held
+   down, distinct from :disabled/[aria-disabled] above (a genuinely
+   inert state, not a momentary one) and from the card hover-lift
+   (elevation increasing, not sinking). */
+button:not(:disabled):not([aria-disabled="true"]):active {
+  box-shadow: var(--elevation-pressed);
 }
 
 button:disabled {
@@ -371,6 +452,17 @@ label {
 
 .page-header h2 {
   margin: 0 0 calc(var(--spacing-unit) * 0.35) 0;
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+/* Batch 4 (ADR-0075): the monospace/tabular half of the typography
+   pairing -- opt-in via this class, applied to the shell's live clock
+   and (where a screen already renders one) a grade/numeric column, not
+   forced onto every number in the app. */
+.font-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Redesign primitives -- Page scaffold (ADR-0057 Wave 2). Reuses the
@@ -1363,10 +1455,89 @@ label {
   gap: var(--spacing-unit);
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
   border-bottom: 1px solid var(--color-border-soft);
+  /* Translucent + blurred sticky header (ADR-0075). Falls back to the
+     prior fully-opaque --color-bg fill on a renderer with no
+     backdrop-filter support -- @supports guards the upgrade so there is
+     never a transparent header over unreadable content. */
   background: var(--color-bg);
   position: sticky;
   top: 0;
   z-index: 20;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .app-topbar {
+    background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+.app-topbar-clock {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.app-theme-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.app-theme-toggle button {
+  min-height: 28px;
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+.app-theme-toggle button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.app-notification-bell {
+  position: relative;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-notification-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.app-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--font-size-small);
+  flex: none;
 }
 
 .app-topbar-menu {
@@ -1480,10 +1651,34 @@ label {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 100vh;
+  transition: grid-template-columns var(--motion-duration-routine) var(--motion-easing-standard);
 }
 
 .app-layout-sidebar {
   min-width: 0;
+}
+
+/* Batch 4 (ADR-0075): collapsible sidebar rail. Expanded is the existing
+   --sidebar-width (~16.5rem); collapsed shrinks to an icon-only rail
+   (~5rem) via the same variable, scoped to this attribute so it never
+   affects the phone off-canvas drawer sizing below. */
+.app-layout:has(.app-sidebar[data-collapsed="true"]) {
+  grid-template-columns: 5rem 1fr;
+}
+.app-sidebar[data-collapsed="true"] .app-sidebar-identity,
+.app-sidebar[data-collapsed="true"] .app-nav-item span,
+.app-sidebar[data-collapsed="true"] .app-nav-group-toggle span:not(.app-nav-group-chevron),
+.app-sidebar[data-collapsed="true"] .app-sidebar-brand-text,
+.app-sidebar[data-collapsed="true"] .app-sidebar-modes {
+  display: none;
+}
+.app-sidebar[data-collapsed="true"] .app-nav-item,
+.app-sidebar[data-collapsed="true"] .app-nav-group-toggle {
+  justify-content: center;
+}
+.app-sidebar-collapse-toggle {
+  width: 100%;
+  margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
 .app-layout-main {
@@ -1691,9 +1886,19 @@ label {
   min-width: 0;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-large);
-  box-shadow: var(--elevation-1);
+  border-radius: var(--radius-card, var(--radius-large));
+  box-shadow: var(--elevation-small);
   padding: calc(var(--spacing-unit) * 1.2);
+  transition: box-shadow var(--motion-duration-routine) var(--motion-easing-standard);
+}
+/* Batch 4 (ADR-0075) card elevation: a resting card lifts on hover
+   (mouse-only -- a touch/keyboard user gets no hover state to begin
+   with, so this never gates any capability, purely decorative
+   affordance). */
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: var(--elevation-medium);
+  }
 }
 .card[data-span="4"] {
   grid-column: span 4;

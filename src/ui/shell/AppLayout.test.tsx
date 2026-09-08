@@ -3,6 +3,7 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./AppLayout";
+import { ColorThemeProvider } from "../theme/ColorThemeContext";
 import { ModeProvider } from "../theme/ModeContext";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
@@ -55,17 +56,19 @@ beforeEach(() => {
 
 function renderLayout(over: Partial<ComponentProps<typeof AppLayout>> = {}) {
   return render(
-    <ModeProvider>
-      <AppLayout
-        session={session}
-        activeTab="attendance"
-        onNavigate={vi.fn()}
-        onLogout={vi.fn()}
-        {...over}
-      >
-        <div data-testid="screen">screen content</div>
-      </AppLayout>
-    </ModeProvider>,
+    <ColorThemeProvider>
+      <ModeProvider>
+        <AppLayout
+          session={session}
+          activeTab="attendance"
+          onNavigate={vi.fn()}
+          onLogout={vi.fn()}
+          {...over}
+        >
+          <div data-testid="screen">screen content</div>
+        </AppLayout>
+      </ModeProvider>
+    </ColorThemeProvider>,
   );
 }
 
