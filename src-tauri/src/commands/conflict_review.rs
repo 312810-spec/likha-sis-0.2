@@ -14,6 +14,7 @@ use crate::error::{AppError, AppResult};
 use crate::repository::sync_hub::AcceptedChange;
 use crate::repository::{
     attendance, child_protection, grade_submission, learner, lesson_plan, nutrition, section,
+    transfer_record,
 };
 use crate::repository::{
     sync_conflict_review::{self, ConflictResolution, ConflictReviewRow},
@@ -105,6 +106,13 @@ pub enum ConflictEntityPreview {
         submission_id: String,
         note_type: String,
         note: String,
+    },
+    TransferRecord {
+        learner_id: String,
+        direction: String,
+        transfer_date: String,
+        other_school_name: String,
+        status: String,
     },
     /// Fallback for any entity kind wired to sync that has no dedicated
     /// typed preview above (every currently-wired kind has one as of
@@ -200,6 +208,16 @@ fn grade_submission_note_preview(n: &grade_submission::SubmissionNote) -> Confli
     }
 }
 
+fn transfer_record_preview(r: &transfer_record::TransferRecord) -> ConflictEntityPreview {
+    ConflictEntityPreview::TransferRecord {
+        learner_id: r.learner_id.clone(),
+        direction: r.direction.clone(),
+        transfer_date: r.transfer_date.clone(),
+        other_school_name: r.other_school_name.clone(),
+        status: r.status.clone(),
+    }
+}
+
 /// This device's own currently-live version of the conflicting entity --
 /// read straight from the domain table, never from the staged conflict
 /// row itself, because the staged row never captured it (staging never
@@ -247,6 +265,9 @@ fn local_preview(
                 .as_ref()
                 .map(grade_submission_note_preview)
         }
+        EntityKind::TransferRecord => transfer_record::find_by_id(conn, school_id, entity_id)?
+            .as_ref()
+            .map(transfer_record_preview),
         _ => None,
     })
 }
@@ -312,6 +333,12 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
                 .ok()
                 .as_ref()
                 .map(grade_submission_note_preview)
+        }
+        EntityKind::TransferRecord => {
+            serde_json::from_slice::<transfer_record::TransferRecord>(plaintext)
+                .ok()
+                .as_ref()
+                .map(transfer_record_preview)
         }
         _ => Some(ConflictEntityPreview::Unknown),
     }

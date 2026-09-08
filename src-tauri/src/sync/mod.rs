@@ -75,6 +75,7 @@ pub enum EntityKind {
     IncidentIntervention,
     GradeSubmission,
     GradeSubmissionNote,
+    TransferRecord,
 }
 
 impl EntityKind {
@@ -101,6 +102,7 @@ impl EntityKind {
             EntityKind::IncidentIntervention => "incident_intervention",
             EntityKind::GradeSubmission => "grade_submission",
             EntityKind::GradeSubmissionNote => "grade_submission_note",
+            EntityKind::TransferRecord => "transfer_record",
         }
     }
 
@@ -123,6 +125,7 @@ impl EntityKind {
             "incident_intervention" => Some(EntityKind::IncidentIntervention),
             "grade_submission" => Some(EntityKind::GradeSubmission),
             "grade_submission_note" => Some(EntityKind::GradeSubmissionNote),
+            "transfer_record" => Some(EntityKind::TransferRecord),
             _ => None,
         }
     }

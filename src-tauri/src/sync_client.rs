@@ -83,6 +83,7 @@ use crate::repository::{
     device_sync_client_credential, grade_submission, grading, learner, learner_score, lesson_plan,
     nutrition, section, section_membership, subject, subject_attendance, sync_conflict_review,
     sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
+    transfer_record,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -782,6 +783,15 @@ pub(crate) fn apply_decrypted_change(
             let incoming: grade_submission::SubmissionNote =
                 serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             grade_submission::upsert_note_from_sync(conn, school_id, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::TransferRecord => {
+            let incoming: transfer_record::TransferRecord =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            transfer_record::upsert_from_sync(conn, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }

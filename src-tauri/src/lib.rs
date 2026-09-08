@@ -209,6 +209,10 @@ pub fn run() {
             commands::grade_submission::get_principal_overview_dashboard,
             commands::import::preview_scholastic_import,
             commands::import::commit_scholastic_import,
+            commands::transfer_record::record_transfer,
+            commands::transfer_record::list_transfers_for_learner,
+            commands::transfer_record::list_transfers_for_school,
+            commands::transfer_record::update_transfer_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

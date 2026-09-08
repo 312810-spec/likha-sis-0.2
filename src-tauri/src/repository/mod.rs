@@ -38,4 +38,5 @@ pub mod sync_payload_key;
 pub mod sync_pull_cursor;
 pub mod sync_version_cache;
 pub mod teaching_assignment;
+pub mod transfer_record;
 pub mod user;

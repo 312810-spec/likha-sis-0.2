@@ -73,3 +73,25 @@ export function validateTransferRecord(input: TransferRecordInput): TransferReco
     remarks: remarks === "" ? undefined : remarks,
   };
 }
+
+/**
+ * A persisted transfer record (Batch 9, ADR-0080). Mirrors Rust's
+ * `repository::transfer_record::TransferRecord` exactly. Kept in this
+ * same file, alongside the validation this batch reuses unchanged, so
+ * the two never drift apart -- see this file's own top-of-file scope
+ * note for why the validation-only slice and this persisted-record slice
+ * were originally split across batches.
+ */
+export interface TransferRecord {
+  id: string;
+  schoolId: string;
+  learnerId: string;
+  direction: TransferDirection;
+  transferDate: string;
+  otherSchoolName: string;
+  status: TransferStatus;
+  remarks: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

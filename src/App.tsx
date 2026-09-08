@@ -28,6 +28,7 @@ import {
   subjectService,
   syncStatusService,
   teachingAssignmentService,
+  transferRecordService,
   weatherService,
 } from "./composition";
 import type { CurrentSession } from "./domain/session";
@@ -67,6 +68,7 @@ import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
+import { TransfersScreen } from "./ui/TransfersScreen";
 import { AppLayout } from "./ui/shell/AppLayout";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ColorThemeProvider } from "./ui/theme/ColorThemeContext";
@@ -462,6 +464,11 @@ function App() {
               <Sf1ImportScreen
                 sf1ImportService={sf1ImportService}
                 sectionService={sectionService}
+              />
+            ) : activeTab === "transfers" ? (
+              <TransfersScreen
+                transferRecordService={transferRecordService}
+                learnerService={learnerService}
               />
             ) : activeTab === "attendance" ? (
               <AttendanceScreen

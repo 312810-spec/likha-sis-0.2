@@ -25,6 +25,7 @@ import { SubjectApplicationService } from "./application/subject-service";
 import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
 import { SyncStatusApplicationService } from "./application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
+import { TransferRecordApplicationService } from "./application/transfer-record-service";
 import { UserApplicationService } from "./application/user-service";
 import { WeatherApplicationService } from "./application/weather-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
@@ -55,6 +56,7 @@ import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repositor
 import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject-attendance-repository";
 import { TauriSyncStatusRepository } from "./infrastructure/tauri/sync-status-repository";
 import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
+import { TauriTransferRecordRepository } from "./infrastructure/tauri/transfer-record-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 import { OpenMeteoWeatherClient } from "./infrastructure/open-meteo-weather-client";
 
@@ -124,6 +126,9 @@ export const teachingAssignmentService = new TeachingAssignmentApplicationServic
 );
 export const schoolMemberService = new SchoolMemberApplicationService(
   new TauriSchoolMemberRepository(),
+);
+export const transferRecordService = new TransferRecordApplicationService(
+  new TauriTransferRecordRepository(),
 );
 export const schoolAttendanceService = new SchoolAttendanceApplicationService(
   new TauriSchoolAttendanceRepository(),

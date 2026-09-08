@@ -536,6 +536,22 @@ pub enum Capability {
     /// reasoning `ManageSchoolBranding`'s own doc comment gives for not
     /// reusing `ManageSchoolMembership`).
     ManageSchoolCoordinates,
+    /// Record or view a learner's inter-school transfer documentation
+    /// (`repository::transfer_record`) -- real learner PII (ADR-0080).
+    /// Deliberately its own variant rather than reusing `ManageLearners`,
+    /// following this codebase's own repeated precedent
+    /// (`ManageTeachingAssignments`/`ManageSectionAdvisories`/
+    /// `ManageSchoolBranding`/`ManageSchoolCoordinates` are each their own
+    /// variant even where several currently resolve to the same roles):
+    /// recording a transfer is a distinct registrar-facing action from
+    /// creating/editing a learner's enrollment record, even though both
+    /// currently resolve to the same two roles. Conservatively scoped to
+    /// the same roles as `ManageLearners` (Registrar, School Head) --
+    /// matching `ManageHealthRecords`'s own reasoning for why a bare
+    /// Teacher role is not included: transfers are a school-wide
+    /// registrar/administrative act, not a per-section teaching duty, and
+    /// this project's role model has no per-section carve-out for it.
+    ManageTransferRecords,
 }
 
 impl Capability {
@@ -551,6 +567,7 @@ impl Capability {
             Capability::ManageChildProtection => &[role_repo::SCHOOL_HEAD],
             Capability::ManageGradeSubmissionReview => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolCoordinates => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageTransferRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
         }
     }
 }

@@ -1,5 +1,106 @@
 # CURRENT HANDOFF
 
+## Batch 9 (complete): Transfers In/Out Documentation Registry, full vertical slice (2026-09-08, ADR-0080), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. This batch shipped the full vertical slice Batch 5
+deliberately deferred: migration/repository/commands/TS service/UI
+screen/sync wiring for the Transfers In/Out Documentation Registry
+(`docs/product/MASTER-TASK-INVENTORY.md` §3.4). All 4 checkpoints from
+the batch prompt were implemented and verified together in one session
+(not committed incrementally per checkpoint, since the whole slice was
+built and verified as one coherent change before any commit landed) --
+see ADR-0080 for the capability-assignment and sync-wire-now-vs-defer
+decisions.
+
+**What shipped:**
+
+- **Migration 52**: `transfer_records` table (school-scoped, references
+  `learners`, `direction`/`status` `CHECK`-constrained, no natural key
+  beyond `id` -- a learner may legitimately accumulate multiple transfer
+  rows over time).
+- **Migration 53**: widens the `entity_kind` allowlist (`sync_outbox`/
+  `sync_hub_log`/`sync_conflict_review`/`sync_version_cache`) to add
+  `'transfer_record'`, the same 12-step CHECK-widening rebuild as every
+  prior entity addition.
+- **`repository::transfer_record`**: tenant-scoped `create`/
+  `find_by_id`/`list_for_learner`/`list_for_school`/`update_status`/
+  `upsert_from_sync`, reusing the exact same
+  trim/non-empty/max-length/ISO-date rules as
+  `src/domain/transfer-record.ts`'s `validateTransferRecord` (Batch 5) so
+  the two never diverge. 16 tests (CRUD, tenant isolation, sync
+  round-trip).
+- **New `Capability::ManageTransferRecords`** (Registrar, School Head) --
+  its own variant rather than reusing `ManageLearners`, following this
+  codebase's repeated precedent (`ManageTeachingAssignments`/
+  `ManageSectionAdvisories`/`ManageSchoolBranding`/
+  `ManageSchoolCoordinates`); role set mirrors `ManageHealthRecords`
+  (school-wide registrar act, no per-section Teacher carve-out) rather
+  than `ManageChildProtection`'s per-section shape -- see ADR-0080
+  Decision 1.
+- **`commands::transfer_record`**: `record_transfer`/
+  `list_transfers_for_learner`/`list_transfers_for_school`/
+  `update_transfer_status`, following `commands::nutrition`'s exact
+  enrollment-gated encrypt-on-enqueue sync pattern (`SAVEPOINT`-atomic
+  with the write, no outbox row when this school has never enrolled a
+  sync device). 5 tests.
+- **`TransferRecordApplicationService`**/`TauriTransferRecordRepository`/
+  `TransferRecordRepository` port, wired in `composition.ts`
+  (`transferRecordService`). 8 TS tests (application service) + 4 TS
+  tests (Tauri adapter).
+- **`TransfersScreen`**: create form (learner picker, direction, date,
+  other-school name, status, remarks) plus a read-only ledger table with
+  an inline status-update control, reachable from the "Learner Records"
+  nav group. Axe-clean. 5 tests.
+- **Sync wiring**: `EntityKind::TransferRecord`,
+  `transfer_record::upsert_from_sync`, the sync-aware command wrapper
+  (authorization gate unchanged), an `apply_decrypted_change` arm
+  (school-scope-checked), and a `ConflictEntityPreview::TransferRecord`
+  typed preview (Batch 8's conflict-review pattern) in
+  `commands::conflict_review`. No dedicated natural-key-collision test --
+  this table has no natural key beyond `id` (see ADR-0080 Decision 3), so
+  a pulled change can only ever collide on `id`, which `ON CONFLICT(id)`
+  always resolves as an update; there is no distinct failure mode to
+  prove.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate, all 21 test binaries) -- **1249 passed, 0
+  failed** (includes the 21 new transfer-record tests across
+  `repository::transfer_record` and `commands::transfer_record`).
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest) -- **138 test files, 1273 tests passed**, 0
+  failed; architecture-boundary check passed (no restricted imports);
+  knip found no new dead code.
+
+**Tenant isolation / authorization verification**: every
+`repository::transfer_record` query takes `school_id` as an explicit
+parameter and filters on it in the SQL itself (never inferred only from
+a joined row); `list_for_learner_is_tenant_scoped` and
+`update_status_is_tenant_scoped` tests prove a same-id-string probe from
+the wrong school returns nothing/`None` rather than leaking or mutating
+another school's row. Every Tauri command derives `school_id` from
+`authorize_capability_with_actor(..., Capability::ManageTransferRecords)`
+-- never a client-supplied parameter -- matching
+`docs/adr/0004-authentication-and-local-session.md`.
+
+**Deferred/out of scope (see ADR-0080)**: no UI-level role gating on the
+nav tab (this project never hides a tab by role; the real gate is
+server-side); editing a transfer's date/direction/school name after
+creation (only `status` is ever updated); resolving `other_school_name`
+against a directory of external schools (none exists in this app).
+
+**Next slice**: no specific next candidate pre-selected this session --
+consult `docs/product/MASTER-TASK-INVENTORY.md` for the next-highest-
+priority unchecked item per `.claude/rules/autonomous-development.md`'s
+selection order (privacy/security → correctness → DepEd compliance →
+teacher usability → offline reliability → maintainability → zero billing
+→ performance → speed) before starting a new wave.
+
 ## Batch 8 (complete, items 1-7): all 7 remaining domain-module UI screens shipped (2026-09-08), commit local only, PR owed
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

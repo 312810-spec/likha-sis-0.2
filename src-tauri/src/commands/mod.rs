@@ -26,6 +26,7 @@ pub mod subject;
 pub mod subject_attendance;
 pub mod sync_status;
 pub mod teaching_assignment;
+pub mod transfer_record;
 pub mod user;
 
 use std::sync::{Mutex, MutexGuard};
