@@ -215,6 +215,10 @@ pub fn run() {
             commands::transfer_record::update_transfer_status,
             commands::formative_assessment::record_formative_assessment,
             commands::formative_assessment::list_formative_assessment_logs_for_assignment,
+            commands::anecdotal_record::record_anecdotal_entry,
+            commands::anecdotal_record::list_anecdotal_records_for_section,
+            commands::anecdotal_record::add_anecdotal_record_followup,
+            commands::anecdotal_record::list_anecdotal_record_followups,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

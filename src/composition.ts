@@ -1,3 +1,4 @@
+import { AnecdotalRecordApplicationService } from "./application/anecdotal-record-service";
 import { AssessmentApplicationService } from "./application/assessment-service";
 import { LessonPlanApplicationService } from "./application/lesson-plan-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
@@ -29,6 +30,7 @@ import { TeachingAssignmentApplicationService } from "./application/teaching-ass
 import { TransferRecordApplicationService } from "./application/transfer-record-service";
 import { UserApplicationService } from "./application/user-service";
 import { WeatherApplicationService } from "./application/weather-service";
+import { TauriAnecdotalRecordRepository } from "./infrastructure/tauri/anecdotal-record-repository";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
 import { TauriLessonPlanRepository } from "./infrastructure/tauri/lesson-plan-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
@@ -134,6 +136,9 @@ export const transferRecordService = new TransferRecordApplicationService(
 );
 export const formativeAssessmentService = new FormativeAssessmentApplicationService(
   new TauriFormativeAssessmentRepository(),
+);
+export const anecdotalRecordService = new AnecdotalRecordApplicationService(
+  new TauriAnecdotalRecordRepository(),
 );
 export const schoolAttendanceService = new SchoolAttendanceApplicationService(
   new TauriSchoolAttendanceRepository(),

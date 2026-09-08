@@ -1,3 +1,4 @@
+pub mod anecdotal_record;
 pub mod assessment_category;
 pub mod assessment_item;
 pub mod attendance;
