@@ -80,9 +80,9 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, attendance, child_protection, device_credential,
-    device_sync_client_credential, grading, learner, learner_score, lesson_plan, nutrition,
-    section, section_membership, subject, subject_attendance, sync_conflict_review, sync_hub,
-    sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
+    device_sync_client_credential, grade_submission, grading, learner, learner_score, lesson_plan,
+    nutrition, section, section_membership, subject, subject_attendance, sync_conflict_review,
+    sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache, teaching_assignment,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -763,6 +763,25 @@ pub(crate) fn apply_decrypted_change(
             let incoming: child_protection::InterventionLogEntry =
                 serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
             child_protection::upsert_intervention_from_sync(conn, school_id, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::GradeSubmission => {
+            let incoming: grade_submission::GradeSubmission =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            grade_submission::upsert_submission_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::GradeSubmissionNote => {
+            // `SubmissionNote` carries no `school_id` field of its own
+            // (see `grade_submission::upsert_note_from_sync`'s doc
+            // comment) -- same trust-boundary shape as
+            // `EntityKind::IncidentIntervention` above.
+            let incoming: grade_submission::SubmissionNote =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            grade_submission::upsert_note_from_sync(conn, school_id, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }
@@ -5268,6 +5287,436 @@ mod tests {
                 )
                 .unwrap();
             assert_eq!(stored, "Synthetic incoming intervention note.");
+        };
+    }
+
+    /// `grade_submissions.submitted_by_user_id` carries a real FK to
+    /// `users(id)`, unlike `NutritionRecord`'s own no-user-FK shape --
+    /// same "must mint a local user" note as
+    /// `setup_local_reporter` above (`fixture.user_id` is only a row on
+    /// the HUB's own database).
+    fn setup_local_submitter(fixture: &TestFixture) -> String {
+        crate::repository::user::create_user(
+            &fixture.conn,
+            "submitter.a",
+            "password",
+            "Submitter A",
+        )
+        .unwrap()
+        .id
+    }
+
+    fn synthetic_grade_submission(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        class_record_id: &str,
+        submitted_at: &str,
+        submitter_user_id: &str,
+    ) -> grade_submission::GradeSubmission {
+        grade_submission::GradeSubmission {
+            id: entity_id.to_string(),
+            school_id: fixture.school_id.clone(),
+            class_record_id: class_record_id.to_string(),
+            submitted_by_user_id: Some(submitter_user_id.to_string()),
+            status: grade_submission::SubmissionStatus::Submitted,
+            submitted_at: submitted_at.to_string(),
+            decided_by_user_id: None,
+            decided_at: None,
+        }
+    }
+
+    fn make_grade_submission_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        class_record_id: &str,
+        submitted_at: &str,
+        submitter_user_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::GradeSubmission;
+        let plaintext = serde_json::to_vec(&synthetic_grade_submission(
+            fixture,
+            entity_id,
+            class_record_id,
+            submitted_at,
+            submitter_user_id,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_grade_submission_change() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let class_record_id = setup_class_record(&fixture);
+        let submitter_user_id = setup_local_submitter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_grade_submission_change(
+                    &fixture,
+                    entity_id,
+                    &class_record_id,
+                    "2026-09-01T00:00:00.000Z",
+                    &submitter_user_id,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT status FROM grade_submissions WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "submitted");
+        };
+    }
+
+    #[test]
+    fn pull_once_rejects_a_tampered_grade_submission_payload_without_applying_or_advancing_past_it()
+    {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let class_record_id = setup_class_record(&fixture);
+        let submitter_user_id = setup_local_submitter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let mut change = make_grade_submission_change(
+                &fixture,
+                entity_id,
+                &class_record_id,
+                "2026-09-01T00:00:00.000Z",
+                &submitter_user_id,
+                0,
+            );
+            let last = change.encrypted_payload.len() - 1;
+            change.encrypted_payload[last] ^= 0xFF;
+            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.rejected, 1);
+        assert!(summary.failed);
+        {
+            let conn = &fixture.conn;
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM grade_submissions WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 0, "a tampered payload must never be materialized");
+        };
+    }
+
+    #[test]
+    fn pull_once_stages_a_grade_submission_conflict_when_this_device_has_an_unsynced_local_edit() {
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let class_record_id = setup_class_record(&fixture);
+        let submitter_user_id = setup_local_submitter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            let other_device_change = make_grade_submission_change(
+                &fixture,
+                entity_id,
+                &class_record_id,
+                "2026-09-01T00:00:00.000Z",
+                &submitter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &other_device_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        {
+            let conn = &fixture.conn;
+            let local_change = make_grade_submission_change(
+                &fixture,
+                entity_id,
+                &class_record_id,
+                "2026-09-01T00:00:00.000Z",
+                &submitter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &local_change).unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 0);
+        assert_eq!(summary.conflicted, 1);
+        {
+            let conn = &fixture.conn;
+            assert_eq!(
+                sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+                1
+            );
+            let count: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM grade_submissions WHERE id = ?1",
+                    [entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(
+                count, 0,
+                "a staged conflict must never touch the domain table"
+            );
+        };
+    }
+
+    /// Natural-key-collision test matrix: `grade_submissions` carries
+    /// `UNIQUE (class_record_id, submitted_at)` distinct from its own
+    /// `id` -- two devices, both offline, each submitting the same class
+    /// record's grades at the exact same timestamp. Proves the generic
+    /// `ApplyRejection::RepositoryRejected` skip-and-advance mechanism
+    /// also protects this entity.
+    #[test]
+    fn pull_once_skips_past_a_grade_submission_natural_key_collision_too() {
+        let fixture = setup();
+        let class_record_id = setup_class_record(&fixture);
+        let submitter_user_id = setup_local_submitter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        // A local submission already exists for this class record at
+        // this exact timestamp.
+        crate::repository::grade_submission::upsert_submission_from_sync(
+            &fixture.conn,
+            &synthetic_grade_submission(
+                &fixture,
+                Uuid::now_v7(),
+                &class_record_id,
+                "2026-09-01T00:00:00.000Z",
+                &submitter_user_id,
+            ),
+        )
+        .unwrap();
+
+        let colliding_entity_id = Uuid::now_v7();
+        let good_entity_id = Uuid::now_v7();
+        {
+            let conn = &fixture.conn;
+            let colliding_change = make_grade_submission_change(
+                &fixture,
+                colliding_entity_id,
+                &class_record_id,
+                "2026-09-01T00:00:00.000Z",
+                &submitter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &colliding_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            let good_change = make_grade_submission_change(
+                &fixture,
+                good_entity_id,
+                &class_record_id,
+                "2026-09-08T00:00:00.000Z",
+                &submitter_user_id,
+                0,
+            );
+            sync_outbox::enqueue(conn, &fixture.school_id, &good_change).unwrap();
+            push_once(conn, &client, &config).unwrap();
+
+            conn.execute_batch("DELETE FROM sync_version_cache")
+                .unwrap();
+        }
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 2);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.rejected, 1);
+        assert!(!summary.failed);
+
+        let conn = &fixture.conn;
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            2,
+            "the cursor must advance past both changes"
+        );
+        let colliding_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM grade_submissions WHERE id = ?1)",
+                [colliding_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!colliding_row_exists);
+        let good_row_exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM grade_submissions WHERE id = ?1)",
+                [good_entity_id.to_string()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(good_row_exists);
+    }
+
+    fn synthetic_submission_note(
+        entity_id: Uuid,
+        submission_id: &str,
+        author_user_id: &str,
+    ) -> grade_submission::SubmissionNote {
+        grade_submission::SubmissionNote {
+            id: entity_id.to_string(),
+            submission_id: submission_id.to_string(),
+            author_user_id: Some(author_user_id.to_string()),
+            note_type: grade_submission::SubmissionNoteType::Feedback,
+            note: "Synthetic incoming feedback note.".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
+    }
+
+    fn make_grade_submission_note_change(
+        fixture: &TestFixture,
+        entity_id: Uuid,
+        submission_id: &str,
+        author_user_id: &str,
+        base_version: u64,
+    ) -> PendingChange {
+        let mut change = make_change(fixture, entity_id, base_version);
+        change.entity_kind = EntityKind::GradeSubmissionNote;
+        let plaintext = serde_json::to_vec(&synthetic_submission_note(
+            entity_id,
+            submission_id,
+            author_user_id,
+        ))
+        .unwrap();
+        change.encrypted_payload = payload_key::encrypt_payload(&fixture.sspk, &plaintext).unwrap();
+        change
+    }
+
+    #[test]
+    fn pull_once_applies_a_non_conflicting_grade_submission_note_change() {
+        let fixture = setup();
+        let submission_entity_id = Uuid::now_v7();
+        let note_entity_id = Uuid::now_v7();
+        let class_record_id = setup_class_record(&fixture);
+        let submitter_user_id = setup_local_submitter(&fixture);
+        let config = config_for(&fixture);
+        let client = http_client();
+
+        {
+            let conn = &fixture.conn;
+            // The parent submission must already exist locally -- this
+            // entity's own FK target -- before pulling its note.
+            crate::repository::grade_submission::upsert_submission_from_sync(
+                conn,
+                &synthetic_grade_submission(
+                    &fixture,
+                    submission_entity_id,
+                    &class_record_id,
+                    "2026-09-01T00:00:00.000Z",
+                    &submitter_user_id,
+                ),
+            )
+            .unwrap();
+
+            sync_outbox::enqueue(
+                conn,
+                &fixture.school_id,
+                &make_grade_submission_note_change(
+                    &fixture,
+                    note_entity_id,
+                    &submission_entity_id.to_string(),
+                    &submitter_user_id,
+                    0,
+                ),
+            )
+            .unwrap();
+            push_once(conn, &client, &config).unwrap();
+            conn.execute(
+                "DELETE FROM sync_version_cache WHERE entity_id = ?1",
+                [note_entity_id.to_string()],
+            )
+            .unwrap();
+        };
+
+        let summary = {
+            let conn = &fixture.conn;
+            pull_once(conn, &client, &config).unwrap()
+        };
+
+        assert_eq!(summary.received, 1);
+        assert_eq!(summary.applied, 1);
+        assert_eq!(summary.conflicted, 0);
+        assert_eq!(summary.rejected, 0);
+        assert!(!summary.failed);
+        {
+            let conn = &fixture.conn;
+            let stored: String = conn
+                .query_row(
+                    "SELECT note FROM grade_submission_notes WHERE id = ?1",
+                    [note_entity_id.to_string()],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(stored, "Synthetic incoming feedback note.");
         };
     }
 

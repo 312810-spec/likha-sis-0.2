@@ -10,16 +10,32 @@ use std::sync::Mutex;
 
 use rusqlite::Connection;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
+use uuid::Uuid;
 
 use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
-use crate::error::AppResult;
+use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
+use crate::db;
+use crate::error::{AppError, AppResult};
 use crate::repository::grade_submission::{self, GradeSubmission, SubmissionNote};
-use crate::repository::section_membership;
+use crate::repository::{
+    device_credential, device_identity, section_membership, sync_outbox, sync_version_cache,
+};
+use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
+/// ADR-0067/0069 sync wiring (Batch 6, continuing the LessonPlan slice):
+/// the exact same enrollment-gated encrypt-on-enqueue pattern as
+/// `commands::lesson_plan::create_lesson_plan`. `submit` creates a
+/// `GradeSubmission` (create-only, matching `Section`/`AssessmentItem`)
+/// plus zero or more `automated_check` notes written internally by
+/// `grade_submission::submit` -- every note actually attached to the new
+/// submission (there is nothing else there yet, since it was just
+/// created) is enqueued as its own `EntityKind::GradeSubmissionNote`
+/// change in the same atomic `SAVEPOINT`.
 #[tauri::command]
 pub fn submit_grades_for_review(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     class_record_id: String,
@@ -27,11 +43,78 @@ pub fn submit_grades_for_review(
     let conn = lock_db(&db);
     let (user_id, school_id) =
         auth::authorize_grade_submission_owner(&conn, &sessions, &class_record_id)?;
-    grade_submission::submit(&conn, &school_id, &class_record_id, &user_id)
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    submit_grades_for_review_with_optional_sync(
+        &conn,
+        &school_id,
+        &user_id,
+        &class_record_id,
+        sspk.as_ref(),
+    )
 }
 
+/// Resolves the SSPK only if this school has already completed the
+/// enrollment ceremony -- identical contract and rationale as
+/// `commands::lesson_plan::resolve_sspk_if_enrolled`.
+fn resolve_sspk_if_enrolled(
+    app: &AppHandle,
+    conn: &Connection,
+    school_id: &str,
+) -> AppResult<Option<[u8; PAYLOAD_KEY_LEN]>> {
+    if device_credential::has_active_for_school(conn, school_id)? {
+        Ok(Some(db::load_or_mint_sspk(app)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Shared logic behind `submit_grades_for_review`, kept separate so it
+/// can be exercised directly in this module's own tests without a real
+/// Tauri `AppHandle`.
+fn submit_grades_for_review_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    class_record_id: &str,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<GradeSubmission> {
+    let Some(sspk) = sspk else {
+        return grade_submission::submit(conn, school_id, class_record_id, actor_user_id);
+    };
+
+    conn.execute_batch("SAVEPOINT submit_grades_for_review_with_sync")?;
+    let outcome = (|| -> AppResult<GradeSubmission> {
+        let created = grade_submission::submit(conn, school_id, class_record_id, actor_user_id)?;
+        enqueue_submission_sync_change(conn, school_id, actor_user_id, &created, sspk)?;
+        for note in grade_submission::list_notes(conn, school_id, &created.id)? {
+            enqueue_note_sync_change(conn, school_id, actor_user_id, &note, sspk)?;
+        }
+        Ok(created)
+    })();
+
+    match outcome {
+        Ok(created) => {
+            conn.execute_batch("RELEASE submit_grades_for_review_with_sync")?;
+            Ok(created)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO submit_grades_for_review_with_sync; RELEASE submit_grades_for_review_with_sync",
+            );
+            Err(error)
+        }
+    }
+}
+
+/// `decide` updates the submission's status and optionally appends a
+/// `feedback` note -- the UPDATED submission is always enqueued (its
+/// `status`/`decided_*` columns changed even with no note), and, if a
+/// note was actually added, it is enqueued too, both in the same atomic
+/// `SAVEPOINT`.
 #[tauri::command]
 pub fn decide_grade_submission(
+    app: AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     submission_id: String,
@@ -44,14 +127,148 @@ pub fn decide_grade_submission(
         &sessions,
         Capability::ManageGradeSubmissionReview,
     )?;
-    grade_submission::decide(
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    decide_grade_submission_with_optional_sync(
         &conn,
         &school_id,
-        &submission_id,
         &user_id,
+        &submission_id,
         approve,
         feedback_note.as_deref(),
+        sspk.as_ref(),
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decide_grade_submission_with_optional_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    submission_id: &str,
+    approve: bool,
+    feedback_note: Option<&str>,
+    sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+) -> AppResult<GradeSubmission> {
+    let Some(sspk) = sspk else {
+        return grade_submission::decide(
+            conn,
+            school_id,
+            submission_id,
+            actor_user_id,
+            approve,
+            feedback_note,
+        );
+    };
+
+    conn.execute_batch("SAVEPOINT decide_grade_submission_with_sync")?;
+    let outcome = (|| -> AppResult<GradeSubmission> {
+        let notes_before = grade_submission::list_notes(conn, school_id, submission_id)?.len();
+        let updated = grade_submission::decide(
+            conn,
+            school_id,
+            submission_id,
+            actor_user_id,
+            approve,
+            feedback_note,
+        )?;
+        enqueue_submission_sync_change(conn, school_id, actor_user_id, &updated, sspk)?;
+        let notes_after = grade_submission::list_notes(conn, school_id, submission_id)?;
+        if notes_after.len() > notes_before {
+            // Notes are ordered oldest-first (see `list_notes`), so a
+            // newly appended note is always the last element.
+            let newest = notes_after
+                .last()
+                .expect("notes_after.len() > notes_before implies at least one element");
+            enqueue_note_sync_change(conn, school_id, actor_user_id, newest, sspk)?;
+        }
+        Ok(updated)
+    })();
+
+    match outcome {
+        Ok(updated) => {
+            conn.execute_batch("RELEASE decide_grade_submission_with_sync")?;
+            Ok(updated)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO decide_grade_submission_with_sync; RELEASE decide_grade_submission_with_sync",
+            );
+            Err(error)
+        }
+    }
+}
+
+fn enqueue_submission_sync_change(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    submission: &GradeSubmission,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let base_version = sync_version_cache::known_version(
+        conn,
+        school_id,
+        EntityKind::GradeSubmission,
+        &submission.id,
+    )?;
+    let plaintext = serde_json::to_vec(submission)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::GradeSubmission,
+        entity_id: parse_sync_uuid(&submission.id, "grade submission id")?,
+        base_version,
+        operation: ChangeOperation::Upsert,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
+}
+
+fn enqueue_note_sync_change(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    note: &SubmissionNote,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<()> {
+    let device_id = device_identity::current_or_create(conn)?;
+    let base_version = sync_version_cache::known_version(
+        conn,
+        school_id,
+        EntityKind::GradeSubmissionNote,
+        &note.id,
+    )?;
+    let plaintext = serde_json::to_vec(note)
+        .map_err(|e| AppError::key_store(format!("failed to serialize sync payload: {e}")))?;
+    let encrypted_payload = payload_key::encrypt_payload(sspk, &plaintext)?;
+
+    let change = PendingChange {
+        change_id: Uuid::now_v7(),
+        device_id: parse_sync_uuid(&device_id, "local device id")?,
+        actor_user_id: parse_sync_uuid(actor_user_id, "actor user id")?,
+        entity_kind: EntityKind::GradeSubmissionNote,
+        entity_id: parse_sync_uuid(&note.id, "grade submission note id")?,
+        base_version,
+        operation: ChangeOperation::Upsert,
+        encrypted_payload,
+    };
+
+    sync_outbox::enqueue(conn, school_id, &change)?;
+    Ok(())
+}
+
+/// Same rationale as `commands::lesson_plan::parse_sync_uuid`.
+fn parse_sync_uuid(value: &str, field_name: &str) -> AppResult<Uuid> {
+    Uuid::parse_str(value)
+        .map_err(|e| AppError::key_store(format!("invalid {field_name} for sync: {e}")))
 }
 
 #[tauri::command]
@@ -117,4 +334,246 @@ pub fn get_principal_overview_dashboard(
             general_average,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod sync_tests {
+    use super::*;
+    use crate::db;
+    use std::path::Path;
+
+    const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+    const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+    fn open_test_db() -> Connection {
+        db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap()
+    }
+
+    struct Fixture {
+        school_id: String,
+        class_record_id: String,
+        teacher_id: String,
+        head_id: String,
+    }
+
+    fn seed(conn: &Connection) -> Fixture {
+        let school = crate::repository::school::create(conn, "Rizal Elementary").unwrap();
+        let section =
+            crate::repository::section::create(conn, &school.id, "2026-2027", "5", "Section A")
+                .unwrap();
+        let subject = crate::repository::subject::create(conn, &school.id, "Mathematics").unwrap();
+        let period = crate::repository::grading::create(
+            conn,
+            &school.id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        let class_record = crate::repository::class_record::create(
+            conn,
+            &school.id,
+            &section.id,
+            &subject.id,
+            &period.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let teacher = crate::repository::user::create_user(
+            conn,
+            "teacher1",
+            "correct horse battery staple",
+            "Teacher One",
+        )
+        .unwrap();
+        let head = crate::repository::user::create_user(
+            conn,
+            "head1",
+            "correct horse battery staple",
+            "Head One",
+        )
+        .unwrap();
+        Fixture {
+            school_id: school.id,
+            class_record_id: class_record.id,
+            teacher_id: teacher.id,
+            head_id: head.id,
+        }
+    }
+
+    fn test_sspk() -> [u8; PAYLOAD_KEY_LEN] {
+        [0x9b; PAYLOAD_KEY_LEN]
+    }
+
+    #[test]
+    fn submit_with_no_sspk_behaves_exactly_like_a_plain_submit() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            None,
+        )
+        .unwrap();
+
+        assert!(!created.id.is_empty());
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a non-enrolled installation must never write an outbox row"
+        );
+    }
+
+    #[test]
+    fn submit_with_an_sspk_enqueues_the_submission_and_its_automated_check_notes() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let sspk = test_sspk();
+
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            Some(&sspk),
+        )
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        // The submission itself, plus at least one automated-check
+        // finding (an empty class record always has one -- see
+        // `grade_submission::run_automated_checks`).
+        assert!(queued.len() >= 2);
+        let submission_changes: Vec<_> = queued
+            .iter()
+            .filter(|q| q.change.entity_kind == EntityKind::GradeSubmission)
+            .collect();
+        assert_eq!(submission_changes.len(), 1);
+        assert_eq!(
+            submission_changes[0].change.entity_id.to_string(),
+            created.id
+        );
+        let note_changes: Vec<_> = queued
+            .iter()
+            .filter(|q| q.change.entity_kind == EntityKind::GradeSubmissionNote)
+            .collect();
+        assert!(!note_changes.is_empty());
+
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &submission_changes[0].change.encrypted_payload)
+                .unwrap();
+        let round_tripped: GradeSubmission = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(round_tripped, created);
+    }
+
+    #[test]
+    fn decide_with_an_sspk_enqueues_the_updated_submission_and_the_feedback_note() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let sspk = test_sspk();
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            Some(&sspk),
+        )
+        .unwrap();
+        let queued_before = sync_outbox::pending_for_school(&conn, &f.school_id, 10)
+            .unwrap()
+            .len();
+
+        let decided = decide_grade_submission_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.head_id,
+            &created.id,
+            true,
+            Some("Synthetic: looks good, approved."),
+            Some(&sspk),
+        )
+        .unwrap();
+
+        assert_eq!(decided.status, grade_submission::SubmissionStatus::Approved);
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        // The updated submission + the new feedback note, on top of
+        // whatever `submit` already enqueued.
+        assert_eq!(queued.len(), queued_before + 2);
+        let last_submission_change = queued
+            .iter()
+            .rfind(|q| q.change.entity_kind == EntityKind::GradeSubmission)
+            .unwrap();
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &last_submission_change.change.encrypted_payload)
+                .unwrap();
+        let round_tripped: GradeSubmission = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(
+            round_tripped.status,
+            grade_submission::SubmissionStatus::Approved
+        );
+    }
+
+    #[test]
+    fn decide_with_no_feedback_note_enqueues_only_the_updated_submission() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let sspk = test_sspk();
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            Some(&sspk),
+        )
+        .unwrap();
+        let queued_before = sync_outbox::pending_for_school(&conn, &f.school_id, 10)
+            .unwrap()
+            .len();
+
+        decide_grade_submission_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.head_id,
+            &created.id,
+            true,
+            None,
+            Some(&sspk),
+        )
+        .unwrap();
+
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        assert_eq!(queued.len(), queued_before + 1);
+    }
+
+    #[test]
+    fn a_rejected_decide_never_enqueues_an_outbox_row() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let sspk = test_sspk();
+
+        // An unknown submission_id -- `grade_submission::decide` errors.
+        let result = decide_grade_submission_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.head_id,
+            "does-not-exist",
+            true,
+            None,
+            Some(&sspk),
+        );
+
+        assert!(result.is_err());
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        assert!(
+            queued.is_empty(),
+            "a rejected decide must never enqueue an outbox row"
+        );
+    }
 }

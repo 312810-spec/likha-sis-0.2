@@ -9,7 +9,7 @@
 //! matching `repository::child_protection`'s intervention log precedent.
 
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppResult;
@@ -18,7 +18,7 @@ use crate::repository::{
     learner_score::LearnerScoreStatus,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionStatus {
     Submitted,
@@ -45,7 +45,7 @@ impl SubmissionStatus {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GradeSubmission {
     pub id: String,
@@ -58,7 +58,7 @@ pub struct GradeSubmission {
     pub decided_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionNoteType {
     AutomatedCheck,
@@ -82,7 +82,7 @@ impl SubmissionNoteType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmissionNote {
     pub id: String,
@@ -206,6 +206,75 @@ pub fn submit(
     }
 
     find_by_id(conn, school_id, &id).map(|opt| opt.expect("just inserted"))
+}
+
+/// Materializes a pulled sync change: an `INSERT ... ON CONFLICT(id) DO
+/// UPDATE` keyed on the row's own stable `id`, mirroring
+/// `lesson_plan::upsert_from_sync` exactly. `grade_submissions` carries
+/// `UNIQUE (class_record_id, submitted_at)` distinct from `id` -- a
+/// collision (two devices independently submitting the same class
+/// record's grades at the exact same timestamp while both offline)
+/// surfaces as an ordinary `rusqlite::Error` here, mapped by the caller
+/// (`sync_client::apply_decrypted_change`) to
+/// `ApplyRejection::RepositoryRejected`, same generic mechanism already
+/// confirmed for `Subject`/`Section`/`LessonPlan`/`NutritionRecord`.
+pub fn upsert_submission_from_sync(
+    conn: &Connection,
+    submission: &GradeSubmission,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO grade_submissions \
+            (id, school_id, class_record_id, submitted_by_user_id, status, \
+             submitted_at, decided_by_user_id, decided_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+         ON CONFLICT(id) DO UPDATE SET \
+             status = excluded.status, \
+             decided_by_user_id = excluded.decided_by_user_id, \
+             decided_at = excluded.decided_at",
+        (
+            &submission.id,
+            &submission.school_id,
+            &submission.class_record_id,
+            &submission.submitted_by_user_id,
+            submission.status.as_db_str(),
+            &submission.submitted_at,
+            &submission.decided_by_user_id,
+            &submission.decided_at,
+        ),
+    )?;
+    Ok(())
+}
+
+/// Materializes a pulled sync change for a submission note.
+/// `grade_submission_notes` is append-only (see this module's own doc
+/// comment) and has no `UNIQUE` constraint besides `id` -- same "no
+/// distinct natural key to collide on" note as
+/// `child_protection::upsert_intervention_from_sync`. `SubmissionNote`
+/// carries no `school_id` field of its own (it always resolves through
+/// its parent submission), so `school_id` comes from the caller's own
+/// already-checked tenant scope.
+pub fn upsert_note_from_sync(
+    conn: &Connection,
+    school_id: &str,
+    note: &SubmissionNote,
+) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO grade_submission_notes \
+            (id, submission_id, school_id, author_user_id, note_type, note, created_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+         ON CONFLICT(id) DO UPDATE SET \
+             note = excluded.note",
+        (
+            &note.id,
+            &note.submission_id,
+            school_id,
+            &note.author_user_id,
+            note.note_type.as_db_str(),
+            &note.note,
+            &note.created_at,
+        ),
+    )?;
+    Ok(())
 }
 
 pub fn find_by_id(
@@ -484,5 +553,134 @@ mod tests {
         submit(&conn, &school_id, &cr1, "teacher1").unwrap();
         let list = list_for_school(&conn, &school_id).unwrap();
         assert_eq!(list.len(), 1);
+    }
+
+    #[test]
+    fn upsert_submission_from_sync_inserts_a_submission_this_device_has_never_seen() {
+        let (conn, school_id, cr1) = setup();
+        let incoming = GradeSubmission {
+            id: "gs1".to_string(),
+            school_id: school_id.clone(),
+            class_record_id: cr1,
+            submitted_by_user_id: Some("teacher1".to_string()),
+            status: SubmissionStatus::Submitted,
+            submitted_at: "2026-01-01T00:00:00.000Z".to_string(),
+            decided_by_user_id: None,
+            decided_at: None,
+        };
+
+        upsert_submission_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id(&conn, &school_id, "gs1").unwrap().unwrap();
+        assert_eq!(found.status, SubmissionStatus::Submitted);
+    }
+
+    #[test]
+    fn upsert_submission_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let (conn, school_id, cr1) = setup();
+        let original = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+
+        let updated = GradeSubmission {
+            status: SubmissionStatus::Approved,
+            decided_by_user_id: Some("head1".to_string()),
+            decided_at: Some("2026-01-02T00:00:00.000Z".to_string()),
+            ..original.clone()
+        };
+        upsert_submission_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id(&conn, &school_id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.status, SubmissionStatus::Approved);
+        let all = list_for_school(&conn, &school_id).unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
+    }
+
+    /// The natural-key-collision scenario this entity is actually exposed
+    /// to: two devices, both offline, each submitting the SAME class
+    /// record's grades at the exact same timestamp before either has
+    /// synced. Each mints its own `id`, so pulling the other device's row
+    /// can never collide on `id` (the `ON CONFLICT(id)` target) -- it
+    /// instead trips the schema's own `UNIQUE (class_record_id,
+    /// submitted_at)` constraint. Proves `upsert_submission_from_sync`
+    /// surfaces this as an ordinary `Err`, never panics and never
+    /// silently drops one submission's data.
+    #[test]
+    fn upsert_submission_from_sync_returns_an_error_on_a_natural_key_collision_distinct_from_id() {
+        let (conn, school_id, cr1) = setup();
+        let existing = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+
+        let colliding = GradeSubmission {
+            id: "gs-colliding".to_string(),
+            school_id: school_id.clone(),
+            class_record_id: existing.class_record_id.clone(),
+            submitted_by_user_id: Some("teacher1".to_string()),
+            status: SubmissionStatus::Submitted,
+            // Same class_record_id + same submitted_at as `existing` --
+            // the exact natural-key collision.
+            submitted_at: existing.submitted_at.clone(),
+            decided_by_user_id: None,
+            decided_at: None,
+        };
+
+        let result = upsert_submission_from_sync(&conn, &colliding);
+
+        assert!(
+            result.is_err(),
+            "a natural-key collision must surface as an Err, not silently succeed or panic"
+        );
+        let all = list_for_school(&conn, &school_id).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, existing.id);
+        assert!(find_by_id(&conn, &school_id, &colliding.id)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn upsert_note_from_sync_inserts_a_note_this_device_has_never_seen() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        let incoming = SubmissionNote {
+            id: "note1".to_string(),
+            submission_id: submission.id.clone(),
+            author_user_id: Some("head1".to_string()),
+            note_type: SubmissionNoteType::Feedback,
+            note: "Synthetic incoming feedback.".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_note_from_sync(&conn, &school_id, &incoming).unwrap();
+
+        let notes = list_notes(&conn, &school_id, &submission.id).unwrap();
+        // The one automated-check note from `submit`, plus this one.
+        assert_eq!(notes.len(), 2);
+        assert!(notes
+            .iter()
+            .any(|n| n.note == "Synthetic incoming feedback."));
+    }
+
+    #[test]
+    fn upsert_note_from_sync_is_idempotent_on_the_same_id() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        let incoming = SubmissionNote {
+            id: "note1".to_string(),
+            submission_id: submission.id.clone(),
+            author_user_id: Some("head1".to_string()),
+            note_type: SubmissionNoteType::Feedback,
+            note: "Synthetic incoming feedback.".to_string(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_note_from_sync(&conn, &school_id, &incoming).unwrap();
+        upsert_note_from_sync(&conn, &school_id, &incoming).unwrap();
+
+        let notes = list_notes(&conn, &school_id, &submission.id).unwrap();
+        assert_eq!(
+            notes.len(),
+            2,
+            "re-applying the same id must never duplicate"
+        );
     }
 }
