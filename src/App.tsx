@@ -33,6 +33,7 @@ import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
+import { CalendarScreen } from "./ui/CalendarScreen";
 import { CertificateAwardScreen } from "./ui/CertificateAwardScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
@@ -541,6 +542,8 @@ function App() {
               />
             ) : activeTab === "seating-chart" ? (
               <SeatingChartScreen sectionService={sectionService} />
+            ) : activeTab === "calendar" ? (
+              <CalendarScreen />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />
             ) : activeTab === "admin-password-reset" ? (
