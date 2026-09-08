@@ -359,6 +359,49 @@ pub fn add_intervention(
     Ok(row)
 }
 
+/// One intervention/resolution log entry by its own `id`, tenant-scoped
+/// by `school_id` (the `incident_interventions` table carries `school_id`
+/// even though `InterventionLogEntry` itself does not, see
+/// `upsert_intervention_from_sync`'s doc comment). Added for the
+/// conflict-review screen's local-version preview
+/// (`commands::conflict_review::local_preview`) -- a conflict's
+/// `entity_id` is the intervention's own id, not its parent incident's,
+/// so `list_interventions_for_incident` (keyed by incident) cannot serve
+/// that lookup.
+pub fn find_intervention_by_id(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+) -> AppResult<Option<InterventionLogEntry>> {
+    conn.query_row(
+        "SELECT id, incident_id, author_user_id, entry_type, note, created_at \
+         FROM incident_interventions WHERE school_id = ?1 AND id = ?2",
+        (school_id, id),
+        |row| {
+            let entry_raw: String = row.get(3)?;
+            Ok(InterventionLogEntry {
+                id: row.get(0)?,
+                incident_id: row.get(1)?,
+                author_user_id: row.get(2)?,
+                entry_type: InterventionEntryType::from_db_str(&entry_raw).ok_or_else(|| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        3,
+                        rusqlite::types::Type::Text,
+                        "unknown entry_type".into(),
+                    )
+                })?,
+                note: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
 /// The full append-only intervention log for one incident, oldest first
 /// (a chronological progress record).
 pub fn list_interventions_for_incident(

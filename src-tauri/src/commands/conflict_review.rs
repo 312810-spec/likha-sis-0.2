@@ -12,7 +12,9 @@ use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::repository::sync_hub::AcceptedChange;
-use crate::repository::{attendance, learner, section};
+use crate::repository::{
+    attendance, child_protection, grade_submission, learner, lesson_plan, nutrition, section,
+};
 use crate::repository::{
     sync_conflict_review::{self, ConflictResolution, ConflictReviewRow},
     sync_outbox, sync_version_cache,
@@ -67,17 +69,52 @@ pub enum ConflictEntityPreview {
         grade_level: String,
         school_year: String,
     },
-    /// Fallback for any entity kind wired to sync (`LessonPlan`,
-    /// `NutritionRecord`, `BehavioralIncident`, `IncidentIntervention`,
-    /// `GradeSubmission`, `GradeSubmissionNote`, and any future kind)
-    /// that has no dedicated typed preview above. Deliberately distinct
-    /// from "could not decrypt" -- decryption already succeeded by the
-    /// time `decrypt_preview` runs (see its own doc comment) -- so a
-    /// teacher can still safely choose "use incoming" for these kinds
-    /// even without a field-level breakdown, rather than the resolve
-    /// action being silently unavailable for every entity kind this
-    /// screen predates. A future slice can add a dedicated typed variant
-    /// for any of these without changing this fallback's shape.
+    LessonPlan {
+        plan_date: String,
+        learning_competency: String,
+        learning_competency_code: String,
+        learning_objectives: String,
+    },
+    NutritionRecord {
+        learner_id: String,
+        school_year: String,
+        period: String,
+        height_m: f64,
+        weight_kg: f64,
+        nutritional_status: Option<String>,
+    },
+    BehavioralIncident {
+        learner_id: String,
+        severity_tier: String,
+        category: String,
+        description: String,
+        incident_date: String,
+        resolved_at: Option<String>,
+    },
+    IncidentIntervention {
+        incident_id: String,
+        entry_type: String,
+        note: String,
+    },
+    GradeSubmission {
+        class_record_id: String,
+        status: String,
+        submitted_at: String,
+    },
+    GradeSubmissionNote {
+        submission_id: String,
+        note_type: String,
+        note: String,
+    },
+    /// Fallback for any entity kind wired to sync that has no dedicated
+    /// typed preview above (every currently-wired kind has one as of
+    /// this commit; this stays in place for a future kind added before
+    /// its own preview is wired). Deliberately distinct from "could not
+    /// decrypt" -- decryption already succeeded by the time
+    /// `decrypt_preview` runs (see its own doc comment) -- so a teacher
+    /// can still safely choose "use incoming" for such a kind even
+    /// without a field-level breakdown, rather than the resolve action
+    /// being silently unavailable.
     Unknown,
 }
 
@@ -106,6 +143,63 @@ fn section_preview(s: &section::Section) -> ConflictEntityPreview {
     }
 }
 
+fn lesson_plan_preview(p: &lesson_plan::LessonPlan) -> ConflictEntityPreview {
+    ConflictEntityPreview::LessonPlan {
+        plan_date: p.plan_date.clone(),
+        learning_competency: p.learning_competency.clone(),
+        learning_competency_code: p.learning_competency_code.clone(),
+        learning_objectives: p.learning_objectives.clone(),
+    }
+}
+
+fn nutrition_record_preview(r: &nutrition::NutritionRecord) -> ConflictEntityPreview {
+    ConflictEntityPreview::NutritionRecord {
+        learner_id: r.learner_id.clone(),
+        school_year: r.school_year.clone(),
+        period: r.period.clone(),
+        height_m: r.height_m,
+        weight_kg: r.weight_kg,
+        nutritional_status: r.nutritional_status.clone(),
+    }
+}
+
+fn behavioral_incident_preview(i: &child_protection::BehavioralIncident) -> ConflictEntityPreview {
+    ConflictEntityPreview::BehavioralIncident {
+        learner_id: i.learner_id.clone(),
+        severity_tier: format!("{:?}", i.severity_tier),
+        category: i.category.clone(),
+        description: i.description.clone(),
+        incident_date: i.incident_date.clone(),
+        resolved_at: i.resolved_at.clone(),
+    }
+}
+
+fn incident_intervention_preview(
+    e: &child_protection::InterventionLogEntry,
+) -> ConflictEntityPreview {
+    ConflictEntityPreview::IncidentIntervention {
+        incident_id: e.incident_id.clone(),
+        entry_type: format!("{:?}", e.entry_type),
+        note: e.note.clone(),
+    }
+}
+
+fn grade_submission_preview(s: &grade_submission::GradeSubmission) -> ConflictEntityPreview {
+    ConflictEntityPreview::GradeSubmission {
+        class_record_id: s.class_record_id.clone(),
+        status: format!("{:?}", s.status),
+        submitted_at: s.submitted_at.clone(),
+    }
+}
+
+fn grade_submission_note_preview(n: &grade_submission::SubmissionNote) -> ConflictEntityPreview {
+    ConflictEntityPreview::GradeSubmissionNote {
+        submission_id: n.submission_id.clone(),
+        note_type: format!("{:?}", n.note_type),
+        note: n.note.clone(),
+    }
+}
+
 /// This device's own currently-live version of the conflicting entity --
 /// read straight from the domain table, never from the staged conflict
 /// row itself, because the staged row never captured it (staging never
@@ -129,6 +223,30 @@ fn local_preview(
         EntityKind::Section => section::find_by_id_in_school(conn, school_id, entity_id)?
             .as_ref()
             .map(section_preview),
+        EntityKind::LessonPlan => lesson_plan::find_by_id_in_school(conn, school_id, entity_id)?
+            .as_ref()
+            .map(lesson_plan_preview),
+        EntityKind::NutritionRecord => nutrition::find_by_id(conn, school_id, entity_id)?
+            .as_ref()
+            .map(nutrition_record_preview),
+        EntityKind::BehavioralIncident => {
+            child_protection::find_incident_by_id(conn, school_id, entity_id)?
+                .as_ref()
+                .map(behavioral_incident_preview)
+        }
+        EntityKind::IncidentIntervention => {
+            child_protection::find_intervention_by_id(conn, school_id, entity_id)?
+                .as_ref()
+                .map(incident_intervention_preview)
+        }
+        EntityKind::GradeSubmission => grade_submission::find_by_id(conn, school_id, entity_id)?
+            .as_ref()
+            .map(grade_submission_preview),
+        EntityKind::GradeSubmissionNote => {
+            grade_submission::find_note_by_id(conn, school_id, entity_id)?
+                .as_ref()
+                .map(grade_submission_note_preview)
+        }
         _ => None,
     })
 }
@@ -161,6 +279,40 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
             .ok()
             .as_ref()
             .map(section_preview),
+        EntityKind::LessonPlan => serde_json::from_slice::<lesson_plan::LessonPlan>(plaintext)
+            .ok()
+            .as_ref()
+            .map(lesson_plan_preview),
+        EntityKind::NutritionRecord => {
+            serde_json::from_slice::<nutrition::NutritionRecord>(plaintext)
+                .ok()
+                .as_ref()
+                .map(nutrition_record_preview)
+        }
+        EntityKind::BehavioralIncident => {
+            serde_json::from_slice::<child_protection::BehavioralIncident>(plaintext)
+                .ok()
+                .as_ref()
+                .map(behavioral_incident_preview)
+        }
+        EntityKind::IncidentIntervention => {
+            serde_json::from_slice::<child_protection::InterventionLogEntry>(plaintext)
+                .ok()
+                .as_ref()
+                .map(incident_intervention_preview)
+        }
+        EntityKind::GradeSubmission => {
+            serde_json::from_slice::<grade_submission::GradeSubmission>(plaintext)
+                .ok()
+                .as_ref()
+                .map(grade_submission_preview)
+        }
+        EntityKind::GradeSubmissionNote => {
+            serde_json::from_slice::<grade_submission::SubmissionNote>(plaintext)
+                .ok()
+                .as_ref()
+                .map(grade_submission_note_preview)
+        }
         _ => Some(ConflictEntityPreview::Unknown),
     }
 }
@@ -710,66 +862,37 @@ mod tests {
     }
 
     /// Proves the conflict-review RESOLUTION mechanism is already
-    /// generic across every wired `EntityKind` -- not hardcoded to
-    /// `Learner`/`Attendance`/`Section` -- without adding a single
+    /// generic across every wired `EntityKind` -- not hardcoded to the
+    /// kinds with a dedicated typed preview -- without adding a single
     /// entity-specific line here. `to_summary`'s `local`/`incoming`
     /// PREVIEW rendering (`local_preview`/`decrypt_preview` above) IS
-    /// still scoped to those three kinds (a UX-only limitation: an
-    /// unrecognized kind's preview is `None`, never an error, and this
-    /// test explicitly checks that), but `resolve_conflict_review`'s
-    /// actual apply/keep-local logic never matches on entity kind at
-    /// all -- it dispatches generically through `row.entity_kind` into
-    /// `sync_client::apply_decrypted_change` (the same function every
-    /// entity's own `apply_decrypted_change` arm already proves correct
-    /// in `sync_client.rs`'s own tests) and
+    /// still scoped to the kinds with a dedicated typed arm (a UX-only
+    /// limitation: an unrecognized kind's preview is `Unknown`/`None`,
+    /// never an error, and this test explicitly checks that), but
+    /// `resolve_conflict_review`'s actual apply/keep-local logic never
+    /// matches on entity kind at all -- it dispatches generically through
+    /// `row.entity_kind` into `sync_client::apply_decrypted_change` (the
+    /// same function every entity's own `apply_decrypted_change` arm
+    /// already proves correct in `sync_client.rs`'s own tests) and
     /// `sync_outbox::correct_base_version_for_entity`, both of which are
     /// keyed purely on `EntityKind` + `entity_id`. This test exercises
-    /// that generic path end to end for `LessonPlan` -- one of the six
-    /// entities wired in this session's batch, wired well after this
-    /// screen shipped, and picked precisely because it is NOT one of the
-    /// three kinds `local_preview`/`decrypt_preview` special-case -- to
-    /// prove new entities need zero changes here to resolve correctly.
+    /// that generic path end to end for `Subject` -- picked precisely
+    /// because it is NOT one of the kinds `local_preview`/`decrypt_preview`
+    /// special-case (as of this commit, every kind added in Batch 6's sync
+    /// expansion now has its own typed preview; `Subject` still predates
+    /// that and has none) -- to prove new/unpreviewed entities need zero
+    /// changes here to resolve correctly.
     #[test]
-    fn conflict_resolution_is_already_generic_for_an_entity_kind_added_after_this_screen_shipped() {
+    fn conflict_resolution_is_already_generic_for_an_entity_kind_with_no_typed_preview() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
-        let teacher = crate::repository::user::create_user(
-            &conn,
-            "teacher.a",
-            "correct horse battery staple",
-            "Teacher A",
-        )
-        .unwrap();
-        crate::repository::user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
-        let section =
-            crate::repository::section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
-        let subject = crate::repository::subject::create(&conn, &s.id, "Mathematics").unwrap();
-        let assignment = crate::repository::teaching_assignment::create(
-            &conn,
-            &s.id,
-            &teacher.id,
-            &section.id,
-            &subject.id,
-        )
-        .unwrap()
-        .unwrap();
         let sspk = test_sspk();
 
-        let incoming = crate::repository::lesson_plan::LessonPlan {
+        let incoming = crate::repository::subject::Subject {
             id: Uuid::now_v7().to_string(),
             school_id: s.id.clone(),
-            teaching_assignment_id: assignment.id.clone(),
-            plan_date: "2026-09-07".to_string(),
-            learning_competency: "Add fractions".to_string(),
-            learning_competency_code: "M7NS-Ig-1".to_string(),
-            learning_objectives: "Add fractions with unlike denominators".to_string(),
-            connection_to_previous_learning: "Builds on like denominators".to_string(),
-            learning_experiences: "Think-pair-share".to_string(),
-            assessment: "Exit ticket".to_string(),
-            ways_forward: "Reteach if needed".to_string(),
-            created_by_user_id: teacher.id.clone(),
+            name: "Mathematics".to_string(),
             created_at: "2026-01-01T00:00:00.000Z".to_string(),
-            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
         };
         let plaintext = serde_json::to_vec(&incoming).unwrap();
         let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
@@ -778,7 +901,7 @@ mod tests {
             change_id: Uuid::now_v7(),
             device_id: Uuid::now_v7(),
             actor_user_id: Uuid::now_v7(),
-            entity_kind: EntityKind::LessonPlan,
+            entity_kind: EntityKind::Subject,
             entity_id: Uuid::parse_str(&incoming.id).unwrap(),
             version: 1,
             operation: ChangeOperation::Upsert,
@@ -798,7 +921,7 @@ mod tests {
         // available (the frontend gates that button on `incoming` being
         // present, see `ConflictReviewScreen.tsx`'s own doc comment).
         let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
-        assert_eq!(summary.entity_kind, "lesson_plan");
+        assert_eq!(summary.entity_kind, "subject");
         assert!(matches!(
             summary.incoming,
             Some(ConflictEntityPreview::Unknown)
@@ -808,8 +931,8 @@ mod tests {
 
         // The generic RESOLUTION path (same composition
         // `resolve_conflict_review`'s `UseIncoming` branch performs)
-        // still applies the incoming LessonPlan correctly, with zero
-        // LessonPlan-specific code in this module.
+        // still applies the incoming Subject correctly, with zero
+        // Subject-specific code in this module.
         let apply_change = AcceptedChange {
             cursor: SyncCursor(0),
             change_id: parse_uuid(&row.change_id, "change id").unwrap(),
@@ -839,11 +962,10 @@ mod tests {
         .unwrap();
 
         assert!(resolved);
-        let stored =
-            crate::repository::lesson_plan::find_by_id_in_school(&conn, &s.id, &incoming.id)
-                .unwrap()
-                .unwrap();
-        assert_eq!(stored.learning_competency, "Add fractions");
+        let stored = crate::repository::subject::find_by_id_in_school(&conn, &s.id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.name, "Mathematics");
         assert_eq!(
             sync_conflict_review::count_open_for_school(&conn, &s.id).unwrap(),
             0
@@ -914,5 +1036,392 @@ mod tests {
             pending[0].change.base_version, 0,
             "UseIncoming must not touch an unrelated pending outbox entry's base_version"
         );
+    }
+
+    // -- Typed previews for the six entity kinds wired in Batch 6's sync
+    // expansion (`LessonPlan`, `NutritionRecord`, `BehavioralIncident`,
+    // `IncidentIntervention`, `GradeSubmission`, `GradeSubmissionNote`).
+    // Each test stages a conflict with a distinct incoming value and a
+    // distinct pre-existing local row, then checks `to_summary` renders
+    // the real typed variant (not `Unknown`) for both sides -- proving a
+    // teacher sees actual field differences, matching this module's own
+    // `Learner` precedent above.
+
+    const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+    #[test]
+    fn to_summary_shows_typed_lesson_plan_previews() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher = crate::repository::user::create_user(
+            &conn,
+            "teacher.a",
+            "correct horse battery staple",
+            "Teacher A",
+        )
+        .unwrap();
+        crate::repository::user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let subject = crate::repository::subject::create(&conn, &s.id, "Mathematics").unwrap();
+        let assignment = crate::repository::teaching_assignment::create(
+            &conn,
+            &s.id,
+            &teacher.id,
+            &section.id,
+            &subject.id,
+        )
+        .unwrap()
+        .unwrap();
+        let sspk = test_sspk();
+
+        let local = crate::repository::lesson_plan::create(
+            &conn,
+            &s.id,
+            &assignment.id,
+            "2026-09-07",
+            &teacher.id,
+            &crate::repository::lesson_plan::LessonPlanFields {
+                learning_competency: "Add fractions",
+                learning_competency_code: "M7NS-Ig-1",
+                learning_objectives: "Add fractions with like denominators",
+                connection_to_previous_learning: "Builds on whole numbers",
+                learning_experiences: "Think-pair-share",
+                assessment: "Exit ticket",
+                ways_forward: "Reteach if needed",
+            },
+        )
+        .unwrap()
+        .unwrap();
+
+        let incoming = crate::repository::lesson_plan::LessonPlan {
+            learning_objectives: "Add fractions with UNLIKE denominators".to_string(),
+            ..local.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::LessonPlan,
+            entity_id: Uuid::parse_str(&incoming.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::LessonPlan { ref learning_objectives, .. })
+                if learning_objectives == "Add fractions with UNLIKE denominators"
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::LessonPlan { ref learning_objectives, .. })
+                if learning_objectives == "Add fractions with like denominators"
+        ));
+    }
+
+    #[test]
+    fn to_summary_shows_typed_nutrition_record_previews() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let learner = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
+        let sspk = test_sspk();
+
+        let local = crate::repository::nutrition::record_measurement(
+            &conn,
+            &s.id,
+            &learner.id,
+            "2026-2027",
+            crate::repository::nutrition::Period::Bosy,
+            "5",
+            "F",
+            "2016-01-01",
+            "2026-06-10",
+            1.20,
+            25.0,
+        )
+        .unwrap();
+
+        let incoming = crate::repository::nutrition::NutritionRecord {
+            weight_kg: 27.5,
+            ..local.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::NutritionRecord,
+            entity_id: Uuid::parse_str(&incoming.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::NutritionRecord { weight_kg, .. }) if weight_kg == 27.5
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::NutritionRecord { weight_kg, .. }) if weight_kg == 25.0
+        ));
+    }
+
+    #[test]
+    fn to_summary_shows_typed_behavioral_incident_and_intervention_previews() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let learner = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = crate::repository::user::create_user(
+            &conn,
+            "adviser.a",
+            "correct horse battery staple",
+            "Adviser A",
+        )
+        .unwrap();
+        let sspk = test_sspk();
+
+        let local_incident = child_protection::create_incident(
+            &conn,
+            &s.id,
+            &learner.id,
+            &section.id,
+            &adviser.id,
+            child_protection::SeverityTier::Level1,
+            "Tardiness",
+            "Arrived late three times",
+            "2026-09-01",
+        )
+        .unwrap();
+
+        let incoming_incident = child_protection::BehavioralIncident {
+            description: "Arrived late five times".to_string(),
+            ..local_incident.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming_incident).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::BehavioralIncident,
+            entity_id: Uuid::parse_str(&incoming_incident.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::BehavioralIncident { ref description, .. })
+                if description == "Arrived late five times"
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::BehavioralIncident { ref description, .. })
+                if description == "Arrived late three times"
+        ));
+
+        // IncidentIntervention preview, keyed by the intervention's OWN
+        // id (not the incident's) -- exercises the new
+        // `find_intervention_by_id` local lookup added for this task.
+        let local_entry = child_protection::add_intervention(
+            &conn,
+            &s.id,
+            &local_incident.id,
+            &adviser.id,
+            child_protection::InterventionEntryType::Intervention,
+            "Called guardian",
+        )
+        .unwrap();
+        let incoming_entry = child_protection::InterventionLogEntry {
+            note: "Scheduled counseling session".to_string(),
+            ..local_entry.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming_entry).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(2),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::IncidentIntervention,
+            entity_id: Uuid::parse_str(&incoming_entry.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .find(|r| r.entity_id == incoming_entry.id)
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::IncidentIntervention { ref note, .. })
+                if note == "Scheduled counseling session"
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::IncidentIntervention { ref note, .. })
+                if note == "Called guardian"
+        ));
+    }
+
+    fn setup_class_record(conn: &Connection, school_id: &str) -> String {
+        let section =
+            crate::repository::section::create(conn, school_id, "2026-2027", "5", "Section A")
+                .unwrap();
+        let subject = crate::repository::subject::create(conn, school_id, "Mathematics").unwrap();
+        let period = crate::repository::grading::create(
+            conn,
+            school_id,
+            "2026-2027",
+            "00000000-0000-7000-8000-000000000011",
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        let class_record = crate::repository::class_record::create(
+            conn,
+            school_id,
+            &section.id,
+            &subject.id,
+            &period.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('teacher1', 'teacher1', 'hash', 'Teacher One')",
+            [],
+        )
+        .unwrap();
+        class_record.id
+    }
+
+    #[test]
+    fn to_summary_shows_typed_grade_submission_and_note_previews() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let class_record_id = setup_class_record(&conn, &s.id);
+        let sspk = test_sspk();
+
+        let local_submission =
+            grade_submission::submit(&conn, &s.id, &class_record_id, "teacher1").unwrap();
+
+        let incoming_submission = grade_submission::GradeSubmission {
+            status: grade_submission::SubmissionStatus::Approved,
+            decided_by_user_id: Some("head1".to_string()),
+            decided_at: Some("2026-09-08T00:00:00.000Z".to_string()),
+            ..local_submission.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming_submission).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::GradeSubmission,
+            entity_id: Uuid::parse_str(&incoming_submission.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::GradeSubmission { ref status, .. }) if status == "Approved"
+        ));
+        assert!(matches!(
+            summary.local,
+            Some(ConflictEntityPreview::GradeSubmission { ref status, .. }) if status == "Submitted"
+        ));
+
+        // GradeSubmissionNote preview, keyed by the note's OWN id --
+        // exercises the new `find_note_by_id` local lookup added for
+        // this task. The submission's own `submit` already appended one
+        // automated-check note; use that as the "local" fixture.
+        let local_note = grade_submission::list_notes(&conn, &s.id, &local_submission.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        let incoming_note = grade_submission::SubmissionNote {
+            note: "Reviewed and cleared".to_string(),
+            ..local_note.clone()
+        };
+        let plaintext = serde_json::to_vec(&incoming_note).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(2),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::GradeSubmissionNote,
+            entity_id: Uuid::parse_str(&incoming_note.id).unwrap(),
+            version: 2,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 1, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .find(|r| r.entity_id == incoming_note.id)
+            .unwrap();
+
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::GradeSubmissionNote { ref note, .. })
+                if note == "Reviewed and cleared"
+        ));
+        assert!(summary.local.is_some());
     }
 }

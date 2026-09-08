@@ -8,14 +8,15 @@
  * ADR-0067's protocol contract point 6 ("Learner identity, enrollment,
  * attendance, and grading records never use silent last-write-wins").
  * The resolution mechanism itself (`resolve_conflict_review`, Rust) is
- * generic across every `EntityKind` wired to sync, not just the three
- * below — see `commands::conflict_review`'s own doc comment. Only
- * Learner, Attendance, and Section have a dedicated, field-level
- * `ConflictEntityPreview` variant today; every other wired kind (e.g.
- * LessonPlan, NutritionRecord, BehavioralIncident, IncidentIntervention,
- * GradeSubmission, GradeSubmissionNote) falls back to `{ kind: "unknown" }`
- * — still resolvable via "use incoming," just without a field-by-field
- * breakdown yet.
+ * generic across every `EntityKind` wired to sync, not just the ones
+ * below — see `commands::conflict_review`'s own doc comment. Every
+ * entity kind wired to sync as of this commit (Learner, Attendance,
+ * Section, LessonPlan, NutritionRecord, BehavioralIncident,
+ * IncidentIntervention, GradeSubmission, GradeSubmissionNote) has a
+ * dedicated, field-level `ConflictEntityPreview` variant; `{ kind:
+ * "unknown" }` remains only as the fallback for a future entity kind
+ * wired to sync before its own preview is added — still resolvable via
+ * "use incoming," just without a field-by-field breakdown until then.
  */
 
 /** One entity's field values, shaped differently per `kind` — a teacher
@@ -43,13 +44,54 @@ export type ConflictEntityPreview =
       schoolYear: string;
     }
   | {
-      /** Fallback for any sync-wired entity kind with no dedicated typed
-       * preview above (e.g. LessonPlan, NutritionRecord,
-       * BehavioralIncident, IncidentIntervention, GradeSubmission,
-       * GradeSubmissionNote) — see the Rust `ConflictEntityPreview::Unknown`
-       * doc comment. The record still decrypted successfully; there is
-       * simply no field-level breakdown for it yet, so "use incoming"
-       * stays available. */
+      kind: "lessonPlan";
+      planDate: string;
+      learningCompetency: string;
+      learningCompetencyCode: string;
+      learningObjectives: string;
+    }
+  | {
+      kind: "nutritionRecord";
+      learnerId: string;
+      schoolYear: string;
+      period: string;
+      heightM: number;
+      weightKg: number;
+      nutritionalStatus: string | null;
+    }
+  | {
+      kind: "behavioralIncident";
+      learnerId: string;
+      severityTier: string;
+      category: string;
+      description: string;
+      incidentDate: string;
+      resolvedAt: string | null;
+    }
+  | {
+      kind: "incidentIntervention";
+      incidentId: string;
+      entryType: string;
+      note: string;
+    }
+  | {
+      kind: "gradeSubmission";
+      classRecordId: string;
+      status: string;
+      submittedAt: string;
+    }
+  | {
+      kind: "gradeSubmissionNote";
+      submissionId: string;
+      noteType: string;
+      note: string;
+    }
+  | {
+      /** Fallback for a sync-wired entity kind with no dedicated typed
+       * preview yet — see the Rust `ConflictEntityPreview::Unknown` doc
+       * comment. The record still decrypted successfully; there is
+       * simply no field-level breakdown for it, so "use incoming" stays
+       * available. */
       kind: "unknown";
     };
 

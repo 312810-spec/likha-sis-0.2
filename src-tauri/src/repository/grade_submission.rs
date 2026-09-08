@@ -385,6 +385,45 @@ fn add_note(
     Ok(())
 }
 
+/// One submission note by its own `id`, tenant-scoped by `school_id`.
+/// Added for the conflict-review screen's local-version preview
+/// (`commands::conflict_review::local_preview`) -- a conflict's
+/// `entity_id` is the note's own id, not its parent submission's, so
+/// `list_notes` (keyed by submission) cannot serve that lookup.
+pub fn find_note_by_id(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+) -> AppResult<Option<SubmissionNote>> {
+    conn.query_row(
+        "SELECT id, submission_id, author_user_id, note_type, note, created_at \
+         FROM grade_submission_notes WHERE school_id = ?1 AND id = ?2",
+        (school_id, id),
+        |row| {
+            let note_type_raw: String = row.get(3)?;
+            Ok(SubmissionNote {
+                id: row.get(0)?,
+                submission_id: row.get(1)?,
+                author_user_id: row.get(2)?,
+                note_type: SubmissionNoteType::from_db_str(&note_type_raw).ok_or_else(|| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        3,
+                        rusqlite::types::Type::Text,
+                        "unknown note_type".into(),
+                    )
+                })?,
+                note: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        e => Err(e.into()),
+    })
+}
+
 pub fn list_notes(
     conn: &Connection,
     school_id: &str,

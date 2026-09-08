@@ -1,5 +1,155 @@
 # CURRENT HANDOFF
 
+## Batch 8 (partial, item 8 only): conflict-review typed field-level previews for the six remaining entity kinds (2026-09-08), commit local only, PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed local only, nothing pushed, PR #55 untouched, no CI
+triggered. This session was assigned all 8 Batch 8 items (Certificate/
+Award screen, Seating Chart screen, Calendar screen, Consolidated
+Grades Matrix screen, weather-composition wiring + school-coordinate
+field, live-palette wiring, ID-card printable layout, and
+conflict-review typed previews). Only item 8 shipped this session,
+fully implemented and tested; items 1-7 (all real UI screens/wiring for
+the seven Batch 5 domain modules, plus the weather/palette composition
+and school-coordinate migration) are explicitly deferred, NOT
+attempted, NOT started -- see "Deferred" below for why and the exact
+resumable next action. Per `.claude/rules/autonomous-development.md`'s
+explicit permission ("ship fewer of the 8 screens fully tested rather
+than all 8 rushed"), stopping after one clean, fully-verified commit
+rather than rushing seven UI screens with weaker verification.
+
+**What shipped (item 8): conflict-review typed field-level previews**
+
+`commands::conflict_review`'s `ConflictEntityPreview` enum (Rust) and
+its mirrored TS `domain/conflict-review.ts` type previously covered
+only `Learner`/`Attendance`/`Section` with a field-level preview --
+every other sync-wired entity kind (`LessonPlan`, `NutritionRecord`,
+`BehavioralIncident`, `IncidentIntervention`, `GradeSubmission`,
+`GradeSubmissionNote` -- all six wired end to end in Batch 6) fell back
+to a generic `{ kind: "unknown" }` placeholder on the conflict-review
+screen, per Batch 6's own conflict-review generalization commit
+(`01d0ac7`). This slice adds a dedicated typed variant for all six,
+both Rust and TS, so a teacher resolving a conflict on a lesson plan,
+nutrition record, behavioral incident, intervention note, grade
+submission, or grade submission note now sees real field values (plan
+date/competency/objectives; height/weight/nutritional status; incident
+category/description/severity/resolved-at; intervention type/note;
+submission status/timestamp; note type/text) on both the incoming and
+local sides, not a placeholder.
+
+**What changed:**
+
+1. `src-tauri/src/commands/conflict_review.rs` -- six new
+   `ConflictEntityPreview` variants (`LessonPlan`, `NutritionRecord`,
+   `BehavioralIncident`, `IncidentIntervention`, `GradeSubmission`,
+   `GradeSubmissionNote`), six new `*_preview` builder functions, and
+   both `local_preview`/`decrypt_preview` wired for all six (the
+   remaining `EntityKind` variants not in this task's scope --
+   `SectionMembership`, `SubjectAttendance`, `AssessmentItem`,
+   `LearnerScore`, `GradingPeriod`, `Subject`, `TeachingAssignment`,
+   `SubjectAttendanceEntry` -- still fall through to `None`/`Unknown`,
+   unchanged).
+2. Two small new repository lookups, added because neither entity
+   previously had a find-by-own-id function (only an append-only
+   list-by-parent query existed, keyed by the wrong id for this
+   purpose -- a conflict's `entity_id` is the child row's own id, not
+   its parent's): `child_protection::find_intervention_by_id` and
+   `grade_submission::find_note_by_id`, both tenant-scoped by
+   `school_id` exactly like every existing find-by-id function in this
+   codebase.
+3. `conflict_resolution_is_already_generic_for_an_entity_kind_added_after_this_screen_shipped`,
+   the test proving generic resolution works for an entity kind with no
+   typed preview, was rewritten against `Subject` instead of
+   `LessonPlan` (renamed to
+   `..._with_no_typed_preview`) -- `LessonPlan` now has its own typed
+   preview as of this commit, so it could no longer serve as the
+   "unpreviewed kind" fixture; `Subject` genuinely still has none.
+4. Six new dedicated tests in `commands::conflict_review::tests`, one
+   per entity kind (the `BehavioralIncident`/`IncidentIntervention` pair
+   and the `GradeSubmission`/`GradeSubmissionNote` pair share a test
+   each, matching how the two are worked with together in practice),
+   each staging a conflict with a distinct incoming value against a
+   distinct pre-existing local row and asserting the real typed variant
+   (not `Unknown`) renders on both sides.
+5. `src/domain/conflict-review.ts` -- six matching TS discriminated-union
+   variants (camelCase field names/tag values, mirroring serde's
+   `rename_all = "camelCase"` exactly).
+6. `src/ui/ConflictReviewScreen.tsx`'s `describePreview` -- six new
+   `switch` arms rendering the same plain-language field summaries the
+   existing `Learner`/`Attendance`/`Section` arms already do.
+7. `src/ui/ConflictReviewScreen.test.tsx` -- one new test asserting all
+   six kinds render their real field values and never the generic
+   "no detailed preview yet" fallback text.
+8. `docs/product/MASTER-TASK-INVENTORY.md` -- new checked item recording
+   this slice under §4.1.
+
+**Verification actually run this slice:**
+
+- `cargo build --lib`, `cargo test --lib` (targeted:
+  `conflict_review`, `child_protection`, `grade_submission` modules --
+  all passed, 22+20+24 tests respectively), `cargo clippy --all-targets
+-- -D warnings` (clean), `cargo fmt --check` (clean after one
+  `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check,
+  `check:architecture`, `check:deadcode`, `vitest run`) -- full run,
+  real output: **125 test files / 1206 tests, all passed**; typecheck,
+  lint, format, architecture-boundary, and dead-code checks all clean.
+- `npm run quality:full` (full `cargo test`, the stable-checkpoint gate)
+  was NOT run this slice -- only the targeted Rust test filter above --
+  since only one narrow module changed on the Rust side; the full
+  workspace `cargo test` remains owed at the next natural checkpoint
+  (already tracked in `docs/VERIFICATION-DEBT.md` from Batch 6).
+  `npm run quality:security` and `npm run quality:ui` were not run --
+  no dependency/secret change in this slice, and `quality:ui`'s native
+  Tauri visual/screen-reader coverage is unavailable in this sandbox
+  regardless (tracked, not new).
+
+**Deferred (items 1-7 of Batch 8), and why:**
+
+Given this session's budget, doing all seven remaining items (four new
+UI screens, a Rust migration + repository + command for school
+coordinates, two composition-wiring decisions warranting their own
+ADRs, and a QR-dependency check) to the same fully-tested standard as
+item 8 was not achievable without rushing at least one of them past
+this project's testing/architecture bar. Per
+`.claude/rules/autonomous-development.md`'s explicit "ship fewer of the
+8 screens fully tested rather than all 8 rushed" permission, this
+session stopped after item 8's clean, fully-verified commit instead.
+None of items 1-7 were started -- no partial screen, no migration file,
+no composition.ts edit exists anywhere in the working tree for any of
+them, so the next session picks each up from a clean slate with the
+same domain modules (`award-eligibility.ts`, `certificate.ts`,
+`seating-chart.ts`, `ph-holidays.ts`, `consolidated-grades.ts`,
+`palette.ts`, `id-card-token.ts`) still fully built and untouched from
+Batch 5.
+
+**Exact next task**: resume Batch 8 items 1-7 in the original prompt's
+order, one commit per feature, `npm run quality` after each:
+
+1. Certificate/Award screen (`award-eligibility.ts` + `certificate.ts` +
+   `LearnerScoreApplicationService`'s `computeTermGrade`) -- must render
+   both existing domain-layer disclosures (unverified GA threshold,
+   no-anecdote-check) visibly, not just in code.
+2. Seating Chart screen (`seating-chart.ts`, click-to-place, session-local
+   -- no persistence per the domain module's own doc comment).
+3. Calendar screen (`ph-holidays.ts`'s SY2025-2026 table, source citation
+   visible in the UI).
+4. Consolidated Grades Matrix screen (`consolidated-grades.ts`).
+5. Weather composition wiring -- school lat/long field (new migration +
+   repository + command, following the existing school-settings
+   pattern), `weather-service.ts` wired into `composition.ts`, a UI
+   advisory affordance that is cleanly absent (never an error state)
+   when coordinates are unset or the API is unreachable. Needs its own
+   ADR (durable composition decision, per the original task).
+6. Live palette wiring -- canvas-based logo pixel extraction through
+   `palette.ts`, applied in place of static theme tokens when a logo
+   exists, falling back to today's static tokens otherwise. Needs its
+   own ADR.
+7. ID card printable layout (`id-card-token.ts`'s offline HMAC token,
+   front/back, explicit photo-placeholder deferral -- do not decide real
+   photo capture/storage). Check `docs/SOURCE-REGISTRY.md` before adding
+   any QR-rendering dependency; flag the addition if one is needed.
+
 ## Batch 7 (Tier 5, final batch): verification-debt audit and documentation pass, no feature work, PR owed (2026-09-08)
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
