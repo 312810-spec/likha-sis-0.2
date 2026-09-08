@@ -21,10 +21,21 @@ pub fn create_school(db: State<'_, Mutex<Connection>>, name: String) -> AppResul
     school::create(&conn, &name)
 }
 
-/// Logos are a small identity icon, not a document store -- 512 KiB is
-/// generous headroom for a sidebar/header-sized PNG/JPEG/WebP while
-/// keeping the encrypted working database from growing unboundedly.
-const MAX_LOGO_BYTES: usize = 512 * 1024;
+/// Logos are a small identity icon, not a document store. Sized so that a
+/// max-size logo's encrypted sync payload (Batch 10,
+/// `docs/adr/0081-school-logo-sync-byte-budget.md`) stays comfortably
+/// under `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB) -- see that ADR for
+/// the full byte-budget math (worst-case JSON-array encoding of the raw
+/// bytes, since this crate deliberately does not add a `base64` direct
+/// dependency just for this, plus AES-256-GCM's 28 bytes of nonce+tag
+/// overhead, plus a small JSON field wrapper). This was previously
+/// 512 KiB (command-layer cap only, with no sync path); shrinking it --
+/// rather than building a new binary-safe sync payload path -- was a
+/// judgment call made in the project owner's absence, see that ADR's
+/// "Decision" section. The actual sync wiring for this entity lands in
+/// a follow-up checkpoint of the same batch; this checkpoint only
+/// shrinks the number and proves the fit.
+const MAX_LOGO_BYTES: usize = 48 * 1024;
 
 /// Deliberately narrow: this is what actually renders in an `<img>` in
 /// the app shell today. Anything else (SVG in particular -- arbitrary
@@ -336,5 +347,32 @@ mod tests {
     fn rejects_non_finite_coordinates() {
         assert!(validate_coordinates(f64::NAN, 0.0).is_err());
         assert!(validate_coordinates(0.0, f64::INFINITY).is_err());
+    }
+
+    /// Ties `MAX_LOGO_BYTES` directly to `sync::MAX_ENCRYPTED_CHANGE_BYTES`
+    /// so the two constants can never silently drift apart again (this is
+    /// exactly the gap that let the old 512 KiB figure sit unnoticed past
+    /// the 256 KiB sync cap until Batch 10 -- see
+    /// `docs/adr/0081-school-logo-sync-byte-budget.md` for the full math).
+    /// Deliberately worst-cases the plaintext encoding: `serde_json`'s
+    /// default `Vec<u8>` serialization is a JSON array of decimal numbers
+    /// (no `base64` -- adding that crate as a direct dependency just for
+    /// this was rejected, see the ADR), so every byte can cost up to 4
+    /// characters (`"255,"`).
+    #[test]
+    fn max_logo_bytes_leaves_headroom_under_the_sync_encrypted_change_cap() {
+        const WORST_CASE_CHARS_PER_BYTE: usize = 4; // "255," (3 digits + comma)
+        const JSON_WRAPPER_OVERHEAD: usize = 256; // schoolId/mime/brackets/keys, generous bound
+        const AES_GCM_OVERHEAD: usize = 12 + 16; // nonce + auth tag, see crypto::payload_key
+
+        let worst_case_encrypted =
+            (MAX_LOGO_BYTES * WORST_CASE_CHARS_PER_BYTE) + JSON_WRAPPER_OVERHEAD + AES_GCM_OVERHEAD;
+
+        assert!(
+            worst_case_encrypted < crate::sync::MAX_ENCRYPTED_CHANGE_BYTES,
+            "a max-size logo's worst-case encrypted sync payload ({worst_case_encrypted} bytes) \
+             must stay under the sync cap ({} bytes)",
+            crate::sync::MAX_ENCRYPTED_CHANGE_BYTES
+        );
     }
 }
