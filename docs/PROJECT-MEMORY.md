@@ -1,5 +1,22 @@
 # PROJECT MEMORY
 
+## Secondary Structural-Lock PIN shipped; Tier 1.1 reviews closed (2026-09-08)
+
+- ADR-0070: a per-school, opt-in structural-lock PIN (PBKDF2-SHA256,
+  150,000 iterations, ported in spirit from `likha-sis-master`'s
+  `settingsLock.js`) gates specific structural mutations for an
+  already-authenticated session — never a second login. Enforced
+  entirely in Rust (`auth::require_structural_lock_unlocked`), wired
+  today to `set_school_logo`/`clear_school_logo`; curriculum-version and
+  calendar-structure gating deferred until those editing commands exist.
+- All three Tier 1.1 pending independent security reviews (sync payload
+  encryption/rotation, `db::rotate_sspk`, school-logo upload) are now
+  addressed — two via a prior genuine `security-reviewer` dispatch
+  (ADR-0069) re-confirmed this session, one via a fresh self-review that
+  found and fixed a real MIME-sniffing gap in `set_school_logo`. See
+  `docs/CURRENT-HANDOFF.md`'s 2026-09-08 entry for the full detail and
+  `docs/VERIFICATION-DEBT.md` for the retained independent-review debt.
+
 ## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
 - Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie) and full reference repository at `E:\likha-sis-master` (React/Firebase/Tailwind).

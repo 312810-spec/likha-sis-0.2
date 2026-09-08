@@ -19,16 +19,16 @@
 
 ### 1.1 Pending Independent Security Reviews
 
-- **Sync Payload Encryption & Key Rotation** (`hub_server::payload_key_wrap_handler`, `repository::sync_payload_key`): Needs fresh-context independent review.
-- **Device Revocation & Key Rotation** (`db::rotate_sspk`): Needs independent review.
-- **In-App School Branding Logo Upload** (`set_school_logo` BLOB/MIME handling): Currently self-reviewed only; needs independent review.
+- [x] **Sync Payload Encryption & Key Rotation** (`hub_server::payload_key_wrap_handler`, `repository::sync_payload_key`): Independent `security-reviewer` dispatch already completed and its finding fixed in an earlier session (ADR-0069, 2026-09-05 addendum). This session (2026-09-08) re-attempted a fresh dispatch (unreachable, same known recurring gap) and performed a self-review confirming no regression — see `docs/VERIFICATION-DEBT.md`'s 2026-09-08 entry. A fresh independent pass remains owed when the dispatch harness is healthy, tracked as debt, not blocking.
+- [x] **Device Revocation & Key Rotation** (`db::rotate_sspk`): Independent `security-reviewer` dispatch already completed and its finding fixed in an earlier session (ADR-0069, 2026-09-05 addendum, same session as above). Re-confirmed via self-review this session — see `docs/VERIFICATION-DEBT.md`.
+- [x] **In-App School Branding Logo Upload** (`set_school_logo` BLOB/MIME handling): Self-reviewed this session (2026-09-08; independent dispatch attempted first and unreachable). Found and fixed a real MIME-sniffing gap (declared MIME type was never checked against actual file bytes) — see ADR-0070. Path traversal: not applicable (no filesystem path involved, BLOB stored in SQLite). Unbounded size and tenant-scoping: already correct, no gap found.
 
 ### 1.2 Sync Production Security & Hardware Gates (ADR-0067)
 
-- **School-Laptop Hub Daemon/Service Resilience:** Windows service relaunch / reboot persistence behavior for the hub laptop is not yet hardened.
-- **Hub Hardware Gates:** Operational validation of BitLocker, firewall rules, and patch management on the physical hub machine.
-- **Disaster Recovery Drill:** Two-copy encrypted backup creation and witnessed restoration drill not yet executed.
-- **Secondary PIN Lock (from `likha-sis-master`):** Port `settingsLock.js` (Web Crypto PBKDF2-SHA256, 150,000 iterations) to protect school identity, curriculum tracks, and calendar structures from accidental edits or unattended terminals.
+- **School-Laptop Hub Daemon/Service Resilience:** Windows service relaunch / reboot persistence behavior for the hub laptop is not yet hardened. Operational/hardware verification — cannot be attempted in this sandbox; tracked in `docs/VERIFICATION-DEBT.md`.
+- **Hub Hardware Gates:** Operational validation of BitLocker, firewall rules, and patch management on the physical hub machine. Same limitation as above.
+- **Disaster Recovery Drill:** Two-copy encrypted backup creation and witnessed restoration drill not yet executed. Same limitation as above.
+- [x] **Secondary PIN Lock (from `likha-sis-master`):** Ported the _intent_ of `settingsLock.js` (Web Crypto PBKDF2-SHA256, 150,000 iterations) as a Rust-side gate (`crypto::pin_lock`, `repository::structural_lock`, `auth::require_structural_lock_unlocked`), wired into the one existing school-identity mutation (`set_school_logo`/`clear_school_logo`). See `docs/adr/0070-secondary-structural-lock-pin.md`. Curriculum-version and calendar-structure gating deferred — no editing command exists for either yet in this codebase (nothing to gate); the reusable gate is ready to wire in the moment either is built.
 
 ---
 

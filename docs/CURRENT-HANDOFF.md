@@ -1,5 +1,129 @@
 # CURRENT HANDOFF
 
+## Batch 1 (Tier 1 Security & Privacy) closed out: three security reviews + Secondary PIN Lock (2026-09-08)
+
+Closed out Batch 1 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1
+(highest priority). Branch `claude/pending-tasks-batch-vjy67v`, batch-
+implement mode (`.claude/rules/autonomous-development.md`) — every
+commit is local, nothing pushed, no CI triggered.
+
+**Three independent security reviews (dispatch-then-fallback, per task
+instruction)**: a fresh-context `security-reviewer` subagent dispatch
+was attempted for all three; the mechanism was not reachable in a way
+that returned a timely result (same known recurring gap this project
+has hit repeatedly — see ADR-0069's several 2026-09-05 addenda). Fell
+back to rigorous self-review, disclosed honestly, per
+`.claude/rules/autonomous-development.md`'s reviewer-fallback rule:
+
+1. **Sync payload encryption & key rotation**
+   (`hub_server::payload_key_wrap_handler`, `repository::sync_payload_key`):
+   already independently reviewed by a real dispatched `security-reviewer`
+   in an earlier session (ADR-0069, 2026-09-05), which found and fixed a
+   genuine SHOULD-FIX. This session's self-review re-confirmed the current
+   code still matches that fixed state (`ensure_wrapped_for_credential`'s
+   revocation + staleness checks both present and correct) — no new
+   finding, no regression.
+2. **Device revocation & key rotation** (`db::rotate_sspk`): same
+   situation — already independently reviewed in the same 2026-09-05
+   session (found and fixed a stale-wrap race). Re-confirmed this
+   session, no regression.
+3. **School branding logo upload** (`set_school_logo` BLOB/MIME
+   handling): never independently reviewed before. Self-review found a
+   real SHOULD-FIX: the command validated the caller-_declared_ MIME
+   string against an allow-list but never checked the actual bytes,
+   letting arbitrary content be stored under a false PNG/JPEG/WebP
+   label. **Fixed same session** — `validate_logo_upload` now also
+   checks each MIME type's real magic-byte signature (PNG's 8-byte
+   header, JPEG's SOI marker, WebP's two-part RIFF/WEBP signature).
+   7 new tests. Path traversal: not applicable (BLOB in SQLite, no
+   filesystem path). Unbounded size and tenant-scoping: already correct.
+
+All independent-review debt is retained, not dropped — recorded in
+`docs/VERIFICATION-DEBT.md`'s new 2026-09-08 entry, owed for a future
+session with a healthy reviewer-dispatch harness.
+
+**Secondary Structural-Lock PIN implemented** (ADR-0070,
+`docs/adr/0070-secondary-structural-lock-pin.md`): ports the _intent_ of
+`likha-sis-master`'s `settingsLock.js` (PBKDF2-SHA256, 150,000
+iterations) as a Rust-side gate, never a frontend-only check — per
+`.claude/rules/architecture.md`, key derivation and enforcement live
+entirely in `src-tauri/src`, never the frontend. TDD throughout.
+
+- `crypto::pin_lock` — PBKDF2-SHA256/150k derive+verify, constant-time
+  compare (`subtle`), fixed-length arrays (no OOB risk). 8 tests.
+- `repository::structural_lock` — per-school PIN storage
+  (`structural_lock_pins`, migration 42), never the plaintext PIN. 6
+  tests.
+- `auth` — `Capability::ManageStructuralLock` (School Head only, for
+  set/clear); `set_structural_lock_pin`/`clear_structural_lock_pin`/
+  `has_structural_lock_pin`/`verify_structural_lock_pin`/
+  `require_structural_lock_unlocked`; `Session` gained a private,
+  in-memory-only 5-minute unlock window
+  (`STRUCTURAL_LOCK_UNLOCK_WINDOW`), never persisted. Deliberately NOT a
+  second authentication system — no new session, no login bypass, opt-in
+  per school (a school with no PIN configured sees zero behavior
+  change). 15 new tests.
+- `commands::structural_lock` — 4 new Tauri commands, registered in
+  `lib.rs`'s `invoke_handler!`.
+- **Wired to the one existing school-identity mutation**:
+  `set_school_logo`/`clear_school_logo` now also call
+  `require_structural_lock_unlocked`. Curriculum-version and calendar-
+  structure gating explicitly deferred — searched the codebase first and
+  confirmed neither has an editing command yet to gate (both are
+  read-only/seeded or entirely unbuilt today); the reusable gate is
+  ready the moment either is built. See ADR-0070 for the full reasoning
+  — this is a scope decision, not an oversight.
+- New dependencies: `pbkdf2` 0.13.0, `subtle` 2.6.1 (both RustCrypto/
+  dalek-cryptography, MIT/Apache-2.0, zero network I/O, no paid tier) —
+  flagged here per task constraint, not a paid addition.
+
+**Verification actually run this session** (sandbox had no Rust
+toolchain new enough, no GTK/webkit2gtk dev headers, and no npm
+dependencies installed at session start — all three were fixed this
+session, not skipped):
+
+- `rustup update stable` (1.94.1 → 1.98.1, the crate requires ≥1.95).
+- `sudo apt-get install libwebkit2gtk-4.1-dev build-essential libxdo-dev
+libssl-dev libayatana-appindicator3-dev librsvg2-dev` (matching
+  `.github/workflows/quality.yml`'s own Linux CI dependency list).
+- `cargo test` (whole crate) — **1080 lib tests passed, 0 failed**,
+  every integration suite green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings` — clean, zero warnings.
+- `cargo fmt --check` — clean (after one `cargo fmt` pass).
+- `npm ci`, then `npm run quality` — typecheck/lint/format:check/
+  architecture-check/`knip`/`vitest run` all passed (111 test files,
+  1099 tests). No TS/UI file was touched by this slice; run anyway to
+  confirm no regression.
+- `npm run quality:security` — installed `cargo-deny` (`cargo install
+cargo-deny --locked`), `gitleaks` v8.30.1, and `osv-scanner` v2.5.1
+  (official static binaries, versions matching `docs/SOURCE-REGISTRY.md`'s
+  existing pins) since none were present in this sandbox, then ran for
+  real: **3 ok, 0 failed, 0 missing** — gitleaks (no leaks), cargo-deny
+  (advisories/bans/licenses/sources all ok), osv-scanner (no issues
+  found, the same 18 pre-documented/accepted advisories correctly
+  filtered as before).
+
+**Tier 1.2's three operational/hardware items** (hub daemon resilience,
+hub hardware gates, disaster-recovery drill) were explicitly NOT
+attempted — real Windows hardware/operational access this sandbox does
+not have, per task scope. Recorded explicitly by name in
+`docs/VERIFICATION-DEBT.md` against the master inventory's Tier 1.2 list.
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for the exact hashes — one commit for the
+logo MIME-sniffing fix, one for the Secondary PIN Lock feature (crypto +
+repository + auth + commands + migration + tests), one for this
+documentation/ADR/inventory update.
+
+**Exact next task**: (1) retry the three independent `security-reviewer`
+dispatches when the harness is confirmed healthy (debt tracked in
+`docs/VERIFICATION-DEBT.md`); (2) build a frontend PIN-entry
+prompt/settings screen for the four new `commands::structural_lock`
+commands (ADR-0070 explicitly scoped the UI layer out of this slice);
+(3) when a curriculum-version or calendar-structure editing command is
+eventually built, wire `auth::require_structural_lock_unlocked` into it
+the same way `set_school_logo` already demonstrates.
+
 ## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
 
 The legacy pre-0.2 codebase, previously unavailable to any audit on this

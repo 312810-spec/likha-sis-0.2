@@ -1,5 +1,58 @@
 # Verification Debt
 
+## Batch 1 (Tier 1 Security & Privacy) closeout: reviewer-dispatch fallback, PIN-lock brute-force mitigation, operational/hardware gates (2026-09-08)
+
+**Independent-review debt retained (self-review fallback used, not
+dropped)**: all three Tier 1.1 reviews this batch required (sync payload
+encryption/key rotation, `db::rotate_sspk` device revocation, and the
+school-logo upload path) were attempted via the documented dispatch
+mechanism first; a fresh-context `security-reviewer` subagent could not
+be reached in a way that returned a timely result in this session (the
+same known recurring gap already recorded across several prior ADR-0069
+addenda). Rigorous self-reviews were performed instead, per
+`.claude/rules/autonomous-development.md`'s reviewer-fallback procedure,
+and are recorded in `docs/adr/0070-secondary-structural-lock-pin.md`
+("Independent review" section) and this file's own history. Two of the
+three surfaces (sync payload encryption, `rotate_sspk`) had ALSO already
+received a genuine independent `security-reviewer` dispatch in an
+earlier session (see ADR-0069's 2026-09-05 addenda) that found and fixed
+real findings — this session's self-review only re-confirmed no
+regression against that already-reviewed state, it did not re-review
+from scratch. The school-logo upload path had never been independently
+reviewed before this session; its self-review found and fixed one real
+SHOULD-FIX (MIME-sniffing gap, see ADR-0070). Owed: a fresh independent
+`security-reviewer` pass on all three surfaces once the dispatch harness
+is healthy again — periodically retry per the project's established
+rule, don't let this debt sit forever unattempted.
+
+**Secondary structural-lock PIN — no brute-force mitigation on repeated
+wrong guesses (open, by design deferral, not an oversight)**: unlike
+`auth::password`'s account lockout (`docs/adr/0019-account-lockout.md`),
+`auth::verify_structural_lock_pin` has no attempt-count or lockout
+tracking of its own — an already-authenticated session may attempt the
+PIN an unlimited number of times. Deferred rather than guessed at
+because no established pattern for a _second_, independent lockout
+counter exists in this codebase to reuse without inventing one from
+scratch, and the realistic threat (a legitimate colleague guessing at an
+already-logged-in terminal) is narrower than the login-credential threat
+model account lockout defends against. See ADR-0070's "Alternatives
+considered" for the full reasoning. Revisit if real usage or a future
+review shows this matters in practice.
+
+**Tier 1.2 operational/hardware items — not attempted this session, by
+explicit task scope, not newly discovered**: School-Laptop hub
+daemon/service resilience (Windows service relaunch/reboot persistence),
+hub hardware gates (BitLocker, firewall rules, patch management on the
+physical hub machine), and the disaster-recovery drill (two-copy
+encrypted backup creation and a witnessed restoration drill) all require
+real Windows hardware/operational access this sandbox does not have.
+These were already implicitly covered by this file's existing "Recovery
+scenarios needing real hardware" and "Native Tauri WebDriver E2E"
+entries below in spirit, but are recorded explicitly here, by name,
+against `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1.2 list, so a
+future session can find them without re-deriving which inventory items
+they map to.
+
 ## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
 
 Follow-up on the BLOCKING finding fixed earlier this session (see the
