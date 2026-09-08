@@ -169,6 +169,12 @@
 
 ### 5.1 Verification Debt Reduction
 
-- **Native Visual & Screen-Reader Inspection:** Comprehensive screen-reader pass on the native Windows WebView2 binary with NVDA and Windows Narrator across all 25+ screens.
-- **Android Platform Architecture Proof:** First Android build target, secure key storage adapter, and touch-optimized layout proof.
-- **Official School Repository Prerequisites:** Awaiting school-owned Microsoft 365 tenant confirmation and privacy review before implementing SharePoint sync.
+**Batch 7 (2026-09-08):** audited, not implemented -- none of these
+three items is safely actionable as feature work in this sandbox (real
+hardware, a new-platform architecture decision, and an owner-provided
+prerequisite respectively). See `docs/VERIFICATION-DEBT.md`'s 2026-09-08
+Batch 7 entry for the full audit; still unchecked and blocked below.
+
+- [ ] **Native Visual & Screen-Reader Inspection:** Comprehensive screen-reader pass on the native Windows WebView2 binary with NVDA and Windows Narrator across all 25+ screens. Still open -- one narrow, real, human-driven NVDA walkthrough happened 2026-09-07 covering a handful of screens (not exhaustive, no saved transcript); every screen shipped since (Batches 3-7, including `SectionTimetableScreen` and the redesigned shell) has zero native visual/screen-reader verification, only automated `axe-core` structural checks. Blocked on real Windows hardware/screen-reader access, same as prior sessions -- not attempted or simulated.
+- [ ] **Android Platform Architecture Proof:** First Android build target, secure key storage adapter, and touch-optimized layout proof. No code/config started (correctly, per `CLAUDE.md`'s "Windows first; Android later" and the 10-scenario process this new-platform decision requires). A scoping note (not a decision) listing what the real decision needs to weigh -- secure-storage adapter options, touch-layout audit of the existing shell, Tauri Android toolchain, zero-billing distribution -- is recorded at `docs/research/2026-09-08-android-architecture-scoping.md`.
+- [ ] **Official School Repository Prerequisites:** Awaiting school-owned Microsoft 365 tenant confirmation and privacy review before implementing SharePoint sync. Spec already approved (`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`); zero integration code exists. This is a genuine human approval gate (external material only the project owner can provide) -- stays open until the owner confirms a tenant.

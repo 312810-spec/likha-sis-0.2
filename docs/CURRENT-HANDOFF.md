@@ -1,5 +1,91 @@
 # CURRENT HANDOFF
 
+## Batch 7 (Tier 5, final batch): verification-debt audit and documentation pass, no feature work, PR owed (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched, no CI triggered.
+Final batch of the multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md`. Tier 5's three items (native
+visual/screen-reader inspection, Android platform architecture, Official
+School Repository/SharePoint) are not buildable feature work in this
+sandbox -- real Windows hardware, a new-platform architecture decision
+requiring its own 10-scenario process, and an owner-provided
+prerequisite, respectively -- so this batch audited and corrected
+`docs/VERIFICATION-DEBT.md` and `docs/product/MASTER-TASK-INVENTORY.md`
+instead of attempting any of the three.
+
+**What was found/fixed:**
+
+1. **Native visual/screen-reader inspection** -- confirmed accurate, not
+   attempted or simulated. The true state (cross-checked, not
+   re-derived): one narrow, real, human-driven NVDA pass happened
+   2026-09-07 on the user's actual Windows machine, covering a handful
+   of screens with a plain "everything works" report and no saved
+   transcript -- meaningfully reduces but does not retire the risk.
+   Every screen shipped in Batches 3-7 of this session
+   (`SectionTimetableScreen`, the redesigned `Sidebar`/`TopBar`, and any
+   Batch 5 item whose deferred UI screen eventually ships) has zero
+   native verification, only jsdom/`axe-core` structural checks.
+   Confirmed neither `docs/CURRENT-HANDOFF.md` nor
+   `docs/product/MASTER-TASK-INVENTORY.md` implied this comprehensive
+   pass was done anywhere -- none did.
+2. **Android** -- no code/config/Gradle/Rust-target added, per
+   `CLAUDE.md`'s explicit "Windows first; Android later" phasing and the
+   10-scenario architecture-decision requirement for a new platform
+   target. Wrote a scoping note (not a decision) at
+   `docs/research/2026-09-08-android-architecture-scoping.md`: secure
+   key-storage adapter options (Android Keystore /
+   `EncryptedSharedPreferences`) equivalent to the current DPAPI
+   approach with the same fail-closed guarantee, a touch-optimized-layout
+   audit the existing pointer/keyboard-oriented shell (Batches 4-5) has
+   never had, the Tauri 2 Android build toolchain question, and the
+   zero-billing distribution constraint -- explicitly stating the real
+   10-scenario process is owed before implementation starts.
+3. **Official School Repository** -- confirmed correctly recorded as
+   blocked-on-owner. The spec
+   (`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`) is already
+   "Approved product requirement; Microsoft 365 integration requires an
+   isolated pilot"; confirmed zero `Microsoft365DocumentAdapter`/Graph/
+   SharePoint code exists anywhere in `src/` or `src-tauri/src/`. This
+   is a genuine human approval gate (autonomous-development.md category
+   2 -- external material only the owner can provide, a school-owned
+   M365 tenant) and stays open. No integration code attempted.
+4. **Repo-wide sweep** for untracked TODO/FIXME/"not yet implemented"/
+   deferred markers across `src/`, `src-tauri/src/`, `docs/adr/`: every
+   hit found was an already-recorded, deliberate design note with its
+   own ADR/doc-comment citation. Two `db/migrations.rs` comments reading
+   as if DO 015 SHS Table 10's six weighting groups were unimplemented
+   turned out to be stale text inside earlier, now-immutable applied
+   migrations -- `docs/PROJECT-MEMORY.md` already confirms migration
+   12/ADR-0068 implemented all six plus the Grade 12 DO 8 carryover, and
+   explicitly warns not to reopen this. No genuinely new item found;
+   nothing added as a result beyond recording that the sweep happened.
+5. Added `[ ]` checkboxes to Tier 5's three items in
+   `docs/product/MASTER-TASK-INVENTORY.md` for format consistency with
+   every other tier (all three remain unchecked/blocked), and a pointer
+   to the new Android scoping note.
+
+**Verification run this batch**: none of the standard gates apply --
+this batch touched only Markdown documentation (`docs/VERIFICATION-DEBT.md`,
+this file, `docs/product/MASTER-TASK-INVENTORY.md`) plus one new
+research note (`docs/research/2026-09-08-android-architecture-scoping.md`).
+No `src/`, `src-tauri/src/`, or dependency change was made.
+
+**Exact next task**: this closes the planned multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md` (Batches 1-7). Retained,
+concrete next candidates already recorded in earlier entries below (not
+started, pick whichever the project owner prioritizes next): the
+`SchoolLogo` sync-wiring payload-size architecture decision; field-level
+`ConflictEntityPreview` variants for the six entities that currently
+only get `Unknown`; the Batch 5 UI-screen debt (seating chart,
+certificate screen, calendar UI, transfers registry persistence,
+consolidated-grades UI, ID-card layout, weather-alerts screen wiring);
+the owed `cargo test` (full binary) re-run at the Batch 6 final
+checkpoint noted in `docs/VERIFICATION-DEBT.md`. Tier 5's three items
+stay blocked exactly as described above until their respective
+prerequisites (real hardware, an owner-authorized Android architecture
+session, or M365 tenant confirmation) are met.
+
 ## Batch 6 sync scope expansion continued: NutritionRecord, BehavioralIncident+IncidentIntervention, GradeSubmission+GradeSubmissionNote, conflict-review generalization (2026-09-08), commit local only (batch mode), PR owed
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

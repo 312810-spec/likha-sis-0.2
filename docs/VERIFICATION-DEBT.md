@@ -1,5 +1,111 @@
 # Verification Debt
 
+## Batch 7 (Tier 5) — audit/documentation pass only, no feature work; Tier 5's three items confirmed still genuinely blocked (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. This batch is the
+final one of the multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md`; Tier 5's three items are not
+buildable feature work in this sandbox (native hardware, a new platform
+target requiring its own architecture decision, and an owner-provided
+prerequisite), so this batch audited and corrected this file instead of
+attempting to close any of them.
+
+1. **Native Visual & Screen-Reader Inspection** -- re-confirmed accurate,
+   not attempted. The real state, cross-checked across this file's own
+   entries, is neither "done" nor "nothing has ever been checked":
+   - A narrow, real, human-driven NVDA pass happened once on the user's
+     actual Windows machine (2026-09-07, see "First-ever native NVDA
+     pass on the compiled Tauri binary" further down this file) covering
+     main-nav announcement, the Devices screen's remove-device
+     confirmation, Sync Status/Conflict Review reachability, and
+     Tab/Shift+Tab order through one form. Reported as working, but a
+     single brief walkthrough with a plain "everything works" report, no
+     saved Speech Viewer transcript, no per-screen sign-off.
+   - A visual (not screen-reader) pass closed 2026-09-01 for four
+     screens, since superseded by the Wave 1 UI redesign (ADR-0064) --
+     see "Native visual / screen-reader inspection" further down.
+   - Every screen shipped across Batches 3-7 of this session
+     (`SectionTimetableScreen`, the redesigned `Sidebar`/`TopBar`, and
+     every UI-deferred Batch 5 item once its screen eventually ships) has
+     had **zero** native visual or screen-reader verification -- only
+     jsdom/`axe-core` structural checks (`npm run quality`'s vitest
+     suite). This sandbox still has no browser/screenshot tool for the
+     compiled native Tauri binary and no Windows screen reader --
+     confirmed again this batch, not newly discovered.
+   - Checked `docs/CURRENT-HANDOFF.md` and
+     `docs/product/MASTER-TASK-INVENTORY.md` for any place that could
+     read as claiming this comprehensive pass is done: none found. The
+     Tier 5 line item's wording ("Comprehensive screen-reader pass ...
+     across all 25+ screens") was already accurate and unchecked; no
+     change was needed to it beyond adding a checkbox for format
+     consistency with the rest of that document (see below). Not
+     attempted or simulated this batch, per this batch's own
+     instruction.
+2. **Android Platform Architecture Proof** -- no code, config, Gradle
+   file, or Rust Android target added. Wrote a scoping note (not a
+   decision) at
+   `docs/research/2026-09-08-android-architecture-scoping.md` listing
+   what a real Android architecture decision needs to weigh: a secure
+   key-storage adapter equivalent to the current DPAPI approach
+   (Android Keystore / Jetpack Security `EncryptedSharedPreferences`,
+   with the same fail-closed guarantee `security-privacy.md` requires),
+   touch-optimized layout implications for the pointer/keyboard-oriented
+   UI shipped in Batches 4-5 (hover affordances, click-to-arm
+   interactions, native `title`-attribute tooltips, untested touch
+   target sizing), the Tauri 2 Android build toolchain question, and the
+   zero-billing distribution constraint. The note explicitly states it
+   is not a decision and that the real 10-scenario architecture-decision
+   process (per `.claude/rules/autonomous-development.md`) is owed
+   before any implementation starts.
+3. **Official School Repository (SharePoint sync)** -- confirmed still
+   correctly recorded as blocked. `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`
+   already states "Status: Approved product requirement; Microsoft 365
+   integration requires an isolated pilot" and lays out the recommended
+   architecture and a next-best pilot path, but no `Microsoft365DocumentAdapter`,
+   Graph client, or SharePoint-integration code exists anywhere in
+   `src/` or `src-tauri/src/` -- confirmed via search this batch. This is
+   a genuine human approval gate (autonomous-development.md category 2:
+   "external material only the user can provide" -- a school-owned M365
+   tenant and Graph consent) and stays open until the project owner
+   confirms a tenant exists. No SharePoint/Microsoft 365 code was
+   attempted this batch, per this batch's own constraint.
+
+**Repo-wide sweep for untracked TODO/FIXME/deferred markers** (`src/`,
+`src-tauri/src/`, `docs/adr/`): ran
+`grep -rnE "TODO|FIXME|XXX|HACK|not yet implemented|deferred|not implemented"`
+across both source trees and `docs/adr/`. Every non-test hit found was
+already an existing, deliberately-recorded design note with its own ADR
+or module-doc-comment citation (e.g. `sync_client.rs`'s DPAPI-caching
+scope note, `auth::verify_structural_lock_pin`'s brute-force-mitigation
+deferral already tracked in this file's Batch 1 entry, `subject_attendance.rs`'s
+deliberately-deferred former-roster-member display, `sync_hub.rs`'s
+per-teacher-scope deferral matching ADR-0067's own "What this ADR does
+NOT decide"). Two `db/migrations.rs` comments read as if DO 015 SHS
+Table 10's six weighting groups were "not yet implemented" (lines ~559
+and ~868) -- these are stale text inside earlier, now-immutable applied
+migrations; `docs/PROJECT-MEMORY.md`'s "Grade 12 legacy SHS grading
+closure" entry already confirms migration 12/ADR-0068 actually
+implemented all six groups plus the Grade 12 DO 8 carryover, and
+explicitly warns not to reopen this. No genuinely new, previously
+untracked item was found. Nothing added to this file or the master
+inventory as a result of the sweep beyond this note recording that the
+sweep happened and found nothing new.
+
+**Tier 5 formatting fix**: `docs/product/MASTER-TASK-INVENTORY.md`'s
+Tier 5 section had no `- [ ]` checkboxes (every other tier does),
+which was not itself wrong but was inconsistent enough to risk
+misreading; added `[ ]` to all three items and a pointer to the new
+Android scoping note.
+
+**Verification run this batch**: none of the standard test/build gates
+apply -- no `src/`, `src-tauri/src/`, or dependency changes were made,
+only Markdown documentation and one new research note. `git status`
+confirms the working tree change set is exactly the four docs files
+touched (`docs/VERIFICATION-DEBT.md`, `docs/CURRENT-HANDOFF.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`, plus the new
+`docs/research/2026-09-08-android-architecture-scoping.md`).
+
 ## Batch 6 sync scope expansion continued (2026-09-08): quality:security/quality:ui not run, integration-test checkpoint pending
 
 - **`npm run quality:security` (gitleaks + `cargo deny check` +
