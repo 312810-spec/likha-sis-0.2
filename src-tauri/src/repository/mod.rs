@@ -23,6 +23,7 @@ pub mod section_advisory;
 pub mod section_membership;
 pub mod session;
 pub mod sf1_import_history;
+pub mod structural_lock;
 pub mod subject;
 pub mod subject_attendance;
 pub mod sync_conflict_review;

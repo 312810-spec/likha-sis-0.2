@@ -18,6 +18,7 @@ pub mod school;
 pub mod section;
 pub mod section_advisory;
 pub mod setup;
+pub mod structural_lock;
 pub mod subject;
 pub mod subject_attendance;
 pub mod sync_status;

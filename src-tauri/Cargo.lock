@@ -113,6 +113,7 @@ dependencies = [
  "if-addrs",
  "log",
  "password-hash",
+ "pbkdf2",
  "proptest",
  "rand 0.10.2",
  "reqwest",
@@ -121,6 +122,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "subtle",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -3003,6 +3005,16 @@ dependencies = [
  "base64ct",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "pbkdf2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
+dependencies = [
+ "digest 0.11.3",
+ "hmac",
 ]
 
 [[package]]

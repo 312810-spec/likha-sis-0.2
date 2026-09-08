@@ -14,7 +14,8 @@ use crate::repository::{
     audit_log as audit_log_repo, device_credential as device_credential_repo,
     installation as installation_repo, role as role_repo, school as school_repo,
     section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
-    sync_payload_key as sync_payload_key_repo, user as user_repo,
+    structural_lock as structural_lock_repo, sync_payload_key as sync_payload_key_repo,
+    user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -46,6 +47,17 @@ pub struct Session {
     /// observe idle state, not extend it, or "is anyone still logged
     /// in?" polling would itself defeat the idle timeout.
     pub last_activity_at: SystemTime,
+    /// ADR-0070: set by a successful `verify_structural_lock_pin` call,
+    /// cleared on logout (a fresh `Session` never inherits a prior one's
+    /// unlock state). `None` means "not currently unlocked" -- the
+    /// initial, and by far the most common, state. Deliberately a plain
+    /// timestamp rather than a bool: an unlock is a short-lived grant
+    /// (`STRUCTURAL_LOCK_UNLOCK_WINDOW`), not a switch that stays on for
+    /// the rest of the session -- re-locking automatically on a timeout
+    /// matters more here than for the login session itself, since the
+    /// whole point of this feature is to gate against an unattended,
+    /// still-logged-in terminal.
+    pub structural_lock_unlocked_until: Option<SystemTime>,
 }
 
 impl Session {
@@ -75,8 +87,17 @@ fn new_session(id: String, user_id: String, school_id: String) -> Session {
         created_at,
         expires_at: created_at + SESSION_DURATION,
         last_activity_at: created_at,
+        structural_lock_unlocked_until: None,
     }
 }
+
+/// How long a successful structural-lock PIN verification stays valid
+/// before the next gated action needs the PIN re-entered. Short by
+/// design -- ADR-0070: this exists specifically to narrow the window an
+/// unattended, still-logged-in terminal could perform a structural edit,
+/// so the grant itself must not quietly last as long as the whole
+/// 8-hour login session.
+pub const STRUCTURAL_LOCK_UNLOCK_WINDOW: Duration = Duration::from_secs(5 * 60);
 
 /// The single source of truth for "who is currently authenticated in this
 /// process." Managed as Tauri state, exactly like the M1 database
@@ -138,6 +159,35 @@ impl SessionManager {
             current.last_activity_at = SystemTime::now();
         }
         Ok((session.user_id, session.school_id))
+    }
+
+    /// ADR-0070: grants the current session a `STRUCTURAL_LOCK_UNLOCK_WINDOW`-
+    /// long structural-lock unlock, anchored to now. A no-op if there is
+    /// no current session (nothing to grant it to) -- callers only ever
+    /// reach this after `verify_structural_lock_pin` already re-confirmed
+    /// an active session and a correct PIN, so this should never actually
+    /// hit that branch in practice, but it must not panic if it somehow
+    /// does (e.g. a session expiring in the narrow window between the two
+    /// checks).
+    fn unlock_structural_lock(&self) {
+        if let Some(session) = self.lock().as_mut() {
+            session.structural_lock_unlocked_until =
+                Some(SystemTime::now() + STRUCTURAL_LOCK_UNLOCK_WINDOW);
+        }
+    }
+
+    /// True only if the current session both exists and has an
+    /// unexpired structural-lock unlock grant. Never mutates -- a
+    /// peek-only check, matching `Session::is_active`'s own convention
+    /// of never conflating "check" with "extend."
+    fn structural_lock_is_unlocked(&self) -> bool {
+        match self.lock().as_ref() {
+            Some(session) => match session.structural_lock_unlocked_until {
+                Some(until) => SystemTime::now() < until,
+                None => false,
+            },
+            None => false,
+        }
     }
 
     fn lock(&self) -> MutexGuard<'_, Option<Session>> {
@@ -428,6 +478,16 @@ pub enum Capability {
     /// session's DepEd research found SF10 restricts official forms to
     /// DepEd's own seal/logo.
     ManageSchoolBranding,
+    /// Set or clear the school's secondary structural-lock PIN
+    /// (ADR-0070) -- `repository::structural_lock::set_pin`/`clear_pin`.
+    /// School Head only, deliberately its own variant for the same
+    /// reason `ManageSchoolBranding` is: configuring the lock itself is a
+    /// distinct administrative act from *unlocking* it for one session
+    /// (`verify_structural_lock_pin`, which is deliberately NOT gated by
+    /// any `Capability` -- any authenticated member of the school may
+    /// attempt to unlock, exactly like knowing a door's combination
+    /// doesn't require a special role, only knowing the combination).
+    ManageStructuralLock,
 }
 
 impl Capability {
@@ -438,6 +498,7 @@ impl Capability {
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageStructuralLock => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -584,6 +645,98 @@ pub fn authorize_capability_with_actor(
         return Err(AppError::Unauthorized);
     }
     Ok((school_id, user_id))
+}
+
+/// ADR-0070: sets (or replaces) the caller's own school's structural-lock
+/// PIN. School Head only (`ManageStructuralLock`) -- `school_id` is
+/// always session-derived, matching every other tenant-write command.
+/// Delegates length/shape validation to `crypto::pin_lock::derive_pin_hash`
+/// itself, which fails closed on a too-short/too-long PIN.
+pub fn set_structural_lock_pin(
+    conn: &Connection,
+    sessions: &SessionManager,
+    pin: &str,
+) -> AppResult<()> {
+    let school_id = authorize_capability(conn, sessions, Capability::ManageStructuralLock)?;
+    let pin_hash = crate::crypto::pin_lock::derive_pin_hash(pin)?;
+    structural_lock_repo::set_pin(conn, &school_id, &pin_hash)
+}
+
+/// ADR-0070: removes the caller's own school's structural-lock PIN
+/// entirely, reverting to "no lock configured" -- gated structural
+/// mutations are no longer enforced for this school until a new PIN is
+/// set. Same `ManageStructuralLock` gate as `set_structural_lock_pin`
+/// (a School Head who forgot the PIN can still reset it -- there is no
+/// "prove you know the old PIN to clear it" requirement, matching this
+/// codebase's convention that role-based admin capabilities, not a
+/// second secret, are the recovery path for every other admin action).
+pub fn clear_structural_lock_pin(conn: &Connection, sessions: &SessionManager) -> AppResult<()> {
+    let school_id = authorize_capability(conn, sessions, Capability::ManageStructuralLock)?;
+    structural_lock_repo::clear_pin(conn, &school_id)
+}
+
+/// ADR-0070: whether the caller's own school currently has a
+/// structural-lock PIN configured. Any authenticated member of the
+/// school may read this (it only drives which prompt the frontend
+/// shows -- "Set a PIN" vs. "Enter PIN" -- never an enforcement
+/// decision), matching `get_school_logo`'s own no-dedicated-capability
+/// read convention.
+pub fn has_structural_lock_pin(conn: &Connection, sessions: &SessionManager) -> AppResult<bool> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    structural_lock_repo::has_pin(conn, &school_id)
+}
+
+/// ADR-0070: attempts to unlock the structural lock for the CURRENT
+/// session only, for `STRUCTURAL_LOCK_UNLOCK_WINDOW`. Deliberately not a
+/// `Capability` check -- this is not "who may configure the lock," it is
+/// "does this already-authenticated caller know the combination," so any
+/// role may attempt it. Returns `Ok(false)` (never an error) for a wrong
+/// PIN or for a school with no PIN configured at all -- a wrong guess is
+/// not itself an authorization failure the way a missing session is;
+/// the caller decides how to surface "PIN did not match" versus "PIN not
+/// yet set" to the user. Never reveals a lockout/attempt-count signal —
+/// see "Not yet decided" in ADR-0070 for why a naive PIN is a weaker
+/// secret than a login password and brute-force mitigation is
+/// deliberately deferred, not silently promised here.
+pub fn verify_structural_lock_pin(
+    conn: &Connection,
+    sessions: &SessionManager,
+    pin: &str,
+) -> AppResult<bool> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    let Some(stored) = structural_lock_repo::find_pin(conn, &school_id)? else {
+        return Ok(false);
+    };
+    if crate::crypto::pin_lock::verify_pin(pin, &stored) {
+        sessions.unlock_structural_lock();
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// ADR-0070: the gate a structural-mutation command (school identity,
+/// curriculum-version, calendar-structure edits) calls IN ADDITION TO
+/// its ordinary `Capability` check, never instead of one. Fails closed
+/// exactly like `authorize_capability`: `Unauthorized` for no session:
+/// a school with NO PIN configured is deliberately NOT gated at all
+/// (returns `Ok` immediately) -- this feature is opt-in, and a school
+/// that never set a PIN must see no behavior change, matching this
+/// project's "no new UX a teacher would see unless they opted in"
+/// precedent (ADR-0069's enrollment ceremony reasons the same way).
+pub fn require_structural_lock_unlocked(
+    conn: &Connection,
+    sessions: &SessionManager,
+) -> AppResult<String> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    if !structural_lock_repo::has_pin(conn, &school_id)? {
+        return Ok(school_id);
+    }
+    if sessions.structural_lock_is_unlocked() {
+        Ok(school_id)
+    } else {
+        Err(AppError::Unauthorized)
+    }
 }
 
 /// Admin-Assisted Password Reset (Wave 3I, ADR-0061): a School Head sets
@@ -1330,6 +1483,7 @@ mod tests {
             created_at: past - SESSION_DURATION,
             expires_at: past,
             last_activity_at: past,
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -1354,6 +1508,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: now,
+            structural_lock_unlocked_until: None,
         });
 
         assert_eq!(sessions.require_active_school_scope(&conn).unwrap(), s.id);
@@ -1376,6 +1531,7 @@ mod tests {
             created_at: now - Duration::from_secs(60 * 60), // logged in an hour ago
             expires_at: now + Duration::from_secs(7 * 60 * 60), // absolute TTL far from expiring
             last_activity_at: now - IDLE_TIMEOUT - Duration::from_secs(1), // idle just past the window
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -1401,6 +1557,7 @@ mod tests {
             expires_at: now + SESSION_DURATION,
             // Idle for nearly the whole window, but not past it yet.
             last_activity_at: now - IDLE_TIMEOUT + Duration::from_secs(5),
+            structural_lock_unlocked_until: None,
         });
 
         // This call succeeds and, per its own contract, resets
@@ -1433,6 +1590,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: stale_activity,
+            structural_lock_unlocked_until: None,
         });
 
         // A peek via `current()` (what `commands::auth::current_session`
@@ -1464,6 +1622,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: now,
+            structural_lock_unlocked_until: None,
         });
         assert!(sessions.require_active_school_scope(&conn).is_ok());
 
@@ -2008,6 +2167,7 @@ mod tests {
             created_at: past - SESSION_DURATION,
             expires_at: past,
             last_activity_at: past,
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -3641,5 +3801,185 @@ mod tests {
             !second,
             "revoking an already-revoked credential reports false, not an error"
         );
+    }
+
+    // --- ADR-0070: secondary structural-lock PIN ---
+
+    fn grant_school_head(conn: &Connection, user_id: &str, school_id: &str) {
+        role_repo::grant(conn, user_id, school_id, role_repo::SCHOOL_HEAD).unwrap();
+    }
+
+    #[test]
+    fn set_structural_lock_pin_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = set_structural_lock_pin(&conn, &sessions, "1234");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(!structural_lock_repo::has_pin(&conn, &s.id).unwrap());
+    }
+
+    #[test]
+    fn a_school_head_can_set_then_verify_the_structural_lock_pin() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+
+        set_structural_lock_pin(&conn, &sessions, "246810").unwrap();
+
+        assert!(has_structural_lock_pin(&conn, &sessions).unwrap());
+        assert!(verify_structural_lock_pin(&conn, &sessions, "246810").unwrap());
+    }
+
+    #[test]
+    fn verify_structural_lock_pin_returns_false_never_an_error_for_a_wrong_pin() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "246810").unwrap();
+
+        let result = verify_structural_lock_pin(&conn, &sessions, "000000").unwrap();
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn verify_structural_lock_pin_returns_false_when_no_pin_is_configured_at_all() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let _ = setup_member_with_session(&conn, &sessions);
+
+        let result = verify_structural_lock_pin(&conn, &sessions, "anything").unwrap();
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn a_teacher_session_may_attempt_to_verify_the_pin_even_though_only_a_school_head_may_set_one()
+    {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &head_sessions);
+        grant_school_head(&conn, &head.id, &s.id);
+        set_structural_lock_pin(&conn, &head_sessions, "135790").unwrap();
+
+        let teacher_sessions = SessionManager::new();
+        let teacher = user::create_user(&conn, "juan.dc", "password", "Juan Dela Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &teacher_sessions, "juan.dc", "password", &s.id).unwrap();
+
+        assert!(verify_structural_lock_pin(&conn, &teacher_sessions, "135790").unwrap());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_is_a_no_op_when_no_pin_is_configured() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let _ = setup_member_with_session(&conn, &sessions);
+
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_denies_when_a_pin_is_configured_but_not_yet_verified() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        let result = require_structural_lock_unlocked(&conn, &sessions);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_succeeds_right_after_a_correct_verify() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        assert!(verify_structural_lock_pin(&conn, &sessions, "112233").unwrap());
+
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_denies_again_once_the_unlock_window_has_elapsed() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+        assert!(verify_structural_lock_pin(&conn, &sessions, "112233").unwrap());
+
+        // Force the grant into the past instead of sleeping in a test.
+        if let Some(session) = sessions.0.lock().unwrap().as_mut() {
+            session.structural_lock_unlocked_until =
+                Some(SystemTime::now() - Duration::from_secs(1));
+        }
+
+        assert!(matches!(
+            require_structural_lock_unlocked(&conn, &sessions),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn clear_structural_lock_pin_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+        role_repo::revoke(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = clear_structural_lock_pin(&conn, &sessions);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(has_structural_lock_pin(&conn, &sessions).unwrap());
+    }
+
+    #[test]
+    fn a_school_head_can_clear_the_structural_lock_pin_reverting_to_unenforced() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        clear_structural_lock_pin(&conn, &sessions).unwrap();
+
+        assert!(!has_structural_lock_pin(&conn, &sessions).unwrap());
+        // And enforcement reverts too -- no PIN means no gate.
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn a_pin_set_in_one_school_does_not_unlock_the_gate_for_another_school() {
+        let conn = open_test_db();
+        let sessions_a = SessionManager::new();
+        let (school_a, head_a) = setup_member_with_session(&conn, &sessions_a);
+        grant_school_head(&conn, &head_a.id, &school_a.id);
+        set_structural_lock_pin(&conn, &sessions_a, "112233").unwrap();
+
+        let sessions_b = SessionManager::new();
+        let school_b = school::create(&conn, "Bonifacio High").unwrap();
+        let head_b = user::create_user(&conn, "juan.dc", "password", "Juan Dela Cruz").unwrap();
+        user::add_school_membership(&conn, &head_b.id, &school_b.id).unwrap();
+        login(&conn, &sessions_b, "juan.dc", "password", &school_b.id).unwrap();
+
+        // School B never configured a PIN, so it is unenforced regardless
+        // of what happened in School A.
+        assert!(require_structural_lock_unlocked(&conn, &sessions_b).is_ok());
     }
 }

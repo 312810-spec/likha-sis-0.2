@@ -1,6 +1,7 @@
 #[cfg(windows)]
 mod dpapi;
 pub mod payload_key;
+pub mod pin_lock;
 
 use std::path::Path;
 

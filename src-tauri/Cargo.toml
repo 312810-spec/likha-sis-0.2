@@ -115,6 +115,8 @@ reqwest = { version = "0.13.4", default-features = false, features = ["blocking"
 # I/O of its own, no phone-home. Single dependency, `libc`, already present
 # transitively elsewhere in this tree.
 if-addrs = { version = "0.15.0", default-features = false }
+pbkdf2 = "0.13.0"
+subtle = "2.6.1"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend

@@ -2002,6 +2002,26 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- M42: ADR-0070 secondary structural-lock PIN. One optional PIN
+        -- per school -- gates specific structural mutations (school
+        -- identity, curriculum-version, calendar-structure edits) for an
+        -- already-authenticated session, never a second login system.
+        -- Only the salted PBKDF2-SHA256 derivation is stored, never the
+        -- plaintext PIN (see crypto::pin_lock). A school with no row here
+        -- simply has no lock configured yet -- backward compatible with
+        -- every existing school, no lock is enforced until one is set.
+        CREATE TABLE structural_lock_pins (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            salt BLOB NOT NULL CHECK (length(salt) = 16),
+            hash BLOB NOT NULL CHECK (length(hash) = 32),
+            iterations INTEGER NOT NULL CHECK (iterations > 0),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
     ])
 }
 
