@@ -1795,6 +1795,20 @@ label {
   .app-topbar-identity {
     display: none;
   }
+  /* ADR-0075's new topbar affordances don't fit alongside the menu
+     button, crumbs, and logout button at phone width -- hidden here the
+     same way app-topbar-modes/identity already were, not a new pattern.
+     None are essential on a phone: the clock is decorative, theme/
+     notifications have no mobile-specific interaction yet. */
+  .app-topbar-clock {
+    display: none;
+  }
+  .app-theme-toggle {
+    display: none;
+  }
+  .app-notification-bell {
+    display: none;
+  }
   .app-sidebar-modes {
     display: flex;
   }
