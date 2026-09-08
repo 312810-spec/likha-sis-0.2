@@ -7,9 +7,15 @@
  * edit to an entity the sync hub also has a newer accepted version of —
  * ADR-0067's protocol contract point 6 ("Learner identity, enrollment,
  * attendance, and grading records never use silent last-write-wins").
- * Only Learner, Attendance, and Section currently produce staged
- * conflicts (the only entity kinds with a working pull-side decrypt/apply
- * path today).
+ * The resolution mechanism itself (`resolve_conflict_review`, Rust) is
+ * generic across every `EntityKind` wired to sync, not just the three
+ * below — see `commands::conflict_review`'s own doc comment. Only
+ * Learner, Attendance, and Section have a dedicated, field-level
+ * `ConflictEntityPreview` variant today; every other wired kind (e.g.
+ * LessonPlan, NutritionRecord, BehavioralIncident, IncidentIntervention,
+ * GradeSubmission, GradeSubmissionNote) falls back to `{ kind: "unknown" }`
+ * — still resolvable via "use incoming," just without a field-by-field
+ * breakdown yet.
  */
 
 /** One entity's field values, shaped differently per `kind` — a teacher
@@ -35,6 +41,16 @@ export type ConflictEntityPreview =
       name: string;
       gradeLevel: string;
       schoolYear: string;
+    }
+  | {
+      /** Fallback for any sync-wired entity kind with no dedicated typed
+       * preview above (e.g. LessonPlan, NutritionRecord,
+       * BehavioralIncident, IncidentIntervention, GradeSubmission,
+       * GradeSubmissionNote) — see the Rust `ConflictEntityPreview::Unknown`
+       * doc comment. The record still decrypted successfully; there is
+       * simply no field-level breakdown for it yet, so "use incoming"
+       * stays available. */
+      kind: "unknown";
     };
 
 /** One staged, not-yet-resolved conflict. */

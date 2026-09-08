@@ -18,6 +18,12 @@ const ENTITY_KIND_LABELS: Record<string, string> = {
   learner: "Learner",
   attendance: "Attendance record",
   section: "Section",
+  lesson_plan: "Lesson plan",
+  nutrition_record: "Nutrition record",
+  behavioral_incident: "Behavioral incident",
+  incident_intervention: "Intervention note",
+  grade_submission: "Grade submission",
+  grade_submission_note: "Grade submission note",
 };
 
 function entityKindLabel(entityKind: string): string {
@@ -58,6 +64,8 @@ function describePreview(preview: ConflictEntityPreview): string[] {
         `Grade level: ${preview.gradeLevel}`,
         `School year: ${preview.schoolYear}`,
       ];
+    case "unknown":
+      return ["This record was received and can be applied, but has no detailed preview yet."];
   }
 }
 

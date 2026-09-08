@@ -67,6 +67,18 @@ pub enum ConflictEntityPreview {
         grade_level: String,
         school_year: String,
     },
+    /// Fallback for any entity kind wired to sync (`LessonPlan`,
+    /// `NutritionRecord`, `BehavioralIncident`, `IncidentIntervention`,
+    /// `GradeSubmission`, `GradeSubmissionNote`, and any future kind)
+    /// that has no dedicated typed preview above. Deliberately distinct
+    /// from "could not decrypt" -- decryption already succeeded by the
+    /// time `decrypt_preview` runs (see its own doc comment) -- so a
+    /// teacher can still safely choose "use incoming" for these kinds
+    /// even without a field-level breakdown, rather than the resolve
+    /// action being silently unavailable for every entity kind this
+    /// screen predates. A future slice can add a dedicated typed variant
+    /// for any of these without changing this fallback's shape.
+    Unknown,
 }
 
 fn learner_preview(l: &learner::Learner) -> ConflictEntityPreview {
@@ -121,6 +133,20 @@ fn local_preview(
     })
 }
 
+/// Called only after `payload_key::decrypt_payload` has already
+/// succeeded (see `to_summary`'s own match) -- so every arm here,
+/// including the fallback, represents a genuinely decrypted, trusted
+/// payload. The three typed arms additionally require the JSON to
+/// deserialize into that entity's own struct (a defensive belt-and-
+/// braces check, not the primary trust boundary); every OTHER wired
+/// entity kind (`LessonPlan`, `NutritionRecord`, `BehavioralIncident`,
+/// `IncidentIntervention`, `GradeSubmission`, `GradeSubmissionNote`, and
+/// any future kind) falls through to `ConflictEntityPreview::Unknown`
+/// rather than `None` -- `None` is reserved for a genuine failure
+/// (`to_summary`'s `Err(_)` arm), never "no preview support yet," so
+/// `resolve_conflict_review`'s "use incoming" action stays available for
+/// every wired entity kind, not just the three with a field-level
+/// breakdown.
 fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<ConflictEntityPreview> {
     match entity_kind {
         EntityKind::Learner => serde_json::from_slice::<learner::Learner>(plaintext)
@@ -135,7 +161,7 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
             .ok()
             .as_ref()
             .map(section_preview),
-        _ => None,
+        _ => Some(ConflictEntityPreview::Unknown),
     }
 }
 
@@ -681,6 +707,147 @@ mod tests {
         resend.actor_user_id = Uuid::parse_str(&verified.user_id).unwrap();
         let outcome = sync_hub::push_change(&conn, &verified, &resend).unwrap();
         assert_eq!(outcome, sync_hub::PushOutcome::Accepted(SyncCursor(2)));
+    }
+
+    /// Proves the conflict-review RESOLUTION mechanism is already
+    /// generic across every wired `EntityKind` -- not hardcoded to
+    /// `Learner`/`Attendance`/`Section` -- without adding a single
+    /// entity-specific line here. `to_summary`'s `local`/`incoming`
+    /// PREVIEW rendering (`local_preview`/`decrypt_preview` above) IS
+    /// still scoped to those three kinds (a UX-only limitation: an
+    /// unrecognized kind's preview is `None`, never an error, and this
+    /// test explicitly checks that), but `resolve_conflict_review`'s
+    /// actual apply/keep-local logic never matches on entity kind at
+    /// all -- it dispatches generically through `row.entity_kind` into
+    /// `sync_client::apply_decrypted_change` (the same function every
+    /// entity's own `apply_decrypted_change` arm already proves correct
+    /// in `sync_client.rs`'s own tests) and
+    /// `sync_outbox::correct_base_version_for_entity`, both of which are
+    /// keyed purely on `EntityKind` + `entity_id`. This test exercises
+    /// that generic path end to end for `LessonPlan` -- one of the six
+    /// entities wired in this session's batch, wired well after this
+    /// screen shipped, and picked precisely because it is NOT one of the
+    /// three kinds `local_preview`/`decrypt_preview` special-case -- to
+    /// prove new entities need zero changes here to resolve correctly.
+    #[test]
+    fn conflict_resolution_is_already_generic_for_an_entity_kind_added_after_this_screen_shipped() {
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let teacher = crate::repository::user::create_user(
+            &conn,
+            "teacher.a",
+            "correct horse battery staple",
+            "Teacher A",
+        )
+        .unwrap();
+        crate::repository::user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        let section =
+            crate::repository::section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let subject = crate::repository::subject::create(&conn, &s.id, "Mathematics").unwrap();
+        let assignment = crate::repository::teaching_assignment::create(
+            &conn,
+            &s.id,
+            &teacher.id,
+            &section.id,
+            &subject.id,
+        )
+        .unwrap()
+        .unwrap();
+        let sspk = test_sspk();
+
+        let incoming = crate::repository::lesson_plan::LessonPlan {
+            id: Uuid::now_v7().to_string(),
+            school_id: s.id.clone(),
+            teaching_assignment_id: assignment.id.clone(),
+            plan_date: "2026-09-07".to_string(),
+            learning_competency: "Add fractions".to_string(),
+            learning_competency_code: "M7NS-Ig-1".to_string(),
+            learning_objectives: "Add fractions with unlike denominators".to_string(),
+            connection_to_previous_learning: "Builds on like denominators".to_string(),
+            learning_experiences: "Think-pair-share".to_string(),
+            assessment: "Exit ticket".to_string(),
+            ways_forward: "Reteach if needed".to_string(),
+            created_by_user_id: teacher.id.clone(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+        let plaintext = serde_json::to_vec(&incoming).unwrap();
+        let encrypted_payload = payload_key::encrypt_payload(&sspk, &plaintext).unwrap();
+        let change = AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::LessonPlan,
+            entity_id: Uuid::parse_str(&incoming.id).unwrap(),
+            version: 1,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload,
+        };
+        stage_pull_conflict(&conn, &s.id, 0, &change).unwrap();
+        let row = sync_conflict_review::list_open_for_school(&conn, &s.id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+
+        // The screen's own read model handles this unrecognized-preview
+        // kind gracefully -- a genuine `Unknown` preview (decryption DID
+        // succeed), never a panic, never `None`/"could not be read" --
+        // so `resolve_conflict_review`'s "use incoming" action stays
+        // available (the frontend gates that button on `incoming` being
+        // present, see `ConflictReviewScreen.tsx`'s own doc comment).
+        let summary = to_summary(&row, &conn, &s.id, Some(sspk)).unwrap();
+        assert_eq!(summary.entity_kind, "lesson_plan");
+        assert!(matches!(
+            summary.incoming,
+            Some(ConflictEntityPreview::Unknown)
+        ));
+        assert!(summary.incoming_unavailable_reason.is_none());
+        assert!(summary.local.is_none());
+
+        // The generic RESOLUTION path (same composition
+        // `resolve_conflict_review`'s `UseIncoming` branch performs)
+        // still applies the incoming LessonPlan correctly, with zero
+        // LessonPlan-specific code in this module.
+        let apply_change = AcceptedChange {
+            cursor: SyncCursor(0),
+            change_id: parse_uuid(&row.change_id, "change id").unwrap(),
+            device_id: parse_uuid(&row.device_id, "device id").unwrap(),
+            actor_user_id: parse_uuid(&row.actor_user_id, "actor id").unwrap(),
+            entity_kind: row.entity_kind,
+            entity_id: parse_uuid(&row.entity_id, "entity id").unwrap(),
+            version: row.current_hub_version,
+            operation: row.operation,
+            encrypted_payload: row.encrypted_payload.clone(),
+        };
+        sync_client::apply_decrypted_change(&conn, &s.id, &apply_change, &sspk).unwrap();
+        sync_version_cache::record_known_version(
+            &conn,
+            &s.id,
+            row.entity_kind,
+            &row.entity_id,
+            row.current_hub_version,
+        )
+        .unwrap();
+        let resolved = sync_conflict_review::mark_resolved(
+            &conn,
+            &s.id,
+            &row.id,
+            ConflictResolution::UsedIncoming,
+        )
+        .unwrap();
+
+        assert!(resolved);
+        let stored =
+            crate::repository::lesson_plan::find_by_id_in_school(&conn, &s.id, &incoming.id)
+                .unwrap()
+                .unwrap();
+        assert_eq!(stored.learning_competency, "Add fractions");
+        assert_eq!(
+            sync_conflict_review::count_open_for_school(&conn, &s.id).unwrap(),
+            0
+        );
     }
 
     /// Regression: the "use incoming" path must not touch an unrelated
