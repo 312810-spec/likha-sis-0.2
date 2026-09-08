@@ -33,6 +33,7 @@ import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
+import { CertificateAwardScreen } from "./ui/CertificateAwardScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
@@ -529,6 +530,13 @@ function App() {
                 lessonPlanService={lessonPlanService}
                 subjectAttendanceService={subjectAttendanceService}
                 teacherUserId={session.userId}
+              />
+            ) : activeTab === "certificates" ? (
+              <CertificateAwardScreen
+                sectionService={sectionService}
+                classRecordService={classRecordService}
+                learnerScoreService={learnerScoreService}
+                schoolName={session.schoolName}
               />
             ) : activeTab === "audit-log" ? (
               <AuditLogScreen authService={authService} />

@@ -2229,3 +2229,176 @@ label {
   margin: 0;
   color: var(--color-text-muted);
 }
+
+/* Certificate / Award (Batch 8, ADR-0076) -- printable content block.
+   Reusable by any future printable screen (e.g. ID cards): everything
+   else on the page hides at print time, only .certificate-printable
+   (and its contents) remains visible, positioned to fill the page. */
+.certificate-printable {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-large);
+  padding: calc(var(--spacing-unit) * 3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.certificate-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.certificate-title {
+  margin: 0;
+  font-size: var(--font-size-xlarge, 1.75rem);
+}
+
+.certificate-learner-name {
+  margin: 0;
+  font-size: var(--font-size-xlarge, 1.75rem);
+  font-weight: 700;
+}
+
+.certificate-body {
+  margin: 0;
+}
+
+.certificate-issued-on {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .certificate-printable,
+  .certificate-printable *,
+  .id-card-printable,
+  .id-card-printable * {
+    visibility: visible;
+  }
+  .certificate-printable {
+    position: absolute;
+    inset: 0;
+    border: none;
+    box-shadow: none;
+  }
+  .id-card-printable {
+    position: absolute;
+    inset: 0;
+  }
+}
+
+/* Seating Chart (Batch 8) -- session-local click-to-place grid. */
+.seating-chart-layout {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 3fr;
+  gap: calc(var(--spacing-unit) * 2);
+  align-items: start;
+}
+
+.seating-chart-learner-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.4);
+}
+
+.seating-chart-grid {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.seating-chart-row {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.seating-chart-seat {
+  min-width: 96px;
+  min-height: 56px;
+  border: 1px dashed var(--color-border-soft);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface-2);
+  font-size: var(--font-size-small);
+  padding: calc(var(--spacing-unit) * 0.4);
+}
+
+.seating-chart-seat[data-occupied="true"] {
+  border-style: solid;
+  background: var(--color-surface-3, var(--color-surface-2));
+  font-weight: 600;
+}
+
+/* Calendar (Batch 8) -- PH holidays table. */
+.calendar-holiday-regular {
+  font-weight: 600;
+}
+
+/* Consolidated Grades Matrix (Batch 8) -- section x subject x term grid,
+   horizontally scrollable so a large subject/term count never causes the
+   page itself to scroll sideways. */
+.consolidated-grades-scroll {
+  overflow-x: auto;
+}
+
+.consolidated-grades-matrix {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.consolidated-grades-matrix th,
+.consolidated-grades-matrix td {
+  border: 1px solid var(--color-border-soft);
+  padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.6);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.consolidated-grades-matrix th[scope="row"] {
+  text-align: left;
+}
+
+/* ID Card (Batch 8) -- front/back printable layout, photo placeholder. */
+.id-card-printable {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 2);
+}
+
+.id-card-face {
+  width: 320px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-large);
+  padding: calc(var(--spacing-unit) * 1.2);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.id-card-photo-placeholder {
+  width: 96px;
+  height: 120px;
+  border: 1px dashed var(--color-border-soft);
+  border-radius: var(--radius-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  align-self: center;
+}
+
+.id-card-token {
+  font-family: monospace;
+  font-size: var(--font-size-small);
+  word-break: break-all;
+}
