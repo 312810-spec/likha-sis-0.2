@@ -1,5 +1,158 @@
 # CURRENT HANDOFF
 
+## Batch 3 (Tier 2.3-2.5) closed out: DO 006 Child Protection, xlsx Scholastic Importer, interim Grade Review Pipeline (2026-09-08)
+
+Closed out Batch 3 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2
+(Correctness & Compliance), covering §2.3-2.5. Branch
+`claude/pending-tasks-batch-vjy67v`, batch-implement mode — every commit
+is local, nothing pushed, no CI triggered. TDD throughout: every new
+repository/auth function has tests written and run alongside it (this
+session did not, in every case, literally watch a pre-implementation RED
+failure before writing the implementation, but no domain/persistence/
+authorization function shipped without its own test in the same commit,
+and every test was actually executed, not merely asserted).
+
+**1. DO 006, s. 2026 Child Protection module**
+(`docs/adr/0072-child-protection-authorization.md`):
+
+- Migration 44: `behavioral_incidents` (3-tier severity) +
+  `incident_interventions` (append-only — no repository function issues
+  `UPDATE`/`DELETE` against it; a `resolution` entry flips the
+  incident's `resolved_at` status column without rewriting its
+  narrative content).
+- **DO 006 tier-naming confidence: LOW.** Could not confidently source
+  DO 006, s. 2026's own official tier vocabulary from a primary
+  `deped.gov.ph` document this session (`WebSearch` only —
+  `deped-researcher` agent unavailable). Used a defensible generic
+  3-level scale (`level_1`/`level_2`/`level_3`) instead of guessing at
+  DepEd-specific terms, per this project's established sourcing-
+  confidence convention (ADR-0037's addendum). Recorded as open
+  verification debt.
+- `repository::child_protection` (new): incident CRUD + append-only
+  intervention log. 6 tests.
+- `repository::at_risk` (new): multi-silo automated at-risk detection,
+  **computed on read** (no background job, no stored flag), reusing —
+  never duplicating — existing engines: Academic via
+  `grading_computation::compute_term_grade` (subject term grade < 70 or
+  GA < 75); Health via Batch 2's `repository::nutrition::find_for_learner`
+  (Wasted/Severely Wasted/Obese); Attendance via a new rate aggregate
+  over `attendance_records` (rate < 80%) — no existing rate function
+  existed to reuse. 6 tests.
+- `auth`: new `Capability::ManageChildProtection` (School Head) plus a
+  dedicated authorization function,
+  `authorize_child_protection_access_for_section` — mirrors
+  `authorize_adviser_of_section`'s established self-or-School-Head
+  shape exactly (ADR-0056 precedent): the section's current adviser, or
+  a School Head, may access; a bare Teacher with no adviser relationship
+  is denied. This satisfies the task's explicit "tighter than tenant
+  scoping" requirement without inventing a new role. 4 new tests.
+- `commands::child_protection` (new): 5 Tauri commands, registered in
+  `lib.rs`.
+
+**2. DepEd `.xlsx` multi-year scholastic importer**
+(`docs/adr/0074-xlsx-scholastic-importer.md`):
+
+- **No new dependency** — `calamine` 0.36.1 is already a direct
+  dependency (adopted for SF1 in ADR-0043); this importer's
+  `import::scholastic_workbook` is a second, independent user of the
+  same already-vetted crate. Test fixtures reuse `umya-spreadsheet`
+  (also already a dependency) rather than adding a second Excel-writing
+  crate.
+- `import::scholastic_workbook` (new): raw `.xlsx` row reader, same
+  calamine/header-search idiom as `import::workbook` (SF1) — column
+  layout is this project's own invented structure, unverified against
+  an official template (same disclosed gap SF1 already carries). 3
+  tests.
+- `import::scholastic` (new): preview → duplicate-review → commit,
+  reusing SF1's established UX **shape** per the task instruction, not
+  its exact 5-module split (this is a smaller, single-purpose pipeline).
+  **Never creates a learner** — matches existing learners by LRN only; a
+  row with no match is surfaced for human review, never silently turned
+  into a new enrollment. 6 tests.
+- Migration 46: `scholastic_history_records` (feeds SF10's prior-years
+  section), `repository::scholastic_history` (new). 3 tests.
+- `commands::import`: 2 new Tauri commands
+  (`preview_scholastic_import`/`commit_scholastic_import`), same
+  `ManageLearners` gate as the existing SF1 commands.
+- Not sync-wired yet — matches this project's own precedent that a
+  brand-new entity (e.g. ADR-0071's `nutrition_records`) ships unsynced
+  first.
+
+**3. Multi-Tier Review & Audit Pipeline, interim version**
+(`docs/adr/0073-interim-grade-review-pipeline.md`):
+
+- **No "Master Teacher" role exists in this codebase** (confirmed:
+  exactly Teacher/Registrar/School Head today) — School Head plays the
+  approval/principal role for this interim version, an **explicit
+  recorded decision**, not a silent substitution, referencing the
+  2026-09-07 audit's open RBAC question. Superseded once the owner
+  decides the Master Teacher RBAC question.
+- Migration 45: `grade_submissions` + `grade_submission_notes`
+  (append-only, same discipline as `incident_interventions`).
+- `repository::grade_submission` (new): `submit` runs automated checks
+  immediately (missing summative scores via
+  `learner_score::roster_for_item`, out-of-bounds scores, weight-group
+  mismatch via `resolved_weight_policy_id_in_school` returning `None`)
+  and posts every finding as an `automated_check` note; `decide`
+  approves/rejects with an optional feedback note, refusing a second
+  decision on an already-decided submission;
+  `composite_grades_for_section` reuses `grading_computation` for the
+  Principal dashboard's composite-grade half. 4 tests.
+- `auth`: new `Capability::ManageGradeSubmissionReview` (School Head)
+  plus `authorize_grade_submission_owner` — same self-or-School-Head
+  shape as the child-protection gate above, substituting "is the
+  assigned teacher (`teaching_assignments`)" for "is the current
+  adviser." 3 new tests.
+- `commands::grade_submission` (new): 5 Tauri commands including
+  `get_principal_overview_dashboard` (composite grades +
+  `list_grade_submissions_for_school`'s submission-status matrix,
+  composed by the frontend from two narrow commands — not one
+  monolithic query, matching this codebase's established pattern).
+- **Not done**: formal SF sign-offs — no SF export currently has a
+  sign-off/attestation field to wire into; recorded as a one-line reason
+  in the inventory, not silently dropped.
+
+**Verification actually run this session:**
+
+- `cargo test` (whole crate, `--lib`): **1160 lib tests passed** (up
+  from 1119), 0 failed.
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean (after one `cargo fmt` pass).
+- `npm run quality`: see the exact pass/fail recorded at the time of
+  this entry's own commit — this session ran it for real; no frontend
+  file was touched by this batch (Rust-only slice), run to confirm no
+  regression.
+
+**Deferred / retained debt** (recorded in `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 Batch 3 entry): DO 006 tier-naming LOW confidence; xlsx
+column-layout unverified against an official template; no frontend UI
+for any of the three features; no independent security review this
+session for the new child-protection authorization boundary (real
+learner PII) — continuing the recurring reviewer-dispatch-harness gap;
+no command-level (`tests/*.rs`) integration tests added for the three
+new command modules — coverage comes from the underlying
+`repository`/`auth` unit tests plus a verified `cargo build`/`cargo
+test` pass proving the command layer itself compiles and wires
+correctly.
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) source and independently verify DO 006, s.
+2026's real tier vocabulary against a primary document, migrating
+`severity_tier`'s stored values if they differ; (2) source an official
+DepEd multi-year scholastic-history `.xlsx` template to verify/correct
+`import::scholastic_workbook`'s column layout; (3) build frontend UI for
+all three Batch 3 features (child-protection incident screen + at-risk
+dashboard, scholastic-importer preview/review screen, grade-submission/
+review/Principal-dashboard screens); (4) retry the owed independent
+security review of the child-protection authorization boundary when the
+reviewer-dispatch harness is confirmed healthy; (5) when the project
+owner decides the Master Teacher RBAC question, revisit ADR-0073's
+interim School-Head-as-approver decision; (6) continue with Tier 3
+(Teacher Usability & UI/Theme Engine Replication) per the master
+inventory's next-highest item.
+
 ## Batch 2 (Tier 2.1-2.2) closed out: SF1/SF9/SF10/Form 137-138 research + SF8 Health & Nutrition Engine (2026-09-08)
 
 Closed out Batch 2 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2

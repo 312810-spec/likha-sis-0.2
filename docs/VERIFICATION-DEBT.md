@@ -1,5 +1,46 @@
 # Verification Debt
 
+## Batch 3 (Tier 2.3-2.5): DO 006 tier naming unverified, xlsx column layout unverified, no frontend UI (2026-09-08)
+
+- **DO 006, s. 2026 tier naming — LOW confidence.** ADR-0072's
+  `behavioral_incidents.severity_tier` uses a generic 3-level scale
+  (`level_1`/`level_2`/`level_3`) because this session could not
+  confidently source DO 006, s. 2026's own official tier vocabulary
+  from a primary `deped.gov.ph` document within its research budget. A
+  future session should locate and read the actual DO 006 text (or an
+  authoritative secondary source quoting it verbatim); if its real tier
+  names differ, migrate the stored values and update every reference,
+  including ADR-0072.
+- **Scholastic-history `.xlsx` column layout — unverified against an
+  official template.** ADR-0074's `import::scholastic_workbook` column
+  order (LRN, School Year, Grade Level, Subject, Final Grade, Remarks,
+  Source School) is this project's own invented structure — no official
+  DepEd multi-year scholastic-history workbook template was available
+  in this session to verify against, the same disclosed gap
+  `import::workbook` (SF1) already carries for its own layout.
+- **No frontend UI for any of Batch 3's three features.** Child
+  protection incident logging/intervention log, the at-risk dashboard,
+  the scholastic importer's preview/review screen, and the grade
+  submission/review/Principal dashboard screens are all
+  Rust-command-only this session — matching this project's established
+  zero-UI-first precedent for a new domain, but still real, disclosed
+  scope left for a future session.
+- **No independent security review this session** for the new
+  child-protection authorization boundary (real learner PII) —
+  continuing the recurring reviewer-dispatch-harness gap already
+  tracked in this file's Batch 1 entry below. Self-review was performed
+  (see ADR-0072's authorization-model section and the auth test suite);
+  a fresh-context independent review is still owed.
+- **No command-level integration tests** were added for
+  `commands::child_protection`/`commands::grade_submission`/the two new
+  `commands::import` scholastic commands this session — coverage comes
+  from the underlying `repository`/`auth` unit tests plus a manual
+  `cargo build`/`cargo test` pass proving the command layer compiles and
+  wires correctly. A future session should add thin
+  `tests/*.rs`-integration-style coverage exercising the Tauri commands
+  themselves end to end, matching this project's coverage depth for
+  older command modules.
+
 ## Batch 2 (Tier 2.1-2.2): SF1/SF9/SF10/Form 137-138 research, WHO growth-standard table not sourced (2026-09-08)
 
 **SF1/SF9/SF10/Form 137-138 research — no new authoritative template

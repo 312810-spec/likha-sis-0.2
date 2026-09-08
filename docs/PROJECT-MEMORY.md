@@ -3365,6 +3365,36 @@ Confirmed already-safe (no change): global reference-data joins,
 `user::list_members_in_school` (`users` global), `subject_attendance`
 entries (no `school_id` column — child of its session).
 
+## Batch 3: DO 006 Child Protection, xlsx Scholastic Importer, interim Grade Review Pipeline (added 2026-09-08)
+
+Migrations 44-46. **`repository::child_protection`** (behavioral
+incidents, 3-tier `severity_tier` — generic placeholder vocabulary,
+LOW-confidence DO 006 tier naming, see `docs/VERIFICATION-DEBT.md`) plus
+append-only `incident_interventions`. **`repository::at_risk`**:
+multi-silo at-risk detection computed on read (Academic via
+`grading_computation`, Health via Batch 2's `repository::nutrition`,
+Attendance via a new rate aggregate) — no stored flag, no background
+job. New `auth::authorize_child_protection_access_for_section`
+(section-adviser-or-School-Head, mirrors ADR-0056's
+`authorize_adviser_of_section` shape) — a bare Teacher gets no
+school-wide incident access. **`import::scholastic`** +
+`import::scholastic_workbook`: `.xlsx` multi-year scholastic-history
+importer reusing the already-adopted `calamine` crate (no new
+dependency), matching existing learners by LRN only, never creating one;
+feeds new `repository::scholastic_history`
+(`scholastic_history_records`, not yet sync-wired). **No "Master
+Teacher" role was added** — `repository::grade_submission` (interim
+Multi-Tier Review & Audit Pipeline) uses School Head as the interim
+approver/principal role via new `auth::authorize_grade_submission_owner`
+(self-or-School-Head, "is the assigned teacher" via
+`teaching_assignments`), an explicit recorded decision
+(`docs/adr/0073-interim-grade-review-pipeline.md`) superseded once the
+2026-09-07 audit's open Master Teacher RBAC question is decided.
+`cargo test`: 1160 lib tests passed. Full record:
+`docs/adr/0072-child-protection-authorization.md`,
+`docs/adr/0073-interim-grade-review-pipeline.md`,
+`docs/adr/0074-xlsx-scholastic-importer.md`.
+
 ## Current Milestone
 
 See `ACTIVE-PLAN.md`. (The harness audit above is a separate,

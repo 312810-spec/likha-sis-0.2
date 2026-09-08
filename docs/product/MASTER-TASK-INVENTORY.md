@@ -48,21 +48,26 @@
 
 ### 2.3 DO 006, s. 2026 Child Protection & Automated At-Risk Triggers
 
-- **3-Tier Behavioral Incident Logging:** DO 006 safe environment classification.
-- **Multi-Silo Automated Risk Detection (`autoFlagTriggers.js`):** Automatically flag learners at risk without manual searching:
-  - _Academic:_ Initial grade $< 70$ (early DO 015 intervention) or General Average $< 75$.
-  - _Health:_ Nutrition status Wasted/Severely Wasted/Obese.
-  - _Attendance:_ Attendance rate $< 80\%$.
-- **Append-Only Intervention Log & Auto-Resolution:** Intervention documentation + remediation progress tracking.
+- [x] **3-Tier Behavioral Incident Logging:** Implemented (`repository::child_protection`, migration 44, `docs/adr/0072-child-protection-authorization.md`). Tier naming is a **generic 3-level scale** (`level_1`/`level_2`/`level_3`), NOT verified DO 006 vocabulary — this session could not confidently source DO 006, s. 2026's own official tier names; LOW confidence, tracked in `docs/VERIFICATION-DEBT.md`.
+- [x] **Multi-Silo Automated Risk Detection:** Implemented, computed on read (`repository::at_risk`), reusing existing engines — no duplicated computation:
+  - _Academic:_ any subject term grade $< 70$ or General Average $< 75$, via `grading_computation::compute_term_grade`.
+  - _Health:_ Wasted/Severely Wasted/Obese, via Batch 2's `repository::nutrition::find_for_learner` (no new nutrition query).
+  - _Attendance:_ rate $< 80\%$, a new aggregate over `attendance_records` (no existing rate function to reuse).
+- [x] **Append-Only Intervention Log & Auto-Resolution:** `incident_interventions` (migration 44) is INSERT-only; a `resolution` entry flips the incident's `resolved_at` without rewriting its narrative content.
+- Authorization: section-adviser-or-School-Head only (`auth::authorize_child_protection_access_for_section`) — a bare Teacher gets no blanket access, per ADR-0072.
+- Deferred: frontend UI; command-level integration tests (see `docs/VERIFICATION-DEBT.md`).
 
 ### 2.4 Multi-Year Scholastic Importer (`.xlsx`)
 
-- **DepEd `.xlsx` Spreadsheet Parser:** Ingest official DepEd workbooks directly into learner profiles and past academic records (SF10) using SheetJS rather than manual entry.
+- [x] **DepEd `.xlsx` Spreadsheet Parser:** Implemented using `calamine` (already an adopted dependency — no new crate added; see `docs/adr/0074-xlsx-scholastic-importer.md`), following the existing SF1 preview → duplicate-review → commit shape. Ingests into a new `scholastic_history_records` table (migration 46) feeding SF10's prior-years section, matched to existing learners by LRN only (never creates a new learner). Column layout unverified against an official template — see `docs/VERIFICATION-DEBT.md`.
+- Deferred: frontend UI (preview/review screen).
 
 ### 2.5 Multi-Tier Review & Audit Pipeline
 
-- **Master Teacher Review Workflow:** Teacher quarterly grade submission $\rightarrow$ MT audit checks (missing summative scores, out-of-bounds values, weight group mismatches) $\rightarrow$ Approve or Reject with feedback notes.
-- **Principal Overview Dashboard:** School-wide composite grade view, submission status matrix, and formal SF sign-offs.
+- [x] **Interim Review Workflow (School-Head-as-approver):** Teacher (or School Head) submits a class record's grades → automated checks (missing summative scores, out-of-bounds values, weight-group mismatch) run and post as notes → School Head approves/rejects with feedback (`repository::grade_submission`, migration 45, `docs/adr/0073-interim-grade-review-pipeline.md`). **No "Master Teacher" role exists in this codebase** — School Head plays that role for this interim version, an explicit recorded decision, not a permanent redesign; superseded once the project owner decides the Master Teacher RBAC question.
+- [x] **Principal Overview Dashboard (interim):** School-wide composite-grade view (`get_principal_overview_dashboard`, reusing `grading_computation`) + submission-status matrix (`list_grade_submissions_for_school`). "Principal" maps to the existing School Head role, same interim substitution as above.
+- Not done: formal SF sign-offs (no SF export currently has a sign-off/attestation field to wire into) — one-line reason recorded here, not silently dropped.
+- Deferred: frontend UI; command-level integration tests (see `docs/VERIFICATION-DEBT.md`).
 
 ---
 
