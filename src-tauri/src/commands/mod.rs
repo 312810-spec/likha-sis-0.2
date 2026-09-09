@@ -3,6 +3,7 @@ pub mod assessment_category;
 pub mod assessment_item;
 pub mod attendance;
 pub mod auth;
+pub mod backup;
 pub mod child_protection;
 pub mod class_record;
 pub mod conflict_review;

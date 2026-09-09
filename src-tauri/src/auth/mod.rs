@@ -552,6 +552,17 @@ pub enum Capability {
     /// registrar/administrative act, not a per-section teaching duty, and
     /// this project's role model has no per-section carve-out for it.
     ManageTransferRecords,
+    /// Batch 14 sub-item 3 / ADR-0087: create a two-copy encrypted
+    /// disaster-recovery backup of the ENTIRE local database (every
+    /// school this installation holds, not just the caller's own school
+    /// scope -- there is currently exactly one school per installation
+    /// in this single-hub architecture, but the backup mechanism itself
+    /// backs up the whole SQLCipher file, which is not a per-school-
+    /// scoped operation the way `ManageLearners`/etc. are). School Head
+    /// only -- the same conservative default `ManageStructuralLock` and
+    /// `ManageSchoolMembership` already use for a whole-installation
+    /// administrative action, not a per-section teaching duty.
+    CreateDisasterRecoveryBackup,
 }
 
 impl Capability {
@@ -568,6 +579,7 @@ impl Capability {
             Capability::ManageGradeSubmissionReview => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolCoordinates => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTransferRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::CreateDisasterRecoveryBackup => &[role_repo::SCHOOL_HEAD],
         }
     }
 }

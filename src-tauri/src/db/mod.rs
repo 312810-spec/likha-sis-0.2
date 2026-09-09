@@ -100,6 +100,37 @@ pub fn open_app_db(_app: &AppHandle) -> AppResult<Connection> {
     ))
 }
 
+/// Resolves the SAME encryption key `open_app_db` uses, without opening a
+/// second connection to the database file. Exists for
+/// `commands::backup::create_disaster_recovery_backup` (ADR-0087, Batch
+/// 14 sub-item 3): the backup mechanism needs the raw key to create
+/// SQLCipher-encrypted copies via `backup::create_two_copy_backup`, but
+/// must reuse this installation's already-managed `Mutex<Connection>`
+/// rather than opening a competing second connection to the live
+/// database file. `DpapiKeyStore::load_or_create_key` is idempotent (see
+/// its own doc comment) -- calling it again here after `open_app_db`
+/// already called it once at startup reloads the identical persisted
+/// value, never mints a new one.
+#[cfg(windows)]
+pub fn load_encryption_key(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    std::fs::create_dir_all(&dir)?;
+    DpapiKeyStore.load_or_create_key(&dir.join(KEY_FILE_NAME))
+}
+
+/// See `open_app_db`'s non-Windows counterpart -- same fail-closed
+/// reasoning applies to loading the encryption key on its own.
+#[cfg(not(windows))]
+pub fn load_encryption_key(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
+    Err(crate::error::AppError::key_store(
+        "no encryption key store is implemented for this platform; \
+         LIKHA-SIS currently ships on Windows only",
+    ))
+}
+
 /// Resolves (creating if needed) this installation's local copy of the
 /// school sync-payload key (ADR-0069). Reuses `DpapiKeyStore` exactly like
 /// the SQLCipher key, only under a different filename

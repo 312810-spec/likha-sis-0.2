@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod backup;
 mod commands;
 pub mod crypto;
 pub mod db;
@@ -92,6 +93,7 @@ pub fn run() {
             commands::structural_lock::clear_structural_lock_pin,
             commands::structural_lock::has_structural_lock_pin,
             commands::structural_lock::verify_structural_lock_pin,
+            commands::backup::create_disaster_recovery_backup,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
             commands::learner::create_learner_with_duplicate_check,
