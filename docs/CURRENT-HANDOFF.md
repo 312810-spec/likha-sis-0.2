@@ -1,5 +1,43 @@
 # CURRENT HANDOFF
 
+## Rate-limit consolidation (2026-09-09): Batch 17 checkpoint 3 + checkpoint 4 partial, Batch 18 checkpoint 2 salvaged and committed
+
+Both the Batch 17 continuation agent and the Batch 18 agent were
+terminated mid-work by a session rate limit (resets 8:40am UTC). Rather
+than leave their in-flight work uncommitted and exposed to loss, I
+verified it directly before committing:
+
+- `cargo check` on the full mixed working tree: clean.
+- `cargo test --lib grade_submission::` (23 tests): all pass — this is
+  Batch 17 checkpoint 3, the two-tier Master Teacher / School Head
+  decision rewire, essentially complete and tested. Commit `bb67f26`.
+- `cargo test --lib microsoft365::` (19 tests, `oauth` module): all
+  pass — Batch 18 checkpoint 2's MSAL/PKCE OAuth core. `token_store.rs`
+  is also complete but its round-trip tests are `#[cfg(windows)]`-gated
+  (matches `crypto::dpapi`'s established pattern) so they don't run on
+  this Linux sandbox — correctly disclosed in the file's own doc
+  comment, not claimed as covered. Bundled into commit `bb67f26`
+  alongside checkpoint 3 because both were already git-staged together
+  when the rate limit hit; not split further to avoid re-doing verified
+  work.
+- `npx tsc --noEmit`: clean. Committed the remaining Batch 17 checkpoint
+  4 partial (role-grant UI: `master_teacher` added to
+  `SCHOOL_MEMBER_ROLES`, labeled in `SchoolMembershipScreen`) separately
+  as `38c18a4`.
+
+**Still outstanding after this consolidation:**
+
+- Batch 17 checkpoint 4: the two-tier status display on the grade-review
+  screen, and the School-Head-only oversight-assignment management
+  screen, are NOT built yet — only the role-grant dropdown update
+  landed.
+- Batch 18 checkpoints 3-4: the School-Head-only settings UI
+  (invisible-when-unconfigured) and the opportunistic upload queue are
+  NOT started.
+
+All committed locally only — nothing pushed, PR #55 untouched, no CI
+triggered, per batch-implement mode.
+
 ## Batch 17 (checkpoints 1-2 complete, 3-4 deferred): real Master Teacher RBAC role + Teacher Oversight Assignment (2026-09-09), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, commit `856c673`, committed
