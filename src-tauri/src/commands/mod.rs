@@ -28,6 +28,7 @@ pub mod structural_lock;
 pub mod subject;
 pub mod subject_attendance;
 pub mod sync_status;
+pub mod teacher_oversight_assignment;
 pub mod teaching_assignment;
 pub mod transfer_record;
 pub mod user;

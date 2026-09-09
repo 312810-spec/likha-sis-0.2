@@ -1,6 +1,16 @@
 # ADR-0073: Multi-Tier Review & Audit Pipeline — Interim (School-Head-as-Approver)
 
-Status: Accepted (interim — see "Superseded when" below)
+Status: **Superseded** (2026-09-09) by
+`docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md` for the
+"who decides, how many steps" question this ADR's Decision section
+answers below. The pipeline **mechanism** this ADR built (submission,
+automated checks, append-only feedback notes, the Principal Overview
+Dashboard) is unchanged and still governs this feature — only the
+School-Head-as-approver substitution and the single-decision-step shape
+are superseded. Kept in place (not deleted) as the honest historical
+record of the interim decision and why it was made; see ADR-0089 for the
+real, permanent Master Teacher design and the intentional no-MT-assigned
+fallback it documents.
 Date: 2026-09-08
 
 ## Context

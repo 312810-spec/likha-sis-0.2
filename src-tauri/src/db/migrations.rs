@@ -3602,6 +3602,76 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- M59 (Batch 17, ADR-0073's superseding addendum): adds the real
+        -- `master_teacher` RBAC role, resolving the "Master Teacher RBAC
+        -- role" question in docs/product/OWNER-DECISIONS-NEEDED.md item 1
+        -- for real -- this is the permanent design, not another interim
+        -- stopgap. SQLite cannot ALTER a CHECK constraint in place, so
+        -- this reuses the same 12-step "create new table, copy data, drop
+        -- old, rename" rebuild `user_school_roles`'s own migration-16
+        -- comment already anticipated for exactly this ("a future role...
+        -- is added by widening this CHECK constraint in a new migration
+        -- -- the same recreate-table pattern this schema already used
+        -- once for `attendance_records`'s status enum"). Holding
+        -- `master_teacher` grants no School-Head-only capability by
+        -- itself -- see `auth::Capability::allowed_roles()`, which is
+        -- left unchanged by this migration: no existing capability lists
+        -- `master_teacher` among its allowed roles.
+        CREATE TABLE user_school_roles_new (
+            user_id TEXT NOT NULL,
+            school_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('teacher', 'registrar', 'school_head', 'master_teacher')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (user_id, school_id, role),
+            FOREIGN KEY (user_id, school_id) REFERENCES user_school_memberships(user_id, school_id) ON DELETE CASCADE
+        );
+
+        INSERT INTO user_school_roles_new (user_id, school_id, role, created_at)
+        SELECT user_id, school_id, role, created_at FROM user_school_roles;
+
+        DROP TABLE user_school_roles;
+        ALTER TABLE user_school_roles_new RENAME TO user_school_roles;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M60 (Batch 17): Teacher Oversight Assignment -- the permanent
+        -- Master Teacher review-hierarchy design (superseding
+        -- ADR-0073's interim School-Head-as-approver substitution, see
+        -- docs/adr/0073-interim-grade-review-pipeline.md's superseding
+        -- addendum). Mirrors `section_advisories` (ADR-0056) exactly:
+        -- a half-open-interval time-scoped assignment
+        -- table, school-scoped, with "at most one active overseer per
+        -- teacher" enforced by a partial unique index -- the same
+        -- structural-invariant pattern
+        -- `idx_one_active_adviser_per_section` already established,
+        -- applied per teacher instead of per section. `ends_on: NULL`
+        -- means still active, matching `section_advisories.ends_on`'s
+        -- own convention.
+        CREATE TABLE teacher_oversight_assignments (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            master_teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            starts_on TEXT NOT NULL,
+            ends_on TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_teacher_oversight_school_id ON teacher_oversight_assignments(school_id);
+        CREATE INDEX idx_teacher_oversight_master_teacher_id ON teacher_oversight_assignments(master_teacher_user_id);
+        CREATE INDEX idx_teacher_oversight_teacher_id ON teacher_oversight_assignments(teacher_user_id);
+
+        -- "At most one active overseer per teacher" -- the same
+        -- structural-invariant reasoning as
+        -- `idx_one_active_adviser_per_section`, applied
+        -- per teacher instead of per section.
+        CREATE UNIQUE INDEX idx_one_active_overseer_per_teacher
+            ON teacher_oversight_assignments(teacher_user_id) WHERE ends_on IS NULL;
+        "#,
+        ),
     ])
 }
 
@@ -4747,6 +4817,73 @@ mod tests {
         assert!(
             result.is_err(),
             "a role cannot be granted for a school membership that doesn't exist"
+        );
+    }
+
+    #[test]
+    fn migration_59_allows_the_real_master_teacher_role() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'master_teacher')",
+            [],
+        );
+
+        assert!(
+            result.is_ok(),
+            "the widened CHECK constraint must accept the real master_teacher role"
+        );
+    }
+
+    #[test]
+    fn migration_59_still_rejects_an_unrecognized_role_after_widening() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'principal')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "the CHECK-widening rebuild must not accidentally drop the allowlist entirely"
+        );
+    }
+
+    #[test]
+    fn migration_59_still_cascades_and_enforces_the_membership_foreign_key() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'teacher')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "DELETE FROM user_school_memberships WHERE user_id = 'u1' AND school_id = 's1'",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM user_school_roles WHERE user_id = 'u1' AND school_id = 's1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count, 0,
+            "the rebuilt table must still cascade-delete roles when the membership is removed"
         );
     }
 

@@ -39,6 +39,7 @@ pub mod sync_outbox;
 pub mod sync_payload_key;
 pub mod sync_pull_cursor;
 pub mod sync_version_cache;
+pub mod teacher_oversight_assignment;
 pub mod teaching_assignment;
 pub mod transfer_record;
 pub mod user;

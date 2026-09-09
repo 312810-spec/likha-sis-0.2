@@ -563,6 +563,18 @@ pub enum Capability {
     /// `ManageSchoolMembership` already use for a whole-installation
     /// administrative action, not a per-section teaching duty.
     CreateDisasterRecoveryBackup,
+    /// Batch 17: assign, reassign, or end a teacher's Master Teacher
+    /// oversight relationship (`repository::teacher_oversight_assignment`)
+    /// -- the permanent Master Teacher review-hierarchy design that
+    /// supersedes ADR-0073's interim School-Head-as-approver
+    /// substitution. School Head only, deliberately its own variant
+    /// rather than reusing `ManageTeachingAssignments`/
+    /// `ManageSectionAdvisories`: who oversees a teacher's submissions is
+    /// a distinct scheduling-authority decision from who teaches which
+    /// subject or advises which section, matching this codebase's own
+    /// repeated precedent of a new variant per distinct authority
+    /// decision even where several currently resolve to the same role.
+    ManageTeacherOversightAssignments,
 }
 
 impl Capability {
@@ -580,6 +592,7 @@ impl Capability {
             Capability::ManageSchoolCoordinates => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTransferRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::CreateDisasterRecoveryBackup => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageTeacherOversightAssignments => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -4344,5 +4357,82 @@ mod tests {
         let result = authorize_capability(&conn, &sessions, Capability::ManageHealthRecords);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    // ---- Master Teacher role (Batch 17): capability boundaries ----
+    //
+    // Holding `master_teacher` alone must never satisfy ANY
+    // `Capability::allowed_roles()` check -- a Master Teacher does not
+    // inherit School-Head-level capabilities (school settings,
+    // structural lock, etc.) merely by holding this role. Rather than
+    // one test per existing capability (which would silently stop
+    // covering a future one), this iterates every variant this module
+    // currently defines -- a new `Capability` added later without also
+    // being added to this list would need to be added here too, but
+    // omitting it here is a visible gap in this test, not a silent one
+    // in production code, since `allowed_roles()` itself is what's
+    // checked, not a duplicate hand-maintained list.
+
+    const ALL_CAPABILITIES: &[Capability] = &[
+        Capability::ManageLearners,
+        Capability::ManageSchoolMembership,
+        Capability::ManageTeachingAssignments,
+        Capability::ManageSectionAdvisories,
+        Capability::ManageSchoolBranding,
+        Capability::ManageStructuralLock,
+        Capability::ManageHealthRecords,
+        Capability::ManageChildProtection,
+        Capability::ManageGradeSubmissionReview,
+        Capability::ManageSchoolCoordinates,
+        Capability::ManageTransferRecords,
+        Capability::CreateDisasterRecoveryBackup,
+        Capability::ManageTeacherOversightAssignments,
+    ];
+
+    #[test]
+    fn holding_master_teacher_alone_grants_no_existing_capability() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+
+        for capability in ALL_CAPABILITIES {
+            let result = authorize_capability(&conn, &sessions, *capability);
+            assert!(
+                matches!(result, Err(AppError::Unauthorized)),
+                "master_teacher alone must not satisfy {capability:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_master_teacher_who_also_holds_teacher_still_gets_no_school_head_capability() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolMembership),
+            Err(AppError::Unauthorized)
+        ));
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageStructuralLock),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn a_school_head_session_is_unaffected_by_master_teacher_being_a_recognized_role() {
+        // Guards against a rebuild-migration regression that would
+        // accidentally narrow `allowed_roles()` matching instead of only
+        // widening the CHECK constraint's accepted role strings.
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageSchoolMembership).is_ok());
     }
 }

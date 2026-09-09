@@ -4,13 +4,39 @@ Consolidated list of items this session deliberately did **not** decide unilater
 
 ---
 
-## 1. Master Teacher RBAC role
+## 1. Master Teacher RBAC role — RESOLVED (2026-09-09, Batch 17)
 
-**Status:** Interim workaround shipped (ADR-0073) — School Head plays the "approver" role in the grade-review pipeline and the "Principal" role in the overview dashboard.
+**Status:** Resolved for real. A genuine `master_teacher` RBAC role now
+exists (`repository::role::MASTER_TEACHER`, migration 59) — this is the
+permanent design, not another interim workaround. See
+`docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md`, which
+supersedes ADR-0073's interim School-Head-as-approver substitution.
 
-**The actual question:** should this project add a real "Master Teacher" role to RBAC (today: Teacher / Registrar / School Head only)? If yes: what capabilities does it get, how is someone assigned it, does it apply per-section or school-wide?
+**The answer:** a Master Teacher oversees a set of teachers
+(`teacher_oversight_assignments`, migration 60 — a time-scoped,
+school-scoped assignment table, School-Head-managed via
+`Capability::ManageTeacherOversightAssignments`). Anything an overseen
+teacher submits that needs review — starting with grade submissions — is
+approved by their assigned Master Teacher first; School Head retains a
+distinct, separate "final lock" step afterward. A teacher with no
+currently-assigned Master Teacher routes directly to School-Head
+approval — the same behavior ADR-0073's interim version already had,
+now documented as the intentional fallback rather than the only path.
+Holding `master_teacher` grants no School-Head-level capability by
+itself, and a Master Teacher can never approve their own submission
+(enforced server-side, not left to the UI).
 
-**Why it wasn't decided here:** expanding the role universe is an irreducible product-policy choice (per `.claude/rules/autonomous-development.md`'s approval-gate #1) — there's no evidence-based "correct" answer, only your preference for how your schools' review hierarchies actually work.
+**Original question (for the record):** should this project add a real
+"Master Teacher" role to RBAC (today: Teacher / Registrar / School Head
+only)? If yes: what capabilities does it get, how is someone assigned
+it, does it apply per-section or school-wide?
+
+**Why it wasn't decided unilaterally at the time:** expanding the role
+universe was an irreducible product-policy choice (per
+`.claude/rules/autonomous-development.md`'s approval-gate #1) — there
+was no evidence-based "correct" answer, only the owner's preference for
+how their schools' review hierarchies actually work. The owner has since
+answered it directly (see above), so this item is no longer open.
 
 ---
 
