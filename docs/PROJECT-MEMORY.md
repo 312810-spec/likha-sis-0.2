@@ -1,5 +1,47 @@
 # PROJECT MEMORY
 
+## Batches 16-18: Master Teacher RBAC + Official School Repository (M365) shipped; both remaining owner decisions resolved; wave stopped (2026-09-09)
+
+- **Both open items in `docs/product/OWNER-DECISIONS-NEEDED.md` are now
+  resolved for real**, not interim workarounds: Master Teacher RBAC
+  (Batch 17, ADR-0089) and the Official School Repository / Microsoft
+  365 document adapter (Batch 18, ADR-0088), per the owner's direct
+  instruction to build both.
+- **Master Teacher RBAC**: real role + `teacher_oversight_assignments`
+  (School-Head-managed). Grade submissions get a genuine two-tier
+  decision — an assigned Master Teacher decides first, `None` falls
+  back straight to School-Head exactly as before (no behavior change
+  for schools not using the feature), School Head keeps a separate
+  final-lock step. Self-approval structurally blocked server-side.
+- **Official School Repository**: hand-rolled PKCE OAuth2 against
+  Microsoft's documented v2.0 endpoints — no maintained Rust MSAL crate
+  exists, checked via `dependency-researcher` before deciding to hand-roll.
+  Refresh token lives DPAPI-protected in its own file, never in SQLite.
+  `reqwest` switched to the `rustls` TLS backend for this (first caller
+  in this codebase to leave loopback and need a real TLS backend) —
+  pulled in `webpki-root-certs` under `CDLA-Permissive-2.0`, now on
+  `deny.toml`'s allow-list (was a real CI gap caught and fixed at the
+  Batch 16 checkpoint, not before — **run `npm run quality:security`
+  whenever `Cargo.lock` changes, not only at final consolidation**).
+  Upload queue is exports-only, opportunistic, follows the existing
+  sync-outbox drain pattern; genuinely cannot deliver bytes to
+  Microsoft Graph yet (no destination SharePoint site/library selection
+  built) — an honest, disclosed `NotConfigured` outcome, not a
+  fabricated success.
+- **New real gap surfaced by this wave, queued as the next slice**: the
+  sync client's hub address is hardcoded to loopback
+  (`127.0.0.1:7878`). The hub server side already supports LAN/Tailscale
+  binding; nothing yet lets a client point at a remote hub address.
+  This blocks the owner's actual deployment shape (3 non-interconnected
+  school modems, teachers rarely sharing WiFi even on campus, home sync
+  needed) and is not a policy question — just missing settings plumbing.
+- **New review debt**: Batch 17's two-tier authorization path and
+  Batch 18's OAuth/token-storage/upload-queue code have self-review and
+  the full verification suite, but no fresh independent
+  `security-reviewer` pass yet.
+- Full checkpoint detail: `docs/CURRENT-HANDOFF.md`'s "Batch 16" entry
+  and `../LIKHA-SIS-DELIVERY-REPORTS/WAVE-16-FINAL-REPORT.md`.
+
 ## Batch 8 (items 1-7): UI wiring for all 7 Batch 5 domain modules; 2 new composition ADRs; migration 51 (2026-09-08)
 
 - All 7 Batch 5 domain-only modules now have real, tested UI/composition

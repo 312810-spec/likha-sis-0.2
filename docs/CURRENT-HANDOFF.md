@@ -1,5 +1,94 @@
 # CURRENT HANDOFF
 
+## Batch 16 (complete, 2026-09-09): final consolidation, push, PR #55 update, CI drive-to-green — Batches 16-18 all fully complete, wave stopped per autonomous-development rule
+
+Branch `claude/pending-tasks-batch-vjy67v`, pushed to origin in two
+commits: `4bbddce` (all of Batches 16-18's local work, consolidated in
+one push per batch-implement mode) and `7098b9d` (one follow-up fix,
+see below). PR #55 description updated to cover Batches 1-18. **CI is
+fully green** on `7098b9d`: Quality workflow run `34338983401` (Ubuntu
+job `102425108617` success, Windows job `102425108784` success) paired
+with Security workflow run `34338983450` (cargo-deny, gitleaks,
+osv-scanner all success) — a complete matching pair, all checks green.
+
+**Verification actually run:** full `cargo test` (all lib tests + all
+18 integration binaries + doctests, exit 0, 0 failed — confirmed by
+grepping the captured log for `FAILED`/`error[`, none found outside the
+one CI flake below); `cargo clippy --all-targets -- -D warnings` clean;
+`cargo fmt --check` clean; `npm run quality` (153 test files, 1401
+vitest tests) clean; `npm run quality:security` (gitleaks + cargo-deny
+
+- osv-scanner) 3 ok/0 failed/0 missing.
+
+**Real issue found and fixed this checkpoint:** CI's `cargo-deny`
+license check failed on the first push (`4bbddce`) — Batch 18's new
+`reqwest` `rustls` feature transitively pulls in `webpki-root-certs`
+(via `rustls-platform-verifier`), licensed `CDLA-Permissive-2.0`
+(Linux Foundation's Community Data License Agreement, permissive terms
+over root-CA bundle _data_, not executable code) — not on
+`src-tauri/deny.toml`'s allow-list. This was not caught locally before
+the first push because `cargo deny check` had not been re-run after
+Batch 18 changed the dependency tree. Fixed by adding the license to
+the allow-list with a documented reason (commit `7098b9d`); re-verified
+`cargo deny check` and `npm run quality:security` both clean before
+pushing the fix. **Lesson for future batches touching dependencies:**
+run `npm run quality:security` (or at least `cargo deny check`) locally
+whenever `Cargo.lock`/`Cargo.toml` changes, not only at the final
+consolidation checkpoint — would have caught this a batch earlier.
+
+**CI flake encountered, diagnosed, and resolved (no code change
+needed):** this repo triggers two parallel CI workflow runs per push.
+On the first push's first run (`34338979534`), `Quality (Ubuntu)`
+failed: 3 of 9 tests in `tests/section_advisory.rs` failed with
+`sqlcipherCodecAttach: sqlcipher not initialized`, all three at the very
+start of that binary's execution, the other 6 in the same file passing
+normally right after. A full local `cargo test` on the identical code
+had passed 100% moments earlier, and no commit in Batches 16-18 touched
+`src-tauri/src/db/` (the SQLCipher init path) — only
+`src-tauri/src/crypto/dpapi.rs` (+19 lines, Batch 18's DPAPI token
+storage, unrelated). Diagnosed as a CI-parallelism flake and confirmed
+by the twin same-commit run (`34338983401`), where `Quality (Ubuntu)`
+passed clean — no PR comment was needed since the twin run's green
+result already made the commit's CI pass overall without any check
+staying permanently red.
+
+**Full wave completion report:**
+`../LIKHA-SIS-DELIVERY-REPORTS/WAVE-16-FINAL-REPORT.md` (git-ignored,
+outside tracked source per `CLAUDE.md`) — repo truth before/after,
+everything shipped in Batches 16-18, full verification record,
+independent-review status, retained debt, and the next slice.
+
+**Retained debt this checkpoint did NOT resolve (see the wave report
+for full detail):**
+
+- Batch 17 (two-tier grade-approval authorization) and Batch 18 (M365
+  OAuth/token storage/upload queue) have only self-review plus the
+  verification above — no fresh independent `security-reviewer` pass
+  yet. Real debt given both touch authorization and (Batch 18) real
+  network egress and token custody.
+- The sync client's hub address is still hardcoded to loopback
+  (`127.0.0.1:7878`) — see "Exact next slice" below.
+- Everything else carried from Batch 15 (see `docs/VERIFICATION-DEBT.md`):
+  sync child-record parent-existence checks, hub supervisor's missing
+  TLS-error carve-out, human-witnessed hardware verifications (DR
+  drill, hub hardware-gate script, native screen-reader sweep), Android
+  platform work.
+
+**Exact next slice (per `.claude/rules/autonomous-development.md`, this
+wave stops here and does not implement it):** make the sync client's
+hub address configurable — a settings field, defaulting to LAN
+auto-discovery, overridable for Tailscale/remote use. The hub server
+side already supports LAN/Tailscale binding; nothing yet lets a client
+point at a remote hub address. This is a real missing piece the
+existing hub-side design already anticipated, not a new policy
+decision, and blocks the owner's actual deployment (3
+non-interconnected school modems, teachers rarely sharing WiFi even on
+campus, home sync needed).
+
+**This wave (Batches 16-18) is now fully complete. Do not begin the
+next slice without a new user instruction to continue**, per the
+autonomous-development mode's mandatory wave-boundary stop.
+
 ## Batch 18 checkpoints 3-4 (complete, 2026-09-09): Microsoft 365 settings screen + opportunistic upload queue — Batch 18 now fully complete
 
 Branch `claude/pending-tasks-batch-vjy67v`, committed locally only in two
