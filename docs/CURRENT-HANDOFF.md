@@ -1,5 +1,84 @@
 # CURRENT HANDOFF
 
+## Configurable sync hub address (complete, 2026-09-09): next-slice item from Batch 16, resolved on the owner's "proceed to all remaining slices" instruction — commit `7a70278`, local only, not yet pushed/PR-updated at this entry's writing
+
+Branch `claude/pending-tasks-batch-vjy67v`. Closes the gap Batch 16
+recorded as the exact next slice: this device could previously only
+reach a hub bound to `127.0.0.1`, which only works when hub and client
+run on the exact same machine, even though the hub server side has
+supported a real LAN/Tailscale bind address since ADR-0067.
+
+**Migration M64**: nullable `hub_base_url` column on
+`device_sync_client_credential` (the existing per-device/per-school
+row, not a new table — one more fact about this device's relationship
+to its school's hub). `NULL` means "use `sync_client::DEFAULT_HUB_BASE_URL`",
+never an empty string.
+
+**Backend**: `repository::device_sync_client_credential::set_hub_base_url`;
+`sync_client::SyncClientConfig::discover` now prefers the stored
+address over the loopback default. Two new commands,
+`get_sync_hub_base_url` (any authenticated school member) and
+`set_sync_hub_base_url` (School-Head-only, `ManageSchoolMembership` —
+this setting controls where this device sends its own sync credential
+secret on every push/pull round via `DEVICE_SECRET_HEADER`, so
+pointing it at an attacker-controlled address would leak that secret;
+treated as security-relevant configuration, not a routine preference,
+matching `revoke_device_sync_credential`'s own capability gate).
+Server-side validation (`commands::device_sync::validate_hub_base_url`)
+via the `url` crate, promoted from a transitive to a direct dependency
+(already in `Cargo.lock` via `reqwest`, no new supply-chain surface) —
+rejects anything that isn't a well-formed `http`/`https` origin,
+normalizes away a trailing path/slash so `sync_client`'s own appended
+`/sync/...` segment is never doubled.
+
+**Frontend**: `DeviceSyncRepository` port + `TauriDeviceSyncRepository`
+
+- `DeviceSyncApplicationService` gain `getHubBaseUrl`/`setHubBaseUrl`.
+  New "This device's hub address" panel on `DeviceManagementScreen`,
+  visible to every authenticated member (matching that screen's own
+  already-documented "no client-side role hiding" convention) — the
+  Save button is always shown, but only a School Head's save actually
+  succeeds server-side; a denial surfaces as a friendly
+  "Only a School Head can change this device's hub address" message,
+  never a raw `"unauthorized"` string. `set_sync_hub_base_url` added to
+  `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` list — a
+  `Capability`-denial `Unauthorized` for a non-School-Head is not a
+  session-expiry event, same class as `set_school_logo` (Wave 3B's
+  original bug this list exists to prevent).
+
+**Bug caught and fixed during this slice's own manual verification**:
+the new `loadHubBaseUrl()` effect initially reused
+`DeviceManagementScreen`'s existing `requestRef` (a stale-request
+guard originally scoped only to the device-list load), which caused
+the two independent loads to invalidate each other's "is this still
+the latest request" check and left the device list stuck on
+"Loading devices…" forever in tests. Fixed with its own
+`hubBaseUrlRequestRef` — caught by this slice's own test suite
+(`DeviceManagementScreen.test.tsx`), not shipped.
+
+**Verification actually run**: `cargo test` (full suite, 0 failed),
+`cargo clippy --all-targets -- -D warnings` clean, `cargo fmt --check`
+clean, `npm run quality` (153 files, 1411 tests) clean, `npm run
+quality:security` (3 ok, 0 failed, 0 missing) clean — run explicitly
+because `Cargo.toml`/`Cargo.lock` changed, per the lesson recorded in
+Batch 16's own entry below (a batch earlier would have caught the
+`webpki-root-certs` license gap before it ever reached CI).
+
+**Retained debt, unchanged from Batch 16**: Batch 17's two-tier
+grade-approval authorization and Batch 18's M365 OAuth/token-storage/
+upload-queue code still have no fresh independent `security-reviewer`
+pass. This slice's own new capability gate
+(`set_sync_hub_base_url`'s `ManageSchoolMembership` check) is small
+and self-reviewed against the identical, already-reviewed pattern
+`revoke_device_sync_credential` uses — not treated as adding to that
+debt on its own, but also not itself independently reviewed.
+
+**Next**: push this commit, update PR #55, confirm CI green, then
+either continue to further slices per the owner's "proceed to all
+remaining slices" instruction (next candidate: dispatching the owed
+independent `security-reviewer` pass for Batches 17-18) or stop if no
+further slice remains safely actionable.
+
 ## Batch 16 (complete, 2026-09-09): final consolidation, push, PR #55 update, CI drive-to-green — Batches 16-18 all fully complete, wave stopped per autonomous-development rule
 
 Branch `claude/pending-tasks-batch-vjy67v`, pushed to origin in two

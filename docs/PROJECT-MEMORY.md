@@ -1,5 +1,29 @@
 # PROJECT MEMORY
 
+## Configurable sync hub address (2026-09-09): the "exact next slice" from Batch 16, done on owner instruction to proceed
+
+- `device_sync_client_credential.hub_base_url` (migration M64, nullable,
+  `NULL` = default loopback) plus `get_sync_hub_base_url`/
+  `set_sync_hub_base_url` commands. `sync_client::SyncClientConfig::discover`
+  now uses the configured address when one is set.
+- **Treated as a security-relevant setting, not a preference**: this
+  address is where a device sends its own sync credential secret on
+  every push/pull round, so `set_sync_hub_base_url` is School-Head-only
+  (`ManageSchoolMembership`) — same gate `revoke_device_sync_credential`
+  already used, reused deliberately rather than adding a new narrow
+  capability for one setting.
+- `url` crate promoted from transitive (already pulled in by `reqwest`)
+  to direct dependency for server-side scheme/host validation — no new
+  supply-chain surface, confirmed by re-running `npm run
+quality:security` (3 ok, 0 failed) before pushing, learning Batch
+  16's own recorded lesson (run it on every `Cargo.lock` change, not
+  only at final consolidation).
+- UI panel on `DeviceManagementScreen` follows that screen's own
+  established "no client-side role hiding" convention (visible to
+  everyone, backend alone enforces who can save).
+- Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of
+  file).
+
 ## Batches 16-18: Master Teacher RBAC + Official School Repository (M365) shipped; both remaining owner decisions resolved; wave stopped (2026-09-09)
 
 - **Both open items in `docs/product/OWNER-DECISIONS-NEEDED.md` are now
