@@ -74,10 +74,16 @@ clippy --all-targets -- -D warnings` clean; targeted `cargo test --lib
 microsoft365` (41 passed) and `document_repository` (3 passed); a full
 `cargo test --lib` for the whole crate (1412 passed, 0 failed) run
 after checkpoint 3 landed, confirming no regression from a concurrent
-session's simultaneous Batch 17 work in this same working tree; `npx
-tsc --noEmit` clean; `npx vitest run` on the new/changed test files (23
-passed after checkpoint 4); a full `npm run quality` (typecheck, lint,
-format:check, architecture check, knip, full vitest suite) run after
+session's simultaneous Batch 17 work in this same working tree; a
+SECOND full `cargo test --lib` for the whole crate run again after
+checkpoint 4's own diff landed on top -- also 1412 passed, 0 failed
+(the count is unchanged from checkpoint 3's run because checkpoint 4
+added no new `#[test]` at the whole-crate level beyond what the
+targeted `microsoft365`/`document_repository` filters below already
+report, which are included in that 1412); `npx tsc --noEmit` clean;
+`npx vitest run` on the new/changed test files (23 passed after
+checkpoint 4); a full `npm run quality` (typecheck, lint, format:check,
+architecture check, knip, full vitest suite -- 1401 tests) run after
 each checkpoint, both green. `cargo fmt --check` was run and its
 findings limited strictly to this batch's own new/touched files
 (`rustfmt --check`) to avoid reformatting a concurrently-edited file
