@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ANECDOTAL_CATEGORIES,
   AnecdotalRecordValidationError,
+  DISQUALIFYING_ANECDOTAL_CATEGORIES,
+  isDisqualifyingAnecdotalCategory,
   validateAnecdotalRecordFollowupInput,
   validateAnecdotalRecordInput,
   type AnecdotalRecordFollowupInput,
@@ -109,5 +111,17 @@ describe("validateAnecdotalRecordFollowupInput", () => {
     expect(() =>
       validateAnecdotalRecordFollowupInput({ ...VALID_FOLLOWUP_INPUT, note: "   " }),
     ).toThrow(AnecdotalRecordValidationError);
+  });
+});
+
+describe("isDisqualifyingAnecdotalCategory", () => {
+  it("treats 'negative' as disqualifying, per the project's own conservative default", () => {
+    expect(isDisqualifyingAnecdotalCategory("negative")).toBe(true);
+    expect(DISQUALIFYING_ANECDOTAL_CATEGORIES).toEqual(["negative"]);
+  });
+
+  it("does not treat 'positive' or 'neutral' as disqualifying", () => {
+    expect(isDisqualifyingAnecdotalCategory("positive")).toBe(false);
+    expect(isDisqualifyingAnecdotalCategory("neutral")).toBe(false);
   });
 });

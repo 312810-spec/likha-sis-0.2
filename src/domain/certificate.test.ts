@@ -8,6 +8,7 @@ describe("buildAcademicExcellenceCertificate", () => {
       learnerId: "l1",
       generalAverage: 93,
       subjectGrades: [90, 95],
+      hasDisqualifyingAnecdotalRecord: false,
     });
 
     const certificate = buildAcademicExcellenceCertificate({
@@ -30,6 +31,7 @@ describe("buildAcademicExcellenceCertificate", () => {
       learnerId: "l2",
       generalAverage: 70,
       subjectGrades: [70],
+      hasDisqualifyingAnecdotalRecord: false,
     });
 
     expect(() =>
@@ -48,6 +50,7 @@ describe("buildAcademicExcellenceCertificate", () => {
       learnerId: "l1",
       generalAverage: 93,
       subjectGrades: [90],
+      hasDisqualifyingAnecdotalRecord: false,
     });
 
     const certificate = buildAcademicExcellenceCertificate({
@@ -60,5 +63,24 @@ describe("buildAcademicExcellenceCertificate", () => {
     });
 
     expect(certificate.awardTitle).toBe("With Highest Honors");
+  });
+
+  it("refuses to build a certificate for a learner excluded solely by a disqualifying anecdote", () => {
+    const eligibility = evaluateAcademicExcellenceEligibility({
+      learnerId: "l3",
+      generalAverage: 95,
+      subjectGrades: [95, 96],
+      hasDisqualifyingAnecdotalRecord: true,
+    });
+
+    expect(() =>
+      buildAcademicExcellenceCertificate({
+        learnerName: "Pedro Reyes",
+        schoolName: "Sample Elementary School",
+        schoolYear: "2025-2026",
+        issuedOn: "2026-03-31",
+        eligibility,
+      }),
+    ).toThrow(/not eligible/);
   });
 });

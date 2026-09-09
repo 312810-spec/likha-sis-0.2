@@ -16,17 +16,17 @@ export interface CertificateContent {
   gaThresholdUsed: number;
   issuedOn: string;
   /** Always shown on the printed certificate and in any export of this
-   * content: the eligibility engine's GA threshold is a configurable,
-   * unverified-against-DepEd default, and the disciplinary-anecdotes leg
-   * of the historical rule was never checked. Certificates must never be
-   * printed without this disclosure. */
+   * content: the eligibility engine's GA threshold, subject-grade floor,
+   * and disciplinary/anecdotal-record disqualification rule are all this
+   * project's own configurable, unverified-against-DepEd defaults.
+   * Certificates must never be printed without this disclosure. */
   eligibilityDisclosure: string;
 }
 
 const ELIGIBILITY_DISCLOSURE =
-  "This award uses a school-configurable general-average threshold that has not been " +
-  "verified against a primary DepEd source, and does not check disciplinary/anecdotal " +
-  "records (no such feature exists yet in this system).";
+  "This award uses a school-configurable general-average threshold and a " +
+  "disciplinary/anecdotal-record disqualification rule (any 'negative'-category guidance " +
+  "record excludes a learner) that have not been verified against a primary DepEd source.";
 
 export interface BuildCertificateInput {
   learnerName: string;

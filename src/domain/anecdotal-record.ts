@@ -11,9 +11,12 @@
  * "disciplinary" framing. Guidance records serve broader purposes than
  * honors eligibility (counseling notes, commendations, routine
  * observations); a disciplinary-only vocabulary would misrepresent most
- * of what an adviser actually records here. A future batch wires this
- * entity into `award-eligibility.ts`'s currently-hardcoded-false
- * anecdotes check -- that wiring is out of scope for this batch.
+ * of what an adviser actually records here.
+ *
+ * Batch 13 wires this entity into `award-eligibility.ts`'s previously
+ * hardcoded-false anecdotes check. `DISQUALIFYING_ANECDOTAL_CATEGORIES`
+ * below is the disqualification rule that wiring uses -- see its own
+ * doc comment for exactly what it means and what it does NOT claim.
  */
 
 export type AnecdotalCategory = "positive" | "negative" | "neutral";
@@ -23,6 +26,30 @@ export const ANECDOTAL_CATEGORIES: readonly AnecdotalCategory[] = [
   "negative",
   "neutral",
 ];
+
+/**
+ * IMPORTANT -- unverified rule, not DepEd law (see
+ * `docs/adr/0084-award-eligibility-anecdotal-record-check.md` and
+ * `docs/product/OWNER-DECISIONS-NEEDED.md` item 4): this project's own
+ * conservative default is that any anecdotal/guidance record in the
+ * `negative` category -- of any severity, since this generic category
+ * model has no severity field to distinguish "minor" from "serious" --
+ * disqualifies a learner from the Academic Excellence Award. `positive`
+ * and `neutral` records never disqualify. This is a placeholder chosen
+ * because no primary DepEd source for the actual honors-eligibility
+ * anecdotes rule was found; it is NOT invented severity modeling beyond
+ * what `AnecdotalCategory` already has -- it is the narrowest rule this
+ * schema can express. Never present this as verified DepEd policy in UI
+ * copy, reports, or a printed certificate.
+ */
+export const DISQUALIFYING_ANECDOTAL_CATEGORIES: readonly AnecdotalCategory[] = ["negative"];
+
+/** True when `category` is one of `DISQUALIFYING_ANECDOTAL_CATEGORIES`.
+ * Pure -- no I/O, no fetch. A caller (application service or UI) supplies
+ * the record(s) it already fetched. */
+export function isDisqualifyingAnecdotalCategory(category: AnecdotalCategory): boolean {
+  return DISQUALIFYING_ANECDOTAL_CATEGORIES.includes(category);
+}
 
 export interface AnecdotalRecordInput {
   learnerId: string;

@@ -219,6 +219,7 @@ pub fn run() {
             commands::anecdotal_record::list_anecdotal_records_for_section,
             commands::anecdotal_record::add_anecdotal_record_followup,
             commands::anecdotal_record::list_anecdotal_record_followups,
+            commands::anecdotal_record::has_anecdotal_category_for_learner,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

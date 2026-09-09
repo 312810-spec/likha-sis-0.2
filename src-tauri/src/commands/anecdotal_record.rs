@@ -219,6 +219,61 @@ pub fn list_anecdotal_records_for_section(
     anecdotal_record::list_for_section(&conn, &school_id, &section_id)
 }
 
+/// Narrow, read-only boolean check for Batch 13's award-eligibility
+/// wiring (ADR-0084): does `learner_id` have any anecdotal record in one
+/// of `categories`, in `section_id`? Same gate as every other command in
+/// this module (`authorize_child_protection_access_for_section`) -- this
+/// is still guidance-adjacent PII, so no gate weaker than the write path
+/// is used, matching this module's own reuse decision (ADR-0083).
+/// Deliberately returns a bare `bool`, never the matching records'
+/// narrative content, so a screen that only needs a disqualification
+/// signal (e.g. `CertificateAwardScreen`) never pulls full guidance
+/// narratives into memory just to check eligibility.
+#[tauri::command]
+pub fn has_anecdotal_category_for_learner(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    learner_id: String,
+    section_id: String,
+    categories: Vec<String>,
+    as_of_date: String,
+) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let (_user_id, school_id) = auth::authorize_child_protection_access_for_section(
+        &conn,
+        &sessions,
+        &section_id,
+        &as_of_date,
+    )?;
+    check_anecdotal_category_for_learner(&conn, &school_id, &section_id, &learner_id, categories)
+}
+
+/// Shared logic behind `has_anecdotal_category_for_learner`, kept
+/// separate so it can be exercised directly in this module's own tests
+/// without a real Tauri `AppHandle`/`State` -- same reason as every other
+/// `*_with_optional_sync` split in this module. The caller must already
+/// have been authorized for this exact `section_id`.
+fn check_anecdotal_category_for_learner(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    learner_id: &str,
+    categories: Vec<String>,
+) -> AppResult<bool> {
+    if categories.is_empty() {
+        return Err(AppError::InvalidInput(
+            "at least one category must be provided".to_string(),
+        ));
+    }
+    let parsed = categories
+        .iter()
+        .map(|c| parse_category(c))
+        .collect::<AppResult<Vec<_>>>()?;
+    anecdotal_record::has_any_category_for_learner_in_section(
+        conn, school_id, section_id, learner_id, &parsed,
+    )
+}
+
 /// Appends one follow-up entry -- the caller must already be authorized
 /// for the anecdotal record's own section. Deliberately INSERT-only --
 /// there is no update/delete command for a follow-up, matching
@@ -597,6 +652,133 @@ mod tests {
         );
 
         assert!(result.is_ok());
+    }
+
+    /// Proves `check_anecdotal_category_for_learner` (the logic behind
+    /// `has_anecdotal_category_for_learner`) composes correctly with the
+    /// repository for the section's own adviser -- the authorization gate
+    /// itself is already exhaustively tested above and in `auth::mod`'s
+    /// own suite, not re-proven here.
+    #[test]
+    fn authorized_adviser_gets_true_when_a_disqualifying_category_record_exists() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let f = seed(&conn);
+        auth::login(
+            &conn,
+            &sessions,
+            "adviser.a",
+            "correct horse battery staple",
+            &f.school_id,
+        )
+        .unwrap();
+        anecdotal_record::create_record(
+            &conn,
+            &f.school_id,
+            &f.learner_id,
+            &f.section_id,
+            &f.adviser_id,
+            AnecdotalCategory::Negative,
+            "2026-09-01",
+            "Synthetic disqualifying-category entry.",
+        )
+        .unwrap();
+
+        let (_user_id, school_id) = auth::authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &f.section_id,
+            "2026-09-02",
+        )
+        .unwrap();
+        let found = check_anecdotal_category_for_learner(
+            &conn,
+            &school_id,
+            &f.section_id,
+            &f.learner_id,
+            vec!["negative".to_string()],
+        )
+        .unwrap();
+        assert!(found);
+    }
+
+    /// A learner with only positive/neutral records is not flagged.
+    #[test]
+    fn authorized_adviser_gets_false_with_only_positive_and_neutral_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let f = seed(&conn);
+        auth::login(
+            &conn,
+            &sessions,
+            "adviser.a",
+            "correct horse battery staple",
+            &f.school_id,
+        )
+        .unwrap();
+        anecdotal_record::create_record(
+            &conn,
+            &f.school_id,
+            &f.learner_id,
+            &f.section_id,
+            &f.adviser_id,
+            AnecdotalCategory::Positive,
+            "2026-09-01",
+            "Synthetic positive entry.",
+        )
+        .unwrap();
+
+        let (_user_id, school_id) = auth::authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &f.section_id,
+            "2026-09-02",
+        )
+        .unwrap();
+        let found = check_anecdotal_category_for_learner(
+            &conn,
+            &school_id,
+            &f.section_id,
+            &f.learner_id,
+            vec!["negative".to_string()],
+        )
+        .unwrap();
+        assert!(!found);
+    }
+
+    /// The command layer itself rejects an empty category list rather
+    /// than silently querying nothing and returning `false` for every
+    /// caller -- a caller forgetting to pass a category set should see an
+    /// explicit error, not a false negative for a real disqualification.
+    #[test]
+    fn has_anecdotal_category_for_learner_rejects_an_empty_category_list() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let f = seed(&conn);
+        auth::login(
+            &conn,
+            &sessions,
+            "adviser.a",
+            "correct horse battery staple",
+            &f.school_id,
+        )
+        .unwrap();
+
+        let (_user_id, school_id) = auth::authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &f.section_id,
+            "2026-09-02",
+        )
+        .unwrap();
+        let result = check_anecdotal_category_for_learner(
+            &conn,
+            &school_id,
+            &f.section_id,
+            &f.learner_id,
+            vec![],
+        );
+        assert!(matches!(result, Err(AppError::InvalidInput(_))));
     }
 
     /// Tenant isolation: a record created in one school is invisible to

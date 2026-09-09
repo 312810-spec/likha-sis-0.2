@@ -15,10 +15,14 @@
 //! "disciplinary" framing. Guidance records serve broader purposes than
 //! honors eligibility (counseling notes, commendations, routine
 //! observations), so a disciplinary-only vocabulary would misrepresent
-//! most of what an adviser actually records here. A future batch wires
-//! this table into `award-eligibility.ts`'s currently-hardcoded-false
-//! anecdotes check -- that wiring is explicitly out of scope for this
-//! batch.
+//! most of what an adviser actually records here.
+//!
+//! Batch 13 (ADR-0084) wires this table into `award-eligibility.ts`'s
+//! previously hardcoded-false anecdotes check, via the narrow read-only
+//! [`has_any_category_for_learner_in_section`] existence check below --
+//! it returns a bare `bool`, never the matching records' narrative
+//! content, so the eligibility screen only ever learns "disqualified or
+//! not", never the guidance narrative itself.
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -177,6 +181,42 @@ pub fn list_for_section(
     ))?;
     let rows = stmt.query_map((school_id, section_id), row_to_record)?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Narrow, read-only existence check: does `learner_id` have any
+/// anecdotal record in one of `categories`, scoped to one `section_id`?
+/// Returns a bare `bool` -- deliberately never the matching records'
+/// narrative content -- because Batch 13's award-eligibility wiring
+/// (`commands::anecdotal_record::has_anecdotal_category_for_learner`)
+/// only needs a disqualification signal, not the guidance narrative
+/// itself. The caller must already have been authorized for this exact
+/// `section_id`, same contract as [`list_for_section`]. An empty
+/// `categories` slice returns `Ok(false)` without touching the database.
+pub fn has_any_category_for_learner_in_section(
+    conn: &Connection,
+    school_id: &str,
+    section_id: &str,
+    learner_id: &str,
+    categories: &[AnecdotalCategory],
+) -> AppResult<bool> {
+    if categories.is_empty() {
+        return Ok(false);
+    }
+    let placeholders: Vec<String> = (0..categories.len())
+        .map(|i| format!("?{}", i + 4))
+        .collect();
+    let sql = format!(
+        "SELECT 1 FROM anecdotal_records WHERE school_id = ?1 AND section_id = ?2 \
+         AND learner_id = ?3 AND category IN ({}) LIMIT 1",
+        placeholders.join(", ")
+    );
+    let category_strs: Vec<&str> = categories.iter().map(|c| c.as_db_str()).collect();
+    let mut params: Vec<&dyn rusqlite::ToSql> = vec![&school_id, &section_id, &learner_id];
+    for s in &category_strs {
+        params.push(s);
+    }
+    let mut stmt = conn.prepare(&sql)?;
+    stmt.exists(params.as_slice()).map_err(Into::into)
 }
 
 /// All anecdotal records for one learner across every section, newest
@@ -519,6 +559,154 @@ mod tests {
         )
         .unwrap();
         assert_ne!(first.id, second.id);
+    }
+
+    #[test]
+    fn has_any_category_for_learner_in_section_is_true_when_a_matching_record_exists() {
+        let conn = setup();
+        create_record(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            AnecdotalCategory::Negative,
+            "2026-09-01",
+            "Synthetic disqualifying-category entry.",
+        )
+        .unwrap();
+
+        let found = has_any_category_for_learner_in_section(
+            &conn,
+            "s1",
+            "sec1",
+            "l1",
+            &[AnecdotalCategory::Negative],
+        )
+        .unwrap();
+        assert!(found);
+    }
+
+    #[test]
+    fn has_any_category_for_learner_in_section_is_false_with_only_positive_and_neutral_records() {
+        let conn = setup();
+        create_record(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            AnecdotalCategory::Positive,
+            "2026-09-01",
+            "Synthetic positive entry.",
+        )
+        .unwrap();
+        create_record(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            AnecdotalCategory::Neutral,
+            "2026-09-02",
+            "Synthetic neutral entry.",
+        )
+        .unwrap();
+
+        let found = has_any_category_for_learner_in_section(
+            &conn,
+            "s1",
+            "sec1",
+            "l1",
+            &[AnecdotalCategory::Negative],
+        )
+        .unwrap();
+        assert!(!found);
+    }
+
+    #[test]
+    fn has_any_category_for_learner_in_section_is_false_with_no_records_at_all() {
+        let conn = setup();
+        let found = has_any_category_for_learner_in_section(
+            &conn,
+            "s1",
+            "sec1",
+            "l1",
+            &[AnecdotalCategory::Negative],
+        )
+        .unwrap();
+        assert!(!found);
+    }
+
+    #[test]
+    fn has_any_category_for_learner_in_section_short_circuits_on_an_empty_category_list() {
+        let conn = setup();
+        create_record(
+            &conn,
+            "s1",
+            "l1",
+            "sec1",
+            "u1",
+            AnecdotalCategory::Negative,
+            "2026-09-01",
+            "Synthetic entry that must not match an empty filter.",
+        )
+        .unwrap();
+
+        let found =
+            has_any_category_for_learner_in_section(&conn, "s1", "sec1", "l1", &[]).unwrap();
+        assert!(!found);
+    }
+
+    #[test]
+    fn has_any_category_for_learner_in_section_is_scoped_to_the_given_section_and_learner() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec2', 's1', '2026-2027', '5', 'Section B')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO learners (id, school_id, given_name, family_name) \
+             VALUES ('l2', 's1', 'Ben', 'Santos')",
+            [],
+        )
+        .unwrap();
+        // A negative record for a different learner in the same section.
+        create_record(
+            &conn,
+            "s1",
+            "l2",
+            "sec1",
+            "u1",
+            AnecdotalCategory::Negative,
+            "2026-09-01",
+            "Synthetic entry for a different learner.",
+        )
+        .unwrap();
+        // A negative record for the target learner, but a different section.
+        create_record(
+            &conn,
+            "s1",
+            "l1",
+            "sec2",
+            "u1",
+            AnecdotalCategory::Negative,
+            "2026-09-01",
+            "Synthetic entry in a different section.",
+        )
+        .unwrap();
+
+        let found = has_any_category_for_learner_in_section(
+            &conn,
+            "s1",
+            "sec1",
+            "l1",
+            &[AnecdotalCategory::Negative],
+        )
+        .unwrap();
+        assert!(!found, "neither record belongs to (l1, sec1) together");
     }
 
     fn sample_incoming_record(id: &str) -> AnecdotalRecord {

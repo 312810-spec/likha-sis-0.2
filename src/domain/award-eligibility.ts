@@ -9,17 +9,27 @@
  * ever checked in this project either. `DEFAULT_UNVERIFIED_GA_THRESHOLD`
  * and `DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE` below are a conservative
  * placeholder a school can override per the ADR for this feature
- * (`docs/adr/0076-award-eligibility-and-certificate-scope.md`) — never
+ * (`docs/adr/0084-award-eligibility-anecdotal-record-check.md`) — never
  * present these as verified DepEd policy in UI copy, reports, or a
  * printed certificate.
  *
- * The "zero disciplinary anecdotes" leg of the historical rule is
- * deliberately NOT implemented: there is no Anecdotal Records / Student
- * Guidance feature in this codebase yet for it to check against (see
- * the audit's open question #3). `evaluateAcademicExcellenceEligibility`
- * always reports `anecdotalRecordsChecked: false` — callers and any UI
- * built on this must surface that explicitly rather than silently
- * treating an unchecked leg as "passed".
+ * The "zero disciplinary anecdotes" leg of the historical rule (Batch
+ * 13, ADR-0084) now runs for real, against the Anecdotal / Guidance
+ * Records entity (ADR-0083): a learner with any anecdotal record in a
+ * `DISQUALIFYING_ANECDOTAL_CATEGORIES` category (see
+ * `domain/anecdotal-record.ts`) is not eligible. That disqualification
+ * rule — "any `negative`-category record, any severity, since this
+ * schema has no severity field" — is this project's own conservative
+ * interpretation, not a verified DepEd rule either; see
+ * `docs/product/OWNER-DECISIONS-NEEDED.md` item 4.
+ *
+ * This module stays a pure function per `.claude/rules/architecture.md`:
+ * it does no I/O of its own. The caller (an application service or a UI
+ * screen) is responsible for performing the real anecdotal-record lookup
+ * (via `AnecdotalRecordApplicationService`/the narrow read-only
+ * `has_anecdotal_category_for_learner` command) and passing its result
+ * in as `hasDisqualifyingAnecdotalRecord` — this function never fetches
+ * anything and never infers "not checked" as "passed".
  */
 
 /** Unverified conservative default — see module doc comment. Configurable,
@@ -46,6 +56,11 @@ export interface AwardEligibilityInput {
    * default without the caller's explicit choice. */
   gaThreshold?: number;
   minSubjectGrade?: number;
+  /** The real result of looking up whether this learner has any
+   * anecdotal/guidance record in a disqualifying category (see module
+   * doc comment). The caller must perform this lookup itself — this
+   * function does no I/O and never assumes `false` by omission. */
+  hasDisqualifyingAnecdotalRecord: boolean;
 }
 
 export interface AwardEligibilityResult {
@@ -57,10 +72,13 @@ export interface AwardEligibilityResult {
   meetsGaThreshold: boolean;
   meetsMinSubjectGrade: boolean;
   lowestSubjectGrade: number | null;
-  /** Always `false` — see module doc comment. Never inferred as "passed"
-   * by omission; a certificate/UI built on this result must show that
-   * this leg of the historical rule was not evaluated. */
-  anecdotalRecordsChecked: false;
+  /** Always `true` as of Batch 13 — the anecdotal-records leg now runs
+   * for real against real data, via a narrow read-only lookup the caller
+   * performed before calling this function. See module doc comment for
+   * the (still unverified-against-DepEd) disqualification rule used. */
+  anecdotalRecordsChecked: true;
+  /** Echoes the caller-supplied lookup result this evaluation used. */
+  hasDisqualifyingAnecdotalRecord: boolean;
   /** Human-readable reasons this learner did not qualify (empty when
    * `eligible` is true). */
   reasons: string[];
@@ -89,17 +107,24 @@ export function evaluateAcademicExcellenceEligibility(
       `Lowest subject grade ${lowestSubjectGrade} is below the configured floor of ${minSubjectGradeUsed}.`,
     );
   }
+  if (input.hasDisqualifyingAnecdotalRecord) {
+    reasons.push(
+      "This learner has at least one anecdotal/guidance record in a disqualifying category " +
+        "(this project's own conservative rule, not a verified DepEd standard).",
+    );
+  }
 
   return {
     learnerId: input.learnerId,
-    eligible: meetsGaThreshold && meetsMinSubjectGrade,
+    eligible: meetsGaThreshold && meetsMinSubjectGrade && !input.hasDisqualifyingAnecdotalRecord,
     generalAverage: input.generalAverage,
     gaThresholdUsed,
     minSubjectGradeUsed,
     meetsGaThreshold,
     meetsMinSubjectGrade,
     lowestSubjectGrade,
-    anecdotalRecordsChecked: false,
+    anecdotalRecordsChecked: true,
+    hasDisqualifyingAnecdotalRecord: input.hasDisqualifyingAnecdotalRecord,
     reasons,
   };
 }
