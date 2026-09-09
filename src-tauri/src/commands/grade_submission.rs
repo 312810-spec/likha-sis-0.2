@@ -822,8 +822,15 @@ mod sync_tests {
             "2026-06-01",
         )
         .unwrap();
-        grade_submission::decide_master_teacher(&conn, &f.school_id, &created.id, &f.mt_id, true, None)
-            .unwrap();
+        grade_submission::decide_master_teacher(
+            &conn,
+            &f.school_id,
+            &created.id,
+            &f.mt_id,
+            true,
+            None,
+        )
+        .unwrap();
 
         let result = require_no_pending_master_teacher_decision(
             &conn,
@@ -881,7 +888,10 @@ mod sync_tests {
         )
         .unwrap();
 
-        assert_eq!(decided.status, grade_submission::SubmissionStatus::Submitted);
+        assert_eq!(
+            decided.status,
+            grade_submission::SubmissionStatus::Submitted
+        );
         assert_eq!(
             decided.master_teacher_decision,
             Some(grade_submission::MasterTeacherDecision::Approved)

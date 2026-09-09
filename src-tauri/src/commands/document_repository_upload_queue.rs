@@ -14,8 +14,8 @@ use tauri::{AppHandle, Manager, State};
 use crate::auth::SessionManager;
 use crate::commands::lock_db;
 use crate::db;
-use crate::error::AppResult;
 use crate::error::AppError;
+use crate::error::AppResult;
 use crate::repository::microsoft365_upload_queue::{self, QueuedUpload, UploadArtifactKind};
 
 /// Queues an already-generated export/backup artifact. Any authenticated

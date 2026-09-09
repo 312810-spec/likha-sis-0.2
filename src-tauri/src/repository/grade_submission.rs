@@ -843,7 +843,10 @@ mod tests {
             decided.master_teacher_decision,
             Some(MasterTeacherDecision::Approved)
         );
-        assert_eq!(decided.master_teacher_decided_by_user_id.as_deref(), Some("mt1"));
+        assert_eq!(
+            decided.master_teacher_decided_by_user_id.as_deref(),
+            Some("mt1")
+        );
         assert!(decided.master_teacher_decided_at.is_some());
         // The top-level "final decision" fields are untouched -- no final
         // decision has been made yet.
@@ -910,7 +913,10 @@ mod tests {
             locked.master_teacher_decision,
             Some(MasterTeacherDecision::Approved)
         );
-        assert_eq!(locked.master_teacher_decided_by_user_id.as_deref(), Some("mt1"));
+        assert_eq!(
+            locked.master_teacher_decided_by_user_id.as_deref(),
+            Some("mt1")
+        );
     }
 
     #[test]
@@ -932,7 +938,6 @@ mod tests {
         assert_eq!(locked.status, SubmissionStatus::Rejected);
         assert_eq!(locked.decided_by_user_id.as_deref(), Some("head1"));
     }
-
 
     #[test]
     fn list_for_school_returns_every_submission_newest_first() {

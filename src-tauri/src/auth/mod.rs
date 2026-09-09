@@ -2868,7 +2868,12 @@ mod tests {
     /// caller assigns that separately per test).
     fn setup_submission_with_master_teacher(
         conn: &Connection,
-    ) -> (crate::repository::school::School, user::User, user::User, String) {
+    ) -> (
+        crate::repository::school::School,
+        user::User,
+        user::User,
+        String,
+    ) {
         let (s, teacher, record_id) = setup_class_record_with_teacher(conn);
         let mt = user::create_user(conn, "mt.one", "password", "MT One").unwrap();
         user::add_school_membership(conn, &mt.id, &s.id).unwrap();
