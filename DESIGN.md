@@ -62,6 +62,78 @@ Locally relevant without costume or cliché. Distinctive through rhythm,
 typography, and detail — not through a mascot, an illustration style,
 or a color explosion. Fast and legible on ordinary school hardware.
 
+### Elevation pass: The Faculty Standard (proposed 2026-09-09)
+
+**Status**: direction proposed and reviewed with the user in a
+dedicated case-file artifact ("The Faculty Standard"); execution
+phasing agreed, per-screen migration not yet started. This is an
+**elevation of Calm Civic Classroom, not a replacement** — same
+tokens, same "no mascot, no color explosion" discipline, same
+audience — the gap it closes is craft discipline, not concept. Only 3
+of 42 screens in `src/ui/` actually use the shared `Page`/`Alert`/
+`StatusChip` vocabulary UX-01 built; the rest hand-roll their own
+markup, which is the concrete, measured gap this elevation closes.
+
+The thesis: the visual grammar of the one civic document a Filipino
+teacher already trusts completely — the permanent record card, the
+class ledger, the official form (ruled columns, numbered fields,
+tabular precision, authority conveyed through _structure_, never
+through an actual government mark) — executed with the spacing
+discipline, restraint, and real depth hierarchy of Linear/Stripe/
+Notion-caliber product design. Competitive grounding: the category's
+own incumbent (PowerSchool SIS) is on record in G2/Gartner reviews as
+"outdated" and "difficult to navigate" — no SIS competitor has ever
+shipped on craft, which is a real, citable opening rather than a taste
+preference.
+
+Concrete additions on top of the existing UX-01 token set (no existing
+token value changes, no new color beyond one accent):
+
+- One new accent token, `--color-accent` (a muted brass, `#7d5f1c`
+  light / `#d9c48a` dark, plus a `--color-accent-surface` wash),
+  reserved for genuinely earned moments (a needs-attention eyebrow, a
+  distinguishing rule) — not a general-purpose highlight. Implemented
+  in `styles.css`; the case-file artifact's first-draft value
+  (`#8a6a1f`) only cleared 4.36:1 on `--color-surface`, short of the
+  4.5:1 AA text bar — recomputed and darkened before landing, same
+  discipline as every other token pair in this file.
+- **Correction from this section's first draft**: no new elevation
+  tokens are needed. `styles.css` already carries a real, dual-themed
+  elevation scale (`--elevation-1`/`--elevation-2`/
+  `--elevation-small`/`--elevation-medium`/`--elevation-pressed`),
+  with real (if sparse) existing usage — the case-file artifact
+  prepared alongside this entry incorrectly described the app as
+  having no elevation hierarchy at all. The actual, verified gap is
+  adoption, not the token set: most screens never reach for the
+  existing scale. Assign it by role going forward — flat (ambient
+  text, never a card), `--elevation-small` (an ordinary resting card),
+  `--elevation-medium` (hover/focus lift), `--elevation-2`
+  (drawer/overlay, or the one thing on screen that must be answered) —
+  rather than inventing a parallel scale.
+- `Source Serif 4` proposed (not yet added) as a second, editorial-
+  register face for screen-level titles/thesis statements, paired with
+  the existing self-hosted Public Sans for every operated control —
+  not a replacement for Public Sans, which stays the UI/body face.
+  **Held pending explicit approval**: `--font-serif` already carries a
+  comment recording an earlier, identical deferral (a system-stack
+  fallback instead of a webfont, "adding a new Google Font is a
+  flaggable dependency decision... not a silent default"). Public Sans
+  is deliberately self-hosted via `@fontsource` with no runtime webfont
+  fetch specifically because this app is offline-first; a live Google
+  Fonts `<link>` would silently break that promise at a school with no
+  internet, so this can only land as a self-hosted `@fontsource`
+  package, and only once the user signs off on the new dependency
+  itself — not assumed from sign-off on the direction as a whole.
+
+Full research, the before/after component comparison, and the phased
+rollout plan live in the case-file artifact prepared this session
+(not checked into the repo — a planning document, not a durable
+record); see `.claude/skills/premium-teacher-ui/SKILL.md` for the
+distilled, checkable version of these rules every screen edit should
+now follow. Record the per-screen migration as it actually lands the
+same way UX-02/UX-03 did above, rather than editing this status block
+in place.
+
 ## Tokens (implemented, UX-01 — see ADR-0031)
 
 `src/ui/theme/styles.css`'s `:root` custom properties now carry the Calm

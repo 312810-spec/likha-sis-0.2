@@ -53,6 +53,15 @@
   --color-warning: #8f5209;
   --color-warning-surface: #fbf1de;
   --color-focus: #1e3a5f;
+  /* The Faculty Standard elevation pass (DESIGN.md): one new accent,
+     reserved for genuinely earned moments (a needs-attention eyebrow,
+     a distinguishing rule) -- not a general-purpose highlight, and
+     never a substitute for --color-warning/--color-danger's semantic
+     meaning. Verified 5.62:1 on --color-bg, 5.15:1 on --color-surface
+     (both clear AA text contrast; the first-draft #8a6a1f only cleared
+     4.36:1 on --color-surface, short of the 4.5:1 bar). */
+  --color-accent: #7d5f1c;
+  --color-accent-surface: #f7f0dc;
 
   --spacing-unit: 12px;
   --font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -173,6 +182,10 @@
     --color-warning: #e8c07d;
     --color-warning-surface: #3a2f14;
     --color-focus: #8fb4dd;
+    /* The Faculty Standard elevation pass: verified 10.37:1 on
+       --color-bg, 9.4:1 on --color-surface. */
+    --color-accent: #d9c48a;
+    --color-accent-surface: #33290f;
     --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
     --elevation-small: 0 1px 2px rgba(0, 0, 0, 0.4);
     --elevation-medium: 0 4px 12px -4px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -205,6 +218,10 @@
   --color-warning: #e8c07d;
   --color-warning-surface: #3a2f14;
   --color-focus: #8fb4dd;
+  /* The Faculty Standard elevation pass: verified 10.37:1 on
+     --color-bg, 9.4:1 on --color-surface. */
+  --color-accent: #d9c48a;
+  --color-accent-surface: #33290f;
   --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --elevation-small: 0 1px 2px rgba(0, 0, 0, 0.4);
   --elevation-medium: 0 4px 12px -4px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.3);
