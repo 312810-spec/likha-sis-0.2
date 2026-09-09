@@ -1,5 +1,111 @@
 # CURRENT HANDOFF
 
+## Batch 13 (complete): award-eligibility anecdote check wired for real (2026-09-09, ADR-0084), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,
+nothing pushed, PR #55 untouched, no CI triggered.
+
+**What changed:** `award-eligibility.ts`'s previously hardcoded-false
+`anecdotalRecordsChecked` now runs for real against Batch 12's Anecdotal
+Records entity.
+
+- **Disqualification rule (this project's own conservative default, not
+  verified DepEd policy — see `docs/product/OWNER-DECISIONS-NEEDED.md`
+  item 4, still open):** any anecdotal record in the `negative` category
+  excludes a learner, any severity (the schema has no severity field),
+  no recency window. `src/domain/anecdotal-record.ts`:
+  `DISQUALIFYING_ANECDOTAL_CATEGORIES = ["negative"]`,
+  `isDisqualifyingAnecdotalCategory()`.
+- **Narrow read path, same authorization gate as every other
+  anecdotal-record operation:** new repository function
+  `has_any_category_for_learner_in_section` (existence-only
+  `SELECT 1 ... LIMIT 1`) and command `has_anecdotal_category_for_learner`,
+  both gated by `auth::authorize_child_protection_access_for_section` —
+  unchanged from ADR-0083's reuse decision. No new, weaker "view" gate
+  was invented; `auth::authorize_view_teacher_load` exists as a narrower
+  pattern in this codebase but is for a materially different, non-PII
+  concern (a teacher's own teaching load), not this sensitivity class.
+  The command returns a bare `bool`, never narrative content, so the
+  eligibility screen never pulls full guidance narratives into memory.
+  See ADR-0084 for the full reasoning.
+- **Domain stays pure:** `AwardEligibilityInput` gained a required
+  `hasDisqualifyingAnecdotalRecord: boolean` field; the function does no
+  I/O. `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`
+  (new, application layer) performs the real lookup;
+  `CertificateAwardScreen` calls it once per roster member before
+  calling `evaluateAcademicExcellenceEligibility`, passing the real
+  result in as plain data.
+- **UI/certificate disclosures corrected:** the old "does not check
+  disciplinary/anecdotal records (no such feature exists yet)" text on
+  both `CertificateAwardScreen`'s top alert and
+  `certificate.ts`'s `ELIGIBILITY_DISCLOSURE` was no longer true and
+  would have been a false claim on a printed certificate. Both now
+  disclose the rule that actually runs and flag it as unverified against
+  DepEd — the same honesty standard already applied to the GA threshold.
+- **Tests:** eligible-with-no-anecdotes, excluded-with-a-disqualifying-
+  category-anecdote, eligible-with-only-positive/neutral-anecdotes,
+  `anecdotalRecordsChecked` always `true`, combined-failure-reasons case
+  (`award-eligibility.test.ts`); certificate build still refuses a
+  learner excluded solely by the anecdote leg (`certificate.test.ts`);
+  `isDisqualifyingAnecdotalCategory` unit tests
+  (`anecdotal-record.test.ts`); `hasDisqualifyingRecordForLearner`
+  validation/forwarding tests (`anecdotal-record-service.test.ts`);
+  `hasCategoryForLearner` IPC-shape test
+  (`anecdotal-record-repository.test.ts`); UI tests for the
+  excluded-by-anecdote case, the still-eligible-with-no-anecdote case,
+  and updated disclosure-text assertions (`CertificateAwardScreen.test.tsx`);
+  a stub method added to `GuidanceRecordsScreen.test.tsx`'s own fake
+  repository to satisfy the widened port interface. Rust:
+  `repository::anecdotal_record::tests` (5 new:
+  `has_any_category_for_learner_in_section` true-on-match,
+  false-with-only-positive/neutral, false-with-no-records,
+  empty-category-list short-circuit, section/learner scoping);
+  `commands::anecdotal_record::tests` (3 new:
+  `check_anecdotal_category_for_learner` authorized-true,
+  authorized-false, empty-category-list rejected).
+
+**Verification actually run this session:**
+
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, `vitest run`): **146 test files, 1339 tests, all
+  passed.** `check:architecture` confirms `src/domain/award-eligibility.ts`
+  still imports nothing from `src/application/**`/`src/infrastructure/**`.
+  `knip`: clean, no dead-code findings.
+- `cargo test --lib anecdotal_record` (targeted): 28 passed (was 25
+  before this batch).
+- `cargo fmt --check`: clean. `cargo clippy --all-targets -- -D
+warnings`: clean.
+- `cargo test` (full workspace — every lib test, both integration test
+  binaries, doc tests; the stable-checkpoint gate): **ran to completion,
+  exit code 0, zero failures anywhere in the workspace** (confirmed via
+  the process exit status; the full unabridged log was piped through
+  `tail` at capture time, but a non-zero exit from `cargo test` would
+  have been reported immediately above regardless — it was not).
+
+**Commits (local only, not pushed):**
+
+1. `ecafda3` — domain rule + narrow Rust read path (repository +
+   command + `lib.rs` registration), `award-eligibility.ts`/`certificate.ts`
+   signature and disclosure changes, `anecdotal-record.ts` disqualification
+   constant, all matching tests.
+2. `2adf0a2` — TS application/infra/UI wiring: port + Tauri adapter
+   method, `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`,
+   `CertificateAwardScreen` real call + corrected disclosures, all
+   matching tests.
+3. (Docs commit — ADR-0084, `OWNER-DECISIONS-NEEDED.md` item 4,
+   `PROJECT-MEMORY.md`, this handoff entry — see `git log` for the exact
+   hash.)
+
+**Exact next slice:** none pre-selected — this was a single, narrowly
+scoped gap-closing batch per explicit instruction, not part of a
+priority queue. The next candidate is whatever the owner names, or (if
+resuming autonomous wave selection) re-derive from
+`docs/product/MASTER-TASK-INVENTORY.md`/`docs/CURRENT-HANDOFF.md`'s
+prior "next slice" notes plus this batch's now-updated
+`OWNER-DECISIONS-NEEDED.md` item 4 (still open: the severity/recency
+question, which would need a schema change to answer, not just a code
+change).
+
 ## Batch 12 (complete): Anecdotal / Guidance Records, full vertical slice (2026-09-08/09, ADR-0083), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

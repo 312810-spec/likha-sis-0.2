@@ -36,11 +36,11 @@ Consolidated list of items this session deliberately did **not** decide unilater
 
 ## 4. Awards & Certificate eligibility — disciplinary-anecdotes threshold
 
-**Status:** `zero disciplinary anecdotes` check now implemented (Anecdotal Records shipped this session) but the exact eligibility rule is still this project's own conservative default (GA ≥ 90, no subject grade < 80, zero anecdotes of any severity), not a verified DepEd rule.
+**Status:** **Resolved that the check runs at all** (Batch 13, `docs/adr/0084-award-eligibility-anecdotal-record-check.md`) — `award-eligibility.ts` no longer hardcodes `anecdotalRecordsChecked: false`; it now takes the real result of a narrow, read-only lookup against the Anecdotal Records entity (Batch 12, ADR-0083) and factors it into eligibility for real. **Still not resolved:** the exact disqualification bar. The rule shipped this session is any anecdotal record in the `negative` category (of the generic `positive`/`negative`/`neutral` classification Batch 12 built) excludes a learner, regardless of severity, with no date/recency window — this project's own conservative default, not a verified DepEd rule, chosen because the schema has no severity field to model anything finer.
 
-**The actual question:** is "zero anecdotes of any severity" the right bar, or should minor/administrative anecdotes not disqualify a learner? Legacy never actually implemented this rule (it was hardcoded mock data), so there's no reference implementation to check against either.
+**The actual question:** is "any `negative`-category record, any severity, no recency window" the right bar, or should minor/administrative anecdotes not disqualify a learner, or should only recent anecdotes (e.g. within the current school year) count? Legacy never actually implemented this rule (it was hardcoded mock data), so there's no reference implementation to check against either. Answering this for real would likely also require deciding whether `AnecdotalCategory` needs a severity dimension added — a schema change, not just a threshold tweak.
 
-**Why it wasn't decided here:** no primary DepEd source was found for the actual honors-eligibility criteria; the current rule is a defensible placeholder, not a citation.
+**Why it wasn't decided here:** no primary DepEd source was found for the actual honors-eligibility criteria; the current rule is a defensible placeholder, not a citation. Adding a severity model to `AnecdotalCategory` without such a citation would itself be inventing structure this project has no evidence for, so ADR-0084 deliberately used only what the schema already has.
 
 ---
 

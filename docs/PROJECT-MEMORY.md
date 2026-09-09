@@ -51,14 +51,27 @@ warnings` both clean.
 
 - **Award eligibility is explicitly unverified/configurable, not DepEd
   law**: `DEFAULT_UNVERIFIED_GA_THRESHOLD`/`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE`
-  in `src/domain/award-eligibility.ts`; the "zero disciplinary
-  anecdotes" leg is not implemented and `anecdotalRecordsChecked` is
-  still hardcoded `false` -- **update (Batch 12, 2026-09-08/09,
-  ADR-0083)**: the Anecdotal Records entity now exists
+  in `src/domain/award-eligibility.ts`. The "zero disciplinary
+  anecdotes" leg was originally not implemented
+  (`anecdotalRecordsChecked` hardcoded `false`) -- **update (Batch 12,
+  2026-09-08/09, ADR-0083)**: the Anecdotal Records entity now exists
   (`repository::anecdotal_record`, `AnecdotalRecord`/
-  `AnecdotalRecordFollowup`, full vertical slice incl. sync), but this
-  batch deliberately did NOT wire it into `award-eligibility.ts` -- that
-  remains a future batch's job, now unblocked.
+  `AnecdotalRecordFollowup`, full vertical slice incl. sync), but that
+  batch deliberately did NOT wire it into `award-eligibility.ts` --
+  **update (Batch 13, 2026-09-09, ADR-0084)**: now wired for real.
+  `evaluateAcademicExcellenceEligibility` takes a required
+  `hasDisqualifyingAnecdotalRecord: boolean` input (the caller performs
+  the real lookup via `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`,
+  which calls the new narrow read-only `has_anecdotal_category_for_learner`
+  command -- gated by the same `authorize_child_protection_access_for_section`
+  every other anecdotal-record read/write uses, no weaker gate); the
+  domain function stays pure and does no I/O.
+  `anecdotalRecordsChecked` is now always `true`. Disqualification rule:
+  any `negative`-category anecdotal record excludes a learner, any
+  severity, no recency window -- this project's own conservative
+  default, not a verified DepEd rule (the schema has no severity field
+  to model anything finer); still open per
+  `docs/product/OWNER-DECISIONS-NEEDED.md` item 4.
 - **ADR-0076**: Weather & Hazard Suspension Alerts — Open-Meteo (free,
   no key), the first third-party network call this codebase makes
   directly from the device; every failure degrades to `"unavailable"`,
