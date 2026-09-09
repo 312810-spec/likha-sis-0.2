@@ -9,4 +9,5 @@
 //! `db::mod.rs`'s existing key accessors -- its own DPAPI round-trip
 //! tests only compile and run on Windows (see ADR-0088's disclosure).
 pub mod oauth;
+pub mod redirect_listener;
 pub mod token_store;

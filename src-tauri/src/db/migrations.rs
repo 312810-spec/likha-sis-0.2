@@ -3728,6 +3728,62 @@ pub fn migrations() -> Migrations<'static> {
             ADD COLUMN master_teacher_decided_at TEXT;
         "#,
         ),
+        M::up(
+            r#"
+        -- M62 (Batch 18 checkpoint 3, ADR-0088): the Official School
+        -- Repository's per-school Microsoft 365 app-registration/
+        -- connection status.
+        --
+        -- Never stores a token -- the refresh token lives only in the
+        -- DPAPI-protected file (`infrastructure::microsoft365::token_store`),
+        -- never SQLite (see `.claude/rules/security-privacy.md`).
+        -- `connected` only becomes 1 once a full OAuth round trip
+        -- actually completed; `last_verified_at`/`last_error` are
+        -- teacher-facing connection health, never a raw OAuth error
+        -- payload.
+        CREATE TABLE microsoft365_app_registrations (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            tenant_id TEXT NOT NULL,
+            client_id TEXT NOT NULL,
+            connected INTEGER NOT NULL DEFAULT 0 CHECK (connected IN (0, 1)),
+            last_verified_at TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M63 (Batch 18 checkpoint 4, ADR-0088): the Official School
+        -- Repository's opportunistic upload queue.
+        --
+        -- `kind` mirrors the TypeScript `UploadableArtifactKind` closed
+        -- union exactly (`src/domain/document-repository.ts`) -- an
+        -- already-generated export/backup artifact, never an arbitrary
+        -- path and never the live database file (the independent
+        -- `local_file_path` guard lives in
+        -- `repository::microsoft365_upload_queue::enqueue`, see
+        -- ADR-0088 Decision 4). `local_file_path` never leaves this
+        -- device and is never synced to another school's device.
+        CREATE TABLE microsoft365_upload_queue (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL CHECK (kind IN ('sf1-export', 'sf9-export', 'sf10-export', 'disaster-recovery-backup')),
+            file_name TEXT NOT NULL,
+            local_file_path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'uploading', 'uploaded', 'failed')),
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_error_code TEXT CHECK (last_error_code IN ('offline', 'timeout', 'unauthorized', 'provider-rejected', 'not-configured')),
+            queued_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_ms365_upload_queue_school_id ON microsoft365_upload_queue(school_id);
+        CREATE INDEX idx_ms365_upload_queue_status ON microsoft365_upload_queue(school_id, status);
+        "#,
+        ),
     ])
 }
 

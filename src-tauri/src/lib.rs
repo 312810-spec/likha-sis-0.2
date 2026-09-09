@@ -230,6 +230,12 @@ pub fn run() {
             commands::anecdotal_record::add_anecdotal_record_followup,
             commands::anecdotal_record::list_anecdotal_record_followups,
             commands::anecdotal_record::has_anecdotal_category_for_learner,
+            commands::document_repository::get_document_repository_connection_status,
+            commands::document_repository::configure_document_repository,
+            commands::document_repository::connect_document_repository,
+            commands::document_repository::disconnect_document_repository,
+            commands::document_repository_upload_queue::queue_document_repository_upload,
+            commands::document_repository_upload_queue::list_document_repository_queued_uploads,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

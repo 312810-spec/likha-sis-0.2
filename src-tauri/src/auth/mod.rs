@@ -576,6 +576,23 @@ pub enum Capability {
     /// repeated precedent of a new variant per distinct authority
     /// decision even where several currently resolve to the same role.
     ManageTeacherOversightAssignments,
+    /// Batch 18 (ADR-0088): save/replace this school's Microsoft 365 app
+    /// registration, start the OAuth PKCE connect flow, or disconnect
+    /// (`repository::microsoft365_config`, `commands::document_repository`).
+    /// School Head only, matching `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`'s
+    /// "Repository Administrator... should be the school head or an
+    /// explicitly delegated role" -- no delegation exists yet, so this is
+    /// conservatively School-Head-only today, the same default this
+    /// module uses for every other whole-school administrative
+    /// configuration capability (`ManageSchoolBranding`,
+    /// `ManageStructuralLock`). Deliberately its own variant for the same
+    /// reason those are: configuring an external, internet-reaching
+    /// integration is a distinct administrative act from any of them.
+    /// Queueing/listing an opportunistic upload is NOT gated by this
+    /// capability -- any authenticated school member may queue an
+    /// already-generated export/backup artifact, matching
+    /// `DocumentRepositoryProviderPort`'s own doc comment.
+    ManageDocumentRepositoryConnection,
 }
 
 impl Capability {
@@ -594,6 +611,7 @@ impl Capability {
             Capability::ManageTransferRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
             Capability::CreateDisasterRecoveryBackup => &[role_repo::SCHOOL_HEAD],
             Capability::ManageTeacherOversightAssignments => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageDocumentRepositoryConnection => &[role_repo::SCHOOL_HEAD],
         }
     }
 }

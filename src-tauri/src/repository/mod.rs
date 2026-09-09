@@ -18,6 +18,8 @@ pub mod installation;
 pub mod learner;
 pub mod learner_score;
 pub mod lesson_plan;
+pub mod microsoft365_config;
+pub mod microsoft365_upload_queue;
 pub mod my_day;
 pub mod nutrition;
 pub mod reference_geo;

@@ -6,6 +6,7 @@ import { AuthApplicationService } from "./application/auth-service";
 import { ClassRecordApplicationService } from "./application/class-record-service";
 import { ConflictReviewApplicationService } from "./application/conflict-review-service";
 import { DeviceSyncApplicationService } from "./application/device-sync-service";
+import { DocumentRepositoryApplicationService } from "./application/document-repository-service";
 import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
 import { FormativeAssessmentApplicationService } from "./application/formative-assessment-service";
@@ -40,6 +41,7 @@ import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
 import { TauriClassRecordRepository } from "./infrastructure/tauri/class-record-repository";
 import { TauriConflictReviewRepository } from "./infrastructure/tauri/conflict-review-repository";
 import { TauriDeviceSyncRepository } from "./infrastructure/tauri/device-sync-repository";
+import { TauriDocumentRepositoryProvider } from "./infrastructure/tauri/document-repository-provider";
 import { TauriExportRepository } from "./infrastructure/tauri/export-repository";
 import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollment-history-repository";
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
@@ -161,4 +163,13 @@ export const gradeSubmissionService = new GradeSubmissionApplicationService(
 );
 export const teacherOversightAssignmentService = new TeacherOversightAssignmentApplicationService(
   new TauriTeacherOversightAssignmentRepository(),
+);
+/** Official School Repository (Microsoft 365 / SharePoint, ADR-0088) —
+ * the only client that ever imports `TauriDocumentRepositoryProvider`
+ * directly, matching `weatherService`'s own doc comment above. Invisible
+ * elsewhere in the app until a School Head configures it: an
+ * unconfigured install's `getConnectionStatus().configured` is simply
+ * `false`. */
+export const documentRepositoryService = new DocumentRepositoryApplicationService(
+  new TauriDocumentRepositoryProvider(),
 );

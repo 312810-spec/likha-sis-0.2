@@ -7,6 +7,7 @@ import {
   classRecordService,
   conflictReviewService,
   deviceSyncService,
+  documentRepositoryService,
   enrollmentHistoryService,
   exportService,
   formativeAssessmentService,
@@ -48,6 +49,7 @@ import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConsolidatedGradesScreen } from "./ui/ConsolidatedGradesScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
+import { DocumentRepositoryScreen } from "./ui/DocumentRepositoryScreen";
 import { SchoolBrandingScreen } from "./ui/SchoolBrandingScreen";
 import { SchoolMembershipScreen } from "./ui/SchoolMembershipScreen";
 import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
@@ -602,6 +604,11 @@ function App() {
               <TeacherOversightScreen
                 teacherOversightAssignmentService={teacherOversightAssignmentService}
                 schoolMemberService={schoolMemberService}
+              />
+            ) : activeTab === "document-repository" ? (
+              <DocumentRepositoryScreen
+                documentRepositoryService={documentRepositoryService}
+                roles={session.roles}
               />
             ) : activeTab === "id-card" ? (
               <IdCardScreen
