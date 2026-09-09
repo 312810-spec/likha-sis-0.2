@@ -236,6 +236,7 @@ pub fn run() {
             commands::document_repository::disconnect_document_repository,
             commands::document_repository_upload_queue::queue_document_repository_upload,
             commands::document_repository_upload_queue::list_document_repository_queued_uploads,
+            commands::document_repository_upload_drain::drain_document_repository_upload_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

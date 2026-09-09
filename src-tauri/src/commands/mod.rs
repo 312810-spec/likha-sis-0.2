@@ -9,6 +9,7 @@ pub mod class_record;
 pub mod conflict_review;
 pub mod device_sync;
 pub mod document_repository;
+pub mod document_repository_upload_drain;
 pub mod document_repository_upload_queue;
 pub mod export;
 pub mod formative_assessment;

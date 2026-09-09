@@ -47,4 +47,8 @@ export class TauriDocumentRepositoryProvider implements DocumentRepositoryProvid
   listQueuedUploads(): Promise<QueuedUpload[]> {
     return invoke<QueuedUpload[]>("list_document_repository_queued_uploads");
   }
+
+  drainQueue(): Promise<QueuedUpload[]> {
+    return invoke<QueuedUpload[]>("drain_document_repository_upload_queue");
+  }
 }

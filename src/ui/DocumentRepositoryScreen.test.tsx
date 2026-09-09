@@ -70,6 +70,13 @@ class FakeDocumentRepositoryProvider implements DocumentRepositoryProviderPort {
   async listQueuedUploads(): Promise<QueuedUpload[]> {
     return this.queue;
   }
+
+  drainCalls = 0;
+
+  async drainQueue(): Promise<QueuedUpload[]> {
+    this.drainCalls += 1;
+    return this.queue;
+  }
 }
 
 function renderScreen(provider: FakeDocumentRepositoryProvider, roles: string[]) {
@@ -164,6 +171,28 @@ describe("DocumentRepositoryScreen", () => {
 
     await waitFor(() => expect(screen.getByText(/sf10\.pdf/)).toBeInTheDocument());
     expect(screen.getByText(/waiting to send/i)).toBeInTheDocument();
+  });
+
+  it("lets any authenticated member opportunistically try sending the queue now", async () => {
+    const provider = new FakeDocumentRepositoryProvider();
+    provider.status = {
+      configured: true,
+      connected: true,
+      tenantId: "contoso-tenant",
+      clientId: "contoso-client",
+      lastVerifiedAt: "2026-09-09T00:00:00.000Z",
+      lastError: null,
+    };
+    const user = userEvent.setup();
+    renderScreen(provider, ["teacher"]);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /try sending now/i })).toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole("button", { name: /try sending now/i }));
+
+    await waitFor(() => expect(provider.drainCalls).toBe(1));
   });
 
   it("has no accessibility violations when unconfigured for a School Head", async () => {

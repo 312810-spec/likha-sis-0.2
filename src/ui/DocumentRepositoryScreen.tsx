@@ -34,12 +34,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * Official School Repository settings (ADR-0088, Batch 18 checkpoint 3):
- * lets a School Head connect this school's Microsoft 365 tenant and shows
- * the upload queue for already-generated exports/backups (queueing itself
- * happens elsewhere via `DocumentRepositoryApplicationService.queueUpload`;
- * opportunistically attempting delivery is checkpoint 4). Genuinely
- * invisible/inert until a School Head configures it —
+ * Official School Repository settings (ADR-0088, Batch 18 checkpoints
+ * 3-4): lets a School Head connect this school's Microsoft 365 tenant and
+ * shows the opportunistic upload queue for already-generated exports/
+ * backups. Genuinely invisible/inert until a School Head configures it —
  * matching the Weather & Hazard Alerts precedent's "absent, not broken"
  * pattern (ADR-0079): an unconfigured install, viewed by anyone who isn't
  * a School Head, renders a single quiet sentence and nothing else — no
@@ -165,6 +163,19 @@ export function DocumentRepositoryScreen({
     }
   }
 
+  async function handleTrySendingNow() {
+    setQueueError(null);
+    setQueueLoading(true);
+    try {
+      const updated = await documentRepositoryService.drainQueue();
+      setQueue(updated);
+    } catch {
+      setQueueError("Could not reach the upload queue right now. It will try again later.");
+    } finally {
+      setQueueLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <Page title="Official School Repository">
@@ -287,6 +298,9 @@ export function DocumentRepositoryScreen({
                 ))}
               </ul>
             )}
+            <button type="button" onClick={handleTrySendingNow} disabled={queueLoading}>
+              Try sending now
+            </button>
           </section>
         </>
       )}

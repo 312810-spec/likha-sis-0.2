@@ -212,14 +212,45 @@ different machines is a materially different exposure than the
 single-device model ADR-0003 was designed around — so this is rejected
 structurally, not left as a code-review convention.
 
+## Batch 18 checkpoints 3-4 addendum (2026-09-09)
+
+Checkpoint 3 built the piece this ADR originally deferred: a hand-rolled
+loopback listener (`infrastructure::microsoft365::redirect_listener`,
+`std::net::TcpListener`, no new dependency — reads one request line,
+writes one fixed HTML response) plus `commands::document_repository`'s
+`connect_document_repository`/`disconnect_document_repository`/
+`configure_document_repository` commands and the School-Head-gated,
+invisible-when-unconfigured `DocumentRepositoryScreen`. A new
+`Capability::ManageDocumentRepositoryConnection` (School-Head-only, see
+`auth::Capability`'s own doc comment) gates configure/connect/disconnect;
+`getConnectionStatus`/`queueUpload`/`listQueuedUploads` remain open to
+any authenticated school member, matching the port's existing doc
+comment. Persistence: migration M62 adds
+`microsoft365_app_registrations` (tenant/client ID + connection health,
+never a token) and `microsoft365_upload_queue`.
+
+Checkpoint 4 built the upload queue itself
+(`repository::microsoft365_upload_queue`, with `enqueue`'s independent
+path guard against the live database/key file — proven by
+`enqueue_rejects_a_path_that_resolves_to_the_live_database_file`/
+`_the_key_file`, exactly as this ADR originally promised) and an
+opportunistic drain command
+(`commands::document_repository::drain_document_repository_upload_queue`)
+that performs a REAL token-refresh round trip
+(`oauth::refresh_access_token`, rotating and re-persisting the refresh
+token via `token_store::store` when Microsoft issues a new one) but
+still cannot deliver bytes to Microsoft Graph — see the still-open item
+below, unchanged from this ADR's original scope. A successful refresh
+therefore still records `AttemptErrorCode::NotConfigured` on every
+pending item rather than a fabricated `uploaded` status: this is an
+honest, disclosed status, not a silent success. No export screen in
+this codebase queues an upload automatically yet — queueing is
+available via `DocumentRepositoryApplicationService.queueUpload` for a
+future slice to call, a deliberate scope decision to keep this batch
+tight.
+
 ## Not yet built (explicitly deferred, not silently dropped)
 
-- The actual loopback HTTP listener that captures the OAuth redirect
-  (`connect()`'s browser-launch + local-server half) — `oauth.rs`
-  provides the URL-building and code/token exchange either side of it,
-  but wiring an actual local listener plus browser launch is Settings-UI-
-  adjacent work; see `docs/CURRENT-HANDOFF.md` for exactly which
-  checkpoints of this batch shipped.
 - A concrete Microsoft Graph `driveItem` upload call (`PUT
 /sites/{id}/drives/{id}/root:/path:/content` or the resumable upload
   session variant for larger files) — the queue and its retry/backoff

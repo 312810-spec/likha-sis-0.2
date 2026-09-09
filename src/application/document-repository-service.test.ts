@@ -63,6 +63,13 @@ class FakeDocumentRepositoryProvider implements DocumentRepositoryProviderPort {
   async listQueuedUploads(): Promise<QueuedUpload[]> {
     return this.queue;
   }
+
+  drainCalls = 0;
+
+  async drainQueue(): Promise<QueuedUpload[]> {
+    this.drainCalls += 1;
+    return this.queue;
+  }
 }
 
 function validCandidate(overrides: Partial<UploadCandidate> = {}): UploadCandidate {
@@ -209,5 +216,14 @@ describe("DocumentRepositoryApplicationService", () => {
     await service.queueUpload(validCandidate());
 
     await expect(service.listQueuedUploads()).resolves.toHaveLength(1);
+  });
+
+  it("drainQueue delegates to the provider", async () => {
+    const provider = new FakeDocumentRepositoryProvider();
+    const service = new DocumentRepositoryApplicationService(provider);
+
+    await service.drainQueue();
+
+    expect(provider.drainCalls).toBe(1);
   });
 });

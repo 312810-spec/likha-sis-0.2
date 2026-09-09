@@ -1,5 +1,118 @@
 # CURRENT HANDOFF
 
+## Batch 18 checkpoints 3-4 (complete, 2026-09-09): Microsoft 365 settings screen + opportunistic upload queue — Batch 18 now fully complete
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only in two
+separate commits (checkpoint 3, checkpoint 4), nothing pushed, PR #55
+untouched, no CI triggered, per batch-implement mode. Builds on
+checkpoints 1-2 (commits `3e1c287`, `bb67f26`: the port/application
+service and the PKCE OAuth core) and ADR-0088.
+
+**Checkpoint 3 (its own commit):** built the loopback redirect listener
+ADR-0088 had explicitly deferred
+(`infrastructure::microsoft365::redirect_listener`, hand-rolled
+`std::net::TcpListener`, zero new dependencies -- reads one request
+line, writes one fixed HTML response, proven with a real TCP round trip
+in this Linux sandbox) plus `commands::document_repository`'s
+get-status/configure/connect/disconnect commands and a new
+`DocumentRepositoryScreen`. A new `Capability::ManageDocumentRepositoryConnection`
+(School-Head-only) gates configure/connect/disconnect;
+`getConnectionStatus`/queue-list stay open to any authenticated school
+member, matching the already-committed port's own doc comment. Verified
+genuinely invisible for an unconfigured school viewed by a non-School-
+Head: one quiet sentence, no dead buttons, no error state, matching the
+Weather & Hazard Alerts precedent (ADR-0079). Persistence: migration M62
+(`microsoft365_app_registrations` -- tenant/client ID + connection
+health, never a token) and M63 (`microsoft365_upload_queue`'s table --
+queue/list data plumbing).
+
+**Checkpoint 4 (its own commit):** the opportunistic upload queue's
+independent path guard (`repository::microsoft365_upload_queue::enqueue`,
+proven by `enqueue_rejects_a_path_that_resolves_to_the_live_database_file`/
+`_the_key_file` -- rejects a candidate that resolves to the live
+database or its DPAPI key file regardless of what the caller claims) and
+a new drain command
+(`commands::document_repository_upload_drain::drain_document_repository_upload_queue`)
+that performs a REAL token-refresh round trip
+(`oauth::refresh_access_token`, rotating and re-persisting the refresh
+token via `token_store::store` when Microsoft issues a new one) but
+still cannot deliver bytes to Microsoft Graph -- no destination
+SharePoint site/library selection exists yet to validate that call
+against (ADR-0088's own disclosed "Not yet built", unchanged). A
+successful refresh therefore still records `AttemptErrorCode::NotConfigured`
+on every pending item rather than a fabricated `uploaded` status: an
+honest, disclosed outcome, never a silent success. The Settings screen
+gained a "Try sending now" opportunistic action (any authenticated
+school member, matching `queueUpload`'s own access level) and an
+upload-queue list. No export screen in this codebase queues an upload
+automatically yet -- `DocumentRepositoryApplicationService.queueUpload`
+is available for a future slice to wire in; a deliberate scope decision
+to keep this batch tight, not an oversight.
+
+**New files:** `src-tauri/src/infrastructure/microsoft365/redirect_listener.rs`,
+`src-tauri/src/repository/microsoft365_config.rs`,
+`src-tauri/src/repository/microsoft365_upload_queue.rs`,
+`src-tauri/src/commands/document_repository.rs`,
+`src-tauri/src/commands/document_repository_upload_queue.rs`,
+`src-tauri/src/commands/document_repository_upload_drain.rs`,
+`src/infrastructure/tauri/document-repository-provider.ts`,
+`src/ui/DocumentRepositoryScreen.tsx` (+ its test file).
+
+**Changed:** `src-tauri/src/auth/mod.rs` (new capability),
+`src-tauri/src/db/migrations.rs` (M62-M63),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/repository/mod.rs`,
+`src-tauri/src/infrastructure/microsoft365/mod.rs`, `src-tauri/src/lib.rs`
+(command registration), `src/composition.ts`, `src/App.tsx`,
+`src/ui/components/workbench-nav-data.ts` (new nav tab),
+`src/domain/ports/document-repository-provider.ts` +
+`src/application/document-repository-service.ts` (+ test) (`drainQueue`
+addition), `docs/adr/0088-official-school-repository-oauth-architecture.md`,
+`docs/VERIFICATION-DEBT.md`.
+
+**Verification actually run, both checkpoints:** `cargo check`/`cargo
+clippy --all-targets -- -D warnings` clean; targeted `cargo test --lib
+microsoft365` (41 passed) and `document_repository` (3 passed); a full
+`cargo test --lib` for the whole crate (1412 passed, 0 failed) run
+after checkpoint 3 landed, confirming no regression from a concurrent
+session's simultaneous Batch 17 work in this same working tree; `npx
+tsc --noEmit` clean; `npx vitest run` on the new/changed test files (23
+passed after checkpoint 4); a full `npm run quality` (typecheck, lint,
+format:check, architecture check, knip, full vitest suite) run after
+each checkpoint, both green. `cargo fmt --check` was run and its
+findings limited strictly to this batch's own new/touched files
+(`rustfmt --check`) to avoid reformatting a concurrently-edited file
+outside this batch's scope.
+
+**Concurrency note:** this session observed the same concurrent-session
+working-tree sharing the 2026-09-09 rate-limit-consolidation entry
+above already describes -- `src-tauri/src/commands/grade_submission.rs`/
+`repository/grade_submission.rs` were mid-edit by another session during
+this batch (one `cargo check` transiently failed on those files, self-
+resolved moments later once that session's own edit completed) and
+`src/ui/components/workbench-nav-data.ts` was independently extended by
+that other session (`grade-review`/`teacher-oversight` tabs) while this
+batch was also editing it. No file from that other session's own scope
+was committed by this batch -- verified via `git status --short`
+immediately before each commit; only this batch's own listed files were
+staged.
+
+**Genuinely still open (unchanged from ADR-0088, not new debt):** a live
+OAuth round trip against a real Azure AD tenant (blocked on
+`docs/product/OWNER-DECISIONS-NEEDED.md` item 2, a genuine human-
+approval gate), and the Microsoft Graph `driveItem` upload call itself
+(needs a destination SharePoint site/library selection mechanism that
+does not exist yet). `token_store`'s own DPAPI round-trip tests remain
+Windows-only and unverified on this Linux sandbox, matching
+`crypto::dpapi`'s already-established, already-disclosed pattern.
+
+**Exact next slice:** either (a) resolve the OWNER-DECISIONS-NEEDED item
+2 human-approval gate (a real Azure AD tenant) so the live OAuth round
+trip and a real Graph `driveItem` upload call can finally be built and
+proven, or (b) if that stays blocked, the next highest-priority
+DepEd-compliance/teacher-usability item from the roadmap -- no
+candidate is pre-selected here; evaluate against current evidence at
+the next wave boundary per `.claude/rules/autonomous-development.md`.
+
 ## Batch 17 checkpoint 4 (complete, 2026-09-09): two-tier grade-review UI + Teacher Oversight Assignment management screen — Batch 17 now fully complete
 
 Branch `claude/pending-tasks-batch-vjy67v`, commit `c7175a5`, committed

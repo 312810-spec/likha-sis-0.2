@@ -247,6 +247,24 @@ attempting to close any of them.
    confirms a tenant exists. No SharePoint/Microsoft 365 code was
    attempted this batch, per this batch's own constraint.
 
+   **Update (Batch 18, 2026-09-09, ADR-0088):** superseded by real
+   engineering built ahead of a live tenant, per explicit owner approval
+   recorded in that ADR. What now exists and is genuinely proven (against
+   mocks, not a live tenant): PKCE OAuth core (`infrastructure::microsoft365::oauth`),
+   a real loopback redirect listener (`redirect_listener`, proven with an
+   actual TCP round trip in this Linux sandbox), DPAPI-protected token
+   storage (`token_store`, Windows-only tests, unverified on this Linux
+   sandbox -- unchanged debt), the app-registration/connection-status and
+   upload-queue persistence (`repository::microsoft365_config`,
+   `repository::microsoft365_upload_queue`), the School-Head-gated
+   Settings screen (`DocumentRepositoryScreen`), and an opportunistic
+   token-refresh drain command. Genuinely still open: a live OAuth round
+   trip against a real Azure AD tenant (needs the human-approval-gated
+   tenant/consent this item originally tracked), and the Microsoft Graph
+   `driveItem` upload call itself (no destination SharePoint site/library
+   selection exists yet to validate it against) -- both explicitly
+   disclosed in ADR-0088, neither claimed as done.
+
 **Repo-wide sweep for untracked TODO/FIXME/deferred markers** (`src/`,
 `src-tauri/src/`, `docs/adr/`): ran
 `grep -rnE "TODO|FIXME|XXX|HACK|not yet implemented|deferred|not implemented"`

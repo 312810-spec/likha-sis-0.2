@@ -87,4 +87,8 @@ export class DocumentRepositoryApplicationService {
   listQueuedUploads(): Promise<QueuedUpload[]> {
     return this.provider.listQueuedUploads();
   }
+
+  drainQueue(): Promise<QueuedUpload[]> {
+    return this.provider.drainQueue();
+  }
 }

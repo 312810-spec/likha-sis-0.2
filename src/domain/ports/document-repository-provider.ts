@@ -69,4 +69,16 @@ export interface DocumentRepositoryProviderPort {
 
   /** Lists this school's upload queue, most recently queued first. */
   listQueuedUploads(): Promise<QueuedUpload[]>;
+
+  /**
+   * Opportunistically attempts every still-pending queued upload right
+   * now (rather than waiting for whatever future trigger a background
+   * mechanism would use) — a best-effort nudge, never required for
+   * correctness: an unattempted or failed item stays durably queued
+   * either way. Returns the queue afterward so a caller can render the
+   * updated statuses without a second round trip. See
+   * `commands::document_repository_upload_drain::drain_document_repository_upload_queue`'s
+   * own doc comment for exactly what "attempt" proves today.
+   */
+  drainQueue(): Promise<QueuedUpload[]>;
 }
