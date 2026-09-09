@@ -1,4 +1,5 @@
 import type {
+  AnecdotalCategory,
   AnecdotalRecord,
   AnecdotalRecordFollowup,
   AnecdotalRecordFollowupInput,
@@ -26,4 +27,18 @@ export interface AnecdotalRecordRepository {
     sectionId: string,
     asOfDate: string,
   ): Promise<AnecdotalRecordFollowup[]>;
+  /** Narrow, read-only existence check (Batch 13, ADR-0084): does
+   * `learnerId` have any anecdotal record in one of `categories`, in
+   * `sectionId`? Gated by the exact same authorization as every other
+   * operation on this port -- there is no weaker "view-only" gate for
+   * this sensitive data. Returns a bare boolean, never the matching
+   * records' narrative content, so a caller that only needs a
+   * disqualification signal (e.g. the award-eligibility screen) never
+   * pulls full guidance narratives into memory just to check it. */
+  hasCategoryForLearner(
+    sectionId: string,
+    learnerId: string,
+    categories: readonly AnecdotalCategory[],
+    asOfDate: string,
+  ): Promise<boolean>;
 }

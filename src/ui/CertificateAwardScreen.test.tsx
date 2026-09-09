@@ -1,11 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { AnecdotalRecordApplicationService } from "../application/anecdotal-record-service";
 import { ClassRecordApplicationService } from "../application/class-record-service";
 import { LearnerScoreApplicationService } from "../application/learner-score-service";
 import { SectionApplicationService } from "../application/section-service";
 import type { ComputedTermGrade } from "../domain/learner-score";
 import type { ClassRecord, ClassRecordDetail, GradingWeightPolicy } from "../domain/class-record";
+import type { AnecdotalRecordRepository } from "../domain/ports/anecdotal-record-repository";
 import type { ClassRecordRepository } from "../domain/ports/class-record-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
@@ -129,16 +131,43 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
   }
 }
 
-function renderScreen() {
+/** By default no learner has a disqualifying anecdotal record; pass
+ * `disqualifiedLearnerIds` to simulate one, per Batch 13's real
+ * anecdote-check wiring (ADR-0084). */
+class FakeAnecdotalRecordRepository implements AnecdotalRecordRepository {
+  constructor(private readonly disqualifiedLearnerIds: ReadonlySet<string> = new Set()) {}
+
+  record(): ReturnType<AnecdotalRecordRepository["record"]> {
+    throw new Error("not used in this test");
+  }
+  listForSection(): ReturnType<AnecdotalRecordRepository["listForSection"]> {
+    throw new Error("not used in this test");
+  }
+  addFollowup(): ReturnType<AnecdotalRecordRepository["addFollowup"]> {
+    throw new Error("not used in this test");
+  }
+  listFollowups(): ReturnType<AnecdotalRecordRepository["listFollowups"]> {
+    throw new Error("not used in this test");
+  }
+  async hasCategoryForLearner(_sectionId: string, learnerId: string): Promise<boolean> {
+    return this.disqualifiedLearnerIds.has(learnerId);
+  }
+}
+
+function renderScreen(disqualifiedLearnerIds: readonly string[] = []) {
   const sectionService = new SectionApplicationService(new FakeSectionRepository());
   const classRecordService = new ClassRecordApplicationService(new FakeClassRecordRepository());
   const learnerScoreService = new LearnerScoreApplicationService(new FakeLearnerScoreRepository());
+  const anecdotalRecordService = new AnecdotalRecordApplicationService(
+    new FakeAnecdotalRecordRepository(new Set(disqualifiedLearnerIds)),
+  );
   return render(
     <ModeProvider>
       <CertificateAwardScreen
         sectionService={sectionService}
         classRecordService={classRecordService}
         learnerScoreService={learnerScoreService}
+        anecdotalRecordService={anecdotalRecordService}
         schoolName="Mabini Elementary School"
       />
     </ModeProvider>,
@@ -146,13 +175,15 @@ function renderScreen() {
 }
 
 describe("CertificateAwardScreen", () => {
-  it("shows the GA-threshold and no-anecdote-check disclosures up front", async () => {
+  it("shows the GA-threshold and anecdote-disqualification-rule disclosures up front", async () => {
     renderScreen();
     await screen.findByRole("heading", { name: "Certificates & Awards" });
     expect(
-      screen.getByText(/has not been.*verified against a primary DepEd source/i),
+      screen.getByText(/not been\s+verified against a primary DepEd source/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/no Anecdotal Records feature/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/disciplinary\/anecdotal-record disqualification rule/i),
+    ).toBeInTheDocument();
   });
 
   it("computes eligibility and only offers a certificate to eligible learners", async () => {
@@ -172,6 +203,33 @@ describe("CertificateAwardScreen", () => {
     expect(within(benRow).getByText(/below the configured threshold/i)).toBeInTheDocument();
   });
 
+  it("excludes a learner who otherwise meets both grade legs but has a disqualifying anecdotal record", async () => {
+    const user = userEvent.setup();
+    // Ana (l1) meets both grade legs per FakeLearnerScoreRepository, but
+    // is given a disqualifying-category anecdotal record here.
+    renderScreen(["l1"]);
+    await screen.findByRole("heading", { name: "Certificates & Awards" });
+
+    await user.click(screen.getByRole("button", { name: /compute eligibility/i }));
+
+    const anaRow = (await screen.findByText("Ana Reyes")).closest("tr")!;
+    expect(
+      within(anaRow).queryByRole("button", { name: /print certificate/i }),
+    ).not.toBeInTheDocument();
+    expect(within(anaRow).getByText(/disqualifying category/i)).toBeInTheDocument();
+  });
+
+  it("is still eligible when the learner has no disqualifying anecdotal record", async () => {
+    const user = userEvent.setup();
+    renderScreen([]);
+    await screen.findByRole("heading", { name: "Certificates & Awards" });
+
+    await user.click(screen.getByRole("button", { name: /compute eligibility/i }));
+
+    const anaRow = (await screen.findByText("Ana Reyes")).closest("tr")!;
+    expect(within(anaRow).getByRole("button", { name: /print certificate/i })).toBeInTheDocument();
+  });
+
   it("renders both disclosures on the printed certificate itself", async () => {
     const user = userEvent.setup();
     renderScreen();
@@ -182,9 +240,11 @@ describe("CertificateAwardScreen", () => {
 
     await screen.findByRole("heading", { name: "Academic Excellence Certificate" });
     expect(
-      screen.getByText(/has not been.*verified against a primary DepEd source/i),
+      screen.getByText(/not been\s+verified against a primary DepEd source/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/does not check disciplinary\/anecdotal/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/disciplinary\/anecdotal-record disqualification rule/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("Ana Reyes")).toBeInTheDocument();
   });
 

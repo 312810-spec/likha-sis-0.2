@@ -171,6 +171,12 @@ class FakeAnecdotalRecordRepository implements AnecdotalRecordRepository {
   async listFollowups(): Promise<AnecdotalRecordFollowup[]> {
     return this.followupsToReturn;
   }
+
+  async hasCategoryForLearner(): Promise<boolean> {
+    // Not used in this screen's own tests -- Batch 13's award-eligibility
+    // wiring is the only caller of this method.
+    return false;
+  }
 }
 
 function renderScreen(overrides?: { anecdotalRepo?: FakeAnecdotalRecordRepository }) {

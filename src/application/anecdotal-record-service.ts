@@ -5,6 +5,7 @@ import type {
   AnecdotalRecordInput,
 } from "../domain/anecdotal-record";
 import {
+  DISQUALIFYING_ANECDOTAL_CATEGORIES,
   validateAnecdotalRecordFollowupInput,
   validateAnecdotalRecordInput,
 } from "../domain/anecdotal-record";
@@ -62,5 +63,37 @@ export class AnecdotalRecordApplicationService {
       throw new ValidationError("A date is required.");
     }
     return this.anecdotalRecords.listFollowups(trimmedRecordId, trimmedSectionId, trimmedDate);
+  }
+
+  /** Batch 13, ADR-0084: the real anecdote-check the award-eligibility
+   * screen calls before evaluating `award-eligibility.ts`'s pure
+   * function -- that domain module never fetches anything itself, so
+   * this is where the actual lookup happens. Uses
+   * `DISQUALIFYING_ANECDOTAL_CATEGORIES` (currently just `"negative"`)
+   * -- this project's own conservative, unverified-against-DepEd
+   * default, not a citation. */
+  async hasDisqualifyingRecordForLearner(
+    sectionId: string,
+    learnerId: string,
+    asOfDate: string,
+  ): Promise<boolean> {
+    const trimmedSectionId = sectionId.trim();
+    if (trimmedSectionId.length === 0) {
+      throw new ValidationError("A section is required.");
+    }
+    const trimmedLearnerId = learnerId.trim();
+    if (trimmedLearnerId.length === 0) {
+      throw new ValidationError("A learner is required.");
+    }
+    const trimmedDate = asOfDate.trim();
+    if (trimmedDate.length === 0) {
+      throw new ValidationError("A date is required.");
+    }
+    return this.anecdotalRecords.hasCategoryForLearner(
+      trimmedSectionId,
+      trimmedLearnerId,
+      DISQUALIFYING_ANECDOTAL_CATEGORIES,
+      trimmedDate,
+    );
   }
 }

@@ -101,4 +101,23 @@ describe("TauriAnecdotalRecordRepository", () => {
     });
     expect(returned).toEqual([FOLLOWUP]);
   });
+
+  it("hasCategoryForLearner invokes has_anecdotal_category_for_learner with every field", async () => {
+    mockInvoke.mockResolvedValueOnce(true);
+
+    const returned = await new TauriAnecdotalRecordRepository().hasCategoryForLearner(
+      "sec1",
+      "l1",
+      ["negative"],
+      "2026-09-01",
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("has_anecdotal_category_for_learner", {
+      learnerId: "l1",
+      sectionId: "sec1",
+      categories: ["negative"],
+      asOfDate: "2026-09-01",
+    });
+    expect(returned).toBe(true);
+  });
 });

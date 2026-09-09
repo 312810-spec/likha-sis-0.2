@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AnecdotalCategory,
   AnecdotalRecord,
   AnecdotalRecordFollowup,
   AnecdotalRecordFollowupInput,
@@ -47,6 +48,8 @@ class FakeAnecdotalRecordRepository implements AnecdotalRecordRepository {
   followupResult: AnecdotalRecordFollowup = FOLLOWUP;
   recordsToReturn: AnecdotalRecord[] = [];
   followupsToReturn: AnecdotalRecordFollowup[] = [];
+  hasCategoryForLearnerCalls: [string, string, readonly AnecdotalCategory[], string][] = [];
+  hasCategoryForLearnerResult = false;
 
   async record(input: AnecdotalRecordInput): Promise<AnecdotalRecord> {
     this.recordCalls.push(input);
@@ -70,6 +73,16 @@ class FakeAnecdotalRecordRepository implements AnecdotalRecordRepository {
   ): Promise<AnecdotalRecordFollowup[]> {
     this.listFollowupsCalls.push([anecdotalRecordId, sectionId, asOfDate]);
     return this.followupsToReturn;
+  }
+
+  async hasCategoryForLearner(
+    sectionId: string,
+    learnerId: string,
+    categories: readonly AnecdotalCategory[],
+    asOfDate: string,
+  ): Promise<boolean> {
+    this.hasCategoryForLearnerCalls.push([sectionId, learnerId, categories, asOfDate]);
+    return this.hasCategoryForLearnerResult;
   }
 }
 
@@ -176,5 +189,60 @@ describe("AnecdotalRecordApplicationService", () => {
       ValidationError,
     );
     expect(repo.listFollowupsCalls).toHaveLength(0);
+  });
+
+  it("hasDisqualifyingRecordForLearner queries only the disqualifying categories, trimmed", async () => {
+    const repo = new FakeAnecdotalRecordRepository();
+    repo.hasCategoryForLearnerResult = true;
+    const service = new AnecdotalRecordApplicationService(repo);
+
+    const result = await service.hasDisqualifyingRecordForLearner(
+      "  sec1  ",
+      "  l1  ",
+      "  2026-09-01  ",
+    );
+
+    expect(result).toBe(true);
+    expect(repo.hasCategoryForLearnerCalls).toEqual([["sec1", "l1", ["negative"], "2026-09-01"]]);
+  });
+
+  it("returns false when the repository reports no disqualifying record", async () => {
+    const repo = new FakeAnecdotalRecordRepository();
+    repo.hasCategoryForLearnerResult = false;
+    const service = new AnecdotalRecordApplicationService(repo);
+
+    const result = await service.hasDisqualifyingRecordForLearner("sec1", "l1", "2026-09-01");
+
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty section id for hasDisqualifyingRecordForLearner", async () => {
+    const repo = new FakeAnecdotalRecordRepository();
+    const service = new AnecdotalRecordApplicationService(repo);
+
+    await expect(
+      service.hasDisqualifyingRecordForLearner("   ", "l1", "2026-09-01"),
+    ).rejects.toThrow(ValidationError);
+    expect(repo.hasCategoryForLearnerCalls).toHaveLength(0);
+  });
+
+  it("rejects an empty learner id for hasDisqualifyingRecordForLearner", async () => {
+    const repo = new FakeAnecdotalRecordRepository();
+    const service = new AnecdotalRecordApplicationService(repo);
+
+    await expect(
+      service.hasDisqualifyingRecordForLearner("sec1", "   ", "2026-09-01"),
+    ).rejects.toThrow(ValidationError);
+    expect(repo.hasCategoryForLearnerCalls).toHaveLength(0);
+  });
+
+  it("rejects an empty as-of date for hasDisqualifyingRecordForLearner", async () => {
+    const repo = new FakeAnecdotalRecordRepository();
+    const service = new AnecdotalRecordApplicationService(repo);
+
+    await expect(service.hasDisqualifyingRecordForLearner("sec1", "l1", "   ")).rejects.toThrow(
+      ValidationError,
+    );
+    expect(repo.hasCategoryForLearnerCalls).toHaveLength(0);
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AnecdotalRecordApplicationService } from "../application/anecdotal-record-service";
 import type { ClassRecordApplicationService } from "../application/class-record-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { SectionApplicationService } from "../application/section-service";
@@ -19,6 +20,13 @@ interface CertificateAwardScreenProps {
   sectionService: SectionApplicationService;
   classRecordService: ClassRecordApplicationService;
   learnerScoreService: LearnerScoreApplicationService;
+  /** Batch 13, ADR-0084: the real anecdote-check the eligibility loop
+   * calls before evaluating `award-eligibility.ts`'s pure function --
+   * only its read-only `hasDisqualifyingRecordForLearner` method is used
+   * here, gated identically to every other anecdotal-record read/write
+   * (`authorize_child_protection_access_for_section`; no weaker gate
+   * exists for this sensitive data). */
+  anecdotalRecordService: AnecdotalRecordApplicationService;
   schoolName: string;
 }
 
@@ -50,6 +58,7 @@ export function CertificateAwardScreen({
   sectionService,
   classRecordService,
   learnerScoreService,
+  anecdotalRecordService,
   schoolName,
 }: CertificateAwardScreenProps) {
   const { mode } = useTeacherMode();
@@ -127,6 +136,7 @@ export function CertificateAwardScreen({
     const recordsInPeriod = classRecordsForSection.filter(
       (cr) => cr.gradingPeriodId === effectiveGradingPeriodId,
     );
+    const asOfDate = todayAsIsoDate();
     try {
       const results: LearnerEligibility[] = [];
       for (const member of roster) {
@@ -137,10 +147,17 @@ export function CertificateAwardScreen({
         }
         const generalAverage =
           grades.length > 0 ? grades.reduce((sum, g) => sum + g, 0) / grades.length : 0;
+        const hasDisqualifyingAnecdotalRecord =
+          await anecdotalRecordService.hasDisqualifyingRecordForLearner(
+            sectionId,
+            member.learnerId,
+            asOfDate,
+          );
         const result = evaluateAcademicExcellenceEligibility({
           learnerId: member.learnerId,
           generalAverage,
           subjectGrades: grades,
+          hasDisqualifyingAnecdotalRecord,
         });
         results.push({
           member,
@@ -220,9 +237,10 @@ export function CertificateAwardScreen({
       }
     >
       <Alert tone="warning">
-        This award uses a school-configurable general-average threshold that has not been verified
-        against a primary DepEd source, and does not check disciplinary/anecdotal records — there is
-        no Anecdotal Records feature in this system yet.
+        This award uses a school-configurable general-average threshold and a
+        disciplinary/anecdotal-record disqualification rule (any &quot;negative&quot;-category
+        guidance record excludes a learner, regardless of severity) that have not been verified
+        against a primary DepEd source.
       </Alert>
 
       {error && <Alert tone="error">{error}</Alert>}

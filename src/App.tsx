@@ -572,6 +572,7 @@ function App() {
                 sectionService={sectionService}
                 classRecordService={classRecordService}
                 learnerScoreService={learnerScoreService}
+                anecdotalRecordService={anecdotalRecordService}
                 schoolName={session.schoolName}
               />
             ) : activeTab === "seating-chart" ? (

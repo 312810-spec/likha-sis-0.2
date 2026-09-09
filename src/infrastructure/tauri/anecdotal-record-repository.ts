@@ -1,4 +1,5 @@
 import type {
+  AnecdotalCategory,
   AnecdotalRecord,
   AnecdotalRecordFollowup,
   AnecdotalRecordFollowupInput,
@@ -9,7 +10,7 @@ import { invoke } from "./invoke";
 
 /** Tauri adapter for `record_anecdotal_entry`/
  * `list_anecdotal_records_for_section`/`add_anecdotal_record_followup`/
- * `list_anecdotal_record_followups`
+ * `list_anecdotal_record_followups`/`has_anecdotal_category_for_learner`
  * (`src-tauri/src/commands/anecdotal_record.rs`). */
 export class TauriAnecdotalRecordRepository implements AnecdotalRecordRepository {
   record(input: AnecdotalRecordInput): Promise<AnecdotalRecord> {
@@ -46,6 +47,20 @@ export class TauriAnecdotalRecordRepository implements AnecdotalRecordRepository
     return invoke<AnecdotalRecordFollowup[]>("list_anecdotal_record_followups", {
       anecdotalRecordId,
       sectionId,
+      asOfDate,
+    });
+  }
+
+  hasCategoryForLearner(
+    sectionId: string,
+    learnerId: string,
+    categories: readonly AnecdotalCategory[],
+    asOfDate: string,
+  ): Promise<boolean> {
+    return invoke<boolean>("has_anecdotal_category_for_learner", {
+      learnerId,
+      sectionId,
+      categories: [...categories],
       asOfDate,
     });
   }
