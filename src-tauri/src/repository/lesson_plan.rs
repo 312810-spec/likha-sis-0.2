@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -14,7 +14,7 @@ use crate::repository::{role, teaching_assignment};
 /// owning teacher/section/subject. This is a teacher's own authoring
 /// tool, not an official DepEd form output -- no PDF export in this
 /// slice.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LessonPlan {
     pub id: String,
@@ -185,6 +185,57 @@ pub fn update(
         ),
     )?;
     find_by_id_in_school(conn, school_id, id)
+}
+
+/// Materializes a pulled sync change: an `INSERT ... ON CONFLICT(id) DO
+/// UPDATE` keyed on the row's own stable `id`, mirroring
+/// `grading::upsert_from_sync` exactly. Bypasses `create`'s own
+/// existence/duplicate-date checks and the schema's own `UNIQUE
+/// (teaching_assignment_id, plan_date)` constraint entirely (that
+/// validation already happened on the originating device) -- a
+/// collision on that natural key (two devices independently authoring a
+/// plan for the same assignment/date while both offline) surfaces as an
+/// ordinary `rusqlite::Error` here, which the caller
+/// (`sync_client::apply_decrypted_change`) maps to
+/// `ApplyRejection::RepositoryRejected` so it never wedges the rest of
+/// the pull batch -- same generic mechanism already confirmed for
+/// `Subject`/`Section` (`docs/VERIFICATION-DEBT.md`, "Confirmed the
+/// natural-key-collision fix is generic across entities").
+pub fn upsert_from_sync(conn: &Connection, plan: &LessonPlan) -> AppResult<()> {
+    conn.execute(
+        "INSERT INTO lesson_plans \
+             (id, school_id, teaching_assignment_id, plan_date, \
+              learning_competency, learning_competency_code, learning_objectives, \
+              connection_to_previous_learning, learning_experiences, assessment, \
+              ways_forward, created_by_user_id, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) \
+         ON CONFLICT(id) DO UPDATE SET \
+             learning_competency = excluded.learning_competency, \
+             learning_competency_code = excluded.learning_competency_code, \
+             learning_objectives = excluded.learning_objectives, \
+             connection_to_previous_learning = excluded.connection_to_previous_learning, \
+             learning_experiences = excluded.learning_experiences, \
+             assessment = excluded.assessment, \
+             ways_forward = excluded.ways_forward, \
+             updated_at = excluded.updated_at",
+        (
+            &plan.id,
+            &plan.school_id,
+            &plan.teaching_assignment_id,
+            &plan.plan_date,
+            &plan.learning_competency,
+            &plan.learning_competency_code,
+            &plan.learning_objectives,
+            &plan.connection_to_previous_learning,
+            &plan.learning_experiences,
+            &plan.assessment,
+            &plan.ways_forward,
+            &plan.created_by_user_id,
+            &plan.created_at,
+            &plan.updated_at,
+        ),
+    )?;
+    Ok(())
 }
 
 pub fn find_by_id_in_school(
@@ -593,5 +644,135 @@ mod tests {
         let result = authorize_view(&conn, &head.id, &other_school.id, &f.assignment_id);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn upsert_from_sync_inserts_a_lesson_plan_this_device_has_never_seen() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let incoming = LessonPlan {
+            id: Uuid::now_v7().to_string(),
+            school_id: f.school_id.clone(),
+            teaching_assignment_id: f.assignment_id.clone(),
+            plan_date: "2026-09-07".to_string(),
+            learning_competency: "Add fractions".to_string(),
+            learning_competency_code: "M7NS-Ig-1".to_string(),
+            learning_objectives: "Add fractions with unlike denominators".to_string(),
+            connection_to_previous_learning: "Builds on like denominators".to_string(),
+            learning_experiences: "Think-pair-share".to_string(),
+            assessment: "Exit ticket".to_string(),
+            ways_forward: "Reteach if needed".to_string(),
+            created_by_user_id: f.teacher_id.clone(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        };
+
+        upsert_from_sync(&conn, &incoming).unwrap();
+
+        let found = find_by_id_in_school(&conn, &f.school_id, &incoming.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.learning_competency, "Add fractions");
+        assert_eq!(found.plan_date, "2026-09-07");
+    }
+
+    #[test]
+    fn upsert_from_sync_updates_an_existing_row_in_place_without_a_duplicate() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let original = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+
+        let updated = LessonPlan {
+            ways_forward: "Revised ways forward".to_string(),
+            ..original.clone()
+        };
+        upsert_from_sync(&conn, &updated).unwrap();
+
+        let found = find_by_id_in_school(&conn, &f.school_id, &original.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.ways_forward, "Revised ways forward");
+        let all = list_by_assignment(&conn, &f.school_id, &f.assignment_id).unwrap();
+        assert_eq!(all.len(), 1, "an upsert must never insert a second row");
+    }
+
+    /// The natural-key-collision scenario this entity is actually
+    /// exposed to: two devices, both offline, each authoring a plan for
+    /// the SAME `(teaching_assignment_id, plan_date)` before either has
+    /// synced. Each mints its own `id`, so pulling the other device's
+    /// row can never collide on `id` (the `ON CONFLICT(id)` target) --
+    /// it instead trips the schema's own `UNIQUE (teaching_assignment_id,
+    /// plan_date)` constraint. Proves `upsert_from_sync` surfaces this as
+    /// an ordinary `Err`, never panics and never silently drops one
+    /// plan's data -- the generic `ApplyRejection::RepositoryRejected`
+    /// skip-and-advance handling in `sync_client` depends on this
+    /// resulting in a normal `Result::Err`, per
+    /// `docs/VERIFICATION-DEBT.md`'s "Confirmed the natural-key-collision
+    /// fix is generic across entities" entry.
+    #[test]
+    fn upsert_from_sync_returns_an_error_on_a_natural_key_collision_distinct_from_id() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let existing = create(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-07",
+            &f.teacher_id,
+            &sample_fields(),
+        )
+        .unwrap()
+        .unwrap();
+
+        // A second device's own plan for the exact same assignment/date,
+        // minted with its own fresh id (never seen locally before).
+        let colliding = LessonPlan {
+            id: Uuid::now_v7().to_string(),
+            ..sample_incoming(&f, "2026-09-07")
+        };
+        assert_ne!(colliding.id, existing.id);
+
+        let result = upsert_from_sync(&conn, &colliding);
+
+        assert!(
+            result.is_err(),
+            "a natural-key collision must surface as an Err, not silently succeed or panic"
+        );
+        // The original row is untouched, and no phantom second row for
+        // the colliding id was ever materialized.
+        let all = list_by_assignment(&conn, &f.school_id, &f.assignment_id).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, existing.id);
+        assert!(find_by_id_in_school(&conn, &f.school_id, &colliding.id)
+            .unwrap()
+            .is_none());
+    }
+
+    fn sample_incoming(f: &Fixture, plan_date: &str) -> LessonPlan {
+        LessonPlan {
+            id: Uuid::now_v7().to_string(),
+            school_id: f.school_id.clone(),
+            teaching_assignment_id: f.assignment_id.clone(),
+            plan_date: plan_date.to_string(),
+            learning_competency: "Add fractions".to_string(),
+            learning_competency_code: "M7NS-Ig-1".to_string(),
+            learning_objectives: "Add fractions with unlike denominators".to_string(),
+            connection_to_previous_learning: "Builds on like denominators".to_string(),
+            learning_experiences: "Think-pair-share".to_string(),
+            assessment: "Exit ticket".to_string(),
+            ways_forward: "Reteach if needed".to_string(),
+            created_by_user_id: f.teacher_id.clone(),
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }
     }
 }

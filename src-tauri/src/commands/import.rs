@@ -8,6 +8,9 @@ use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::db;
 use crate::error::AppResult;
+use crate::import::scholastic::{
+    self, ScholasticCommitPlan, ScholasticImportPreview, ScholasticImportSummary,
+};
 use crate::import::sf1::{Sf1ImportPreview, Sf1ImportSummary, Sf1RowCommitPlan};
 use crate::import::{commit, fingerprint, preview};
 use crate::repository::device_credential;
@@ -116,4 +119,34 @@ pub fn list_sf1_import_history(
     let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
     sf1_import_history::list_for_school(&conn, &school_id, limit)
+}
+
+/// Parses and previews a multi-year scholastic-history `.xlsx` workbook
+/// against this school's existing learners — read-only, writes nothing.
+/// Same `ManageLearners` gate and same session-derived-`school_id`
+/// discipline as the SF1 import commands above (ADR-0074).
+#[tauri::command]
+pub fn preview_scholastic_import(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    file_path: String,
+) -> AppResult<ScholasticImportPreview> {
+    let conn = lock_db(&db);
+    let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageLearners)?;
+    scholastic::build_preview(&conn, &school_id, &PathBuf::from(file_path))
+}
+
+/// Commits an already-reviewed batch of scholastic-history rows as one
+/// atomic transaction. Same `ManageLearners` gate; `school_id` is
+/// session-derived, never accepted from the caller.
+#[tauri::command]
+pub fn commit_scholastic_import(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    plans: Vec<ScholasticCommitPlan>,
+) -> AppResult<ScholasticImportSummary> {
+    let mut conn = lock_db(&db);
+    let (school_id, user_id) =
+        auth::authorize_capability_with_actor(&conn, &sessions, Capability::ManageLearners)?;
+    scholastic::commit_scholastic_import(&mut conn, &school_id, &plans, Some(&user_id))
 }

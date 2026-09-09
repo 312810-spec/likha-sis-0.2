@@ -11,10 +11,13 @@ use crate::crypto::payload_key::PAYLOAD_KEY_LEN;
 use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
-    audit_log as audit_log_repo, device_credential as device_credential_repo,
+    audit_log as audit_log_repo, class_record as class_record_repo,
+    device_credential as device_credential_repo, grade_submission as grade_submission_repo,
     installation as installation_repo, role as role_repo, school as school_repo,
     section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
-    sync_payload_key as sync_payload_key_repo, user as user_repo,
+    structural_lock as structural_lock_repo, sync_payload_key as sync_payload_key_repo,
+    teacher_oversight_assignment as teacher_oversight_assignment_repo,
+    teaching_assignment as teaching_assignment_repo, user as user_repo,
 };
 
 /// Fixed session lifetime — an absolute cap regardless of activity. See
@@ -46,6 +49,17 @@ pub struct Session {
     /// observe idle state, not extend it, or "is anyone still logged
     /// in?" polling would itself defeat the idle timeout.
     pub last_activity_at: SystemTime,
+    /// ADR-0070: set by a successful `verify_structural_lock_pin` call,
+    /// cleared on logout (a fresh `Session` never inherits a prior one's
+    /// unlock state). `None` means "not currently unlocked" -- the
+    /// initial, and by far the most common, state. Deliberately a plain
+    /// timestamp rather than a bool: an unlock is a short-lived grant
+    /// (`STRUCTURAL_LOCK_UNLOCK_WINDOW`), not a switch that stays on for
+    /// the rest of the session -- re-locking automatically on a timeout
+    /// matters more here than for the login session itself, since the
+    /// whole point of this feature is to gate against an unattended,
+    /// still-logged-in terminal.
+    pub structural_lock_unlocked_until: Option<SystemTime>,
 }
 
 impl Session {
@@ -75,8 +89,17 @@ fn new_session(id: String, user_id: String, school_id: String) -> Session {
         created_at,
         expires_at: created_at + SESSION_DURATION,
         last_activity_at: created_at,
+        structural_lock_unlocked_until: None,
     }
 }
+
+/// How long a successful structural-lock PIN verification stays valid
+/// before the next gated action needs the PIN re-entered. Short by
+/// design -- ADR-0070: this exists specifically to narrow the window an
+/// unattended, still-logged-in terminal could perform a structural edit,
+/// so the grant itself must not quietly last as long as the whole
+/// 8-hour login session.
+pub const STRUCTURAL_LOCK_UNLOCK_WINDOW: Duration = Duration::from_secs(5 * 60);
 
 /// The single source of truth for "who is currently authenticated in this
 /// process." Managed as Tauri state, exactly like the M1 database
@@ -138,6 +161,35 @@ impl SessionManager {
             current.last_activity_at = SystemTime::now();
         }
         Ok((session.user_id, session.school_id))
+    }
+
+    /// ADR-0070: grants the current session a `STRUCTURAL_LOCK_UNLOCK_WINDOW`-
+    /// long structural-lock unlock, anchored to now. A no-op if there is
+    /// no current session (nothing to grant it to) -- callers only ever
+    /// reach this after `verify_structural_lock_pin` already re-confirmed
+    /// an active session and a correct PIN, so this should never actually
+    /// hit that branch in practice, but it must not panic if it somehow
+    /// does (e.g. a session expiring in the narrow window between the two
+    /// checks).
+    fn unlock_structural_lock(&self) {
+        if let Some(session) = self.lock().as_mut() {
+            session.structural_lock_unlocked_until =
+                Some(SystemTime::now() + STRUCTURAL_LOCK_UNLOCK_WINDOW);
+        }
+    }
+
+    /// True only if the current session both exists and has an
+    /// unexpired structural-lock unlock grant. Never mutates -- a
+    /// peek-only check, matching `Session::is_active`'s own convention
+    /// of never conflating "check" with "extend."
+    fn structural_lock_is_unlocked(&self) -> bool {
+        match self.lock().as_ref() {
+            Some(session) => match session.structural_lock_unlocked_until {
+                Some(until) => SystemTime::now() < until,
+                None => false,
+            },
+            None => false,
+        }
     }
 
     fn lock(&self) -> MutexGuard<'_, Option<Session>> {
@@ -428,6 +480,119 @@ pub enum Capability {
     /// session's DepEd research found SF10 restricts official forms to
     /// DepEd's own seal/logo.
     ManageSchoolBranding,
+    /// Set or clear the school's secondary structural-lock PIN
+    /// (ADR-0070) -- `repository::structural_lock::set_pin`/`clear_pin`.
+    /// School Head only, deliberately its own variant for the same
+    /// reason `ManageSchoolBranding` is: configuring the lock itself is a
+    /// distinct administrative act from *unlocking* it for one session
+    /// (`verify_structural_lock_pin`, which is deliberately NOT gated by
+    /// any `Capability` -- any authenticated member of the school may
+    /// attempt to unlock, exactly like knowing a door's combination
+    /// doesn't require a special role, only knowing the combination).
+    ManageStructuralLock,
+    /// Record or view a learner's SF8 nutrition status measurement
+    /// (`repository::nutrition`) -- real learner health PII. Deliberately
+    /// its own variant, conservatively scoped to the same two roles as
+    /// `ManageLearners` (Registrar, School Head) rather than also
+    /// including Teacher: this project's role model has no per-section
+    /// "class adviser measures their own section" restriction yet (the
+    /// pattern `authorize_adviser_of_section`/`authorize_own_assignment`
+    /// establish for other features), and granting a bare Teacher role
+    /// unrestricted read/write over every learner's health data
+    /// school-wide would be broader than the real DepEd workflow (a
+    /// section adviser records only their own section's measurements).
+    /// Widening this to a section-scoped Teacher capability is a
+    /// deliberate, disclosed deferral -- see
+    /// `docs/adr/0071-sf8-health-nutrition-engine.md` -- not an oversight.
+    ManageHealthRecords,
+    /// School-Head-only half of the DO 006 Child Protection module
+    /// (ADR-0072): school-wide read/write over every section's
+    /// behavioral incidents. A section adviser's equally valid access to
+    /// their OWN section's incidents is deliberately NOT expressed as
+    /// this capability's `allowed_roles` (that would grant blanket
+    /// school-wide access to any Teacher role, which the task explicitly
+    /// forbids) -- it is instead a per-section carve-out checked by
+    /// `authorize_child_protection_access_for_section`, mirroring
+    /// `authorize_adviser_of_section`'s established self-or-School-Head
+    /// shape exactly.
+    ManageChildProtection,
+    /// School-Head-as-interim-approver half of the Multi-Tier Review &
+    /// Audit Pipeline (ADR-0073) -- deciding (approve/reject) a
+    /// submitted grade submission, and reading the school-wide
+    /// submission-status matrix / Principal Overview Dashboard. Does NOT
+    /// gate a teacher *submitting* their own class record's grades --
+    /// that is a self-or-School-Head check
+    /// (`authorize_grade_submission_owner`), the same shape as
+    /// `ManageChildProtection`/`authorize_child_protection_access_for_section`
+    /// above, not a role-based capability, since it depends on which
+    /// specific class record is being submitted.
+    ManageGradeSubmissionReview,
+    /// Set or clear the school's latitude/longitude
+    /// (`repository::school::set_coordinates`/`clear_coordinates`), used
+    /// only by the Weather & Hazard Suspension Alerts advisory
+    /// (ADR-0079). School Head only, deliberately its own variant rather
+    /// than reusing `ManageSchoolBranding`: a school's physical location
+    /// is a distinct administrative fact from its visual identity, even
+    /// though today both capabilities resolve to the same role (the same
+    /// reasoning `ManageSchoolBranding`'s own doc comment gives for not
+    /// reusing `ManageSchoolMembership`).
+    ManageSchoolCoordinates,
+    /// Record or view a learner's inter-school transfer documentation
+    /// (`repository::transfer_record`) -- real learner PII (ADR-0080).
+    /// Deliberately its own variant rather than reusing `ManageLearners`,
+    /// following this codebase's own repeated precedent
+    /// (`ManageTeachingAssignments`/`ManageSectionAdvisories`/
+    /// `ManageSchoolBranding`/`ManageSchoolCoordinates` are each their own
+    /// variant even where several currently resolve to the same roles):
+    /// recording a transfer is a distinct registrar-facing action from
+    /// creating/editing a learner's enrollment record, even though both
+    /// currently resolve to the same two roles. Conservatively scoped to
+    /// the same roles as `ManageLearners` (Registrar, School Head) --
+    /// matching `ManageHealthRecords`'s own reasoning for why a bare
+    /// Teacher role is not included: transfers are a school-wide
+    /// registrar/administrative act, not a per-section teaching duty, and
+    /// this project's role model has no per-section carve-out for it.
+    ManageTransferRecords,
+    /// Batch 14 sub-item 3 / ADR-0087: create a two-copy encrypted
+    /// disaster-recovery backup of the ENTIRE local database (every
+    /// school this installation holds, not just the caller's own school
+    /// scope -- there is currently exactly one school per installation
+    /// in this single-hub architecture, but the backup mechanism itself
+    /// backs up the whole SQLCipher file, which is not a per-school-
+    /// scoped operation the way `ManageLearners`/etc. are). School Head
+    /// only -- the same conservative default `ManageStructuralLock` and
+    /// `ManageSchoolMembership` already use for a whole-installation
+    /// administrative action, not a per-section teaching duty.
+    CreateDisasterRecoveryBackup,
+    /// Batch 17: assign, reassign, or end a teacher's Master Teacher
+    /// oversight relationship (`repository::teacher_oversight_assignment`)
+    /// -- the permanent Master Teacher review-hierarchy design that
+    /// supersedes ADR-0073's interim School-Head-as-approver
+    /// substitution. School Head only, deliberately its own variant
+    /// rather than reusing `ManageTeachingAssignments`/
+    /// `ManageSectionAdvisories`: who oversees a teacher's submissions is
+    /// a distinct scheduling-authority decision from who teaches which
+    /// subject or advises which section, matching this codebase's own
+    /// repeated precedent of a new variant per distinct authority
+    /// decision even where several currently resolve to the same role.
+    ManageTeacherOversightAssignments,
+    /// Batch 18 (ADR-0088): save/replace this school's Microsoft 365 app
+    /// registration, start the OAuth PKCE connect flow, or disconnect
+    /// (`repository::microsoft365_config`, `commands::document_repository`).
+    /// School Head only, matching `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`'s
+    /// "Repository Administrator... should be the school head or an
+    /// explicitly delegated role" -- no delegation exists yet, so this is
+    /// conservatively School-Head-only today, the same default this
+    /// module uses for every other whole-school administrative
+    /// configuration capability (`ManageSchoolBranding`,
+    /// `ManageStructuralLock`). Deliberately its own variant for the same
+    /// reason those are: configuring an external, internet-reaching
+    /// integration is a distinct administrative act from any of them.
+    /// Queueing/listing an opportunistic upload is NOT gated by this
+    /// capability -- any authenticated school member may queue an
+    /// already-generated export/backup artifact, matching
+    /// `DocumentRepositoryProviderPort`'s own doc comment.
+    ManageDocumentRepositoryConnection,
 }
 
 impl Capability {
@@ -438,6 +603,15 @@ impl Capability {
             Capability::ManageTeachingAssignments => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSectionAdvisories => &[role_repo::SCHOOL_HEAD],
             Capability::ManageSchoolBranding => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageStructuralLock => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageHealthRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::ManageChildProtection => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageGradeSubmissionReview => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageSchoolCoordinates => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageTransferRecords => &[role_repo::REGISTRAR, role_repo::SCHOOL_HEAD],
+            Capability::CreateDisasterRecoveryBackup => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageTeacherOversightAssignments => &[role_repo::SCHOOL_HEAD],
+            Capability::ManageDocumentRepositoryConnection => &[role_repo::SCHOOL_HEAD],
         }
     }
 }
@@ -525,6 +699,124 @@ pub fn authorize_adviser_of_section(
     Err(AppError::Unauthorized)
 }
 
+/// DO 006 Child Protection module (ADR-0072): only the section's current
+/// adviser, or a School Head, may read/write that section's behavioral
+/// incidents and intervention log. This is child-protection PII --
+/// tighter than ordinary tenant scoping -- so a general Teacher with no
+/// adviser relationship to `section_id` must never pass this, matching
+/// the task's explicit requirement. Mirrors
+/// `authorize_adviser_of_section`'s exact self-or-School-Head shape and
+/// its same cross-school forged-id guard (a School Head's role holds
+/// only within their own school; `section_id` must independently be
+/// verified to belong to it).
+pub fn authorize_child_protection_access_for_section(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    as_of_date: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    if section_repo::find_by_id_in_school(conn, &school_id, section_id)?.is_none() {
+        return Err(AppError::Unauthorized);
+    }
+    if section_advisory_repo::is_current_adviser(
+        conn, &school_id, section_id, &user_id, as_of_date,
+    )? {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageChildProtection.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// Multi-Tier Review & Audit Pipeline (ADR-0073): only the teacher
+/// actually assigned to teach `class_record_id`'s section+subject, or a
+/// School Head, may submit its grades for review. Mirrors
+/// `authorize_child_protection_access_for_section`'s exact
+/// self-or-School-Head shape, substituting "is the assigned teacher" for
+/// "is the current adviser" -- a different relationship, the same
+/// authorization pattern.
+pub fn authorize_grade_submission_owner(
+    conn: &Connection,
+    sessions: &SessionManager,
+    class_record_id: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let Some(record) = class_record_repo::find_by_id_in_school(conn, &school_id, class_record_id)?
+    else {
+        return Err(AppError::Unauthorized);
+    };
+    let assignments =
+        teaching_assignment_repo::list_by_section_in_school(conn, &school_id, &record.section_id)?;
+    let is_assigned_teacher = assignments
+        .iter()
+        .any(|a| a.subject_id == record.subject_id && a.teacher_user_id == user_id);
+    if is_assigned_teacher {
+        return Ok((user_id, school_id));
+    }
+    if role_repo::has_any_role(
+        conn,
+        &user_id,
+        &school_id,
+        Capability::ManageGradeSubmissionReview.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// ADR-0089's permanent two-tier grade-review design: only the
+/// submission's teacher's CURRENTLY-assigned Master Teacher overseer
+/// (`teacher_oversight_assignment::is_current_overseer`) may perform the
+/// Master-Teacher-tier decision on that submission. Self-approval is
+/// structurally blocked here -- at the trusted boundary, never left to
+/// the UI to hide a button -- so a Master Teacher who also holds
+/// `TEACHER` and submitted this very submission themselves is always
+/// denied, matching the ADR's explicit requirement. This gate says
+/// nothing about the no-MT-assigned fallback (routing straight to
+/// School-Head approval): that path never calls this function at all --
+/// see `commands::grade_submission::decide_grade_submission_master_teacher`,
+/// which resolves `current_overseer_for_teacher` itself and returns a
+/// distinct, honest error rather than pretending this gate covers it.
+pub fn authorize_grade_submission_master_teacher_decision(
+    conn: &Connection,
+    sessions: &SessionManager,
+    submission_id: &str,
+    as_of_date: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let Some(submission) = grade_submission_repo::find_by_id(conn, &school_id, submission_id)?
+    else {
+        return Err(AppError::Unauthorized);
+    };
+    let Some(submitted_by) = submission.submitted_by_user_id.as_deref() else {
+        // No recorded submitter (e.g. a legacy/sync-materialized row with
+        // the field cleared) -- there is no "their overseer" relationship
+        // to check, so this must fail closed rather than treat an absent
+        // submitter as "no one to self-approve as".
+        return Err(AppError::Unauthorized);
+    };
+    if submitted_by == user_id {
+        return Err(AppError::Unauthorized);
+    }
+    if teacher_oversight_assignment_repo::is_current_overseer(
+        conn,
+        &school_id,
+        &user_id,
+        submitted_by,
+        as_of_date,
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
 /// Resolves the current Adviser View list scope. A School Head may
 /// choose any section in their school; everyone else receives only
 /// sections they actively advise. This is picker scoping, not the data
@@ -584,6 +876,98 @@ pub fn authorize_capability_with_actor(
         return Err(AppError::Unauthorized);
     }
     Ok((school_id, user_id))
+}
+
+/// ADR-0070: sets (or replaces) the caller's own school's structural-lock
+/// PIN. School Head only (`ManageStructuralLock`) -- `school_id` is
+/// always session-derived, matching every other tenant-write command.
+/// Delegates length/shape validation to `crypto::pin_lock::derive_pin_hash`
+/// itself, which fails closed on a too-short/too-long PIN.
+pub fn set_structural_lock_pin(
+    conn: &Connection,
+    sessions: &SessionManager,
+    pin: &str,
+) -> AppResult<()> {
+    let school_id = authorize_capability(conn, sessions, Capability::ManageStructuralLock)?;
+    let pin_hash = crate::crypto::pin_lock::derive_pin_hash(pin)?;
+    structural_lock_repo::set_pin(conn, &school_id, &pin_hash)
+}
+
+/// ADR-0070: removes the caller's own school's structural-lock PIN
+/// entirely, reverting to "no lock configured" -- gated structural
+/// mutations are no longer enforced for this school until a new PIN is
+/// set. Same `ManageStructuralLock` gate as `set_structural_lock_pin`
+/// (a School Head who forgot the PIN can still reset it -- there is no
+/// "prove you know the old PIN to clear it" requirement, matching this
+/// codebase's convention that role-based admin capabilities, not a
+/// second secret, are the recovery path for every other admin action).
+pub fn clear_structural_lock_pin(conn: &Connection, sessions: &SessionManager) -> AppResult<()> {
+    let school_id = authorize_capability(conn, sessions, Capability::ManageStructuralLock)?;
+    structural_lock_repo::clear_pin(conn, &school_id)
+}
+
+/// ADR-0070: whether the caller's own school currently has a
+/// structural-lock PIN configured. Any authenticated member of the
+/// school may read this (it only drives which prompt the frontend
+/// shows -- "Set a PIN" vs. "Enter PIN" -- never an enforcement
+/// decision), matching `get_school_logo`'s own no-dedicated-capability
+/// read convention.
+pub fn has_structural_lock_pin(conn: &Connection, sessions: &SessionManager) -> AppResult<bool> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    structural_lock_repo::has_pin(conn, &school_id)
+}
+
+/// ADR-0070: attempts to unlock the structural lock for the CURRENT
+/// session only, for `STRUCTURAL_LOCK_UNLOCK_WINDOW`. Deliberately not a
+/// `Capability` check -- this is not "who may configure the lock," it is
+/// "does this already-authenticated caller know the combination," so any
+/// role may attempt it. Returns `Ok(false)` (never an error) for a wrong
+/// PIN or for a school with no PIN configured at all -- a wrong guess is
+/// not itself an authorization failure the way a missing session is;
+/// the caller decides how to surface "PIN did not match" versus "PIN not
+/// yet set" to the user. Never reveals a lockout/attempt-count signal —
+/// see "Not yet decided" in ADR-0070 for why a naive PIN is a weaker
+/// secret than a login password and brute-force mitigation is
+/// deliberately deferred, not silently promised here.
+pub fn verify_structural_lock_pin(
+    conn: &Connection,
+    sessions: &SessionManager,
+    pin: &str,
+) -> AppResult<bool> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    let Some(stored) = structural_lock_repo::find_pin(conn, &school_id)? else {
+        return Ok(false);
+    };
+    if crate::crypto::pin_lock::verify_pin(pin, &stored) {
+        sessions.unlock_structural_lock();
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+/// ADR-0070: the gate a structural-mutation command (school identity,
+/// curriculum-version, calendar-structure edits) calls IN ADDITION TO
+/// its ordinary `Capability` check, never instead of one. Fails closed
+/// exactly like `authorize_capability`: `Unauthorized` for no session:
+/// a school with NO PIN configured is deliberately NOT gated at all
+/// (returns `Ok` immediately) -- this feature is opt-in, and a school
+/// that never set a PIN must see no behavior change, matching this
+/// project's "no new UX a teacher would see unless they opted in"
+/// precedent (ADR-0069's enrollment ceremony reasons the same way).
+pub fn require_structural_lock_unlocked(
+    conn: &Connection,
+    sessions: &SessionManager,
+) -> AppResult<String> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    if !structural_lock_repo::has_pin(conn, &school_id)? {
+        return Ok(school_id);
+    }
+    if sessions.structural_lock_is_unlocked() {
+        Ok(school_id)
+    } else {
+        Err(AppError::Unauthorized)
+    }
 }
 
 /// Admin-Assisted Password Reset (Wave 3I, ADR-0061): a School Head sets
@@ -1330,6 +1714,7 @@ mod tests {
             created_at: past - SESSION_DURATION,
             expires_at: past,
             last_activity_at: past,
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -1354,6 +1739,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: now,
+            structural_lock_unlocked_until: None,
         });
 
         assert_eq!(sessions.require_active_school_scope(&conn).unwrap(), s.id);
@@ -1376,6 +1762,7 @@ mod tests {
             created_at: now - Duration::from_secs(60 * 60), // logged in an hour ago
             expires_at: now + Duration::from_secs(7 * 60 * 60), // absolute TTL far from expiring
             last_activity_at: now - IDLE_TIMEOUT - Duration::from_secs(1), // idle just past the window
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -1401,6 +1788,7 @@ mod tests {
             expires_at: now + SESSION_DURATION,
             // Idle for nearly the whole window, but not past it yet.
             last_activity_at: now - IDLE_TIMEOUT + Duration::from_secs(5),
+            structural_lock_unlocked_until: None,
         });
 
         // This call succeeds and, per its own contract, resets
@@ -1433,6 +1821,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: stale_activity,
+            structural_lock_unlocked_until: None,
         });
 
         // A peek via `current()` (what `commands::auth::current_session`
@@ -1464,6 +1853,7 @@ mod tests {
             created_at: now,
             expires_at: now + SESSION_DURATION,
             last_activity_at: now,
+            structural_lock_unlocked_until: None,
         });
         assert!(sessions.require_active_school_scope(&conn).is_ok());
 
@@ -2008,6 +2398,7 @@ mod tests {
             created_at: past - SESSION_DURATION,
             expires_at: past,
             last_activity_at: past,
+            structural_lock_unlocked_until: None,
         });
 
         assert!(matches!(
@@ -2159,6 +2550,32 @@ mod tests {
         assert_ne!(resolved_school, other_school.id);
     }
 
+    // ---- School coordinates for weather advisory (ADR-0079) ----
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_school_coordinates() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates).is_ok()
+        );
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_school_coordinates() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageSchoolCoordinates);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
     #[test]
     fn authorize_view_teacher_load_allows_a_teacher_to_view_their_own() {
         let conn = open_test_db();
@@ -2300,6 +2717,282 @@ mod tests {
             matches!(result, Err(AppError::Unauthorized)),
             "a School Head's authority in their own school must not extend to a different school's section"
         );
+    }
+
+    // ---- ADR-0072: authorize_child_protection_access_for_section ----
+
+    #[test]
+    fn authorize_child_protection_access_allows_the_sections_current_adviser() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &u.id, "2026-06-01").unwrap();
+
+        assert!(authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &sec.id,
+            "2026-08-29"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_child_protection_access_denies_a_teacher_who_does_not_advise_the_section() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _u) = setup_member_with_session(&conn, &sessions);
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = user::create_user(&conn, "adviser", "password", "The Adviser").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &s.id).unwrap();
+        section_advisory_repo::assign(&conn, &s.id, &sec.id, &adviser.id, "2026-06-01").unwrap();
+
+        let result =
+            authorize_child_protection_access_for_section(&conn, &sessions, &sec.id, "2026-08-29");
+
+        assert!(
+            matches!(result, Err(AppError::Unauthorized)),
+            "a bare Teacher role must not get blanket read access to another section's incidents"
+        );
+    }
+
+    #[test]
+    fn authorize_child_protection_access_allows_a_school_head_even_without_advising_it() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+
+        assert!(authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &sec.id,
+            "2026-08-29"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_child_protection_access_denies_a_school_head_for_a_different_schools_section() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        let other_school = school::create(&conn, "Other School").unwrap();
+        let other_sec =
+            section::create(&conn, &other_school.id, "2026-2027", "7", "Rizal").unwrap();
+
+        let result = authorize_child_protection_access_for_section(
+            &conn,
+            &sessions,
+            &other_sec.id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    // ---- ADR-0073: authorize_grade_submission_owner ----
+
+    fn setup_class_record_with_teacher(
+        conn: &Connection,
+    ) -> (crate::repository::school::School, user::User, String) {
+        use crate::repository::{class_record, grading, subject};
+        const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+        const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+        let s = school::create(conn, "Rizal Elementary").unwrap();
+        let teacher = user::create_user(conn, "teacher.one", "password", "Teacher One").unwrap();
+        user::add_school_membership(conn, &teacher.id, &s.id).unwrap();
+        let sec = section::create(conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
+        let sub = subject::create(conn, &s.id, "Mathematics").unwrap();
+        let period = grading::create(conn, &s.id, "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
+            .unwrap()
+            .unwrap();
+        let record =
+            class_record::create(conn, &s.id, &sec.id, &sub.id, &period.id, K10_POLICY, None)
+                .unwrap()
+                .unwrap();
+        crate::repository::teaching_assignment::create(conn, &s.id, &teacher.id, &sec.id, &sub.id)
+            .unwrap();
+        (s, teacher, record.id)
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_allows_the_assigned_teacher() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, teacher, record_id) = setup_class_record_with_teacher(&conn);
+        login(&conn, &sessions, "teacher.one", "password", &_s.id).unwrap();
+        let _ = teacher;
+
+        assert!(authorize_grade_submission_owner(&conn, &sessions, &record_id).is_ok());
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_denies_a_teacher_not_assigned_to_the_class_record() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher, record_id) = setup_class_record_with_teacher(&conn);
+        let other_teacher =
+            user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &other_teacher.id, &s.id).unwrap();
+        login(&conn, &sessions, "other.teacher", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_owner(&conn, &sessions, &record_id);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_owner_allows_a_school_head_as_the_interim_approver() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, _teacher, record_id) = setup_class_record_with_teacher(&conn);
+        let head = user::create_user(&conn, "head.one", "password", "Head One").unwrap();
+        user::add_school_membership(&conn, &head.id, &s.id).unwrap();
+        role_repo::grant(&conn, &head.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        login(&conn, &sessions, "head.one", "password", &s.id).unwrap();
+
+        assert!(authorize_grade_submission_owner(&conn, &sessions, &record_id).is_ok());
+    }
+
+    // ---- ADR-0089: authorize_grade_submission_master_teacher_decision ----
+
+    /// Seeds a class record with its assigned teacher (reusing
+    /// `setup_class_record_with_teacher`), plus a real submission from
+    /// that teacher and a second user holding `master_teacher` in the
+    /// same school (not yet assigned as this teacher's overseer -- the
+    /// caller assigns that separately per test).
+    fn setup_submission_with_master_teacher(
+        conn: &Connection,
+    ) -> (
+        crate::repository::school::School,
+        user::User,
+        user::User,
+        String,
+    ) {
+        let (s, teacher, record_id) = setup_class_record_with_teacher(conn);
+        let mt = user::create_user(conn, "mt.one", "password", "MT One").unwrap();
+        user::add_school_membership(conn, &mt.id, &s.id).unwrap();
+        role_repo::grant(conn, &mt.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        let submission =
+            crate::repository::grade_submission::submit(conn, &s.id, &record_id, &teacher.id)
+                .unwrap();
+        (s, teacher, mt, submission.id)
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_allows_the_current_overseer() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        teacher_oversight_assignment_repo::assign(&conn, &s.id, &mt.id, &teacher.id, "2026-06-01")
+            .unwrap();
+        login(&conn, &sessions, "mt.one", "password", &s.id).unwrap();
+
+        assert!(authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_denies_a_master_teacher_who_is_not_the_current_overseer(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        // A second Master Teacher who was never assigned to oversee this
+        // teacher at all.
+        let other_mt = user::create_user(&conn, "mt.two", "password", "MT Two").unwrap();
+        user::add_school_membership(&conn, &other_mt.id, &s.id).unwrap();
+        role_repo::grant(&conn, &other_mt.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        login(&conn, &sessions, "mt.two", "password", &s.id).unwrap();
+        let _ = teacher;
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    /// The self-approval guard this ADR requires structurally: a Master
+    /// Teacher who ALSO holds `TEACHER` and submitted this exact
+    /// submission themselves must never be allowed to decide it, even
+    /// though they are (nonsensically) assigned as their own overseer's
+    /// namesake -- assignment itself already blocks a literal
+    /// self-assignment (`CannotOverseeSelf`), but this proves the
+    /// decision-time gate ALSO blocks self-approval independently, the
+    /// documented defense-in-depth the ADR calls for.
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_blocks_self_approval() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        // The submitting teacher is ALSO granted `master_teacher` and
+        // assigned as another teacher's overseer -- irrelevant to this
+        // submission, but proves holding the role doesn't bypass the
+        // check for their OWN submission.
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.one", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_denies_an_ordinary_teacher_with_no_oversight_relationship(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        teacher_oversight_assignment_repo::assign(&conn, &s.id, &mt.id, &teacher.id, "2026-06-01")
+            .unwrap();
+        // Log in as the submitting teacher themselves -- they hold no
+        // `master_teacher` role at all here, distinct from the
+        // self-approval test above.
+        login(&conn, &sessions, "teacher.one", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 
     // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----
@@ -3641,5 +4334,306 @@ mod tests {
             !second,
             "revoking an already-revoked credential reports false, not an error"
         );
+    }
+
+    // --- ADR-0070: secondary structural-lock PIN ---
+
+    fn grant_school_head(conn: &Connection, user_id: &str, school_id: &str) {
+        role_repo::grant(conn, user_id, school_id, role_repo::SCHOOL_HEAD).unwrap();
+    }
+
+    #[test]
+    fn set_structural_lock_pin_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = set_structural_lock_pin(&conn, &sessions, "1234");
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(!structural_lock_repo::has_pin(&conn, &s.id).unwrap());
+    }
+
+    #[test]
+    fn a_school_head_can_set_then_verify_the_structural_lock_pin() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+
+        set_structural_lock_pin(&conn, &sessions, "246810").unwrap();
+
+        assert!(has_structural_lock_pin(&conn, &sessions).unwrap());
+        assert!(verify_structural_lock_pin(&conn, &sessions, "246810").unwrap());
+    }
+
+    #[test]
+    fn verify_structural_lock_pin_returns_false_never_an_error_for_a_wrong_pin() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "246810").unwrap();
+
+        let result = verify_structural_lock_pin(&conn, &sessions, "000000").unwrap();
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn verify_structural_lock_pin_returns_false_when_no_pin_is_configured_at_all() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let _ = setup_member_with_session(&conn, &sessions);
+
+        let result = verify_structural_lock_pin(&conn, &sessions, "anything").unwrap();
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn a_teacher_session_may_attempt_to_verify_the_pin_even_though_only_a_school_head_may_set_one()
+    {
+        let conn = open_test_db();
+        let head_sessions = SessionManager::new();
+        let (s, head) = setup_member_with_session(&conn, &head_sessions);
+        grant_school_head(&conn, &head.id, &s.id);
+        set_structural_lock_pin(&conn, &head_sessions, "135790").unwrap();
+
+        let teacher_sessions = SessionManager::new();
+        let teacher = user::create_user(&conn, "juan.dc", "password", "Juan Dela Cruz").unwrap();
+        user::add_school_membership(&conn, &teacher.id, &s.id).unwrap();
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::TEACHER).unwrap();
+        login(&conn, &teacher_sessions, "juan.dc", "password", &s.id).unwrap();
+
+        assert!(verify_structural_lock_pin(&conn, &teacher_sessions, "135790").unwrap());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_is_a_no_op_when_no_pin_is_configured() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let _ = setup_member_with_session(&conn, &sessions);
+
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_denies_when_a_pin_is_configured_but_not_yet_verified() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        let result = require_structural_lock_unlocked(&conn, &sessions);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_succeeds_right_after_a_correct_verify() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        assert!(verify_structural_lock_pin(&conn, &sessions, "112233").unwrap());
+
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn require_structural_lock_unlocked_denies_again_once_the_unlock_window_has_elapsed() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+        assert!(verify_structural_lock_pin(&conn, &sessions, "112233").unwrap());
+
+        // Force the grant into the past instead of sleeping in a test.
+        if let Some(session) = sessions.0.lock().unwrap().as_mut() {
+            session.structural_lock_unlocked_until =
+                Some(SystemTime::now() - Duration::from_secs(1));
+        }
+
+        assert!(matches!(
+            require_structural_lock_unlocked(&conn, &sessions),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn clear_structural_lock_pin_denies_a_teacher_only_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+        role_repo::revoke(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = clear_structural_lock_pin(&conn, &sessions);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+        assert!(has_structural_lock_pin(&conn, &sessions).unwrap());
+    }
+
+    #[test]
+    fn a_school_head_can_clear_the_structural_lock_pin_reverting_to_unenforced() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        grant_school_head(&conn, &u.id, &s.id);
+        set_structural_lock_pin(&conn, &sessions, "112233").unwrap();
+
+        clear_structural_lock_pin(&conn, &sessions).unwrap();
+
+        assert!(!has_structural_lock_pin(&conn, &sessions).unwrap());
+        // And enforcement reverts too -- no PIN means no gate.
+        assert!(require_structural_lock_unlocked(&conn, &sessions).is_ok());
+    }
+
+    #[test]
+    fn a_pin_set_in_one_school_does_not_unlock_the_gate_for_another_school() {
+        let conn = open_test_db();
+        let sessions_a = SessionManager::new();
+        let (school_a, head_a) = setup_member_with_session(&conn, &sessions_a);
+        grant_school_head(&conn, &head_a.id, &school_a.id);
+        set_structural_lock_pin(&conn, &sessions_a, "112233").unwrap();
+
+        let sessions_b = SessionManager::new();
+        let school_b = school::create(&conn, "Bonifacio High").unwrap();
+        let head_b = user::create_user(&conn, "juan.dc", "password", "Juan Dela Cruz").unwrap();
+        user::add_school_membership(&conn, &head_b.id, &school_b.id).unwrap();
+        login(&conn, &sessions_b, "juan.dc", "password", &school_b.id).unwrap();
+
+        // School B never configured a PIN, so it is unenforced regardless
+        // of what happened in School A.
+        assert!(require_structural_lock_unlocked(&conn, &sessions_b).is_ok());
+    }
+
+    // ---- SF8 Health & Nutrition Engine (ADR-0071, 2026-09-08) ----
+
+    #[test]
+    fn authorize_capability_allows_a_registrar_session_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::REGISTRAR).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageHealthRecords).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_allows_a_school_head_session_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageHealthRecords).is_ok());
+    }
+
+    #[test]
+    fn authorize_capability_denies_a_teacher_for_manage_health_records() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageHealthRecords);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_capability_denies_manage_health_records_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+
+        let result = authorize_capability(&conn, &sessions, Capability::ManageHealthRecords);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    // ---- Master Teacher role (Batch 17): capability boundaries ----
+    //
+    // Holding `master_teacher` alone must never satisfy ANY
+    // `Capability::allowed_roles()` check -- a Master Teacher does not
+    // inherit School-Head-level capabilities (school settings,
+    // structural lock, etc.) merely by holding this role. Rather than
+    // one test per existing capability (which would silently stop
+    // covering a future one), this iterates every variant this module
+    // currently defines -- a new `Capability` added later without also
+    // being added to this list would need to be added here too, but
+    // omitting it here is a visible gap in this test, not a silent one
+    // in production code, since `allowed_roles()` itself is what's
+    // checked, not a duplicate hand-maintained list.
+
+    const ALL_CAPABILITIES: &[Capability] = &[
+        Capability::ManageLearners,
+        Capability::ManageSchoolMembership,
+        Capability::ManageTeachingAssignments,
+        Capability::ManageSectionAdvisories,
+        Capability::ManageSchoolBranding,
+        Capability::ManageStructuralLock,
+        Capability::ManageHealthRecords,
+        Capability::ManageChildProtection,
+        Capability::ManageGradeSubmissionReview,
+        Capability::ManageSchoolCoordinates,
+        Capability::ManageTransferRecords,
+        Capability::CreateDisasterRecoveryBackup,
+        Capability::ManageTeacherOversightAssignments,
+    ];
+
+    #[test]
+    fn holding_master_teacher_alone_grants_no_existing_capability() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+
+        for capability in ALL_CAPABILITIES {
+            let result = authorize_capability(&conn, &sessions, *capability);
+            assert!(
+                matches!(result, Err(AppError::Unauthorized)),
+                "master_teacher alone must not satisfy {capability:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_master_teacher_who_also_holds_teacher_still_gets_no_school_head_capability() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::TEACHER).unwrap();
+
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageSchoolMembership),
+            Err(AppError::Unauthorized)
+        ));
+        assert!(matches!(
+            authorize_capability(&conn, &sessions, Capability::ManageStructuralLock),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn a_school_head_session_is_unaffected_by_master_teacher_being_a_recognized_role() {
+        // Guards against a rebuild-migration regression that would
+        // accidentally narrow `allowed_roles()` matching instead of only
+        // widening the CHECK constraint's accepted role strings.
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, u) = setup_member_with_session(&conn, &sessions);
+        role_repo::grant(&conn, &u.id, &s.id, role_repo::SCHOOL_HEAD).unwrap();
+
+        assert!(authorize_capability(&conn, &sessions, Capability::ManageSchoolMembership).is_ok());
     }
 }

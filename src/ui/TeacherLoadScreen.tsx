@@ -6,6 +6,7 @@ import type { SchoolMember } from "../domain/school-member";
 import type { TeacherLoad } from "../domain/teacher-load";
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
+import { Kpi, KpiStrip } from "./components/KpiStrip";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
@@ -145,20 +146,14 @@ export function TeacherLoadScreen({
         <Loading label="Loading teaching load…" />
       ) : error || !teacherLoad ? null : (
         <>
-          <dl className="attendance-count">
-            <div>
-              <dt>Assignments</dt>
-              <dd>{teacherLoad.assignmentCount}</dd>
-            </div>
-            <div>
-              <dt>Distinct subjects</dt>
-              <dd>{teacherLoad.distinctSubjectCount}</dd>
-            </div>
-            <div>
-              <dt>Weekly instructional time</dt>
-              <dd>{formatMinutes(teacherLoad.weeklyInstructionalMinutes)}</dd>
-            </div>
-          </dl>
+          <KpiStrip>
+            <Kpi label="Assignments" value={teacherLoad.assignmentCount} />
+            <Kpi label="Distinct subjects" value={teacherLoad.distinctSubjectCount} />
+            <Kpi
+              label="Weekly instructional time"
+              value={formatMinutes(teacherLoad.weeklyInstructionalMinutes)}
+            />
+          </KpiStrip>
 
           {assignments.length > 0 && (
             <>

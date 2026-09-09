@@ -62,7 +62,7 @@ describe("SchoolLogoApplicationService", () => {
   it("setLogo rejects an oversized upload before calling the repository", async () => {
     const repo = new FakeSchoolLogoRepository();
     const service = new SchoolLogoApplicationService(repo);
-    const tooBig = new Uint8Array(512 * 1024 + 1);
+    const tooBig = new Uint8Array(48 * 1024 + 1);
 
     await expect(service.setLogo("image/png", tooBig)).rejects.toThrow(ValidationError);
     expect(repo.setCalls).toHaveLength(0);

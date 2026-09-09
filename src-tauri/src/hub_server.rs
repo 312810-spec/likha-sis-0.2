@@ -167,27 +167,160 @@ pub fn should_listen(conn: &Connection) -> AppResult<bool> {
     Ok(false)
 }
 
+/// Batch 14 sub-item 1: restart-on-failure backoff for the in-process hub
+/// listener supervisor -- see `spawn`'s own doc comment for how this is
+/// used. Deliberately a pure function of the attempt count (no sleeping,
+/// no I/O, no Tauri/tokio dependency) so its schedule can be proven by a
+/// plain `cargo test` without spawning a real listener or waiting in real
+/// time.
+///
+/// This is the "codable core" half of Batch 14 sub-item 1 (hub daemon
+/// resilience): it hardens the ALREADY-RUNNING app process against its own
+/// listener task failing (a transient bind conflict, the OS momentarily
+/// reclaiming the socket, an unexpected `axum::serve` error) by retrying
+/// with bounded exponential backoff instead of the previous behavior of
+/// logging once and permanently giving up on that address for the rest of
+/// the process's life. It does NOT and cannot address the whole app
+/// process crashing or the school-laptop rebooting -- LIKHA ships as a
+/// normal user-launched Tauri desktop app (see `tauri.conf.json`'s
+/// `bundle.targets: "all"`; no Windows Service Control Manager wrapper
+/// exists in this codebase's packaging), so OS-level "relaunch the whole
+/// app after it dies, or on machine startup" is necessarily an
+/// OS-scheduling concern outside this process's own control -- see
+/// `ops/hub-daemon-recovery-setup.ps1` for that hardware-only remainder
+/// and `docs/adr/0085-hub-daemon-resilience.md` for the full decision
+/// record of why an in-process supervisor plus a Scheduled Task (not a
+/// Windows Service rewrite) was chosen.
+pub mod supervisor {
+    use std::time::Duration;
+
+    /// Backoff floor: retry almost immediately after the very first
+    /// failure, since most real-world causes (a second app launch that
+    /// briefly held the port, an interface flapping for a moment) clear
+    /// within a second.
+    const BASE_MS: u64 = 1_000;
+    /// Backoff ceiling: never wait longer than this between attempts, so a
+    /// persistently-failing listener (e.g. the port is permanently taken
+    /// by something else) still retries often enough to recover promptly
+    /// once the real underlying cause clears, without busy-looping.
+    const CAP_MS: u64 = 60_000;
+    /// `2^SHIFT_CAP * BASE_MS` already meets/exceeds `CAP_MS` for the
+    /// current constants (`2^6 * 1000 = 64_000 >= 60_000`) -- capping the
+    /// shift itself (rather than relying solely on the final `.min()`)
+    /// keeps the intermediate `1u64 << shift` computation from ever
+    /// needing to reason about large shift values as the constants evolve.
+    const SHIFT_CAP: u32 = 6;
+
+    /// Attempt `0` is the delay before the very first retry (i.e. after
+    /// the first failure), `1` before the second, and so on. Never
+    /// returns zero and never exceeds `CAP_MS` -- both are unit-tested
+    /// below, not just asserted in this comment.
+    pub fn backoff_for_attempt(attempt: u32) -> Duration {
+        let shift = attempt.min(SHIFT_CAP);
+        let millis = BASE_MS.saturating_mul(1u64 << shift);
+        Duration::from_millis(millis.min(CAP_MS))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn first_attempt_backs_off_by_the_base_delay() {
+            assert_eq!(backoff_for_attempt(0), Duration::from_millis(BASE_MS));
+        }
+
+        #[test]
+        fn backoff_doubles_with_each_attempt_before_the_cap() {
+            assert_eq!(backoff_for_attempt(1), Duration::from_millis(2_000));
+            assert_eq!(backoff_for_attempt(2), Duration::from_millis(4_000));
+            assert_eq!(backoff_for_attempt(3), Duration::from_millis(8_000));
+            assert_eq!(backoff_for_attempt(4), Duration::from_millis(16_000));
+            assert_eq!(backoff_for_attempt(5), Duration::from_millis(32_000));
+        }
+
+        #[test]
+        fn backoff_never_exceeds_the_cap_however_many_attempts_have_failed() {
+            for attempt in [6, 7, 20, 1_000, u32::MAX] {
+                let wait = backoff_for_attempt(attempt);
+                assert!(
+                    wait <= Duration::from_millis(CAP_MS),
+                    "attempt {attempt} produced {wait:?}, exceeding the cap"
+                );
+            }
+        }
+
+        #[test]
+        fn backoff_is_never_zero_so_a_persistent_failure_can_never_busy_loop() {
+            for attempt in 0..20 {
+                assert!(backoff_for_attempt(attempt) > Duration::ZERO);
+            }
+        }
+
+        #[test]
+        fn backoff_is_monotonically_non_decreasing_in_the_attempt_count() {
+            let mut previous = Duration::ZERO;
+            for attempt in 0..20 {
+                let wait = backoff_for_attempt(attempt);
+                assert!(wait >= previous, "attempt {attempt} regressed backoff");
+                previous = wait;
+            }
+        }
+    }
+}
+
 /// Spawns one listener task bound to `bind_addr`, reusing the `tokio`
 /// runtime Tauri already runs internally (`tauri::async_runtime::spawn`,
-/// not a second/parallel runtime). A bind failure (e.g. the port is
-/// already in use, perhaps by a second launch of this same app, or an
-/// address that changed after enumeration ran) is logged, never a panic
-/// -- a local-first desktop app must keep working even when sync is
-/// unavailable, and a failure on one interface must never take down the
-/// others (each address gets its own independent task).
+/// not a second/parallel runtime).
+///
+/// **Batch 14 sub-item 1**: unlike the original version of this function
+/// (which logged a bind/serve failure once and then permanently abandoned
+/// this address for the rest of the process's life), this now retries
+/// forever with `supervisor::backoff_for_attempt`'s bounded exponential
+/// schedule -- a transient failure (a brief port conflict, a momentary
+/// interface hiccup) recovers on its own without requiring the whole app
+/// to be relaunched. The retry count resets to zero after any successful
+/// bind + serve start, so a listener that has been healthy for a while
+/// and then fails again starts backing off from the beginning, not from
+/// wherever a much earlier failure streak left off. A failure on one
+/// interface's task never affects any other address's independent task --
+/// unchanged from before this change.
+///
+/// This loop never exits by itself (only dropping/aborting the
+/// `tauri::async_runtime` task would stop it, which nothing in this
+/// codebase currently does -- the listener is meant to run for the whole
+/// app lifetime). It still cannot recover from the *entire app process*
+/// crashing or the machine rebooting -- see this module's own top-level
+/// doc comment and `ops/hub-daemon-recovery-setup.ps1` for that
+/// necessarily-OS-level remainder.
 pub fn spawn(db: Arc<Mutex<Connection>>, sspk: SharedSspk, bind_addr: SocketAddr) {
     let app_router = router(HubServerState { db, sspk });
     tauri::async_runtime::spawn(async move {
-        match tokio::net::TcpListener::bind(bind_addr).await {
-            Ok(listener) => {
-                log::info!("hub sync listener bound to {bind_addr}");
-                if let Err(error) = axum::serve(listener, app_router).await {
-                    log::error!("hub sync listener stopped: {error}");
+        let mut attempt: u32 = 0;
+        loop {
+            match tokio::net::TcpListener::bind(bind_addr).await {
+                Ok(listener) => {
+                    log::info!("hub sync listener bound to {bind_addr}");
+                    // A successful bind (even if `serve` fails moments
+                    // later) proves this address is currently usable, so
+                    // the next failure -- if any -- starts backing off
+                    // from the beginning again rather than compounding
+                    // with an old failure streak from long before.
+                    attempt = 0;
+                    if let Err(error) = axum::serve(listener, app_router.clone()).await {
+                        log::error!("hub sync listener stopped: {error}");
+                    }
+                }
+                Err(error) => {
+                    log::error!("hub sync listener failed to bind {bind_addr}: {error}");
                 }
             }
-            Err(error) => {
-                log::error!("hub sync listener failed to bind {bind_addr}: {error}");
-            }
+            let wait = supervisor::backoff_for_attempt(attempt);
+            attempt = attempt.saturating_add(1);
+            log::warn!(
+                "hub sync listener for {bind_addr} will retry in {wait:?} (attempt {attempt})"
+            );
+            tokio::time::sleep(wait).await;
         }
     });
 }

@@ -1,5 +1,66 @@
 # ACTIVE PLAN
 
+## Wave 16 consolidation: Batches 16-18 pushed, PR #55 updated, CI green (2026-09-09)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s "Batch 16" entry (top of file),
+`../LIKHA-SIS-DELIVERY-REPORTS/WAVE-16-FINAL-REPORT.md`. Summary:
+Batch 17 (Master Teacher RBAC, ADR-0089) and Batch 18 (Official School
+Repository / Microsoft 365, ADR-0088) pushed as commits `4bbddce` +
+`7098b9d` (the second fixing a `cargo-deny` license-allowlist gap
+`4bbddce` introduced). PR #55 description updated to cover Batches
+1-18.
+
+Verification actually run this checkpoint:
+
+- `cargo test` (whole crate: `--lib` + all 18 `tests/*.rs` integration
+  binaries + doctests): exit 0, 0 failed.
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean.
+- `npm run quality`: 153 test files, 1401 tests passed.
+- `npm run quality:security` (gitleaks + `cargo deny check` +
+  OSV-Scanner): 3 ok, 0 failed, 0 missing (after the license fix).
+- **CI, fully green matching pair on commit `7098b9d`**: Quality
+  workflow run `34338983401` (Ubuntu job `102425108617`, Windows job
+  `102425108784`, both success) + Security workflow run `34338983450`
+  (cargo-deny, gitleaks, osv-scanner, all success).
+- One CI flake encountered and resolved without a code change: the
+  twin `Quality (Ubuntu)` run on the same commit (`34338979534`) failed
+  3 tests in `tests/section_advisory.rs` with a SQLCipher-init error at
+  binary start — diagnosed as CI-parallelism, confirmed by the passing
+  twin run. Full reasoning in `CURRENT-HANDOFF.md`'s Batch 16 entry.
+
+Pushed to `origin/claude/pending-tasks-batch-vjy67v`. This wave stops
+here per `.claude/rules/autonomous-development.md` — next slice
+(sync client hub-address configurability) recorded but not started.
+
+## SF8 Health & Nutrition Engine (2026-09-08)
+
+Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file),
+`docs/adr/0071-sf8-health-nutrition-engine.md`. Summary: new
+`src-tauri/src/health/{nutrition,consolidation}.rs` domain modules,
+`repository::nutrition`, migration 43 (`nutrition_records`),
+`Capability::ManageHealthRecords`, and 3 new Tauri commands
+(`commands::nutrition`). Decimal-age-in-months/BMI/classification logic
+and the BOSY-vs-EOSY consolidation report are complete and tested; the
+WHO 2007 numeric growth-standard tables are deliberately unpopulated
+pending a verified source (open verification debt, not silently
+skipped). No frontend UI or export built this slice.
+
+Verification actually run this session:
+
+- `cargo test` (whole crate: `--lib` + every `tests/*.rs` integration
+  binary, from an existing `target/`): 1119 lib tests passed (39 new),
+  every integration binary exited green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings`: clean on the first run.
+- `cargo fmt --check`: found drift in this slice's own new files, fixed
+  with plain `cargo fmt`, re-ran `--check` clean.
+- `npm run quality`: typecheck/lint/format:check/architecture-check
+  passed; `check:deadcode` (`knip`) reported 0 findings; `vitest run`
+  passed (111 test files, 1099 tests, unchanged — no frontend file
+  touched by this slice).
+
+Not pushed; commit is local only per this task's batch-mode instruction.
+
 ## GradingPeriod sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

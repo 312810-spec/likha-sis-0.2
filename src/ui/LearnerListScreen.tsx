@@ -495,7 +495,7 @@ export function LearnerListScreen({
                         inputMode="numeric"
                         value={editLrn}
                         onChange={(event) => setEditLrn(event.target.value)}
-                        placeholder="12-digit Learner Reference Number"
+                        placeholder="e.g. 123456789012"
                       />
                     </div>
                     <div className="field">
@@ -697,7 +697,7 @@ export function LearnerListScreen({
               inputMode="numeric"
               value={lrn}
               onChange={(event) => setLrn(event.target.value)}
-              placeholder="12-digit Learner Reference Number"
+              placeholder="e.g. 123456789012"
             />
           </div>
           <div className="field">

@@ -55,6 +55,14 @@ pub enum AppError {
     /// error text — a malformed/corrupted workbook's internal error
     /// detail must never cross the Tauri IPC boundary.
     FormGeneration(String),
+    /// A repository-level domain-validation failure that a database
+    /// `CHECK` constraint cannot express or should not be relied on alone
+    /// to catch (e.g. an unparseable sex/date value, or a computed
+    /// age/BMI that could not be derived) -- see `health::nutrition` and
+    /// `repository::nutrition`. Same discipline as `Import`/
+    /// `FormGeneration`: a fixed, generic category message, never raw
+    /// caller-supplied content.
+    InvalidInput(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -70,6 +78,7 @@ impl std::fmt::Display for AppError {
             AppError::AlreadyInitialized => write!(f, "already initialized"),
             AppError::Import(msg) => write!(f, "import error: {msg}"),
             AppError::FormGeneration(msg) => write!(f, "form generation error: {msg}"),
+            AppError::InvalidInput(msg) => write!(f, "invalid input: {msg}"),
         }
     }
 }
@@ -125,6 +134,7 @@ impl Serialize for AppError {
             AppError::AlreadyInitialized => "already_initialized",
             AppError::Import(_) => "import_error",
             AppError::FormGeneration(_) => "form_generation_error",
+            AppError::InvalidInput(_) => "invalid_input",
         };
         serializer.serialize_str(category)
     }

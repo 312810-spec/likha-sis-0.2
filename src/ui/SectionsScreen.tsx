@@ -32,6 +32,12 @@ interface SectionsScreenProps {
   /** Open Section Adviser Management for one section (Wave 3G). Same
    * handoff pattern as `onManageAssignments`. */
   onManageAdviser: (sectionId: string, sectionName: string) => void;
+  /** Open the Visual Timetable / Class Program Builder for one section
+   * (Batch 4, ADR-0075). Same handoff pattern as `onManageAssignments`.
+   * Optional, like `exportService` above -- existing tests that only
+   * exercise section/enrollment management don't need to supply it, and
+   * the button simply doesn't render without it. */
+  onManageTimetable?: (sectionId: string, sectionName: string) => void;
 }
 
 function todayAsIsoDate(): string {
@@ -49,6 +55,7 @@ export function SectionsScreen({
   onOpenRoster,
   onManageAssignments,
   onManageAdviser,
+  onManageTimetable,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
   const [sections, setSections] = useState<Section[]>([]);
@@ -228,6 +235,18 @@ export function SectionsScreen({
               >
                 Manage adviser
               </button>
+              {onManageTimetable && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => onManageTimetable(section.id, section.name)}
+                    aria-label={`Open visual timetable for ${section.name}`}
+                  >
+                    Visual timetable
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>

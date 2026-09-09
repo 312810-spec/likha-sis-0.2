@@ -249,6 +249,134 @@ describe("ConflictReviewScreen", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows real field values for the six previously-'unknown' entity kinds, not a generic placeholder", async () => {
+    const typedConflicts: ConflictReviewSummary[] = [
+      {
+        id: "cr-lp",
+        entityKind: "lesson_plan",
+        entityId: "lp-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "lessonPlan",
+          planDate: "2026-09-07",
+          learningCompetency: "Add fractions",
+          learningCompetencyCode: "M7NS-Ig-1",
+          learningObjectives: "Add fractions with unlike denominators",
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+      {
+        id: "cr-nr",
+        entityKind: "nutrition_record",
+        entityId: "nr-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "nutritionRecord",
+          learnerId: "l-1",
+          schoolYear: "2026-2027",
+          period: "BOSY",
+          heightM: 1.2,
+          weightKg: 27.5,
+          nutritionalStatus: "NORMAL",
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+      {
+        id: "cr-bi",
+        entityKind: "behavioral_incident",
+        entityId: "bi-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "behavioralIncident",
+          learnerId: "l-1",
+          severityTier: "Level1",
+          category: "Tardiness",
+          description: "Arrived late five times",
+          incidentDate: "2026-09-01",
+          resolvedAt: null,
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+      {
+        id: "cr-ii",
+        entityKind: "incident_intervention",
+        entityId: "ii-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "incidentIntervention",
+          incidentId: "bi-1",
+          entryType: "Intervention",
+          note: "Scheduled counseling session",
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+      {
+        id: "cr-gs",
+        entityKind: "grade_submission",
+        entityId: "gs-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "gradeSubmission",
+          classRecordId: "cr-1",
+          status: "Approved",
+          submittedAt: "2026-09-01T08:00:00.000Z",
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+      {
+        id: "cr-gsn",
+        entityKind: "grade_submission_note",
+        entityId: "gsn-1",
+        deviceId: "d-1",
+        createdAt: "2026-09-01T08:00:00.000Z",
+        submittedBaseVersion: 1,
+        currentHubVersion: 2,
+        incoming: {
+          kind: "gradeSubmissionNote",
+          submissionId: "gs-1",
+          noteType: "Feedback",
+          note: "Reviewed and cleared",
+        },
+        incomingUnavailableReason: null,
+        local: null,
+      },
+    ];
+    renderScreen(new FakeConflictReviewRepository(typedConflicts));
+
+    expect(await screen.findByText("Lesson plan conflict")).toBeInTheDocument();
+    expect(screen.getByText(/Add fractions with unlike denominators/)).toBeInTheDocument();
+    expect(screen.getByText(/27.5 kg/)).toBeInTheDocument();
+    expect(screen.getByText(/Arrived late five times/)).toBeInTheDocument();
+    expect(screen.getByText(/Scheduled counseling session/)).toBeInTheDocument();
+    expect(screen.getByText("Status: Approved")).toBeInTheDocument();
+    expect(screen.getByText(/Reviewed and cleared/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "This record was received and can be applied, but has no detailed preview yet.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen();
     await screen.findByText("Learner conflict");

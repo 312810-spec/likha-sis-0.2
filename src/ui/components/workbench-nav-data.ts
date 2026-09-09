@@ -6,11 +6,13 @@ export type SignedInTab =
   | "teaching-assignments"
   | "section-adviser"
   | "schedule-meetings"
+  | "section-timetable"
   | "sf1-import"
   | "my-day"
   | "today-classes"
   | "attendance"
   | "subject-attendance"
+  | "formative-assessment"
   | "subject-monitor"
   | "adviser-view"
   | "teacher-load"
@@ -24,7 +26,17 @@ export type SignedInTab =
   | "devices"
   | "conflict-review"
   | "sync-status"
-  | "school-branding";
+  | "school-branding"
+  | "certificates"
+  | "seating-chart"
+  | "calendar"
+  | "consolidated-grades"
+  | "id-card"
+  | "transfers"
+  | "guidance-records"
+  | "grade-review"
+  | "teacher-oversight"
+  | "document-repository";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -41,11 +53,13 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "teaching-assignments": "Teaching Assignments",
   "section-adviser": "Section Adviser",
   "schedule-meetings": "Class Schedule",
+  "section-timetable": "Visual Timetable",
   "sf1-import": "Import Learners (SF1)",
   "my-day": "My Day",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
+  "formative-assessment": "Formative Assessment (ESRU)",
   "subject-monitor": "My Subject Attendance",
   "adviser-view": "My Advisory Overview",
   "teacher-load": "My Teaching Load",
@@ -60,6 +74,16 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "conflict-review": "Review Sync Conflicts",
   "sync-status": "Sync Status",
   "school-branding": "School Logo",
+  certificates: "Certificates & Awards",
+  "seating-chart": "Seating Chart",
+  calendar: "School Calendar",
+  "consolidated-grades": "Consolidated Grades Matrix",
+  "id-card": "Student ID Card",
+  transfers: "Transfers In/Out",
+  "guidance-records": "Guidance Records",
+  "grade-review": "Grade Review",
+  "teacher-oversight": "Teacher Oversight Assignments",
+  "document-repository": "Official School Repository",
 };
 
 interface NavGroup {
@@ -83,7 +107,13 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
-    tabs: [tab("my-day"), tab("today-classes"), tab("attendance"), tab("subject-attendance")],
+    tabs: [
+      tab("my-day"),
+      tab("today-classes"),
+      tab("attendance"),
+      tab("subject-attendance"),
+      tab("formative-assessment"),
+    ],
   },
   {
     label: "Class Overview",
@@ -96,15 +126,32 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Learner Records",
-    tabs: [tab("learners"), tab("sections"), tab("sf1-import")],
+    tabs: [
+      tab("learners"),
+      tab("sections"),
+      tab("sf1-import"),
+      tab("transfers"),
+      tab("guidance-records"),
+    ],
   },
   {
     label: "Grading",
-    tabs: [tab("grading-periods"), tab("class-records")],
+    tabs: [
+      tab("grading-periods"),
+      tab("class-records"),
+      tab("consolidated-grades"),
+      tab("grade-review"),
+    ],
   },
   {
     label: "Creation Studio",
-    tabs: [tab("lesson-plans")],
+    tabs: [
+      tab("lesson-plans"),
+      tab("certificates"),
+      tab("seating-chart"),
+      tab("calendar"),
+      tab("id-card"),
+    ],
   },
   {
     label: "Sync",
@@ -118,6 +165,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       tab("school-members"),
       tab("devices"),
       tab("school-branding"),
+      tab("teacher-oversight"),
+      tab("document-repository"),
     ],
   },
 ];

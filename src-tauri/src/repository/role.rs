@@ -14,6 +14,20 @@ use crate::error::AppResult;
 pub const TEACHER: &str = "teacher";
 pub const REGISTRAR: &str = "registrar";
 pub const SCHOOL_HEAD: &str = "school_head";
+/// The real Master Teacher role (Batch 17, ADR-0073's superseding
+/// addendum) -- resolves `docs/product/OWNER-DECISIONS-NEEDED.md` item 1
+/// for real: a Master Teacher oversees a set of teachers
+/// (`repository::teacher_oversight_assignment`) and approves what they
+/// submit, starting with grade submissions
+/// (`repository::grade_submission`), with School Head retaining final
+/// lock authority. Added by widening migration 16's CHECK constraint in
+/// migration 59, exactly as that migration's own comment anticipated --
+/// no change to this type or to any existing function signature below.
+/// Holding this role grants NO `Capability::allowed_roles()` membership
+/// by itself -- see `auth::Capability`'s doc comments -- a Master
+/// Teacher does not inherit School-Head-level capabilities (school
+/// settings, structural lock, etc.) merely by holding this role.
+pub const MASTER_TEACHER: &str = "master_teacher";
 
 /// Grants `role` to `user_id` within `school_id`. A user may hold more
 /// than one role in the same school at once (e.g. Teacher + a future
@@ -302,6 +316,29 @@ mod tests {
         revoke(&conn, &user_id, &school_id, SCHOOL_HEAD).unwrap();
 
         assert_eq!(count_holders(&conn, &school_id, SCHOOL_HEAD).unwrap(), 0);
+    }
+
+    #[test]
+    fn grant_then_has_any_role_finds_the_granted_master_teacher_role() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        grant(&conn, &user_id, &school_id, MASTER_TEACHER).unwrap();
+
+        assert!(has_any_role(&conn, &user_id, &school_id, &[MASTER_TEACHER]).unwrap());
+        assert!(!has_any_role(&conn, &user_id, &school_id, &[SCHOOL_HEAD]).unwrap());
+    }
+
+    #[test]
+    fn a_master_teacher_may_also_hold_the_teacher_role_at_the_same_time() {
+        let conn = open_test_db();
+        let (user_id, school_id) = seed_member(&conn);
+
+        grant(&conn, &user_id, &school_id, TEACHER).unwrap();
+        grant(&conn, &user_id, &school_id, MASTER_TEACHER).unwrap();
+
+        assert!(has_any_role(&conn, &user_id, &school_id, &[TEACHER]).unwrap());
+        assert!(has_any_role(&conn, &user_id, &school_id, &[MASTER_TEACHER]).unwrap());
     }
 
     #[test]

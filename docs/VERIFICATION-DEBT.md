@@ -1,5 +1,607 @@
 # Verification Debt
 
+## Batch 15: independent security-reviewer dispatch succeeded for real, zero BLOCKING findings (2026-09-09)
+
+Closes the long-standing "independent (non-self) security review owed"
+debt recorded repeatedly since 2026-09-05/07/08 (see the "Batch 1" and
+"Sync payload encryption/key-rotation" entries below). A fresh-context
+`security-reviewer` dispatch this session, instructed to write its full
+findings to a file rather than rely on chat-message relay (which had
+been the actual point of failure in every prior attempt, not the
+reviewer agent itself), completed successfully and produced
+`docs/security-reviews/2026-09-09-batch1-14-independent-review.md`.
+
+**Scope reviewed**: sync payload encryption/key rotation, device
+revocation, school-logo MIME/BLOB handling, the Secondary
+Structural-Lock PIN (ADR-0070), Child Protection/Anecdotal Records
+authorization reuse, sync wiring for all nine sensitive entities added
+this session, the SchoolLogo sync byte-budget shrink (ADR-0081), the
+disaster-recovery backup mechanism (ADR-0087), and the hub daemon
+supervisor (ADR-0085) — plus an explicit cross-check for recurrence of
+this project's two previously-fixed defect classes (unauthenticated
+bootstrap self-grant; SELECT-then-act singleton-guard race). **Zero
+BLOCKING findings.** Two non-blocking notes recorded in the report
+itself: sync child-records (`IncidentIntervention`/
+`GradeSubmissionNote`/`AnecdotalRecordFollowup`) don't verify their
+parent row exists locally before inserting (a data-integrity nuisance,
+not a tenant-isolation gap, since the SSPK/decryption boundary already
+blocks cross-school payloads); and the hub supervisor's retry-forever
+design has no TLS-error carve-out, currently moot since this listener
+has no TLS layer at all.
+
+**Still open, not closed by this entry**: the original Batch 1 items
+(sync payload encryption, device revocation, logo upload) were
+self-reviewed on 2026-09-08 before this pass — this session's
+independent review re-confirmed them for real this time, so that
+specific debt is now closed. Any _future_ security-sensitive change
+still needs its own independent review; this entry does not grant a
+standing exemption.
+
+## Batch 14: hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09)
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit-locally-only (no push,
+PR #55 untouched). This batch corrects a prior-session mistake: the three
+Tier 1.2 items below (recorded 2026-09-08, see this file's own "Batch 1"
+entry) were marked as pure verification-debt on the assumption they
+needed real Windows hardware end to end. Each actually had a genuinely
+codable core; only a genuinely hardware-only remainder is still owed.
+
+### Sub-item 1 — Hub daemon resilience
+
+**Now tested by CI**: `hub_server::spawn` retries forever on
+bind/serve failure with a new `hub_server::supervisor::backoff_for_attempt`
+schedule (exponential, 1s→60s cap, reset after a healthy bind) — the
+listener previously logged one failure and permanently gave up on that
+address. 5 new unit tests in `src-tauri/src/hub_server.rs`
+(`cargo test --lib hub_server::supervisor`) prove the schedule directly:
+never zero, doubles correctly, capped, monotonically non-decreasing.
+
+**Still needs a human on real hardware**: this in-process fix cannot
+help if the WHOLE `LIKHA-SIS.exe` process crashes or the machine
+reboots — that is inherently OS-level. `ops/hub-daemon-recovery-setup.ps1`
+(a Windows Scheduled Task registrar with restart-on-failure settings) is
+reviewed but has never executed against a real Windows Task Scheduler —
+no `pwsh` is available in this Linux sandbox. `ops/hub-daemon-recovery-runbook.md`
+is the exact manual witness steps (logon-launch, crash-restart,
+listener-rebind-after-a-forced-port-conflict, reboot) an ICT coordinator
+must perform once on the real hub laptop. See
+`docs/adr/0085-hub-daemon-resilience.md`.
+
+### Sub-item 2 — Hub hardware gates (BitLocker/firewall/patch)
+
+**Now written and reviewed**: `ops/hub-hardware-gate-audit.ps1`, a
+read-only, non-destructive script checking BitLocker status, an inbound
+firewall rule for the hub sync port (7878), and Windows Update
+pending-patch age. Its decision logic (`Get-BitLockerGateResult`,
+`Get-FirewallGateResult`, `Test-PortInRuleRange`, `Get-PatchGateResult`)
+is deliberately separated from live data-fetching, and a `-DryRun` mode
+exercises it against synthetic pass/mixed/fail fixtures without touching
+any real Windows API. `ops/hub-hardware-gate-audit.Tests.ps1` is a Pester
+suite asserting every PASS/WARN/FAIL branch against fixture inputs.
+
+**Not executed in this session**: no `pwsh`/PowerShell exists in this
+Linux sandbox, so neither the script nor its Pester suite has ever
+actually run — reviewed line-by-line against documented cmdlet
+contracts, not observed against a real Windows machine.
+`ops/hub-hardware-gate-audit-runbook.md` is the human-executable
+verification a school IT admin must perform once (run the real audit,
+run `Invoke-Pester`, confirm output matches expectations). See
+`docs/adr/0086-hub-hardware-gate-audit.md`.
+
+### Sub-item 3 — Disaster Recovery drill
+
+**Now tested by CI**: no encrypted backup/export mechanism existed
+before this batch (confirmed by search — `export::*` only ever produces
+already-visible report CSV/XLSX, `commands::export::export_learner_roster`'s
+own doc comment explicitly disclaims being a database/key backup). Built
+`src-tauri/src/backup.rs` (`create_two_copy_backup`, `verify_backup_copy`)
+using SQLCipher's own `sqlcipher_export()` mechanism (never a raw file
+copy, never a plaintext dump) plus a Tauri command
+(`commands::backup::create_disaster_recovery_backup`, School-Head-gated
+via a new `Capability::CreateDisasterRecoveryBackup`). TDD: the round-trip
+test failed first and caught two real bugs before passing (an uncopied
+`PRAGMA user_version` that made every backup look unmigrated to
+`db::open`, and an ATTACH `KEY` quoting difference that produced a
+working-but-different actual encryption key) — see
+`docs/adr/0087-disaster-recovery-backup-mechanism.md` for both. 11
+automated tests (`cargo test --lib backup::` /
+`cargo test --lib commands::backup::`) prove: two distinct non-empty
+backup files are created; both independently round-trip real data via
+`db::open` with the correct key; deleting one never affects the other;
+neither ever contains plaintext bytes on disk; neither is readable with
+no/wrong key; re-running at the same filename overwrites cleanly.
+
+**Still needs a human on real hardware**: that a School-Head user can
+actually reach this command from the running Windows app, that it writes
+correctly to a real `%APPDATA%` path, and an actual witnessed
+loss-and-restore drill (kill the app, replace the live db file with a
+backup copy, relaunch, verify data). `ops/DR-DRILL-RUNBOOK.md` is the
+exact step-by-step runbook, explicitly separating what CI already proves
+from what remains to witness. No dedicated UI button exists yet for
+triggering a backup (documented as a known deferred follow-up in the
+runbook, not silently dropped) — the drill uses the Tauri devtools
+console as an interim invocation path.
+
+### Verification actually run this batch
+
+`cargo fmt --check` (clean), `cargo clippy --all-targets -- -D warnings`
+(0 warnings), `cargo test` (full crate, see this batch's own commits for
+the exact pass count at each checkpoint). No TypeScript/frontend file was
+touched this batch, so `npm run quality` was not re-run (nothing for it
+to catch). `npm run quality:security`/`quality:ui` were not run this
+batch — no dependency or UI surface changed; not claimed as covered.
+
+## Batch 8 (items 1-7): 7 new/wired screens — `quality:ui` unavailable in this sandbox, native visual/screen-reader pass still owed (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. This batch shipped
+all 7 remaining Batch 8 items (Certificate/Award, Seating Chart,
+Calendar, Consolidated Grades Matrix, weather composition wiring, live
+palette wiring, ID card printable layout), each with real
+typecheck/lint/format/architecture/deadcode/vitest coverage (`npm run
+quality` run and passing after every single commit) and, for item 5's
+Rust changes, a full `cargo test --lib` (1233 passed), `cargo fmt
+--check`, and `cargo clippy --all-targets -- -D warnings`, all clean.
+
+Two things this batch could NOT verify, disclosed here rather than
+implied as covered:
+
+1. **`npm run quality:ui` (Playwright renderer/accessibility smoke)** --
+   attempted once at the end of this batch and failed for an
+   environment reason, not a code defect: `browserType.launch` reports
+   no Chromium executable at
+   `/opt/pw-browsers/chromium_headless_shell-1237/...`, and
+   `npx playwright install chromium-headless-shell` fails with
+   `403 request blocked: no rule or allowlist entry allows host
+"cdn.playwright.dev"` -- this sandbox's network egress does not
+   allowlist Playwright's browser-download CDN. This is a sandbox
+   limitation, confirmed by attempting the actual fix the tool itself
+   suggests, not a code problem in any of the 7 screens shipped this
+   batch. Retry `npm run quality:ui` in an environment with that host
+   allowlisted (or Playwright browsers pre-installed).
+2. **Native visual / screen-reader inspection** of all 7 new/changed
+   screens (`CertificateAwardScreen`, `SeatingChartScreen`,
+   `CalendarScreen`, `ConsolidatedGradesScreen`, `IdCardScreen`, the
+   `SchoolBrandingScreen` "School location" addition,
+   `WeatherAdvisoryBanner`, and the live-palette dark-mode token
+   override) -- unchanged from every prior batch's disclosed limitation:
+   this sandbox has no browser/screenshot tool for the compiled native
+   Tauri binary and no Windows screen reader. Only jsdom/`axe-core`
+   structural checks ran (every new component's own `*.test.tsx`). Adds
+   8 more screens to the existing native-pass backlog described under
+   "Native Visual & Screen-Reader Inspection" below -- does not newly
+   discover the gap, just grows its scope.
+
+Everything else in this batch's own completion bar (unit/component
+tests, architecture boundary, dead-code, Rust test/clippy/fmt) is real,
+not disclosed debt.
+
+## Batch 7 (Tier 5) — audit/documentation pass only, no feature work; Tier 5's three items confirmed still genuinely blocked (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. This batch is the
+final one of the multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md`; Tier 5's three items are not
+buildable feature work in this sandbox (native hardware, a new platform
+target requiring its own architecture decision, and an owner-provided
+prerequisite), so this batch audited and corrected this file instead of
+attempting to close any of them.
+
+1. **Native Visual & Screen-Reader Inspection** -- re-confirmed accurate,
+   not attempted. The real state, cross-checked across this file's own
+   entries, is neither "done" nor "nothing has ever been checked":
+   - A narrow, real, human-driven NVDA pass happened once on the user's
+     actual Windows machine (2026-09-07, see "First-ever native NVDA
+     pass on the compiled Tauri binary" further down this file) covering
+     main-nav announcement, the Devices screen's remove-device
+     confirmation, Sync Status/Conflict Review reachability, and
+     Tab/Shift+Tab order through one form. Reported as working, but a
+     single brief walkthrough with a plain "everything works" report, no
+     saved Speech Viewer transcript, no per-screen sign-off.
+   - A visual (not screen-reader) pass closed 2026-09-01 for four
+     screens, since superseded by the Wave 1 UI redesign (ADR-0064) --
+     see "Native visual / screen-reader inspection" further down.
+   - Every screen shipped across Batches 3-7 of this session
+     (`SectionTimetableScreen`, the redesigned `Sidebar`/`TopBar`, and
+     every UI-deferred Batch 5 item once its screen eventually ships) has
+     had **zero** native visual or screen-reader verification -- only
+     jsdom/`axe-core` structural checks (`npm run quality`'s vitest
+     suite). This sandbox still has no browser/screenshot tool for the
+     compiled native Tauri binary and no Windows screen reader --
+     confirmed again this batch, not newly discovered.
+   - Checked `docs/CURRENT-HANDOFF.md` and
+     `docs/product/MASTER-TASK-INVENTORY.md` for any place that could
+     read as claiming this comprehensive pass is done: none found. The
+     Tier 5 line item's wording ("Comprehensive screen-reader pass ...
+     across all 25+ screens") was already accurate and unchecked; no
+     change was needed to it beyond adding a checkbox for format
+     consistency with the rest of that document (see below). Not
+     attempted or simulated this batch, per this batch's own
+     instruction.
+2. **Android Platform Architecture Proof** -- no code, config, Gradle
+   file, or Rust Android target added. Wrote a scoping note (not a
+   decision) at
+   `docs/research/2026-09-08-android-architecture-scoping.md` listing
+   what a real Android architecture decision needs to weigh: a secure
+   key-storage adapter equivalent to the current DPAPI approach
+   (Android Keystore / Jetpack Security `EncryptedSharedPreferences`,
+   with the same fail-closed guarantee `security-privacy.md` requires),
+   touch-optimized layout implications for the pointer/keyboard-oriented
+   UI shipped in Batches 4-5 (hover affordances, click-to-arm
+   interactions, native `title`-attribute tooltips, untested touch
+   target sizing), the Tauri 2 Android build toolchain question, and the
+   zero-billing distribution constraint. The note explicitly states it
+   is not a decision and that the real 10-scenario architecture-decision
+   process (per `.claude/rules/autonomous-development.md`) is owed
+   before any implementation starts.
+3. **Official School Repository (SharePoint sync)** -- confirmed still
+   correctly recorded as blocked. `docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`
+   already states "Status: Approved product requirement; Microsoft 365
+   integration requires an isolated pilot" and lays out the recommended
+   architecture and a next-best pilot path, but no `Microsoft365DocumentAdapter`,
+   Graph client, or SharePoint-integration code exists anywhere in
+   `src/` or `src-tauri/src/` -- confirmed via search this batch. This is
+   a genuine human approval gate (autonomous-development.md category 2:
+   "external material only the user can provide" -- a school-owned M365
+   tenant and Graph consent) and stays open until the project owner
+   confirms a tenant exists. No SharePoint/Microsoft 365 code was
+   attempted this batch, per this batch's own constraint.
+
+   **Update (Batch 18, 2026-09-09, ADR-0088):** superseded by real
+   engineering built ahead of a live tenant, per explicit owner approval
+   recorded in that ADR. What now exists and is genuinely proven (against
+   mocks, not a live tenant): PKCE OAuth core (`infrastructure::microsoft365::oauth`),
+   a real loopback redirect listener (`redirect_listener`, proven with an
+   actual TCP round trip in this Linux sandbox), DPAPI-protected token
+   storage (`token_store`, Windows-only tests, unverified on this Linux
+   sandbox -- unchanged debt), the app-registration/connection-status and
+   upload-queue persistence (`repository::microsoft365_config`,
+   `repository::microsoft365_upload_queue`), the School-Head-gated
+   Settings screen (`DocumentRepositoryScreen`), and an opportunistic
+   token-refresh drain command. Genuinely still open: a live OAuth round
+   trip against a real Azure AD tenant (needs the human-approval-gated
+   tenant/consent this item originally tracked), and the Microsoft Graph
+   `driveItem` upload call itself (no destination SharePoint site/library
+   selection exists yet to validate it against) -- both explicitly
+   disclosed in ADR-0088, neither claimed as done.
+
+**Repo-wide sweep for untracked TODO/FIXME/deferred markers** (`src/`,
+`src-tauri/src/`, `docs/adr/`): ran
+`grep -rnE "TODO|FIXME|XXX|HACK|not yet implemented|deferred|not implemented"`
+across both source trees and `docs/adr/`. Every non-test hit found was
+already an existing, deliberately-recorded design note with its own ADR
+or module-doc-comment citation (e.g. `sync_client.rs`'s DPAPI-caching
+scope note, `auth::verify_structural_lock_pin`'s brute-force-mitigation
+deferral already tracked in this file's Batch 1 entry, `subject_attendance.rs`'s
+deliberately-deferred former-roster-member display, `sync_hub.rs`'s
+per-teacher-scope deferral matching ADR-0067's own "What this ADR does
+NOT decide"). Two `db/migrations.rs` comments read as if DO 015 SHS
+Table 10's six weighting groups were "not yet implemented" (lines ~559
+and ~868) -- these are stale text inside earlier, now-immutable applied
+migrations; `docs/PROJECT-MEMORY.md`'s "Grade 12 legacy SHS grading
+closure" entry already confirms migration 12/ADR-0068 actually
+implemented all six groups plus the Grade 12 DO 8 carryover, and
+explicitly warns not to reopen this. No genuinely new, previously
+untracked item was found. Nothing added to this file or the master
+inventory as a result of the sweep beyond this note recording that the
+sweep happened and found nothing new.
+
+**Tier 5 formatting fix**: `docs/product/MASTER-TASK-INVENTORY.md`'s
+Tier 5 section had no `- [ ]` checkboxes (every other tier does),
+which was not itself wrong but was inconsistent enough to risk
+misreading; added `[ ]` to all three items and a pointer to the new
+Android scoping note.
+
+**Verification run this batch**: none of the standard test/build gates
+apply -- no `src/`, `src-tauri/src/`, or dependency changes were made,
+only Markdown documentation and one new research note. `git status`
+confirms the working tree change set is exactly the four docs files
+touched (`docs/VERIFICATION-DEBT.md`, `docs/CURRENT-HANDOFF.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`, plus the new
+`docs/research/2026-09-08-android-architecture-scoping.md`).
+
+## Batch 6 sync scope expansion continued (2026-09-08): quality:security/quality:ui not run, integration-test checkpoint pending
+
+- **`npm run quality:security` (gitleaks + `cargo deny check` +
+  OSV-Scanner) was not run this batch** — no new dependency and no
+  secret-shaped fixture was added, but this is not yet independently
+  confirmed against the actual scan output for this batch's commits.
+- **`npm run quality:ui` (Playwright) was not run** — the only `src/`
+  changes this batch were to `ConflictReviewScreen.tsx`'s existing
+  render logic (a new `case "unknown":` branch and a labels-map
+  addition), not a new screen; `npm run quality` (vitest) covers its
+  existing test suite, which passed, but no fresh Playwright
+  accessibility/renderer pass was run specifically for this change.
+- **RESOLVED**: `cargo test` (full binary, including every
+  `src-tauri/tests/*.rs` integration suite and doc-tests) was run
+  once at the `f85d91d` (GradeSubmission) checkpoint (clean), and the
+  equivalent full run for the final `01d0ac7`
+  (conflict-review-generalization)/`8d84879` (docs) checkpoint
+  finished after this entry was first written — also clean: every
+  integration binary (`assessment`, `attendance_management`, `auth`,
+  `bootstrap`, `class_record`, `enrollment`,
+  `enrollment_concurrency`, `export`, `formgen`, `grading`,
+  `learner_management`, `local_database`, `reference_geo`,
+  `schedule_meeting_management`, `section_advisory`, `sf1_import`,
+  `subject_attendance`, `teaching_assignment_management`) plus
+  doc-tests passed, exit code 0. No debt remaining for this batch's
+  Rust verification.
+
+## Batch 5 (Tier 3.3-3.4): domain-only this batch, no Rust changes, holiday table needs periodic manual update (2026-09-08)
+
+- **`src/domain/ph-holidays.ts`'s holiday table covers SY 2025-2026
+  only** and must be refreshed for each new school year and whenever a
+  new Malacañang proclamation adds/removes a special non-working day —
+  see the module's own doc comment for the sourced proclamations. Islamic
+  holiday dates (Eid'l Fitr, Eid'l Adha) are marked approximate pending
+  each year's specific confirming proclamation.
+- **No Rust/`src-tauri` files were touched this batch** — `cargo fmt
+--check`, `cargo test`, and `cargo clippy` were not run because there
+  was nothing there to verify, not because they were skipped under time
+  pressure. The next slice (Transfers Registry persistence) will need a
+  full `npm run quality:full` pass including these.
+- **`npm run quality:security` and `npm run quality:ui` were not run**
+  this batch — no new dependency was added and no new UI screen exists
+  yet to Playwright-check. Both apply once the next slice's UI screens
+  and (if approved) a QR-rendering dependency land.
+- **Weather integration (`src/infrastructure/open-meteo-weather-client.ts`)
+  has never made a real network call against the live Open-Meteo API in
+  this session** — only its response-parsing/error-handling logic is
+  tested, against a mocked `fetch`. Confirm the real response shape
+  against the live API before wiring a UI screen to it.
+- **ID-card token engine (`src/domain/id-card-token.ts`) has no real
+  secret-key source wired up yet** — tests use an arbitrary imported
+  key. Do not treat the token as production-ready until a real
+  device/school-bound secret is sourced (see ADR-0077).
+
+## Batch 4 (Tier 3.1-3.2): no native visual/screen-reader pass, Playwright unavailable in sandbox, palette extractor not wired to a screen (2026-09-08)
+
+- **`npm run quality:ui` could not run.** `chrome-headless-shell` is not
+  installed in this sandbox
+  (`browserType.launch: Executable doesn't exist at
+/opt/pw-browsers/chromium_headless_shell-1237/...`). Not attempted to
+  work around by installing browsers (out of scope, and this sandbox may
+  not have the needed network/OS access). A future session with a
+  working Playwright install should run it against the new/changed
+  screens (`SectionTimetableScreen`, `Sidebar`, `TopBar`).
+- **No native visual/screen-reader verification of the compiled Tauri
+  binary.** This sandbox has no browser or Windows device. Every new/
+  changed screen this batch (`SectionTimetableScreen`, the collapsible
+  sidebar rail, the theme toggle, the live clock/notification bell/
+  avatar) was verified only via jsdom component tests, including
+  `expectNoAccessibilityViolations` (axe-core) structural checks. That
+  is necessary but not sufficient — a human/screen-reader pass on the
+  actual Windows binary is still owed, per `.claude/rules/testing.md`.
+- **`derivePaletteTokens` (`src/domain/palette.ts`) is fully implemented
+  and unit-tested but not wired to any live screen.** No UI component
+  this batch draws an uploaded school logo to a `<canvas>`, reads its
+  pixels, and feeds them through the pipeline to actually theme the app.
+  The function itself is correct and AA-verified in isolation
+  (`palette.test.ts`); the _integration_ — and therefore any real-logo
+  visual confirmation of the derived tokens — has not happened yet. See
+  ADR-0075.
+- **`curriculum_subject_requirements` (per-subject weekly-minutes
+  requirement) does not exist as persisted data.**
+  `validateSubjectWeeklyMinutes` is correct and tested against whatever
+  `requiredMinutes` figure is passed in, but today that figure comes
+  from a manually-typed number in `SectionTimetableScreen`'s auto-seed
+  form, not from a sourced, verified DepEd curriculum table. Building
+  that table is a DepEd-compliance research task in its own right (the
+  same sourcing-confidence bar this project already applies to SF8's
+  WHO BMI cutoffs) — not attempted this batch.
+- **Real Fraunces/IBM Plex Mono webfonts not adopted.** Token-level
+  serif/mono pairing shipped using system font stacks
+  (`--font-serif`/`--font-mono`); the real webfonts are a flagged,
+  approval-gated follow-up (new `@fontsource` dependency), not silently
+  substituted or silently dropped. See ADR-0075 §2.
+- **No independent security/reliability review requested this batch** —
+  this batch touched no auth/persistence/sync surface (pure UI +
+  `src/domain/timetable.ts`/`palette.ts` pure functions only, reusing
+  existing Rust commands unchanged), so `.claude/rules/security-privacy.md`'s
+  "milestones touching auth, persistence, or sync" review trigger does
+  not apply. Recorded here only for completeness, not as owed debt.
+
+## Batch 3 (Tier 2.3-2.5): DO 006 tier naming unverified, xlsx column layout unverified, no frontend UI (2026-09-08)
+
+- **DO 006, s. 2026 tier naming — LOW confidence.** ADR-0072's
+  `behavioral_incidents.severity_tier` uses a generic 3-level scale
+  (`level_1`/`level_2`/`level_3`) because this session could not
+  confidently source DO 006, s. 2026's own official tier vocabulary
+  from a primary `deped.gov.ph` document within its research budget. A
+  future session should locate and read the actual DO 006 text (or an
+  authoritative secondary source quoting it verbatim); if its real tier
+  names differ, migrate the stored values and update every reference,
+  including ADR-0072.
+- **Scholastic-history `.xlsx` column layout — unverified against an
+  official template.** ADR-0074's `import::scholastic_workbook` column
+  order (LRN, School Year, Grade Level, Subject, Final Grade, Remarks,
+  Source School) is this project's own invented structure — no official
+  DepEd multi-year scholastic-history workbook template was available
+  in this session to verify against, the same disclosed gap
+  `import::workbook` (SF1) already carries for its own layout.
+- **No frontend UI for any of Batch 3's three features.** Child
+  protection incident logging/intervention log, the at-risk dashboard,
+  the scholastic importer's preview/review screen, and the grade
+  submission/review/Principal dashboard screens are all
+  Rust-command-only this session — matching this project's established
+  zero-UI-first precedent for a new domain, but still real, disclosed
+  scope left for a future session.
+- **No independent security review this session** for the new
+  child-protection authorization boundary (real learner PII) —
+  continuing the recurring reviewer-dispatch-harness gap already
+  tracked in this file's Batch 1 entry below. Self-review was performed
+  (see ADR-0072's authorization-model section and the auth test suite);
+  a fresh-context independent review is still owed.
+- **No command-level integration tests** were added for
+  `commands::child_protection`/`commands::grade_submission`/the two new
+  `commands::import` scholastic commands this session — coverage comes
+  from the underlying `repository`/`auth` unit tests plus a manual
+  `cargo build`/`cargo test` pass proving the command layer compiles and
+  wires correctly. A future session should add thin
+  `tests/*.rs`-integration-style coverage exercising the Tauri commands
+  themselves end to end, matching this project's coverage depth for
+  older command modules.
+
+## Batch 2 (Tier 2.1-2.2): SF1/SF9/SF10/Form 137-138 research, WHO growth-standard table not sourced (2026-09-08)
+
+**SF1/SF9/SF10/Form 137-138 research — no new authoritative template
+found, existing gaps unchanged.** Re-searched this session (WebSearch;
+`deped-researcher` agent not available in this sandbox) on top of the
+extensive prior work in ADR-0048/0049/0051/0053/0063:
+
+- **SF1**: no new primary `deped.gov.ph`-hosted SF1 template found.
+  `OFFICIAL_SF1_FIDELITY` remains `NOT_VERIFIED` (`formgen::evidence`,
+  ADR-0051). Every hit remains third-party (Scribd, teacher blogs, SEO
+  aggregator sites) — COMMUNITY tier, never promotable to authoritative
+  per this project's own evidence-gate discipline.
+- **SF9**: no new primary source found either. Multiple 2026-dated
+  secondary sources (deped-click.com, depedtambayanph.net,
+  edufilesph.com) describe a finalized "SF9 Grades 1-12 SY 2026-2027"
+  three-term-aware release and point at
+  `sites.google.com/deped.gov.ph/lsguide/budgets-of-work` as the access
+  point — a real lead, genuinely stronger than prior sessions' complete
+  blank, but this session did not fetch that page's actual file (a
+  Google Sites page behind DepEd's domain, not itself a direct
+  `.xlsx` — no confirmed byte-level content this session). Recorded as
+  a lead for a future session with fetch tooling for that URL;
+  `OFFICIAL_SF9_FIDELITY` stays `NOT_VERIFIED` — a URL that plausibly
+  hosts the real file is not the same as having read it. **No code
+  changed for SF9/SF1 this session** — nothing safely alignable was
+  found, per this project's "do not guess" rule.
+- **SF10**: unchanged from ADR-0053/Wave 2N — SSHS SF10
+  `AuthoritativeSourceConfirmed`/render-fidelity `NotVerified`; JHS
+  MATATAG SF10 still evidence-blocked; pre-MATATAG templates
+  unconfirmed. This project's actual shipped SF10 export
+  (`export::sf10`, ADR-0063) is deliberately a content-based CSV, not a
+  byte-faithful `.xlsx` reproduction, exactly because of this gap — no
+  change needed or made this session.
+- **Form 137/138 reconciliation**: multiple mutually consistent 2026
+  secondary sources (smarteskwela.com, bayaniguro.com, depedph.com,
+  filipinobusinesshub.com) confirm Form 137 was renamed SF10 (permanent
+  academic record) and Form 138 was renamed SF9 (progress report card/
+  card sa magulang) — this project's existing SF9/SF10 naming and
+  scope already match this mapping correctly. Medium confidence (no
+  single primary DepEd issuance fetched, but the mapping is old,
+  well-established, and consistent across every independent secondary
+  source checked, unlike the disputed SF1 layout question above). No
+  code change required — this is a corroboration of an already-correct
+  decision, not a new gap.
+
+**WHO 2007 BMI-for-Age / Height-for-Age numeric growth-standard tables —
+NOT sourced, NOT hardcoded (ADR-0071).** `likha-sis-master`'s
+`bmiForAgeTable.js`/`hfaForAgeTable.js` (the legacy port target) ship a
+full numeric table self-attributed in a comment to "the DepEd School
+Form 8 (SF8) workbook's BMI Tables sheet" — but that attribution was
+never independently verified this session (no primary WHO/DepEd document
+fetched and read), and a spot-check of several rows against this
+session's general knowledge of the published WHO 2007 5-19y BMI-for-age
+reference did not reconcile with confidence (the legacy table's
+normal/overweight cutoffs at 60 months read implausibly high). Per this
+project's own gate #6 (`.claude/rules/autonomous-development.md`) and
+the explicit task instruction not to invent plausible-looking numbers,
+**this table was deliberately NOT ported**. `src-tauri/src/health/
+nutrition.rs`'s `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` return `None`
+unconditionally, with a regression test guarding against a future silent
+flip. Everything else in the SF8 engine (decimal-age-in-months, BMI
+computation, the classification _logic_ given already-resolved cutoffs,
+the BOSY/EOSY consolidation aggregation, persistence, and authorization)
+is fully implemented and tested — only the numeric reference table
+itself is missing. **Owed**: source the real WHO 2007 Growth Reference
+(5-19 years) BMI-for-Age and Height-for-Age tables from a primary
+`who.int` or `deped.gov.ph` document, independently verify a
+representative sample of rows against this project's own general
+knowledge or a second independent source, then populate
+`lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` and update ADR-0071 and this
+entry together. Until then, no real nutrition classification can be
+computed by this feature — a captured measurement's `nutritional_status`/
+`height_for_age_status` will stay `NULL`, which the BOSY/EOSY
+consolidation report already tolerates correctly (a measurement counts
+as "weighed" but lands in no BMI/HFA category bucket).
+
+**SF8 section-scoped Teacher authorization — deferred, by design
+(open)**: `Capability::ManageHealthRecords` currently allows only
+Registrar/School Head, not Teacher, even though DepEd's real workflow
+has a class adviser measure their own section. This project's role
+model has no per-section restriction analog to reuse yet (the
+`authorize_adviser_of_section`/`authorize_own_assignment` pattern other
+features use) — see ADR-0071's "Authorization" section for the full
+reasoning. Revisit once either a real need surfaces or a section-scoped
+health-recording pattern is built for another feature first.
+
+**SF8 frontend UI and CSV/official-form export — not built this
+session**: `docs/adr/0071-sf8-health-nutrition-engine.md` closes the
+Rust-side data model, classification logic, persistence, and
+authorization boundary; a measurement-entry screen, a consolidation
+report view, and any CSV/official-form export of the report remain
+future UI-layer/export-layer slices, matching this project's established
+split between a security/architecture ADR and its later UI slice.
+
+## Batch 1 (Tier 1 Security & Privacy) closeout: reviewer-dispatch fallback, PIN-lock brute-force mitigation, operational/hardware gates (2026-09-08)
+
+**Independent-review debt retained (self-review fallback used, not
+dropped)**: all three Tier 1.1 reviews this batch required (sync payload
+encryption/key rotation, `db::rotate_sspk` device revocation, and the
+school-logo upload path) were attempted via the documented dispatch
+mechanism first; a fresh-context `security-reviewer` subagent could not
+be reached in a way that returned a timely result in this session (the
+same known recurring gap already recorded across several prior ADR-0069
+addenda). Rigorous self-reviews were performed instead, per
+`.claude/rules/autonomous-development.md`'s reviewer-fallback procedure,
+and are recorded in `docs/adr/0070-secondary-structural-lock-pin.md`
+("Independent review" section) and this file's own history. Two of the
+three surfaces (sync payload encryption, `rotate_sspk`) had ALSO already
+received a genuine independent `security-reviewer` dispatch in an
+earlier session (see ADR-0069's 2026-09-05 addenda) that found and fixed
+real findings — this session's self-review only re-confirmed no
+regression against that already-reviewed state, it did not re-review
+from scratch. The school-logo upload path had never been independently
+reviewed before this session; its self-review found and fixed one real
+SHOULD-FIX (MIME-sniffing gap, see ADR-0070). Owed: a fresh independent
+`security-reviewer` pass on all three surfaces once the dispatch harness
+is healthy again — periodically retry per the project's established
+rule, don't let this debt sit forever unattempted.
+
+**Secondary structural-lock PIN — no brute-force mitigation on repeated
+wrong guesses (open, by design deferral, not an oversight)**: unlike
+`auth::password`'s account lockout (`docs/adr/0019-account-lockout.md`),
+`auth::verify_structural_lock_pin` has no attempt-count or lockout
+tracking of its own — an already-authenticated session may attempt the
+PIN an unlimited number of times. Deferred rather than guessed at
+because no established pattern for a _second_, independent lockout
+counter exists in this codebase to reuse without inventing one from
+scratch, and the realistic threat (a legitimate colleague guessing at an
+already-logged-in terminal) is narrower than the login-credential threat
+model account lockout defends against. See ADR-0070's "Alternatives
+considered" for the full reasoning. Revisit if real usage or a future
+review shows this matters in practice.
+
+**Tier 1.2 operational/hardware items — not attempted this session, by
+explicit task scope, not newly discovered**: School-Laptop hub
+daemon/service resilience (Windows service relaunch/reboot persistence),
+hub hardware gates (BitLocker, firewall rules, patch management on the
+physical hub machine), and the disaster-recovery drill (two-copy
+encrypted backup creation and a witnessed restoration drill) all require
+real Windows hardware/operational access this sandbox does not have.
+These were already implicitly covered by this file's existing "Recovery
+scenarios needing real hardware" and "Native Tauri WebDriver E2E"
+entries below in spirit, but are recorded explicitly here, by name,
+against `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1.2 list, so a
+future session can find them without re-deriving which inventory items
+they map to.
+
+**Correction (2026-09-09, Batch 14, see this file's own top entry)**:
+this framing conflated "needs a human to witness it once on real
+hardware" with "nothing here is codable" — that was wrong. Each of the
+three items had a genuinely codable core (the hub listener's own
+restart-on-failure logic; a PowerShell audit script's decision logic; the
+full backup-create-verify-restore round trip) that a later session built
+and proved with real automated tests, leaving only the actually-hardware-only
+remainder (an OS-level Scheduled Task actually firing on a real reboot; a
+PowerShell script actually querying live BitLocker/firewall/WSUS APIs; a
+human physically carrying out a loss-and-restore drill) genuinely
+undone. See this file's top "Batch 14" entry for the accurate, corrected
+split.
+
 ## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
 
 Follow-up on the BLOCKING finding fixed earlier this session (see the

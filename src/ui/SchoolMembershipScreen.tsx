@@ -40,6 +40,8 @@ function roleLabel(role: string): string {
       return "Registrar";
     case "teacher":
       return "Teacher";
+    case "master_teacher":
+      return "Master Teacher";
     default:
       return role;
   }

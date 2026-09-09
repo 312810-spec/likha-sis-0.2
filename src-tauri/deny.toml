@@ -49,6 +49,15 @@ allow = [
   "CC0-1.0",
   "Zlib",
   "MPL-2.0",
+  # webpki-root-certs (Mozilla's root CA bundle data), pulled in
+  # transitively via rustls-platform-verifier -> reqwest's `rustls`
+  # feature (ADR-0088, Batch 18's Microsoft 365 OAuth client -- the
+  # first reqwest caller to leave loopback and need a real TLS
+  # backend). CDLA-Permissive-2.0 is the Linux Foundation's Community
+  # Data License Agreement, permissive terms (reproduce/distribute/
+  # modify/sublicense) applied to a root-certificate *data* bundle, not
+  # executable code -- not a copyleft or paid-license concern.
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 # `app` (this crate) is never published to a registry — see `publish =

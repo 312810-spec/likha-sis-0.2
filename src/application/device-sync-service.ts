@@ -21,4 +21,19 @@ export class DeviceSyncApplicationService {
     }
     return this.devices.revokeDevice(target);
   }
+
+  getHubBaseUrl(): Promise<string | null> {
+    return this.devices.getHubBaseUrl();
+  }
+
+  /** Trims and treats an empty string exactly like `null` (clears the
+   * setting) before ever calling the repository — the actual
+   * scheme/host format check is the backend's alone
+   * (`commands::device_sync::validate_hub_base_url`), since duplicating
+   * URL-parsing logic here would just be a second, possibly-diverging
+   * copy of the same rule. */
+  setHubBaseUrl(hubBaseUrl: string | null): Promise<void> {
+    const trimmed = hubBaseUrl?.trim() ?? "";
+    return this.devices.setHubBaseUrl(trimmed.length === 0 ? null : trimmed);
+  }
 }

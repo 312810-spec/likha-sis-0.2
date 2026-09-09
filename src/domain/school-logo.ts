@@ -19,5 +19,8 @@ export const ALLOWED_LOGO_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"]
 
 /** Mirrors `commands::school::MAX_LOGO_BYTES` on the Rust side — a UX
  * convenience so the picker can reject an oversized file before ever
- * invoking the backend; the backend enforces the real limit regardless. */
-export const MAX_LOGO_BYTES = 512 * 1024;
+ * invoking the backend; the backend enforces the real limit regardless.
+ * 48 KiB, not 512 KiB — shrunk in Batch 10 so a logo's encrypted sync
+ * payload fits under `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB); see
+ * `docs/adr/0081-school-logo-sync-byte-budget.md` for the byte math. */
+export const MAX_LOGO_BYTES = 48 * 1024;

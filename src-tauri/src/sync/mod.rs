@@ -69,6 +69,17 @@ pub enum EntityKind {
     Subject,
     TeachingAssignment,
     SubjectAttendanceEntry,
+    LessonPlan,
+    NutritionRecord,
+    BehavioralIncident,
+    IncidentIntervention,
+    GradeSubmission,
+    GradeSubmissionNote,
+    TransferRecord,
+    SchoolLogo,
+    FormativeAssessmentLog,
+    AnecdotalRecord,
+    AnecdotalRecordFollowup,
 }
 
 impl EntityKind {
@@ -89,6 +100,17 @@ impl EntityKind {
             EntityKind::Subject => "subject",
             EntityKind::TeachingAssignment => "teaching_assignment",
             EntityKind::SubjectAttendanceEntry => "subject_attendance_entry",
+            EntityKind::LessonPlan => "lesson_plan",
+            EntityKind::NutritionRecord => "nutrition_record",
+            EntityKind::BehavioralIncident => "behavioral_incident",
+            EntityKind::IncidentIntervention => "incident_intervention",
+            EntityKind::GradeSubmission => "grade_submission",
+            EntityKind::GradeSubmissionNote => "grade_submission_note",
+            EntityKind::TransferRecord => "transfer_record",
+            EntityKind::SchoolLogo => "school_logo",
+            EntityKind::FormativeAssessmentLog => "formative_assessment_log",
+            EntityKind::AnecdotalRecord => "anecdotal_record",
+            EntityKind::AnecdotalRecordFollowup => "anecdotal_record_followup",
         }
     }
 
@@ -105,6 +127,17 @@ impl EntityKind {
             "subject" => Some(EntityKind::Subject),
             "teaching_assignment" => Some(EntityKind::TeachingAssignment),
             "subject_attendance_entry" => Some(EntityKind::SubjectAttendanceEntry),
+            "lesson_plan" => Some(EntityKind::LessonPlan),
+            "nutrition_record" => Some(EntityKind::NutritionRecord),
+            "behavioral_incident" => Some(EntityKind::BehavioralIncident),
+            "incident_intervention" => Some(EntityKind::IncidentIntervention),
+            "grade_submission" => Some(EntityKind::GradeSubmission),
+            "grade_submission_note" => Some(EntityKind::GradeSubmissionNote),
+            "transfer_record" => Some(EntityKind::TransferRecord),
+            "school_logo" => Some(EntityKind::SchoolLogo),
+            "formative_assessment_log" => Some(EntityKind::FormativeAssessmentLog),
+            "anecdotal_record" => Some(EntityKind::AnecdotalRecord),
+            "anecdotal_record_followup" => Some(EntityKind::AnecdotalRecordFollowup),
             _ => None,
         }
     }

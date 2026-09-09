@@ -19,6 +19,9 @@ class FakeDeviceSyncRepository implements DeviceSyncRepository {
   calls = 0;
   revokeCalls: string[] = [];
   revokeResult: boolean | "reject" = true;
+  hubBaseUrl: string | null = null;
+  setHubBaseUrlCalls: (string | null)[] = [];
+  setHubBaseUrlResult: "ok" | "reject" = "ok";
 
   async listDevices() {
     this.calls += 1;
@@ -31,6 +34,18 @@ class FakeDeviceSyncRepository implements DeviceSyncRepository {
       throw new Error("unauthorized");
     }
     return this.revokeResult;
+  }
+
+  async getHubBaseUrl(): Promise<string | null> {
+    return this.hubBaseUrl;
+  }
+
+  async setHubBaseUrl(hubBaseUrl: string | null): Promise<void> {
+    this.setHubBaseUrlCalls.push(hubBaseUrl);
+    if (this.setHubBaseUrlResult === "reject") {
+      throw new Error("unauthorized");
+    }
+    this.hubBaseUrl = hubBaseUrl;
   }
 }
 
@@ -79,5 +94,41 @@ describe("DeviceSyncApplicationService", () => {
     const service = new DeviceSyncApplicationService(repo);
 
     await expect(service.revokeDevice("c-1")).rejects.toThrow("unauthorized");
+  });
+
+  it("reads back this device's configured hub address", async () => {
+    const repo = new FakeDeviceSyncRepository();
+    repo.hubBaseUrl = "https://192.168.1.10:7878";
+    const service = new DeviceSyncApplicationService(repo);
+
+    await expect(service.getHubBaseUrl()).resolves.toBe("https://192.168.1.10:7878");
+  });
+
+  it("sets the hub address, trimming surrounding whitespace", async () => {
+    const repo = new FakeDeviceSyncRepository();
+    const service = new DeviceSyncApplicationService(repo);
+
+    await service.setHubBaseUrl("  https://192.168.1.10:7878  ");
+
+    expect(repo.setHubBaseUrlCalls).toEqual(["https://192.168.1.10:7878"]);
+  });
+
+  it("treats null the same as an empty or whitespace-only string, clearing the setting", async () => {
+    const repo = new FakeDeviceSyncRepository();
+    const service = new DeviceSyncApplicationService(repo);
+
+    await service.setHubBaseUrl(null);
+    await service.setHubBaseUrl("");
+    await service.setHubBaseUrl("   ");
+
+    expect(repo.setHubBaseUrlCalls).toEqual([null, null, null]);
+  });
+
+  it("propagates a thrown validation rejection from the backend without swallowing it", async () => {
+    const repo = new FakeDeviceSyncRepository();
+    repo.setHubBaseUrlResult = "reject";
+    const service = new DeviceSyncApplicationService(repo);
+
+    await expect(service.setHubBaseUrl("not a url")).rejects.toThrow("unauthorized");
   });
 });

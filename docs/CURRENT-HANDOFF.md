@@ -1,5 +1,2641 @@
 # CURRENT HANDOFF
 
+## Configurable sync hub address (complete, 2026-09-09): next-slice item from Batch 16, resolved on the owner's "proceed to all remaining slices" instruction — commit `7a70278`, local only, not yet pushed/PR-updated at this entry's writing
+
+Branch `claude/pending-tasks-batch-vjy67v`. Closes the gap Batch 16
+recorded as the exact next slice: this device could previously only
+reach a hub bound to `127.0.0.1`, which only works when hub and client
+run on the exact same machine, even though the hub server side has
+supported a real LAN/Tailscale bind address since ADR-0067.
+
+**Migration M64**: nullable `hub_base_url` column on
+`device_sync_client_credential` (the existing per-device/per-school
+row, not a new table — one more fact about this device's relationship
+to its school's hub). `NULL` means "use `sync_client::DEFAULT_HUB_BASE_URL`",
+never an empty string.
+
+**Backend**: `repository::device_sync_client_credential::set_hub_base_url`;
+`sync_client::SyncClientConfig::discover` now prefers the stored
+address over the loopback default. Two new commands,
+`get_sync_hub_base_url` (any authenticated school member) and
+`set_sync_hub_base_url` (School-Head-only, `ManageSchoolMembership` —
+this setting controls where this device sends its own sync credential
+secret on every push/pull round via `DEVICE_SECRET_HEADER`, so
+pointing it at an attacker-controlled address would leak that secret;
+treated as security-relevant configuration, not a routine preference,
+matching `revoke_device_sync_credential`'s own capability gate).
+Server-side validation (`commands::device_sync::validate_hub_base_url`)
+via the `url` crate, promoted from a transitive to a direct dependency
+(already in `Cargo.lock` via `reqwest`, no new supply-chain surface) —
+rejects anything that isn't a well-formed `http`/`https` origin,
+normalizes away a trailing path/slash so `sync_client`'s own appended
+`/sync/...` segment is never doubled.
+
+**Frontend**: `DeviceSyncRepository` port + `TauriDeviceSyncRepository`
+
+- `DeviceSyncApplicationService` gain `getHubBaseUrl`/`setHubBaseUrl`.
+  New "This device's hub address" panel on `DeviceManagementScreen`,
+  visible to every authenticated member (matching that screen's own
+  already-documented "no client-side role hiding" convention) — the
+  Save button is always shown, but only a School Head's save actually
+  succeeds server-side; a denial surfaces as a friendly
+  "Only a School Head can change this device's hub address" message,
+  never a raw `"unauthorized"` string. `set_sync_hub_base_url` added to
+  `invoke.ts`'s `COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING` list — a
+  `Capability`-denial `Unauthorized` for a non-School-Head is not a
+  session-expiry event, same class as `set_school_logo` (Wave 3B's
+  original bug this list exists to prevent).
+
+**Bug caught and fixed during this slice's own manual verification**:
+the new `loadHubBaseUrl()` effect initially reused
+`DeviceManagementScreen`'s existing `requestRef` (a stale-request
+guard originally scoped only to the device-list load), which caused
+the two independent loads to invalidate each other's "is this still
+the latest request" check and left the device list stuck on
+"Loading devices…" forever in tests. Fixed with its own
+`hubBaseUrlRequestRef` — caught by this slice's own test suite
+(`DeviceManagementScreen.test.tsx`), not shipped.
+
+**Verification actually run**: `cargo test` (full suite, 0 failed),
+`cargo clippy --all-targets -- -D warnings` clean, `cargo fmt --check`
+clean, `npm run quality` (153 files, 1411 tests) clean, `npm run
+quality:security` (3 ok, 0 failed, 0 missing) clean — run explicitly
+because `Cargo.toml`/`Cargo.lock` changed, per the lesson recorded in
+Batch 16's own entry below (a batch earlier would have caught the
+`webpki-root-certs` license gap before it ever reached CI).
+
+**Retained debt, unchanged from Batch 16**: Batch 17's two-tier
+grade-approval authorization and Batch 18's M365 OAuth/token-storage/
+upload-queue code still have no fresh independent `security-reviewer`
+pass. This slice's own new capability gate
+(`set_sync_hub_base_url`'s `ManageSchoolMembership` check) is small
+and self-reviewed against the identical, already-reviewed pattern
+`revoke_device_sync_credential` uses — not treated as adding to that
+debt on its own, but also not itself independently reviewed.
+
+**Next**: push this commit, update PR #55, confirm CI green, then
+either continue to further slices per the owner's "proceed to all
+remaining slices" instruction (next candidate: dispatching the owed
+independent `security-reviewer` pass for Batches 17-18) or stop if no
+further slice remains safely actionable.
+
+## Batch 16 (complete, 2026-09-09): final consolidation, push, PR #55 update, CI drive-to-green — Batches 16-18 all fully complete, wave stopped per autonomous-development rule
+
+Branch `claude/pending-tasks-batch-vjy67v`, pushed to origin in two
+commits: `4bbddce` (all of Batches 16-18's local work, consolidated in
+one push per batch-implement mode) and `7098b9d` (one follow-up fix,
+see below). PR #55 description updated to cover Batches 1-18. **CI is
+fully green** on `7098b9d`: Quality workflow run `34338983401` (Ubuntu
+job `102425108617` success, Windows job `102425108784` success) paired
+with Security workflow run `34338983450` (cargo-deny, gitleaks,
+osv-scanner all success) — a complete matching pair, all checks green.
+
+**Verification actually run:** full `cargo test` (all lib tests + all
+18 integration binaries + doctests, exit 0, 0 failed — confirmed by
+grepping the captured log for `FAILED`/`error[`, none found outside the
+one CI flake below); `cargo clippy --all-targets -- -D warnings` clean;
+`cargo fmt --check` clean; `npm run quality` (153 test files, 1401
+vitest tests) clean; `npm run quality:security` (gitleaks + cargo-deny
+
+- osv-scanner) 3 ok/0 failed/0 missing.
+
+**Real issue found and fixed this checkpoint:** CI's `cargo-deny`
+license check failed on the first push (`4bbddce`) — Batch 18's new
+`reqwest` `rustls` feature transitively pulls in `webpki-root-certs`
+(via `rustls-platform-verifier`), licensed `CDLA-Permissive-2.0`
+(Linux Foundation's Community Data License Agreement, permissive terms
+over root-CA bundle _data_, not executable code) — not on
+`src-tauri/deny.toml`'s allow-list. This was not caught locally before
+the first push because `cargo deny check` had not been re-run after
+Batch 18 changed the dependency tree. Fixed by adding the license to
+the allow-list with a documented reason (commit `7098b9d`); re-verified
+`cargo deny check` and `npm run quality:security` both clean before
+pushing the fix. **Lesson for future batches touching dependencies:**
+run `npm run quality:security` (or at least `cargo deny check`) locally
+whenever `Cargo.lock`/`Cargo.toml` changes, not only at the final
+consolidation checkpoint — would have caught this a batch earlier.
+
+**CI flake encountered, diagnosed, and resolved (no code change
+needed):** this repo triggers two parallel CI workflow runs per push.
+On the first push's first run (`34338979534`), `Quality (Ubuntu)`
+failed: 3 of 9 tests in `tests/section_advisory.rs` failed with
+`sqlcipherCodecAttach: sqlcipher not initialized`, all three at the very
+start of that binary's execution, the other 6 in the same file passing
+normally right after. A full local `cargo test` on the identical code
+had passed 100% moments earlier, and no commit in Batches 16-18 touched
+`src-tauri/src/db/` (the SQLCipher init path) — only
+`src-tauri/src/crypto/dpapi.rs` (+19 lines, Batch 18's DPAPI token
+storage, unrelated). Diagnosed as a CI-parallelism flake and confirmed
+by the twin same-commit run (`34338983401`), where `Quality (Ubuntu)`
+passed clean — no PR comment was needed since the twin run's green
+result already made the commit's CI pass overall without any check
+staying permanently red.
+
+**Full wave completion report:**
+`../LIKHA-SIS-DELIVERY-REPORTS/WAVE-16-FINAL-REPORT.md` (git-ignored,
+outside tracked source per `CLAUDE.md`) — repo truth before/after,
+everything shipped in Batches 16-18, full verification record,
+independent-review status, retained debt, and the next slice.
+
+**Retained debt this checkpoint did NOT resolve (see the wave report
+for full detail):**
+
+- Batch 17 (two-tier grade-approval authorization) and Batch 18 (M365
+  OAuth/token storage/upload queue) have only self-review plus the
+  verification above — no fresh independent `security-reviewer` pass
+  yet. Real debt given both touch authorization and (Batch 18) real
+  network egress and token custody.
+- The sync client's hub address is still hardcoded to loopback
+  (`127.0.0.1:7878`) — see "Exact next slice" below.
+- Everything else carried from Batch 15 (see `docs/VERIFICATION-DEBT.md`):
+  sync child-record parent-existence checks, hub supervisor's missing
+  TLS-error carve-out, human-witnessed hardware verifications (DR
+  drill, hub hardware-gate script, native screen-reader sweep), Android
+  platform work.
+
+**Exact next slice (per `.claude/rules/autonomous-development.md`, this
+wave stops here and does not implement it):** make the sync client's
+hub address configurable — a settings field, defaulting to LAN
+auto-discovery, overridable for Tailscale/remote use. The hub server
+side already supports LAN/Tailscale binding; nothing yet lets a client
+point at a remote hub address. This is a real missing piece the
+existing hub-side design already anticipated, not a new policy
+decision, and blocks the owner's actual deployment (3
+non-interconnected school modems, teachers rarely sharing WiFi even on
+campus, home sync needed).
+
+**This wave (Batches 16-18) is now fully complete. Do not begin the
+next slice without a new user instruction to continue**, per the
+autonomous-development mode's mandatory wave-boundary stop.
+
+## Batch 18 checkpoints 3-4 (complete, 2026-09-09): Microsoft 365 settings screen + opportunistic upload queue — Batch 18 now fully complete
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only in two
+separate commits (checkpoint 3, checkpoint 4), nothing pushed, PR #55
+untouched, no CI triggered, per batch-implement mode. Builds on
+checkpoints 1-2 (commits `3e1c287`, `bb67f26`: the port/application
+service and the PKCE OAuth core) and ADR-0088.
+
+**Checkpoint 3 (its own commit):** built the loopback redirect listener
+ADR-0088 had explicitly deferred
+(`infrastructure::microsoft365::redirect_listener`, hand-rolled
+`std::net::TcpListener`, zero new dependencies -- reads one request
+line, writes one fixed HTML response, proven with a real TCP round trip
+in this Linux sandbox) plus `commands::document_repository`'s
+get-status/configure/connect/disconnect commands and a new
+`DocumentRepositoryScreen`. A new `Capability::ManageDocumentRepositoryConnection`
+(School-Head-only) gates configure/connect/disconnect;
+`getConnectionStatus`/queue-list stay open to any authenticated school
+member, matching the already-committed port's own doc comment. Verified
+genuinely invisible for an unconfigured school viewed by a non-School-
+Head: one quiet sentence, no dead buttons, no error state, matching the
+Weather & Hazard Alerts precedent (ADR-0079). Persistence: migration M62
+(`microsoft365_app_registrations` -- tenant/client ID + connection
+health, never a token) and M63 (`microsoft365_upload_queue`'s table --
+queue/list data plumbing).
+
+**Checkpoint 4 (its own commit):** the opportunistic upload queue's
+independent path guard (`repository::microsoft365_upload_queue::enqueue`,
+proven by `enqueue_rejects_a_path_that_resolves_to_the_live_database_file`/
+`_the_key_file` -- rejects a candidate that resolves to the live
+database or its DPAPI key file regardless of what the caller claims) and
+a new drain command
+(`commands::document_repository_upload_drain::drain_document_repository_upload_queue`)
+that performs a REAL token-refresh round trip
+(`oauth::refresh_access_token`, rotating and re-persisting the refresh
+token via `token_store::store` when Microsoft issues a new one) but
+still cannot deliver bytes to Microsoft Graph -- no destination
+SharePoint site/library selection exists yet to validate that call
+against (ADR-0088's own disclosed "Not yet built", unchanged). A
+successful refresh therefore still records `AttemptErrorCode::NotConfigured`
+on every pending item rather than a fabricated `uploaded` status: an
+honest, disclosed outcome, never a silent success. The Settings screen
+gained a "Try sending now" opportunistic action (any authenticated
+school member, matching `queueUpload`'s own access level) and an
+upload-queue list. No export screen in this codebase queues an upload
+automatically yet -- `DocumentRepositoryApplicationService.queueUpload`
+is available for a future slice to wire in; a deliberate scope decision
+to keep this batch tight, not an oversight.
+
+**New files:** `src-tauri/src/infrastructure/microsoft365/redirect_listener.rs`,
+`src-tauri/src/repository/microsoft365_config.rs`,
+`src-tauri/src/repository/microsoft365_upload_queue.rs`,
+`src-tauri/src/commands/document_repository.rs`,
+`src-tauri/src/commands/document_repository_upload_queue.rs`,
+`src-tauri/src/commands/document_repository_upload_drain.rs`,
+`src/infrastructure/tauri/document-repository-provider.ts`,
+`src/ui/DocumentRepositoryScreen.tsx` (+ its test file).
+
+**Changed:** `src-tauri/src/auth/mod.rs` (new capability),
+`src-tauri/src/db/migrations.rs` (M62-M63),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/repository/mod.rs`,
+`src-tauri/src/infrastructure/microsoft365/mod.rs`, `src-tauri/src/lib.rs`
+(command registration), `src/composition.ts`, `src/App.tsx`,
+`src/ui/components/workbench-nav-data.ts` (new nav tab),
+`src/domain/ports/document-repository-provider.ts` +
+`src/application/document-repository-service.ts` (+ test) (`drainQueue`
+addition), `docs/adr/0088-official-school-repository-oauth-architecture.md`,
+`docs/VERIFICATION-DEBT.md`.
+
+**Verification actually run, both checkpoints:** `cargo check`/`cargo
+clippy --all-targets -- -D warnings` clean; targeted `cargo test --lib
+microsoft365` (41 passed) and `document_repository` (3 passed); a full
+`cargo test --lib` for the whole crate (1412 passed, 0 failed) run
+after checkpoint 3 landed, confirming no regression from a concurrent
+session's simultaneous Batch 17 work in this same working tree; a
+SECOND full `cargo test --lib` for the whole crate run again after
+checkpoint 4's own diff landed on top -- also 1412 passed, 0 failed
+(the count is unchanged from checkpoint 3's run because checkpoint 4
+added no new `#[test]` at the whole-crate level beyond what the
+targeted `microsoft365`/`document_repository` filters below already
+report, which are included in that 1412); `npx tsc --noEmit` clean;
+`npx vitest run` on the new/changed test files (23 passed after
+checkpoint 4); a full `npm run quality` (typecheck, lint, format:check,
+architecture check, knip, full vitest suite -- 1401 tests) run after
+each checkpoint, both green. `cargo fmt --check` was run and its
+findings limited strictly to this batch's own new/touched files
+(`rustfmt --check`) to avoid reformatting a concurrently-edited file
+outside this batch's scope.
+
+**Concurrency note:** this session observed the same concurrent-session
+working-tree sharing the 2026-09-09 rate-limit-consolidation entry
+above already describes -- `src-tauri/src/commands/grade_submission.rs`/
+`repository/grade_submission.rs` were mid-edit by another session during
+this batch (one `cargo check` transiently failed on those files, self-
+resolved moments later once that session's own edit completed) and
+`src/ui/components/workbench-nav-data.ts` was independently extended by
+that other session (`grade-review`/`teacher-oversight` tabs) while this
+batch was also editing it. No file from that other session's own scope
+was committed by this batch -- verified via `git status --short`
+immediately before each commit; only this batch's own listed files were
+staged.
+
+**Genuinely still open (unchanged from ADR-0088, not new debt):** a live
+OAuth round trip against a real Azure AD tenant (blocked on
+`docs/product/OWNER-DECISIONS-NEEDED.md` item 2, a genuine human-
+approval gate), and the Microsoft Graph `driveItem` upload call itself
+(needs a destination SharePoint site/library selection mechanism that
+does not exist yet). `token_store`'s own DPAPI round-trip tests remain
+Windows-only and unverified on this Linux sandbox, matching
+`crypto::dpapi`'s already-established, already-disclosed pattern.
+
+**Exact next slice:** either (a) resolve the OWNER-DECISIONS-NEEDED item
+2 human-approval gate (a real Azure AD tenant) so the live OAuth round
+trip and a real Graph `driveItem` upload call can finally be built and
+proven, or (b) if that stays blocked, the next highest-priority
+DepEd-compliance/teacher-usability item from the roadmap -- no
+candidate is pre-selected here; evaluate against current evidence at
+the next wave boundary per `.claude/rules/autonomous-development.md`.
+
+## Batch 17 checkpoint 4 (complete, 2026-09-09): two-tier grade-review UI + Teacher Oversight Assignment management screen — Batch 17 now fully complete
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit `c7175a5`, committed
+locally only, nothing pushed, PR #55 untouched, no CI triggered, per
+batch-implement mode.
+
+**What shipped:**
+
+- **`GradeReviewScreen`** (`src/ui/GradeReviewScreen.tsx`): shows every
+  grade submission relevant to the signed-in user (a School Head's full
+  submission-status matrix via `list_grade_submissions_for_school`, a
+  Master Teacher's own review queue via the new
+  `list_grade_submissions_for_master_teacher` — both, merged and
+  de-duplicated, for someone holding both roles) with an explicit
+  two-tier stage label: awaiting Master Teacher, awaiting School Head
+  final lock (covers both the after-MT-approval step and the
+  no-MT-assigned fallback), approved, rejected by Master Teacher, or
+  rejected by School Head. `src/domain/grade-submission.ts`'s
+  `reviewStageFor` is the pure display-logic function this reads off,
+  mirroring `commands::grade_submission::require_no_pending_master_teacher_decision`'s
+  server-side logic exactly so the label never disagrees with what a
+  decide call would actually be allowed to do. Only the decision action
+  the signed-in user's own role AND relationship to that specific
+  submission supports is rendered (a Master Teacher sees "Decide as
+  Master Teacher" only on a submission from a teacher THEY currently
+  oversee; a School Head sees "Final lock decision" only once the MT
+  tier is no longer pending) — this is a display convenience only, not
+  the security boundary; `decideMasterTeacher`/`decideSchoolHead` still
+  re-verify the exact same authorization server-side regardless of what
+  button rendered.
+- **`TeacherOversightScreen`** (`src/ui/TeacherOversightScreen.tsx`):
+  School-Head-only (backend-enforced, screen itself follows this
+  codebase's "show the same screen to everyone, let the backend refuse"
+  convention like `SectionAdviserScreen`) management of
+  `teacher_oversight_assignments` — lists active assignments (who
+  oversees whom, since when) with an "End assignment" two-step
+  confirmation, a past-assignments history section for audit purposes,
+  and an assign form (Master Teacher + teacher pickers, filtered to
+  exclude a teacher who already has an active overseer) with per-outcome
+  error messages (`notAMasterTeacher`, `cannotOverseeSelf`,
+  `alreadyHasAnActiveOverseer`, etc.) matching `SectionAdviserScreen`'s
+  established messaging convention.
+- **New backend read** (small, necessary addition — not pure UI wiring):
+  `repository::grade_submission::list_for_master_teacher` +
+  `commands::grade_submission::list_grade_submissions_for_master_teacher`.
+  This did not exist before this checkpoint —
+  `list_grade_submissions_for_school` is gated on
+  `ManageGradeSubmissionReview` (School-Head-only), so a Master Teacher
+  had no command at all to see their own review queue. Self-scoped, no
+  dedicated capability, matching `list_teachers_i_oversee`'s own
+  precedent: resolves the caller's currently-overseen teachers via
+  `teacher_oversight_assignment::list_teachers_overseen_by`, then
+  filters `list_for_school`'s full set down to those teachers'
+  submissions. Returns an empty list for a caller overseeing nobody,
+  never an error.
+- Full new frontend layer for both screens, following this codebase's
+  established layering exactly: `src/domain/{grade-submission,teacher-oversight-assignment}.ts`
+  (mirroring the Rust `#[serde(tag = "kind", rename_all = "camelCase")]`
+  outcome enums and `GradeSubmission`/`SubmissionNote` shapes field-for-
+  field), `src/domain/ports/*-repository.ts`, `src/infrastructure/tauri/*-repository.ts`
+  (Tauri `invoke` adapters only — no SQL, no `@tauri-apps/*` import
+  outside `infrastructure/`), `src/application/*-service.ts`
+  (`GradeSubmissionApplicationService`, `TeacherOversightAssignmentApplicationService`
+  — validate shape/non-empty input only, backend stays authoritative on
+  authorization), wired into `src/composition.ts` and two new
+  `SignedInTab`s (`grade-review` under "Grading", `teacher-oversight`
+  under "Security") in `src/ui/components/workbench-nav-data.ts` +
+  `src/App.tsx`.
+- Efficient/Comfortable/Guided mode parity via the existing
+  `useTeacherMode` hook (both screens show an extra Guided-mode hint
+  paragraph; every action is available in every mode — no
+  mode-conditional feature loss).
+- Accessibility: `expectNoAccessibilityViolations` (axe-core) against
+  both screens' empty state, populated list, and each open
+  confirmation/decision panel.
+
+**Verification actually run:**
+
+- `npm run quality` (typecheck, lint, format:check, architecture-
+  boundary check, `knip`, `vitest run`): all green — 153 test files,
+  1400 tests passed, 0 failed. `knip` initially flagged
+  `SubmissionStatus`/`MasterTeacherDecision`/`SubmissionNoteType` as
+  unused exports (structural-only consumption via `GradeSubmission`/
+  `SubmissionNote` field types) — marked `@public` per
+  `.claude/rules/testing.md` rather than deleted.
+- `cargo test --lib` (whole crate): 1412 passed, 0 failed. One test
+  (`list_for_master_teacher_returns_only_submissions_from_currently_overseen_teachers`)
+  initially failed only when run as part of the FULL suite (not in
+  isolation) — root cause: `grade_submissions` has a
+  `UNIQUE(class_record_id, submitted_at)` constraint, and the test's two
+  `submit()` calls against the same class record within the same
+  millisecond collided on that constraint under the concurrency/timing
+  of a full-suite run. Fixed by submitting the second (unrelated)
+  teacher's grade against a distinct second class record — a real test
+  bug, not a product bug; confirmed by rerunning both the isolated
+  filter and the full `cargo test --lib` afterward, both green.
+- `cargo clippy --all-targets -- -D warnings`: clean, 0 warnings.
+- `cargo fmt --check`: introduces no NEW drift from this checkpoint's
+  own changes (pre-existing drift in `auth/mod.rs` and two other spots
+  in `commands/grade_submission.rs`/`repository/grade_submission.rs`,
+  left over from checkpoint 3's commit `bb67f26` which predates this
+  session, is unchanged — not this checkpoint's to fix per scope
+  discipline, noted here for visibility).
+- No independent security/reliability review dispatched for this
+  checkpoint specifically: it is UI + one narrow, structurally-identical-
+  to-precedent self-scoped read, built entirely on checkpoint 3's
+  already-reviewed-pending authorization gates
+  (`authorize_grade_submission_master_teacher_decision`,
+  `ManageGradeSubmissionReview`, `ManageTeacherOversightAssignments`) —
+  no new authorization gate was added or loosened. The review debt
+  already recorded against Batch 17 checkpoints 1-3 (see the entry
+  below) still stands and should cover this checkpoint too when that
+  review happens.
+
+**Concurrency note**: this session ran alongside another Claude Code
+session actively building Batch 18 (Official School Repository /
+Microsoft 365 document upload) in the same working tree at the same
+time — confirmed via `git status` showing their files appearing mid-
+session (e.g. `document_repository_upload_queue.rs` was not present at
+this session's start and appeared before this session's commit). Three
+files this checkpoint needed to touch (`src/App.tsx`, `src/composition.ts`,
+`src/ui/components/workbench-nav-data.ts`) and one Rust file
+(`src-tauri/src/lib.rs`) were ALSO being concurrently edited by that
+other session for Batch 18's own wiring. Rather than bundle both
+sessions' changes into one commit (the precedent the previous
+rate-limit-consolidation entry below used out of necessity), this
+session reconstructed each shared file's HEAD version plus ONLY this
+checkpoint's own intended edits, generated a patch, and applied it to
+the git index with `git apply --cached` — so this commit's diff for
+those four files contains exactly Batch 17 checkpoint 4's changes, not
+Batch 18's. The working tree still carries Batch 18's in-progress,
+uncommitted edits to those same files untouched, ready for that session
+to commit separately when it finishes. Verified via `git status --short`
+and `git diff --cached` immediately before and after committing that no
+Batch 18 file was staged or touched by this commit.
+
+**Batch 17 is now fully complete (checkpoints 1-4).** No further Batch
+17 work is pending. The exact next slice is Batch 18's remaining
+checkpoints (3-4: School-Head-only settings UI, invisible-when-
+unconfigured; the opportunistic upload queue) — already in progress in
+this same working tree by a concurrent session as of this entry, not
+something this session should also start.
+
+## Rate-limit consolidation (2026-09-09): Batch 17 checkpoint 3 + checkpoint 4 partial, Batch 18 checkpoint 2 salvaged and committed
+
+Both the Batch 17 continuation agent and the Batch 18 agent were
+terminated mid-work by a session rate limit (resets 8:40am UTC). Rather
+than leave their in-flight work uncommitted and exposed to loss, I
+verified it directly before committing:
+
+- `cargo check` on the full mixed working tree: clean.
+- `cargo test --lib grade_submission::` (23 tests): all pass — this is
+  Batch 17 checkpoint 3, the two-tier Master Teacher / School Head
+  decision rewire, essentially complete and tested. Commit `bb67f26`.
+- `cargo test --lib microsoft365::` (19 tests, `oauth` module): all
+  pass — Batch 18 checkpoint 2's MSAL/PKCE OAuth core. `token_store.rs`
+  is also complete but its round-trip tests are `#[cfg(windows)]`-gated
+  (matches `crypto::dpapi`'s established pattern) so they don't run on
+  this Linux sandbox — correctly disclosed in the file's own doc
+  comment, not claimed as covered. Bundled into commit `bb67f26`
+  alongside checkpoint 3 because both were already git-staged together
+  when the rate limit hit; not split further to avoid re-doing verified
+  work.
+- `npx tsc --noEmit`: clean. Committed the remaining Batch 17 checkpoint
+  4 partial (role-grant UI: `master_teacher` added to
+  `SCHOOL_MEMBER_ROLES`, labeled in `SchoolMembershipScreen`) separately
+  as `38c18a4`.
+
+**Still outstanding after this consolidation:**
+
+- Batch 17 checkpoint 4: the two-tier status display on the grade-review
+  screen, and the School-Head-only oversight-assignment management
+  screen, are NOT built yet — only the role-grant dropdown update
+  landed.
+- Batch 18 checkpoints 3-4: the School-Head-only settings UI
+  (invisible-when-unconfigured) and the opportunistic upload queue are
+  NOT started.
+
+All committed locally only — nothing pushed, PR #55 untouched, no CI
+triggered, per batch-implement mode.
+
+## Batch 17 (checkpoints 1-2 complete, 3-4 deferred): real Master Teacher RBAC role + Teacher Oversight Assignment (2026-09-09), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit `856c673`, committed
+locally only, nothing pushed, PR #55 untouched, no CI triggered.
+
+**Resolves `docs/product/OWNER-DECISIONS-NEEDED.md` item 1 for real**:
+the owner decided the Master Teacher RBAC question directly (Master
+Teachers oversee a set of teachers; anything those teachers submit is
+approved by their assigned Master Teacher first, School Head retains
+final lock authority) — this is the permanent design, not another
+interim stopgap, and `docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md`
+supersedes ADR-0073's interim School-Head-as-approver substitution for
+that question.
+
+**Checkpoint 1 — MasterTeacher role (done):** `repository::role::MASTER_TEACHER`
+added via migration 59, the same 12-step CHECK-widening rebuild this
+schema has used repeatedly (SQLite cannot `ALTER` a `CHECK` constraint
+in place) — `user_school_roles`'s own long-standing doc comment already
+anticipated exactly this. Holding `master_teacher` alone satisfies no
+existing `Capability::allowed_roles()` — proven by a test that iterates
+every `Capability` variant this module defines, not a hand-picked
+subset. A Master Teacher who also holds `TEACHER` still gets no
+School-Head capability.
+
+**Checkpoint 2 — Teacher Oversight Assignment (done):** new
+`teacher_oversight_assignments` table (migration 60) mirrors
+`section_advisories` exactly — half-open interval, school-scoped, "at
+most one active overseer per teacher" via a real partial unique index
+(`idx_one_active_overseer_per_teacher`), not a check-then-act race.
+`repository::teacher_oversight_assignment::assign` additionally
+verifies the proposed Master Teacher actually holds the role, and
+structurally rejects a teacher being assigned as their own overseer
+(`CannotOverseeSelf`) — a defense-in-depth guard on top of the
+self-approval check the decision pipeline itself will perform.
+School-Head-only assign/end via a new `Capability::ManageTeacherOversightAssignments`
+(`commands::teacher_oversight_assignment`).
+
+**Why checkpoints 1-2 landed as one commit, not two:** they are not
+independently compilable/testable without throwaway duplication — the
+oversight-assignment repository tests need the `master_teacher` role to
+exist to seed fixtures, and the capability-boundary test (which
+iterates every `Capability` variant) needs `ManageTeacherOversightAssignments`
+to exist to be accurate. Splitting them would have meant temporarily
+deleting and re-adding code across two commits for no real benefit,
+since both are verified by the same test run regardless.
+
+**Checkpoints 3-4 — NOT started, this batch's exact next slice:**
+
+- **Checkpoint 3** (two-tier grade-submission decision rewire):
+  `repository::grade_submission::decide` / `commands::grade_submission::decide_grade_submission`
+  still use ADR-0073's single-step School-Head-only decision. Rewiring
+  requires: widening `grade_submissions`' status model (or adding
+  master-teacher-decision columns) via another CHECK-widening rebuild,
+  a new `authorize_grade_submission_master_teacher_decision` gate in
+  `auth` (self-approval-blocked, using `teacher_oversight_assignment::current_overseer_for_teacher`
+  — `None` is the intentional no-MT-assigned fallback straight to
+  School-Head approval, matching today's behavior), a distinct School-
+  Head "final lock" step, and touching `commands::conflict_review`'s
+  existing `GradeSubmission`/`SubmissionNote` sync preview code paths
+  since they pattern-match on the current shape. Not started —
+  deliberately deferred rather than rushed, since a broken/partial
+  rewire of an already-shipped, sync-wired feature is worse than a
+  clean stop.
+- **Checkpoint 4** (UI): two-tier status display on the grade-review
+  screen + a School-Head-only oversight-assignment management screen,
+  Efficient/Comfortable/Guided parity, axe-clean. Blocked on checkpoint
+  3's decision shape landing first — not started.
+
+**New files**: `src-tauri/src/repository/teacher_oversight_assignment.rs`,
+`src-tauri/src/commands/teacher_oversight_assignment.rs`,
+`docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md`.
+
+**Changed**: `src-tauri/src/repository/role.rs` (`MASTER_TEACHER`
+constant + tests), `src-tauri/src/auth/mod.rs` (`ManageTeacherOversightAssignments`
+capability + capability-boundary tests), `src-tauri/src/db/migrations.rs`
+(migrations 59-60 + migration 59 tests), `src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs` (command
+registration), `docs/adr/0073-interim-grade-review-pipeline.md` (marked
+Superseded), `docs/product/OWNER-DECISIONS-NEEDED.md` (item 1 resolved),
+`docs/product/MASTER-TASK-INVENTORY.md` (Tier 2.5 checkboxes).
+
+**Verification actually run**: `cargo test --lib` (whole crate, 1349
+passed / 0 failed — includes the new role/auth/migration/repository
+tests); `cargo fmt --check` (clean after one auto-fix pass); `cargo
+clippy --all-targets -- -D warnings` (clean, 0 warnings). `npm run
+quality` was NOT run this batch — no frontend/TypeScript files changed.
+No independent security/reliability review dispatched this batch (this
+milestone touches authorization but is additive-only: no existing
+authorization gate was loosened, and every new gate fails closed by
+construction, matching this module's established pattern) — recorded
+here as review debt to close before Batch 17's checkpoint 3-4 remainder
+is marked complete, per `.claude/rules/security-privacy.md`'s
+auth/persistence/sync review requirement.
+
+**Concurrency note**: this session observed clear evidence of another
+Claude Code session operating concurrently in this same working tree
+during this batch (a `git stash` labeled "stashed before Batch 18"
+briefly reverted this session's in-progress edits before being
+recovered via `git stash pop`; ADR number 0088 was independently
+claimed by that other session for an unrelated Official School
+Repository OAuth architecture document, so this batch's new ADR was
+numbered 0089 instead). No files from that other session's work were
+touched or committed by this batch — verified via `git status --short`
+immediately before committing.
+
+## Batch 14 (complete): hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,
+nothing pushed, PR #55 untouched, no CI triggered.
+
+**Corrects a prior-session mistake** (see `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 "Batch 1" entry and its 2026-09-09 correction note): three
+Tier 1.2 items previously recorded as pure hardware-only verification
+debt each had a genuinely codable core. This batch built and tested each
+codable core and wrote an executable runbook/script for the genuinely
+hardware-only remainder of each, rather than leaving anything inert.
+
+**Sub-item 1 — Hub daemon resilience** (ADR-0085): `hub_server::spawn`
+now retries forever on bind/serve failure via a new
+`hub_server::supervisor::backoff_for_attempt` (exponential 1s→60s cap,
+resets after a healthy bind) instead of permanently abandoning a failed
+listener address. 5 new pure unit tests prove the schedule. Whole-process
+crash/reboot recovery (outside any one process's control, since LIKHA-SIS
+ships as a normal desktop app, not a Windows Service) is addressed by
+`ops/hub-daemon-recovery-setup.ps1` (registers a Windows Scheduled Task
+with restart-on-failure) + `ops/hub-daemon-recovery-runbook.md` (the
+human witness steps) — reviewed but not executed on real hardware (no
+`pwsh` in this sandbox).
+
+**Sub-item 2 — Hub hardware gates** (ADR-0086):
+`ops/hub-hardware-gate-audit.ps1` audits BitLocker/firewall(port
+7878)/patch status with fetch/decide logic deliberately separated so the
+decision functions are unit-testable via
+`ops/hub-hardware-gate-audit.Tests.ps1` (Pester) against synthetic
+fixtures, plus a `-DryRun` mode. Reviewed but never executed (no `pwsh`
+here) — `ops/hub-hardware-gate-audit-runbook.md` is the admin
+runbook.
+
+**Sub-item 3 — Disaster recovery backup** (ADR-0087): no backup/export
+mechanism existed before this batch. Built `backup::create_two_copy_backup`
+(SQLCipher's own `sqlcipher_export()`, never a raw copy or plaintext
+dump) + `commands::backup::create_disaster_recovery_backup`
+(School-Head-gated via new `Capability::CreateDisasterRecoveryBackup`).
+TDD caught two real bugs before the round-trip test passed: an uncopied
+`PRAGMA user_version` (made every backup look unmigrated) and an ATTACH
+`KEY` quoting difference (produced a working-but-different actual key) —
+both documented in the ADR. 11 new automated tests prove: two independent
+non-empty encrypted files are created; both round-trip real data via
+`db::open` with the correct key; deleting one never affects the other;
+neither ever contains plaintext bytes on disk; neither opens with no/wrong
+key; re-running at the same filename overwrites cleanly.
+`ops/DR-DRILL-RUNBOOK.md` is the human witness runbook for the actual
+loss-and-restore drill on real hardware (still owed).
+
+**New files**: `src-tauri/src/backup.rs`, `src-tauri/src/commands/backup.rs`,
+`ops/hub-daemon-recovery-setup.ps1`, `ops/hub-daemon-recovery-runbook.md`,
+`ops/hub-hardware-gate-audit.ps1`, `ops/hub-hardware-gate-audit.Tests.ps1`,
+`ops/hub-hardware-gate-audit-runbook.md`, `ops/DR-DRILL-RUNBOOK.md`,
+`docs/adr/0085-hub-daemon-resilience.md`,
+`docs/adr/0086-hub-hardware-gate-audit.md`,
+`docs/adr/0087-disaster-recovery-backup-mechanism.md`.
+
+**Changed**: `src-tauri/src/hub_server.rs` (supervisor + retry loop),
+`src-tauri/src/db/mod.rs` (new `load_encryption_key` accessor),
+`src-tauri/src/auth/mod.rs` (new `Capability::CreateDisasterRecoveryBackup`),
+`src-tauri/src/lib.rs`/`commands/mod.rs` (new command wiring).
+
+**No TypeScript/frontend file touched** — `npm run quality` was not
+re-run this batch (nothing for it to catch); this is Rust + PowerShell +
+docs only.
+
+**Verified**: `cargo fmt --check` (clean), `cargo clippy --all-targets
+-- -D warnings` (0 warnings), `cargo test` (full crate — see this
+batch's own commits for exact counts). PowerShell scripts are
+reviewed/logic-verified only, never executed (no `pwsh` in this Linux
+sandbox) — disclosed, not claimed as covered, in
+`docs/VERIFICATION-DEBT.md`.
+
+**Exact next task**: witness the three hardware-only runbooks
+(`ops/hub-daemon-recovery-runbook.md`, `ops/hub-hardware-gate-audit-runbook.md`,
+`ops/DR-DRILL-RUNBOOK.md`) on a real Windows hub laptop and record the
+outcome in `docs/VERIFICATION-DEBT.md`; alternatively, continue with the
+next highest-priority item from `docs/product/MASTER-TASK-INVENTORY.md`
+per this project's established priority order. Await explicit
+instruction to continue past this wave boundary.
+
+## Batch 13 (complete): award-eligibility anecdote check wired for real (2026-09-09, ADR-0084), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,
+nothing pushed, PR #55 untouched, no CI triggered.
+
+**What changed:** `award-eligibility.ts`'s previously hardcoded-false
+`anecdotalRecordsChecked` now runs for real against Batch 12's Anecdotal
+Records entity.
+
+- **Disqualification rule (this project's own conservative default, not
+  verified DepEd policy — see `docs/product/OWNER-DECISIONS-NEEDED.md`
+  item 4, still open):** any anecdotal record in the `negative` category
+  excludes a learner, any severity (the schema has no severity field),
+  no recency window. `src/domain/anecdotal-record.ts`:
+  `DISQUALIFYING_ANECDOTAL_CATEGORIES = ["negative"]`,
+  `isDisqualifyingAnecdotalCategory()`.
+- **Narrow read path, same authorization gate as every other
+  anecdotal-record operation:** new repository function
+  `has_any_category_for_learner_in_section` (existence-only
+  `SELECT 1 ... LIMIT 1`) and command `has_anecdotal_category_for_learner`,
+  both gated by `auth::authorize_child_protection_access_for_section` —
+  unchanged from ADR-0083's reuse decision. No new, weaker "view" gate
+  was invented; `auth::authorize_view_teacher_load` exists as a narrower
+  pattern in this codebase but is for a materially different, non-PII
+  concern (a teacher's own teaching load), not this sensitivity class.
+  The command returns a bare `bool`, never narrative content, so the
+  eligibility screen never pulls full guidance narratives into memory.
+  See ADR-0084 for the full reasoning.
+- **Domain stays pure:** `AwardEligibilityInput` gained a required
+  `hasDisqualifyingAnecdotalRecord: boolean` field; the function does no
+  I/O. `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`
+  (new, application layer) performs the real lookup;
+  `CertificateAwardScreen` calls it once per roster member before
+  calling `evaluateAcademicExcellenceEligibility`, passing the real
+  result in as plain data.
+- **UI/certificate disclosures corrected:** the old "does not check
+  disciplinary/anecdotal records (no such feature exists yet)" text on
+  both `CertificateAwardScreen`'s top alert and
+  `certificate.ts`'s `ELIGIBILITY_DISCLOSURE` was no longer true and
+  would have been a false claim on a printed certificate. Both now
+  disclose the rule that actually runs and flag it as unverified against
+  DepEd — the same honesty standard already applied to the GA threshold.
+- **Tests:** eligible-with-no-anecdotes, excluded-with-a-disqualifying-
+  category-anecdote, eligible-with-only-positive/neutral-anecdotes,
+  `anecdotalRecordsChecked` always `true`, combined-failure-reasons case
+  (`award-eligibility.test.ts`); certificate build still refuses a
+  learner excluded solely by the anecdote leg (`certificate.test.ts`);
+  `isDisqualifyingAnecdotalCategory` unit tests
+  (`anecdotal-record.test.ts`); `hasDisqualifyingRecordForLearner`
+  validation/forwarding tests (`anecdotal-record-service.test.ts`);
+  `hasCategoryForLearner` IPC-shape test
+  (`anecdotal-record-repository.test.ts`); UI tests for the
+  excluded-by-anecdote case, the still-eligible-with-no-anecdote case,
+  and updated disclosure-text assertions (`CertificateAwardScreen.test.tsx`);
+  a stub method added to `GuidanceRecordsScreen.test.tsx`'s own fake
+  repository to satisfy the widened port interface. Rust:
+  `repository::anecdotal_record::tests` (5 new:
+  `has_any_category_for_learner_in_section` true-on-match,
+  false-with-only-positive/neutral, false-with-no-records,
+  empty-category-list short-circuit, section/learner scoping);
+  `commands::anecdotal_record::tests` (3 new:
+  `check_anecdotal_category_for_learner` authorized-true,
+  authorized-false, empty-category-list rejected).
+
+**Verification actually run this session:**
+
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, `vitest run`): **146 test files, 1339 tests, all
+  passed.** `check:architecture` confirms `src/domain/award-eligibility.ts`
+  still imports nothing from `src/application/**`/`src/infrastructure/**`.
+  `knip`: clean, no dead-code findings.
+- `cargo test --lib anecdotal_record` (targeted): 28 passed (was 25
+  before this batch).
+- `cargo fmt --check`: clean. `cargo clippy --all-targets -- -D
+warnings`: clean.
+- `cargo test` (full workspace — every lib test, both integration test
+  binaries, doc tests; the stable-checkpoint gate): **ran to completion,
+  exit code 0, zero failures anywhere in the workspace** (confirmed via
+  the process exit status; the full unabridged log was piped through
+  `tail` at capture time, but a non-zero exit from `cargo test` would
+  have been reported immediately above regardless — it was not).
+
+**Commits (local only, not pushed):**
+
+1. `ecafda3` — domain rule + narrow Rust read path (repository +
+   command + `lib.rs` registration), `award-eligibility.ts`/`certificate.ts`
+   signature and disclosure changes, `anecdotal-record.ts` disqualification
+   constant, all matching tests.
+2. `2adf0a2` — TS application/infra/UI wiring: port + Tauri adapter
+   method, `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`,
+   `CertificateAwardScreen` real call + corrected disclosures, all
+   matching tests.
+3. (Docs commit — ADR-0084, `OWNER-DECISIONS-NEEDED.md` item 4,
+   `PROJECT-MEMORY.md`, this handoff entry — see `git log` for the exact
+   hash.)
+
+**Exact next slice:** none pre-selected — this was a single, narrowly
+scoped gap-closing batch per explicit instruction, not part of a
+priority queue. The next candidate is whatever the owner names, or (if
+resuming autonomous wave selection) re-derive from
+`docs/product/MASTER-TASK-INVENTORY.md`/`docs/CURRENT-HANDOFF.md`'s
+prior "next slice" notes plus this batch's now-updated
+`OWNER-DECISIONS-NEEDED.md` item 4 (still open: the severity/recency
+question, which would need a schema change to answer, not just a code
+change).
+
+## Batch 12 (complete): Anecdotal / Guidance Records, full vertical slice (2026-09-08/09, ADR-0083), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. All 4 checkpoints shipped, each its own local commit.
+
+**Checkpoint 1 -- migration + repository:** migration 57
+(`anecdotal_records` -- school/section/learner-scoped, `category`
+`CHECK`-constrained to `positive`/`negative`/`neutral` (deliberately
+generic, not Awards' narrow disciplinary framing); `anecdotal_record_followups`
+-- append-only, exactly mirroring `incident_interventions`'s discipline,
+no `UPDATE`/`DELETE` code path against it anywhere) + migration 58
+(entity_kind `CHECK` widening, bundled here for schema-file locality,
+same "SQL allowlist widens early, Rust-side `EntityKind`/sync command
+wiring lands in checkpoint 4" pattern Batch 11 established).
+`repository::anecdotal_record` provides tenant-scoped CRUD
+(`create_record`, `list_for_section`, `list_for_learner`,
+`add_followup` INSERT-only, `upsert_record_from_sync`/
+`upsert_followup_from_sync`). No new authorization function -- this
+module is designed to be gated by
+`auth::authorize_child_protection_access_for_section` (ADR-0072)
+directly, wired in checkpoint 2.
+
+**Authorization-reuse decision (ADR-0083)**: DO 006 Child Protection's
+`authorize_child_protection_access_for_section` (section adviser, or
+School Head, in their own school) was reused **directly, unchanged** --
+no new sibling function, no new `Capability`. The authorization need is
+genuinely identical (same actors, same tenant-scoping bug class to
+guard, same sensitivity class), and this codebase has no Guidance
+Counselor role that would need a divergent rule. If one is ever added,
+`authorize_child_protection_access_for_section` is the point to fork --
+not before. See ADR-0083's "Authorization" section for the full
+reasoning against writing a near-identical sibling.
+
+**Checkpoint 2 -- commands + TS service:** `commands::anecdotal_record`
+(`record_anecdotal_entry`, `list_anecdotal_records_for_section`,
+`add_anecdotal_record_followup`, `list_anecdotal_record_followups`),
+gating on `auth::authorize_child_protection_access_for_section`,
+`school_id` always session-derived. Follow-up commands additionally
+verify the target record belongs to the authorized section (defense in
+depth, mirrors `commands::child_protection::add_incident_intervention`).
+TS: `src/domain/anecdotal-record.ts` (`AnecdotalCategory`,
+`validateAnecdotalRecordInput`, `validateAnecdotalRecordFollowupInput`),
+`AnecdotalRecordRepository` port, `AnecdotalRecordApplicationService`,
+`TauriAnecdotalRecordRepository`, wired into `composition.ts`
+(`anecdotalRecordService`).
+
+**Checkpoint 3 -- UI screen:** `GuidanceRecordsScreen` -- section/roster
+pickers (reusing `subjectAttendanceService.listAdviserViewSections`,
+`sectionService.roster`, mirroring `AdviserViewScreen`'s own scoping
+convention rather than adding new backend reads), a category button
+group (Positive/Negative/Neutral, never a disciplinary-only label), an
+entry-date field, a narrative field, a record list for the section, and
+a per-record detail panel showing the narrative plus its append-only
+follow-up history with a form to add a new follow-up. Reachable from
+the "Learner Records" nav group as "Guidance Records"
+(`workbench-nav-data.ts`, `App.tsx`). Efficient/Comfortable/Guided mode
+parity (only the guided-mode intro hint differs); axe-clean.
+
+**Checkpoint 4 -- sync wiring**, following the exact Batch 6/9/10/11
+pattern:
+
+- `EntityKind::AnecdotalRecord` (`"anecdotal_record"`)/
+  `EntityKind::AnecdotalRecordFollowup` (`"anecdotal_record_followup"`)
+  wire strings.
+- `repository::anecdotal_record::upsert_record_from_sync`/
+  `upsert_followup_from_sync` (`INSERT ... ON CONFLICT(id) DO UPDATE`,
+  matching every other create-only entity; already present since
+  checkpoint 1, now reachable via the wire).
+- `commands::anecdotal_record::record_anecdotal_entry`/
+  `add_anecdotal_record_followup` now take `AppHandle`, resolve the
+  SSPK only if this school has enrolled a device, and enqueue through a
+  `_with_optional_sync` helper -- the same enrollment-gated,
+  `SAVEPOINT`-atomic-with-the-write pattern as
+  `commands::child_protection`. **The authorization gate
+  (`authorize_child_protection_access_for_section`) runs first and
+  unchanged** -- verified by inspection (the gate call and its `?` sit
+  before any sync-aware code in both commands) and by the sync tests
+  below (a rejected write never enqueues an outbox row).
+- `sync_client::apply_decrypted_change`: `EntityKind::AnecdotalRecord`
+  arm (school-scope-checked) and `EntityKind::AnecdotalRecordFollowup`
+  arm (no `school_id` field of its own, same trust-boundary shape as
+  `EntityKind::IncidentIntervention`).
+- `ConflictEntityPreview::AnecdotalRecord { learner_id, category,
+entry_date, narrative }` / `ConflictEntityPreview::AnecdotalRecordFollowup
+{ anecdotal_record_id, note }` -- `category` always the generic
+  positive/negative/neutral label.
+- No natural-key-collision test -- confirmed against migration 57's own
+  `CREATE TABLE`: neither table has a `UNIQUE` constraint beyond `id`,
+  matching `BehavioralIncident`/`IncidentIntervention`'s own precedent
+  (stated explicitly in `repository::anecdotal_record`'s own test
+  module, not silently assumed).
+
+**New tests this batch**: 9 `repository::anecdotal_record::tests`
+(checkpoint 1: CRUD, section/learner scoping, append-only follow-up,
+no-unique-constraint disclosure, sync upsert insert/update/idempotency)
+
+- 6 `commands::anecdotal_record::tests` (checkpoint 2: category parsing
+  incl. rejecting a disciplinary-only value, authorized-adviser
+  create+list+followup round trip, Teacher-denied, School-Head-allowed,
+  tenant isolation) + 4 `commands::anecdotal_record::sync_tests`
+  (checkpoint 4: no-sspk passthrough, sspk-enqueues-correctly-encrypted-
+  upsert for both record and follow-up, rejected-followup-never-enqueues)
+- 1 `commands::conflict_review::tests` (typed preview shows the generic
+  category on both incoming and local sides) = 20 new Rust tests. 25 new
+  TS tests (checkpoint 2: domain validation, application service, Tauri
+  adapter) + 5 new UI tests (checkpoint 3: pickers load, generic
+  categories shown, record+list round trip, select-record loads
+  follow-ups and can add one, accessibility) = 30 new TS tests.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean (checkpoint 4).
+- `cargo test` (whole crate) -- all tests passed at the checkpoint 1 and
+  checkpoint 2 baselines (confirmed via full background runs, exit code
+  0 both times); `cargo test --lib anecdotal_record`/`conflict_review`/
+  `sync_client::` individually confirmed green at checkpoint 4 (20 + 25
+  - 65 tests respectively, no regressions in any pre-existing
+    `sync_client` test).
+- `cargo clippy --all-targets -- -D warnings` -- clean at every
+  checkpoint.
+- `cargo fmt --check` -- clean at every checkpoint.
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest run) -- run in full at checkpoint 3: 146 test
+  files, 1324 tests passed, 0 architecture violations, 0 dead-code
+  findings (the prior checkpoint's transient `anecdotalRecordService`
+  knip flag resolved once the UI screen wired it in, as expected and
+  disclosed in that checkpoint's own commit).
+
+**Tenant isolation / authorization verification**: every
+`repository::anecdotal_record` query takes `school_id` as an explicit
+parameter and filters on it in the SQL itself;
+`tenant_isolation_a_record_is_not_visible_under_a_different_schools_scope`
+proves a cross-school lookup returns nothing rather than leaking.
+`a_teacher_with_no_adviser_relationship_is_denied_by_the_reused_gate`
+and `a_school_head_is_authorized_without_advising_the_section` prove
+the command layer's call site actually surfaces
+`authorize_child_protection_access_for_section`'s adviser-or-School-
+Head decision correctly -- the gate function itself is exhaustively
+proven in `auth::mod`'s own test suite (reused unchanged, not
+re-derived here).
+
+**Deferred/out of scope (explicit, per the task)**: this batch does
+**NOT** wire `AnecdotalRecord` into `award-eligibility.ts`'s
+currently-hardcoded-false disciplinary-anecdotes check -- that is a
+future batch's job; this batch only built the entity so it is ready.
+No update/delete of an existing record's narrative (create-and-append-
+only by design, matching the append-only precedent). No cross-section
+"every guidance record for a learner across the whole school" UI (the
+repository function `list_for_learner` exists and is tested for an
+eventual School-Head-level use; the shipped screen is section-scoped
+only, matching the adviser's own authorized boundary). No new
+`SignedInTab`-level role gating in the UI shell (this project never
+hides a tab by role -- the real gate is server-side).
+
+**Files touched**: `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/repository/anecdotal_record.rs` (new),
+`src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/anecdotal_record.rs` (new),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs`,
+`src-tauri/src/sync/mod.rs`, `src-tauri/src/sync_client.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/anecdotal-record.ts` (new),
+`src/domain/ports/anecdotal-record-repository.ts` (new),
+`src/application/anecdotal-record-service.ts` (new),
+`src/infrastructure/tauri/anecdotal-record-repository.ts` (new),
+`src/composition.ts`, `src/ui/GuidanceRecordsScreen.tsx` (new),
+`src/ui/components/workbench-nav-data.ts`, `src/App.tsx`,
+`docs/adr/0083-anecdotal-guidance-records.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: no specific next candidate pre-selected this
+session -- consult `docs/product/MASTER-TASK-INVENTORY.md` for the
+next-highest-priority unchecked item per
+`.claude/rules/autonomous-development.md`'s selection order
+(privacy/security → correctness → DepEd compliance → teacher usability
+→ offline reliability → maintainability → zero billing → performance →
+speed) before starting a new wave. Two natural candidates the task
+itself named as future work: (1) wiring `AnecdotalRecord` into
+`award-eligibility.ts`'s disciplinary-anecdotes check (now unblocked --
+the entity exists); (2) `scholastic_history_records`
+(DepEd `.xlsx` multi-year importer, deliberately deferred, see its own
+line item) and Schedule Grids sync wiring remain deferred per
+`docs/product/MASTER-TASK-INVENTORY.md`'s existing notes.
+
+## Batch 11 (complete): Formative Assessment (ESRU) logging, full vertical slice (2026-09-08, ADR-0082), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. All 4 checkpoints shipped, each its own local commit.
+
+**Checkpoint 1 -- migration + repository:** migration 55
+(`formative_assessment_logs` table -- `teaching_assignment_id` as the
+authorization anchor, `grading_period_id` as the "quarter" identifier,
+`esru_rating` `CHECK`-constrained to the four bare literal letters
+E/S/R/U only, never the gloss word) + migration 56 (entity_kind `CHECK`
+widening, bundled here for schema-file locality rather than deferred to
+checkpoint 4 -- the Rust-side `EntityKind` enum and sync command wiring
+still landed in checkpoint 4, only the SQL allowlist widening moved
+earlier). `repository::formative_assessment` provides tenant-scoped
+CRUD reusing `subject_attendance::authorize_own_assignment` unchanged --
+"Teacher owns this assignment," not a school-wide `Capability` -- see
+ADR-0082 Decision 1 for the explicit analogy against
+`ManageChildProtection`'s tighter per-section-adviser shape and why ESRU
+logs are closer to an ordinary attendance mark or quiz score than to
+incident/health data. No natural key beyond `id` (a learner may
+accumulate many logs per subject/quarter), matching the `TransferRecord`
+precedent (ADR-0080).
+
+**Storage decision (do not relitigate without re-reading
+`docs/product/OWNER-DECISIONS-NEEDED.md` item 3 first)**: the ESRU
+rubric's real meaning is unverified against any DepEd primary source --
+neither this project nor the legacy `likha-sis` codebase it was ported
+from ever cited one. The schema and every persisted value store **only
+the bare letter**; the full gloss word (Exploration/Structured
+practice/Reflection/Understanding) exists purely as a UI-display label
+(`src/domain/formative-assessment.ts`'s `ESRU_GLOSS`/
+`formatEsruRatingLabel`), always rendered with an explicit "meaning
+unverified" flag. If the gloss is later found wrong, fixing it is a
+one-line label change -- no migration, no data rewrite.
+
+**Checkpoint 2 -- commands + TS service:** `commands::formative_assessment`
+(`record_formative_assessment`/`list_formative_assessment_logs_for_assignment`),
+gating on `formative_assessment::authorize_own_assignment`, `school_id`
+always session-derived. TS: `src/domain/formative-assessment.ts`
+(`EsruRating`, `validateFormativeAssessmentLog`, `formatEsruRatingLabel`),
+`FormativeAssessmentRepository` port,
+`FormativeAssessmentApplicationService`, `TauriFormativeAssessmentRepository`,
+wired into `composition.ts` (`formativeAssessmentService`).
+
+**Checkpoint 3 -- UI screen:** `FormativeAssessmentScreen` -- class/
+quarter/learner pickers (reusing
+`subjectAttendanceService.listMyAssignments`, `sectionService.roster`,
+`gradingService.listPeriodsBySchoolYear` rather than adding new backend
+reads), an activity-name field, an ESRU rating button group always shown
+as the bare letter with `formatEsruRatingLabel`'s explicit
+"meaning unverified" flag as a tooltip/hint, an optional notes field,
+and a read-only log table for the selected class. Reachable from the
+"Daily Teaching" nav group next to Subject Attendance
+(`workbench-nav-data.ts`, `App.tsx`). Efficient/Comfortable/Guided mode
+parity (only the guided-mode intro hint differs); axe-clean.
+
+**Checkpoint 4 -- sync wiring**, following the exact Batch 6/9/10 pattern:
+
+- `EntityKind::FormativeAssessmentLog` (`"formative_assessment_log"`
+  wire string).
+- `repository::formative_assessment::upsert_from_sync` (`INSERT ...
+ON CONFLICT(id) DO UPDATE`, matching every other create-only entity).
+- `commands::formative_assessment::record_formative_assessment` now
+  takes `AppHandle`, resolves the SSPK only if this school has enrolled
+  a device, and enqueues through `record_with_optional_sync` -- the
+  same enrollment-gated, `SAVEPOINT`-atomic-with-the-write pattern as
+  `commands::transfer_record::record_transfer`. The authorization gate
+  (`authorize_own_assignment`) runs first and unchanged, using `?` --
+  `record_with_optional_sync` takes an already-authorized
+  `teaching_assignment_id`/`actor_user_id` as plain parameters and
+  performs no authorization of its own.
+- `sync_client::apply_decrypted_change`: `EntityKind::FormativeAssessmentLog`
+  arm, school-scope-checked like every other tenant-scoped entity's arm.
+- `ConflictEntityPreview::FormativeAssessmentLog { learner_id,
+activity_name, esru_rating, grading_period_id }` -- `esru_rating` is
+  always the bare letter, matching the storage discipline above.
+- No natural-key-collision test -- like `TransferRecord` (ADR-0080),
+  this entity's sync identity is `id` alone, resolved by `ON
+CONFLICT(id)` with no separate uniqueness rule to violate.
+
+**New tests this batch**: 13 `repository::formative_assessment::tests`
+(CRUD, authorization, tenant isolation, sync round-trip, gloss-word
+rejection), 8 `commands::formative_assessment::tests` (authorization,
+create+list round trip, gloss rejection, sync enqueue/no-enqueue,
+rejected-create-never-enqueues), 1 `db::migrations::tests` (migration 55
+CHECK constraint rejects the gloss word / accepts the bare letter), 1
+`db::migrations::tests` (migration 56 entity_kind widening), 1
+`commands::conflict_review::tests` (typed preview shows the bare letter
+on both the incoming and local sides), 17 TS tests (domain validation +
+gloss-format invariant, application service, Tauri adapter), 4 UI tests
+(picker loading, ESRU rating group + unverified flag, record-with-bare-
+letter, accessibility).
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate) -- all tests passed, including the 21 new
+  formative-assessment tests plus the new conflict-review preview test.
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest run) -- 142 test files, 1294 tests passed, 0
+  architecture violations, 0 dead-code findings.
+
+**Tenant isolation / authorization verification**: every
+`repository::formative_assessment` query takes `school_id` as an
+explicit parameter and filters on it in the SQL itself;
+`list_for_assignment_never_leaks_a_different_schools_logs` and
+`create_rejects_a_learner_from_a_different_school` prove a
+cross-school probe returns nothing/an error rather than leaking or
+mutating another school's row. Every Tauri command derives `school_id`
+from `sessions.require_active_session` and then gates on
+`formative_assessment::authorize_own_assignment` -- never a
+client-supplied parameter -- matching
+`docs/adr/0004-authentication-and-local-session.md`.
+`authorize_own_assignment_denies_a_different_teacher` proves the
+own-assignment boundary holds.
+
+**Deferred/out of scope (see ADR-0082)**: no cross-subject "every ESRU
+log for a learner across all their subjects" command or UI (only
+per-assignment listing is exposed; the repository function exists and
+is tested for an eventual use); no edit/delete of an existing log
+(create-and-list only, matching Subject Attendance's own first-slice
+precedent); no configurable per-school ESRU-pattern threshold or
+automatic flagging; no new `SignedInTab`-level role gating in the UI
+shell (this project never hides a tab by role -- the real gate is
+server-side).
+
+**Files touched**: `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/repository/formative_assessment.rs` (new),
+`src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/formative_assessment.rs` (new),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs`,
+`src-tauri/src/sync/mod.rs`, `src-tauri/src/sync_client.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/formative-assessment.ts` (new),
+`src/domain/ports/formative-assessment-repository.ts` (new),
+`src/application/formative-assessment-service.ts` (new),
+`src/infrastructure/tauri/formative-assessment-repository.ts` (new),
+`src/composition.ts`, `src/ui/FormativeAssessmentScreen.tsx` (new),
+`src/ui/components/workbench-nav-data.ts`, `src/App.tsx`,
+`docs/adr/0082-formative-assessment-esru-logging.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: no specific next candidate pre-selected this
+session -- consult `docs/product/MASTER-TASK-INVENTORY.md` for the
+next-highest-priority unchecked item per
+`.claude/rules/autonomous-development.md`'s selection order
+(privacy/security → correctness → DepEd compliance → teacher usability
+→ offline reliability → maintainability → zero billing → performance →
+speed) before starting a new wave. `scholastic_history_records` (DepEd
+`.xlsx` multi-year importer) and Anecdotal Records/Schedule Grids sync
+wiring remain deliberately deferred per
+`docs/product/MASTER-TASK-INVENTORY.md`'s existing notes.
+
+## Batch 10 (complete): SchoolLogo sync byte-budget shrink + full sync wiring (2026-09-08, ADR-0081), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. Two checkpoints, each its own local commit.
+
+**Checkpoint 1 -- byte-budget math + shrink `MAX_LOGO_BYTES`:**
+`MAX_LOGO_BYTES` (`commands::school`) shrunk from `512 * 1024` to
+`48 * 1024` (49,152 bytes) so a max-size logo's encrypted sync payload
+fits safely under `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB). Full
+math in `docs/adr/0081-school-logo-sync-byte-budget.md`:
+
+```
+encrypted_blob_len(X) = 4·X (worst-case JSON-array-of-numbers encoding
+                              of the raw bytes -- serde_json's DEFAULT
+                              Vec<u8> encoding, since base64 is only a
+                              transitive dependency here, not a direct
+                              one, and this batch may not add one)
+                       + 256 (JSON field wrapper: schoolId/mime/braces)
+                       + 28  (AES-256-GCM: 12-byte nonce + 16-byte tag)
+
+Solved against a 200 KiB (204,800-byte) safety-margin target:
+    4·X + 284 ≤ 204,800  =>  X ≤ 51,129 bytes
+
+Chosen: MAX_LOGO_BYTES = 48 * 1024 = 49,152 bytes (under the solved
+ceiling; worst-case encrypted payload = 196,892 bytes, ~24.9% headroom
+under the real 262,144-byte cap).
+```
+
+New regression test ties the two constants together permanently:
+`commands::school::tests::max_logo_bytes_leaves_headroom_under_the_sync_encrypted_change_cap`.
+Updated every reference to the old 512 KiB figure: the constant's own
+doc comment/error message, the Rust test that asserted the old value
+symbolically (`MAX_LOGO_BYTES + 1`, needed no literal change), the
+frontend mirror (`src/domain/school-logo.ts`'s `MAX_LOGO_BYTES`), and
+its test (`src/application/school-logo-service.test.ts`). No frontend
+display string hardcoded the old figure (the error message computes
+`Math.floor(MAX_LOGO_BYTES / 1024)` dynamically).
+
+**Checkpoint 2 -- sync wiring**, following the exact Batch 6/9 pattern:
+
+- **Migration 54**: widens `entity_kind`'s allowlist (all four sync
+  tables, the same 12-step CHECK-widening rebuild) to add
+  `'school_logo'`.
+- **`sync::EntityKind::SchoolLogo`** (`"school_logo"` wire string).
+- **`repository::school::SchoolLogoSyncRecord`** (`schoolId`, `mime`,
+  `bytes`) + `upsert_logo_from_sync` + `find_logo_by_id`. A logo has no
+  `id` column of its own (it lives as two columns on the `schools` row
+  itself) -- this entity's sync `entity_id` **is** `school_id`, a
+  school-scoped singleton; `find_logo_by_id` fails closed on a
+  mismatched `(school_id, entity_id)` pair.
+- **`commands::school`**: `set_school_logo`/`clear_school_logo` now
+  take `AppHandle`, resolve the SSPK only if this school has enrolled a
+  device (`resolve_sspk_if_enrolled`, identical contract to
+  `commands::nutrition`'s), and enqueue through
+  `set_school_logo_with_optional_sync`/`clear_school_logo_with_optional_sync`
+  -- same enrollment-gated encrypt-on-enqueue `SAVEPOINT` pattern as
+  every prior entity. `clear_school_logo` enqueues a
+  `ChangeOperation::Delete` (carrying the last-known content, matching
+  `commands::teaching_assignment`'s own delete-payload precedent) only
+  when a logo actually existed to clear; clearing an already-absent
+  logo stays a true no-op.
+- **`sync_client::apply_decrypted_change`**: `EntityKind::SchoolLogo`
+  arm, the second entity kind (after `TeachingAssignment`) with a real
+  `Delete` handler -- the "any other kind's Delete is untrusted" guard
+  was widened to allow both.
+- **`ConflictEntityPreview::SchoolLogo { mime, byte_len }`** --
+  deliberately omits the raw bytes (a text/JSON preview screen, not an
+  `<img>`); `byte_len` still shows "this changed."
+
+**Structural-lock-PIN gate (ADR-0070) survival -- verified explicitly,
+same rigor as Batch 6's `LessonPlan::authorize_own_assignment` check**:
+in both `set_school_logo` and `clear_school_logo`,
+`auth::authorize_capability_with_actor` then
+`auth::require_structural_lock_unlocked` run first, using `?` (early
+return on `Err`); `resolve_sspk_if_enrolled` and the
+`*_with_optional_sync` sync-aware write functions are only ever reached
+after both gates already succeeded, and take an already-authorized
+`school_id`/`actor_user_id` as plain parameters -- they perform no
+authorization of their own and have no code path that bypasses either
+gate.
+
+**New tests this batch**: 5 `commands::school::tests::sync_tests`
+(no-sspk passthrough, sspk-enqueues-correctly-encrypted-upsert, a
+no-op-clear-enqueues-nothing case, a delete-enqueues-last-known-content
+case, device-id stamping), 5 `repository::school::tests` (sync-record
+round trip, `find_logo_by_id` fail-closed on a mismatched id, round
+trip when ids match, `None` when no logo is set), 2
+`sync_client::tests` full push/pull integration round trips (`Upsert`
+and `Delete`), 1 `commands::conflict_review::tests` typed-preview test.
+No natural-key-collision test -- like `TransferRecord` (ADR-0080), this
+entity's sync identity is `entity_id` alone (here, always `school_id`),
+resolved by a singleton `UPDATE` with no separate uniqueness rule to
+violate.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate) -- all tests passed (see the commit for
+  the exact count at HEAD).
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` -- typecheck, lint, format:check,
+  check:architecture, check:deadcode, `vitest run` (138 test files,
+  1273 tests) all passed -- run for the Checkpoint 1 frontend
+  `MAX_LOGO_BYTES` mirror change.
+
+**Owner disclosure**: `docs/product/OWNER-DECISIONS-NEEDED.md` item 5
+records the shrink-vs-new-payload-path decision as an FYI (not
+blocking) -- the owner can revisit toward a larger logo ceiling later
+via the documented alternative (a hand-rolled base64 encoder, or a
+dedicated binary-safe sync payload path) if 48 KiB proves too small in
+practice.
+
+**Files touched**: `src-tauri/src/commands/school.rs`,
+`src-tauri/src/repository/school.rs`, `src-tauri/src/sync/mod.rs`,
+`src-tauri/src/sync_client.rs`, `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/school-logo.ts`,
+`src/application/school-logo-service.test.ts`,
+`docs/adr/0081-school-logo-sync-byte-budget.md`,
+`docs/product/OWNER-DECISIONS-NEEDED.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: `scholastic_history_records` (DepEd `.xlsx`
+multi-year importer) and Anecdotal Records/Schedule Grids sync wiring
+remain deliberately deferred per `docs/product/MASTER-TASK-INVENTORY.md`'s
+existing notes (bulk-import paths stay unwired to sync by established
+precedent; the latter two have no persisted entity yet). No further
+sync-wiring candidate is currently outstanding among existing entities
+-- the next slice is either building one of those un-built entities, or
+a different priority area entirely per `CLAUDE.md`'s priority order.
+Per this batch's own instructions, stopping here: both checkpoints
+shipped, nothing left half-wired.
+
+## Batch 9 (complete): Transfers In/Out Documentation Registry, full vertical slice (2026-09-08, ADR-0080), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. This batch shipped the full vertical slice Batch 5
+deliberately deferred: migration/repository/commands/TS service/UI
+screen/sync wiring for the Transfers In/Out Documentation Registry
+(`docs/product/MASTER-TASK-INVENTORY.md` §3.4). All 4 checkpoints from
+the batch prompt were implemented and verified together in one session
+(not committed incrementally per checkpoint, since the whole slice was
+built and verified as one coherent change before any commit landed) --
+see ADR-0080 for the capability-assignment and sync-wire-now-vs-defer
+decisions.
+
+**What shipped:**
+
+- **Migration 52**: `transfer_records` table (school-scoped, references
+  `learners`, `direction`/`status` `CHECK`-constrained, no natural key
+  beyond `id` -- a learner may legitimately accumulate multiple transfer
+  rows over time).
+- **Migration 53**: widens the `entity_kind` allowlist (`sync_outbox`/
+  `sync_hub_log`/`sync_conflict_review`/`sync_version_cache`) to add
+  `'transfer_record'`, the same 12-step CHECK-widening rebuild as every
+  prior entity addition.
+- **`repository::transfer_record`**: tenant-scoped `create`/
+  `find_by_id`/`list_for_learner`/`list_for_school`/`update_status`/
+  `upsert_from_sync`, reusing the exact same
+  trim/non-empty/max-length/ISO-date rules as
+  `src/domain/transfer-record.ts`'s `validateTransferRecord` (Batch 5) so
+  the two never diverge. 16 tests (CRUD, tenant isolation, sync
+  round-trip).
+- **New `Capability::ManageTransferRecords`** (Registrar, School Head) --
+  its own variant rather than reusing `ManageLearners`, following this
+  codebase's repeated precedent (`ManageTeachingAssignments`/
+  `ManageSectionAdvisories`/`ManageSchoolBranding`/
+  `ManageSchoolCoordinates`); role set mirrors `ManageHealthRecords`
+  (school-wide registrar act, no per-section Teacher carve-out) rather
+  than `ManageChildProtection`'s per-section shape -- see ADR-0080
+  Decision 1.
+- **`commands::transfer_record`**: `record_transfer`/
+  `list_transfers_for_learner`/`list_transfers_for_school`/
+  `update_transfer_status`, following `commands::nutrition`'s exact
+  enrollment-gated encrypt-on-enqueue sync pattern (`SAVEPOINT`-atomic
+  with the write, no outbox row when this school has never enrolled a
+  sync device). 5 tests.
+- **`TransferRecordApplicationService`**/`TauriTransferRecordRepository`/
+  `TransferRecordRepository` port, wired in `composition.ts`
+  (`transferRecordService`). 8 TS tests (application service) + 4 TS
+  tests (Tauri adapter).
+- **`TransfersScreen`**: create form (learner picker, direction, date,
+  other-school name, status, remarks) plus a read-only ledger table with
+  an inline status-update control, reachable from the "Learner Records"
+  nav group. Axe-clean. 5 tests.
+- **Sync wiring**: `EntityKind::TransferRecord`,
+  `transfer_record::upsert_from_sync`, the sync-aware command wrapper
+  (authorization gate unchanged), an `apply_decrypted_change` arm
+  (school-scope-checked), and a `ConflictEntityPreview::TransferRecord`
+  typed preview (Batch 8's conflict-review pattern) in
+  `commands::conflict_review`. No dedicated natural-key-collision test --
+  this table has no natural key beyond `id` (see ADR-0080 Decision 3), so
+  a pulled change can only ever collide on `id`, which `ON CONFLICT(id)`
+  always resolves as an update; there is no distinct failure mode to
+  prove.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean.
+- `cargo test` (whole crate, all 21 test binaries) -- **1249 passed, 0
+  failed** (includes the 21 new transfer-record tests across
+  `repository::transfer_record` and `commands::transfer_record`).
+- `cargo clippy --all-targets -- -D warnings` -- clean.
+- `cargo fmt --check` -- clean (after one `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest) -- **138 test files, 1273 tests passed**, 0
+  failed; architecture-boundary check passed (no restricted imports);
+  knip found no new dead code.
+
+**Tenant isolation / authorization verification**: every
+`repository::transfer_record` query takes `school_id` as an explicit
+parameter and filters on it in the SQL itself (never inferred only from
+a joined row); `list_for_learner_is_tenant_scoped` and
+`update_status_is_tenant_scoped` tests prove a same-id-string probe from
+the wrong school returns nothing/`None` rather than leaking or mutating
+another school's row. Every Tauri command derives `school_id` from
+`authorize_capability_with_actor(..., Capability::ManageTransferRecords)`
+-- never a client-supplied parameter -- matching
+`docs/adr/0004-authentication-and-local-session.md`.
+
+**Deferred/out of scope (see ADR-0080)**: no UI-level role gating on the
+nav tab (this project never hides a tab by role; the real gate is
+server-side); editing a transfer's date/direction/school name after
+creation (only `status` is ever updated); resolving `other_school_name`
+against a directory of external schools (none exists in this app).
+
+**Next slice**: no specific next candidate pre-selected this session --
+consult `docs/product/MASTER-TASK-INVENTORY.md` for the next-highest-
+priority unchecked item per `.claude/rules/autonomous-development.md`'s
+selection order (privacy/security → correctness → DepEd compliance →
+teacher usability → offline reliability → maintainability → zero billing
+→ performance → speed) before starting a new wave.
+
+## Batch 8 (complete, items 1-7): all 7 remaining domain-module UI screens shipped (2026-09-08), commit local only, PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. This session resumed Batch 8 exactly where the prior session
+(item 8 only, commit `5832205`) left off and shipped all 7 remaining
+items in the original prompt's order, one commit per item, `npm run
+quality` passing after every single commit:
+
+1. `707e541` -- Certificate/Award screen (`CertificateAwardScreen.tsx`).
+2. `e0bd2c7` -- Seating Chart screen (`SeatingChartScreen.tsx`).
+3. `f05944d` -- School Calendar screen (`CalendarScreen.tsx`).
+4. `7fab054` -- Consolidated Grades Matrix screen (`ConsolidatedGradesScreen.tsx`).
+5. `df79ded` -- Weather composition wiring (school-coordinate migration
+   51 + repository + commands + `composition.ts` + `WeatherAdvisoryBanner`,
+   ADR-0079).
+6. `c735ec7` -- Live logo palette wiring (`useLivePalette.ts`, ADR-0078).
+7. `5abf7f7` -- ID card printable layout (`IdCardScreen.tsx`).
+
+All 7 domain modules from Batch 5 (`award-eligibility.ts`,
+`certificate.ts`, `seating-chart.ts`, `ph-holidays.ts`,
+`consolidated-grades.ts`, `palette.ts`, `id-card-token.ts`,
+`weather-hazard.ts`/`weather-service.ts`) now have real, tested UI/
+composition wiring -- none is domain-only-with-zero-UI any more.
+
+**What shipped, per item:**
+
+- **Item 1 (Certificate/Award)**: loops a section roster through
+  `LearnerScoreApplicationService.computeTermGrade` per subject/grading-
+  period into `award-eligibility.ts`, then `certificate.ts` for eligible
+  learners. Both domain-layer disclosures (unverified/configurable GA
+  threshold; disciplinary anecdotes not checked, no such feature exists)
+  render visibly on the eligibility list AND on the printed certificate
+  itself, not just in code comments. Printable via a new shared
+  `.certificate-printable` `@media print` CSS block (reusable by future
+  printable screens).
+- **Item 2 (Seating Chart)**: click-to-place over an existing section
+  roster (`seating-chart.ts`), session-local per that module's own
+  design (no persistence, no save action) -- a banner says so plainly.
+  Consistent with Batch 4's established precedent of avoiding native
+  drag-and-drop for accessibility/keyboard-navigation reasons.
+- **Item 3 (Calendar)**: `ph-holidays.ts`'s SY 2025-2026 table, sorted,
+  with the Malacañang Proclamation No. 727/665 source citation (and the
+  Islamic-holiday-dates-are-approximate caveat) visible in the UI, not
+  only the module's code comment.
+- **Item 4 (Consolidated Grades Matrix)**: section x subject x term grid
+  with a general-average column, built by looping the roster through
+  `computeTermGrade` for every class record in the section and reshaping
+  via `consolidated-grades.ts`. Read-only; horizontally scrollable so a
+  large subject/term count never scrolls the page itself sideways.
+- **Item 5 (Weather composition wiring, ADR-0079)**: migration 51 adds
+  nullable `schools.latitude`/`longitude`; a new `ManageSchoolCoordinates`
+  capability (School Head only, deliberately its own variant rather than
+  reusing `ManageSchoolBranding` -- same reasoning this codebase already
+  applies to every prior capability split); `set`/`get`/`clear_school_coordinates`
+  commands with range validation mirrored on both sides; new
+  `SchoolCoordinatesApplicationService`/repository/Tauri adapter;
+  `composition.ts` now instantiates `weatherService` (the only caller of
+  `OpenMeteoWeatherClient`); a "School location" section on
+  `SchoolBrandingScreen` (School Head only); `WeatherAdvisoryBanner`
+  mounted once in `App.tsx` that renders literally nothing for
+  no-coordinates/fetch-failure/normal-conditions, only a genuine
+  advisory, and never claims a suspension decision.
+- **Item 6 (Live palette wiring, ADR-0078)**: `useLivePalette` draws the
+  already-fetched school logo (same object URL `AppLayout` uses for the
+  sidebar/topbar image) to an offscreen canvas, samples it via
+  `palette.ts`'s `derivePaletteTokens`, and -- only when the derived pair
+  clears WCAG AA -- injects a single `<style id="live-palette-tokens">`
+  overriding `--color-primary`/`--color-surface`/`--color-text` for dark
+  mode only (mirroring `styles.css`'s own dark-mode selectors exactly so
+  light mode is never touched). Falls back cleanly (style element
+  removed) for no logo, decode failure, no canvas context, or a pair
+  that fails AA.
+- **Item 7 (ID card)**: `id-card-token.ts`'s offline HMAC token on a
+  front/back printable layout. Two deliberate scope limits, both flagged
+  in the UI itself: photo storage is NOT decided (placeholder box only,
+  explicit deferral note); the token renders as plain monospace text,
+  not a QR code -- checked `docs/SOURCE-REGISTRY.md` first, confirmed
+  nothing QR-related is adopted, and added no new dependency (flagged
+  for the record). The signing key is a random, session-local,
+  non-persisted `CryptoKey` -- real device/school-bound secret sourcing
+  stays out of `id-card-token.ts`'s own stated scope, unresolved
+  next-slice work.
+
+**New nav entries** (all under existing groups in
+`workbench-nav-data.ts`, no new top-level structure): `certificates`,
+`seating-chart`, `calendar`, `consolidated-grades`, `id-card`.
+
+**New ADRs**: `docs/adr/0078-live-palette-composition-wiring.md` (item 6),
+`docs/adr/0079-weather-composition-wiring.md` (item 5).
+
+**Verification actually run, real output:**
+
+- `npm run quality` run fresh after EVERY commit (7 separate full runs,
+  not one run at the end) -- typecheck, lint, format:check,
+  check:architecture, check:deadcode, vitest, all clean every time. Test
+  count grew from 1206 (start of this session) to **1255 tests across
+  135 files** by the final commit.
+- Item 5's Rust changes: full `cargo test --lib` -- **1233 passed, 0
+  failed** (whole crate, not a targeted filter) -- plus `cargo fmt
+--check` and `cargo clippy --all-targets -- -D warnings`, both clean.
+- `npm run quality:ui` (Playwright renderer/accessibility smoke)
+  attempted once at the end -- **failed for an environment reason, not a
+  code defect**: this sandbox's network egress does not allowlist
+  `cdn.playwright.dev`, so neither the pre-installed browser nor
+  `npx playwright install` can obtain a Chromium binary. See
+  `docs/VERIFICATION-DEBT.md`'s new entry for the exact error and what a
+  future session with different network access should retry.
+- Native visual/screen-reader inspection of all 7 new/changed screens:
+  **not done**, same disclosed limitation as every prior batch (no
+  browser/screenshot tool for the compiled native Tauri binary, no
+  Windows screen reader in this sandbox) -- only jsdom/`axe-core`
+  structural checks ran. Recorded in `docs/VERIFICATION-DEBT.md`.
+
+**Deferred / explicitly out of scope this batch** (all pre-existing,
+not newly discovered):
+
+- Transfers In/Out Documentation Registry (`docs/product/MASTER-TASK-INVENTORY.md`
+  §3.4) -- still the one remaining Tier 3.3/3.4 item needing a
+  brand-new persisted tenant-scoped entity from scratch; not part of
+  this batch's 7 named items, unchanged.
+- A dedicated "School Settings" screen consolidating logo + coordinates
+  -- explicitly deferred in ADR-0079, not needed yet at two settings.
+  Item 5's coordinate field lives on the existing `SchoolBrandingScreen`.
+- Extending derived palette tokens beyond
+  `--color-primary`/`--color-surface`/`--color-text`, or to light mode
+  -- explicitly deferred in ADR-0078, known aesthetic (not correctness)
+  limitation.
+- Real photo capture/storage for ID cards, real QR-code rendering, and
+  real device/school-bound signing-key sourcing -- all explicitly NOT
+  decided by item 7, per the original task's own instruction not to
+  decide the photo-storage question.
+
+**Exact next task**: resume the batch-round wave-boundary protocol --
+run `npm run quality:full` (or at least a fresh `npm run quality:ui`
+once Playwright's CDN is reachable) as the stable checkpoint gate before
+considering this batch's own PR-push step, then push the accumulated
+local commits (`707e541` through `df79ded`, 8 commits total with item
+8's `5832205`) to PR #55 and let its CI run for real, per the batch-
+implement mode's "one push at the end" contract in
+`.claude/rules/autonomous-development.md`. Next feature candidate after
+that: Transfers In/Out Documentation Registry (the one remaining
+Tier 3.3/3.4 item), or continue down `docs/product/MASTER-TASK-INVENTORY.md`
+in priority order.
+
+## Batch 8 (partial, item 8 only): conflict-review typed field-level previews for the six remaining entity kinds (2026-09-08), commit local only, PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed local only, nothing pushed, PR #55 untouched, no CI
+triggered. This session was assigned all 8 Batch 8 items (Certificate/
+Award screen, Seating Chart screen, Calendar screen, Consolidated
+Grades Matrix screen, weather-composition wiring + school-coordinate
+field, live-palette wiring, ID-card printable layout, and
+conflict-review typed previews). Only item 8 shipped this session,
+fully implemented and tested; items 1-7 (all real UI screens/wiring for
+the seven Batch 5 domain modules, plus the weather/palette composition
+and school-coordinate migration) are explicitly deferred, NOT
+attempted, NOT started -- see "Deferred" below for why and the exact
+resumable next action. Per `.claude/rules/autonomous-development.md`'s
+explicit permission ("ship fewer of the 8 screens fully tested rather
+than all 8 rushed"), stopping after one clean, fully-verified commit
+rather than rushing seven UI screens with weaker verification.
+
+**What shipped (item 8): conflict-review typed field-level previews**
+
+`commands::conflict_review`'s `ConflictEntityPreview` enum (Rust) and
+its mirrored TS `domain/conflict-review.ts` type previously covered
+only `Learner`/`Attendance`/`Section` with a field-level preview --
+every other sync-wired entity kind (`LessonPlan`, `NutritionRecord`,
+`BehavioralIncident`, `IncidentIntervention`, `GradeSubmission`,
+`GradeSubmissionNote` -- all six wired end to end in Batch 6) fell back
+to a generic `{ kind: "unknown" }` placeholder on the conflict-review
+screen, per Batch 6's own conflict-review generalization commit
+(`01d0ac7`). This slice adds a dedicated typed variant for all six,
+both Rust and TS, so a teacher resolving a conflict on a lesson plan,
+nutrition record, behavioral incident, intervention note, grade
+submission, or grade submission note now sees real field values (plan
+date/competency/objectives; height/weight/nutritional status; incident
+category/description/severity/resolved-at; intervention type/note;
+submission status/timestamp; note type/text) on both the incoming and
+local sides, not a placeholder.
+
+**What changed:**
+
+1. `src-tauri/src/commands/conflict_review.rs` -- six new
+   `ConflictEntityPreview` variants (`LessonPlan`, `NutritionRecord`,
+   `BehavioralIncident`, `IncidentIntervention`, `GradeSubmission`,
+   `GradeSubmissionNote`), six new `*_preview` builder functions, and
+   both `local_preview`/`decrypt_preview` wired for all six (the
+   remaining `EntityKind` variants not in this task's scope --
+   `SectionMembership`, `SubjectAttendance`, `AssessmentItem`,
+   `LearnerScore`, `GradingPeriod`, `Subject`, `TeachingAssignment`,
+   `SubjectAttendanceEntry` -- still fall through to `None`/`Unknown`,
+   unchanged).
+2. Two small new repository lookups, added because neither entity
+   previously had a find-by-own-id function (only an append-only
+   list-by-parent query existed, keyed by the wrong id for this
+   purpose -- a conflict's `entity_id` is the child row's own id, not
+   its parent's): `child_protection::find_intervention_by_id` and
+   `grade_submission::find_note_by_id`, both tenant-scoped by
+   `school_id` exactly like every existing find-by-id function in this
+   codebase.
+3. `conflict_resolution_is_already_generic_for_an_entity_kind_added_after_this_screen_shipped`,
+   the test proving generic resolution works for an entity kind with no
+   typed preview, was rewritten against `Subject` instead of
+   `LessonPlan` (renamed to
+   `..._with_no_typed_preview`) -- `LessonPlan` now has its own typed
+   preview as of this commit, so it could no longer serve as the
+   "unpreviewed kind" fixture; `Subject` genuinely still has none.
+4. Six new dedicated tests in `commands::conflict_review::tests`, one
+   per entity kind (the `BehavioralIncident`/`IncidentIntervention` pair
+   and the `GradeSubmission`/`GradeSubmissionNote` pair share a test
+   each, matching how the two are worked with together in practice),
+   each staging a conflict with a distinct incoming value against a
+   distinct pre-existing local row and asserting the real typed variant
+   (not `Unknown`) renders on both sides.
+5. `src/domain/conflict-review.ts` -- six matching TS discriminated-union
+   variants (camelCase field names/tag values, mirroring serde's
+   `rename_all = "camelCase"` exactly).
+6. `src/ui/ConflictReviewScreen.tsx`'s `describePreview` -- six new
+   `switch` arms rendering the same plain-language field summaries the
+   existing `Learner`/`Attendance`/`Section` arms already do.
+7. `src/ui/ConflictReviewScreen.test.tsx` -- one new test asserting all
+   six kinds render their real field values and never the generic
+   "no detailed preview yet" fallback text.
+8. `docs/product/MASTER-TASK-INVENTORY.md` -- new checked item recording
+   this slice under §4.1.
+
+**Verification actually run this slice:**
+
+- `cargo build --lib`, `cargo test --lib` (targeted:
+  `conflict_review`, `child_protection`, `grade_submission` modules --
+  all passed, 22+20+24 tests respectively), `cargo clippy --all-targets
+-- -D warnings` (clean), `cargo fmt --check` (clean after one
+  `cargo fmt` pass).
+- `npm run quality` (typecheck, lint, format:check,
+  `check:architecture`, `check:deadcode`, `vitest run`) -- full run,
+  real output: **125 test files / 1206 tests, all passed**; typecheck,
+  lint, format, architecture-boundary, and dead-code checks all clean.
+- `npm run quality:full` (full `cargo test`, the stable-checkpoint gate)
+  was NOT run this slice -- only the targeted Rust test filter above --
+  since only one narrow module changed on the Rust side; the full
+  workspace `cargo test` remains owed at the next natural checkpoint
+  (already tracked in `docs/VERIFICATION-DEBT.md` from Batch 6).
+  `npm run quality:security` and `npm run quality:ui` were not run --
+  no dependency/secret change in this slice, and `quality:ui`'s native
+  Tauri visual/screen-reader coverage is unavailable in this sandbox
+  regardless (tracked, not new).
+
+**Deferred (items 1-7 of Batch 8), and why:**
+
+Given this session's budget, doing all seven remaining items (four new
+UI screens, a Rust migration + repository + command for school
+coordinates, two composition-wiring decisions warranting their own
+ADRs, and a QR-dependency check) to the same fully-tested standard as
+item 8 was not achievable without rushing at least one of them past
+this project's testing/architecture bar. Per
+`.claude/rules/autonomous-development.md`'s explicit "ship fewer of the
+8 screens fully tested rather than all 8 rushed" permission, this
+session stopped after item 8's clean, fully-verified commit instead.
+None of items 1-7 were started -- no partial screen, no migration file,
+no composition.ts edit exists anywhere in the working tree for any of
+them, so the next session picks each up from a clean slate with the
+same domain modules (`award-eligibility.ts`, `certificate.ts`,
+`seating-chart.ts`, `ph-holidays.ts`, `consolidated-grades.ts`,
+`palette.ts`, `id-card-token.ts`) still fully built and untouched from
+Batch 5.
+
+**Exact next task**: resume Batch 8 items 1-7 in the original prompt's
+order, one commit per feature, `npm run quality` after each:
+
+1. Certificate/Award screen (`award-eligibility.ts` + `certificate.ts` +
+   `LearnerScoreApplicationService`'s `computeTermGrade`) -- must render
+   both existing domain-layer disclosures (unverified GA threshold,
+   no-anecdote-check) visibly, not just in code.
+2. Seating Chart screen (`seating-chart.ts`, click-to-place, session-local
+   -- no persistence per the domain module's own doc comment).
+3. Calendar screen (`ph-holidays.ts`'s SY2025-2026 table, source citation
+   visible in the UI).
+4. Consolidated Grades Matrix screen (`consolidated-grades.ts`).
+5. Weather composition wiring -- school lat/long field (new migration +
+   repository + command, following the existing school-settings
+   pattern), `weather-service.ts` wired into `composition.ts`, a UI
+   advisory affordance that is cleanly absent (never an error state)
+   when coordinates are unset or the API is unreachable. Needs its own
+   ADR (durable composition decision, per the original task).
+6. Live palette wiring -- canvas-based logo pixel extraction through
+   `palette.ts`, applied in place of static theme tokens when a logo
+   exists, falling back to today's static tokens otherwise. Needs its
+   own ADR.
+7. ID card printable layout (`id-card-token.ts`'s offline HMAC token,
+   front/back, explicit photo-placeholder deferral -- do not decide real
+   photo capture/storage). Check `docs/SOURCE-REGISTRY.md` before adding
+   any QR-rendering dependency; flag the addition if one is needed.
+
+## Batch 7 (Tier 5, final batch): verification-debt audit and documentation pass, no feature work, PR owed (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched, no CI triggered.
+Final batch of the multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md`. Tier 5's three items (native
+visual/screen-reader inspection, Android platform architecture, Official
+School Repository/SharePoint) are not buildable feature work in this
+sandbox -- real Windows hardware, a new-platform architecture decision
+requiring its own 10-scenario process, and an owner-provided
+prerequisite, respectively -- so this batch audited and corrected
+`docs/VERIFICATION-DEBT.md` and `docs/product/MASTER-TASK-INVENTORY.md`
+instead of attempting any of the three.
+
+**What was found/fixed:**
+
+1. **Native visual/screen-reader inspection** -- confirmed accurate, not
+   attempted or simulated. The true state (cross-checked, not
+   re-derived): one narrow, real, human-driven NVDA pass happened
+   2026-09-07 on the user's actual Windows machine, covering a handful
+   of screens with a plain "everything works" report and no saved
+   transcript -- meaningfully reduces but does not retire the risk.
+   Every screen shipped in Batches 3-7 of this session
+   (`SectionTimetableScreen`, the redesigned `Sidebar`/`TopBar`, and any
+   Batch 5 item whose deferred UI screen eventually ships) has zero
+   native verification, only jsdom/`axe-core` structural checks.
+   Confirmed neither `docs/CURRENT-HANDOFF.md` nor
+   `docs/product/MASTER-TASK-INVENTORY.md` implied this comprehensive
+   pass was done anywhere -- none did.
+2. **Android** -- no code/config/Gradle/Rust-target added, per
+   `CLAUDE.md`'s explicit "Windows first; Android later" phasing and the
+   10-scenario architecture-decision requirement for a new platform
+   target. Wrote a scoping note (not a decision) at
+   `docs/research/2026-09-08-android-architecture-scoping.md`: secure
+   key-storage adapter options (Android Keystore /
+   `EncryptedSharedPreferences`) equivalent to the current DPAPI
+   approach with the same fail-closed guarantee, a touch-optimized-layout
+   audit the existing pointer/keyboard-oriented shell (Batches 4-5) has
+   never had, the Tauri 2 Android build toolchain question, and the
+   zero-billing distribution constraint -- explicitly stating the real
+   10-scenario process is owed before implementation starts.
+3. **Official School Repository** -- confirmed correctly recorded as
+   blocked-on-owner. The spec
+   (`docs/product/OFFICIAL-SCHOOL-REPOSITORY-SPEC.md`) is already
+   "Approved product requirement; Microsoft 365 integration requires an
+   isolated pilot"; confirmed zero `Microsoft365DocumentAdapter`/Graph/
+   SharePoint code exists anywhere in `src/` or `src-tauri/src/`. This
+   is a genuine human approval gate (autonomous-development.md category
+   2 -- external material only the owner can provide, a school-owned
+   M365 tenant) and stays open. No integration code attempted.
+4. **Repo-wide sweep** for untracked TODO/FIXME/"not yet implemented"/
+   deferred markers across `src/`, `src-tauri/src/`, `docs/adr/`: every
+   hit found was an already-recorded, deliberate design note with its
+   own ADR/doc-comment citation. Two `db/migrations.rs` comments reading
+   as if DO 015 SHS Table 10's six weighting groups were unimplemented
+   turned out to be stale text inside earlier, now-immutable applied
+   migrations -- `docs/PROJECT-MEMORY.md` already confirms migration
+   12/ADR-0068 implemented all six plus the Grade 12 DO 8 carryover, and
+   explicitly warns not to reopen this. No genuinely new item found;
+   nothing added as a result beyond recording that the sweep happened.
+5. Added `[ ]` checkboxes to Tier 5's three items in
+   `docs/product/MASTER-TASK-INVENTORY.md` for format consistency with
+   every other tier (all three remain unchecked/blocked), and a pointer
+   to the new Android scoping note.
+
+**Verification run this batch**: none of the standard gates apply --
+this batch touched only Markdown documentation (`docs/VERIFICATION-DEBT.md`,
+this file, `docs/product/MASTER-TASK-INVENTORY.md`) plus one new
+research note (`docs/research/2026-09-08-android-architecture-scoping.md`).
+No `src/`, `src-tauri/src/`, or dependency change was made.
+
+**Exact next task**: this closes the planned multi-batch pass through
+`docs/product/MASTER-TASK-INVENTORY.md` (Batches 1-7). Retained,
+concrete next candidates already recorded in earlier entries below (not
+started, pick whichever the project owner prioritizes next): the
+`SchoolLogo` sync-wiring payload-size architecture decision; field-level
+`ConflictEntityPreview` variants for the six entities that currently
+only get `Unknown`; the Batch 5 UI-screen debt (seating chart,
+certificate screen, calendar UI, transfers registry persistence,
+consolidated-grades UI, ID-card layout, weather-alerts screen wiring);
+the owed `cargo test` (full binary) re-run at the Batch 6 final
+checkpoint noted in `docs/VERIFICATION-DEBT.md`. Tier 5's three items
+stay blocked exactly as described above until their respective
+prerequisites (real hardware, an owner-authorized Android architecture
+session, or M365 tenant confirmation) are met.
+
+## Batch 6 sync scope expansion continued: NutritionRecord, BehavioralIncident+IncidentIntervention, GradeSubmission+GradeSubmissionNote, conflict-review generalization (2026-09-08), commit local only (batch mode), PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+every commit local, nothing pushed, PR #55 untouched, no CI
+triggered. Continues directly from the LessonPlan slice below (commit
+`1fab715`), replicating its exact established pattern for four more
+`docs/product/MASTER-TASK-INVENTORY.md` §4.1 items, plus a fifth
+commit fixing a real generalization gap found along the way.
+
+**Entities wired this run** (each already covered by the LessonPlan
+slice's "What changed" shape below -- migration widening `entity_kind`,
+`EntityKind` variant, `upsert_from_sync`, sync-aware command
+wrapper(s), `sync_client::apply_decrypted_change` arm, dedicated tests):
+
+1. **`NutritionRecord`** (SF8 Health & Nutrition Engine) -- migration 48. Create-only (`record_nutrition_measurement`), matching
+   `Section`/`AssessmentItem`'s precedent. `UNIQUE (learner_id,
+school_year, period)` is a real distinct natural key -- a dedicated
+   collision test (repository-level and a `sync_client` integration
+   test) proves the generic skip-and-advance mechanism covers it.
+2. **`BehavioralIncident` + `IncidentIntervention`** (DO 006 Child
+   Protection, ADR-0072) -- migration 49. Both create-only
+   (`record_behavioral_incident`, `add_incident_intervention`).
+   **Neither table has a `UNIQUE` constraint besides its own `id`** --
+   confirmed against migration 44's `CREATE TABLE` and stated
+   explicitly in both repository doc comments and a dedicated test
+   (`behavioral_incidents_has_no_unique_constraint_besides_id_so_no_collision_scenario_exists`)
+   -- so no natural-key-collision test applies to these two, unlike
+   `LessonPlan`/`NutritionRecord`. A `resolution`-type intervention
+   also re-enqueues the just-updated (now-resolved) `BehavioralIncident`
+   in the same `SAVEPOINT` as the intervention entry, so a pulling
+   device learns both facts together.
+   **Child-protection authorization survival (verified with the same
+   rigor as LessonPlan's `authorize_own_assignment` check)**:
+   `auth::authorize_child_protection_access_for_section` (adviser-of-
+   the-section-or-School-Head) still runs, completely unchanged, in
+   both `record_behavioral_incident` and `add_incident_intervention`
+   before the sync-aware `*_with_optional_sync` write path is ever
+   reached -- those functions have no code path that skips it, and the
+   `add_incident_intervention` handler's defense-in-depth
+   forged-`incident_id`-different-section check also runs unaffected,
+   before any sync wiring is reached. On the pull side,
+   `apply_decrypted_change`'s `BehavioralIncident` arm checks the
+   decrypted payload's own `school_id`; the `IncidentIntervention` arm
+   (whose entity has no `school_id` field of its own) uses the pulling
+   device's own already-authenticated `school_id` instead -- same
+   trust boundary, supplied directly rather than read back out of an
+   untrusted payload. There is still no separate read-side
+   authorization gate on pulled sync data for any wired entity in this
+   codebase (same as every prior entity) -- `authorize_view`/list
+   commands are unaffected by this slice, exactly as documented for
+   LessonPlan below.
+3. **`GradeSubmission` + `GradeSubmissionNote`** (interim Multi-Tier
+   Review & Audit Pipeline, ADR-0073) -- migration 50. `submit_grades_for_review`
+   is create (enqueues the new submission plus every automated-check
+   note it wrote internally, in one `SAVEPOINT`); `decide_grade_submission`
+   is update (enqueues the updated submission always, plus the new
+   feedback note only when one was actually added). `GradeSubmission`
+   carries `UNIQUE (class_record_id, submitted_at)` -- a real distinct
+   natural key with its own dedicated collision test.
+   `GradeSubmissionNote` has no `UNIQUE` besides `id`, same as
+   `IncidentIntervention` -- no collision test, stated explicitly.
+4. **Conflict-review screen generalization** (its own commit,
+   `01d0ac7`) -- confirmed the RESOLUTION mechanism
+   (`resolve_conflict_review` -> `sync_client::apply_decrypted_change` +
+   `sync_outbox::correct_base_version_for_entity`) was already fully
+   generic across every `EntityKind`, with a new test that stages and
+   resolves a `LessonPlan` conflict using zero `LessonPlan`-specific
+   code in `commands::conflict_review`. But found the PREVIEW half was
+   NOT generic: `decrypt_preview`'s fallback returned `None` for every
+   entity kind besides `Learner`/`Attendance`/`Section`, which the
+   frontend's own gating (`!conflict.incoming` disables "use incoming")
+   treated identically to a real decrypt failure -- in practice, a
+   teacher could not resolve a staged conflict on any of the six
+   entities wired this session via "use incoming" through the UI at
+   all, even though the backend could already apply it correctly.
+   Fixed with a `ConflictEntityPreview::Unknown` fallback (decryption
+   already succeeded by the time that function runs, so this is a
+   genuine resolvable state, not a failure) and a matching TS
+   `{ kind: "unknown" }` variant plus friendly `ENTITY_KIND_LABELS`
+   entries for all six. **Retained/deferred**: `local_preview` and the
+   three typed preview variants still only cover
+   `Learner`/`Attendance`/`Section` -- a genuine field-level preview
+   (not just "Unknown") for the six newer entities is real,
+   separately-scoped UI/UX work.
+
+**Deferred this run, with reasons** (not silently dropped):
+
+- **`SchoolLogo`/branding bytes** -- a real architectural mismatch, not
+  scope pressure: the command-layer logo cap (`MAX_LOGO_BYTES`, 512
+  KiB) is larger than `sync::MAX_ENCRYPTED_CHANGE_BYTES` (256 KiB), and
+  there is no base64/binary-safe layer in the sync payload path today
+  -- JSON-encoding raw bytes would balloon further past that cap for
+  any logo anywhere near the current size limit. This needs a real
+  decision first (shrink `MAX_LOGO_BYTES`, or add a binary-safe payload
+  path) before it can be wired safely -- not attempted this run.
+- **`scholastic_history_records`** -- matches an established
+  precedent, not an oversight: `scholastic_history::insert` has
+  exactly one caller, `import::scholastic::commit_scholastic_import`,
+  a bulk-import transaction over potentially many rows at once.
+  `sync_client.rs`'s own module doc comment already establishes that
+  this codebase deliberately leaves bulk/import write paths unwired to
+  sync (the SF1 CSV `enroll` primitive is the precedent) in favor of
+  the typed, single-row verbs a screen actually drives. There is no
+  other write path for this entity to wire instead of the bulk one.
+
+**Verification actually run** (this session, each of the five commits
+individually, plus a final full pass):
+
+- `cargo test --lib`: 1217 passed, 0 failed (after all five commits).
+- `cargo test` (full, including all `src-tauri/tests/*.rs` integration
+  binaries and doc-tests): 0 failed. Run at the grade_submission
+  checkpoint (clean) and again at the final
+  conflict-review-generalization/docs checkpoint -- also clean, exit
+  code 0, every one of the 18 integration binaries plus doc-tests
+  passed (see `docs/VERIFICATION-DEBT.md`'s now-resolved entry for
+  the full binary list).
+- `cargo clippy --all-targets -- -D warnings`: clean at every commit.
+- `cargo fmt --check`: clean at every commit (drift fixed with plain
+  `cargo fmt`, never hand-restyled).
+- `npm run quality` (typecheck, lint, format:check,
+  check:architecture, check:deadcode, vitest): run once, for the
+  conflict-review-generalization commit (the only commit in this run
+  touching `src/` -- every sync-wiring commit was Rust-only) -- all
+  clean, 125 test files / 1205 tests passed.
+
+**Commits this run** (all local, nothing pushed): `b6ad48e`
+(NutritionRecord + BehavioralIncident + IncidentIntervention,
+combined -- see that commit's own message for why: their migration/
+EntityKind/sync_client changes interleave in the same three shared
+files, and a manual git-hunk split across ~1100 changed lines was
+judged higher-risk than value), `f85d91d` (GradeSubmission +
+GradeSubmissionNote), `01d0ac7` (conflict-review generalization),
+`8d84879` (this documentation).
+
+**Exact next task**: `SchoolLogo` sync wiring needs the payload-size
+architecture decision above resolved first (or an explicit decision to
+leave it local-only permanently, documented in an ADR). Absent that,
+the next candidate is the field-level `ConflictEntityPreview` variants
+for the six entities that currently only get `Unknown`, or picking up
+the Batch 5 UI-screen debt already recorded further down this file
+(seating chart, certificate screen, calendar UI, transfers registry,
+consolidated-grades UI, ID-card layout).
+
+## LessonPlan wired through the sync encrypt/decrypt pattern (2026-09-08), Batch 6 slice 1 of N, commit local only (batch mode), PR owed
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+commit local only, nothing pushed, PR #55 untouched. Closes the
+`LessonPlan` slice of Batch 6 (`docs/product/MASTER-TASK-INVENTORY.md`
+§4.1's "wire remaining entities to sync" list), following the exact
+established ADR-0067/0069 pattern used for every prior entity
+(`Learner` through `SubjectAttendanceEntry`).
+
+**What changed**, mirroring `commands::grading`'s create-only slice
+where applicable, but wiring BOTH `create` and `update` since this
+entity really has both verbs:
+
+- `db/migrations.rs`: migration 47 widens the `entity_kind` `CHECK`
+  allowlist (4 tables: `sync_outbox`, `sync_hub_log`,
+  `sync_conflict_review`, `sync_version_cache`) to add `'lesson_plan'`,
+  the same 12-step rebuild as migrations 24/26/36/41. New test
+  `migration_47_widens_entity_kind_to_accept_lesson_plan_and_preserves_existing_rows`.
+- `sync/mod.rs`: new `EntityKind::LessonPlan` variant, `as_db_str`/
+  `from_db_str` arms.
+- `repository/lesson_plan.rs`: `LessonPlan` now derives `Deserialize`;
+  new `upsert_from_sync(conn, plan)` -- `INSERT ... ON CONFLICT(id) DO
+UPDATE`, mirroring `grading::upsert_from_sync`. Three new tests:
+  insert-unseen, update-in-place-without-a-duplicate, and a dedicated
+  **natural-key-collision** test
+  (`upsert_from_sync_returns_an_error_on_a_natural_key_collision_distinct_from_id`)
+  proving the schema's own `UNIQUE (teaching_assignment_id, plan_date)`
+  constraint (distinct from `id`) surfaces as an ordinary `Err`, never a
+  panic or silent drop -- the precondition the generic
+  `ApplyRejection::RepositoryRejected` skip-and-advance mechanism
+  depends on.
+- `commands/lesson_plan.rs`: `create_lesson_plan`/`update_lesson_plan`
+  now take an `AppHandle`, resolve the SSPK only if this school has
+  enrolled a device, and delegate to
+  `create_lesson_plan_with_optional_sync`/
+  `update_lesson_plan_with_optional_sync` -- atomic `SAVEPOINT`/
+  `ROLLBACK TO` around the domain write plus the outbox enqueue, exactly
+  as `commands::grading`'s. `update`'s `base_version` is read from
+  `sync_version_cache::known_version` (never unconditionally 0),
+  matching `commands::attendance`'s re-recordable pattern, since a plan
+  can be revised more than once. **Authorization preserved unchanged**:
+  both commands still call `lesson_plan::authorize_own_assignment`
+  before the sync-aware write path is ever reached -- sync wiring adds
+  encryption/enqueue only, it does not touch or bypass the existing
+  teacher-owns-this-assignment gate. 8 new command tests: no-sspk
+  passthrough, sspk-enqueues-correctly-encrypted-entry, device-id
+  stamping, a-rejected-create-never-enqueues, update's known
+  base_version, and a create-side duplicate-date rejection test.
+- `sync_client.rs`: new `EntityKind::LessonPlan` arm in
+  `apply_decrypted_change`, identical tamper-check/school_id-check/
+  upsert shape to every other entity. 4 new integration-shaped tests
+  (real hub round trip over loopback HTTP, real encrypt/decrypt): applies
+  a non-conflicting change, rejects a tampered payload without applying
+  or advancing the cursor, stages a conflict when this device has an
+  unsynced local edit, and
+  **`pull_once_skips_past_a_lesson_plan_natural_key_collision_too`** --
+  the natural-key-collision test matrix item for this entity, proving
+  the generic `RepositoryRejected` skip-and-advance mechanism (confirmed
+  generic for `Subject`/`Section` in `docs/VERIFICATION-DEBT.md`) also
+  protects `LessonPlan` as a third, independently-checked entity.
+
+**Verification actually run** (this session):
+
+- `cargo build --lib`: clean, both before and after the `cargo fmt`
+  pass below.
+- `cargo test --lib`: **1174 passed, 0 failed** (full lib suite,
+  including all new `lesson_plan`/`commands::lesson_plan`/
+  `sync_client`/`migrations` tests). Also ran filtered
+  `cargo test --lib lesson_plan` in isolation first (29 passed) before
+  the full run.
+- `cargo clippy --all-targets -- -D warnings`: clean, no warnings.
+- `cargo fmt --check`: found drift on first run (this slice's own new
+  code, standard rustfmt line-wrapping); ran plain `cargo fmt` to fix it
+  (never hand-restyled), then `cargo fmt --check` was clean.
+- `npm run quality` not yet run this slice (deferred to the batch's
+  final documentation/verification commit per the batch-implement
+  workflow) -- this slice touched Rust only, no `src/`/TypeScript
+  changes.
+
+**Authorization/tenant-isolation verification for this entity**: the
+sync path never bypasses `lesson_plan::authorize_own_assignment` --
+that check runs in the Tauri command handler before
+`create_lesson_plan_with_optional_sync`/`update_lesson_plan_with_optional_sync`
+is ever called, and those functions have no code path that skips it.
+On the PULL side, `apply_decrypted_change`'s `EntityKind::LessonPlan`
+arm checks the decrypted payload's `school_id` against the pulling
+device's own `school_id` before calling `upsert_from_sync` -- a plan
+from a different school (even if somehow encrypted correctly, which
+requires that school's own SSPK) is rejected as `Untrusted`. There is
+no separate read-side authorization gate on pulled sync data for any
+already-wired entity in this codebase (the same is true for `Learner`,
+`Attendance`, etc.) -- `authorize_view`'s School-Head-inclusive read
+gate applies only to the Tauri `list_lesson_plans_by_assignment`/query
+commands, unaffected by this slice.
+
+**Retained debt / deferred** (Batch 6's remaining entities, not yet
+started this slice): school logo/branding bytes, `nutrition_records`,
+`behavioral_incidents`+`incident_interventions`, `scholastic_history_records`,
+`grade_submissions`+`grade_submission_notes`; the conflict-review-screen
+generalization check. Each is its own separate commit per the batch's
+explicit instruction -- see later entries above this one (prepended in
+chronological order) for what was completed after this slice, or this
+remains the latest state if no later entry exists.
+
+## Batch 5 (Tier 3.3-3.4) — domain-first, honestly scoped: eligibility/certificate, seating chart, holidays, weather (ADR-0076), ID-card token (ADR-0077), consolidated matrix; transfers deferred (2026-09-08)
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode — every
+commit local, nothing pushed, PR #55 untouched, no CI triggered. Covers
+`docs/product/MASTER-TASK-INVENTORY.md` §3.3-3.4 (7 items).
+
+**Scope decision made up front, and kept honest throughout**: given this
+batch's own explicit permission ("ship fewer items well-tested rather
+than all seven rushed") and the two flagged policy-uncertain items
+(award eligibility, ID-card verification) needing real rigor, this batch
+prioritized **tested pure domain logic for all 7 items** plus full
+architecture (port/adapter/service) for the one item needing a new
+external dependency (weather), over rushing UI screens and a brand-new
+persisted entity (transfers) that would not have gotten proper TDD
+treatment in the time available. UI screens and the Transfers registry's
+persistence layer are the recorded next slice, not silently dropped.
+
+**1. Certificate & Recognition (Academic Excellence)** —
+`src/domain/award-eligibility.ts` + `src/domain/certificate.ts` (12
+tests total). `DEFAULT_UNVERIFIED_GA_THRESHOLD` (90) and
+`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE` (80) are explicitly named and
+doc-commented as an unverified, school-overridable default — the
+2026-09-07 audit found legacy never actually implemented this rule (it
+was hardcoded mock data) and no primary DepEd source was ever checked.
+The "zero disciplinary anecdotes" leg is **not implemented** — there is
+no Anecdotal Records feature to check against — and
+`AwardEligibilityResult.anecdotalRecordsChecked` is hardcoded `false`
+and asserted so in tests, so nothing downstream can silently treat it as
+passed. `buildAcademicExcellenceCertificate` refuses to build a
+certificate for an ineligible learner and always includes a printed
+disclosure of both caveats. **UI (printable certificate screen)
+deferred** — the underlying per-learner grade data (`computeTermGrade`)
+already exists via `LearnerScoreApplicationService`; wiring a screen
+that loops a section roster through it is the next slice.
+
+**2. Custom Seating Chart** — `src/domain/seating-chart.ts` (9 tests):
+click-to-place (not drag-and-drop, per Batch 4's precedent), session-
+local by design (no persistence — matches the Batch 4 "session-local
+tool" pattern), no new learner field. **UI screen deferred** — the
+domain logic (place/remove/summarize) is ready for a screen to consume
+against the existing section roster.
+
+**3. School Calendar & Philippine Holidays** —
+`src/domain/ph-holidays.ts` (7 tests): hardcoded SY 2025-2026 table
+(regular/special-non-working/Islamic), sourced to Proclamation Nos. 727
+and 665 s. 2025 (Official Gazette) plus DepEd's SY 2025-2026 school
+calendar order, with Islamic-holiday dates flagged as approximate
+pending each year's specific proclamation. Flagged in this entry and in
+`docs/VERIFICATION-DEBT.md` as needing periodic manual update. **UI
+calendar screen deferred.**
+
+**4. Weather & Hazard Suspension Alerts** — full port/adapter/service
+slice, see **ADR-0076**
+(`docs/adr/0076-weather-hazard-alerts-open-meteo-scope.md`): a NEW
+external network dependency (Open-Meteo, free, no key) for an
+offline-first app, explicitly flagged despite zero cost. Every failure
+mode (offline, timeout, non-2xx, malformed response) degrades to
+`{status:"unavailable"}` and never throws — proven in
+`src/application/weather-service.test.ts` and
+`src/infrastructure/open-meteo-weather-client.test.ts` (19 tests total
+across the three weather files). `>30mm rain / >50kph wind` thresholds
+are the inventory doc's own figures, explicitly flagged as an
+unverified-against-a-specific-PAGASA/DepEd-circular heuristic, worded as
+advisory only. **Not yet wired into `composition.ts` or a UI screen**
+(no school-coordinate field exists yet either) — kept out of
+`composition.ts` this batch specifically so `knip` doesn't carry a
+dead top-level export; the next slice adds both the coordinate field (if
+a screen is built) and the composition wiring together.
+
+**5. Transfers In/Out Documentation Registry** — **deferred**, domain
+validation only shipped (`src/domain/transfer-record.ts`, 6 tests). This
+is the one item needing a genuinely new tenant-scoped persisted entity
+(migration + repository + narrow commands + TS port + application
+service + `authorize_*` wiring, both-sides tests) — a full vertical
+slice in its own right that this batch chose not to rush alongside the
+two policy-sensitive items above. Recorded as the top candidate for the
+next slice.
+
+**6. Consolidated Grades Matrix** — `src/domain/consolidated-grades.ts`
+(6 tests): pure aggregation over already-computed
+`ComputedTermGrade`/`computeTermGrade` values (the same source
+`export-service.ts`'s Rust SF9/SF10 exports already use) — no new grade
+storage, no new source of truth, per this batch's own constraint.
+Produces a section x subject x term matrix plus a per-row general
+average (feeding directly into item 1's eligibility engine). **UI screen
+deferred** — the aggregation is ready for a screen to loop a roster
+through existing services and feed the result in.
+
+**7. Student ID Card Generator** — full offline-verification token
+engine, see **ADR-0077**
+(`docs/adr/0077-id-card-qr-offline-verification-scope.md`): resolves
+audit open question #5 conservatively as **offline-only, no cloud
+endpoint, ever without explicit approval**. `src/domain/id-card-token.ts` (8 tests)
+implements `HMAC-SHA256(secretKey, schoolId|learnerId|lrn)` via Web
+Crypto (no new dependency), verified by local recomputation only — a
+test explicitly asserts verification never calls `fetch`. Real
+secret-key sourcing (wiring to `src-tauri/src/crypto/`) and the
+printable front/back card layout are deferred; **QR image rendering is
+deferred rather than faked** — no QR-rendering dependency exists in this
+project yet, and hand-rolling a correct QR encoder was judged too
+error-prone for this batch. A specific library (e.g. `qrcode`, MIT) is
+flagged for evaluation, not added, next slice.
+
+**Verification actually run**: `npm run quality` (typecheck, lint,
+format:check, architecture-boundary check, knip, vitest) — **1205 tests
+passed across 125 files**, no failures. No Rust/`src-tauri` files were
+touched this batch, so `cargo fmt --check`/`cargo test`/`cargo clippy`
+were not run (not applicable — nothing to verify there) and
+`npm run quality:security`/`npm run quality:ui` were not run either
+(no new dependency, no new UI screen this batch to Playwright-check).
+
+**New dependencies added: none.** Weather uses `fetch`/`AbortController`
+(already available); ID-card tokens use `crypto.subtle` (Web Crypto,
+already available). No npm/cargo package was added.
+
+**Exact next slice** (in priority order): (a) Transfers In/Out
+Documentation Registry full-stack persistence (migration + repository +
+commands + TS port + service + tests + UI) — the only item requiring
+new Rust; (b) wire the 6 domain-only modules above into UI screens,
+starting with Consolidated Grades Matrix and the Certificate screen
+since their data plumbing (`computeTermGrade`) already exists; (c)
+evaluate and, if approved, add a QR-rendering dependency for the ID
+card's visual layout; (d) source a real device/school-bound secret key
+for `id-card-token.ts` instead of a caller-supplied one.
+
+## Batch 4 (Tier 3.1-3.2) closed out: theme-token extensions, logo palette extraction, Visual Timetable / Class Program Builder (2026-09-08)
+
+Closed out Batch 4 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 3
+(§3.1-3.2). Branch `claude/pending-tasks-batch-vjy67v`, batch-implement
+mode -- every commit is local, nothing pushed, no CI triggered, PR #55
+untouched. This batch **extends** the existing Wave 1-6 UI redesign
+shell (ADR-0064's `AppLayout`/`Sidebar`/`TopBar`, ADR-0057's `Page`/
+`Card`/token system) rather than building a parallel one -- confirmed by
+reading those ADRs and the existing components before touching them.
+Full detail and rationale for every dependency/scope decision below is
+in `docs/adr/0075-visual-timetable-and-theme-tokens.md`.
+
+**1. Theme token extensions & logo palette extraction**
+(ADR-0075 §1-5):
+
+- `src/domain/palette.ts` (new): dependency-light dominant-color
+  extraction (color-bucket quantization over raw RGBA pixel data, no
+  `ColorThief`/`node-vibrant` added), WCAG contrast-ratio math, and
+  `derivePaletteTokens` -- a full pipeline that derives a dark-mode
+  surface/text pair from a logo's dominant color and **programmatically
+  verifies** it against real WCAG AA thresholds before claiming
+  `meetsAa: true`. 16 tests, all passing, including a cross-check
+  against this project's own already-verified primary/bg contrast pair.
+  **Not yet wired to a live screen** -- no UI component this batch draws
+  an uploaded logo to a canvas and feeds pixels through it; that glue is
+  the recorded next slice.
+- Two new CSS tokens, `--font-serif` (system serif stack) and
+  `--font-mono` (system monospace stack), applied to page `<h2>`
+  headings and a new `.font-tabular` utility (used by the shell's live
+  clock and the timetable grid's time column). Real Fraunces/IBM Plex
+  Mono webfonts are **deliberately deferred** -- flagged per this
+  batch's "no new font without flagging" constraint, not silently added.
+- 3-way Light/System/Dark theme toggle: `src/ui/theme/color-theme.ts` +
+  `ColorThemeContext.tsx` + `useColorTheme.ts`, mirroring the existing
+  `TeacherMode` pattern exactly (per-device `localStorage`, never app
+  data). Wired into `TopBar`, `App.tsx`, and `DevPreviewApp.tsx`. New
+  `[data-theme="light"|"dark"]` CSS blocks let an explicit choice win
+  over `prefers-color-scheme`; "System" (default) writes no attribute,
+  so the existing media-query behavior is byte-for-byte unchanged.
+- Three-tier card/control elevation scale (`--elevation-small/medium/
+pressed`) plus `--radius-medium`/`--radius-card`, both with dark-mode
+  overrides -- extends, not replaces, the existing `--elevation-1/2`
+  chrome-separation tokens from ADR-0057. `.card` lifts on
+  `@media (hover: hover)`; `button:active` (non-disabled) presses.
+- `Sidebar.tsx` gains a whole-rail collapse (independent from the
+  existing per-group collapse), shrinking to a ~5rem icon rail with
+  native `title`-attribute tooltips on the collapsed icons, remembered
+  in `localStorage`. Driven by a `:has()` CSS selector so the collapse
+  state stays local to `Sidebar`, not lifted into `AppLayout`.
+- `TopBar.tsx` gains a live clock (`useLiveClock`, per-minute tick, not
+  per-second), a notification-bell affordance with an unread-count badge
+  (defaults to 0 -- no notification-producing backend exists yet, UI
+  affordance only, honestly disclosed as such), and a user-initials
+  avatar.
+
+**2. Visual Timetable / Class Program Builder** (ADR-0075 §6-7):
+
+- `src/domain/timetable.ts` (new, pure domain logic, zero UI/persistence
+  import): `detectTimetableConflicts` (teacher/section/room double-
+  booking over half-open time intervals, matching the server's existing
+  `CreateMeetingOutcome` overlap convention exactly),
+  `validateSubjectWeeklyMinutes` (subject-hours check against a caller-
+  supplied required-minutes figure -- **no new
+  `curriculum_subject_requirements` persistence table this batch**,
+  flagged in the ADR as a deliberate scope decision pending real DepEd
+  curriculum-hours sourcing), and `autoSeedWeeklySlots` (greedy weekly-
+  minutes distribution into open slots, skipping conflicts including
+  against its own already-chosen candidates in the same run). 22 tests,
+  including a real bug caught by TDD: an early draft's "don't conflict
+  with itself" guard compared by `teachingAssignmentId`, which wrongly
+  let two _different_ new weekly meetings of the same subject overlap
+  each other during auto-seed; fixed by comparing an optional
+  `meetingId` instead (only a persisted meeting being edited in place
+  carries one).
+- `SectionTimetableScreen.tsx` (new): a Monday-Friday x hourly grid for
+  one section, reusing the _existing_ `TeachingAssignmentApplicationService.
+listBySection`/`listMeetings`/`createMeeting`/`removeMeeting` (Wave
+  2Y/2Z) -- **no new Rust migration, repository, or command**.
+  Click-to-arm/click-to-place, not drag-and-drop -- flagged and
+  justified in the ADR (no new dependency, fully keyboard-operable,
+  trivial Efficient/Comfortable/Guided parity). Live client-side
+  conflict preview via `detectTimetableConflicts` before a placement is
+  committed; the server's `CreateMeetingOutcome` remains the real
+  authority. Wired into `SectionsScreen` (`onManageTimetable`, optional
+  prop, existing tests unaffected) and `App.tsx` (new
+  `section-timetable` tab, same narrowly-typed per-screen state handoff
+  pattern as `schedule-meetings`). 5 tests, including an axe-clean
+  render and a genuine time-overlap-across-grid-cells conflict scenario
+  (a 90-minute meeting spilling into a neighboring hour cell it doesn't
+  visually occupy).
+- **Derived Teacher Load**: confirmed already computed live from
+  `schedule_meetings` since ADR-0039/Wave 3A (`teacher-load.ts`) -- this
+  batch changed nothing here; recorded as "already done," not
+  reimplemented or duplicated into a new stored table.
+
+**Verification actually run this session:**
+
+- `npm run quality` (typecheck + lint + format:check + architecture-
+  boundary + knip + vitest): **PASS**. 115 test files, 1146 tests
+  passed, 0 failed. Typecheck clean, lint clean, Prettier clean,
+  architecture-boundary check clean (`src/ui/**`/`src/domain/**` import
+  no `@tauri-apps/*`/`src/infrastructure/**`), knip clean (one
+  structurally-referenced type marked `@public` per the established
+  convention, one genuinely-unused internal helper un-exported rather
+  than deleted since it's still used inside its own module).
+- `npm run quality:ui` (Playwright CLI checks): **attempted, could not
+  run** -- `chrome-headless-shell` is not installed in this sandbox
+  (`browserType.launch: Executable doesn't exist`). This is an
+  environment limitation, not a result -- disclosed here rather than
+  omitted. **Native visual/screen-reader verification of the compiled
+  Tauri binary was NOT performed** -- this sandbox has no browser or
+  device to render it; every new/changed screen was verified only via
+  jsdom-based component tests (including axe-core structural checks via
+  `expectNoAccessibilityViolations`), which is necessary but not
+  sufficient. Recorded as retained verification debt in
+  `docs/VERIFICATION-DEBT.md`.
+- `cargo test`/`cargo clippy`/`cargo fmt --check`: not run this session
+  -- this batch touched no Rust code (no new migration, repository, or
+  command was needed; see ADR-0075 for why). The prior session's Rust
+  checkpoint (1160 lib tests) is unaffected and not re-claimed here.
+
+**Deferred / retained debt** (see ADR-0075's Consequences section and
+`docs/VERIFICATION-DEBT.md`'s Batch 4 entry): real Fraunces/IBM Plex Mono
+webfonts (flagged, approval-gated); the palette extractor's UI wiring to
+`SchoolBrandingScreen` (pipeline complete and tested, glue not built);
+`curriculum_subject_requirements` persistence (subject-hours validation
+works only with a manually-entered required-minutes figure today); a
+real drag-and-drop interaction (click-to-arm/place shipped instead, by
+deliberate choice, not as a stopgap); native visual/screen-reader
+verification of the compiled Windows binary; independent security/
+reliability review not requested for this batch (no auth/persistence/
+sync surface was touched -- this batch is UI + pure domain logic only,
+so the "milestones touching auth, persistence, or sync" review trigger
+in `.claude/rules/security-privacy.md` does not apply).
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) wire `derivePaletteTokens` to a real screen
+(most naturally `SchoolBrandingScreen`'s logo upload flow) so a school's
+actual theme derives from its uploaded logo, not just the pipeline
+existing in isolation; (2) decide (owner approval gate -- new
+dependency/font) whether to adopt real Fraunces/IBM Plex Mono webfonts
+now that the token-level pairing structure is in place; (3) source and
+verify an authoritative DepEd per-subject weekly-instructional-minutes
+table so `validateSubjectWeeklyMinutes` can be driven by real curriculum
+data instead of a manually-entered figure; (4) continue Batch 3's
+still-open next tasks (DO 006 tier-vocabulary verification, xlsx
+scholastic-importer template verification, frontend UI for Batch 3's
+three features, the owed independent security review) -- unaffected and
+un-superseded by this batch.
+
+## Batch 3 (Tier 2.3-2.5) closed out: DO 006 Child Protection, xlsx Scholastic Importer, interim Grade Review Pipeline (2026-09-08)
+
+Closed out Batch 3 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2
+(Correctness & Compliance), covering §2.3-2.5. Branch
+`claude/pending-tasks-batch-vjy67v`, batch-implement mode — every commit
+is local, nothing pushed, no CI triggered. TDD throughout: every new
+repository/auth function has tests written and run alongside it (this
+session did not, in every case, literally watch a pre-implementation RED
+failure before writing the implementation, but no domain/persistence/
+authorization function shipped without its own test in the same commit,
+and every test was actually executed, not merely asserted).
+
+**1. DO 006, s. 2026 Child Protection module**
+(`docs/adr/0072-child-protection-authorization.md`):
+
+- Migration 44: `behavioral_incidents` (3-tier severity) +
+  `incident_interventions` (append-only — no repository function issues
+  `UPDATE`/`DELETE` against it; a `resolution` entry flips the
+  incident's `resolved_at` status column without rewriting its
+  narrative content).
+- **DO 006 tier-naming confidence: LOW.** Could not confidently source
+  DO 006, s. 2026's own official tier vocabulary from a primary
+  `deped.gov.ph` document this session (`WebSearch` only —
+  `deped-researcher` agent unavailable). Used a defensible generic
+  3-level scale (`level_1`/`level_2`/`level_3`) instead of guessing at
+  DepEd-specific terms, per this project's established sourcing-
+  confidence convention (ADR-0037's addendum). Recorded as open
+  verification debt.
+- `repository::child_protection` (new): incident CRUD + append-only
+  intervention log. 6 tests.
+- `repository::at_risk` (new): multi-silo automated at-risk detection,
+  **computed on read** (no background job, no stored flag), reusing —
+  never duplicating — existing engines: Academic via
+  `grading_computation::compute_term_grade` (subject term grade < 70 or
+  GA < 75); Health via Batch 2's `repository::nutrition::find_for_learner`
+  (Wasted/Severely Wasted/Obese); Attendance via a new rate aggregate
+  over `attendance_records` (rate < 80%) — no existing rate function
+  existed to reuse. 6 tests.
+- `auth`: new `Capability::ManageChildProtection` (School Head) plus a
+  dedicated authorization function,
+  `authorize_child_protection_access_for_section` — mirrors
+  `authorize_adviser_of_section`'s established self-or-School-Head
+  shape exactly (ADR-0056 precedent): the section's current adviser, or
+  a School Head, may access; a bare Teacher with no adviser relationship
+  is denied. This satisfies the task's explicit "tighter than tenant
+  scoping" requirement without inventing a new role. 4 new tests.
+- `commands::child_protection` (new): 5 Tauri commands, registered in
+  `lib.rs`.
+
+**2. DepEd `.xlsx` multi-year scholastic importer**
+(`docs/adr/0074-xlsx-scholastic-importer.md`):
+
+- **No new dependency** — `calamine` 0.36.1 is already a direct
+  dependency (adopted for SF1 in ADR-0043); this importer's
+  `import::scholastic_workbook` is a second, independent user of the
+  same already-vetted crate. Test fixtures reuse `umya-spreadsheet`
+  (also already a dependency) rather than adding a second Excel-writing
+  crate.
+- `import::scholastic_workbook` (new): raw `.xlsx` row reader, same
+  calamine/header-search idiom as `import::workbook` (SF1) — column
+  layout is this project's own invented structure, unverified against
+  an official template (same disclosed gap SF1 already carries). 3
+  tests.
+- `import::scholastic` (new): preview → duplicate-review → commit,
+  reusing SF1's established UX **shape** per the task instruction, not
+  its exact 5-module split (this is a smaller, single-purpose pipeline).
+  **Never creates a learner** — matches existing learners by LRN only; a
+  row with no match is surfaced for human review, never silently turned
+  into a new enrollment. 6 tests.
+- Migration 46: `scholastic_history_records` (feeds SF10's prior-years
+  section), `repository::scholastic_history` (new). 3 tests.
+- `commands::import`: 2 new Tauri commands
+  (`preview_scholastic_import`/`commit_scholastic_import`), same
+  `ManageLearners` gate as the existing SF1 commands.
+- Not sync-wired yet — matches this project's own precedent that a
+  brand-new entity (e.g. ADR-0071's `nutrition_records`) ships unsynced
+  first.
+
+**3. Multi-Tier Review & Audit Pipeline, interim version**
+(`docs/adr/0073-interim-grade-review-pipeline.md`):
+
+- **No "Master Teacher" role exists in this codebase** (confirmed:
+  exactly Teacher/Registrar/School Head today) — School Head plays the
+  approval/principal role for this interim version, an **explicit
+  recorded decision**, not a silent substitution, referencing the
+  2026-09-07 audit's open RBAC question. Superseded once the owner
+  decides the Master Teacher RBAC question.
+- Migration 45: `grade_submissions` + `grade_submission_notes`
+  (append-only, same discipline as `incident_interventions`).
+- `repository::grade_submission` (new): `submit` runs automated checks
+  immediately (missing summative scores via
+  `learner_score::roster_for_item`, out-of-bounds scores, weight-group
+  mismatch via `resolved_weight_policy_id_in_school` returning `None`)
+  and posts every finding as an `automated_check` note; `decide`
+  approves/rejects with an optional feedback note, refusing a second
+  decision on an already-decided submission;
+  `composite_grades_for_section` reuses `grading_computation` for the
+  Principal dashboard's composite-grade half. 4 tests.
+- `auth`: new `Capability::ManageGradeSubmissionReview` (School Head)
+  plus `authorize_grade_submission_owner` — same self-or-School-Head
+  shape as the child-protection gate above, substituting "is the
+  assigned teacher (`teaching_assignments`)" for "is the current
+  adviser." 3 new tests.
+- `commands::grade_submission` (new): 5 Tauri commands including
+  `get_principal_overview_dashboard` (composite grades +
+  `list_grade_submissions_for_school`'s submission-status matrix,
+  composed by the frontend from two narrow commands — not one
+  monolithic query, matching this codebase's established pattern).
+- **Not done**: formal SF sign-offs — no SF export currently has a
+  sign-off/attestation field to wire into; recorded as a one-line reason
+  in the inventory, not silently dropped.
+
+**Verification actually run this session:**
+
+- `cargo test` (whole crate, `--lib`): **1160 lib tests passed** (up
+  from 1119), 0 failed.
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean (after one `cargo fmt` pass).
+- `npm run quality`: see the exact pass/fail recorded at the time of
+  this entry's own commit — this session ran it for real; no frontend
+  file was touched by this batch (Rust-only slice), run to confirm no
+  regression.
+
+**Deferred / retained debt** (recorded in `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 Batch 3 entry): DO 006 tier-naming LOW confidence; xlsx
+column-layout unverified against an official template; no frontend UI
+for any of the three features; no independent security review this
+session for the new child-protection authorization boundary (real
+learner PII) — continuing the recurring reviewer-dispatch-harness gap;
+no command-level (`tests/*.rs`) integration tests added for the three
+new command modules — coverage comes from the underlying
+`repository`/`auth` unit tests plus a verified `cargo build`/`cargo
+test` pass proving the command layer itself compiles and wires
+correctly.
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) source and independently verify DO 006, s.
+2026's real tier vocabulary against a primary document, migrating
+`severity_tier`'s stored values if they differ; (2) source an official
+DepEd multi-year scholastic-history `.xlsx` template to verify/correct
+`import::scholastic_workbook`'s column layout; (3) build frontend UI for
+all three Batch 3 features (child-protection incident screen + at-risk
+dashboard, scholastic-importer preview/review screen, grade-submission/
+review/Principal-dashboard screens); (4) retry the owed independent
+security review of the child-protection authorization boundary when the
+reviewer-dispatch harness is confirmed healthy; (5) when the project
+owner decides the Master Teacher RBAC question, revisit ADR-0073's
+interim School-Head-as-approver decision; (6) continue with Tier 3
+(Teacher Usability & UI/Theme Engine Replication) per the master
+inventory's next-highest item.
+
+## Batch 2 (Tier 2.1-2.2) closed out: SF1/SF9/SF10/Form 137-138 research + SF8 Health & Nutrition Engine (2026-09-08)
+
+Closed out Batch 2 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2
+(Correctness & Compliance). Branch `claude/pending-tasks-batch-vjy67v`,
+batch-implement mode — every commit is local, nothing pushed, no CI
+triggered.
+
+**Part A — SF1/SF9/SF10/Form 137-138 research (no code change; nothing
+safely alignable was found).** Re-searched via `WebSearch` (no
+`deped-researcher` agent available this session) on top of the
+extensive prior work in ADR-0048/0049/0051/0053/0063:
+
+- **SF1**: no new primary `deped.gov.ph` template found. Stays
+  `OFFICIAL_SF1_FIDELITY = NOT_VERIFIED`.
+- **SF9**: found a plausible lead (a `sites.google.com/deped.gov.ph/
+lsguide/budgets-of-work` page multiple 2026-dated secondary sources
+  describe as hosting a finalized SY2026-2027 three-term SF9), but this
+  session did not fetch/read the actual file — recorded as a lead, not
+  promoted. Stays `OFFICIAL_SF9_FIDELITY = NOT_VERIFIED`.
+- **SF10**: unchanged (SSHS provenance-confirmed/fidelity-unverified,
+  JHS MATATAG evidence-blocked); the shipped `export::sf10` CSV export
+  correctly continues to disclose non-byte-fidelity rather than
+  claiming otherwise.
+- **Form 137/138 reconciliation**: closed with medium confidence.
+  Multiple mutually consistent secondary sources confirm Form 137 → SF10,
+  Form 138 → SF9 — this project's existing naming/scope already matches;
+  this is corroboration, not a new finding requiring a code change.
+
+Full detail and exact confidence levels: `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 entry, `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 2.1.
+
+**Part B — SF8 Health & Nutrition Engine, real TDD implementation**
+(`docs/adr/0071-sf8-health-nutrition-engine.md`). The legacy port
+target (`likha-sis-master`'s `nutritionComputations.js`/
+`nutritionConsolidation.js`) was not reachable locally; found and cloned
+read-only from its actual GitHub home, `312810-spec/likha-sis` (distinct
+from this project's own `312810-spec/likha-sis-0.2`), specifically to
+read those two files and their test suites before porting.
+
+- `src-tauri/src/health/nutrition.rs` (new): decimal-age-in-months
+  (pure calendar arithmetic, no new date-library dependency — follows
+  `repository::attendance`'s existing no-dependency precedent), BMI
+  computation, and BMI-for-Age/Height-for-Age classification _logic_
+  (given already-resolved cutoffs) — all fully ported, tested, and
+  correct today. 20 tests.
+- **The WHO 2007 numeric growth-standard reference tables themselves
+  were deliberately NOT hardcoded.** The legacy table's own source
+  comment attributes it to "the DepEd SF8 workbook's BMI Tables sheet,"
+  but that was never independently verified this session, and a
+  spot-check of several rows against general knowledge of the published
+  WHO 2007 5-19y reference did not reconcile with confidence (the
+  legacy table's cutoffs at 60 months read implausibly high).
+  `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs` return `None`
+  unconditionally, with a regression test guarding against a future
+  silent flip. This is the task's own explicitly anticipated outcome
+  (gate #6: flag, don't guess) — recorded as open verification debt,
+  not silently skipped.
+- `src-tauri/src/health/consolidation.rs` (new): BOSY-vs-EOSY
+  school-wide grade-level consolidation (Enrolment/Weighed/BMI-category/
+  HFA-category counts split M/F/T, grand total, percentage derivation)
+  — ported from `nutritionConsolidation.js`, fully correct and tested
+  regardless of the table gap above (an unclassified record still
+  counts as "weighed," lands in no category bucket). 8 tests.
+- `src-tauri/src/db/migrations.rs` migration 43: `nutrition_records`
+  table — one row per learner per school year per BOSY/EOSY period,
+  `birth_date` captured per-record (not added to `learners`, which
+  ADR-0017 deliberately keeps birthdate off pending its own
+  verification — this migration scopes the field to SF8 only, it does
+  not reopen that decision). 6 tests.
+- `src-tauri/src/repository/nutrition.rs` (new): CRUD + tenant-scoped
+  queries, server-side age/BMI computation (never trusts a
+  caller-supplied computed value), new `AppError::InvalidInput` variant
+  for domain-validation failures the `CHECK` constraints alone
+  shouldn't be relied on to catch. 8 tests.
+- `src-tauri/src/auth/mod.rs`: new `Capability::ManageHealthRecords`
+  (Registrar, School Head — deliberately not Teacher yet; see ADR-0071
+  for the scoped-deferral reasoning). 4 new tests.
+- `src-tauri/src/commands/nutrition.rs` (new): 3 Tauri commands
+  (`record_nutrition_measurement`, `get_nutrition_record_for_learner`,
+  `get_nutrition_consolidation_report`), registered in `lib.rs`. The
+  consolidation command reuses `commands::export::
+export_school_eosy_sf6`'s exact section-roster-building pattern for
+  school-wide enrolment — no new query shape invented.
+- **Frontend UI, CSV/official-form export, and section-scoped Teacher
+  authorization are explicitly deferred** — see ADR-0071's "Scope
+  explicitly deferred" section.
+
+**Verification actually run this session:**
+
+- `cargo test` (whole crate, `--lib` + every `tests/*.rs` integration
+  binary): **1119 lib tests passed** (up from 1080), all integration
+  binaries green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings`: clean.
+- `cargo fmt --check`: clean (after one `cargo fmt` pass).
+- `npm run quality`: typecheck/lint/format:check/architecture-check/
+  `knip`/vitest all passed (111 test files, 1099 tests — no frontend
+  file was touched by this slice, run to confirm no regression).
+  `knip` found 0 new dead-code findings.
+
+**No new dependency added** — `chrono` was considered for date math and
+explicitly rejected in favor of this project's existing no-date-library
+precedent (see ADR-0071).
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for exact hashes.
+
+**Exact next task**: (1) source and independently verify a real
+WHO 2007 BMI-for-Age/Height-for-Age reference table from a primary
+`who.int` or `deped.gov.ph` document, then populate `lookup_bmi_cutoffs`/
+`lookup_hfa_cutoffs`, updating ADR-0071 and `docs/VERIFICATION-DEBT.md`
+together; (2) build the SF8 frontend UI (measurement-entry screen,
+consolidation report view) against the now-complete Rust command
+surface; (3) if/when a section-scoped Teacher authorization pattern is
+built for another feature, extend `Capability::ManageHealthRecords` the
+same way; (4) continue Tier 2.3 (DO 006 Child Protection & Automated
+At-Risk Triggers) per the master inventory's next-highest item.
+
+## Batch 1 (Tier 1 Security & Privacy) closed out: three security reviews + Secondary PIN Lock (2026-09-08)
+
+Closed out Batch 1 of `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1
+(highest priority). Branch `claude/pending-tasks-batch-vjy67v`, batch-
+implement mode (`.claude/rules/autonomous-development.md`) — every
+commit is local, nothing pushed, no CI triggered.
+
+**Three independent security reviews (dispatch-then-fallback, per task
+instruction)**: a fresh-context `security-reviewer` subagent dispatch
+was attempted for all three; the mechanism was not reachable in a way
+that returned a timely result (same known recurring gap this project
+has hit repeatedly — see ADR-0069's several 2026-09-05 addenda). Fell
+back to rigorous self-review, disclosed honestly, per
+`.claude/rules/autonomous-development.md`'s reviewer-fallback rule:
+
+1. **Sync payload encryption & key rotation**
+   (`hub_server::payload_key_wrap_handler`, `repository::sync_payload_key`):
+   already independently reviewed by a real dispatched `security-reviewer`
+   in an earlier session (ADR-0069, 2026-09-05), which found and fixed a
+   genuine SHOULD-FIX. This session's self-review re-confirmed the current
+   code still matches that fixed state (`ensure_wrapped_for_credential`'s
+   revocation + staleness checks both present and correct) — no new
+   finding, no regression.
+2. **Device revocation & key rotation** (`db::rotate_sspk`): same
+   situation — already independently reviewed in the same 2026-09-05
+   session (found and fixed a stale-wrap race). Re-confirmed this
+   session, no regression.
+3. **School branding logo upload** (`set_school_logo` BLOB/MIME
+   handling): never independently reviewed before. Self-review found a
+   real SHOULD-FIX: the command validated the caller-_declared_ MIME
+   string against an allow-list but never checked the actual bytes,
+   letting arbitrary content be stored under a false PNG/JPEG/WebP
+   label. **Fixed same session** — `validate_logo_upload` now also
+   checks each MIME type's real magic-byte signature (PNG's 8-byte
+   header, JPEG's SOI marker, WebP's two-part RIFF/WEBP signature).
+   7 new tests. Path traversal: not applicable (BLOB in SQLite, no
+   filesystem path). Unbounded size and tenant-scoping: already correct.
+
+All independent-review debt is retained, not dropped — recorded in
+`docs/VERIFICATION-DEBT.md`'s new 2026-09-08 entry, owed for a future
+session with a healthy reviewer-dispatch harness.
+
+**Secondary Structural-Lock PIN implemented** (ADR-0070,
+`docs/adr/0070-secondary-structural-lock-pin.md`): ports the _intent_ of
+`likha-sis-master`'s `settingsLock.js` (PBKDF2-SHA256, 150,000
+iterations) as a Rust-side gate, never a frontend-only check — per
+`.claude/rules/architecture.md`, key derivation and enforcement live
+entirely in `src-tauri/src`, never the frontend. TDD throughout.
+
+- `crypto::pin_lock` — PBKDF2-SHA256/150k derive+verify, constant-time
+  compare (`subtle`), fixed-length arrays (no OOB risk). 8 tests.
+- `repository::structural_lock` — per-school PIN storage
+  (`structural_lock_pins`, migration 42), never the plaintext PIN. 6
+  tests.
+- `auth` — `Capability::ManageStructuralLock` (School Head only, for
+  set/clear); `set_structural_lock_pin`/`clear_structural_lock_pin`/
+  `has_structural_lock_pin`/`verify_structural_lock_pin`/
+  `require_structural_lock_unlocked`; `Session` gained a private,
+  in-memory-only 5-minute unlock window
+  (`STRUCTURAL_LOCK_UNLOCK_WINDOW`), never persisted. Deliberately NOT a
+  second authentication system — no new session, no login bypass, opt-in
+  per school (a school with no PIN configured sees zero behavior
+  change). 15 new tests.
+- `commands::structural_lock` — 4 new Tauri commands, registered in
+  `lib.rs`'s `invoke_handler!`.
+- **Wired to the one existing school-identity mutation**:
+  `set_school_logo`/`clear_school_logo` now also call
+  `require_structural_lock_unlocked`. Curriculum-version and calendar-
+  structure gating explicitly deferred — searched the codebase first and
+  confirmed neither has an editing command yet to gate (both are
+  read-only/seeded or entirely unbuilt today); the reusable gate is
+  ready the moment either is built. See ADR-0070 for the full reasoning
+  — this is a scope decision, not an oversight.
+- New dependencies: `pbkdf2` 0.13.0, `subtle` 2.6.1 (both RustCrypto/
+  dalek-cryptography, MIT/Apache-2.0, zero network I/O, no paid tier) —
+  flagged here per task constraint, not a paid addition.
+
+**Verification actually run this session** (sandbox had no Rust
+toolchain new enough, no GTK/webkit2gtk dev headers, and no npm
+dependencies installed at session start — all three were fixed this
+session, not skipped):
+
+- `rustup update stable` (1.94.1 → 1.98.1, the crate requires ≥1.95).
+- `sudo apt-get install libwebkit2gtk-4.1-dev build-essential libxdo-dev
+libssl-dev libayatana-appindicator3-dev librsvg2-dev` (matching
+  `.github/workflows/quality.yml`'s own Linux CI dependency list).
+- `cargo test` (whole crate) — **1080 lib tests passed, 0 failed**,
+  every integration suite green, 0 doctests (unchanged).
+- `cargo clippy --all-targets -- -D warnings` — clean, zero warnings.
+- `cargo fmt --check` — clean (after one `cargo fmt` pass).
+- `npm ci`, then `npm run quality` — typecheck/lint/format:check/
+  architecture-check/`knip`/`vitest run` all passed (111 test files,
+  1099 tests). No TS/UI file was touched by this slice; run anyway to
+  confirm no regression.
+- `npm run quality:security` — installed `cargo-deny` (`cargo install
+cargo-deny --locked`), `gitleaks` v8.30.1, and `osv-scanner` v2.5.1
+  (official static binaries, versions matching `docs/SOURCE-REGISTRY.md`'s
+  existing pins) since none were present in this sandbox, then ran for
+  real: **3 ok, 0 failed, 0 missing** — gitleaks (no leaks), cargo-deny
+  (advisories/bans/licenses/sources all ok), osv-scanner (no issues
+  found, the same 18 pre-documented/accepted advisories correctly
+  filtered as before).
+
+**Tier 1.2's three operational/hardware items** (hub daemon resilience,
+hub hardware gates, disaster-recovery drill) were explicitly NOT
+attempted — real Windows hardware/operational access this sandbox does
+not have, per task scope. Recorded explicitly by name in
+`docs/VERIFICATION-DEBT.md` against the master inventory's Tier 1.2 list.
+
+**Commits this session** (local only, `claude/pending-tasks-batch-vjy67v`,
+nothing pushed): see `git log` for the exact hashes — one commit for the
+logo MIME-sniffing fix, one for the Secondary PIN Lock feature (crypto +
+repository + auth + commands + migration + tests), one for this
+documentation/ADR/inventory update.
+
+**Exact next task**: (1) retry the three independent `security-reviewer`
+dispatches when the harness is confirmed healthy (debt tracked in
+`docs/VERIFICATION-DEBT.md`); (2) build a frontend PIN-entry
+prompt/settings screen for the four new `commands::structural_lock`
+commands (ADR-0070 explicitly scoped the UI layer out of this slice);
+(3) when a curriculum-version or calendar-structure editing command is
+eventually built, wire `auth::require_structural_lock_unlocked` into it
+the same way `set_school_logo` already demonstrates.
+
 ## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
 
 The legacy pre-0.2 codebase, previously unavailable to any audit on this

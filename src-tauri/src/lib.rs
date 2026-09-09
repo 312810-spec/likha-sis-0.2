@@ -1,12 +1,15 @@
 pub mod auth;
+pub mod backup;
 mod commands;
 pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod export;
 pub mod formgen;
+pub mod health;
 pub mod hub_server;
 pub mod import;
+pub mod infrastructure;
 pub mod repository;
 pub mod sync;
 pub mod sync_client;
@@ -84,6 +87,14 @@ pub fn run() {
             commands::school::set_school_logo,
             commands::school::get_school_logo,
             commands::school::clear_school_logo,
+            commands::school::set_school_coordinates,
+            commands::school::get_school_coordinates,
+            commands::school::clear_school_coordinates,
+            commands::structural_lock::set_structural_lock_pin,
+            commands::structural_lock::clear_structural_lock_pin,
+            commands::structural_lock::has_structural_lock_pin,
+            commands::structural_lock::verify_structural_lock_pin,
+            commands::backup::create_disaster_recovery_backup,
             commands::learner::list_learners_by_school,
             commands::learner::create_learner,
             commands::learner::create_learner_with_duplicate_check,
@@ -172,6 +183,11 @@ pub fn run() {
             commands::section_advisory::end_section_adviser,
             commands::section_advisory::current_section_adviser,
             commands::section_advisory::list_adviser_view_sections,
+            commands::teacher_oversight_assignment::assign_teacher_oversight,
+            commands::teacher_oversight_assignment::end_teacher_oversight,
+            commands::teacher_oversight_assignment::current_teacher_overseer,
+            commands::teacher_oversight_assignment::list_teacher_oversight_assignments,
+            commands::teacher_oversight_assignment::list_teachers_i_oversee,
             commands::import::preview_sf1_import,
             commands::import::commit_sf1_import,
             commands::import::list_sf1_import_history,
@@ -183,9 +199,46 @@ pub fn run() {
             commands::device_sync::enroll_device_sync_credential,
             commands::device_sync::revoke_device_sync_credential,
             commands::device_sync::list_device_sync_credentials,
+            commands::device_sync::get_sync_hub_base_url,
+            commands::device_sync::set_sync_hub_base_url,
             commands::conflict_review::list_conflict_reviews,
             commands::conflict_review::resolve_conflict_review,
             commands::sync_status::get_sync_status,
+            commands::nutrition::record_nutrition_measurement,
+            commands::nutrition::get_nutrition_record_for_learner,
+            commands::nutrition::get_nutrition_consolidation_report,
+            commands::child_protection::record_behavioral_incident,
+            commands::child_protection::list_behavioral_incidents_for_section,
+            commands::child_protection::add_incident_intervention,
+            commands::child_protection::list_incident_interventions,
+            commands::child_protection::get_at_risk_flags_for_section,
+            commands::grade_submission::submit_grades_for_review,
+            commands::grade_submission::decide_grade_submission,
+            commands::grade_submission::decide_grade_submission_master_teacher,
+            commands::grade_submission::list_grade_submissions_for_school,
+            commands::grade_submission::list_grade_submissions_for_master_teacher,
+            commands::grade_submission::list_grade_submission_notes,
+            commands::grade_submission::get_principal_overview_dashboard,
+            commands::import::preview_scholastic_import,
+            commands::import::commit_scholastic_import,
+            commands::transfer_record::record_transfer,
+            commands::transfer_record::list_transfers_for_learner,
+            commands::transfer_record::list_transfers_for_school,
+            commands::transfer_record::update_transfer_status,
+            commands::formative_assessment::record_formative_assessment,
+            commands::formative_assessment::list_formative_assessment_logs_for_assignment,
+            commands::anecdotal_record::record_anecdotal_entry,
+            commands::anecdotal_record::list_anecdotal_records_for_section,
+            commands::anecdotal_record::add_anecdotal_record_followup,
+            commands::anecdotal_record::list_anecdotal_record_followups,
+            commands::anecdotal_record::has_anecdotal_category_for_learner,
+            commands::document_repository::get_document_repository_connection_status,
+            commands::document_repository::configure_document_repository,
+            commands::document_repository::connect_document_repository,
+            commands::document_repository::disconnect_document_repository,
+            commands::document_repository_upload_queue::queue_document_repository_upload,
+            commands::document_repository_upload_queue::list_document_repository_queued_uploads,
+            commands::document_repository_upload_drain::drain_document_repository_upload_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

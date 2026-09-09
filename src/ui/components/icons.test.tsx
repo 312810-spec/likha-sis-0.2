@@ -15,6 +15,7 @@ const NAMES: IconName[] = [
   "shield",
   "menu",
   "chevron",
+  "bell",
 ];
 
 describe("Icon", () => {

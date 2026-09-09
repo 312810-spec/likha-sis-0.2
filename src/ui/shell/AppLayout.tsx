@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { SchoolLogoApplicationService } from "../../application/school-logo-service";
 import type { CurrentSession } from "../../domain/session";
 import type { SignedInTab } from "../components/workbench-nav-data";
+import { useLivePalette } from "../theme/useLivePalette";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -58,6 +59,13 @@ export function AppLayout({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [schoolLogoService]);
+
+  // Batch 8 item 6 / ADR-0078: derive WCAG-AA dark-mode tokens from the
+  // school logo when one exists, falling back cleanly to the static
+  // palette (styles.css) otherwise -- see useLivePalette's own doc
+  // comment.
+  useLivePalette(logoUrl);
+
   const [isPhone, setIsPhone] = useState(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
     return window.matchMedia(PHONE_QUERY).matches;

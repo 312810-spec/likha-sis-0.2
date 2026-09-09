@@ -2002,6 +2002,1811 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- M42: ADR-0070 secondary structural-lock PIN. One optional PIN
+        -- per school -- gates specific structural mutations (school
+        -- identity, curriculum-version, calendar-structure edits) for an
+        -- already-authenticated session, never a second login system.
+        -- Only the salted PBKDF2-SHA256 derivation is stored, never the
+        -- plaintext PIN (see crypto::pin_lock). A school with no row here
+        -- simply has no lock configured yet -- backward compatible with
+        -- every existing school, no lock is enforced until one is set.
+        CREATE TABLE structural_lock_pins (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            salt BLOB NOT NULL CHECK (length(salt) = 16),
+            hash BLOB NOT NULL CHECK (length(hash) = 32),
+            iterations INTEGER NOT NULL CHECK (iterations > 0),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M43: SF8 Health & Nutrition Engine (ADR-0071). One record per
+        -- learner per school year per BOSY (Beginning of School Year) /
+        -- EOSY (End of School Year) measurement period, matching DepEd's
+        -- own twice-yearly Nutritional Status Report cadence. `birth_date`
+        -- is captured per-record here (NOT added to `learners`) --
+        -- `docs/adr/0017-learner-reference-number-and-sex.md` deliberately
+        -- kept birthdate off the learner profile until verified against an
+        -- official template; SF8 needs it for age computation but this
+        -- migration does not reopen that decision, it scopes the field to
+        -- this table only. `nutritional_status`/`height_for_age_status`
+        -- are nullable: `health::nutrition`'s WHO 2007 BMI-for-Age/
+        -- Height-for-Age cutoff tables are NOT YET POPULATED (unverified
+        -- numeric source -- see docs/VERIFICATION-DEBT.md), so a record
+        -- can be captured (age/BMI computed, both real arithmetic) with
+        -- its classification left NULL until a verified table lands; the
+        -- BOSY/EOSY consolidation report already tolerates a NULL
+        -- classification (it simply is not counted in any category
+        -- bucket) exactly like the ported legacy `nutritionConsolidation.js`
+        -- does. One row per learner per school year per period.
+        CREATE TABLE nutrition_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            school_year TEXT NOT NULL,
+            period TEXT NOT NULL CHECK (period IN ('BOSY', 'EOSY')),
+            grade_level TEXT NOT NULL,
+            sex TEXT NOT NULL CHECK (sex IN ('M', 'F')),
+            birth_date TEXT NOT NULL,
+            measurement_date TEXT NOT NULL,
+            height_m REAL NOT NULL CHECK (height_m > 0),
+            weight_kg REAL NOT NULL CHECK (weight_kg > 0),
+            age_in_months INTEGER NOT NULL CHECK (age_in_months >= 0),
+            bmi REAL NOT NULL CHECK (bmi > 0),
+            nutritional_status TEXT
+                CHECK (nutritional_status IS NULL OR nutritional_status IN
+                    ('SEVERELY_WASTED', 'WASTED', 'NORMAL', 'OVERWEIGHT', 'OBESE')),
+            height_for_age_status TEXT
+                CHECK (height_for_age_status IS NULL OR height_for_age_status IN
+                    ('SEVERELY_STUNTED', 'STUNTED', 'NORMAL', 'TALL')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (learner_id, school_year, period)
+        );
+
+        CREATE INDEX idx_nutrition_records_school_period
+            ON nutrition_records(school_id, school_year, period, grade_level);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M44: DO 006, s. 2026 Child Protection module (ADR-0072). Tier
+        -- naming ("level_1"/"level_2"/"level_3") is deliberately generic,
+        -- NOT DepEd-specific vocabulary -- this session could not
+        -- confidently source DO 006's exact tier names/thresholds from a
+        -- primary deped.gov.ph document, so a defensible generic 3-level
+        -- severity scale is used instead of guessing at official
+        -- terminology (see ADR-0072 and docs/VERIFICATION-DEBT.md).
+        -- `resolved_at`/`resolved_by_user_id` mark a status transition on
+        -- the incident row itself, never a content edit -- the narrative
+        -- content of an incident is set once at INSERT and never UPDATEd
+        -- by any repository function; corrections/progress are new rows
+        -- in `incident_interventions` below, matching this project's
+        -- established audit-log append-only precedent.
+        CREATE TABLE behavioral_incidents (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            reported_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            severity_tier TEXT NOT NULL CHECK (severity_tier IN ('level_1', 'level_2', 'level_3')),
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            incident_date TEXT NOT NULL,
+            resolved_at TEXT,
+            resolved_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_behavioral_incidents_school_section
+            ON behavioral_incidents(school_id, section_id, incident_date DESC);
+        CREATE INDEX idx_behavioral_incidents_school_learner
+            ON behavioral_incidents(school_id, learner_id, incident_date DESC);
+
+        -- Append-only: every intervention/resolution-progress entry is an
+        -- INSERT only. No repository function in
+        -- `repository::child_protection` issues an UPDATE or DELETE
+        -- against this table -- a correction is a new row referencing the
+        -- same incident, never an edit of a past one.
+        CREATE TABLE incident_interventions (
+            id TEXT PRIMARY KEY,
+            incident_id TEXT NOT NULL REFERENCES behavioral_incidents(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            entry_type TEXT NOT NULL CHECK (entry_type IN ('intervention', 'resolution')),
+            note TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_incident_interventions_incident
+            ON incident_interventions(incident_id, created_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M45: Multi-Tier Review & Audit Pipeline, interim version
+        -- (ADR-0073). No "Master Teacher" role exists yet (a recorded,
+        -- undecided RBAC gap -- see the 2026-09-07 unbuilt-features
+        -- audit) -- School Head plays the approval role for this interim
+        -- version, an explicit recorded decision, not a silent
+        -- role-substitution. `grade_submission_notes` is append-only,
+        -- same discipline as `incident_interventions` above: an
+        -- automated-check finding or a reviewer's feedback is a new row,
+        -- never an edit of a past one.
+        CREATE TABLE grade_submissions (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_record_id TEXT NOT NULL REFERENCES class_records(id) ON DELETE CASCADE,
+            submitted_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            status TEXT NOT NULL CHECK (status IN ('submitted', 'approved', 'rejected'))
+                DEFAULT 'submitted',
+            submitted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            decided_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            decided_at TEXT,
+            UNIQUE (class_record_id, submitted_at)
+        );
+
+        CREATE INDEX idx_grade_submissions_school_status
+            ON grade_submissions(school_id, status, submitted_at DESC);
+        CREATE INDEX idx_grade_submissions_class_record
+            ON grade_submissions(class_record_id, submitted_at DESC);
+
+        CREATE TABLE grade_submission_notes (
+            id TEXT PRIMARY KEY,
+            submission_id TEXT NOT NULL REFERENCES grade_submissions(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            note_type TEXT NOT NULL CHECK (note_type IN ('automated_check', 'feedback')),
+            note TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_grade_submission_notes_submission
+            ON grade_submission_notes(submission_id, created_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M46: DepEd `.xlsx` multi-year scholastic importer (ADR-0074).
+        -- One row per learner per prior school year per subject, ingested
+        -- from an external DepEd workbook (a transferee's history earned
+        -- at a school/system outside this app's own grading tables) --
+        -- distinct from this app's own `class_records`/`learner_scores`,
+        -- which only ever cover work actually recorded in THIS app.
+        -- `final_grade` is stored as given by the workbook (already a
+        -- DepEd-rounded whole-number transmutation, not recomputed here).
+        CREATE TABLE scholastic_history_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            school_year TEXT NOT NULL,
+            grade_level TEXT NOT NULL,
+            subject_name TEXT NOT NULL,
+            final_grade INTEGER NOT NULL CHECK (final_grade BETWEEN 60 AND 100),
+            remarks TEXT,
+            source_school_name TEXT,
+            imported_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            imported_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (learner_id, school_year, subject_name)
+        );
+
+        CREATE INDEX idx_scholastic_history_school_learner
+            ON scholastic_history_records(school_id, learner_id, school_year);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M47: widens the `entity_kind` allowlist to add `lesson_plan`
+        -- (ADR-0067/0069 sync rollout, Batch 6). Same 12-step
+        -- CHECK-widening rebuild as migrations 24, 26, 36, and 41
+        -- (SQLite cannot ALTER a CHECK constraint in place), applied to
+        -- all four tables that carry this same CHECK: `sync_outbox`,
+        -- `sync_hub_log`, `sync_conflict_review`, `sync_version_cache`.
+        -- None of these four has any incoming foreign key from another
+        -- table (confirmed by grep before writing this migration), so
+        -- each rebuild is safe with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M48: widens the `entity_kind` allowlist to add
+        -- `nutrition_record` (Batch 6 sync scope expansion, continuing
+        -- the LessonPlan slice's ADR-0067/0069 pattern). Same 12-step
+        -- CHECK-widening rebuild as migrations 24, 26, 36, 41, and 47
+        -- (SQLite cannot ALTER a CHECK constraint in place), applied to
+        -- all four tables that carry this same CHECK: `sync_outbox`,
+        -- `sync_hub_log`, `sync_conflict_review`, `sync_version_cache`.
+        -- None of these four has any incoming foreign key from another
+        -- table (confirmed by grep before writing this migration), so
+        -- each rebuild is safe with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M49: widens the `entity_kind` allowlist to add
+        -- `behavioral_incident`/`incident_intervention` (DO 006 Child
+        -- Protection module, ADR-0072; Batch 6 sync scope expansion,
+        -- continuing the LessonPlan slice's ADR-0067/0069 pattern). Same
+        -- 12-step CHECK-widening rebuild as migrations 24, 26, 36, 41,
+        -- 47, and 48 (SQLite cannot ALTER a CHECK constraint in place),
+        -- applied to all four tables that carry this same CHECK:
+        -- `sync_outbox`, `sync_hub_log`, `sync_conflict_review`,
+        -- `sync_version_cache`. None of these four has any incoming
+        -- foreign key from another table (confirmed by grep before
+        -- writing this migration), so each rebuild is safe with
+        -- `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M50: widens the `entity_kind` allowlist to add
+        -- `grade_submission`/`grade_submission_note` (interim Multi-Tier
+        -- Review & Audit Pipeline, ADR-0073; Batch 6 sync scope
+        -- expansion, continuing the LessonPlan slice's ADR-0067/0069
+        -- pattern). Same 12-step CHECK-widening rebuild as migrations 24,
+        -- 26, 36, 41, 47, 48, and 49 (SQLite cannot ALTER a CHECK
+        -- constraint in place), applied to all four tables that carry
+        -- this same CHECK: `sync_outbox`, `sync_hub_log`,
+        -- `sync_conflict_review`, `sync_version_cache`. None of these
+        -- four has any incoming foreign key from another table (confirmed
+        -- by grep before writing this migration), so each rebuild is safe
+        -- with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M51 (Batch 8 item 5, ADR-0079): school latitude/longitude for
+        -- the Weather & Hazard Suspension Alerts advisory
+        -- (domain/weather-hazard.ts, ADR-0077). Nullable -- a school that
+        -- has never set its coordinates simply gets no weather advisory,
+        -- never an error (matching every other "optional, best-effort"
+        -- feature in this codebase). No CHECK range constraint here: the
+        -- application-layer WeatherApplicationService already validates
+        -- the -90..90 / -180..180 range before this column is ever
+        -- written, matching this codebase's established convention that
+        -- input validation lives at the command/application boundary,
+        -- not the schema (see commands::school's logo upload
+        -- validation for the same split).
+        ALTER TABLE schools ADD COLUMN latitude REAL;
+        ALTER TABLE schools ADD COLUMN longitude REAL;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M52 (Batch 9, ADR-0080): Transfers In/Out Documentation Registry.
+        -- A formal ledger of a learner's inter-school transfers -- date,
+        -- direction, the OTHER school's name (this app has no directory of
+        -- external schools, so it is a free-text field, matching how
+        -- `scholastic_history_records.source_school_name` already handles
+        -- an external school name), and a document-completion status.
+        -- Mirrors `src/domain/transfer-record.ts` (Batch 5) field-for-field
+        -- so the Rust and TS validation never diverge. No natural key
+        -- besides `id`: a learner may legitimately have multiple transfer
+        -- rows over time (transferred out, later transferred back in), and
+        -- there is no real-world uniqueness rule to enforce beyond that --
+        -- unlike `nutrition_records`' `UNIQUE (learner_id, school_year,
+        -- period)`, so `upsert_from_sync` here needs no dedicated
+        -- natural-key-collision test (see ADR-0080).
+        CREATE TABLE transfer_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            direction TEXT NOT NULL CHECK (direction IN ('in', 'out')),
+            transfer_date TEXT NOT NULL,
+            other_school_name TEXT NOT NULL CHECK (length(other_school_name) > 0 AND length(other_school_name) <= 200),
+            status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'cancelled')),
+            remarks TEXT CHECK (remarks IS NULL OR length(remarks) <= 1000),
+            created_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_transfer_records_school_learner
+            ON transfer_records(school_id, learner_id, transfer_date);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M53 (Batch 9, ADR-0080): widens the `entity_kind` allowlist to
+        -- add `transfer_record`, the same 12-step CHECK-widening rebuild
+        -- as migrations 24, 26, 36, 41, 47, and 48 (SQLite cannot ALTER a
+        -- CHECK constraint in place), applied to all four tables that
+        -- carry this same CHECK: `sync_outbox`, `sync_hub_log`,
+        -- `sync_conflict_review`, `sync_version_cache`. None of these four
+        -- has any incoming foreign key from another table, so each
+        -- rebuild is safe with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M54 (Batch 10, ADR-0081): widens the `entity_kind` allowlist to
+        -- add `school_logo`, the same 12-step CHECK-widening rebuild as
+        -- migrations 24, 26, 36, 41, 47, 48, and 53 (SQLite cannot ALTER a
+        -- CHECK constraint in place), applied to all four tables that
+        -- carry this same CHECK: `sync_outbox`, `sync_hub_log`,
+        -- `sync_conflict_review`, `sync_version_cache`. `school_logo`'s
+        -- `MAX_LOGO_BYTES` was shrunk from 512 KiB to 48 KiB in the same
+        -- batch so its encrypted sync payload fits under this table's own
+        -- `length(encrypted_payload) <= 262144` CHECK -- see
+        -- `docs/adr/0081-school-logo-sync-byte-budget.md` for the byte
+        -- math. None of these four tables has any incoming foreign key
+        -- from another table, so each rebuild is safe with `foreign_keys`
+        -- enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M55 (Batch 11, ADR-0082): Formative Assessment (ESRU) logging.
+        -- One row per per-learner, per-activity ESRU observation -- a
+        -- teacher's own quick formative-assessment note, not a graded
+        -- score (this is not `assessment_items`/`learner_scores`, which
+        -- feed grade computation; ESRU logs never do). `esru_rating` is
+        -- CHECK-constrained to the four bare literal letters only --
+        -- E/S/R/U -- never the full gloss word. The gloss (Exploration/
+        -- Structured practice/Reflection/Understanding) is UI-display-only
+        -- and its correctness against any DepEd primary source is
+        -- unverified (`docs/product/OWNER-DECISIONS-NEEDED.md` item 3) --
+        -- storing only the letter means that if the gloss turns out wrong
+        -- later, fixing it is a label-string change, never a migration or
+        -- a data rewrite. `teaching_assignment_id` (not a bare
+        -- `subject_id`) is the authorization anchor, matching
+        -- `subject_attendance_sessions`' own precedent -- it is what ties
+        -- a teacher to the exact section+subject they may act on (see
+        -- `repository::formative_assessment::authorize_own_assignment`,
+        -- which reuses `subject_attendance::authorize_own_assignment`
+        -- unchanged). `grading_period_id` (not a bare free-text quarter
+        -- string) is this schema's own established "quarter" identifier
+        -- (see `grading_periods`, referenced the same way
+        -- `class_records.grading_period_id` already is). No natural key
+        -- beyond `id` -- a learner may legitimately accumulate many ESRU
+        -- logs across many activities in the same subject/quarter, the
+        -- same "no natural key besides `id`" shape as `transfer_records`
+        -- (migration 52, ADR-0080).
+        CREATE TABLE formative_assessment_logs (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            grading_period_id TEXT NOT NULL REFERENCES grading_periods(id),
+            activity_name TEXT NOT NULL CHECK (length(activity_name) > 0 AND length(activity_name) <= 200),
+            esru_rating TEXT NOT NULL CHECK (esru_rating IN ('E', 'S', 'R', 'U')),
+            notes TEXT CHECK (notes IS NULL OR length(notes) <= 1000),
+            created_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            updated_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_formative_assessment_logs_school_assignment_learner
+            ON formative_assessment_logs(school_id, teaching_assignment_id, learner_id);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M56 (Batch 11, ADR-0082): widens the `entity_kind` allowlist to
+        -- add `formative_assessment_log`, the same 12-step CHECK-widening
+        -- rebuild as migrations 24, 26, 36, 41, 47, 48, 53, and 54 (SQLite
+        -- cannot ALTER a CHECK constraint in place), applied to all four
+        -- tables that carry this same CHECK: `sync_outbox`, `sync_hub_log`,
+        -- `sync_conflict_review`, `sync_version_cache`. None of these four
+        -- has any incoming foreign key from another table, so each
+        -- rebuild is safe with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M57 (Batch 12, ADR-0083): Anecdotal / Guidance Records. One row
+        -- per learner narrative entry -- structurally and
+        -- sensitivity-wise almost identical to DO 006 Child Protection's
+        -- `behavioral_incidents` (migration 44, ADR-0072), reused as this
+        -- module's own template. `category` is deliberately a generic
+        -- positive/negative/neutral classification, NOT a disciplinary-only
+        -- framing -- guidance records serve broader purposes than honors
+        -- eligibility (see ADR-0083 for why this must not be overfit to
+        -- `award-eligibility.ts`'s narrow "disciplinary" framing, even
+        -- though a future batch wires this table into that check).
+        -- `narrative` is set once at INSERT and never UPDATEd by any
+        -- repository function -- a correction or follow-up is always a
+        -- new row in `anecdotal_record_followups` below, matching this
+        -- project's established append-only precedent
+        -- (`incident_interventions`, migration 44).
+        CREATE TABLE anecdotal_records (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            section_id TEXT NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+            authored_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            category TEXT NOT NULL CHECK (category IN ('positive', 'negative', 'neutral')),
+            entry_date TEXT NOT NULL,
+            narrative TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_anecdotal_records_school_section
+            ON anecdotal_records(school_id, section_id, entry_date DESC);
+        CREATE INDEX idx_anecdotal_records_school_learner
+            ON anecdotal_records(school_id, learner_id, entry_date DESC);
+
+        -- Append-only: every follow-up entry is an INSERT only. No
+        -- repository function in `repository::anecdotal_record` issues an
+        -- UPDATE or DELETE against this table -- a follow-up is always a
+        -- new row referencing the same anecdotal record, never an edit of
+        -- a past one (exact same discipline as `incident_interventions`,
+        -- migration 44).
+        CREATE TABLE anecdotal_record_followups (
+            id TEXT PRIMARY KEY,
+            anecdotal_record_id TEXT NOT NULL REFERENCES anecdotal_records(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            note TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_anecdotal_record_followups_record
+            ON anecdotal_record_followups(anecdotal_record_id, created_at);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M58 (Batch 12, ADR-0083): widens the `entity_kind` allowlist to
+        -- add `anecdotal_record` and `anecdotal_record_followup`, the
+        -- same 12-step CHECK-widening rebuild as migrations 24, 26, 36,
+        -- 41, 47, 48, 53, 54, and 56 (SQLite cannot ALTER a CHECK
+        -- constraint in place), applied to all four tables that carry
+        -- this same CHECK: `sync_outbox`, `sync_hub_log`,
+        -- `sync_conflict_review`, `sync_version_cache`. None of these four
+        -- has any incoming foreign key from another table, so each
+        -- rebuild is safe with `foreign_keys` enforcement on.
+        CREATE TABLE sync_outbox_new (
+            change_id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log',
+                'anecdotal_record', 'anecdotal_record_followup'
+            )),
+            entity_id TEXT NOT NULL,
+            base_version INTEGER NOT NULL CHECK (base_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            last_attempt_at TEXT,
+            last_error_code TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_outbox_new
+            (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+             last_error_code, created_at)
+        SELECT
+            change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            base_version, operation, encrypted_payload, attempt_count, last_attempt_at,
+            last_error_code, created_at
+        FROM sync_outbox;
+
+        DROP TABLE sync_outbox;
+        ALTER TABLE sync_outbox_new RENAME TO sync_outbox;
+
+        CREATE INDEX idx_sync_outbox_school_created
+            ON sync_outbox(school_id, created_at, change_id);
+
+        CREATE TABLE sync_hub_log_new (
+            cursor INTEGER PRIMARY KEY AUTOINCREMENT,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log',
+                'anecdotal_record', 'anecdotal_record_followup'
+            )),
+            entity_id TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version >= 1),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            accepted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        INSERT INTO sync_hub_log_new
+            (cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+             entity_id, version, operation, encrypted_payload, accepted_at)
+        SELECT
+            cursor, change_id, school_id, device_id, actor_user_id, entity_kind,
+            entity_id, version, operation, encrypted_payload, accepted_at
+        FROM sync_hub_log;
+
+        DROP TABLE sync_hub_log;
+        ALTER TABLE sync_hub_log_new RENAME TO sync_hub_log;
+
+        CREATE INDEX idx_sync_hub_log_school_cursor ON sync_hub_log(school_id, cursor);
+        CREATE INDEX idx_sync_hub_log_entity_version
+            ON sync_hub_log(school_id, entity_kind, entity_id, version DESC);
+
+        CREATE TABLE sync_conflict_review_new (
+            id TEXT PRIMARY KEY,
+            change_id TEXT NOT NULL UNIQUE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            actor_user_id TEXT NOT NULL,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log',
+                'anecdotal_record', 'anecdotal_record_followup'
+            )),
+            entity_id TEXT NOT NULL,
+            submitted_base_version INTEGER NOT NULL CHECK (submitted_base_version >= 0),
+            current_hub_version INTEGER NOT NULL CHECK (current_hub_version >= 0),
+            operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+            encrypted_payload BLOB NOT NULL CHECK (length(encrypted_payload) > 0 AND length(encrypted_payload) <= 262144),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            resolution TEXT CHECK (resolution IN ('kept_local', 'used_incoming'))
+        );
+
+        INSERT INTO sync_conflict_review_new
+            (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+             submitted_base_version, current_hub_version, operation, encrypted_payload,
+             created_at, resolved_at, resolution)
+        SELECT
+            id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+            submitted_base_version, current_hub_version, operation, encrypted_payload,
+            created_at, resolved_at, resolution
+        FROM sync_conflict_review;
+
+        DROP TABLE sync_conflict_review;
+        ALTER TABLE sync_conflict_review_new RENAME TO sync_conflict_review;
+
+        CREATE INDEX idx_sync_conflict_review_school_open
+            ON sync_conflict_review(school_id, resolved_at);
+
+        CREATE TABLE sync_version_cache_new (
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            entity_kind TEXT NOT NULL CHECK (entity_kind IN (
+                'learner', 'section', 'section_membership', 'attendance',
+                'subject_attendance', 'subject_attendance_entry',
+                'assessment_item', 'learner_score', 'grading_period',
+                'subject', 'teaching_assignment', 'lesson_plan',
+                'nutrition_record',
+                'behavioral_incident', 'incident_intervention',
+                'grade_submission', 'grade_submission_note',
+                'transfer_record', 'school_logo', 'formative_assessment_log',
+                'anecdotal_record', 'anecdotal_record_followup'
+            )),
+            entity_id TEXT NOT NULL,
+            known_version INTEGER NOT NULL CHECK (known_version >= 0),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (school_id, entity_kind, entity_id)
+        );
+
+        INSERT INTO sync_version_cache_new
+            (school_id, entity_kind, entity_id, known_version, updated_at)
+        SELECT
+            school_id, entity_kind, entity_id, known_version, updated_at
+        FROM sync_version_cache;
+
+        DROP TABLE sync_version_cache;
+        ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M59 (Batch 17, ADR-0073's superseding addendum): adds the real
+        -- `master_teacher` RBAC role, resolving the "Master Teacher RBAC
+        -- role" question in docs/product/OWNER-DECISIONS-NEEDED.md item 1
+        -- for real -- this is the permanent design, not another interim
+        -- stopgap. SQLite cannot ALTER a CHECK constraint in place, so
+        -- this reuses the same 12-step "create new table, copy data, drop
+        -- old, rename" rebuild `user_school_roles`'s own migration-16
+        -- comment already anticipated for exactly this ("a future role...
+        -- is added by widening this CHECK constraint in a new migration
+        -- -- the same recreate-table pattern this schema already used
+        -- once for `attendance_records`'s status enum"). Holding
+        -- `master_teacher` grants no School-Head-only capability by
+        -- itself -- see `auth::Capability::allowed_roles()`, which is
+        -- left unchanged by this migration: no existing capability lists
+        -- `master_teacher` among its allowed roles.
+        CREATE TABLE user_school_roles_new (
+            user_id TEXT NOT NULL,
+            school_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('teacher', 'registrar', 'school_head', 'master_teacher')),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            PRIMARY KEY (user_id, school_id, role),
+            FOREIGN KEY (user_id, school_id) REFERENCES user_school_memberships(user_id, school_id) ON DELETE CASCADE
+        );
+
+        INSERT INTO user_school_roles_new (user_id, school_id, role, created_at)
+        SELECT user_id, school_id, role, created_at FROM user_school_roles;
+
+        DROP TABLE user_school_roles;
+        ALTER TABLE user_school_roles_new RENAME TO user_school_roles;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M60 (Batch 17): Teacher Oversight Assignment -- the permanent
+        -- Master Teacher review-hierarchy design (superseding
+        -- ADR-0073's interim School-Head-as-approver substitution, see
+        -- docs/adr/0073-interim-grade-review-pipeline.md's superseding
+        -- addendum). Mirrors `section_advisories` (ADR-0056) exactly:
+        -- a half-open-interval time-scoped assignment
+        -- table, school-scoped, with "at most one active overseer per
+        -- teacher" enforced by a partial unique index -- the same
+        -- structural-invariant pattern
+        -- `idx_one_active_adviser_per_section` already established,
+        -- applied per teacher instead of per section. `ends_on: NULL`
+        -- means still active, matching `section_advisories.ends_on`'s
+        -- own convention.
+        CREATE TABLE teacher_oversight_assignments (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            master_teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            starts_on TEXT NOT NULL,
+            ends_on TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_teacher_oversight_school_id ON teacher_oversight_assignments(school_id);
+        CREATE INDEX idx_teacher_oversight_master_teacher_id ON teacher_oversight_assignments(master_teacher_user_id);
+        CREATE INDEX idx_teacher_oversight_teacher_id ON teacher_oversight_assignments(teacher_user_id);
+
+        -- "At most one active overseer per teacher" -- the same
+        -- structural-invariant reasoning as
+        -- `idx_one_active_adviser_per_section`, applied
+        -- per teacher instead of per section.
+        CREATE UNIQUE INDEX idx_one_active_overseer_per_teacher
+            ON teacher_oversight_assignments(teacher_user_id) WHERE ends_on IS NULL;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M61 (Batch 17, checkpoint 3, ADR-0089 section 3): the permanent
+        -- two-tier grade-submission decision flow. Deliberately does NOT
+        -- widen `grade_submissions.status`'s CHECK constraint (the
+        -- ADR explicitly left either option open: "widening the status
+        -- model (or adding master-teacher-decision columns)"). A real
+        -- table-rebuild CHECK-widening (this schema's usual "create new
+        -- table, copy data, drop old, rename" pattern, e.g. M59) was
+        -- tried and rejected here after proving experimentally that it
+        -- would SILENTLY DELETE every `grade_submission_notes` row:
+        -- `grade_submissions` (unlike every prior CHECK-widening target
+        -- in this file -- see M5/M12/M17/M20/M21's own "no incoming
+        -- foreign keys from any other table, so this is safe" comments)
+        -- IS referenced by an inbound `ON DELETE CASCADE` foreign key
+        -- from `grade_submission_notes`. `rusqlite_migration` runs every
+        -- pending migration inside ONE transaction
+        -- (`Migrations::goto_up`), and `PRAGMA foreign_keys` is a
+        -- documented no-op once a transaction is already open -- so it
+        -- cannot be toggled off from inside this migration's own SQL to
+        -- protect the rebuild. With `foreign_keys` ON the whole time (as
+        -- `db::open` sets it before migrations run), `DROP TABLE
+        -- grade_submissions` performs SQLite's implicit
+        -- delete-then-cascade over every child row first: every
+        -- append-only submission note this school has ever recorded
+        -- would be silently destroyed. Adding new nullable columns
+        -- instead needs no table rebuild at all and carries none of that
+        -- risk -- the two sub-states a widened enum would have encoded
+        -- are instead read off `status = 'submitted'` combined with
+        -- `master_teacher_decision`:
+        --   * `status = 'submitted'`, `master_teacher_decision IS NULL`:
+        --     awaiting a decision at whichever tier actually applies
+        --     (the assigned Master Teacher, or School Head directly for
+        --     the intentional no-MT-assigned fallback) -- unchanged from
+        --     ADR-0073's original single-tier shape.
+        --   * `status = 'submitted'`, `master_teacher_decision =
+        --     'approved'`: the Master Teacher tier approved; awaiting
+        --     School Head's distinct final-lock step.
+        --   * `status = 'approved' | 'rejected'`: terminal, exactly as
+        --     before -- reached either via the fallback, via a Master
+        --     Teacher's own rejection, or via School Head's final lock
+        --     (approve or reject) after Master Teacher approval.
+        -- `master_teacher_decided_by_user_id`/`_at` preserve who made the
+        -- Master Teacher decision even when School Head's later final
+        -- lock overwrites the top-level `decided_by_user_id`/`decided_at`
+        -- columns (which continue to mean "who made the FINAL decision",
+        -- unchanged in meaning from ADR-0073).
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decision TEXT
+                CHECK (master_teacher_decision IN ('approved', 'rejected'));
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decided_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decided_at TEXT;
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M62 (Batch 18 checkpoint 3, ADR-0088): the Official School
+        -- Repository's per-school Microsoft 365 app-registration/
+        -- connection status.
+        --
+        -- Never stores a token -- the refresh token lives only in the
+        -- DPAPI-protected file (`infrastructure::microsoft365::token_store`),
+        -- never SQLite (see `.claude/rules/security-privacy.md`).
+        -- `connected` only becomes 1 once a full OAuth round trip
+        -- actually completed; `last_verified_at`/`last_error` are
+        -- teacher-facing connection health, never a raw OAuth error
+        -- payload.
+        CREATE TABLE microsoft365_app_registrations (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            tenant_id TEXT NOT NULL,
+            client_id TEXT NOT NULL,
+            connected INTEGER NOT NULL DEFAULT 0 CHECK (connected IN (0, 1)),
+            last_verified_at TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M63 (Batch 18 checkpoint 4, ADR-0088): the Official School
+        -- Repository's opportunistic upload queue.
+        --
+        -- `kind` mirrors the TypeScript `UploadableArtifactKind` closed
+        -- union exactly (`src/domain/document-repository.ts`) -- an
+        -- already-generated export/backup artifact, never an arbitrary
+        -- path and never the live database file (the independent
+        -- `local_file_path` guard lives in
+        -- `repository::microsoft365_upload_queue::enqueue`, see
+        -- ADR-0088 Decision 4). `local_file_path` never leaves this
+        -- device and is never synced to another school's device.
+        CREATE TABLE microsoft365_upload_queue (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL CHECK (kind IN ('sf1-export', 'sf9-export', 'sf10-export', 'disaster-recovery-backup')),
+            file_name TEXT NOT NULL,
+            local_file_path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'uploading', 'uploaded', 'failed')),
+            attempt_count INTEGER NOT NULL DEFAULT 0,
+            last_error_code TEXT CHECK (last_error_code IN ('offline', 'timeout', 'unauthorized', 'provider-rejected', 'not-configured')),
+            queued_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_ms365_upload_queue_school_id ON microsoft365_upload_queue(school_id);
+        CREATE INDEX idx_ms365_upload_queue_status ON microsoft365_upload_queue(school_id, status);
+        "#,
+        ),
+        M::up(
+            r#"
+        -- M64: makes the sync client's hub address configurable per
+        -- device/school, closing the gap recorded at the end of Batches
+        -- 16-18 (`docs/CURRENT-HANDOFF.md`): this device could previously
+        -- only reach a hub on `127.0.0.1` (`sync_client::DEFAULT_HUB_BASE_URL`),
+        -- which only ever works when the hub process happens to be running
+        -- on the exact same machine. The hub server side has supported a
+        -- real LAN/Tailscale bind address since ADR-0067; nothing let a
+        -- client point at one until now.
+        --
+        -- Nullable, stored on the existing per-school row rather than a
+        -- new table -- this is one more fact about THIS device's existing
+        -- relationship to its school's hub, not an independent entity
+        -- (matches `device_sync_client_credential`'s own existing
+        -- single-row-per-school shape). NULL means "use the default
+        -- loopback address" (`sync_client::SyncClientConfig::discover`),
+        -- never an empty string -- an explicit absent-value sentinel, not
+        -- a magic string a caller could accidentally produce.
+        ALTER TABLE device_sync_client_credential
+            ADD COLUMN hub_base_url TEXT;
+        "#,
+        ),
     ])
 }
 
@@ -3147,6 +4952,205 @@ mod tests {
         assert!(
             result.is_err(),
             "a role cannot be granted for a school membership that doesn't exist"
+        );
+    }
+
+    #[test]
+    fn migration_59_allows_the_real_master_teacher_role() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'master_teacher')",
+            [],
+        );
+
+        assert!(
+            result.is_ok(),
+            "the widened CHECK constraint must accept the real master_teacher role"
+        );
+    }
+
+    #[test]
+    fn migration_59_still_rejects_an_unrecognized_role_after_widening() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+
+        let result = conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'principal')",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "the CHECK-widening rebuild must not accidentally drop the allowlist entirely"
+        );
+    }
+
+    #[test]
+    fn migration_59_still_cascades_and_enforces_the_membership_foreign_key() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_user_and_membership(&conn);
+        conn.execute(
+            "INSERT INTO user_school_roles (user_id, school_id, role) VALUES ('u1', 's1', 'teacher')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "DELETE FROM user_school_memberships WHERE user_id = 'u1' AND school_id = 's1'",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM user_school_roles WHERE user_id = 'u1' AND school_id = 's1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count, 0,
+            "the rebuilt table must still cascade-delete roles when the membership is removed"
+        );
+    }
+
+    /// Builds a real, FK-valid `class_records` row (school, section,
+    /// subject, grading period) via the ordinary repository functions --
+    /// none of which touch anything M61 changes, so this works
+    /// identically whether `conn` is at M60 or the latest schema.
+    /// Returns the new class record's id.
+    fn seed_class_record_for_grade_submission(conn: &Connection) -> String {
+        use crate::repository::{class_record, grading, section, subject};
+        const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+        const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        let sec = section::create(conn, "s1", "2026-2027", "5", "Section A").unwrap();
+        let sub = subject::create(conn, "s1", "Mathematics").unwrap();
+        let period = grading::create(conn, "s1", "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
+            .unwrap()
+            .unwrap();
+        class_record::create(conn, "s1", &sec.id, &sub.id, &period.id, K10_POLICY, None)
+            .unwrap()
+            .unwrap()
+            .id
+    }
+
+    #[test]
+    fn migration_61_never_loses_a_pre_existing_submissions_append_only_notes() {
+        // Proves the specific data-loss failure mode M61's own doc
+        // comment records having found and rejected (a CHECK-widening
+        // table rebuild would silently cascade-delete every
+        // `grade_submission_notes` row via the inbound `ON DELETE
+        // CASCADE` foreign key, since `PRAGMA foreign_keys` cannot be
+        // toggled off mid-migration-transaction). Applies through M60
+        // first (the pre-M61 schema), seeds a submission with a note the
+        // same way `repository::grade_submission::submit` does, then
+        // applies M61 and checks the note survives untouched.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 60).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+
+        conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grade_submission_notes (id, submission_id, school_id, note_type, note) \
+             VALUES ('n1', 'gs1', 's1', 'automated_check', 'pre-existing finding')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let note_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM grade_submission_notes", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            note_count, 1,
+            "M61 must never lose a pre-existing submission note"
+        );
+        let submission_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM grade_submissions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(submission_count, 1);
+    }
+
+    #[test]
+    fn migration_61_adds_nullable_master_teacher_decision_columns() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+
+        // Omitting the new columns entirely must still succeed (NULL
+        // default) -- an existing INSERT statement written before M61
+        // continues to work unmodified.
+        let result = conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        );
+        assert!(result.is_ok());
+
+        let (decision, decided_by, decided_at): (Option<String>, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT master_teacher_decision, master_teacher_decided_by_user_id, master_teacher_decided_at \
+                 FROM grade_submissions WHERE id = 'gs1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(decision, None);
+        assert_eq!(decided_by, None);
+        assert_eq!(decided_at, None);
+    }
+
+    #[test]
+    fn migration_61_rejects_an_unrecognized_master_teacher_decision_value() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+        conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "UPDATE grade_submissions SET master_teacher_decision = 'bogus' WHERE id = 'gs1'",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "master_teacher_decision must reject a value outside ('approved', 'rejected')"
         );
     }
 
@@ -4607,5 +6611,731 @@ mod tests {
             )
             .unwrap();
         assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_47_widens_entity_kind_to_accept_lesson_plan_and_preserves_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        // A pre-existing `sync_outbox` row (some other entity kind) must
+        // survive the rebuild untouched.
+        conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'01020304')",
+            [],
+        )
+        .unwrap();
+
+        // The new value is now accepted across all four widened tables.
+        for table in [
+            "sync_outbox",
+            "sync_hub_log",
+            "sync_conflict_review",
+            "sync_version_cache",
+        ] {
+            let sql = match table {
+                "sync_outbox" => {
+                    "INSERT INTO sync_outbox
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     base_version, operation, encrypted_payload)
+                 VALUES ('c2', 's1', 'd1', 'u1', 'lesson_plan', 'e1', 0, 'upsert', X'01')"
+                }
+                "sync_hub_log" => {
+                    "INSERT INTO sync_hub_log
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     version, operation, encrypted_payload)
+                 VALUES ('c3', 's1', 'd1', 'u1', 'lesson_plan', 'e1', 1, 'upsert', X'01')"
+                }
+                "sync_conflict_review" => {
+                    "INSERT INTO sync_conflict_review
+                    (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     submitted_base_version, current_hub_version, operation, encrypted_payload)
+                 VALUES ('r1', 'c4', 's1', 'd1', 'u1', 'lesson_plan', 'e1', 0, 1, 'upsert', X'01')"
+                }
+                "sync_version_cache" => {
+                    "INSERT INTO sync_version_cache
+                    (school_id, entity_kind, entity_id, known_version)
+                 VALUES ('s1', 'lesson_plan', 'e1', 1)"
+                }
+                _ => unreachable!(),
+            };
+            conn.execute(sql, [])
+                .unwrap_or_else(|e| panic!("{table} must accept 'lesson_plan': {e}"));
+        }
+
+        // An entity kind that was never valid is still rejected -- the
+        // rebuild widened the allowlist, it did not remove it.
+        let rejected = conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c5', 's1', 'd1', 'u1', 'not-a-real-entity', 'e1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        // The pre-existing row survived the rebuild.
+        let preserved: String = conn
+            .query_row(
+                "SELECT entity_id FROM sync_outbox WHERE change_id = 'c1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_48_widens_entity_kind_to_accept_nutrition_record_and_preserves_existing_rows() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        // A pre-existing `sync_outbox` row (some other entity kind) must
+        // survive the rebuild untouched.
+        conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'01020304')",
+            [],
+        )
+        .unwrap();
+
+        // The new value is now accepted across all four widened tables.
+        for table in [
+            "sync_outbox",
+            "sync_hub_log",
+            "sync_conflict_review",
+            "sync_version_cache",
+        ] {
+            let sql = match table {
+                "sync_outbox" => {
+                    "INSERT INTO sync_outbox
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     base_version, operation, encrypted_payload)
+                 VALUES ('c2', 's1', 'd1', 'u1', 'nutrition_record', 'e1', 0, 'upsert', X'01')"
+                }
+                "sync_hub_log" => {
+                    "INSERT INTO sync_hub_log
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     version, operation, encrypted_payload)
+                 VALUES ('c3', 's1', 'd1', 'u1', 'nutrition_record', 'e1', 1, 'upsert', X'01')"
+                }
+                "sync_conflict_review" => {
+                    "INSERT INTO sync_conflict_review
+                    (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     submitted_base_version, current_hub_version, operation, encrypted_payload)
+                 VALUES ('r1', 'c4', 's1', 'd1', 'u1', 'nutrition_record', 'e1', 0, 1, 'upsert', X'01')"
+                }
+                "sync_version_cache" => {
+                    "INSERT INTO sync_version_cache
+                    (school_id, entity_kind, entity_id, known_version)
+                 VALUES ('s1', 'nutrition_record', 'e1', 1)"
+                }
+                _ => unreachable!(),
+            };
+            conn.execute(sql, [])
+                .unwrap_or_else(|e| panic!("{table} must accept 'nutrition_record': {e}"));
+        }
+
+        // An entity kind that was never valid is still rejected -- the
+        // rebuild widened the allowlist, it did not remove it.
+        let rejected = conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c5', 's1', 'd1', 'u1', 'not-a-real-entity', 'e1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        // The pre-existing row survived the rebuild.
+        let preserved: String = conn
+            .query_row(
+                "SELECT entity_id FROM sync_outbox WHERE change_id = 'c1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_49_widens_entity_kind_to_accept_behavioral_incident_and_incident_intervention() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        // A pre-existing `sync_outbox` row (some other entity kind) must
+        // survive the rebuild untouched.
+        conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'01020304')",
+            [],
+        )
+        .unwrap();
+
+        for new_kind in ["behavioral_incident", "incident_intervention"] {
+            for table in [
+                "sync_outbox",
+                "sync_hub_log",
+                "sync_conflict_review",
+                "sync_version_cache",
+            ] {
+                let sql = match table {
+                    "sync_outbox" => format!(
+                        "INSERT INTO sync_outbox
+                        (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         base_version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-c2', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 'upsert', X'01')"
+                    ),
+                    "sync_hub_log" => format!(
+                        "INSERT INTO sync_hub_log
+                        (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-c3', 's1', 'd1', 'u1', '{new_kind}', 'e1', 1, 'upsert', X'01')"
+                    ),
+                    "sync_conflict_review" => format!(
+                        "INSERT INTO sync_conflict_review
+                        (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         submitted_base_version, current_hub_version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-r1', '{new_kind}-c4', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 1, 'upsert', X'01')"
+                    ),
+                    "sync_version_cache" => format!(
+                        "INSERT INTO sync_version_cache
+                        (school_id, entity_kind, entity_id, known_version)
+                     VALUES ('s1', '{new_kind}', '{new_kind}-e1', 1)"
+                    ),
+                    _ => unreachable!(),
+                };
+                conn.execute(&sql, [])
+                    .unwrap_or_else(|e| panic!("{table} must accept '{new_kind}': {e}"));
+            }
+        }
+
+        // An entity kind that was never valid is still rejected -- the
+        // rebuild widened the allowlist, it did not remove it.
+        let rejected = conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c5', 's1', 'd1', 'u1', 'not-a-real-entity', 'e1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        // The pre-existing row survived the rebuild.
+        let preserved: String = conn
+            .query_row(
+                "SELECT entity_id FROM sync_outbox WHERE change_id = 'c1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_50_widens_entity_kind_to_accept_grade_submission_and_grade_submission_note() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'01020304')",
+            [],
+        )
+        .unwrap();
+
+        for new_kind in ["grade_submission", "grade_submission_note"] {
+            for table in [
+                "sync_outbox",
+                "sync_hub_log",
+                "sync_conflict_review",
+                "sync_version_cache",
+            ] {
+                let sql = match table {
+                    "sync_outbox" => format!(
+                        "INSERT INTO sync_outbox
+                        (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         base_version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-c2', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 'upsert', X'01')"
+                    ),
+                    "sync_hub_log" => format!(
+                        "INSERT INTO sync_hub_log
+                        (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-c3', 's1', 'd1', 'u1', '{new_kind}', 'e1', 1, 'upsert', X'01')"
+                    ),
+                    "sync_conflict_review" => format!(
+                        "INSERT INTO sync_conflict_review
+                        (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                         submitted_base_version, current_hub_version, operation, encrypted_payload)
+                     VALUES ('{new_kind}-r1', '{new_kind}-c4', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 1, 'upsert', X'01')"
+                    ),
+                    "sync_version_cache" => format!(
+                        "INSERT INTO sync_version_cache
+                        (school_id, entity_kind, entity_id, known_version)
+                     VALUES ('s1', '{new_kind}', '{new_kind}-e1', 1)"
+                    ),
+                    _ => unreachable!(),
+                };
+                conn.execute(&sql, [])
+                    .unwrap_or_else(|e| panic!("{table} must accept '{new_kind}': {e}"));
+            }
+        }
+
+        let rejected = conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c5', 's1', 'd1', 'u1', 'not-a-real-entity', 'e1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        let preserved: String = conn
+            .query_row(
+                "SELECT entity_id FROM sync_outbox WHERE change_id = 'c1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_56_widens_entity_kind_to_accept_formative_assessment_log() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c1', 's1', 'd1', 'u1', 'learner', 'l1', 0, 'upsert', X'01020304')",
+            [],
+        )
+        .unwrap();
+
+        let new_kind = "formative_assessment_log";
+        for table in [
+            "sync_outbox",
+            "sync_hub_log",
+            "sync_conflict_review",
+            "sync_version_cache",
+        ] {
+            let sql = match table {
+                "sync_outbox" => format!(
+                    "INSERT INTO sync_outbox
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     base_version, operation, encrypted_payload)
+                 VALUES ('{new_kind}-c2', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 'upsert', X'01')"
+                ),
+                "sync_hub_log" => format!(
+                    "INSERT INTO sync_hub_log
+                    (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     version, operation, encrypted_payload)
+                 VALUES ('{new_kind}-c3', 's1', 'd1', 'u1', '{new_kind}', 'e1', 1, 'upsert', X'01')"
+                ),
+                "sync_conflict_review" => format!(
+                    "INSERT INTO sync_conflict_review
+                    (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                     submitted_base_version, current_hub_version, operation, encrypted_payload)
+                 VALUES ('{new_kind}-r1', '{new_kind}-c4', 's1', 'd1', 'u1', '{new_kind}', 'e1', 0, 1, 'upsert', X'01')"
+                ),
+                "sync_version_cache" => format!(
+                    "INSERT INTO sync_version_cache
+                    (school_id, entity_kind, entity_id, known_version)
+                 VALUES ('s1', '{new_kind}', '{new_kind}-e1', 1)"
+                ),
+                _ => unreachable!(),
+            };
+            conn.execute(&sql, [])
+                .unwrap_or_else(|e| panic!("{table} must accept '{new_kind}': {e}"));
+        }
+
+        let rejected = conn.execute(
+            "INSERT INTO sync_outbox
+                (change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
+                 base_version, operation, encrypted_payload)
+             VALUES ('c5', 's1', 'd1', 'u1', 'not-a-real-entity', 'e1', 0, 'upsert', X'01')",
+            [],
+        );
+        assert!(rejected.is_err());
+
+        let preserved: String = conn
+            .query_row(
+                "SELECT entity_id FROM sync_outbox WHERE change_id = 'c1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, "l1");
+    }
+
+    #[test]
+    fn migration_55_rejects_an_esru_rating_outside_the_four_bare_letters() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO learners (id, school_id, given_name, family_name) \
+             VALUES ('l1', 's1', 'Ana', 'Cruz')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('t1', 'teacher.a', 'x', 'Teacher A')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2026-2027', '7', 'Mabini')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO subjects (id, school_id, name) VALUES ('sub1', 's1', 'Mathematics')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES ('ta1', 's1', 't1', 'sec1', 'sub1')",
+            [],
+        )
+        .unwrap();
+        let policy_period_id: String = conn
+            .query_row("SELECT id FROM grading_policy_periods LIMIT 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        conn.execute(
+            "INSERT INTO grading_periods (id, school_id, school_year, policy_period_id, starts_on, ends_on) \
+             VALUES ('gp1', 's1', '2026-2027', ?1, '2026-06-01', '2026-08-31')",
+            [&policy_period_id],
+        )
+        .unwrap();
+
+        // The full gloss word must never be accepted -- only the four bare
+        // letters (see the migration's own doc comment: the gloss is
+        // UI-display-only and unverified).
+        let rejected = conn.execute(
+            "INSERT INTO formative_assessment_logs \
+                (id, school_id, teaching_assignment_id, learner_id, grading_period_id, \
+                 activity_name, esru_rating) \
+             VALUES ('f1', 's1', 'ta1', 'l1', 'gp1', 'Quiz 1', 'Exploration')",
+            [],
+        );
+        assert!(
+            rejected.is_err(),
+            "the full gloss word must never be a valid stored esru_rating"
+        );
+
+        let accepted = conn.execute(
+            "INSERT INTO formative_assessment_logs \
+                (id, school_id, teaching_assignment_id, learner_id, grading_period_id, \
+                 activity_name, esru_rating) \
+             VALUES ('f2', 's1', 'ta1', 'l1', 'gp1', 'Quiz 1', 'E')",
+            [],
+        );
+        assert!(accepted.is_ok(), "the bare letter 'E' must be accepted");
+    }
+
+    fn seed_school_and_learner(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO learners (id, school_id, given_name, family_name) \
+             VALUES ('l1', 's1', 'Juan', 'Dela Cruz')",
+            [],
+        )
+        .unwrap();
+    }
+
+    fn insert_nutrition_record(conn: &Connection, period: &str) -> rusqlite::Result<usize> {
+        let id = format!("n-{period}");
+        conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES (?2, 's1', 'l1', '2026-2027', ?1, '5', 'M', \
+                     '2020-06-15', '2026-06-20', 1.10, 18.5, 72, 15.29)",
+            [period, &id],
+        )
+    }
+
+    #[test]
+    fn migration_43_enforces_the_nutrition_record_contract() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+
+        let (age, bmi): (i64, f64) = conn
+            .query_row(
+                "SELECT age_in_months, bmi FROM nutrition_records WHERE id = 'n-BOSY'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(age, 72);
+        assert!((bmi - 15.29).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn migration_43_rejects_an_unrecognized_period() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        assert!(insert_nutrition_record(&conn, "MIDYEAR").is_err());
+    }
+
+    #[test]
+    fn migration_43_rejects_a_second_record_for_the_same_learner_school_year_and_period() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        let dup = conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES ('n2', 's1', 'l1', '2026-2027', 'BOSY', '5', 'M', \
+                     '2020-06-15', '2026-06-21', 1.11, 18.6, 72, 15.09)",
+            [],
+        );
+        assert!(dup.is_err());
+    }
+
+    #[test]
+    fn migration_43_allows_one_bosy_and_one_eosy_record_for_the_same_learner_and_school_year() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        insert_nutrition_record(&conn, "EOSY").unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nutrition_records WHERE learner_id = 'l1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn migration_43_rejects_a_nonpositive_height_or_weight() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        let bad_height = conn.execute(
+            "INSERT INTO nutrition_records \
+                (id, school_id, learner_id, school_year, period, grade_level, sex, \
+                 birth_date, measurement_date, height_m, weight_kg, age_in_months, bmi) \
+             VALUES ('n1', 's1', 'l1', '2026-2027', 'BOSY', '5', 'M', \
+                     '2020-06-15', '2026-06-20', 0.0, 18.5, 72, 15.29)",
+            [],
+        );
+        assert!(bad_height.is_err());
+    }
+
+    #[test]
+    fn migration_43_allows_a_null_classification_pending_verified_who_tables() {
+        // See docs/VERIFICATION-DEBT.md: the WHO 2007 BMI-for-Age /
+        // Height-for-Age cutoff tables are not yet sourced with
+        // confidence, so a real captured measurement must be storable
+        // with its classification left unset rather than blocked or
+        // guessed.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        insert_nutrition_record(&conn, "BOSY").unwrap();
+        let status: Option<String> = conn
+            .query_row(
+                "SELECT nutritional_status FROM nutrition_records WHERE id = 'n-BOSY'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(status, None);
+    }
+
+    fn seed_section(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO sections (id, school_id, school_year, grade_level, name) \
+             VALUES ('sec1', 's1', '2026-2027', '5', 'Section A')",
+            [],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn migration_44_rejects_an_unrecognized_severity_tier() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+        seed_section(&conn);
+
+        let bad = conn.execute(
+            "INSERT INTO behavioral_incidents \
+                (id, school_id, learner_id, section_id, severity_tier, category, description, incident_date) \
+             VALUES ('bi1', 's1', 'l1', 'sec1', 'critical', 'fighting', 'synthetic test row', '2026-09-01')",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_44_stores_an_incident_and_an_append_only_intervention_chain() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+        seed_section(&conn);
+
+        conn.execute(
+            "INSERT INTO behavioral_incidents \
+                (id, school_id, learner_id, section_id, severity_tier, category, description, incident_date) \
+             VALUES ('bi1', 's1', 'l1', 'sec1', 'level_2', 'bullying', 'synthetic test row', '2026-09-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO incident_interventions (id, incident_id, school_id, entry_type, note) \
+             VALUES ('ii1', 'bi1', 's1', 'intervention', 'synthetic note one')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO incident_interventions (id, incident_id, school_id, entry_type, note) \
+             VALUES ('ii2', 'bi1', 's1', 'resolution', 'synthetic note two')",
+            [],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM incident_interventions WHERE incident_id = 'bi1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn migration_45_rejects_an_unrecognized_submission_status() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        let bad = conn.execute(
+            "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+             VALUES ('gs1', 's1', 'cr1', 'pending_review')",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_46_rejects_a_final_grade_outside_the_deped_passing_scale() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        let bad = conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh1', 's1', 'l1', '2024-2025', '4', 'Mathematics', 59)",
+            [],
+        );
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn migration_46_rejects_a_duplicate_subject_for_the_same_learner_and_school_year() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        seed_school_and_learner(&conn);
+
+        conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh1', 's1', 'l1', '2024-2025', '4', 'Mathematics', 88)",
+            [],
+        )
+        .unwrap();
+        let dup = conn.execute(
+            "INSERT INTO scholastic_history_records \
+                (id, school_id, learner_id, school_year, grade_level, subject_name, final_grade) \
+             VALUES ('sh2', 's1', 'l1', '2024-2025', '4', 'Mathematics', 90)",
+            [],
+        );
+        assert!(dup.is_err());
     }
 }

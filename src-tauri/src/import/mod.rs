@@ -4,6 +4,8 @@ pub mod matching;
 pub mod normalize;
 pub mod preview;
 pub mod psgc;
+pub mod scholastic;
+pub mod scholastic_workbook;
 pub mod sf1;
 pub mod validate;
 pub mod workbook;

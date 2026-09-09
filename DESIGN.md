@@ -62,6 +62,91 @@ Locally relevant without costume or cliché. Distinctive through rhythm,
 typography, and detail — not through a mascot, an illustration style,
 or a color explosion. Fast and legible on ordinary school hardware.
 
+### Elevation pass: The Faculty Standard (proposed 2026-09-09)
+
+**Status**: name and thesis confirmed by the user 2026-09-09, along
+with the accent token and the Phase 1+2 execution order. This is an
+**elevation of Calm Civic Classroom, not a replacement** — same
+tokens, same "no mascot, no color explosion" discipline, same
+audience — the gap it closes is craft discipline, not concept.
+
+**Correction to this section's original count**: the first draft
+claimed only 3 of 42 screens used the shared `Page`/`Alert`/
+`StatusChip` vocabulary. Re-measured directly against the codebase
+(`grep -LE "<Page($|[ >])|<PageHeader" src/ui/*Screen.tsx`) — the true
+count was the reverse: 39 of 42 already did, and only 3 didn't
+(`LoginScreen`, `FirstRunSetupScreen`, `HomeScreen`). Phase 2 migrated
+the two pre-auth screens onto `<Page>` (removing their hand-rolled
+heading/focus-management duplicate of what `Page` already does);
+`HomeScreen` is a pure role-router with no title of its own — both its
+branches (`TeacherWorkspaceScreen`, `SchoolHeadHome`) already render
+`<Page>` themselves, so it correctly stays as-is. **Phase 2 (shared
+vocabulary adoption) is complete as of 2026-09-09** — every screen in
+`src/ui/` either uses the shared vocabulary directly or delegates to a
+child that does.
+
+The thesis: the visual grammar of the one civic document a Filipino
+teacher already trusts completely — the permanent record card, the
+class ledger, the official form (ruled columns, numbered fields,
+tabular precision, authority conveyed through _structure_, never
+through an actual government mark) — executed with the spacing
+discipline, restraint, and real depth hierarchy of Linear/Stripe/
+Notion-caliber product design. Competitive grounding: the category's
+own incumbent (PowerSchool SIS) is on record in G2/Gartner reviews as
+"outdated" and "difficult to navigate" — no SIS competitor has ever
+shipped on craft, which is a real, citable opening rather than a taste
+preference.
+
+Concrete additions on top of the existing UX-01 token set (no existing
+token value changes, no new color beyond one accent):
+
+- One new accent token, `--color-accent` (a muted brass, `#7d5f1c`
+  light / `#d9c48a` dark, plus a `--color-accent-surface` wash),
+  reserved for genuinely earned moments (a needs-attention eyebrow, a
+  distinguishing rule) — not a general-purpose highlight. Implemented
+  in `styles.css`; the case-file artifact's first-draft value
+  (`#8a6a1f`) only cleared 4.36:1 on `--color-surface`, short of the
+  4.5:1 AA text bar — recomputed and darkened before landing, same
+  discipline as every other token pair in this file.
+- **Correction from this section's first draft**: no new elevation
+  tokens are needed. `styles.css` already carries a real, dual-themed
+  elevation scale (`--elevation-1`/`--elevation-2`/
+  `--elevation-small`/`--elevation-medium`/`--elevation-pressed`),
+  with real (if sparse) existing usage — the case-file artifact
+  prepared alongside this entry incorrectly described the app as
+  having no elevation hierarchy at all. The actual, verified gap is
+  adoption, not the token set: most screens never reach for the
+  existing scale. Assign it by role going forward — flat (ambient
+  text, never a card), `--elevation-small` (an ordinary resting card),
+  `--elevation-medium` (hover/focus lift), `--elevation-2`
+  (drawer/overlay, or the one thing on screen that must be answered) —
+  rather than inventing a parallel scale.
+- `Source Serif 4` proposed (not yet added) as a second, editorial-
+  register face for screen-level titles/thesis statements, paired with
+  the existing self-hosted Public Sans for every operated control —
+  not a replacement for Public Sans, which stays the UI/body face.
+  **Held pending explicit approval**: `--font-serif` already carries a
+  comment recording an earlier, identical deferral (a system-stack
+  fallback instead of a webfont, "adding a new Google Font is a
+  flaggable dependency decision... not a silent default"). Public Sans
+  is deliberately self-hosted via `@fontsource` with no runtime webfont
+  fetch specifically because this app is offline-first; a live Google
+  Fonts `<link>` would silently break that promise at a school with no
+  internet, so this can only land as a self-hosted `@fontsource`
+  package, and only once the user signs off on the new dependency
+  itself — not assumed from sign-off on the direction as a whole.
+
+Full research and the before/after component comparison live in the
+case-file artifact prepared this session (not checked into the repo —
+a planning document, not a durable record); see
+`.claude/skills/premium-teacher-ui/SKILL.md` for the distilled,
+checkable version of these rules every screen edit should now follow.
+
+Next phases (not yet started, no candidate implemented): Phase 3
+(hover-lift/motion signature moments on the shared components) and
+Phase 4 (two new surfaces — a public landing page, a principal/admin
+overview concept). Neither begins without a separate go-ahead.
+
 ## Tokens (implemented, UX-01 — see ADR-0031)
 
 `src/ui/theme/styles.css`'s `:root` custom properties now carry the Calm

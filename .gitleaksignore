@@ -1,0 +1,13 @@
+# Confirmed false positives from gitleaks scans, verified by hand before
+# being added here. Each entry is a fingerprint from a gitleaks finding,
+# never a real secret.
+#
+# 2026-09-08: docs/adr/0075-visual-timetable-and-theme-tokens.md line 55
+# heading text "...token-level pairing now, Fraunces/IBM..." matched the
+# generic-api-key rule purely because the word "token" appeared near a
+# mixed-case slash-separated phrase ("Fraunces/IBM") with enough entropy.
+# Confirmed not a secret: it's an ADR section heading about typography
+# tokens. The heading was also reworded in a follow-up commit to avoid
+# retriggering this class of false positive, but the fingerprint below
+# still needs to stay ignored because it's pinned to the original commit.
+210d09b7841c49e133600cdd1e11494585beb45c:docs/adr/0075-visual-timetable-and-theme-tokens.md:generic-api-key:55

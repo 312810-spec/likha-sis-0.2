@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { SetupApplicationService } from "../application/setup-service";
 import { ValidationError } from "../domain/errors";
 import type { CurrentSession } from "../domain/session";
 import { Alert } from "./components/Alert";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface FirstRunSetupScreenProps {
@@ -12,7 +13,6 @@ interface FirstRunSetupScreenProps {
 
 export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunSetupScreenProps) {
   const { mode } = useTeacherMode();
-  const headingRef = useRef<HTMLHeadingElement>(null);
   const [schoolName, setSchoolName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -21,11 +21,6 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
   const [showPasswords, setShowPasswords] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    // See LoginScreen/LearnerListScreen's equivalent effect.
-    headingRef.current?.focus();
-  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -55,16 +50,16 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
   const passwordFieldType = showPasswords ? "text" : "password";
 
   return (
-    <div>
-      <h2 ref={headingRef} tabIndex={-1}>
-        Welcome to LIKHA-SIS
-      </h2>
-      <p>
-        Let's get your school set up. LIKHA-SIS works right on this computer — you don't need an
-        internet connection to use it. This only takes a minute, and you'll be ready to start adding
-        learners right after.
-      </p>
-
+    <Page
+      title="Welcome to LIKHA-SIS"
+      hint={
+        <p>
+          Let's get your school set up. LIKHA-SIS works right on this computer — you don't need an
+          internet connection to use it. This only takes a minute, and you'll be ready to start
+          adding learners right after.
+        </p>
+      }
+    >
       <form onSubmit={handleSubmit} aria-label="Set up your school">
         {error && <Alert tone="error">{error}</Alert>}
 
@@ -170,6 +165,6 @@ export function FirstRunSetupScreen({ setupService, onSetupComplete }: FirstRunS
           {submitting ? "Setting up…" : "Finish setup"}
         </button>
       </form>
-    </div>
+    </Page>
   );
 }

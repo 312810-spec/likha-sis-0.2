@@ -18,6 +18,12 @@ const ENTITY_KIND_LABELS: Record<string, string> = {
   learner: "Learner",
   attendance: "Attendance record",
   section: "Section",
+  lesson_plan: "Lesson plan",
+  nutrition_record: "Nutrition record",
+  behavioral_incident: "Behavioral incident",
+  incident_intervention: "Intervention note",
+  grade_submission: "Grade submission",
+  grade_submission_note: "Grade submission note",
 };
 
 function entityKindLabel(entityKind: string): string {
@@ -58,6 +64,35 @@ function describePreview(preview: ConflictEntityPreview): string[] {
         `Grade level: ${preview.gradeLevel}`,
         `School year: ${preview.schoolYear}`,
       ];
+    case "lessonPlan":
+      return [
+        `Date: ${preview.planDate}`,
+        `Competency: ${preview.learningCompetency}${preview.learningCompetencyCode ? ` (${preview.learningCompetencyCode})` : ""}`,
+        `Objectives: ${preview.learningObjectives}`,
+      ];
+    case "nutritionRecord":
+      return [
+        `School year / period: ${preview.schoolYear} ${preview.period}`,
+        `Height: ${preview.heightM} m`,
+        `Weight: ${preview.weightKg} kg`,
+        `Status: ${preview.nutritionalStatus ?? "Not yet classified"}`,
+      ];
+    case "behavioralIncident":
+      return [
+        `Date: ${preview.incidentDate}`,
+        `Category: ${preview.category}`,
+        `Severity: ${preview.severityTier}`,
+        `Description: ${preview.description}`,
+        `Resolved: ${preview.resolvedAt ?? "Not yet resolved"}`,
+      ];
+    case "incidentIntervention":
+      return [`Type: ${preview.entryType}`, `Note: ${preview.note}`];
+    case "gradeSubmission":
+      return [`Status: ${preview.status}`, `Submitted: ${preview.submittedAt}`];
+    case "gradeSubmissionNote":
+      return [`Type: ${preview.noteType}`, `Note: ${preview.note}`];
+    case "unknown":
+      return ["This record was received and can be applied, but has no detailed preview yet."];
   }
 }
 

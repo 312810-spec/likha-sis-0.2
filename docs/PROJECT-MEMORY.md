@@ -1,5 +1,238 @@
 # PROJECT MEMORY
 
+## Configurable sync hub address (2026-09-09): the "exact next slice" from Batch 16, done on owner instruction to proceed
+
+- `device_sync_client_credential.hub_base_url` (migration M64, nullable,
+  `NULL` = default loopback) plus `get_sync_hub_base_url`/
+  `set_sync_hub_base_url` commands. `sync_client::SyncClientConfig::discover`
+  now uses the configured address when one is set.
+- **Treated as a security-relevant setting, not a preference**: this
+  address is where a device sends its own sync credential secret on
+  every push/pull round, so `set_sync_hub_base_url` is School-Head-only
+  (`ManageSchoolMembership`) — same gate `revoke_device_sync_credential`
+  already used, reused deliberately rather than adding a new narrow
+  capability for one setting.
+- `url` crate promoted from transitive (already pulled in by `reqwest`)
+  to direct dependency for server-side scheme/host validation — no new
+  supply-chain surface, confirmed by re-running `npm run
+quality:security` (3 ok, 0 failed) before pushing, learning Batch
+  16's own recorded lesson (run it on every `Cargo.lock` change, not
+  only at final consolidation).
+- UI panel on `DeviceManagementScreen` follows that screen's own
+  established "no client-side role hiding" convention (visible to
+  everyone, backend alone enforces who can save).
+- Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of
+  file).
+
+## Batches 16-18: Master Teacher RBAC + Official School Repository (M365) shipped; both remaining owner decisions resolved; wave stopped (2026-09-09)
+
+- **Both open items in `docs/product/OWNER-DECISIONS-NEEDED.md` are now
+  resolved for real**, not interim workarounds: Master Teacher RBAC
+  (Batch 17, ADR-0089) and the Official School Repository / Microsoft
+  365 document adapter (Batch 18, ADR-0088), per the owner's direct
+  instruction to build both.
+- **Master Teacher RBAC**: real role + `teacher_oversight_assignments`
+  (School-Head-managed). Grade submissions get a genuine two-tier
+  decision — an assigned Master Teacher decides first, `None` falls
+  back straight to School-Head exactly as before (no behavior change
+  for schools not using the feature), School Head keeps a separate
+  final-lock step. Self-approval structurally blocked server-side.
+- **Official School Repository**: hand-rolled PKCE OAuth2 against
+  Microsoft's documented v2.0 endpoints — no maintained Rust MSAL crate
+  exists, checked via `dependency-researcher` before deciding to hand-roll.
+  Refresh token lives DPAPI-protected in its own file, never in SQLite.
+  `reqwest` switched to the `rustls` TLS backend for this (first caller
+  in this codebase to leave loopback and need a real TLS backend) —
+  pulled in `webpki-root-certs` under `CDLA-Permissive-2.0`, now on
+  `deny.toml`'s allow-list (was a real CI gap caught and fixed at the
+  Batch 16 checkpoint, not before — **run `npm run quality:security`
+  whenever `Cargo.lock` changes, not only at final consolidation**).
+  Upload queue is exports-only, opportunistic, follows the existing
+  sync-outbox drain pattern; genuinely cannot deliver bytes to
+  Microsoft Graph yet (no destination SharePoint site/library selection
+  built) — an honest, disclosed `NotConfigured` outcome, not a
+  fabricated success.
+- **New real gap surfaced by this wave, queued as the next slice**: the
+  sync client's hub address is hardcoded to loopback
+  (`127.0.0.1:7878`). The hub server side already supports LAN/Tailscale
+  binding; nothing yet lets a client point at a remote hub address.
+  This blocks the owner's actual deployment shape (3 non-interconnected
+  school modems, teachers rarely sharing WiFi even on campus, home sync
+  needed) and is not a policy question — just missing settings plumbing.
+- **New review debt**: Batch 17's two-tier authorization path and
+  Batch 18's OAuth/token-storage/upload-queue code have self-review and
+  the full verification suite, but no fresh independent
+  `security-reviewer` pass yet.
+- Full checkpoint detail: `docs/CURRENT-HANDOFF.md`'s "Batch 16" entry
+  and `../LIKHA-SIS-DELIVERY-REPORTS/WAVE-16-FINAL-REPORT.md`.
+
+## Batch 8 (items 1-7): UI wiring for all 7 Batch 5 domain modules; 2 new composition ADRs; migration 51 (2026-09-08)
+
+- All 7 Batch 5 domain-only modules now have real, tested UI/composition
+  wiring: `CertificateAwardScreen`, `SeatingChartScreen`,
+  `CalendarScreen`, `ConsolidatedGradesScreen`, weather composition
+  wiring, live palette wiring, `IdCardScreen`. Commits `707e541`
+  (cert), `e0bd2c7` (seating), `f05944d` (calendar), `7fab054`
+  (consolidated grades), `df79ded` (weather), `c735ec7` (palette),
+  `5abf7f7` (ID card).
+- **Migration 51**: `schools.latitude`/`longitude`, both nullable, no
+  `CHECK` (range validation lives at command/application boundary, not
+  schema — matches `set_logo`'s established split). New
+  `Capability::ManageSchoolCoordinates` (School Head only, its own
+  variant — deliberately not reusing `ManageSchoolBranding`, matching
+  every prior capability-split precedent). New commands
+  `set/get/clear_school_coordinates`. See ADR-0079.
+- **`composition.ts` now instantiates `weatherService`**
+  (`WeatherApplicationService` + `OpenMeteoWeatherClient`) and
+  `schoolCoordinatesService` — both were built in Batch 5 but never
+  wired until this batch.
+- **ADR-0078**: live logo palette wiring — `useLivePalette` derives
+  WCAG-AA dark-mode `--color-primary`/`--color-surface`/`--color-text`
+  from the school logo via a single injected `<style>` scoped to dark
+  mode only (never touches light mode); falls back cleanly to the
+  static palette for no logo/decode failure/no canvas context/failed AA.
+- **ADR-0079**: weather composition wiring — coordinates on `schools`
+  (not a new table), new capability (not reused), settings field on the
+  existing `SchoolBrandingScreen` (not a new screen), `WeatherAdvisoryBanner`
+  mounted once app-wide in `App.tsx` (not per-screen) that renders
+  nothing except for a genuine advisory.
+- ID card (`IdCardScreen`): photo storage explicitly NOT decided
+  (placeholder only); no QR-rendering dependency added (checked
+  `docs/SOURCE-REGISTRY.md` first); signing key is a random,
+  session-local, non-persisted `CryptoKey` — real secret-key sourcing
+  still deferred, per `id-card-token.ts`'s own stated scope.
+- No new npm dependency. `npm run quality` clean after every one of the
+  7 commits (grew from 1206 to 1255 tests, 135 files). Rust: full
+  `cargo test --lib` 1233 passed, `cargo fmt --check`/`cargo clippy -D
+warnings` both clean.
+- `npm run quality:ui` could not run in this sandbox this batch —
+  network egress does not allowlist `cdn.playwright.dev`, so neither the
+  pre-installed browser nor `playwright install` could obtain a
+  Chromium binary. See `docs/VERIFICATION-DEBT.md`.
+- Still deferred, unchanged from Batch 5: Transfers In/Out
+  Documentation Registry (needs a brand-new persisted tenant-scoped
+  entity from scratch, not one of this batch's 7 named items).
+
+## Batch 5 (Tier 3.3-3.4): domain foundations for 7 items shipped; 2 policy-scope ADRs; Transfers persistence deferred (2026-09-08)
+
+- **Award eligibility is explicitly unverified/configurable, not DepEd
+  law**: `DEFAULT_UNVERIFIED_GA_THRESHOLD`/`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE`
+  in `src/domain/award-eligibility.ts`. The "zero disciplinary
+  anecdotes" leg was originally not implemented
+  (`anecdotalRecordsChecked` hardcoded `false`) -- **update (Batch 12,
+  2026-09-08/09, ADR-0083)**: the Anecdotal Records entity now exists
+  (`repository::anecdotal_record`, `AnecdotalRecord`/
+  `AnecdotalRecordFollowup`, full vertical slice incl. sync), but that
+  batch deliberately did NOT wire it into `award-eligibility.ts` --
+  **update (Batch 13, 2026-09-09, ADR-0084)**: now wired for real.
+  `evaluateAcademicExcellenceEligibility` takes a required
+  `hasDisqualifyingAnecdotalRecord: boolean` input (the caller performs
+  the real lookup via `AnecdotalRecordApplicationService.hasDisqualifyingRecordForLearner`,
+  which calls the new narrow read-only `has_anecdotal_category_for_learner`
+  command -- gated by the same `authorize_child_protection_access_for_section`
+  every other anecdotal-record read/write uses, no weaker gate); the
+  domain function stays pure and does no I/O.
+  `anecdotalRecordsChecked` is now always `true`. Disqualification rule:
+  any `negative`-category anecdotal record excludes a learner, any
+  severity, no recency window -- this project's own conservative
+  default, not a verified DepEd rule (the schema has no severity field
+  to model anything finer); still open per
+  `docs/product/OWNER-DECISIONS-NEEDED.md` item 4.
+- **ADR-0076**: Weather & Hazard Suspension Alerts — Open-Meteo (free,
+  no key), the first third-party network call this codebase makes
+  directly from the device; every failure degrades to `"unavailable"`,
+  never blocks a workflow. Port/adapter/service shipped and tested, not
+  yet wired into `composition.ts` or a UI screen.
+- **ADR-0077**: Student ID Card QR — offline-only verification, no cloud
+  endpoint (resolves the 2026-09-07 audit's open question #5
+  conservatively). `src/domain/id-card-token.ts`: HMAC-SHA256 via Web
+  Crypto, no new dependency; a test asserts verification never calls
+  `fetch`. Real secret-key sourcing and QR image rendering (needs a new,
+  not-yet-evaluated dependency) both deferred.
+- Also shipped, domain-only, tested: `src/domain/seating-chart.ts`
+  (session-local click-to-place validation), `src/domain/ph-holidays.ts`
+  (hardcoded, sourced SY 2025-2026 table — needs periodic manual
+  update), `src/domain/consolidated-grades.ts` (pure aggregation over
+  already-computed `ComputedTermGrade` values, no new grade storage).
+- **Deferred entirely except domain validation**: Transfers In/Out
+  Documentation Registry (`src/domain/transfer-record.ts`) — the only
+  Tier 3.3/3.4 item needing a brand-new persisted tenant-scoped entity
+  (migration/repository/commands); judged out of this batch's time
+  budget rather than rushed. Top candidate for the next slice.
+- No npm/cargo dependency added. No Rust/`src-tauri` file touched.
+  `npm run quality`: 1205 tests passed, 125 files, clean typecheck/lint/
+  format/architecture/knip.
+
+## Theme-token extensions, logo palette extraction, and Visual Timetable shipped (2026-09-08)
+
+- ADR-0075: extends (not replaces) the existing Wave 1-6 shell/token
+  system. New: `src/domain/palette.ts` (dependency-light dominant-color
+  extraction + WCAG-AA-verified dark-token derivation, no `ColorThief`),
+  a 3-way Light/System/Dark theme toggle (`ColorThemeContext`, mirrors
+  `TeacherMode`'s pattern), a 3-tier card/control elevation scale
+  extending ADR-0057's tokens, a sidebar whole-rail collapse, and
+  `src/domain/timetable.ts` (pure conflict-detection + auto-seed logic)
+  backing the new `SectionTimetableScreen`.
+- **No new Rust migration/repository/command** — the timetable screen
+  reuses Wave 2Y/2Z's existing `schedule_meetings`
+  persistence/`TeachingAssignmentApplicationService` unchanged.
+- **Deliberately deferred, flagged (not silently dropped):** real
+  Fraunces/IBM Plex Mono webfonts (system-stack tokens shipped instead);
+  a real drag-and-drop library for the timetable (click-to-arm/place
+  shipped instead — zero new dependency, keyboard-operable); a
+  `curriculum_subject_requirements` persistence table (subject-hours
+  validation takes required-minutes as a caller-supplied parameter);
+  wiring `derivePaletteTokens` to a live logo-upload screen (the pure
+  pipeline is complete and tested, integration is not).
+- Teacher Load remains derived-on-read from `schedule_meetings`
+  (ADR-0039/Wave 3A) — confirmed unchanged, not duplicated into a new
+  stored table.
+
+## SF8 Health & Nutrition Engine data model shipped; SF1/SF9/SF10/Form 137-138 research closed with no new fidelity change (2026-09-08)
+
+- ADR-0071: `src-tauri/src/health/{nutrition,consolidation}.rs` +
+  `repository::nutrition` + migration 43 (`nutrition_records`) +
+  `Capability::ManageHealthRecords` (Registrar/School Head) + 3 new
+  Tauri commands. Decimal-age-in-months, BMI computation, and
+  BMI-for-Age/Height-for-Age classification _logic_ are fully ported
+  from `likha-sis-master`'s `nutritionComputations.js` (found at its
+  real GitHub home `312810-spec/likha-sis`) and tested. The BOSY/EOSY
+  consolidation report (from `nutritionConsolidation.js`) is fully
+  ported and tested independently of the item below.
+- **The WHO 2007 BMI-for-Age/Height-for-Age numeric reference tables are
+  deliberately NOT hardcoded** — the legacy table's own DepEd-SF8-
+  workbook attribution was never independently verified, and a
+  spot-check did not reconcile confidently against general knowledge of
+  the published WHO reference. `lookup_bmi_cutoffs`/`lookup_hfa_cutoffs`
+  return `None` until a future session sources and verifies a real
+  table — see `docs/VERIFICATION-DEBT.md`. Real per-learner nutrition
+  classification cannot run until then; everything else in the feature
+  (persistence, tenant isolation, authorization, consolidation
+  aggregation) works correctly today.
+- SF1/SF9/SF10/Form 137-138: re-searched, no new authoritative
+  byte-level template found for SF1 or SF9 (both stay
+  `NOT_VERIFIED`); SF10 unchanged from ADR-0053/Wave 2N; Form 137→SF10/
+  Form 138→SF9 naming reconciliation confirmed at medium confidence
+  (multiple consistent secondary sources) — this project's existing
+  naming already matches, no code change needed.
+
+## Secondary Structural-Lock PIN shipped; Tier 1.1 reviews closed (2026-09-08)
+
+- ADR-0070: a per-school, opt-in structural-lock PIN (PBKDF2-SHA256,
+  150,000 iterations, ported in spirit from `likha-sis-master`'s
+  `settingsLock.js`) gates specific structural mutations for an
+  already-authenticated session — never a second login. Enforced
+  entirely in Rust (`auth::require_structural_lock_unlocked`), wired
+  today to `set_school_logo`/`clear_school_logo`; curriculum-version and
+  calendar-structure gating deferred until those editing commands exist.
+- All three Tier 1.1 pending independent security reviews (sync payload
+  encryption/rotation, `db::rotate_sspk`, school-logo upload) are now
+  addressed — two via a prior genuine `security-reviewer` dispatch
+  (ADR-0069) re-confirmed this session, one via a fresh self-review that
+  found and fixed a real MIME-sniffing gap in `set_school_logo`. See
+  `docs/CURRENT-HANDOFF.md`'s 2026-09-08 entry for the full detail and
+  `docs/VERIFICATION-DEBT.md` for the retained independent-review debt.
+
 ## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
 - Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie) and full reference repository at `E:\likha-sis-master` (React/Firebase/Tailwind).
@@ -3319,6 +3552,36 @@ Confirmed already-safe (no change): global reference-data joins,
 `section_advisory` (`sec.school_id = sa.school_id` in the `ON`),
 `user::list_members_in_school` (`users` global), `subject_attendance`
 entries (no `school_id` column — child of its session).
+
+## Batch 3: DO 006 Child Protection, xlsx Scholastic Importer, interim Grade Review Pipeline (added 2026-09-08)
+
+Migrations 44-46. **`repository::child_protection`** (behavioral
+incidents, 3-tier `severity_tier` — generic placeholder vocabulary,
+LOW-confidence DO 006 tier naming, see `docs/VERIFICATION-DEBT.md`) plus
+append-only `incident_interventions`. **`repository::at_risk`**:
+multi-silo at-risk detection computed on read (Academic via
+`grading_computation`, Health via Batch 2's `repository::nutrition`,
+Attendance via a new rate aggregate) — no stored flag, no background
+job. New `auth::authorize_child_protection_access_for_section`
+(section-adviser-or-School-Head, mirrors ADR-0056's
+`authorize_adviser_of_section` shape) — a bare Teacher gets no
+school-wide incident access. **`import::scholastic`** +
+`import::scholastic_workbook`: `.xlsx` multi-year scholastic-history
+importer reusing the already-adopted `calamine` crate (no new
+dependency), matching existing learners by LRN only, never creating one;
+feeds new `repository::scholastic_history`
+(`scholastic_history_records`, not yet sync-wired). **No "Master
+Teacher" role was added** — `repository::grade_submission` (interim
+Multi-Tier Review & Audit Pipeline) uses School Head as the interim
+approver/principal role via new `auth::authorize_grade_submission_owner`
+(self-or-School-Head, "is the assigned teacher" via
+`teaching_assignments`), an explicit recorded decision
+(`docs/adr/0073-interim-grade-review-pipeline.md`) superseded once the
+2026-09-07 audit's open Master Teacher RBAC question is decided.
+`cargo test`: 1160 lib tests passed. Full record:
+`docs/adr/0072-child-protection-authorization.md`,
+`docs/adr/0073-interim-grade-review-pipeline.md`,
+`docs/adr/0074-xlsx-scholastic-importer.md`.
 
 ## Current Milestone
 

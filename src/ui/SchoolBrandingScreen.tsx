@@ -1,13 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import type { SchoolCoordinatesApplicationService } from "../application/school-coordinates-service";
 import type { SchoolLogoApplicationService } from "../application/school-logo-service";
 import { ValidationError } from "../domain/errors";
 import { ALLOWED_LOGO_MIME_TYPES, type SchoolLogo } from "../domain/school-logo";
+import type { SchoolCoordinates } from "../domain/school-coordinates";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 
 interface SchoolBrandingScreenProps {
   schoolLogoService: SchoolLogoApplicationService;
+  /** Optional for backwards compatibility with any existing caller/test
+   * that only exercises the logo half of this screen -- when omitted,
+   * the "School location" section below simply doesn't render (same
+   * "absent, not broken" convention `WeatherAdvisoryBanner` follows). */
+  schoolCoordinatesService?: SchoolCoordinatesApplicationService;
 }
 
 function logoObjectUrl(logo: SchoolLogo): string {
@@ -36,7 +43,10 @@ function logoObjectUrl(logo: SchoolLogo): string {
  * (`ManageSchoolBranding`) may actually change the logo -- security must
  * not rely on UI hiding.
  */
-export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreenProps) {
+export function SchoolBrandingScreen({
+  schoolLogoService,
+  schoolCoordinatesService,
+}: SchoolBrandingScreenProps) {
   const [logo, setLogo] = useState<SchoolLogo | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +54,14 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [coordinates, setCoordinates] = useState<SchoolCoordinates | null>(null);
+  const [coordinatesLoading, setCoordinatesLoading] = useState(true);
+  const [coordinatesError, setCoordinatesError] = useState<string | null>(null);
+  const [coordinatesConfirmation, setCoordinatesConfirmation] = useState<string | null>(null);
+  const [coordinatesSaving, setCoordinatesSaving] = useState(false);
+  const [latitudeDraft, setLatitudeDraft] = useState("");
+  const [longitudeDraft, setLongitudeDraft] = useState("");
 
   const requestRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +139,70 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
     }
   }
 
+  function loadCoordinates() {
+    if (!schoolCoordinatesService) return;
+    setCoordinatesLoading(true);
+    setCoordinatesError(null);
+    schoolCoordinatesService
+      .getCoordinates()
+      .then((result) => {
+        setCoordinates(result);
+        setLatitudeDraft(result ? String(result.latitude) : "");
+        setLongitudeDraft(result ? String(result.longitude) : "");
+      })
+      .catch(() => {
+        setCoordinatesError("Could not load the school's coordinates. Try again.");
+      })
+      .finally(() => {
+        setCoordinatesLoading(false);
+      });
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCoordinates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolCoordinatesService]);
+
+  async function handleSaveCoordinates(event: FormEvent) {
+    event.preventDefault();
+    if (!schoolCoordinatesService) return;
+    setCoordinatesError(null);
+    setCoordinatesConfirmation(null);
+    setCoordinatesSaving(true);
+    try {
+      await schoolCoordinatesService.setCoordinates(Number(latitudeDraft), Number(longitudeDraft));
+      setCoordinatesConfirmation("School coordinates updated.");
+      loadCoordinates();
+    } catch (e) {
+      setCoordinatesError(
+        e instanceof ValidationError
+          ? e.message
+          : "Could not save these coordinates. You may not have permission to change them.",
+      );
+    } finally {
+      setCoordinatesSaving(false);
+    }
+  }
+
+  async function handleClearCoordinates() {
+    if (!schoolCoordinatesService) return;
+    setCoordinatesError(null);
+    setCoordinatesConfirmation(null);
+    setCoordinatesSaving(true);
+    try {
+      await schoolCoordinatesService.clearCoordinates();
+      setCoordinatesConfirmation("School coordinates removed.");
+      loadCoordinates();
+    } catch {
+      setCoordinatesError(
+        "Could not remove the school's coordinates. You may not have permission to change them.",
+      );
+    } finally {
+      setCoordinatesSaving(false);
+    }
+  }
+
   return (
     <Page
       title="School Logo"
@@ -169,6 +251,69 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
             )}
           </div>
         </>
+      )}
+
+      {schoolCoordinatesService && (
+        <section aria-label="School location" className="school-coordinates-section">
+          <h3>School location</h3>
+          <p className="field-hint">
+            Used only for the optional weather/hazard advisory shown to teachers -- never for
+            anything else. Only a School Head can change it. Leaving this unset simply means no
+            advisory is shown; it is never an error.
+          </p>
+
+          {coordinatesLoading ? (
+            <Loading label="Loading school location…" />
+          ) : (
+            <>
+              {coordinatesError && <Alert tone="error">{coordinatesError}</Alert>}
+              {coordinatesConfirmation && <Alert tone="success">{coordinatesConfirmation}</Alert>}
+
+              <form className="form-row" onSubmit={handleSaveCoordinates}>
+                <div className="field">
+                  <label htmlFor="school-latitude">Latitude</label>
+                  <input
+                    id="school-latitude"
+                    type="number"
+                    step="any"
+                    min={-90}
+                    max={90}
+                    value={latitudeDraft}
+                    onChange={(event) => setLatitudeDraft(event.target.value)}
+                    disabled={coordinatesSaving}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="school-longitude">Longitude</label>
+                  <input
+                    id="school-longitude"
+                    type="number"
+                    step="any"
+                    min={-180}
+                    max={180}
+                    value={longitudeDraft}
+                    onChange={(event) => setLongitudeDraft(event.target.value)}
+                    disabled={coordinatesSaving}
+                    required
+                  />
+                </div>
+                <button type="submit" aria-disabled={coordinatesSaving}>
+                  {coordinatesSaving ? "Saving…" : "Save location"}
+                </button>
+                {coordinates && (
+                  <button
+                    type="button"
+                    onClick={handleClearCoordinates}
+                    disabled={coordinatesSaving}
+                  >
+                    Remove location
+                  </button>
+                )}
+              </form>
+            </>
+          )}
+        </section>
       )}
     </Page>
   );

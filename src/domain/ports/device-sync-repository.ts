@@ -24,4 +24,25 @@ export interface DeviceSyncRepository {
    * established convention.
    */
   revokeDevice(credentialId: string): Promise<boolean>;
+
+  /**
+   * This device's configured hub address for the caller's own school, if
+   * any has ever been set — `null` means it is using the default
+   * loopback address (`sync_client::DEFAULT_HUB_BASE_URL`, only reachable
+   * when the hub happens to run on this exact same machine). Any
+   * authenticated school member may read it.
+   */
+  getHubBaseUrl(): Promise<string | null>;
+
+  /**
+   * Sets (`hubBaseUrl` non-null) or clears (`null`) this device's hub
+   * address. School-Head-only server-side
+   * (`Capability::ManageSchoolMembership`) — this controls where this
+   * device sends its own sync credential secret on every push/pull
+   * round, see `commands::device_sync::set_sync_hub_base_url`'s own doc
+   * comment for why that makes it a security-relevant setting, not a
+   * routine preference. A malformed address is rejected server-side
+   * (thrown, never silently stored) before it is ever saved.
+   */
+  setHubBaseUrl(hubBaseUrl: string | null): Promise<void>;
 }

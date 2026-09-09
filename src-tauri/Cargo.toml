@@ -100,7 +100,30 @@ tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"]
 # own "loopback only, plaintext HTTP inside the trust boundary" decision
 # for `hub_server` -- a TLS backend would be dead weight and a bigger
 # dependency surface for a URL that can never be `https://`.
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query"] }
+#
+# ADR-0088 addendum: `form` and `rustls` added for
+# `infrastructure::microsoft365::oauth`'s calls to
+# `https://login.microsoftonline.com` -- the ONLY `reqwest` caller so far
+# that ever leaves the loopback interface, so it is the first to need a
+# real TLS backend (`form` enables `RequestBuilder::form`, the
+# `application/x-www-form-urlencoded` body the Microsoft identity
+# platform's token endpoint requires). Chose `rustls` (pure Rust, via the
+# `rustls`/`webpki-roots` crates reqwest pulls in transitively) over
+# `native-tls`: this project already vendors OpenSSL once for SQLCipher's
+# `bundled-sqlcipher-vendored-openssl` (ADR-0003) and a second,
+# independent OpenSSL binding for TLS would duplicate that build-time
+# cost and attack surface for no benefit; `rustls` adds no second
+# native/system TLS dependency. Flagged explicitly per
+# `docs/SOURCE-REGISTRY.md`'s convention -- this is a genuine capability
+# expansion (this dependency can now reach the public internet, not only
+# `127.0.0.1`), not a routine version bump.
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query", "form", "rustls"] }
+
+# Already pulled in transitively (reqwest, tauri-utils) -- promoted to a
+# direct dependency for `commands::device_sync::validate_hub_base_url`'s
+# scheme/host parsing (the configurable sync hub address slice). No new
+# supply-chain surface: same crate, same version already in Cargo.lock.
+url = "2.5.8"
 
 # ADR-0067 network listener: enumerates this machine's non-loopback network
 # interfaces so the hub can bind its LAN/Tailscale address(es) instead of
@@ -115,6 +138,8 @@ reqwest = { version = "0.13.4", default-features = false, features = ["blocking"
 # I/O of its own, no phone-home. Single dependency, `libc`, already present
 # transitively elsewhere in this tree.
 if-addrs = { version = "0.15.0", default-features = false }
+pbkdf2 = "0.13.0"
+subtle = "2.6.1"
 
 # Windows-only: the DPAPI key store (src/crypto/dpapi.rs) binds Win32 COM
 # APIs that only exist on Windows. Tauri's own Windows-only webview backend
