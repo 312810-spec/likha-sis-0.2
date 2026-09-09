@@ -52,8 +52,13 @@ warnings` both clean.
 - **Award eligibility is explicitly unverified/configurable, not DepEd
   law**: `DEFAULT_UNVERIFIED_GA_THRESHOLD`/`DEFAULT_UNVERIFIED_MIN_SUBJECT_GRADE`
   in `src/domain/award-eligibility.ts`; the "zero disciplinary
-  anecdotes" leg is not implemented (no Anecdotal Records feature
-  exists) and `anecdotalRecordsChecked` is hardcoded `false`.
+  anecdotes" leg is not implemented and `anecdotalRecordsChecked` is
+  still hardcoded `false` -- **update (Batch 12, 2026-09-08/09,
+  ADR-0083)**: the Anecdotal Records entity now exists
+  (`repository::anecdotal_record`, `AnecdotalRecord`/
+  `AnecdotalRecordFollowup`, full vertical slice incl. sync), but this
+  batch deliberately did NOT wire it into `award-eligibility.ts` -- that
+  remains a future batch's job, now unblocked.
 - **ADR-0076**: Weather & Hazard Suspension Alerts — Open-Meteo (free,
   no key), the first third-party network call this codebase makes
   directly from the device; every failure degrades to `"unavailable"`,

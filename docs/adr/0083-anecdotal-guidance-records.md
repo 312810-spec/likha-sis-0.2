@@ -147,6 +147,25 @@ warnings`: clean. `cargo fmt --check`: clean.
   disciplinary-only value, authorized-adviser create+list+followup round
   trip, Teacher-denied, School-Head-allowed, tenant isolation). `cargo
 clippy --all-targets -- -D warnings`: clean. `cargo fmt --check`:
-  clean.
+  clean. `npm run typecheck`/`lint`/`format:check`/`check:architecture`:
+  clean; `vitest run` (anecdotal-record\*): 25 passed. `check:deadcode`
+  (knip) flagged `anecdotalRecordService` as unused -- expected and
+  transient, resolved at checkpoint 3.
+- Checkpoint 3: 5 new UI tests (pickers, generic categories shown,
+  record+list round trip, select-record loads follow-ups and can add
+  one, accessibility). `npm run quality` in full: 146 test files, 1324
+  tests, 0 architecture violations, 0 knip findings.
+- Checkpoint 4: `EntityKind::AnecdotalRecord`/`AnecdotalRecordFollowup`,
+  sync-aware `record_anecdotal_entry`/`add_anecdotal_record_followup`
+  (4 new `commands::anecdotal_record::sync_tests`), `apply_decrypted_change`
+  arms, `ConflictEntityPreview::AnecdotalRecord`/`AnecdotalRecordFollowup`
+  typed variants (1 new `commands::conflict_review` test). `cargo build
+--lib`: clean. `cargo test --lib anecdotal_record`: 20 passed. `cargo
+test --lib conflict_review`: 25 passed (including the new typed-preview
+  test). `cargo test sync_client::` (whole module): 65 passed, no
+  regressions in any pre-existing entity's pull/push/conflict test.
+  `cargo clippy --all-targets -- -D warnings`: clean. `cargo fmt
+--check`: clean. `npm run typecheck`/`check:architecture`: clean (no TS
+  files changed this checkpoint).
 - See `docs/CURRENT-HANDOFF.md`'s Batch 12 entry for the full checkpoint
-  ledger and whichever checkpoints landed in this session.
+  ledger, including the exact commit each checkpoint landed in.

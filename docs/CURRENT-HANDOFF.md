@@ -1,5 +1,190 @@
 # CURRENT HANDOFF
 
+## Batch 12 (complete): Anecdotal / Guidance Records, full vertical slice (2026-09-08/09, ADR-0083), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
+committed locally only, nothing pushed, PR #55 untouched, no CI
+triggered. All 4 checkpoints shipped, each its own local commit.
+
+**Checkpoint 1 -- migration + repository:** migration 57
+(`anecdotal_records` -- school/section/learner-scoped, `category`
+`CHECK`-constrained to `positive`/`negative`/`neutral` (deliberately
+generic, not Awards' narrow disciplinary framing); `anecdotal_record_followups`
+-- append-only, exactly mirroring `incident_interventions`'s discipline,
+no `UPDATE`/`DELETE` code path against it anywhere) + migration 58
+(entity_kind `CHECK` widening, bundled here for schema-file locality,
+same "SQL allowlist widens early, Rust-side `EntityKind`/sync command
+wiring lands in checkpoint 4" pattern Batch 11 established).
+`repository::anecdotal_record` provides tenant-scoped CRUD
+(`create_record`, `list_for_section`, `list_for_learner`,
+`add_followup` INSERT-only, `upsert_record_from_sync`/
+`upsert_followup_from_sync`). No new authorization function -- this
+module is designed to be gated by
+`auth::authorize_child_protection_access_for_section` (ADR-0072)
+directly, wired in checkpoint 2.
+
+**Authorization-reuse decision (ADR-0083)**: DO 006 Child Protection's
+`authorize_child_protection_access_for_section` (section adviser, or
+School Head, in their own school) was reused **directly, unchanged** --
+no new sibling function, no new `Capability`. The authorization need is
+genuinely identical (same actors, same tenant-scoping bug class to
+guard, same sensitivity class), and this codebase has no Guidance
+Counselor role that would need a divergent rule. If one is ever added,
+`authorize_child_protection_access_for_section` is the point to fork --
+not before. See ADR-0083's "Authorization" section for the full
+reasoning against writing a near-identical sibling.
+
+**Checkpoint 2 -- commands + TS service:** `commands::anecdotal_record`
+(`record_anecdotal_entry`, `list_anecdotal_records_for_section`,
+`add_anecdotal_record_followup`, `list_anecdotal_record_followups`),
+gating on `auth::authorize_child_protection_access_for_section`,
+`school_id` always session-derived. Follow-up commands additionally
+verify the target record belongs to the authorized section (defense in
+depth, mirrors `commands::child_protection::add_incident_intervention`).
+TS: `src/domain/anecdotal-record.ts` (`AnecdotalCategory`,
+`validateAnecdotalRecordInput`, `validateAnecdotalRecordFollowupInput`),
+`AnecdotalRecordRepository` port, `AnecdotalRecordApplicationService`,
+`TauriAnecdotalRecordRepository`, wired into `composition.ts`
+(`anecdotalRecordService`).
+
+**Checkpoint 3 -- UI screen:** `GuidanceRecordsScreen` -- section/roster
+pickers (reusing `subjectAttendanceService.listAdviserViewSections`,
+`sectionService.roster`, mirroring `AdviserViewScreen`'s own scoping
+convention rather than adding new backend reads), a category button
+group (Positive/Negative/Neutral, never a disciplinary-only label), an
+entry-date field, a narrative field, a record list for the section, and
+a per-record detail panel showing the narrative plus its append-only
+follow-up history with a form to add a new follow-up. Reachable from
+the "Learner Records" nav group as "Guidance Records"
+(`workbench-nav-data.ts`, `App.tsx`). Efficient/Comfortable/Guided mode
+parity (only the guided-mode intro hint differs); axe-clean.
+
+**Checkpoint 4 -- sync wiring**, following the exact Batch 6/9/10/11
+pattern:
+
+- `EntityKind::AnecdotalRecord` (`"anecdotal_record"`)/
+  `EntityKind::AnecdotalRecordFollowup` (`"anecdotal_record_followup"`)
+  wire strings.
+- `repository::anecdotal_record::upsert_record_from_sync`/
+  `upsert_followup_from_sync` (`INSERT ... ON CONFLICT(id) DO UPDATE`,
+  matching every other create-only entity; already present since
+  checkpoint 1, now reachable via the wire).
+- `commands::anecdotal_record::record_anecdotal_entry`/
+  `add_anecdotal_record_followup` now take `AppHandle`, resolve the
+  SSPK only if this school has enrolled a device, and enqueue through a
+  `_with_optional_sync` helper -- the same enrollment-gated,
+  `SAVEPOINT`-atomic-with-the-write pattern as
+  `commands::child_protection`. **The authorization gate
+  (`authorize_child_protection_access_for_section`) runs first and
+  unchanged** -- verified by inspection (the gate call and its `?` sit
+  before any sync-aware code in both commands) and by the sync tests
+  below (a rejected write never enqueues an outbox row).
+- `sync_client::apply_decrypted_change`: `EntityKind::AnecdotalRecord`
+  arm (school-scope-checked) and `EntityKind::AnecdotalRecordFollowup`
+  arm (no `school_id` field of its own, same trust-boundary shape as
+  `EntityKind::IncidentIntervention`).
+- `ConflictEntityPreview::AnecdotalRecord { learner_id, category,
+entry_date, narrative }` / `ConflictEntityPreview::AnecdotalRecordFollowup
+{ anecdotal_record_id, note }` -- `category` always the generic
+  positive/negative/neutral label.
+- No natural-key-collision test -- confirmed against migration 57's own
+  `CREATE TABLE`: neither table has a `UNIQUE` constraint beyond `id`,
+  matching `BehavioralIncident`/`IncidentIntervention`'s own precedent
+  (stated explicitly in `repository::anecdotal_record`'s own test
+  module, not silently assumed).
+
+**New tests this batch**: 9 `repository::anecdotal_record::tests`
+(checkpoint 1: CRUD, section/learner scoping, append-only follow-up,
+no-unique-constraint disclosure, sync upsert insert/update/idempotency)
+
+- 6 `commands::anecdotal_record::tests` (checkpoint 2: category parsing
+  incl. rejecting a disciplinary-only value, authorized-adviser
+  create+list+followup round trip, Teacher-denied, School-Head-allowed,
+  tenant isolation) + 4 `commands::anecdotal_record::sync_tests`
+  (checkpoint 4: no-sspk passthrough, sspk-enqueues-correctly-encrypted-
+  upsert for both record and follow-up, rejected-followup-never-enqueues)
+- 1 `commands::conflict_review::tests` (typed preview shows the generic
+  category on both incoming and local sides) = 20 new Rust tests. 25 new
+  TS tests (checkpoint 2: domain validation, application service, Tauri
+  adapter) + 5 new UI tests (checkpoint 3: pickers load, generic
+  categories shown, record+list round trip, select-record loads
+  follow-ups and can add one, accessibility) = 30 new TS tests.
+
+**Verification actually run this session:**
+
+- `cargo build --lib` -- clean (checkpoint 4).
+- `cargo test` (whole crate) -- all tests passed at the checkpoint 1 and
+  checkpoint 2 baselines (confirmed via full background runs, exit code
+  0 both times); `cargo test --lib anecdotal_record`/`conflict_review`/
+  `sync_client::` individually confirmed green at checkpoint 4 (20 + 25
+  - 65 tests respectively, no regressions in any pre-existing
+    `sync_client` test).
+- `cargo clippy --all-targets -- -D warnings` -- clean at every
+  checkpoint.
+- `cargo fmt --check` -- clean at every checkpoint.
+- `npm run quality` (typecheck, lint, format:check, check:architecture,
+  check:deadcode, vitest run) -- run in full at checkpoint 3: 146 test
+  files, 1324 tests passed, 0 architecture violations, 0 dead-code
+  findings (the prior checkpoint's transient `anecdotalRecordService`
+  knip flag resolved once the UI screen wired it in, as expected and
+  disclosed in that checkpoint's own commit).
+
+**Tenant isolation / authorization verification**: every
+`repository::anecdotal_record` query takes `school_id` as an explicit
+parameter and filters on it in the SQL itself;
+`tenant_isolation_a_record_is_not_visible_under_a_different_schools_scope`
+proves a cross-school lookup returns nothing rather than leaking.
+`a_teacher_with_no_adviser_relationship_is_denied_by_the_reused_gate`
+and `a_school_head_is_authorized_without_advising_the_section` prove
+the command layer's call site actually surfaces
+`authorize_child_protection_access_for_section`'s adviser-or-School-
+Head decision correctly -- the gate function itself is exhaustively
+proven in `auth::mod`'s own test suite (reused unchanged, not
+re-derived here).
+
+**Deferred/out of scope (explicit, per the task)**: this batch does
+**NOT** wire `AnecdotalRecord` into `award-eligibility.ts`'s
+currently-hardcoded-false disciplinary-anecdotes check -- that is a
+future batch's job; this batch only built the entity so it is ready.
+No update/delete of an existing record's narrative (create-and-append-
+only by design, matching the append-only precedent). No cross-section
+"every guidance record for a learner across the whole school" UI (the
+repository function `list_for_learner` exists and is tested for an
+eventual School-Head-level use; the shipped screen is section-scoped
+only, matching the adviser's own authorized boundary). No new
+`SignedInTab`-level role gating in the UI shell (this project never
+hides a tab by role -- the real gate is server-side).
+
+**Files touched**: `src-tauri/src/db/migrations.rs`,
+`src-tauri/src/repository/anecdotal_record.rs` (new),
+`src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/anecdotal_record.rs` (new),
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs`,
+`src-tauri/src/sync/mod.rs`, `src-tauri/src/sync_client.rs`,
+`src-tauri/src/commands/conflict_review.rs`,
+`src/domain/anecdotal-record.ts` (new),
+`src/domain/ports/anecdotal-record-repository.ts` (new),
+`src/application/anecdotal-record-service.ts` (new),
+`src/infrastructure/tauri/anecdotal-record-repository.ts` (new),
+`src/composition.ts`, `src/ui/GuidanceRecordsScreen.tsx` (new),
+`src/ui/components/workbench-nav-data.ts`, `src/App.tsx`,
+`docs/adr/0083-anecdotal-guidance-records.md`,
+`docs/product/MASTER-TASK-INVENTORY.md`.
+
+**Exact next slice**: no specific next candidate pre-selected this
+session -- consult `docs/product/MASTER-TASK-INVENTORY.md` for the
+next-highest-priority unchecked item per
+`.claude/rules/autonomous-development.md`'s selection order
+(privacy/security → correctness → DepEd compliance → teacher usability
+→ offline reliability → maintainability → zero billing → performance →
+speed) before starting a new wave. Two natural candidates the task
+itself named as future work: (1) wiring `AnecdotalRecord` into
+`award-eligibility.ts`'s disciplinary-anecdotes check (now unblocked --
+the entity exists); (2) `scholastic_history_records`
+(DepEd `.xlsx` multi-year importer, deliberately deferred, see its own
+line item) and Schedule Grids sync wiring remain deferred per
+`docs/product/MASTER-TASK-INVENTORY.md`'s existing notes.
+
 ## Batch 11 (complete): Formative Assessment (ESRU) logging, full vertical slice (2026-09-08, ADR-0082), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --

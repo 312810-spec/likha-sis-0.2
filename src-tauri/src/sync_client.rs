@@ -79,7 +79,7 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
 use crate::error::AppResult;
 use crate::repository::{
-    assessment_item, attendance, child_protection, device_credential,
+    anecdotal_record, assessment_item, attendance, child_protection, device_credential,
     device_sync_client_credential, formative_assessment, grade_submission, grading, learner,
     learner_score, lesson_plan, nutrition, school, section, section_membership, subject,
     subject_attendance, sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor,
@@ -816,6 +816,25 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             formative_assessment::upsert_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::AnecdotalRecord => {
+            let incoming: anecdotal_record::AnecdotalRecord =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id {
+                return Err(ApplyRejection::Untrusted);
+            }
+            anecdotal_record::upsert_record_from_sync(conn, &incoming)
+                .map_err(|_| ApplyRejection::RepositoryRejected)
+        }
+        EntityKind::AnecdotalRecordFollowup => {
+            // `AnecdotalRecordFollowup` carries no `school_id` field of
+            // its own (see `anecdotal_record::upsert_followup_from_sync`'s
+            // doc comment) -- same trust-boundary shape as
+            // `EntityKind::IncidentIntervention` above.
+            let incoming: anecdotal_record::AnecdotalRecordFollowup =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            anecdotal_record::upsert_followup_from_sync(conn, school_id, &incoming)
                 .map_err(|_| ApplyRejection::RepositoryRejected)
         }
     }
