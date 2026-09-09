@@ -64,15 +64,26 @@ or a color explosion. Fast and legible on ordinary school hardware.
 
 ### Elevation pass: The Faculty Standard (proposed 2026-09-09)
 
-**Status**: direction proposed and reviewed with the user in a
-dedicated case-file artifact ("The Faculty Standard"); execution
-phasing agreed, per-screen migration not yet started. This is an
+**Status**: name and thesis confirmed by the user 2026-09-09, along
+with the accent token and the Phase 1+2 execution order. This is an
 **elevation of Calm Civic Classroom, not a replacement** — same
 tokens, same "no mascot, no color explosion" discipline, same
-audience — the gap it closes is craft discipline, not concept. Only 3
-of 42 screens in `src/ui/` actually use the shared `Page`/`Alert`/
-`StatusChip` vocabulary UX-01 built; the rest hand-roll their own
-markup, which is the concrete, measured gap this elevation closes.
+audience — the gap it closes is craft discipline, not concept.
+
+**Correction to this section's original count**: the first draft
+claimed only 3 of 42 screens used the shared `Page`/`Alert`/
+`StatusChip` vocabulary. Re-measured directly against the codebase
+(`grep -LE "<Page($|[ >])|<PageHeader" src/ui/*Screen.tsx`) — the true
+count was the reverse: 39 of 42 already did, and only 3 didn't
+(`LoginScreen`, `FirstRunSetupScreen`, `HomeScreen`). Phase 2 migrated
+the two pre-auth screens onto `<Page>` (removing their hand-rolled
+heading/focus-management duplicate of what `Page` already does);
+`HomeScreen` is a pure role-router with no title of its own — both its
+branches (`TeacherWorkspaceScreen`, `SchoolHeadHome`) already render
+`<Page>` themselves, so it correctly stays as-is. **Phase 2 (shared
+vocabulary adoption) is complete as of 2026-09-09** — every screen in
+`src/ui/` either uses the shared vocabulary directly or delegates to a
+child that does.
 
 The thesis: the visual grammar of the one civic document a Filipino
 teacher already trusts completely — the permanent record card, the
@@ -125,14 +136,16 @@ token value changes, no new color beyond one accent):
   package, and only once the user signs off on the new dependency
   itself — not assumed from sign-off on the direction as a whole.
 
-Full research, the before/after component comparison, and the phased
-rollout plan live in the case-file artifact prepared this session
-(not checked into the repo — a planning document, not a durable
-record); see `.claude/skills/premium-teacher-ui/SKILL.md` for the
-distilled, checkable version of these rules every screen edit should
-now follow. Record the per-screen migration as it actually lands the
-same way UX-02/UX-03 did above, rather than editing this status block
-in place.
+Full research and the before/after component comparison live in the
+case-file artifact prepared this session (not checked into the repo —
+a planning document, not a durable record); see
+`.claude/skills/premium-teacher-ui/SKILL.md` for the distilled,
+checkable version of these rules every screen edit should now follow.
+
+Next phases (not yet started, no candidate implemented): Phase 3
+(hover-lift/motion signature moments on the shared components) and
+Phase 4 (two new surfaces — a public landing page, a principal/admin
+overview concept). Neither begins without a separate go-ahead.
 
 ## Tokens (implemented, UX-01 — see ADR-0031)
 

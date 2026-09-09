@@ -50,9 +50,11 @@ title=... hint=...>` (or `<PageHeader>` inside a custom layout) for
    screen is duplicating what one of these already does, that's the
    bug to fix, not a reason to add a sixth ad hoc pattern. Check with
    `grep -LE "<Page($|[ >])|<PageHeader" src/ui/*Screen.tsx` — as of
-   this writing 39 of 42 screens still fail this check; each one you
-   touch is a chance to close that gap, not just ship the one change
-   you came for.
+   2026-09-09 every screen passes (either directly or by delegating to
+   a child that does; `HomeScreen` is the one legitimate exception, a
+   pure role-router with no title of its own). Keep this check clean
+   on every new screen — a green check today doesn't excuse a new
+   hand-rolled header tomorrow.
 2. **Depth is assigned by role, not decoration — and the tokens
    already exist.** `styles.css` already has a real, dual-themed
    elevation scale (`--elevation-1`, `--elevation-2`,
