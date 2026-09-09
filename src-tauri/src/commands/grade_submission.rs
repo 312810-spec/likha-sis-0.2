@@ -387,6 +387,23 @@ pub fn list_grade_submissions_for_school(
     grade_submission::list_for_school(&conn, &school_id)
 }
 
+/// Master-Teacher-facing review queue (Batch 17 checkpoint 4 UI): every
+/// submission currently awaiting or already decided by the caller's own
+/// oversight relationship, self-scoped like `list_teachers_i_oversee` --
+/// no dedicated capability, since holding `master_teacher` alone grants
+/// no blanket authority (see ADR-0089). Returns an empty list for a
+/// caller overseeing nobody right now, never an error.
+#[tauri::command]
+pub fn list_grade_submissions_for_master_teacher(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    as_of_date: String,
+) -> AppResult<Vec<GradeSubmission>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    grade_submission::list_for_master_teacher(&conn, &school_id, &user_id, &as_of_date)
+}
+
 #[tauri::command]
 pub fn list_grade_submission_notes(
     db: State<'_, Mutex<Connection>>,

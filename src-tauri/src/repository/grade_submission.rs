@@ -32,7 +32,7 @@ use uuid::Uuid;
 use crate::error::AppResult;
 use crate::repository::{
     assessment_item, class_record, grading_computation, learner_score,
-    learner_score::LearnerScoreStatus,
+    learner_score::LearnerScoreStatus, teacher_oversight_assignment,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -377,6 +377,47 @@ pub fn list_for_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Grad
     let mut stmt = conn.prepare(&format!("{SUBMISSION_SELECT} ORDER BY submitted_at DESC"))?;
     let rows = stmt.query_map((school_id,), row_to_submission)?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// Master-Teacher-facing review queue: every submission whose submitter
+/// is CURRENTLY overseen by `master_teacher_user_id` on `as_of_date`,
+/// newest first. Relationship-scoped, not a blanket capability read --
+/// matching this ADR's own established shape for
+/// `auth::authorize_grade_submission_master_teacher_decision` ("is this
+/// specific person the one relevant actor," not "does this role unlock
+/// this whole feature school-wide"). Returns an empty list for someone
+/// not currently overseeing anyone, the same no-dedicated-capability
+/// self-scoped-read convention `teacher_oversight_assignment::list_teachers_overseen_by`
+/// itself already establishes -- there is nothing sensitive to hide in
+/// "you have no one assigned to you right now."
+pub fn list_for_master_teacher(
+    conn: &Connection,
+    school_id: &str,
+    master_teacher_user_id: &str,
+    as_of_date: &str,
+) -> AppResult<Vec<GradeSubmission>> {
+    let overseen = teacher_oversight_assignment::list_teachers_overseen_by(
+        conn,
+        school_id,
+        master_teacher_user_id,
+        as_of_date,
+    )?;
+    if overseen.is_empty() {
+        return Ok(Vec::new());
+    }
+    let all = list_for_school(conn, school_id)?;
+    let overseen_ids: std::collections::HashSet<&str> = overseen
+        .iter()
+        .map(|a| a.teacher_user_id.as_str())
+        .collect();
+    Ok(all
+        .into_iter()
+        .filter(|s| {
+            s.submitted_by_user_id
+                .as_deref()
+                .is_some_and(|submitter| overseen_ids.contains(submitter))
+        })
+        .collect())
 }
 
 /// ADR-0089 tier 1: the teacher's currently-assigned Master Teacher
@@ -899,6 +940,78 @@ mod tests {
         submit(&conn, &school_id, &cr1, "teacher1").unwrap();
         let list = list_for_school(&conn, &school_id).unwrap();
         assert_eq!(list.len(), 1);
+    }
+
+    // ---- Batch 17 checkpoint 4: list_for_master_teacher ----
+
+    #[test]
+    fn list_for_master_teacher_returns_only_submissions_from_currently_overseen_teachers() {
+        let (conn, school_id, cr1) = setup();
+        crate::repository::user::add_school_membership(&conn, "teacher1", &school_id).unwrap();
+        crate::repository::user::add_school_membership(&conn, "mt1", &school_id).unwrap();
+        crate::repository::role::grant(
+            &conn,
+            "mt1",
+            &school_id,
+            crate::repository::role::MASTER_TEACHER,
+        )
+        .unwrap();
+        teacher_oversight_assignment::assign(&conn, &school_id, "mt1", "teacher1", "2026-06-01")
+            .unwrap();
+        let overseen_submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        // A second teacher this Master Teacher does NOT oversee, submitting
+        // against a DIFFERENT class record -- `grade_submissions` has a
+        // `UNIQUE(class_record_id, submitted_at)` constraint, and two
+        // `submit()` calls against the same class record back to back can
+        // otherwise collide on the same millisecond timestamp.
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name) \
+             VALUES ('teacher2', 'teacher2', 'hash', 'Teacher Two')",
+            [],
+        )
+        .unwrap();
+        let subject2 = crate::repository::subject::create(&conn, &school_id, "Science").unwrap();
+        let section2 =
+            crate::repository::section::create(&conn, &school_id, "2026-2027", "5", "Section B")
+                .unwrap();
+        // Reuse the grading period `setup()` already created for TERM_1 --
+        // `grading_periods` has a `UNIQUE(school_id, school_year,
+        // policy_period_id)` constraint, so creating a second one for the
+        // same term would fail.
+        let period_id: String = conn
+            .query_row(
+                "SELECT id FROM grading_periods WHERE school_id = ?1 LIMIT 1",
+                (&school_id,),
+                |row| row.get(0),
+            )
+            .unwrap();
+        let cr2 = class_record::create(
+            &conn,
+            &school_id,
+            &section2.id,
+            &subject2.id,
+            &period_id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        submit(&conn, &school_id, &cr2.id, "teacher2").unwrap();
+
+        let queue = list_for_master_teacher(&conn, &school_id, "mt1", "2026-08-29").unwrap();
+
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].id, overseen_submission.id);
+    }
+
+    #[test]
+    fn list_for_master_teacher_is_empty_when_overseeing_nobody() {
+        let (conn, school_id, cr1) = setup();
+        submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+
+        let queue = list_for_master_teacher(&conn, &school_id, "mt1", "2026-08-29").unwrap();
+
+        assert!(queue.is_empty());
     }
 
     #[test]

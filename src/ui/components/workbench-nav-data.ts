@@ -33,7 +33,9 @@ export type SignedInTab =
   | "consolidated-grades"
   | "id-card"
   | "transfers"
-  | "guidance-records";
+  | "guidance-records"
+  | "grade-review"
+  | "teacher-oversight";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -78,6 +80,8 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "id-card": "Student ID Card",
   transfers: "Transfers In/Out",
   "guidance-records": "Guidance Records",
+  "grade-review": "Grade Review",
+  "teacher-oversight": "Teacher Oversight Assignments",
 };
 
 interface NavGroup {
@@ -130,7 +134,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Grading",
-    tabs: [tab("grading-periods"), tab("class-records"), tab("consolidated-grades")],
+    tabs: [
+      tab("grading-periods"),
+      tab("class-records"),
+      tab("consolidated-grades"),
+      tab("grade-review"),
+    ],
   },
   {
     label: "Creation Studio",
@@ -154,6 +163,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       tab("school-members"),
       tab("devices"),
       tab("school-branding"),
+      tab("teacher-oversight"),
     ],
   },
 ];

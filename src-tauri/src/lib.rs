@@ -214,6 +214,7 @@ pub fn run() {
             commands::grade_submission::decide_grade_submission,
             commands::grade_submission::decide_grade_submission_master_teacher,
             commands::grade_submission::list_grade_submissions_for_school,
+            commands::grade_submission::list_grade_submissions_for_master_teacher,
             commands::grade_submission::list_grade_submission_notes,
             commands::grade_submission::get_principal_overview_dashboard,
             commands::import::preview_scholastic_import,

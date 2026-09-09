@@ -10,6 +10,7 @@ import { ExportApplicationService } from "./application/export-service";
 import { EnrollmentHistoryApplicationService } from "./application/enrollment-history-service";
 import { FormativeAssessmentApplicationService } from "./application/formative-assessment-service";
 import { FormGenerationApplicationService } from "./application/form-generation-service";
+import { GradeSubmissionApplicationService } from "./application/grade-submission-service";
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
@@ -24,6 +25,7 @@ import { SectionAdvisoryApplicationService } from "./application/section-advisor
 import { SetupApplicationService } from "./application/setup-service";
 import { Sf1ImportApplicationService } from "./application/sf1-import-service";
 import { SubjectApplicationService } from "./application/subject-service";
+import { TeacherOversightAssignmentApplicationService } from "./application/teacher-oversight-assignment-service";
 import { SubjectAttendanceApplicationService } from "./application/subject-attendance-service";
 import { SyncStatusApplicationService } from "./application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
@@ -43,6 +45,7 @@ import { TauriEnrollmentHistoryRepository } from "./infrastructure/tauri/enrollm
 import { TauriFilePicker } from "./infrastructure/tauri/file-picker";
 import { TauriFormativeAssessmentRepository } from "./infrastructure/tauri/formative-assessment-repository";
 import { TauriFormGenerationRepository } from "./infrastructure/tauri/form-generation-repository";
+import { TauriGradeSubmissionRepository } from "./infrastructure/tauri/grade-submission-repository";
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
@@ -59,6 +62,7 @@ import { TauriSf1ImportRepository } from "./infrastructure/tauri/sf1-import-repo
 import { TauriSubjectRepository } from "./infrastructure/tauri/subject-repository";
 import { TauriSubjectAttendanceRepository } from "./infrastructure/tauri/subject-attendance-repository";
 import { TauriSyncStatusRepository } from "./infrastructure/tauri/sync-status-repository";
+import { TauriTeacherOversightAssignmentRepository } from "./infrastructure/tauri/teacher-oversight-assignment-repository";
 import { TauriTeachingAssignmentRepository } from "./infrastructure/tauri/teaching-assignment-repository";
 import { TauriTransferRecordRepository } from "./infrastructure/tauri/transfer-record-repository";
 import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
@@ -152,3 +156,9 @@ export const conflictReviewService = new ConflictReviewApplicationService(
 );
 export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());
 export const myDayService = new MyDayApplicationService(new TauriMyDayRepository());
+export const gradeSubmissionService = new GradeSubmissionApplicationService(
+  new TauriGradeSubmissionRepository(),
+);
+export const teacherOversightAssignmentService = new TeacherOversightAssignmentApplicationService(
+  new TauriTeacherOversightAssignmentRepository(),
+);

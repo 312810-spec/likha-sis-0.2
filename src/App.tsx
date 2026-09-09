@@ -11,6 +11,7 @@ import {
   exportService,
   formativeAssessmentService,
   formGenerationService,
+  gradeSubmissionService,
   gradingService,
   learnerScoreService,
   lessonPlanService,
@@ -29,6 +30,7 @@ import {
   subjectAttendanceService,
   subjectService,
   syncStatusService,
+  teacherOversightAssignmentService,
   teachingAssignmentService,
   transferRecordService,
   weatherService,
@@ -37,6 +39,7 @@ import type { CurrentSession } from "./domain/session";
 import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
+import { GradeReviewScreen } from "./ui/GradeReviewScreen";
 import { GuidanceRecordsScreen } from "./ui/GuidanceRecordsScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { CalendarScreen } from "./ui/CalendarScreen";
@@ -70,6 +73,7 @@ import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
 import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
+import { TeacherOversightScreen } from "./ui/TeacherOversightScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
 import { TransfersScreen } from "./ui/TransfersScreen";
@@ -584,6 +588,20 @@ function App() {
                 sectionService={sectionService}
                 classRecordService={classRecordService}
                 learnerScoreService={learnerScoreService}
+              />
+            ) : activeTab === "grade-review" ? (
+              <GradeReviewScreen
+                gradeSubmissionService={gradeSubmissionService}
+                teacherOversightAssignmentService={teacherOversightAssignmentService}
+                classRecordService={classRecordService}
+                schoolMemberService={schoolMemberService}
+                roles={session.roles}
+                userId={session.userId}
+              />
+            ) : activeTab === "teacher-oversight" ? (
+              <TeacherOversightScreen
+                teacherOversightAssignmentService={teacherOversightAssignmentService}
+                schoolMemberService={schoolMemberService}
               />
             ) : activeTab === "id-card" ? (
               <IdCardScreen
