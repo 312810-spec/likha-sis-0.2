@@ -1,5 +1,86 @@
 # CURRENT HANDOFF
 
+## Batch 14 (complete): hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,
+nothing pushed, PR #55 untouched, no CI triggered.
+
+**Corrects a prior-session mistake** (see `docs/VERIFICATION-DEBT.md`'s
+2026-09-08 "Batch 1" entry and its 2026-09-09 correction note): three
+Tier 1.2 items previously recorded as pure hardware-only verification
+debt each had a genuinely codable core. This batch built and tested each
+codable core and wrote an executable runbook/script for the genuinely
+hardware-only remainder of each, rather than leaving anything inert.
+
+**Sub-item 1 — Hub daemon resilience** (ADR-0085): `hub_server::spawn`
+now retries forever on bind/serve failure via a new
+`hub_server::supervisor::backoff_for_attempt` (exponential 1s→60s cap,
+resets after a healthy bind) instead of permanently abandoning a failed
+listener address. 5 new pure unit tests prove the schedule. Whole-process
+crash/reboot recovery (outside any one process's control, since LIKHA-SIS
+ships as a normal desktop app, not a Windows Service) is addressed by
+`ops/hub-daemon-recovery-setup.ps1` (registers a Windows Scheduled Task
+with restart-on-failure) + `ops/hub-daemon-recovery-runbook.md` (the
+human witness steps) — reviewed but not executed on real hardware (no
+`pwsh` in this sandbox).
+
+**Sub-item 2 — Hub hardware gates** (ADR-0086):
+`ops/hub-hardware-gate-audit.ps1` audits BitLocker/firewall(port
+7878)/patch status with fetch/decide logic deliberately separated so the
+decision functions are unit-testable via
+`ops/hub-hardware-gate-audit.Tests.ps1` (Pester) against synthetic
+fixtures, plus a `-DryRun` mode. Reviewed but never executed (no `pwsh`
+here) — `ops/hub-hardware-gate-audit-runbook.md` is the admin
+runbook.
+
+**Sub-item 3 — Disaster recovery backup** (ADR-0087): no backup/export
+mechanism existed before this batch. Built `backup::create_two_copy_backup`
+(SQLCipher's own `sqlcipher_export()`, never a raw copy or plaintext
+dump) + `commands::backup::create_disaster_recovery_backup`
+(School-Head-gated via new `Capability::CreateDisasterRecoveryBackup`).
+TDD caught two real bugs before the round-trip test passed: an uncopied
+`PRAGMA user_version` (made every backup look unmigrated) and an ATTACH
+`KEY` quoting difference (produced a working-but-different actual key) —
+both documented in the ADR. 11 new automated tests prove: two independent
+non-empty encrypted files are created; both round-trip real data via
+`db::open` with the correct key; deleting one never affects the other;
+neither ever contains plaintext bytes on disk; neither opens with no/wrong
+key; re-running at the same filename overwrites cleanly.
+`ops/DR-DRILL-RUNBOOK.md` is the human witness runbook for the actual
+loss-and-restore drill on real hardware (still owed).
+
+**New files**: `src-tauri/src/backup.rs`, `src-tauri/src/commands/backup.rs`,
+`ops/hub-daemon-recovery-setup.ps1`, `ops/hub-daemon-recovery-runbook.md`,
+`ops/hub-hardware-gate-audit.ps1`, `ops/hub-hardware-gate-audit.Tests.ps1`,
+`ops/hub-hardware-gate-audit-runbook.md`, `ops/DR-DRILL-RUNBOOK.md`,
+`docs/adr/0085-hub-daemon-resilience.md`,
+`docs/adr/0086-hub-hardware-gate-audit.md`,
+`docs/adr/0087-disaster-recovery-backup-mechanism.md`.
+
+**Changed**: `src-tauri/src/hub_server.rs` (supervisor + retry loop),
+`src-tauri/src/db/mod.rs` (new `load_encryption_key` accessor),
+`src-tauri/src/auth/mod.rs` (new `Capability::CreateDisasterRecoveryBackup`),
+`src-tauri/src/lib.rs`/`commands/mod.rs` (new command wiring).
+
+**No TypeScript/frontend file touched** — `npm run quality` was not
+re-run this batch (nothing for it to catch); this is Rust + PowerShell +
+docs only.
+
+**Verified**: `cargo fmt --check` (clean), `cargo clippy --all-targets
+-- -D warnings` (0 warnings), `cargo test` (full crate — see this
+batch's own commits for exact counts). PowerShell scripts are
+reviewed/logic-verified only, never executed (no `pwsh` in this Linux
+sandbox) — disclosed, not claimed as covered, in
+`docs/VERIFICATION-DEBT.md`.
+
+**Exact next task**: witness the three hardware-only runbooks
+(`ops/hub-daemon-recovery-runbook.md`, `ops/hub-hardware-gate-audit-runbook.md`,
+`ops/DR-DRILL-RUNBOOK.md`) on a real Windows hub laptop and record the
+outcome in `docs/VERIFICATION-DEBT.md`; alternatively, continue with the
+next highest-priority item from `docs/product/MASTER-TASK-INVENTORY.md`
+per this project's established priority order. Await explicit
+instruction to continue past this wave boundary.
+
 ## Batch 13 (complete): award-eligibility anecdote check wired for real (2026-09-09, ADR-0084), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,

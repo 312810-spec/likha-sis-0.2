@@ -1,5 +1,99 @@
 # Verification Debt
 
+## Batch 14: hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09)
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit-locally-only (no push,
+PR #55 untouched). This batch corrects a prior-session mistake: the three
+Tier 1.2 items below (recorded 2026-09-08, see this file's own "Batch 1"
+entry) were marked as pure verification-debt on the assumption they
+needed real Windows hardware end to end. Each actually had a genuinely
+codable core; only a genuinely hardware-only remainder is still owed.
+
+### Sub-item 1 — Hub daemon resilience
+
+**Now tested by CI**: `hub_server::spawn` retries forever on
+bind/serve failure with a new `hub_server::supervisor::backoff_for_attempt`
+schedule (exponential, 1s→60s cap, reset after a healthy bind) — the
+listener previously logged one failure and permanently gave up on that
+address. 5 new unit tests in `src-tauri/src/hub_server.rs`
+(`cargo test --lib hub_server::supervisor`) prove the schedule directly:
+never zero, doubles correctly, capped, monotonically non-decreasing.
+
+**Still needs a human on real hardware**: this in-process fix cannot
+help if the WHOLE `LIKHA-SIS.exe` process crashes or the machine
+reboots — that is inherently OS-level. `ops/hub-daemon-recovery-setup.ps1`
+(a Windows Scheduled Task registrar with restart-on-failure settings) is
+reviewed but has never executed against a real Windows Task Scheduler —
+no `pwsh` is available in this Linux sandbox. `ops/hub-daemon-recovery-runbook.md`
+is the exact manual witness steps (logon-launch, crash-restart,
+listener-rebind-after-a-forced-port-conflict, reboot) an ICT coordinator
+must perform once on the real hub laptop. See
+`docs/adr/0085-hub-daemon-resilience.md`.
+
+### Sub-item 2 — Hub hardware gates (BitLocker/firewall/patch)
+
+**Now written and reviewed**: `ops/hub-hardware-gate-audit.ps1`, a
+read-only, non-destructive script checking BitLocker status, an inbound
+firewall rule for the hub sync port (7878), and Windows Update
+pending-patch age. Its decision logic (`Get-BitLockerGateResult`,
+`Get-FirewallGateResult`, `Test-PortInRuleRange`, `Get-PatchGateResult`)
+is deliberately separated from live data-fetching, and a `-DryRun` mode
+exercises it against synthetic pass/mixed/fail fixtures without touching
+any real Windows API. `ops/hub-hardware-gate-audit.Tests.ps1` is a Pester
+suite asserting every PASS/WARN/FAIL branch against fixture inputs.
+
+**Not executed in this session**: no `pwsh`/PowerShell exists in this
+Linux sandbox, so neither the script nor its Pester suite has ever
+actually run — reviewed line-by-line against documented cmdlet
+contracts, not observed against a real Windows machine.
+`ops/hub-hardware-gate-audit-runbook.md` is the human-executable
+verification a school IT admin must perform once (run the real audit,
+run `Invoke-Pester`, confirm output matches expectations). See
+`docs/adr/0086-hub-hardware-gate-audit.md`.
+
+### Sub-item 3 — Disaster Recovery drill
+
+**Now tested by CI**: no encrypted backup/export mechanism existed
+before this batch (confirmed by search — `export::*` only ever produces
+already-visible report CSV/XLSX, `commands::export::export_learner_roster`'s
+own doc comment explicitly disclaims being a database/key backup). Built
+`src-tauri/src/backup.rs` (`create_two_copy_backup`, `verify_backup_copy`)
+using SQLCipher's own `sqlcipher_export()` mechanism (never a raw file
+copy, never a plaintext dump) plus a Tauri command
+(`commands::backup::create_disaster_recovery_backup`, School-Head-gated
+via a new `Capability::CreateDisasterRecoveryBackup`). TDD: the round-trip
+test failed first and caught two real bugs before passing (an uncopied
+`PRAGMA user_version` that made every backup look unmigrated to
+`db::open`, and an ATTACH `KEY` quoting difference that produced a
+working-but-different actual encryption key) — see
+`docs/adr/0087-disaster-recovery-backup-mechanism.md` for both. 11
+automated tests (`cargo test --lib backup::` /
+`cargo test --lib commands::backup::`) prove: two distinct non-empty
+backup files are created; both independently round-trip real data via
+`db::open` with the correct key; deleting one never affects the other;
+neither ever contains plaintext bytes on disk; neither is readable with
+no/wrong key; re-running at the same filename overwrites cleanly.
+
+**Still needs a human on real hardware**: that a School-Head user can
+actually reach this command from the running Windows app, that it writes
+correctly to a real `%APPDATA%` path, and an actual witnessed
+loss-and-restore drill (kill the app, replace the live db file with a
+backup copy, relaunch, verify data). `ops/DR-DRILL-RUNBOOK.md` is the
+exact step-by-step runbook, explicitly separating what CI already proves
+from what remains to witness. No dedicated UI button exists yet for
+triggering a backup (documented as a known deferred follow-up in the
+runbook, not silently dropped) — the drill uses the Tauri devtools
+console as an interim invocation path.
+
+### Verification actually run this batch
+
+`cargo fmt --check` (clean), `cargo clippy --all-targets -- -D warnings`
+(0 warnings), `cargo test` (full crate, see this batch's own commits for
+the exact pass count at each checkpoint). No TypeScript/frontend file was
+touched this batch, so `npm run quality` was not re-run (nothing for it
+to catch). `npm run quality:security`/`quality:ui` were not run this
+batch — no dependency or UI surface changed; not claimed as covered.
+
 ## Batch 8 (items 1-7): 7 new/wired screens — `quality:ui` unavailable in this sandbox, native visual/screen-reader pass still owed (2026-09-08)
 
 Branch `claude/pending-tasks-batch-vjy67v`, batch-implement mode --
@@ -439,6 +533,19 @@ entries below in spirit, but are recorded explicitly here, by name,
 against `docs/product/MASTER-TASK-INVENTORY.md`'s Tier 1.2 list, so a
 future session can find them without re-deriving which inventory items
 they map to.
+
+**Correction (2026-09-09, Batch 14, see this file's own top entry)**:
+this framing conflated "needs a human to witness it once on real
+hardware" with "nothing here is codable" — that was wrong. Each of the
+three items had a genuinely codable core (the hub listener's own
+restart-on-failure logic; a PowerShell audit script's decision logic; the
+full backup-create-verify-restore round trip) that a later session built
+and proved with real automated tests, leaving only the actually-hardware-only
+remainder (an OS-level Scheduled Task actually firing on a real reboot; a
+PowerShell script actually querying live BitLocker/firewall/WSUS APIs; a
+human physically carrying out a loss-and-restore drill) genuinely
+undone. See this file's top "Batch 14" entry for the accurate, corrected
+split.
 
 ## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
 
