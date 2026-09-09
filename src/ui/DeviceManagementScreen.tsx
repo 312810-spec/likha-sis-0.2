@@ -40,6 +40,12 @@ function deviceName(device: DeviceSyncCredential): string {
     : "Unnamed device";
 }
 
+/** No dedicated "not configured" placeholder text -- an empty text
+ * field with this as its `placeholder` attribute already communicates
+ * "using the default" without a second sentence to keep in sync with
+ * `sync_client::DEFAULT_HUB_BASE_URL`'s actual value. */
+const DEFAULT_HUB_ADDRESS_PLACEHOLDER = "http://127.0.0.1:7878 (default, this device only)";
+
 /**
  * Device sync management (Wave, ADR-0067/0069's device credential surface,
  * finally given a screen): lets a School Head see every device currently
@@ -57,6 +63,13 @@ function deviceName(device: DeviceSyncCredential): string {
  * confirmation panel itself, matching this app's "no unexplained
  * destructive action" convention. No enrollment/pairing flow here --
  * that is a separate, larger UX question (see `docs/CURRENT-HANDOFF.md`).
+ *
+ * Also carries this device's hub-address setting (the fix for the
+ * "loopback-only" gap recorded at the end of Batches 16-18): visible to
+ * everyone for the same "no UI hiding" reason as the device list above,
+ * but only a School Head can actually save a change
+ * (`commands::device_sync::set_sync_hub_base_url`'s own
+ * `ManageSchoolMembership` gate).
  */
 export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementScreenProps) {
   const { mode } = useTeacherMode();
@@ -70,7 +83,14 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
 
+  const [hubBaseUrlDraft, setHubBaseUrlDraft] = useState("");
+  const [hubBaseUrlLoading, setHubBaseUrlLoading] = useState(true);
+  const [hubBaseUrlSaving, setHubBaseUrlSaving] = useState(false);
+  const [hubBaseUrlError, setHubBaseUrlError] = useState<string | null>(null);
+  const [hubBaseUrlConfirmation, setHubBaseUrlConfirmation] = useState<string | null>(null);
+
   const requestRef = useRef(0);
+  const hubBaseUrlRequestRef = useRef(0);
   const confirmPanelRef = useRef<HTMLDivElement | null>(null);
 
   // Moves keyboard/screen-reader focus into the inline confirmation panel
@@ -112,6 +132,59 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceSyncService]);
+
+  function loadHubBaseUrl() {
+    const requestId = ++hubBaseUrlRequestRef.current;
+    setHubBaseUrlLoading(true);
+    deviceSyncService
+      .getHubBaseUrl()
+      .then((result) => {
+        if (hubBaseUrlRequestRef.current !== requestId) return;
+        setHubBaseUrlDraft(result ?? "");
+      })
+      .catch(() => {
+        // Silent: the hub-address panel simply shows an empty (default)
+        // field rather than blocking the whole screen's device list on
+        // a failure of this one read -- `devices.length === 0`'s
+        // EmptyState above is the load-failure path that actually
+        // matters for this screen.
+      })
+      .finally(() => {
+        if (hubBaseUrlRequestRef.current !== requestId) return;
+        setHubBaseUrlLoading(false);
+      });
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadHubBaseUrl();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceSyncService]);
+
+  async function saveHubBaseUrl() {
+    if (hubBaseUrlSaving) return;
+    setHubBaseUrlError(null);
+    setHubBaseUrlConfirmation(null);
+    setHubBaseUrlSaving(true);
+    try {
+      await deviceSyncService.setHubBaseUrl(hubBaseUrlDraft);
+      setHubBaseUrlConfirmation(
+        hubBaseUrlDraft.trim().length === 0
+          ? "This device will use the default address again."
+          : "This device's hub address was updated.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setHubBaseUrlError(
+        message.toLowerCase().includes("unauthorized")
+          ? "Only a School Head can change this device's hub address."
+          : message ||
+              "Could not save this address. Check that it looks like http://192.168.1.10:7878.",
+      );
+    } finally {
+      setHubBaseUrlSaving(false);
+    }
+  }
 
   function startRevoke(credentialId: string) {
     setError(null);
@@ -167,6 +240,35 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
       )}
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+
+      <section className="device-hub-address" aria-label="This device's hub address">
+        <h2>This device&rsquo;s hub address</h2>
+        {mode === "guided" && (
+          <p className="field-hint">
+            This is the school computer this device sends and receives records from. Leave it blank
+            to use the default, which only works when the hub is running on this exact same computer
+            -- fill it in with the hub computer&rsquo;s network address (for example
+            <code> http://192.168.1.10:7878</code>) if this device needs to reach it over your
+            school&rsquo;s network. Only a School Head can change this.
+          </p>
+        )}
+        {hubBaseUrlError && <Alert tone="error">{hubBaseUrlError}</Alert>}
+        {hubBaseUrlConfirmation && <Alert tone="success">{hubBaseUrlConfirmation}</Alert>}
+        <div className="field">
+          <label htmlFor="device-hub-address-input">Hub address</label>
+          <input
+            id="device-hub-address-input"
+            type="text"
+            value={hubBaseUrlDraft}
+            placeholder={DEFAULT_HUB_ADDRESS_PLACEHOLDER}
+            disabled={hubBaseUrlLoading || hubBaseUrlSaving}
+            onChange={(event) => setHubBaseUrlDraft(event.target.value)}
+          />
+          <button type="button" onClick={saveHubBaseUrl} aria-disabled={hubBaseUrlSaving}>
+            {hubBaseUrlSaving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </section>
 
       {loading ? (
         <Loading label="Loading devices…" />

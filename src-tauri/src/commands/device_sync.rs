@@ -5,13 +5,14 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 use zeroize::Zeroize;
 
-use crate::auth::{self, SessionManager};
+use crate::auth::{self, Capability, SessionManager};
 use crate::commands::lock_db;
 use crate::db;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::hub_server::SharedSspk;
 use crate::repository::device_credential::{self, ActiveDeviceCredential, EnrolledCredential};
 use crate::repository::device_identity;
+use crate::repository::device_sync_client_credential;
 
 /// Tauri command surface for ADR-0067's device sync enrollment/revocation
 /// and ADR-0069's key ceremony. Both `auth::enroll_device_sync_credential`
@@ -169,6 +170,119 @@ impl From<ActiveDeviceCredential> for DeviceSyncCredentialSummary {
             last_used_at: value.last_used_at,
         }
     }
+}
+
+/// Validates a caller-supplied hub base URL before it is ever stored: a
+/// non-empty, trimmed `http://`/`https://` origin (scheme + host,
+/// optional port), rejecting anything else outright -- a malformed value
+/// here would otherwise surface only much later as an opaque connection
+/// failure inside `sync_client`'s background loop. Deliberately does not
+/// resolve DNS or attempt a connection (that would make this command
+/// network-dependent and slow for what is meant to be an instant save);
+/// `sync_client::push_once`/`pull_once` already handle an unreachable-but
+/// well-formed address as an ordinary `Offline`/`HubUnavailable` retry
+/// case.
+fn validate_hub_base_url(raw: &str) -> AppResult<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::InvalidInput(
+            "Hub address cannot be empty.".to_string(),
+        ));
+    }
+    let Ok(parsed) = url::Url::parse(trimmed) else {
+        return Err(AppError::InvalidInput(format!(
+            "\"{trimmed}\" is not a valid address."
+        )));
+    };
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err(AppError::InvalidInput(
+            "Hub address must start with http:// or https://".to_string(),
+        ));
+    }
+    if parsed.host_str().is_none() {
+        return Err(AppError::InvalidInput(
+            "Hub address must include a host.".to_string(),
+        ));
+    }
+    // Normalized to just the origin (scheme + host + port when
+    // non-default), never the raw caller string: `sync_client` always
+    // appends its own `/sync/...` path segment onto `base_url`, so a
+    // trailing path/slash/query the caller typed would otherwise get
+    // silently doubled into every request. A validated `http`/`https`
+    // URL always parses to a `Tuple` origin (never the opaque `"null"`
+    // origin some other schemes produce), so this is always a real,
+    // non-empty `scheme://host[:port]` string -- proven by this
+    // function's own tests, including one with a non-default port.
+    Ok(parsed.origin().unicode_serialization())
+}
+
+/// Sets (or clears, with `None`/an empty string) THIS device's hub
+/// address for the caller's own school -- the fix for the gap recorded
+/// at the end of Batches 16-18: a device could previously only reach a
+/// hub bound to `127.0.0.1`, which only works when hub and client run on
+/// the exact same machine. School-Head-only (`ManageSchoolMembership`,
+/// the same capability `revoke_device_sync_credential` already gates
+/// on): this setting controls where this device sends its own sync
+/// credential secret on every push/pull round (see
+/// `sync_client::push_once`'s `DEVICE_SECRET_HEADER`), so pointing it at
+/// an attacker-controlled address would leak that secret -- not a
+/// setting to leave changeable by any authenticated teacher. `school_id`
+/// is always session-derived, never a parameter, matching every other
+/// tenant-write command in this codebase.
+///
+/// Pure `&Connection`/`&SessionManager` logic, deliberately factored out
+/// of the `#[tauri::command]` below so it is directly unit-testable
+/// without a real `AppHandle`/`State` harness -- same convention as
+/// `commands::school::validate_logo_upload`/`validate_coordinates`.
+fn set_hub_base_url_for_session(
+    conn: &Connection,
+    sessions: &SessionManager,
+    hub_base_url: Option<String>,
+) -> AppResult<()> {
+    let school_id = auth::authorize_capability(conn, sessions, Capability::ManageSchoolMembership)?;
+
+    let normalized = match hub_base_url {
+        None => None,
+        Some(raw) if raw.trim().is_empty() => None,
+        Some(raw) => Some(validate_hub_base_url(&raw)?),
+    };
+    device_sync_client_credential::set_hub_base_url(conn, &school_id, normalized.as_deref())
+}
+
+#[tauri::command]
+pub fn set_sync_hub_base_url(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    hub_base_url: Option<String>,
+) -> AppResult<()> {
+    let conn = lock_db(&db);
+    set_hub_base_url_for_session(&conn, &sessions, hub_base_url)
+}
+
+/// Reads back THIS device's configured hub address for the caller's own
+/// school, if any -- `None` means it is using the default loopback
+/// address (`sync_client::DEFAULT_HUB_BASE_URL`). Any authenticated
+/// school member may view it (matching `list_device_sync_credentials`'s
+/// own "read-only reference data" convention); only the write side
+/// carries the stricter `ManageSchoolMembership` gate.
+fn get_hub_base_url_for_session(
+    conn: &Connection,
+    sessions: &SessionManager,
+) -> AppResult<Option<String>> {
+    let school_id = sessions.require_active_school_scope(conn)?;
+    Ok(
+        device_sync_client_credential::get(conn, &school_id)?
+            .and_then(|stored| stored.hub_base_url),
+    )
+}
+
+#[tauri::command]
+pub fn get_sync_hub_base_url(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+) -> AppResult<Option<String>> {
+    let conn = lock_db(&db);
+    get_hub_base_url_for_session(&conn, &sessions)
 }
 
 /// Lists every currently-enrolled (active) device sync credential for
@@ -456,5 +570,258 @@ mod tests {
         assert_eq!(devices[0].device_label.as_deref(), Some("Ana's laptop"));
         assert_eq!(devices[0].owner_display_name, "Ana Cruz");
         assert_eq!(devices[0].owner_username, "ana.cruz");
+    }
+
+    mod hub_base_url_tests {
+        use super::*;
+        use crate::repository::role as role_repo;
+
+        #[test]
+        fn accepts_and_normalizes_a_well_formed_http_and_https_address() {
+            assert_eq!(
+                validate_hub_base_url("http://192.168.1.10:7878").unwrap(),
+                "http://192.168.1.10:7878"
+            );
+            assert_eq!(
+                validate_hub_base_url("https://school-hub.local").unwrap(),
+                "https://school-hub.local"
+            );
+        }
+
+        #[test]
+        fn trims_surrounding_whitespace() {
+            assert_eq!(
+                validate_hub_base_url("  http://192.168.1.10:7878  ").unwrap(),
+                "http://192.168.1.10:7878"
+            );
+        }
+
+        #[test]
+        fn drops_a_trailing_path_or_slash_since_sync_client_appends_its_own() {
+            assert_eq!(
+                validate_hub_base_url("http://192.168.1.10:7878/").unwrap(),
+                "http://192.168.1.10:7878"
+            );
+            assert_eq!(
+                validate_hub_base_url("http://192.168.1.10:7878/sync/push").unwrap(),
+                "http://192.168.1.10:7878"
+            );
+        }
+
+        #[test]
+        fn preserves_a_non_default_port() {
+            let result = validate_hub_base_url("http://100.64.0.5:9999").unwrap();
+            assert!(
+                result.ends_with(":9999"),
+                "expected a preserved port, got {result}"
+            );
+        }
+
+        #[test]
+        fn rejects_an_empty_or_whitespace_only_address() {
+            assert!(validate_hub_base_url("").is_err());
+            assert!(validate_hub_base_url("   ").is_err());
+        }
+
+        #[test]
+        fn rejects_an_address_with_no_scheme() {
+            assert!(validate_hub_base_url("192.168.1.10:7878").is_err());
+        }
+
+        #[test]
+        fn rejects_a_non_http_scheme() {
+            assert!(validate_hub_base_url("ftp://192.168.1.10").is_err());
+            assert!(validate_hub_base_url("javascript:alert(1)").is_err());
+        }
+
+        struct HubUrlFixture {
+            school_id: String,
+        }
+
+        /// Creates a school with a School Head (`role_repo::SCHOOL_HEAD`,
+        /// which holds `ManageSchoolMembership`) and a plain Teacher (which
+        /// does not), each with their own logged-in session -- lets a test
+        /// exercise both the allow and the deny side of
+        /// `set_hub_base_url_for_session`'s capability gate against the
+        /// SAME school.
+        fn seed(conn: &Connection) -> (HubUrlFixture, SessionManager, SessionManager) {
+            let school = crate::repository::school::create(conn, "Rizal Elementary").unwrap();
+            let head =
+                crate::repository::user::create_user(conn, "head.a", "correct password", "Head A")
+                    .unwrap();
+            crate::repository::user::add_school_membership(conn, &head.id, &school.id).unwrap();
+            role_repo::grant(conn, &head.id, &school.id, role_repo::SCHOOL_HEAD).unwrap();
+            let teacher = crate::repository::user::create_user(
+                conn,
+                "teacher.a",
+                "correct password",
+                "Teacher A",
+            )
+            .unwrap();
+            crate::repository::user::add_school_membership(conn, &teacher.id, &school.id).unwrap();
+            role_repo::grant(conn, &teacher.id, &school.id, role_repo::TEACHER).unwrap();
+
+            let head_sessions = SessionManager::new();
+            auth_mod::login(
+                conn,
+                &head_sessions,
+                "head.a",
+                "correct password",
+                &school.id,
+            )
+            .unwrap();
+            let teacher_sessions = SessionManager::new();
+            auth_mod::login(
+                conn,
+                &teacher_sessions,
+                "teacher.a",
+                "correct password",
+                &school.id,
+            )
+            .unwrap();
+
+            (
+                HubUrlFixture {
+                    school_id: school.id,
+                },
+                head_sessions,
+                teacher_sessions,
+            )
+        }
+
+        #[test]
+        fn a_school_head_can_set_and_read_back_the_hub_address() {
+            let conn = open_test_db();
+            let (fixture, head_sessions, _teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+
+            set_hub_base_url_for_session(
+                &conn,
+                &head_sessions,
+                Some("https://192.168.1.10:7878".to_string()),
+            )
+            .unwrap();
+
+            assert_eq!(
+                get_hub_base_url_for_session(&conn, &head_sessions).unwrap(),
+                Some("https://192.168.1.10:7878".to_string())
+            );
+        }
+
+        #[test]
+        fn a_plain_teacher_cannot_set_the_hub_address() {
+            let conn = open_test_db();
+            let (fixture, _head_sessions, teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+
+            let result = set_hub_base_url_for_session(
+                &conn,
+                &teacher_sessions,
+                Some("https://192.168.1.10:7878".to_string()),
+            );
+
+            assert!(matches!(result, Err(AppError::Unauthorized)));
+        }
+
+        #[test]
+        fn a_plain_teacher_can_still_read_the_configured_hub_address() {
+            let conn = open_test_db();
+            let (fixture, head_sessions, teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+            set_hub_base_url_for_session(
+                &conn,
+                &head_sessions,
+                Some("https://192.168.1.10:7878".to_string()),
+            )
+            .unwrap();
+
+            assert_eq!(
+                get_hub_base_url_for_session(&conn, &teacher_sessions).unwrap(),
+                Some("https://192.168.1.10:7878".to_string())
+            );
+        }
+
+        #[test]
+        fn setting_none_or_an_empty_string_clears_a_previously_configured_address() {
+            let conn = open_test_db();
+            let (fixture, head_sessions, _teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+            set_hub_base_url_for_session(
+                &conn,
+                &head_sessions,
+                Some("https://192.168.1.10:7878".to_string()),
+            )
+            .unwrap();
+
+            set_hub_base_url_for_session(&conn, &head_sessions, Some("   ".to_string())).unwrap();
+
+            assert_eq!(
+                get_hub_base_url_for_session(&conn, &head_sessions).unwrap(),
+                None
+            );
+        }
+
+        #[test]
+        fn a_malformed_address_is_rejected_and_never_stored() {
+            let conn = open_test_db();
+            let (fixture, head_sessions, _teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+
+            let result =
+                set_hub_base_url_for_session(&conn, &head_sessions, Some("not a url".to_string()));
+
+            assert!(result.is_err());
+            assert_eq!(
+                get_hub_base_url_for_session(&conn, &head_sessions).unwrap(),
+                None
+            );
+        }
+
+        #[test]
+        fn get_returns_none_for_a_school_head_in_a_different_school_from_the_configured_one() {
+            let conn = open_test_db();
+            let (fixture, head_sessions, _teacher_sessions) = seed(&conn);
+            device_sync_client_credential::store(&conn, &fixture.school_id, "cred-1", "aabbcc")
+                .unwrap();
+            set_hub_base_url_for_session(
+                &conn,
+                &head_sessions,
+                Some("https://192.168.1.10:7878".to_string()),
+            )
+            .unwrap();
+
+            let other_school = crate::repository::school::create(&conn, "Other School").unwrap();
+            let other_head =
+                crate::repository::user::create_user(&conn, "head.b", "correct password", "Head B")
+                    .unwrap();
+            crate::repository::user::add_school_membership(&conn, &other_head.id, &other_school.id)
+                .unwrap();
+            role_repo::grant(
+                &conn,
+                &other_head.id,
+                &other_school.id,
+                role_repo::SCHOOL_HEAD,
+            )
+            .unwrap();
+            let other_sessions = SessionManager::new();
+            auth_mod::login(
+                &conn,
+                &other_sessions,
+                "head.b",
+                "correct password",
+                &other_school.id,
+            )
+            .unwrap();
+
+            assert_eq!(
+                get_hub_base_url_for_session(&conn, &other_sessions).unwrap(),
+                None
+            );
+        }
     }
 }

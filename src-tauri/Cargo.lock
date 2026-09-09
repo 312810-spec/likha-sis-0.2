@@ -132,6 +132,7 @@ dependencies = [
  "tokio",
  "tower",
  "umya-spreadsheet",
+ "url",
  "uuid",
  "windows 0.62.2",
  "zeroize",

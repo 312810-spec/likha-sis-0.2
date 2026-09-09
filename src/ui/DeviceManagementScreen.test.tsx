@@ -35,6 +35,10 @@ class FakeDeviceSyncRepository implements DeviceSyncRepository {
    * established convention for proving an in-flight guard. */
   pending = false;
 
+  hubBaseUrl: string | null = null;
+  setHubBaseUrlCalls: (string | null)[] = [];
+  setHubBaseUrlResult: "ok" | "unauthorized" | "invalid" = "ok";
+
   constructor(private devices: DeviceSyncCredential[] = DEVICES) {}
 
   async listDevices() {
@@ -50,6 +54,21 @@ class FakeDeviceSyncRepository implements DeviceSyncRepository {
       throw new Error("unauthorized");
     }
     return this.revokeResult;
+  }
+
+  async getHubBaseUrl(): Promise<string | null> {
+    return this.hubBaseUrl;
+  }
+
+  async setHubBaseUrl(hubBaseUrl: string | null): Promise<void> {
+    this.setHubBaseUrlCalls.push(hubBaseUrl);
+    if (this.setHubBaseUrlResult === "unauthorized") {
+      throw new Error("unauthorized");
+    }
+    if (this.setHubBaseUrlResult === "invalid") {
+      throw new Error('"not a url" is not a valid address.');
+    }
+    this.hubBaseUrl = hubBaseUrl;
   }
 }
 
@@ -212,5 +231,80 @@ describe("DeviceManagementScreen", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Remove device" }).at(0)!);
     await expectNoAccessibilityViolations(container);
+  });
+
+  describe("hub address", () => {
+    it("starts empty when no address is configured", async () => {
+      renderScreen();
+      await screen.findByText("Front Office PC");
+
+      expect(screen.getByLabelText("Hub address")).toHaveValue("");
+    });
+
+    it("loads a previously configured address into the field", async () => {
+      const repo = new FakeDeviceSyncRepository();
+      repo.hubBaseUrl = "https://192.168.1.10:7878";
+
+      renderScreen(repo);
+
+      expect(await screen.findByLabelText("Hub address")).toHaveValue("https://192.168.1.10:7878");
+    });
+
+    it("saves a typed address and shows a confirmation", async () => {
+      const user = userEvent.setup();
+      const repo = new FakeDeviceSyncRepository();
+      renderScreen(repo);
+      await screen.findByText("Front Office PC");
+
+      await user.type(screen.getByLabelText("Hub address"), "https://192.168.1.10:7878");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByText("This device's hub address was updated.")).toBeInTheDocument();
+      expect(repo.setHubBaseUrlCalls).toEqual(["https://192.168.1.10:7878"]);
+    });
+
+    it("shows a different confirmation when the field is cleared back to the default", async () => {
+      const user = userEvent.setup();
+      const repo = new FakeDeviceSyncRepository();
+      repo.hubBaseUrl = "https://192.168.1.10:7878";
+      renderScreen(repo);
+      await screen.findByDisplayValue("https://192.168.1.10:7878");
+
+      await user.clear(screen.getByLabelText("Hub address"));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(
+        await screen.findByText("This device will use the default address again."),
+      ).toBeInTheDocument();
+    });
+
+    it("shows a permission-specific message for a non-School-Head, not a raw backend string", async () => {
+      const user = userEvent.setup();
+      const repo = new FakeDeviceSyncRepository();
+      repo.setHubBaseUrlResult = "unauthorized";
+      renderScreen(repo);
+      await screen.findByText("Front Office PC");
+
+      await user.type(screen.getByLabelText("Hub address"), "https://192.168.1.10:7878");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(
+        await screen.findByText("Only a School Head can change this device's hub address."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/unauthorized/i)).not.toBeInTheDocument();
+    });
+
+    it("shows the backend's own validation message for a malformed address", async () => {
+      const user = userEvent.setup();
+      const repo = new FakeDeviceSyncRepository();
+      repo.setHubBaseUrlResult = "invalid";
+      renderScreen(repo);
+      await screen.findByText("Front Office PC");
+
+      await user.type(screen.getByLabelText("Hub address"), "not a url");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByText('"not a url" is not a valid address.')).toBeInTheDocument();
+    });
   });
 });

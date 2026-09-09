@@ -119,6 +119,12 @@ tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"]
 # `127.0.0.1`), not a routine version bump.
 reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query", "form", "rustls"] }
 
+# Already pulled in transitively (reqwest, tauri-utils) -- promoted to a
+# direct dependency for `commands::device_sync::validate_hub_base_url`'s
+# scheme/host parsing (the configurable sync hub address slice). No new
+# supply-chain surface: same crate, same version already in Cargo.lock.
+url = "2.5.8"
+
 # ADR-0067 network listener: enumerates this machine's non-loopback network
 # interfaces so the hub can bind its LAN/Tailscale address(es) instead of
 # loopback-only. messense/if-addrs, MIT OR BSD-3-Clause, actively

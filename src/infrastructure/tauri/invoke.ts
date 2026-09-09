@@ -98,6 +98,11 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "list_schedule_meetings_by_assignment",
   "set_school_logo",
   "clear_school_logo",
+  // `authorize_capability(ManageSchoolMembership)` -- a genuine
+  // permission denial for a non-School-Head session, not an expired
+  // one, same class as `set_school_logo` above (see this list's own
+  // doc comment).
+  "set_sync_hub_base_url",
 ]);
 
 /**

@@ -122,13 +122,20 @@ impl SyncClientConfig {
     /// Builds a config for whichever school/credential this installation
     /// currently has stored (see
     /// `repository::device_sync_client_credential::get_any`), talking to
-    /// the default loopback hub address. Returns `None` for a
-    /// never-enrolled installation -- the same "nothing to do" case
-    /// `should_run` checks before this loop is even started.
+    /// this device's configured hub address for that school
+    /// (`stored.hub_base_url`) if one has ever been set via
+    /// `commands::device_sync::set_sync_hub_base_url`, falling back to
+    /// `DEFAULT_HUB_BASE_URL` (loopback) otherwise -- unchanged default
+    /// behavior for every installation that has never touched this
+    /// setting. Returns `None` for a never-enrolled installation -- the
+    /// same "nothing to do" case `should_run` checks before this loop is
+    /// even started.
     pub fn discover(conn: &Connection) -> AppResult<Option<SyncClientConfig>> {
         Ok(
             device_sync_client_credential::get_any(conn)?.map(|stored| SyncClientConfig {
-                base_url: DEFAULT_HUB_BASE_URL.to_string(),
+                base_url: stored
+                    .hub_base_url
+                    .unwrap_or_else(|| DEFAULT_HUB_BASE_URL.to_string()),
                 school_id: stored.school_id,
                 credential_id: stored.credential_id,
                 device_secret_hex: stored.device_secret_hex,
@@ -1499,6 +1506,42 @@ mod tests {
         device_sync_client_credential::store(&conn, &school.id, "cred-1", "aabbcc").unwrap();
 
         assert!(should_run(&conn).unwrap());
+    }
+
+    #[test]
+    fn discover_uses_the_default_loopback_address_when_no_hub_address_is_configured() {
+        let conn = crate::db::open(
+            std::path::Path::new(":memory:"),
+            &crate::crypto::generate_key(),
+        )
+        .unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        device_sync_client_credential::store(&conn, &school.id, "cred-1", "aabbcc").unwrap();
+
+        let config = SyncClientConfig::discover(&conn).unwrap().unwrap();
+
+        assert_eq!(config.base_url, DEFAULT_HUB_BASE_URL);
+    }
+
+    #[test]
+    fn discover_uses_a_configured_hub_address_once_one_is_set() {
+        let conn = crate::db::open(
+            std::path::Path::new(":memory:"),
+            &crate::crypto::generate_key(),
+        )
+        .unwrap();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        device_sync_client_credential::store(&conn, &school.id, "cred-1", "aabbcc").unwrap();
+        device_sync_client_credential::set_hub_base_url(
+            &conn,
+            &school.id,
+            Some("https://192.168.1.10:7878"),
+        )
+        .unwrap();
+
+        let config = SyncClientConfig::discover(&conn).unwrap().unwrap();
+
+        assert_eq!(config.base_url, "https://192.168.1.10:7878");
     }
 
     #[test]

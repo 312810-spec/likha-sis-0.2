@@ -3784,6 +3784,29 @@ pub fn migrations() -> Migrations<'static> {
         CREATE INDEX idx_ms365_upload_queue_status ON microsoft365_upload_queue(school_id, status);
         "#,
         ),
+        M::up(
+            r#"
+        -- M64: makes the sync client's hub address configurable per
+        -- device/school, closing the gap recorded at the end of Batches
+        -- 16-18 (`docs/CURRENT-HANDOFF.md`): this device could previously
+        -- only reach a hub on `127.0.0.1` (`sync_client::DEFAULT_HUB_BASE_URL`),
+        -- which only ever works when the hub process happens to be running
+        -- on the exact same machine. The hub server side has supported a
+        -- real LAN/Tailscale bind address since ADR-0067; nothing let a
+        -- client point at one until now.
+        --
+        -- Nullable, stored on the existing per-school row rather than a
+        -- new table -- this is one more fact about THIS device's existing
+        -- relationship to its school's hub, not an independent entity
+        -- (matches `device_sync_client_credential`'s own existing
+        -- single-row-per-school shape). NULL means "use the default
+        -- loopback address" (`sync_client::SyncClientConfig::discover`),
+        -- never an empty string -- an explicit absent-value sentinel, not
+        -- a magic string a caller could accidentally produce.
+        ALTER TABLE device_sync_client_credential
+            ADD COLUMN hub_base_url TEXT;
+        "#,
+        ),
     ])
 }
 

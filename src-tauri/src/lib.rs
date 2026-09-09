@@ -199,6 +199,8 @@ pub fn run() {
             commands::device_sync::enroll_device_sync_credential,
             commands::device_sync::revoke_device_sync_credential,
             commands::device_sync::list_device_sync_credentials,
+            commands::device_sync::get_sync_hub_base_url,
+            commands::device_sync::set_sync_hub_base_url,
             commands::conflict_review::list_conflict_reviews,
             commands::conflict_review::resolve_conflict_review,
             commands::sync_status::get_sync_status,
