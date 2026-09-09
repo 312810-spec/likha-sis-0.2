@@ -1,8 +1,25 @@
-//! Multi-Tier Review & Audit Pipeline, interim version
-//! (`docs/adr/0073-interim-grade-review-pipeline.md`). No "Master
-//! Teacher" role exists in this codebase yet — School Head plays the
-//! approval role for this interim version, an explicit recorded
-//! decision (see the ADR), not a silent substitution.
+//! Multi-Tier Review & Audit Pipeline. ADR-0073 built the mechanism with
+//! School Head as an explicit, disclosed interim stand-in for a "Master
+//! Teacher" approver role that did not exist yet. ADR-0089 (Batch 17,
+//! checkpoint 3) is the permanent design: a submission is decided by the
+//! teacher's currently-assigned Master Teacher first
+//! (`decide_master_teacher`), then School Head performs a distinct,
+//! separate final-lock step (`decide_school_head`) before it is truly
+//! final. A teacher with no currently-assigned Master Teacher overseer
+//! routes straight to `decide_school_head` on the still-`submitted`
+//! status — the intentional, documented no-MT-assigned fallback,
+//! identical to ADR-0073's original behavior, not a bug.
+//!
+//! `status` itself is deliberately left unwidened (`submitted` |
+//! `approved` | `rejected`, unchanged since ADR-0073) — see migration
+//! M61's own doc comment for why a CHECK-widening table rebuild was
+//! tried and rejected (it would silently cascade-delete every
+//! `grade_submission_notes` row via the inbound foreign key). The two
+//! sub-states a widened enum would have encoded are instead read off
+//! `status == Submitted` combined with the new `master_teacher_decision`
+//! column: `None` means still awaiting a decision at whichever tier
+//! applies; `Some(Approved)` means the Master Teacher tier approved and
+//! School Head's final lock is pending.
 //!
 //! `grade_submission_notes` is append-only: automated-check findings and
 //! a reviewer's feedback are both new rows, never edits of a past one —
@@ -45,6 +62,35 @@ impl SubmissionStatus {
     }
 }
 
+/// The Master Teacher tier's own decision, distinct from the top-level
+/// `status`/`decided_*` fields (which always mean "the FINAL decision",
+/// whoever made it). `None` means the Master Teacher tier has not
+/// decided yet — either because no Master Teacher is assigned (the
+/// fallback) or because an assigned one simply hasn't acted yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MasterTeacherDecision {
+    Approved,
+    Rejected,
+}
+
+impl MasterTeacherDecision {
+    fn as_db_str(self) -> &'static str {
+        match self {
+            MasterTeacherDecision::Approved => "approved",
+            MasterTeacherDecision::Rejected => "rejected",
+        }
+    }
+
+    fn from_db_str(raw: &str) -> Option<MasterTeacherDecision> {
+        match raw {
+            "approved" => Some(MasterTeacherDecision::Approved),
+            "rejected" => Some(MasterTeacherDecision::Rejected),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GradeSubmission {
@@ -56,6 +102,13 @@ pub struct GradeSubmission {
     pub submitted_at: String,
     pub decided_by_user_id: Option<String>,
     pub decided_at: Option<String>,
+    /// The Master Teacher tier's own decision (see
+    /// [`MasterTeacherDecision`]) -- `None` when no Master Teacher has
+    /// decided yet, whether because none is assigned (fallback) or
+    /// because one is assigned but hasn't acted.
+    pub master_teacher_decision: Option<MasterTeacherDecision>,
+    pub master_teacher_decided_by_user_id: Option<String>,
+    pub master_teacher_decided_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +148,18 @@ pub struct SubmissionNote {
 
 fn row_to_submission(row: &rusqlite::Row) -> rusqlite::Result<GradeSubmission> {
     let status_raw: String = row.get(4)?;
+    let mt_decision_raw: Option<String> = row.get(8)?;
+    let master_teacher_decision = mt_decision_raw
+        .map(|raw| {
+            MasterTeacherDecision::from_db_str(&raw).ok_or_else(|| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    8,
+                    rusqlite::types::Type::Text,
+                    "unknown master_teacher_decision".into(),
+                )
+            })
+        })
+        .transpose()?;
     Ok(GradeSubmission {
         id: row.get(0)?,
         school_id: row.get(1)?,
@@ -110,11 +175,15 @@ fn row_to_submission(row: &rusqlite::Row) -> rusqlite::Result<GradeSubmission> {
         submitted_at: row.get(5)?,
         decided_by_user_id: row.get(6)?,
         decided_at: row.get(7)?,
+        master_teacher_decision,
+        master_teacher_decided_by_user_id: row.get(9)?,
+        master_teacher_decided_at: row.get(10)?,
     })
 }
 
 const SUBMISSION_SELECT: &str = "SELECT id, school_id, class_record_id, submitted_by_user_id, \
-     status, submitted_at, decided_by_user_id, decided_at \
+     status, submitted_at, decided_by_user_id, decided_at, master_teacher_decision, \
+     master_teacher_decided_by_user_id, master_teacher_decided_at \
      FROM grade_submissions WHERE school_id = ?1";
 
 /// One finding from the automated checks this module runs at submission
@@ -225,12 +294,16 @@ pub fn upsert_submission_from_sync(
     conn.execute(
         "INSERT INTO grade_submissions \
             (id, school_id, class_record_id, submitted_by_user_id, status, \
-             submitted_at, decided_by_user_id, decided_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
+             submitted_at, decided_by_user_id, decided_at, master_teacher_decision, \
+             master_teacher_decided_by_user_id, master_teacher_decided_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) \
          ON CONFLICT(id) DO UPDATE SET \
              status = excluded.status, \
              decided_by_user_id = excluded.decided_by_user_id, \
-             decided_at = excluded.decided_at",
+             decided_at = excluded.decided_at, \
+             master_teacher_decision = excluded.master_teacher_decision, \
+             master_teacher_decided_by_user_id = excluded.master_teacher_decided_by_user_id, \
+             master_teacher_decided_at = excluded.master_teacher_decided_at",
         (
             &submission.id,
             &submission.school_id,
@@ -240,6 +313,9 @@ pub fn upsert_submission_from_sync(
             &submission.submitted_at,
             &submission.decided_by_user_id,
             &submission.decided_at,
+            submission.master_teacher_decision.map(|d| d.as_db_str()),
+            &submission.master_teacher_decided_by_user_id,
+            &submission.master_teacher_decided_at,
         ),
     )?;
     Ok(())
@@ -303,13 +379,120 @@ pub fn list_for_school(conn: &Connection, school_id: &str) -> AppResult<Vec<Grad
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
-/// Appends a `feedback` note and records the reviewer's decision
-/// (approve/reject). Only a submission currently `submitted` may be
-/// decided — deciding an already-decided submission is rejected rather
-/// than silently overwriting a prior decision (a correction is a new
-/// submission cycle, matching this module's append-only discipline for
-/// its notes).
-pub fn decide(
+/// ADR-0089 tier 1: the teacher's currently-assigned Master Teacher
+/// overseer decides. Only a submission currently `submitted` with no
+/// prior Master Teacher decision recorded may be decided this way --
+/// deciding an already-decided submission (at either tier) is rejected
+/// rather than silently overwriting a prior decision, matching this
+/// module's append-only discipline for its notes. Caller must already be
+/// authorized as that teacher's current overseer -- see
+/// `auth::authorize_grade_submission_master_teacher_decision`, which also
+/// structurally blocks self-approval.
+///
+/// * Rejecting is terminal immediately: `status` becomes `Rejected`, and
+///   the top-level `decided_by_user_id`/`decided_at` (which always mean
+///   "the final decision") are set to this Master Teacher.
+/// * Approving is NOT terminal: `status` stays `Submitted` (only
+///   `master_teacher_decision` becomes `Approved`) -- School Head's
+///   distinct final-lock step (`decide_school_head`) is still required
+///   before the submission is truly final.
+pub fn decide_master_teacher(
+    conn: &Connection,
+    school_id: &str,
+    submission_id: &str,
+    master_teacher_user_id: &str,
+    approve: bool,
+    feedback_note: Option<&str>,
+) -> AppResult<GradeSubmission> {
+    let Some(existing) = find_by_id(conn, school_id, submission_id)? else {
+        return Err(crate::error::AppError::InvalidInput(
+            "unknown grade submission".to_string(),
+        ));
+    };
+    if existing.status != SubmissionStatus::Submitted || existing.master_teacher_decision.is_some()
+    {
+        return Err(crate::error::AppError::InvalidInput(
+            "this submission has already been decided".to_string(),
+        ));
+    }
+
+    let decision = if approve {
+        MasterTeacherDecision::Approved
+    } else {
+        MasterTeacherDecision::Rejected
+    };
+    if approve {
+        conn.execute(
+            "UPDATE grade_submissions \
+             SET master_teacher_decision = ?3, master_teacher_decided_by_user_id = ?4, \
+                 master_teacher_decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             WHERE school_id = ?1 AND id = ?2",
+            (
+                school_id,
+                submission_id,
+                decision.as_db_str(),
+                master_teacher_user_id,
+            ),
+        )?;
+    } else {
+        conn.execute(
+            "UPDATE grade_submissions \
+             SET master_teacher_decision = ?3, master_teacher_decided_by_user_id = ?4, \
+                 master_teacher_decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), \
+                 status = 'rejected', decided_by_user_id = ?4, \
+                 decided_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             WHERE school_id = ?1 AND id = ?2",
+            (
+                school_id,
+                submission_id,
+                decision.as_db_str(),
+                master_teacher_user_id,
+            ),
+        )?;
+    }
+
+    if let Some(note) = feedback_note {
+        add_note(
+            conn,
+            school_id,
+            submission_id,
+            Some(master_teacher_user_id),
+            SubmissionNoteType::Feedback,
+            note,
+        )?;
+    }
+
+    find_by_id(conn, school_id, submission_id).map(|opt| opt.expect("just updated"))
+}
+
+/// ADR-0089 tier 2 (also the no-MT-assigned fallback, identical to
+/// ADR-0073's original single-tier behavior): School Head's decision.
+/// Allowed in exactly two situations:
+///
+/// 1. `status == Submitted` and `master_teacher_decision.is_none()` --
+///    the fallback: no Master Teacher tier applies to this submission at
+///    all (either none is currently assigned to the submitter, or none
+///    ever will be for this submission cycle), so School Head decides
+///    directly, exactly like ADR-0073.
+/// 2. `status == Submitted` and `master_teacher_decision ==
+///    Some(Approved)` -- the distinct final-lock step after the Master
+///    Teacher tier approved.
+///
+/// Any other state (already `Approved`/`Rejected`, or `Submitted` with a
+/// pending Master Teacher decision the caller has no business skipping)
+/// is rejected. This repository-level check is structural defense in
+/// depth on top of the command layer's own routing -- it does not by
+/// itself know whether a Master Teacher IS currently assigned (that is
+/// the command layer's job, using
+/// `teacher_oversight_assignment::current_overseer_for_teacher`); it only
+/// ever refuses to let School Head skip an Master-Teacher-tier decision
+/// that has not happened yet when `master_teacher_decision` is still
+/// unset. Since the fallback and case 1 above share the exact same
+/// database shape (`Submitted` + no MT decision), the command layer is
+/// solely responsible for having already established that no Master
+/// Teacher is currently assigned before calling this in that shape --
+/// see `commands::grade_submission::decide_grade_submission`.
+pub fn decide_school_head(
     conn: &Connection,
     school_id: &str,
     submission_id: &str,
@@ -323,6 +506,14 @@ pub fn decide(
         ));
     };
     if existing.status != SubmissionStatus::Submitted {
+        return Err(crate::error::AppError::InvalidInput(
+            "this submission has already been decided".to_string(),
+        ));
+    }
+    if existing.master_teacher_decision == Some(MasterTeacherDecision::Rejected) {
+        // Structurally unreachable in practice (a Master Teacher
+        // rejection already sets status to Rejected), kept as an
+        // explicit, honest guard rather than an unreachable!().
         return Err(crate::error::AppError::InvalidInput(
             "this submission has already been decided".to_string(),
         ));
@@ -527,7 +718,8 @@ mod tests {
         conn.execute(
             "INSERT INTO users (id, username, password_hash, display_name) \
              VALUES ('teacher1', 'teacher1', 'hash', 'Teacher One'), \
-                    ('head1', 'head1', 'hash', 'Head One')",
+                    ('head1', 'head1', 'hash', 'Head One'), \
+                    ('mt1', 'mt1', 'hash', 'MT One')",
             [],
         )
         .unwrap();
@@ -546,11 +738,11 @@ mod tests {
     }
 
     #[test]
-    fn decide_approves_and_appends_a_feedback_note() {
+    fn decide_school_head_approves_and_appends_a_feedback_note_the_fallback_path() {
         let (conn, school_id, cr1) = setup();
         let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
 
-        let decided = decide(
+        let decided = decide_school_head(
             &conn,
             &school_id,
             &submission.id,
@@ -569,10 +761,10 @@ mod tests {
     }
 
     #[test]
-    fn decide_rejects_a_second_decision_on_an_already_decided_submission() {
+    fn decide_school_head_rejects_a_second_decision_on_an_already_decided_submission() {
         let (conn, school_id, cr1) = setup();
         let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
-        decide(
+        decide_school_head(
             &conn,
             &school_id,
             &submission.id,
@@ -582,9 +774,124 @@ mod tests {
         )
         .unwrap();
 
-        let second = decide(&conn, &school_id, &submission.id, "head1", true, None);
+        let second = decide_school_head(&conn, &school_id, &submission.id, "head1", true, None);
         assert!(second.is_err());
     }
+
+    #[test]
+    fn decide_master_teacher_approving_leaves_status_submitted_awaiting_school_head_lock() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+
+        let decided = decide_master_teacher(
+            &conn,
+            &school_id,
+            &submission.id,
+            "mt1",
+            true,
+            Some("Synthetic: MT approves."),
+        )
+        .unwrap();
+
+        assert_eq!(
+            decided.status,
+            SubmissionStatus::Submitted,
+            "an MT approval alone must not finalize the submission"
+        );
+        assert_eq!(
+            decided.master_teacher_decision,
+            Some(MasterTeacherDecision::Approved)
+        );
+        assert_eq!(decided.master_teacher_decided_by_user_id.as_deref(), Some("mt1"));
+        assert!(decided.master_teacher_decided_at.is_some());
+        // The top-level "final decision" fields are untouched -- no final
+        // decision has been made yet.
+        assert!(decided.decided_by_user_id.is_none());
+        assert!(decided.decided_at.is_none());
+    }
+
+    #[test]
+    fn decide_master_teacher_rejecting_is_immediately_terminal() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+
+        let decided = decide_master_teacher(
+            &conn,
+            &school_id,
+            &submission.id,
+            "mt1",
+            false,
+            Some("Synthetic: MT rejects, needs fixes."),
+        )
+        .unwrap();
+
+        assert_eq!(decided.status, SubmissionStatus::Rejected);
+        assert_eq!(
+            decided.master_teacher_decision,
+            Some(MasterTeacherDecision::Rejected)
+        );
+        assert_eq!(decided.decided_by_user_id.as_deref(), Some("mt1"));
+        assert!(decided.decided_at.is_some());
+    }
+
+    #[test]
+    fn decide_master_teacher_refuses_to_decide_twice() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        decide_master_teacher(&conn, &school_id, &submission.id, "mt1", true, None).unwrap();
+
+        let second = decide_master_teacher(&conn, &school_id, &submission.id, "mt1", true, None);
+
+        assert!(second.is_err());
+    }
+
+    #[test]
+    fn decide_school_head_final_locks_an_mt_approved_submission() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        decide_master_teacher(&conn, &school_id, &submission.id, "mt1", true, None).unwrap();
+
+        let locked = decide_school_head(
+            &conn,
+            &school_id,
+            &submission.id,
+            "head1",
+            true,
+            Some("Synthetic: final lock, approved."),
+        )
+        .unwrap();
+
+        assert_eq!(locked.status, SubmissionStatus::Approved);
+        assert_eq!(locked.decided_by_user_id.as_deref(), Some("head1"));
+        // The Master Teacher's own earlier decision is preserved for
+        // audit, not overwritten by the final lock.
+        assert_eq!(
+            locked.master_teacher_decision,
+            Some(MasterTeacherDecision::Approved)
+        );
+        assert_eq!(locked.master_teacher_decided_by_user_id.as_deref(), Some("mt1"));
+    }
+
+    #[test]
+    fn decide_school_head_can_also_reject_at_the_final_lock_step() {
+        let (conn, school_id, cr1) = setup();
+        let submission = submit(&conn, &school_id, &cr1, "teacher1").unwrap();
+        decide_master_teacher(&conn, &school_id, &submission.id, "mt1", true, None).unwrap();
+
+        let locked = decide_school_head(
+            &conn,
+            &school_id,
+            &submission.id,
+            "head1",
+            false,
+            Some("Synthetic: on closer look, rejected at final lock."),
+        )
+        .unwrap();
+
+        assert_eq!(locked.status, SubmissionStatus::Rejected);
+        assert_eq!(locked.decided_by_user_id.as_deref(), Some("head1"));
+    }
+
 
     #[test]
     fn list_for_school_returns_every_submission_newest_first() {
@@ -606,6 +913,9 @@ mod tests {
             submitted_at: "2026-01-01T00:00:00.000Z".to_string(),
             decided_by_user_id: None,
             decided_at: None,
+            master_teacher_decision: None,
+            master_teacher_decided_by_user_id: None,
+            master_teacher_decided_at: None,
         };
 
         upsert_submission_from_sync(&conn, &incoming).unwrap();
@@ -660,6 +970,9 @@ mod tests {
             submitted_at: existing.submitted_at.clone(),
             decided_by_user_id: None,
             decided_at: None,
+            master_teacher_decision: None,
+            master_teacher_decided_by_user_id: None,
+            master_teacher_decided_at: None,
         };
 
         let result = upsert_submission_from_sync(&conn, &colliding);

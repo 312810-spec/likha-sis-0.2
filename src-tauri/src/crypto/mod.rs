@@ -7,6 +7,12 @@ use std::path::Path;
 
 #[cfg(windows)]
 pub use dpapi::DpapiKeyStore;
+/// Crate-private byte-oriented DPAPI protect/unprotect, reused by
+/// `infrastructure::microsoft365::token_store` (ADR-0088) so it never
+/// duplicates `dpapi`'s Win32 calls for a differently-shaped secret (a
+/// variable-length OAuth refresh token rather than a fixed 32-byte key).
+#[cfg(windows)]
+pub(crate) use dpapi::{protect_bytes, unprotect_bytes};
 
 use crate::error::AppResult;
 

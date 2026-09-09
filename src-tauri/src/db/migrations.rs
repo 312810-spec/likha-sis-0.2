@@ -3672,6 +3672,62 @@ pub fn migrations() -> Migrations<'static> {
             ON teacher_oversight_assignments(teacher_user_id) WHERE ends_on IS NULL;
         "#,
         ),
+        M::up(
+            r#"
+        -- M61 (Batch 17, checkpoint 3, ADR-0089 section 3): the permanent
+        -- two-tier grade-submission decision flow. Deliberately does NOT
+        -- widen `grade_submissions.status`'s CHECK constraint (the
+        -- ADR explicitly left either option open: "widening the status
+        -- model (or adding master-teacher-decision columns)"). A real
+        -- table-rebuild CHECK-widening (this schema's usual "create new
+        -- table, copy data, drop old, rename" pattern, e.g. M59) was
+        -- tried and rejected here after proving experimentally that it
+        -- would SILENTLY DELETE every `grade_submission_notes` row:
+        -- `grade_submissions` (unlike every prior CHECK-widening target
+        -- in this file -- see M5/M12/M17/M20/M21's own "no incoming
+        -- foreign keys from any other table, so this is safe" comments)
+        -- IS referenced by an inbound `ON DELETE CASCADE` foreign key
+        -- from `grade_submission_notes`. `rusqlite_migration` runs every
+        -- pending migration inside ONE transaction
+        -- (`Migrations::goto_up`), and `PRAGMA foreign_keys` is a
+        -- documented no-op once a transaction is already open -- so it
+        -- cannot be toggled off from inside this migration's own SQL to
+        -- protect the rebuild. With `foreign_keys` ON the whole time (as
+        -- `db::open` sets it before migrations run), `DROP TABLE
+        -- grade_submissions` performs SQLite's implicit
+        -- delete-then-cascade over every child row first: every
+        -- append-only submission note this school has ever recorded
+        -- would be silently destroyed. Adding new nullable columns
+        -- instead needs no table rebuild at all and carries none of that
+        -- risk -- the two sub-states a widened enum would have encoded
+        -- are instead read off `status = 'submitted'` combined with
+        -- `master_teacher_decision`:
+        --   * `status = 'submitted'`, `master_teacher_decision IS NULL`:
+        --     awaiting a decision at whichever tier actually applies
+        --     (the assigned Master Teacher, or School Head directly for
+        --     the intentional no-MT-assigned fallback) -- unchanged from
+        --     ADR-0073's original single-tier shape.
+        --   * `status = 'submitted'`, `master_teacher_decision =
+        --     'approved'`: the Master Teacher tier approved; awaiting
+        --     School Head's distinct final-lock step.
+        --   * `status = 'approved' | 'rejected'`: terminal, exactly as
+        --     before -- reached either via the fallback, via a Master
+        --     Teacher's own rejection, or via School Head's final lock
+        --     (approve or reject) after Master Teacher approval.
+        -- `master_teacher_decided_by_user_id`/`_at` preserve who made the
+        -- Master Teacher decision even when School Head's later final
+        -- lock overwrites the top-level `decided_by_user_id`/`decided_at`
+        -- columns (which continue to mean "who made the FINAL decision",
+        -- unchanged in meaning from ADR-0073).
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decision TEXT
+                CHECK (master_teacher_decision IN ('approved', 'rejected'));
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decided_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+        ALTER TABLE grade_submissions
+            ADD COLUMN master_teacher_decided_at TEXT;
+        "#,
+        ),
     ])
 }
 
@@ -4884,6 +4940,138 @@ mod tests {
         assert_eq!(
             count, 0,
             "the rebuilt table must still cascade-delete roles when the membership is removed"
+        );
+    }
+
+    /// Builds a real, FK-valid `class_records` row (school, section,
+    /// subject, grading period) via the ordinary repository functions --
+    /// none of which touch anything M61 changes, so this works
+    /// identically whether `conn` is at M60 or the latest schema.
+    /// Returns the new class record's id.
+    fn seed_class_record_for_grade_submission(conn: &Connection) -> String {
+        use crate::repository::{class_record, grading, section, subject};
+        const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+        const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+        conn.execute(
+            "INSERT INTO schools (id, name) VALUES ('s1', 'Test School')",
+            [],
+        )
+        .unwrap();
+        let sec = section::create(conn, "s1", "2026-2027", "5", "Section A").unwrap();
+        let sub = subject::create(conn, "s1", "Mathematics").unwrap();
+        let period = grading::create(conn, "s1", "2026-2027", TERM_1, "2026-06-08", "2026-09-15")
+            .unwrap()
+            .unwrap();
+        class_record::create(conn, "s1", &sec.id, &sub.id, &period.id, K10_POLICY, None)
+            .unwrap()
+            .unwrap()
+            .id
+    }
+
+    #[test]
+    fn migration_61_never_loses_a_pre_existing_submissions_append_only_notes() {
+        // Proves the specific data-loss failure mode M61's own doc
+        // comment records having found and rejected (a CHECK-widening
+        // table rebuild would silently cascade-delete every
+        // `grade_submission_notes` row via the inbound `ON DELETE
+        // CASCADE` foreign key, since `PRAGMA foreign_keys` cannot be
+        // toggled off mid-migration-transaction). Applies through M60
+        // first (the pre-M61 schema), seeds a submission with a note the
+        // same way `repository::grade_submission::submit` does, then
+        // applies M61 and checks the note survives untouched.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_version(&mut conn, 60).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+
+        conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grade_submission_notes (id, submission_id, school_id, note_type, note) \
+             VALUES ('n1', 'gs1', 's1', 'automated_check', 'pre-existing finding')",
+            [],
+        )
+        .unwrap();
+
+        migrations().to_latest(&mut conn).unwrap();
+
+        let note_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM grade_submission_notes", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            note_count, 1,
+            "M61 must never lose a pre-existing submission note"
+        );
+        let submission_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM grade_submissions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(submission_count, 1);
+    }
+
+    #[test]
+    fn migration_61_adds_nullable_master_teacher_decision_columns() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+
+        // Omitting the new columns entirely must still succeed (NULL
+        // default) -- an existing INSERT statement written before M61
+        // continues to work unmodified.
+        let result = conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        );
+        assert!(result.is_ok());
+
+        let (decision, decided_by, decided_at): (Option<String>, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT master_teacher_decision, master_teacher_decided_by_user_id, master_teacher_decided_at \
+                 FROM grade_submissions WHERE id = 'gs1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(decision, None);
+        assert_eq!(decided_by, None);
+        assert_eq!(decided_at, None);
+    }
+
+    #[test]
+    fn migration_61_rejects_an_unrecognized_master_teacher_decision_value() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "ON").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let class_record_id = seed_class_record_for_grade_submission(&conn);
+        conn.execute(
+            &format!(
+                "INSERT INTO grade_submissions (id, school_id, class_record_id, status) \
+                 VALUES ('gs1', 's1', '{class_record_id}', 'submitted')"
+            ),
+            [],
+        )
+        .unwrap();
+
+        let result = conn.execute(
+            "UPDATE grade_submissions SET master_teacher_decision = 'bogus' WHERE id = 'gs1'",
+            [],
+        );
+
+        assert!(
+            result.is_err(),
+            "master_teacher_decision must reject a value outside ('approved', 'rejected')"
         );
     }
 

@@ -1,10 +1,24 @@
-//! Tauri commands for the interim Multi-Tier Review & Audit Pipeline
-//! (ADR-0073). `submit_grades_for_review` gates on
-//! `auth::authorize_grade_submission_owner` (self-or-School-Head);
-//! `decide_grade_submission`/`list_grade_submissions_for_school`/
-//! `get_principal_overview_dashboard` gate on
-//! `Capability::ManageGradeSubmissionReview` (School Head, playing the
-//! interim approver/principal role — see the ADR).
+//! Tauri commands for the Multi-Tier Review & Audit Pipeline.
+//! `submit_grades_for_review` gates on
+//! `auth::authorize_grade_submission_owner` (self-or-School-Head).
+//! ADR-0089's permanent two-tier design (Batch 17, checkpoint 3) splits
+//! the decision itself into two commands:
+//!
+//! * `decide_grade_submission_master_teacher` gates on
+//!   `auth::authorize_grade_submission_master_teacher_decision` (only the
+//!   submitter's CURRENTLY-assigned Master Teacher overseer, never the
+//!   submitter themselves).
+//! * `decide_grade_submission` is School Head's step -- either the
+//!   distinct final lock after Master Teacher approval, or, when the
+//!   submitter currently has no Master Teacher assigned, the intentional
+//!   fallback direct decision identical to ADR-0073's original
+//!   behavior. This command itself checks whether a Master Teacher is
+//!   currently assigned and structurally refuses to let School Head skip
+//!   a pending Master-Teacher-tier decision -- this is not left to the
+//!   UI to hide a button.
+//!
+//! `list_grade_submissions_for_school`/`get_principal_overview_dashboard`
+//! also gate on `Capability::ManageGradeSubmissionReview` (School Head).
 
 use std::sync::Mutex;
 
@@ -21,6 +35,7 @@ use crate::error::{AppError, AppResult};
 use crate::repository::grade_submission::{self, GradeSubmission, SubmissionNote};
 use crate::repository::{
     device_credential, device_identity, section_membership, sync_outbox, sync_version_cache,
+    teacher_oversight_assignment,
 };
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
@@ -107,11 +122,61 @@ fn submit_grades_for_review_with_optional_sync(
     }
 }
 
-/// `decide` updates the submission's status and optionally appends a
-/// `feedback` note -- the UPDATED submission is always enqueued (its
-/// `status`/`decided_*` columns changed even with no note), and, if a
-/// note was actually added, it is enqueued too, both in the same atomic
-/// `SAVEPOINT`.
+/// ADR-0089 tier 1: only the submitter's currently-assigned Master
+/// Teacher overseer may call this (see
+/// `auth::authorize_grade_submission_master_teacher_decision`, which also
+/// structurally blocks self-approval). `as_of_date` resolves "currently
+/// assigned" the same way every other date-scoped read in this codebase
+/// takes an explicit, client-supplied date (e.g.
+/// `get_principal_overview_dashboard`) rather than trusting a server
+/// clock read baked into the authorization boundary itself.
+#[tauri::command]
+pub fn decide_grade_submission_master_teacher(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    submission_id: String,
+    approve: bool,
+    feedback_note: Option<String>,
+    as_of_date: String,
+) -> AppResult<GradeSubmission> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = auth::authorize_grade_submission_master_teacher_decision(
+        &conn,
+        &sessions,
+        &submission_id,
+        &as_of_date,
+    )?;
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+
+    decide_with_optional_sync(
+        &conn,
+        &school_id,
+        &user_id,
+        &submission_id,
+        sspk.as_ref(),
+        |conn| {
+            grade_submission::decide_master_teacher(
+                conn,
+                &school_id,
+                &submission_id,
+                &user_id,
+                approve,
+                feedback_note.as_deref(),
+            )
+        },
+    )
+}
+
+/// ADR-0089 tier 2 / the no-MT-assigned fallback. Before deciding,
+/// resolves whether the submitter currently has an assigned Master
+/// Teacher overseer (`as_of_date`, same client-supplied-date convention
+/// as the sibling command above): if one is assigned and the Master
+/// Teacher tier has not yet decided, School Head is structurally refused
+/// -- skipping that tier is never left to the UI to prevent by merely
+/// hiding a button. Otherwise (no Master Teacher assigned -- the
+/// fallback -- or the Master Teacher tier already approved) proceeds to
+/// `grade_submission::decide_school_head`.
 #[tauri::command]
 pub fn decide_grade_submission(
     app: AppHandle,
@@ -120,58 +185,98 @@ pub fn decide_grade_submission(
     submission_id: String,
     approve: bool,
     feedback_note: Option<String>,
+    as_of_date: String,
 ) -> AppResult<GradeSubmission> {
     let conn = lock_db(&db);
-    let (user_id, school_id) = auth::authorize_capability_with_actor(
+    let (school_id, user_id) = auth::authorize_capability_with_actor(
         &conn,
         &sessions,
         Capability::ManageGradeSubmissionReview,
     )?;
+
+    require_no_pending_master_teacher_decision(&conn, &school_id, &submission_id, &as_of_date)?;
+
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
-    decide_grade_submission_with_optional_sync(
+    decide_with_optional_sync(
         &conn,
         &school_id,
         &user_id,
         &submission_id,
-        approve,
-        feedback_note.as_deref(),
         sspk.as_ref(),
+        |conn| {
+            grade_submission::decide_school_head(
+                conn,
+                &school_id,
+                &submission_id,
+                &user_id,
+                approve,
+                feedback_note.as_deref(),
+            )
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
-fn decide_grade_submission_with_optional_sync(
+/// The structural skip-tier guard behind `decide_grade_submission`:
+/// refuses School Head's decision when the submitter currently has an
+/// assigned Master Teacher overseer who has not yet decided. Extracted
+/// as its own testable function -- exercised directly by this module's
+/// own tests without needing a real Tauri `AppHandle`/`State`, the same
+/// rationale `*_with_optional_sync` extraction already established in
+/// this file.
+fn require_no_pending_master_teacher_decision(
+    conn: &Connection,
+    school_id: &str,
+    submission_id: &str,
+    as_of_date: &str,
+) -> AppResult<()> {
+    let Some(submission) = grade_submission::find_by_id(conn, school_id, submission_id)? else {
+        return Err(AppError::InvalidInput(
+            "unknown grade submission".to_string(),
+        ));
+    };
+    if submission.master_teacher_decision.is_none() {
+        if let Some(submitted_by) = submission.submitted_by_user_id.as_deref() {
+            if teacher_oversight_assignment::current_overseer_for_teacher(
+                conn,
+                school_id,
+                submitted_by,
+                as_of_date,
+            )?
+            .is_some()
+            {
+                return Err(AppError::InvalidInput(
+                    "this submission has a Master Teacher assigned and must be decided by them first"
+                        .to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Shared sync-enqueue wrapper behind both decision commands above: the
+/// UPDATED submission is always enqueued (its `status`/`decided_*`/
+/// `master_teacher_decided_*` columns changed even with no note), and,
+/// if a note was actually added, it is enqueued too, both in the same
+/// atomic `SAVEPOINT`. `decide` performs the actual repository decision
+/// (either tier) and is called inside that savepoint.
+fn decide_with_optional_sync(
     conn: &Connection,
     school_id: &str,
     actor_user_id: &str,
     submission_id: &str,
-    approve: bool,
-    feedback_note: Option<&str>,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
+    decide: impl FnOnce(&Connection) -> AppResult<GradeSubmission>,
 ) -> AppResult<GradeSubmission> {
     let Some(sspk) = sspk else {
-        return grade_submission::decide(
-            conn,
-            school_id,
-            submission_id,
-            actor_user_id,
-            approve,
-            feedback_note,
-        );
+        return decide(conn);
     };
 
     conn.execute_batch("SAVEPOINT decide_grade_submission_with_sync")?;
     let outcome = (|| -> AppResult<GradeSubmission> {
         let notes_before = grade_submission::list_notes(conn, school_id, submission_id)?.len();
-        let updated = grade_submission::decide(
-            conn,
-            school_id,
-            submission_id,
-            actor_user_id,
-            approve,
-            feedback_note,
-        )?;
+        let updated = decide(conn)?;
         enqueue_submission_sync_change(conn, school_id, actor_user_id, &updated, sspk)?;
         let notes_after = grade_submission::list_notes(conn, school_id, submission_id)?;
         if notes_after.len() > notes_before {
@@ -354,6 +459,7 @@ mod sync_tests {
         class_record_id: String,
         teacher_id: String,
         head_id: String,
+        mt_id: String,
     }
 
     fn seed(conn: &Connection) -> Fixture {
@@ -390,6 +496,7 @@ mod sync_tests {
             "Teacher One",
         )
         .unwrap();
+        crate::repository::user::add_school_membership(conn, &teacher.id, &school.id).unwrap();
         let head = crate::repository::user::create_user(
             conn,
             "head1",
@@ -397,11 +504,27 @@ mod sync_tests {
             "Head One",
         )
         .unwrap();
+        let mt = crate::repository::user::create_user(
+            conn,
+            "mt1",
+            "correct horse battery staple",
+            "MT One",
+        )
+        .unwrap();
+        crate::repository::user::add_school_membership(conn, &mt.id, &school.id).unwrap();
+        crate::repository::role::grant(
+            conn,
+            &mt.id,
+            &school.id,
+            crate::repository::role::MASTER_TEACHER,
+        )
+        .unwrap();
         Fixture {
             school_id: school.id,
             class_record_id: class_record.id,
             teacher_id: teacher.id,
             head_id: head.id,
+            mt_id: mt.id,
         }
     }
 
@@ -490,14 +613,22 @@ mod sync_tests {
             .unwrap()
             .len();
 
-        let decided = decide_grade_submission_with_optional_sync(
+        let decided = decide_with_optional_sync(
             &conn,
             &f.school_id,
             &f.head_id,
             &created.id,
-            true,
-            Some("Synthetic: looks good, approved."),
             Some(&sspk),
+            |conn| {
+                grade_submission::decide_school_head(
+                    conn,
+                    &f.school_id,
+                    &created.id,
+                    &f.head_id,
+                    true,
+                    Some("Synthetic: looks good, approved."),
+                )
+            },
         )
         .unwrap();
 
@@ -537,14 +668,22 @@ mod sync_tests {
             .unwrap()
             .len();
 
-        decide_grade_submission_with_optional_sync(
+        decide_with_optional_sync(
             &conn,
             &f.school_id,
             &f.head_id,
             &created.id,
-            true,
-            None,
             Some(&sspk),
+            |conn| {
+                grade_submission::decide_school_head(
+                    conn,
+                    &f.school_id,
+                    &created.id,
+                    &f.head_id,
+                    true,
+                    None,
+                )
+            },
         )
         .unwrap();
 
@@ -558,15 +697,23 @@ mod sync_tests {
         let f = seed(&conn);
         let sspk = test_sspk();
 
-        // An unknown submission_id -- `grade_submission::decide` errors.
-        let result = decide_grade_submission_with_optional_sync(
+        // An unknown submission_id -- `grade_submission::decide_school_head` errors.
+        let result = decide_with_optional_sync(
             &conn,
             &f.school_id,
             &f.head_id,
             "does-not-exist",
-            true,
-            None,
             Some(&sspk),
+            |conn| {
+                grade_submission::decide_school_head(
+                    conn,
+                    &f.school_id,
+                    "does-not-exist",
+                    &f.head_id,
+                    true,
+                    None,
+                )
+            },
         );
 
         assert!(result.is_err());
@@ -575,5 +722,178 @@ mod sync_tests {
             queued.is_empty(),
             "a rejected decide must never enqueue an outbox row"
         );
+    }
+
+    // ---- ADR-0089 checkpoint 3: the skip-tier guard ----
+
+    #[test]
+    fn require_no_pending_master_teacher_decision_allows_the_fallback_with_no_mt_assigned() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            None,
+        )
+        .unwrap();
+
+        // No teacher_oversight_assignment ever created for f.teacher_id.
+        let result = require_no_pending_master_teacher_decision(
+            &conn,
+            &f.school_id,
+            &created.id,
+            "2026-08-29",
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn require_no_pending_master_teacher_decision_blocks_school_head_when_an_mt_is_assigned_and_undecided(
+    ) {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            None,
+        )
+        .unwrap();
+        teacher_oversight_assignment::assign(
+            &conn,
+            &f.school_id,
+            &f.mt_id,
+            &f.teacher_id,
+            "2026-06-01",
+        )
+        .unwrap();
+
+        let result = require_no_pending_master_teacher_decision(
+            &conn,
+            &f.school_id,
+            &created.id,
+            "2026-08-29",
+        );
+
+        assert!(
+            result.is_err(),
+            "School Head must not be able to skip a pending Master Teacher decision"
+        );
+    }
+
+    #[test]
+    fn require_no_pending_master_teacher_decision_allows_school_head_after_mt_approval() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            None,
+        )
+        .unwrap();
+        teacher_oversight_assignment::assign(
+            &conn,
+            &f.school_id,
+            &f.mt_id,
+            &f.teacher_id,
+            "2026-06-01",
+        )
+        .unwrap();
+        grade_submission::decide_master_teacher(&conn, &f.school_id, &created.id, &f.mt_id, true, None)
+            .unwrap();
+
+        let result = require_no_pending_master_teacher_decision(
+            &conn,
+            &f.school_id,
+            &created.id,
+            "2026-08-29",
+        );
+
+        assert!(result.is_ok());
+    }
+
+    // ---- ADR-0089 checkpoint 3: decide_master_teacher_with_optional_sync ----
+
+    #[test]
+    fn master_teacher_approval_with_an_sspk_enqueues_the_updated_submission() {
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let sspk = test_sspk();
+        let created = submit_grades_for_review_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.teacher_id,
+            &f.class_record_id,
+            Some(&sspk),
+        )
+        .unwrap();
+        teacher_oversight_assignment::assign(
+            &conn,
+            &f.school_id,
+            &f.mt_id,
+            &f.teacher_id,
+            "2026-06-01",
+        )
+        .unwrap();
+        let queued_before = sync_outbox::pending_for_school(&conn, &f.school_id, 10)
+            .unwrap()
+            .len();
+
+        let decided = decide_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.mt_id,
+            &created.id,
+            Some(&sspk),
+            |conn| {
+                grade_submission::decide_master_teacher(
+                    conn,
+                    &f.school_id,
+                    &created.id,
+                    &f.mt_id,
+                    true,
+                    Some("Synthetic: MT approves."),
+                )
+            },
+        )
+        .unwrap();
+
+        assert_eq!(decided.status, grade_submission::SubmissionStatus::Submitted);
+        assert_eq!(
+            decided.master_teacher_decision,
+            Some(grade_submission::MasterTeacherDecision::Approved)
+        );
+        let queued = sync_outbox::pending_for_school(&conn, &f.school_id, 10).unwrap();
+        // The updated submission + the new feedback note.
+        assert_eq!(queued.len(), queued_before + 2);
+
+        // School Head's final lock is still required and still enqueues
+        // its own update -- the end-to-end two-tier flow this checkpoint
+        // adds.
+        let locked = decide_with_optional_sync(
+            &conn,
+            &f.school_id,
+            &f.head_id,
+            &created.id,
+            Some(&sspk),
+            |conn| {
+                grade_submission::decide_school_head(
+                    conn,
+                    &f.school_id,
+                    &created.id,
+                    &f.head_id,
+                    true,
+                    None,
+                )
+            },
+        )
+        .unwrap();
+        assert_eq!(locked.status, grade_submission::SubmissionStatus::Approved);
     }
 }

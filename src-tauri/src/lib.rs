@@ -9,6 +9,7 @@ pub mod formgen;
 pub mod health;
 pub mod hub_server;
 pub mod import;
+pub mod infrastructure;
 pub mod repository;
 pub mod sync;
 pub mod sync_client;
@@ -211,6 +212,7 @@ pub fn run() {
             commands::child_protection::get_at_risk_flags_for_section,
             commands::grade_submission::submit_grades_for_review,
             commands::grade_submission::decide_grade_submission,
+            commands::grade_submission::decide_grade_submission_master_teacher,
             commands::grade_submission::list_grade_submissions_for_school,
             commands::grade_submission::list_grade_submission_notes,
             commands::grade_submission::get_principal_overview_dashboard,

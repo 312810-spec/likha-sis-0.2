@@ -422,3 +422,27 @@ evidence.
   own established fallback (direct `WebSearch`) was used from the start,
   given the agent's confirmed, repeated retrieval failures earlier this
   same session (Curriculum Foundation, twice).
+
+## `reqwest` `rustls`/`form` features — ADOPT, for Microsoft 365 OAuth (added 2026-09-09, Batch 18)
+
+`reqwest` was already a direct dependency (`sync_client.rs`/`hub_server.rs`,
+loopback-only, deliberately no TLS feature). ADR-0088's
+`infrastructure::microsoft365::oauth` is the first caller that leaves
+`127.0.0.1` — it calls `https://login.microsoftonline.com` — so this adds
+the `form` feature (`application/x-www-form-urlencoded` bodies, required
+by the Microsoft identity platform's token endpoint) and a `rustls` TLS
+backend. **ADOPT `rustls` over `native-tls`**: this project already
+vendors OpenSSL once for SQLCipher (`bundled-sqlcipher-vendored-openssl`,
+ADR-0003); a second, independent OpenSSL binding for TLS would duplicate
+build cost and attack surface. `rustls` is a pure-Rust TLS
+implementation with no second native/system TLS dependency. No new
+top-level crate was added by name — both are `reqwest` feature flags,
+pulling in `rustls`/`webpki-roots`/`tokio-rustls` transitively.
+
+Flagged explicitly because this is a genuine capability expansion: this
+dependency can now reach the public internet, not only the loopback
+interface `hub_server`'s sync protocol is scoped to. No MSAL crate was
+added — see ADR-0088: Microsoft publishes no Rust MSAL, and the
+community alternatives found (`msal-rs`, `msal`) are
+unmaintained/stale, so the PKCE code exchange is hand-rolled against
+Microsoft's documented v2.0 endpoints instead.

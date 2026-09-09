@@ -5502,6 +5502,9 @@ mod tests {
             submitted_at: submitted_at.to_string(),
             decided_by_user_id: None,
             decided_at: None,
+            master_teacher_decision: None,
+            master_teacher_decided_by_user_id: None,
+            master_teacher_decided_at: None,
         }
     }
 

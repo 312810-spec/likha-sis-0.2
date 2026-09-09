@@ -12,10 +12,11 @@ use crate::error::{AppError, AppResult};
 use crate::repository::audit_log::AuditEventType;
 use crate::repository::{
     audit_log as audit_log_repo, class_record as class_record_repo,
-    device_credential as device_credential_repo, installation as installation_repo,
-    role as role_repo, school as school_repo, section as section_repo,
-    section_advisory as section_advisory_repo, session as session_repo,
+    device_credential as device_credential_repo, grade_submission as grade_submission_repo,
+    installation as installation_repo, role as role_repo, school as school_repo,
+    section as section_repo, section_advisory as section_advisory_repo, session as session_repo,
     structural_lock as structural_lock_repo, sync_payload_key as sync_payload_key_repo,
+    teacher_oversight_assignment as teacher_oversight_assignment_repo,
     teaching_assignment as teaching_assignment_repo, user as user_repo,
 };
 
@@ -746,6 +747,52 @@ pub fn authorize_grade_submission_owner(
         &user_id,
         &school_id,
         Capability::ManageGradeSubmissionReview.allowed_roles(),
+    )? {
+        return Ok((user_id, school_id));
+    }
+    Err(AppError::Unauthorized)
+}
+
+/// ADR-0089's permanent two-tier grade-review design: only the
+/// submission's teacher's CURRENTLY-assigned Master Teacher overseer
+/// (`teacher_oversight_assignment::is_current_overseer`) may perform the
+/// Master-Teacher-tier decision on that submission. Self-approval is
+/// structurally blocked here -- at the trusted boundary, never left to
+/// the UI to hide a button -- so a Master Teacher who also holds
+/// `TEACHER` and submitted this very submission themselves is always
+/// denied, matching the ADR's explicit requirement. This gate says
+/// nothing about the no-MT-assigned fallback (routing straight to
+/// School-Head approval): that path never calls this function at all --
+/// see `commands::grade_submission::decide_grade_submission_master_teacher`,
+/// which resolves `current_overseer_for_teacher` itself and returns a
+/// distinct, honest error rather than pretending this gate covers it.
+pub fn authorize_grade_submission_master_teacher_decision(
+    conn: &Connection,
+    sessions: &SessionManager,
+    submission_id: &str,
+    as_of_date: &str,
+) -> AppResult<(String, String)> {
+    let (user_id, school_id) = sessions.require_active_session(conn)?;
+    let Some(submission) = grade_submission_repo::find_by_id(conn, &school_id, submission_id)?
+    else {
+        return Err(AppError::Unauthorized);
+    };
+    let Some(submitted_by) = submission.submitted_by_user_id.as_deref() else {
+        // No recorded submitter (e.g. a legacy/sync-materialized row with
+        // the field cleared) -- there is no "their overseer" relationship
+        // to check, so this must fail closed rather than treat an absent
+        // submitter as "no one to self-approve as".
+        return Err(AppError::Unauthorized);
+    };
+    if submitted_by == user_id {
+        return Err(AppError::Unauthorized);
+    }
+    if teacher_oversight_assignment_repo::is_current_overseer(
+        conn,
+        &school_id,
+        &user_id,
+        submitted_by,
+        as_of_date,
     )? {
         return Ok((user_id, school_id));
     }
@@ -2792,6 +2839,137 @@ mod tests {
         login(&conn, &sessions, "head.one", "password", &s.id).unwrap();
 
         assert!(authorize_grade_submission_owner(&conn, &sessions, &record_id).is_ok());
+    }
+
+    // ---- ADR-0089: authorize_grade_submission_master_teacher_decision ----
+
+    /// Seeds a class record with its assigned teacher (reusing
+    /// `setup_class_record_with_teacher`), plus a real submission from
+    /// that teacher and a second user holding `master_teacher` in the
+    /// same school (not yet assigned as this teacher's overseer -- the
+    /// caller assigns that separately per test).
+    fn setup_submission_with_master_teacher(
+        conn: &Connection,
+    ) -> (crate::repository::school::School, user::User, user::User, String) {
+        let (s, teacher, record_id) = setup_class_record_with_teacher(conn);
+        let mt = user::create_user(conn, "mt.one", "password", "MT One").unwrap();
+        user::add_school_membership(conn, &mt.id, &s.id).unwrap();
+        role_repo::grant(conn, &mt.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        let submission =
+            crate::repository::grade_submission::submit(conn, &s.id, &record_id, &teacher.id)
+                .unwrap();
+        (s, teacher, mt, submission.id)
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_allows_the_current_overseer() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        teacher_oversight_assignment_repo::assign(&conn, &s.id, &mt.id, &teacher.id, "2026-06-01")
+            .unwrap();
+        login(&conn, &sessions, "mt.one", "password", &s.id).unwrap();
+
+        assert!(authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_denies_a_master_teacher_who_is_not_the_current_overseer(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        // A second Master Teacher who was never assigned to oversee this
+        // teacher at all.
+        let other_mt = user::create_user(&conn, "mt.two", "password", "MT Two").unwrap();
+        user::add_school_membership(&conn, &other_mt.id, &s.id).unwrap();
+        role_repo::grant(&conn, &other_mt.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        login(&conn, &sessions, "mt.two", "password", &s.id).unwrap();
+        let _ = teacher;
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    /// The self-approval guard this ADR requires structurally: a Master
+    /// Teacher who ALSO holds `TEACHER` and submitted this exact
+    /// submission themselves must never be allowed to decide it, even
+    /// though they are (nonsensically) assigned as their own overseer's
+    /// namesake -- assignment itself already blocks a literal
+    /// self-assignment (`CannotOverseeSelf`), but this proves the
+    /// decision-time gate ALSO blocks self-approval independently, the
+    /// documented defense-in-depth the ADR calls for.
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_blocks_self_approval() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        // The submitting teacher is ALSO granted `master_teacher` and
+        // assigned as another teacher's overseer -- irrelevant to this
+        // submission, but proves holding the role doesn't bypass the
+        // check for their OWN submission.
+        role_repo::grant(&conn, &teacher.id, &s.id, role_repo::MASTER_TEACHER).unwrap();
+        login(&conn, &sessions, "teacher.one", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_denies_an_ordinary_teacher_with_no_oversight_relationship(
+    ) {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (s, teacher, mt, submission_id) = setup_submission_with_master_teacher(&conn);
+        teacher_oversight_assignment_repo::assign(&conn, &s.id, &mt.id, &teacher.id, "2026-06-01")
+            .unwrap();
+        // Log in as the submitting teacher themselves -- they hold no
+        // `master_teacher` role at all here, distinct from the
+        // self-approval test above.
+        login(&conn, &sessions, "teacher.one", "password", &s.id).unwrap();
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn authorize_grade_submission_master_teacher_decision_fails_closed_with_no_session() {
+        let conn = open_test_db();
+        let sessions = SessionManager::new();
+        let (_s, _teacher, _mt, submission_id) = setup_submission_with_master_teacher(&conn);
+
+        let result = authorize_grade_submission_master_teacher_decision(
+            &conn,
+            &sessions,
+            &submission_id,
+            "2026-08-29",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 
     // ---- Wave 3I: admin_reset_teacher_password (ADR-0061) ----

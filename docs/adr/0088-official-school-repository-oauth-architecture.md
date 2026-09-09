@@ -125,16 +125,32 @@ BASE64URL(SHA256(code_verifier))`, `code_challenge_method=S256`.
   explicitly grant it to exactly the one school-owned site, matching
   the spec's least-privilege requirement) plus `openid profile
 offline_access`.
-- **No paid tier implied**: `Sites.Selected` and `offline_access` are
-  ordinary Microsoft Graph/identity-platform scopes available under a
-  standard Microsoft 365 Business/Education/Enterprise plan a school
-  already has if it has SharePoint at all; nothing here requires an
-  additional paid add-on license. Flagged explicitly per this batch's
-  constraints — if a target school's specific tenant plan turns out to
-  restrict `Sites.Selected` (some restricted-permission Graph features
-  have historically required specific SKUs), that must be re-verified
-  against that school's actual licensing before the live pilot, not
-  assumed from this research alone.
+- **`reqwest` TLS backend addendum**: `reqwest` was already a direct
+  dependency, but only for `sync_client.rs`'s loopback-only (`127.0.0.1`)
+  sync protocol, deliberately built with no TLS feature at all.
+  `oauth.rs`'s calls to `https://login.microsoftonline.com` are the first
+  `reqwest` use in this crate that ever leaves the loopback interface, so
+  this ADR adds the `form` feature (the token endpoint requires
+  `application/x-www-form-urlencoded` bodies) and a `rustls` TLS backend —
+  chosen over `native-tls` specifically because this project already
+  vendors OpenSSL once for SQLCipher (ADR-0003's
+  `bundled-sqlcipher-vendored-openssl`); a second, independent OpenSSL
+  binding for TLS would duplicate that build cost and attack surface for
+  no benefit, while `rustls` is pure Rust with no second native/system TLS
+  dependency. Flagged explicitly in `docs/SOURCE-REGISTRY.md` — this is a
+  genuine capability expansion (this dependency can now reach the public
+  internet), not a routine version bump.
+
+**No paid tier implied**: `Sites.Selected` and `offline_access` are
+ordinary Microsoft Graph/identity-platform scopes available under a
+standard Microsoft 365 Business/Education/Enterprise plan a school
+already has if it has SharePoint at all; nothing here requires an
+additional paid add-on license. Flagged explicitly per this batch's
+constraints — if a target school's specific tenant plan turns out to
+restrict `Sites.Selected` (some restricted-permission Graph features
+have historically required specific SKUs), that must be re-verified
+against that school's actual licensing before the live pilot, not
+assumed from this research alone.
 
 **Error/retry handling implemented**: a non-2xx token-endpoint response
 is parsed for the standard `error`/`error_description` OAuth fields and

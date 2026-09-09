@@ -126,6 +126,25 @@ fn generate_key_suffix() -> String {
     bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// Protects an arbitrary secret byte string with the SAME DPAPI
+/// primitive `DpapiKeyStore` uses for the database key -- exposed one
+/// level further (still crate-private) for
+/// `infrastructure::microsoft365::token_store` (ADR-0088), which needs
+/// to protect a variable-length OAuth refresh token, not a fixed-size
+/// key. No new cryptographic code: this is the exact same `protect`
+/// call, just callable from outside this module.
+pub(crate) fn protect_bytes(data: &[u8]) -> AppResult<Vec<u8>> {
+    protect(data).map_err(|e| AppError::key_store(format!("could not protect secret: {e}")))
+}
+
+/// See `protect_bytes`. Fails closed (returns `Err`, never a fallback
+/// value) exactly like `unprotect`'s existing callers already require --
+/// a secret that cannot be decrypted must never be silently discarded or
+/// replaced.
+pub(crate) fn unprotect_bytes(data: &[u8]) -> AppResult<Vec<u8>> {
+    unprotect(data).map_err(|e| AppError::key_store(format!("could not unprotect secret: {e}")))
+}
+
 fn protect(data: &[u8]) -> windows::core::Result<Vec<u8>> {
     unsafe {
         let input = CRYPT_INTEGER_BLOB {
