@@ -1,5 +1,148 @@
 # CURRENT HANDOFF
 
+## Batch 17 checkpoint 4 (complete, 2026-09-09): two-tier grade-review UI + Teacher Oversight Assignment management screen — Batch 17 now fully complete
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit `c7175a5`, committed
+locally only, nothing pushed, PR #55 untouched, no CI triggered, per
+batch-implement mode.
+
+**What shipped:**
+
+- **`GradeReviewScreen`** (`src/ui/GradeReviewScreen.tsx`): shows every
+  grade submission relevant to the signed-in user (a School Head's full
+  submission-status matrix via `list_grade_submissions_for_school`, a
+  Master Teacher's own review queue via the new
+  `list_grade_submissions_for_master_teacher` — both, merged and
+  de-duplicated, for someone holding both roles) with an explicit
+  two-tier stage label: awaiting Master Teacher, awaiting School Head
+  final lock (covers both the after-MT-approval step and the
+  no-MT-assigned fallback), approved, rejected by Master Teacher, or
+  rejected by School Head. `src/domain/grade-submission.ts`'s
+  `reviewStageFor` is the pure display-logic function this reads off,
+  mirroring `commands::grade_submission::require_no_pending_master_teacher_decision`'s
+  server-side logic exactly so the label never disagrees with what a
+  decide call would actually be allowed to do. Only the decision action
+  the signed-in user's own role AND relationship to that specific
+  submission supports is rendered (a Master Teacher sees "Decide as
+  Master Teacher" only on a submission from a teacher THEY currently
+  oversee; a School Head sees "Final lock decision" only once the MT
+  tier is no longer pending) — this is a display convenience only, not
+  the security boundary; `decideMasterTeacher`/`decideSchoolHead` still
+  re-verify the exact same authorization server-side regardless of what
+  button rendered.
+- **`TeacherOversightScreen`** (`src/ui/TeacherOversightScreen.tsx`):
+  School-Head-only (backend-enforced, screen itself follows this
+  codebase's "show the same screen to everyone, let the backend refuse"
+  convention like `SectionAdviserScreen`) management of
+  `teacher_oversight_assignments` — lists active assignments (who
+  oversees whom, since when) with an "End assignment" two-step
+  confirmation, a past-assignments history section for audit purposes,
+  and an assign form (Master Teacher + teacher pickers, filtered to
+  exclude a teacher who already has an active overseer) with per-outcome
+  error messages (`notAMasterTeacher`, `cannotOverseeSelf`,
+  `alreadyHasAnActiveOverseer`, etc.) matching `SectionAdviserScreen`'s
+  established messaging convention.
+- **New backend read** (small, necessary addition — not pure UI wiring):
+  `repository::grade_submission::list_for_master_teacher` +
+  `commands::grade_submission::list_grade_submissions_for_master_teacher`.
+  This did not exist before this checkpoint —
+  `list_grade_submissions_for_school` is gated on
+  `ManageGradeSubmissionReview` (School-Head-only), so a Master Teacher
+  had no command at all to see their own review queue. Self-scoped, no
+  dedicated capability, matching `list_teachers_i_oversee`'s own
+  precedent: resolves the caller's currently-overseen teachers via
+  `teacher_oversight_assignment::list_teachers_overseen_by`, then
+  filters `list_for_school`'s full set down to those teachers'
+  submissions. Returns an empty list for a caller overseeing nobody,
+  never an error.
+- Full new frontend layer for both screens, following this codebase's
+  established layering exactly: `src/domain/{grade-submission,teacher-oversight-assignment}.ts`
+  (mirroring the Rust `#[serde(tag = "kind", rename_all = "camelCase")]`
+  outcome enums and `GradeSubmission`/`SubmissionNote` shapes field-for-
+  field), `src/domain/ports/*-repository.ts`, `src/infrastructure/tauri/*-repository.ts`
+  (Tauri `invoke` adapters only — no SQL, no `@tauri-apps/*` import
+  outside `infrastructure/`), `src/application/*-service.ts`
+  (`GradeSubmissionApplicationService`, `TeacherOversightAssignmentApplicationService`
+  — validate shape/non-empty input only, backend stays authoritative on
+  authorization), wired into `src/composition.ts` and two new
+  `SignedInTab`s (`grade-review` under "Grading", `teacher-oversight`
+  under "Security") in `src/ui/components/workbench-nav-data.ts` +
+  `src/App.tsx`.
+- Efficient/Comfortable/Guided mode parity via the existing
+  `useTeacherMode` hook (both screens show an extra Guided-mode hint
+  paragraph; every action is available in every mode — no
+  mode-conditional feature loss).
+- Accessibility: `expectNoAccessibilityViolations` (axe-core) against
+  both screens' empty state, populated list, and each open
+  confirmation/decision panel.
+
+**Verification actually run:**
+
+- `npm run quality` (typecheck, lint, format:check, architecture-
+  boundary check, `knip`, `vitest run`): all green — 153 test files,
+  1400 tests passed, 0 failed. `knip` initially flagged
+  `SubmissionStatus`/`MasterTeacherDecision`/`SubmissionNoteType` as
+  unused exports (structural-only consumption via `GradeSubmission`/
+  `SubmissionNote` field types) — marked `@public` per
+  `.claude/rules/testing.md` rather than deleted.
+- `cargo test --lib` (whole crate): 1412 passed, 0 failed. One test
+  (`list_for_master_teacher_returns_only_submissions_from_currently_overseen_teachers`)
+  initially failed only when run as part of the FULL suite (not in
+  isolation) — root cause: `grade_submissions` has a
+  `UNIQUE(class_record_id, submitted_at)` constraint, and the test's two
+  `submit()` calls against the same class record within the same
+  millisecond collided on that constraint under the concurrency/timing
+  of a full-suite run. Fixed by submitting the second (unrelated)
+  teacher's grade against a distinct second class record — a real test
+  bug, not a product bug; confirmed by rerunning both the isolated
+  filter and the full `cargo test --lib` afterward, both green.
+- `cargo clippy --all-targets -- -D warnings`: clean, 0 warnings.
+- `cargo fmt --check`: introduces no NEW drift from this checkpoint's
+  own changes (pre-existing drift in `auth/mod.rs` and two other spots
+  in `commands/grade_submission.rs`/`repository/grade_submission.rs`,
+  left over from checkpoint 3's commit `bb67f26` which predates this
+  session, is unchanged — not this checkpoint's to fix per scope
+  discipline, noted here for visibility).
+- No independent security/reliability review dispatched for this
+  checkpoint specifically: it is UI + one narrow, structurally-identical-
+  to-precedent self-scoped read, built entirely on checkpoint 3's
+  already-reviewed-pending authorization gates
+  (`authorize_grade_submission_master_teacher_decision`,
+  `ManageGradeSubmissionReview`, `ManageTeacherOversightAssignments`) —
+  no new authorization gate was added or loosened. The review debt
+  already recorded against Batch 17 checkpoints 1-3 (see the entry
+  below) still stands and should cover this checkpoint too when that
+  review happens.
+
+**Concurrency note**: this session ran alongside another Claude Code
+session actively building Batch 18 (Official School Repository /
+Microsoft 365 document upload) in the same working tree at the same
+time — confirmed via `git status` showing their files appearing mid-
+session (e.g. `document_repository_upload_queue.rs` was not present at
+this session's start and appeared before this session's commit). Three
+files this checkpoint needed to touch (`src/App.tsx`, `src/composition.ts`,
+`src/ui/components/workbench-nav-data.ts`) and one Rust file
+(`src-tauri/src/lib.rs`) were ALSO being concurrently edited by that
+other session for Batch 18's own wiring. Rather than bundle both
+sessions' changes into one commit (the precedent the previous
+rate-limit-consolidation entry below used out of necessity), this
+session reconstructed each shared file's HEAD version plus ONLY this
+checkpoint's own intended edits, generated a patch, and applied it to
+the git index with `git apply --cached` — so this commit's diff for
+those four files contains exactly Batch 17 checkpoint 4's changes, not
+Batch 18's. The working tree still carries Batch 18's in-progress,
+uncommitted edits to those same files untouched, ready for that session
+to commit separately when it finishes. Verified via `git status --short`
+and `git diff --cached` immediately before and after committing that no
+Batch 18 file was staged or touched by this commit.
+
+**Batch 17 is now fully complete (checkpoints 1-4).** No further Batch
+17 work is pending. The exact next slice is Batch 18's remaining
+checkpoints (3-4: School-Head-only settings UI, invisible-when-
+unconfigured; the opportunistic upload queue) — already in progress in
+this same working tree by a concurrent session as of this entry, not
+something this session should also start.
+
 ## Rate-limit consolidation (2026-09-09): Batch 17 checkpoint 3 + checkpoint 4 partial, Batch 18 checkpoint 2 salvaged and committed
 
 Both the Batch 17 continuation agent and the Batch 18 agent were
