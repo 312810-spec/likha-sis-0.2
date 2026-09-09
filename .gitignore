@@ -38,3 +38,11 @@ Thumbs.db
 # only, but keeping it out of git is still the right default for local
 # working state).
 .claude/memory/
+
+# playwright-cli local session state: .playwright/cli.config.json holds
+# a sandbox-specific browser executablePath workaround (see the
+# playwright-cli skill's "LIKHA-SIS project notes"), and .playwright-cli/
+# holds per-session snapshot/console logs. Neither is portable or
+# canonical — disposable local tooling state, not project source.
+.playwright/
+.playwright-cli/
