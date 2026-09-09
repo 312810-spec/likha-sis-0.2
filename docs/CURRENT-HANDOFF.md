@@ -1,5 +1,110 @@
 # CURRENT HANDOFF
 
+## Batch 17 (checkpoints 1-2 complete, 3-4 deferred): real Master Teacher RBAC role + Teacher Oversight Assignment (2026-09-09), commit local only, PR #55 untouched
+
+Branch `claude/pending-tasks-batch-vjy67v`, commit `856c673`, committed
+locally only, nothing pushed, PR #55 untouched, no CI triggered.
+
+**Resolves `docs/product/OWNER-DECISIONS-NEEDED.md` item 1 for real**:
+the owner decided the Master Teacher RBAC question directly (Master
+Teachers oversee a set of teachers; anything those teachers submit is
+approved by their assigned Master Teacher first, School Head retains
+final lock authority) — this is the permanent design, not another
+interim stopgap, and `docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md`
+supersedes ADR-0073's interim School-Head-as-approver substitution for
+that question.
+
+**Checkpoint 1 — MasterTeacher role (done):** `repository::role::MASTER_TEACHER`
+added via migration 59, the same 12-step CHECK-widening rebuild this
+schema has used repeatedly (SQLite cannot `ALTER` a `CHECK` constraint
+in place) — `user_school_roles`'s own long-standing doc comment already
+anticipated exactly this. Holding `master_teacher` alone satisfies no
+existing `Capability::allowed_roles()` — proven by a test that iterates
+every `Capability` variant this module defines, not a hand-picked
+subset. A Master Teacher who also holds `TEACHER` still gets no
+School-Head capability.
+
+**Checkpoint 2 — Teacher Oversight Assignment (done):** new
+`teacher_oversight_assignments` table (migration 60) mirrors
+`section_advisories` exactly — half-open interval, school-scoped, "at
+most one active overseer per teacher" via a real partial unique index
+(`idx_one_active_overseer_per_teacher`), not a check-then-act race.
+`repository::teacher_oversight_assignment::assign` additionally
+verifies the proposed Master Teacher actually holds the role, and
+structurally rejects a teacher being assigned as their own overseer
+(`CannotOverseeSelf`) — a defense-in-depth guard on top of the
+self-approval check the decision pipeline itself will perform.
+School-Head-only assign/end via a new `Capability::ManageTeacherOversightAssignments`
+(`commands::teacher_oversight_assignment`).
+
+**Why checkpoints 1-2 landed as one commit, not two:** they are not
+independently compilable/testable without throwaway duplication — the
+oversight-assignment repository tests need the `master_teacher` role to
+exist to seed fixtures, and the capability-boundary test (which
+iterates every `Capability` variant) needs `ManageTeacherOversightAssignments`
+to exist to be accurate. Splitting them would have meant temporarily
+deleting and re-adding code across two commits for no real benefit,
+since both are verified by the same test run regardless.
+
+**Checkpoints 3-4 — NOT started, this batch's exact next slice:**
+
+- **Checkpoint 3** (two-tier grade-submission decision rewire):
+  `repository::grade_submission::decide` / `commands::grade_submission::decide_grade_submission`
+  still use ADR-0073's single-step School-Head-only decision. Rewiring
+  requires: widening `grade_submissions`' status model (or adding
+  master-teacher-decision columns) via another CHECK-widening rebuild,
+  a new `authorize_grade_submission_master_teacher_decision` gate in
+  `auth` (self-approval-blocked, using `teacher_oversight_assignment::current_overseer_for_teacher`
+  — `None` is the intentional no-MT-assigned fallback straight to
+  School-Head approval, matching today's behavior), a distinct School-
+  Head "final lock" step, and touching `commands::conflict_review`'s
+  existing `GradeSubmission`/`SubmissionNote` sync preview code paths
+  since they pattern-match on the current shape. Not started —
+  deliberately deferred rather than rushed, since a broken/partial
+  rewire of an already-shipped, sync-wired feature is worse than a
+  clean stop.
+- **Checkpoint 4** (UI): two-tier status display on the grade-review
+  screen + a School-Head-only oversight-assignment management screen,
+  Efficient/Comfortable/Guided parity, axe-clean. Blocked on checkpoint
+  3's decision shape landing first — not started.
+
+**New files**: `src-tauri/src/repository/teacher_oversight_assignment.rs`,
+`src-tauri/src/commands/teacher_oversight_assignment.rs`,
+`docs/adr/0089-master-teacher-rbac-and-two-tier-grade-review.md`.
+
+**Changed**: `src-tauri/src/repository/role.rs` (`MASTER_TEACHER`
+constant + tests), `src-tauri/src/auth/mod.rs` (`ManageTeacherOversightAssignments`
+capability + capability-boundary tests), `src-tauri/src/db/migrations.rs`
+(migrations 59-60 + migration 59 tests), `src-tauri/src/repository/mod.rs`,
+`src-tauri/src/commands/mod.rs`, `src-tauri/src/lib.rs` (command
+registration), `docs/adr/0073-interim-grade-review-pipeline.md` (marked
+Superseded), `docs/product/OWNER-DECISIONS-NEEDED.md` (item 1 resolved),
+`docs/product/MASTER-TASK-INVENTORY.md` (Tier 2.5 checkboxes).
+
+**Verification actually run**: `cargo test --lib` (whole crate, 1349
+passed / 0 failed — includes the new role/auth/migration/repository
+tests); `cargo fmt --check` (clean after one auto-fix pass); `cargo
+clippy --all-targets -- -D warnings` (clean, 0 warnings). `npm run
+quality` was NOT run this batch — no frontend/TypeScript files changed.
+No independent security/reliability review dispatched this batch (this
+milestone touches authorization but is additive-only: no existing
+authorization gate was loosened, and every new gate fails closed by
+construction, matching this module's established pattern) — recorded
+here as review debt to close before Batch 17's checkpoint 3-4 remainder
+is marked complete, per `.claude/rules/security-privacy.md`'s
+auth/persistence/sync review requirement.
+
+**Concurrency note**: this session observed clear evidence of another
+Claude Code session operating concurrently in this same working tree
+during this batch (a `git stash` labeled "stashed before Batch 18"
+briefly reverted this session's in-progress edits before being
+recovered via `git stash pop`; ADR number 0088 was independently
+claimed by that other session for an unrelated Official School
+Repository OAuth architecture document, so this batch's new ADR was
+numbered 0089 instead). No files from that other session's work were
+touched or committed by this batch — verified via `git status --short`
+immediately before committing.
+
 ## Batch 14 (complete): hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09), commit local only, PR #55 untouched
 
 Branch `claude/pending-tasks-batch-vjy67v`, committed locally only,
