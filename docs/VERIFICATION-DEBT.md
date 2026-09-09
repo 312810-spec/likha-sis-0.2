@@ -1,5 +1,42 @@
 # Verification Debt
 
+## Batch 15: independent security-reviewer dispatch succeeded for real, zero BLOCKING findings (2026-09-09)
+
+Closes the long-standing "independent (non-self) security review owed"
+debt recorded repeatedly since 2026-09-05/07/08 (see the "Batch 1" and
+"Sync payload encryption/key-rotation" entries below). A fresh-context
+`security-reviewer` dispatch this session, instructed to write its full
+findings to a file rather than rely on chat-message relay (which had
+been the actual point of failure in every prior attempt, not the
+reviewer agent itself), completed successfully and produced
+`docs/security-reviews/2026-09-09-batch1-14-independent-review.md`.
+
+**Scope reviewed**: sync payload encryption/key rotation, device
+revocation, school-logo MIME/BLOB handling, the Secondary
+Structural-Lock PIN (ADR-0070), Child Protection/Anecdotal Records
+authorization reuse, sync wiring for all nine sensitive entities added
+this session, the SchoolLogo sync byte-budget shrink (ADR-0081), the
+disaster-recovery backup mechanism (ADR-0087), and the hub daemon
+supervisor (ADR-0085) — plus an explicit cross-check for recurrence of
+this project's two previously-fixed defect classes (unauthenticated
+bootstrap self-grant; SELECT-then-act singleton-guard race). **Zero
+BLOCKING findings.** Two non-blocking notes recorded in the report
+itself: sync child-records (`IncidentIntervention`/
+`GradeSubmissionNote`/`AnecdotalRecordFollowup`) don't verify their
+parent row exists locally before inserting (a data-integrity nuisance,
+not a tenant-isolation gap, since the SSPK/decryption boundary already
+blocks cross-school payloads); and the hub supervisor's retry-forever
+design has no TLS-error carve-out, currently moot since this listener
+has no TLS layer at all.
+
+**Still open, not closed by this entry**: the original Batch 1 items
+(sync payload encryption, device revocation, logo upload) were
+self-reviewed on 2026-09-08 before this pass — this session's
+independent review re-confirmed them for real this time, so that
+specific debt is now closed. Any _future_ security-sensitive change
+still needs its own independent review; this entry does not grant a
+standing exemption.
+
 ## Batch 14: hub daemon resilience, hub hardware gate audit, disaster recovery backup — codable cores built and tested, hardware remainders honestly split out (2026-09-09)
 
 Branch `claude/pending-tasks-batch-vjy67v`, commit-locally-only (no push,
