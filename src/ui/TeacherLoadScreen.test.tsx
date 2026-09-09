@@ -171,10 +171,10 @@ describe("TeacherLoadScreen", () => {
   it("shows the three derived load numbers for the signed-in teacher by default", async () => {
     renderScreen();
 
-    const assignmentsRow = (await screen.findByText("Assignments")).closest("div");
-    expect(assignmentsRow?.querySelector("dd")).toHaveTextContent("2");
-    const subjectsRow = screen.getByText("Distinct subjects").closest("div");
-    expect(subjectsRow?.querySelector("dd")).toHaveTextContent("2");
+    const assignmentsRow = (await screen.findByText("Assignments")).closest(".kpi");
+    expect(assignmentsRow?.querySelector(".kpi-value")).toHaveTextContent("2");
+    const subjectsRow = screen.getByText("Distinct subjects").closest(".kpi");
+    expect(subjectsRow?.querySelector(".kpi-value")).toHaveTextContent("2");
     expect(screen.getByText("Weekly instructional time")).toBeInTheDocument();
     expect(screen.getByText("2h 10m")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "My Teaching Load" })).toBeInTheDocument();
@@ -238,8 +238,8 @@ describe("TeacherLoadScreen", () => {
       await screen.findByRole("heading", { name: "Bo Reyes's Teaching Load" }),
     ).toBeInTheDocument();
     await waitFor(() => {
-      const assignmentsRow = screen.getByText("Assignments").closest("div");
-      expect(assignmentsRow?.querySelector("dd")).toHaveTextContent("1");
+      const assignmentsRow = screen.getByText("Assignments").closest(".kpi");
+      expect(assignmentsRow?.querySelector(".kpi-value")).toHaveTextContent("1");
     });
   });
 
