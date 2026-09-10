@@ -5,12 +5,11 @@
 **Status**: Waves A (appearance foundation), B (shell finish), C
 (persistence/sync status vocabulary), D (teacher Home rebuild), and E
 (pre-auth trust & sign-in presentation) implemented, `npm run quality`
-green after each. Waves A–D pushed (`c96899f`); **Wave E commit
-`36fa068` is LOCAL ONLY** — `git push` failed on a network outage
-("Could not resolve host: github.com"). Push `feat/precision-intelligence-shell`
-when connectivity returns; nothing else is blocked.
+green after each. All waves pushed — head `3360e5a` on
+`origin/feat/precision-intelligence-shell` (a transient network outage
+delayed the Wave E push by one retry; it is now on the remote).
 
-### Wave E — pre-auth trust & sign-in presentation (commit 36fa068, local)
+### Wave E — pre-auth trust & sign-in presentation (commit 36fa068, pushed)
 
 - `.app-boot` (the out-of-shell container for loading / first-run /
   sign-in) is now a calm vertically-centred layout: brand wordmark + a
@@ -37,10 +36,16 @@ vocabulary and the Wave D duty-row pattern where they overlap. Depends
 on Wave D (done). No approval gate expected. Success gate:
 `npm run quality` green + `accessibility-reviewer` + `teacher-ux-reviewer`.
 
-**Before Wave F**: push the local Wave E commit (`36fa068`) once the
-network is back, and record the results of the three pending independent
-reviews (Waves A–D accessibility, Wave D teacher-ux) — fold any
-Important/High findings in first.
+**Before Wave F**: the independent-review harness is non-functional this
+session — the Waves A+B a11y reviewer, the Waves A–D a11y reviewer, and
+the Wave D teacher-ux reviewer all ran to completion but returned
+**empty output files** (0 bytes; agent-resume disabled). Controller
+self-reviews found no blocking issue (recorded in
+`docs/VERIFICATION-DEBT.md`, 2026-09-10 entries). All three independent
+reviews are re-owed; retry when the harness looks healthy. Two teacher
+copy nits surfaced by self-review, for the owner to weigh (not blocking):
+"homeroom" vs. DepEd's "advisory class"; "sync hub" jargon in the
+`failed` device sentence in `TeacherHome`.
 
 Owner directives recorded in the plan doc: autonomous continuation
 authorised; **no file deletions during

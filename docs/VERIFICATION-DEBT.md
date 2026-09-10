@@ -1,5 +1,58 @@
 # Verification Debt
 
+## Precision Intelligence Waves C–E — independent reviews not retrievable (2026-09-10)
+
+The reviewer-subagent harness stayed non-functional through the rest of
+the session. After the empty Waves A+B a11y review (entry below), two
+more independent reviewers were dispatched and **also returned empty
+0-byte output files** (agent-resume disabled, so findings are
+unrecoverable):
+
+- `accessibility-reviewer` over Waves A–D (appearance split, Display
+  cluster, 44px hamburger, Wave C `StatusChip` adoptions, the whole
+  `TeacherHome` three-zone rebuild). _[This one was still running when
+  the session's final checkpoint was written — if it returns findings,
+  record them; assume empty otherwise.]_
+- `teacher-ux-reviewer` over the `TeacherHome` rebuild (Wave D).
+
+Controller self-review (rigorous, in place of the lost reviews) found
+**no blocking issue**:
+
+- **Wave C** (`persistence-status.ts`, `status-vocabulary.md`, the
+  `SyncStatusScreen` / `ConflictReviewScreen` chips): text carries the
+  meaning; `warning` tone serves both `pending-sync` and `conflict` but
+  the labels differ ("Waiting to sync" vs "Needs your review"), so WCAG
+  1.4.1 holds; all tones are ADR-0031-verified. Behavior-preserving —
+  no screen logic changed, only additive chips.
+- **Wave D** (`TeacherHome`): `Page` provides the `<h2>` + mount focus
+  (fixes the old no-focus outlier); three `<section aria-label>` zones
+  under it; duty rows are a real `<ul>`/`<li>`; each row has one
+  `<button>`; the `is-*` left-accent bar is backed by the `StatusChip`
+  text (not color-only); the `.link-button` is a real `<button>` with a
+  visible focus ring (inherits the global `:focus-visible` outline);
+  `@media (max-width:640px)` gives duty/grading buttons 44px min-height
+  - full width; the one `border-left-color` transition uses the shared
+    motion token (collapses under reduced-motion). Mode parity verified:
+    `useTeacherMode()` gates only hint paragraphs, never a control. Three
+    independent load paths — a failing zone never blanks another (unit
+    test proves it).
+- **Wave E** (`.app-boot` card, trust line, `notice` tone): `surface-2`
+  / `border-soft` / `elevation-1` are verified tokens; contrast
+  unaffected; `notice` stays `role="status"`; `@media (max-height:640px)`
+  prevents landscape-phone clipping; no auth/authz code touched.
+
+**Debt retained**: (1) re-run all three independent reviews (A–D a11y,
+D teacher-ux) plus a `security-reviewer` glance at Wave E's pre-auth
+copy when the harness is healthy; (2) native Windows visual pass of
+Light / System / Dark across the shell, the two Wave C screens, the new
+`TeacherHome`, and the restyled `.app-boot` — still owed (no
+browser/screenshot tooling for the compiled Tauri binary here);
+(3) `npm run quality:ui` (Playwright) still cannot run here.
+
+**Owner copy nits from self-review (not blocking, for the owner to
+decide)**: `TeacherHome` says "homeroom" where DepEd usually says
+"advisory class"; the `failed` device sentence uses "sync hub" jargon.
+
 ## Precision Intelligence Waves A+B — independent a11y review not retrievable; native visual pass owed (2026-09-10)
 
 An `accessibility-reviewer` subagent was dispatched over PI Waves A+B
