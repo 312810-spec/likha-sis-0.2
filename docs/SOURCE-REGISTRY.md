@@ -422,3 +422,28 @@ evidence.
   own established fallback (direct `WebSearch`) was used from the start,
   given the agent's confirmed, repeated retrieval failures earlier this
   same session (Curriculum Foundation, twice).
+
+## UI/visual tooling enhancement — 2026-09-10
+
+- `scripts/check-contrast.mjs` (this project's own code) — **ADOPT**.
+  Zero-dependency Node script (only `node:fs` / `node:path` / `node:url`).
+  Parses `src/ui/theme/styles.css`'s `:root` and
+  `:root[data-appearance="dark"]` token blocks and asserts 19 documented
+  semantic colour pairs meet WCAG 2.2 AA (≥4.5:1 text, ≥3.0:1 non-text)
+  in **both** the light and dark palette. Automates the by-hand contrast
+  tables in `docs/adr/0031-*` and `docs/adr/0064-*`; a future token edit
+  that drops a pair below AA now fails `npm run check:contrast` /
+  `npm run quality`. Verified: passes 19/19 on the current tokens, and a
+  deliberate token break was confirmed to make it exit 1. No npm
+  package added. Harness change recorded against
+  `docs/adr/0054-final-harness-v2-certification.md`.
+- Evaluated, **NOT adopted** this pass (see
+  `docs/design/ui-tooling-enhancement-plan.md` for the full matrix):
+  `eslint-plugin-jsx-a11y` (**BLOCKED** — no ESLint-10-compatible
+  release), `stylelint` + `stylelint-config-standard` (**staged** —
+  needs an owner-run `npm install`), `stylelint-declaration-strict-value`,
+  `@playwright/test` visual snapshots, `size-limit`, `lucide-react`
+  (**DEFER / copy-paths-only**), `@playwright/mcp` v0.0.80 (**HOLD** —
+  0.0.x), `anthropics/skills` `frontend-design` (**REJECT** — ~80%
+  overlap with the installed `premium-teacher-ui` + `impeccable` skills
+  and ADR-0070).

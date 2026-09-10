@@ -29,3 +29,23 @@ The first remote candidate (`c803c9c`) passed Security and the canonical Ubuntu 
 - `npm run harness:verify`: all immutable ADR-0052 dimensions pass, exactly **100/100**, zero fatal overrides.
 
 The harness is therefore relocked. Future harness changes require a new owner-authorized unlock and must repeat this certification protocol.
+
+## Post-certification additions (owner-authorized unlock, 2026-09-10)
+
+The owner authorized a UI/visual-tooling enhancement pass after the
+Precision Intelligence program (Waves A–N). Full evaluation:
+`docs/design/ui-tooling-enhancement-plan.md`.
+
+- **Phase 1 — `scripts/check-contrast.mjs` + `npm run check:contrast`,
+  folded into `npm run quality`.** Zero npm dependency (Node built-ins
+  only). Asserts 19 documented `styles.css` semantic colour pairs meet
+  WCAG 2.2 AA in both palettes — automating the by-hand tables in
+  ADR-0031 / ADR-0064. Verified: `npm run quality` green with the new
+  step (Vitest 113 files / 1097 tests, unchanged); a deliberate token
+  break was confirmed to exit 1. Recorded in `docs/SOURCE-REGISTRY.md`.
+  This is a `quality`-script addition, not a change to any immutable
+  ADR-0052 harness dimension, so it does not require the full
+  re-certification protocol; `npm run harness:verify` is unaffected.
+- **Staged, not applied**: `stylelint` + `stylelint-config-standard`
+  (Phase 2 — needs an owner-run `npm install`). All other candidates
+  held or rejected — see the plan doc.
