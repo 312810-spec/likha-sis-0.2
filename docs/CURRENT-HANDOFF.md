@@ -1,12 +1,22 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–M complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — every implementable wave done (2026-09-10)
 
-**All 13 waves (A–M) executed.** `feat/precision-intelligence-shell`
-head is the newest commit; `npm run quality` green at **115 files /
-1132 tests**; `npm run build` ok with **no dependency added across the
-whole program**. The branch is coherent and green but **not
-merge-ready** — see the owed list below.
+**Waves A–N executed** (13 lettered waves + the Wave N follow-up).
+`feat/precision-intelligence-shell` head is the newest commit;
+`npm run quality` green at **113 files / 1097 tests**; `npm run build`
+ok, JS gzip **118.05 kB** — **no dependency added across the whole
+program** (+0.75 kB vs. the pre-A baseline). The branch is coherent and
+green but **not merge-ready** — the only remaining work is the
+tooling-blocked verification in §17.4.
+
+**Wave N (SchoolHeadHome rebuild) — shipped** (plan §20). The last
+screen on the superseded ADR-0064 dashboard pattern is now on the
+dominant-surface model: a "Needs your attention" list (adviser gaps +
+the teaching-load outlier as action rows), a single context line
+replacing the 4-KPI strip (only "attendance today" tone-carrying),
+"Recent SF1 imports" removed, "Manage / Import" as `Page` header
+actions. No new backend read; every capability-gated read preserved.
 
 **Wave M (final)** produced the migration ledger (plan §17.2), migrated
 `AdminPasswordResetScreen` off the legacy `PageHeader` pattern onto
@@ -39,27 +49,34 @@ quality:full` (one run incl. cargo gates), `npm run quality:security`
   aggregator screen). Wave J complete.
 - **Two `TeacherHome` copy nits — FIXED** ("· homeroom" → "· advisory
   class"; dropped "sync hub" jargon).
-- **`SchoolHeadHome` — its own follow-up wave (Wave N)**, scoped with
-  `prompt-master`, in the spirit of Wave D.
+- **`SchoolHeadHome` — Wave N, PROPOSED then BUILT and shipped** (plan
+  §§19–20). Owner approved: dominant "Needs attention" surface; KpiStrip
+  → one context line; "Recent SF1 imports" removed.
 
-### Wave N — `SchoolHeadHome` rebuild: IA PROPOSED, awaiting owner approval
+### Exact next task: the tooling-blocked verification (plan §17.4)
 
-Scoped via `prompt-master`. `SchoolHeadHome` is the last screen on the
-superseded ADR-0064 dashboard pattern (KpiStrip(4) + 4 equal `span=6`
-cards). Per the Wave D precedent, the new IA is **proposed in plan §19,
-not built**. Proposal: one dominant "Needs attention" surface (adviser
-gaps + the teaching-load outlier as ranked action rows), a single
-context line replacing the 4-KPI strip (only "attendance today" kept
-prominent, tone-carrying), a quiet "Recent imports" region, and
-"Manage / Import" as header actions. No new backend read; every
-capability-gated read and every action preserved.
+Every implementable wave is done. Before this branch merges, run — when
+the tooling / harness is available:
 
-**Exact next task**: get owner answers to plan §19.7 (approve the
-dominant-surface model? collapse the KpiStrip to one context line? keep
-Recent SF1 imports here?), then build `SchoolHeadHome` per the approved
-IA — `npm run quality` green vs. the post-M baseline **113 files / 1107
-tests**, `SchoolHeadHome.test.tsx` updated, axe clean, every action
-still reachable.
+1. **Independent review** — one accessibility + teacher-UX + security
+   pass over the whole A–N surface (every reviewer subagent returned an
+   empty output this session).
+2. **Native Windows visual pass** — Light / System / Dark on the
+   compiled Tauri binary, across every screen.
+3. `npm run quality:ui` (Playwright binary absent here), one run of
+   `npm run quality:full` (incl. `cargo fmt --check` / `cargo test` /
+   `cargo clippy` — no Rust changed, but the checkpoint gate should run
+   once) and `npm run quality:security` (gitleaks + `cargo deny` + OSV;
+   no dependency added, run once).
+4. **Wave L Android device / emulator pass** — priority-workflow
+   recomposition vs. compression, on-screen keyboard, rotation, real
+   safe-area insets.
+5. **Wave-completion delivery report** — per the
+   `wave-completion-delivery-reports` memory, written outside the repo,
+   once 1–4 pass.
+
+If any of 1–4 surfaces a defect, that becomes the next implementation
+slice; otherwise the branch is ready for a PR.
 
 ---
 

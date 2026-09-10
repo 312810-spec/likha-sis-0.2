@@ -952,3 +952,43 @@ capability-gated server-side and stay so.
    only "attendance today" prominent (as a tone-carrying figure) — yes?
 3. **Recent SF1 imports** — keep it on this screen (Zone 3), or drop it
    here and rely on the SF1 Import screen's own history?
+
+---
+
+## 20. Wave N — SchoolHeadHome rebuilt (owner-approved, shipped)
+
+Owner answered §19.7 (plain-language framing): (1) lead with a "Needs
+attention" list; (2) collapse the 4 KPI tiles to one context line
+keeping only "attendance today" prominent; (3) remove "Recent SF1
+imports" from this screen.
+
+**Shipped** (`feat(ui): Precision Intelligence Wave N`):
+
+- **Zone 1 (dominant) — "Needs your attention"**: one list. A row per
+  section with no adviser (`StatusChip` "No adviser" + "Assign adviser"
+  → `onManageSections`), plus the single teaching-load outlier row when
+  present (`StatusChip` with weekly hours + "Review teaching load" → new
+  `onViewTeacherLoad` → the Teacher Load tab). Calm `EmptyState` when
+  there are no gaps and no outlier.
+- **Context line** (replaces `KpiStrip`): `{N} learners · {M} sections ·
+SY {year} · Attendance today {chip}` — only the attendance figure
+  carries tone/prominence (`success` ≥85 / `warning` 60–84 / `danger`
+  <60 / `neutral` unmarked); the raw present/marked counts sit on the
+  line below; a multi-year note appears when sections disagree.
+- **Removed**: the "Recent SF1 imports" card (history lives on the SF1
+  Import screen), the standalone "Manage" card (→ two `Page` header
+  actions), and the `KpiStrip` / `BentoGrid` / `Card` imports.
+- **Preserved**: no new backend read; the same composite `Promise.all`
+  under one `requestRef`; every capability-gated read
+  (`teachingAssignmentService.getLoad` etc.) unchanged. `HomeScreen` /
+  `App.tsx` drop the now-unused `sf1ImportService` prop to
+  `SchoolHeadHome` and thread `onViewTeacherLoad`.
+
+`npm run quality` exit 0 — Vitest **113 files / 1097 tests**
+(`SchoolHeadHome.test.tsx` rewritten; axe clean). `npm run build` ok, JS
+gzip **118.05 kB** (−0.33; SchoolHeadHome shed three primitive imports).
+`check:dev-preview-isolation` exit 0.
+
+**This completes every implementable Precision Intelligence wave.** The
+`SchoolHeadHome` ledger row (§17.2) moves from _Deferred_ to _Complete_.
+What remains is only the tooling-blocked verification in §17.4.

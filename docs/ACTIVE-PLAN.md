@@ -1,5 +1,32 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave N: SchoolHeadHome rebuilt (2026-09-10)
+
+Full detail: plan §§19–20. Owner-approved IA (proposed first, per the
+Wave D precedent). SchoolHeadHome — the last screen on the superseded
+ADR-0064 dashboard pattern — is now on the dominant-surface model:
+
+- Zone 1 (dominant): one "Needs your attention" list — adviser-gap rows
+  ("Assign adviser") + the single teaching-load outlier row ("Review
+  teaching load" → new `onViewTeacherLoad`). Calm EmptyState otherwise.
+- The 4-tile KpiStrip → one context line
+  (`N learners · M sections · SY ____ · Attendance today <chip>`); only
+  the attendance figure is tone-carrying.
+- "Recent SF1 imports" removed; "Manage / Import" → `Page` header
+  actions. `KpiStrip`/`BentoGrid`/`Card` no longer imported here.
+
+No new backend read; every capability-gated read preserved.
+`HomeScreen`/`App` drop the unused `sf1ImportService` prop and thread
+`onViewTeacherLoad`.
+
+Verification: `npm run quality` exit 0 — Vitest **113 files / 1097
+tests** (`SchoolHeadHome.test.tsx` rewritten; axe clean). `npm run
+build` ok, JS gzip **118.05 kB** (−0.33). `check:dev-preview-isolation`
+exit 0.
+
+**Every implementable Precision Intelligence wave is now done.** Only
+the §17.4 tooling-blocked verification remains.
+
 ## Precision Intelligence — §17.5 owner decisions resolved (2026-09-10)
 
 Plan §18. (1) **M.3 deletion package approved + executed** —

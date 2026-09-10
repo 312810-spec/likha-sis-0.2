@@ -21,14 +21,20 @@
   layout primitives, the non-color-cue / 24px-target discipline, and the
   three density modes.
 - Work branch `feat/precision-intelligence-shell` (from `main` `f4b75a1`);
-  **all 13 waves A–M executed and pushed**, `npm run quality` green after
-  each (final: 115 files / 1132 tests), **no dependency added across the
-  whole program**. Waves F–K and J-PartA and Wave I were largely
-  "assessed — already on the bar, no code change": the prior ADR-0064
-  redesign had already put every screen on `Page` with `StatusChip`
-  non-color cues, Guided hints, two-step destructive confirms, and
-  honest form-export disclosures. The branch is coherent and green but
-  **not merge-ready** — see plan §17.4 (owed independent review, native
+  **every implementable wave executed and pushed** (A–M + the Wave N
+  `SchoolHeadHome` follow-up), `npm run quality` green after each (final:
+  113 files / 1097 tests), **no dependency added across the whole
+  program** (JS gzip +0.75 kB vs. the pre-A baseline). Waves F–K, J-PartA
+  and I were largely "assessed — already on the bar, no code change":
+  the prior ADR-0064 redesign had already put every screen on `Page`
+  with `StatusChip` non-color cues, Guided hints, two-step destructive
+  confirms, and honest form-export disclosures. Real code work landed in
+  A (appearance), B (shell), C (status vocabulary), D (teacher Home),
+  E (pre-auth), G (long-name CSS), L (Android safe-area/touch),
+  M (deletions: `TeacherWorkspaceScreen` + `PageHeader` gone,
+  `AdminPasswordResetScreen` → `Page`), and N (`SchoolHeadHome` →
+  dominant surface). The branch is coherent and green but **not
+  merge-ready** — see plan §17.4 (owed independent review, native
   visual pass, `quality:ui/full/security`, Android device pass) and
   §17.3 (owner-approval-gated superseded-file deletion package:
   `TeacherWorkspaceScreen` + `PageHeader`).
