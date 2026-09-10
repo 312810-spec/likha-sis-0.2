@@ -10,10 +10,15 @@ unrecoverable):
 
 - `accessibility-reviewer` over Waves A–D (appearance split, Display
   cluster, 44px hamburger, Wave C `StatusChip` adoptions, the whole
-  `TeacherHome` three-zone rebuild). _[This one was still running when
-  the session's final checkpoint was written — if it returns findings,
-  record them; assume empty otherwise.]_
-- `teacher-ux-reviewer` over the `TeacherHome` rebuild (Wave D).
+  `TeacherHome` three-zone rebuild). Confirmed: finished with a **0-byte
+  output** (~11 min, 31 tool calls) — nothing to record.
+- `teacher-ux-reviewer` over the `TeacherHome` rebuild (Wave D) —
+  0-byte output.
+
+All four reviewer subagents dispatched this session (two A+B a11y
+attempts across the two entries here, the A–D a11y pass, and the D
+teacher-ux pass) returned empty. Treat the harness as down for the rest
+of this session; retry the owed reviews in a later session.
 
 Controller self-review (rigorous, in place of the lost reviews) found
 **no blocking issue**:
