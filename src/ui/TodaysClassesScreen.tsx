@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
 import { DataTable } from "./components/DataTable";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import {
+  todaysClassesForTeacher,
+  type TodaysClassOccurrence,
+  type TodaysClassStatus,
+} from "./home/todays-classes";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TodaysClassesScreenProps {
@@ -14,17 +18,7 @@ interface TodaysClassesScreenProps {
   onCheckAttendance: (teachingAssignmentId: string) => void;
 }
 
-type ClassStatus = "not_checked" | "held" | "no_class";
-
-interface TodaysClassOccurrence {
-  assignment: TeachingAssignmentSummary;
-  startsAt: string;
-  endsAt: string;
-  room: string | null;
-  status: ClassStatus;
-}
-
-const STATUS_LABELS: Record<ClassStatus, string> = {
+const STATUS_LABELS: Record<TodaysClassStatus, string> = {
   not_checked: "Not checked",
   held: "Checked",
   no_class: "No class",
@@ -62,34 +56,9 @@ export function TodaysClassesScreen({
     const today = todayAsIsoDate();
     const todaysWeekday = new Date().getDay();
 
-    subjectAttendanceService
-      .listMyAssignments(teacherUserId)
-      .then(async (assignments) => {
-        const perAssignment = await Promise.all(
-          assignments.map(async (assignment) => {
-            const meetings = await subjectAttendanceService.listMeetings(assignment.id);
-            const todaysMeetings = meetings.filter((meeting) => meeting.weekday === todaysWeekday);
-            if (todaysMeetings.length === 0) return [];
-
-            const sessions = await subjectAttendanceService.listSessions(assignment.id);
-            const todaysSession = sessions.find((session) => session.sessionDate === today);
-            const status: ClassStatus = !todaysSession
-              ? "not_checked"
-              : todaysSession.status === "no_class"
-                ? "no_class"
-                : "held";
-
-            return todaysMeetings.map((meeting) => ({
-              assignment,
-              startsAt: meeting.startsAt,
-              endsAt: meeting.endsAt,
-              room: meeting.room,
-              status,
-            }));
-          }),
-        );
+    todaysClassesForTeacher(subjectAttendanceService, teacherUserId, today, todaysWeekday)
+      .then((flattened) => {
         if (requestRef.current !== requestId) return;
-        const flattened = perAssignment.flat().sort((a, b) => a.startsAt.localeCompare(b.startsAt));
         setOccurrences(flattened);
       })
       .catch(() => {
