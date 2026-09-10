@@ -718,3 +718,111 @@ a.button-primary, [role="button"]` get `min-height: 44px`
   performance on modest hardware; touch-vs-hover state correctness.
 - Bottom sheets / additional sticky action bars were **not** added —
   they need device UX validation first.
+
+---
+
+## 17. Wave M — product-wide hardening + migration ledger (2026-09-10)
+
+Scoped via `prompt-master`. This session has no browser / screenshot /
+Playwright, no Android device, and the reviewer-subagent harness returns
+empty — so the visual / keyboard / responsive / theme / a11y **review
+passes the brief lists for Wave M could not be executed**. What ran:
+the synthesis below, one safe code cleanup, and the local gates.
+
+### M.1 — one code cleanup (this wave's only code change)
+
+`AdminPasswordResetScreen` was still on the legacy
+`<section aria-label><PageHeader>` pattern (mis-recorded as "on `Page`"
+in the Wave K notes — corrected here). Migrated to `<Page title=…>` —
+the same behavior-preserving wrapper swap ADR-0064 Wave 5 applied to 16
+screens. It now gets the `<h2>` + mount-focus every other in-shell
+screen has. Its tests (role-based, no region/heading-name assertion)
+pass unchanged. This leaves **`PageHeader` with a single remaining
+consumer: `TeacherWorkspaceScreen`**.
+
+### M.2 — route / component migration ledger
+
+| Area                | Item(s)                                                                                                                                                                      | Status                                                                                                                         | Wave    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| Shell               | `AppLayout`, `Sidebar`, `TopBar`, `BottomNav`                                                                                                                                | **Complete**                                                                                                                   | A, B, L |
+| Appearance          | `AppearanceProvider` + `appearance*.ts`, dark-selector split                                                                                                                 | **Complete**                                                                                                                   | A       |
+| Pre-auth            | `LoginScreen`, `FirstRunSetupScreen`, `.app-boot`, `IdleTimeoutWarning`                                                                                                      | **Complete**                                                                                                                   | E       |
+| Home                | `HomeScreen` (router) + `TeacherHome` (3-zone rebuild)                                                                                                                       | **Complete**                                                                                                                   | D       |
+| Home                | `SchoolHeadHome`                                                                                                                                                             | **Deferred** — functional, on primitives; a dedicated pass was never in an owner-approved wave                                 | —       |
+| Home                | `TeacherWorkspaceScreen`                                                                                                                                                     | **Superseded — pending deletion** (M.3)                                                                                        | D       |
+| Daily teaching      | `MyDayScreen` (chip alignment); `TodaysClassesScreen`, `ScheduleMeetingsScreen`, `SubjectMonitorScreen`, `AdviserViewScreen`, `TeacherLoadScreen` (assessed, already on bar) | **Complete**                                                                                                                   | F       |
+| Attendance / roster | `AttendanceScreen`, `SubjectAttendanceScreen`, `MonthlySummaryScreen`, `SectionRosterScreen` — PI consistency + long-name CSS                                                | **Complete**                                                                                                                   | G       |
+| Attendance / roster | `DataTable` / `reflowAt` migration of those 4 + `ClassRecordWorkspace`                                                                                                       | **Deferred** — disproportionate keyboard-model risk (ADR-0064 Wave 6 + Wave G); needs an independent keyboard-behaviour review | —       |
+| Grading             | `GradingPeriodsScreen` ("Saved" chip); `ClassRecordsScreen`, `ClassRecordWorkspace`, `AssessmentAuthoringScreen` (assessed)                                                  | **Complete**                                                                                                                   | H       |
+| Learner / section   | `LearnerListScreen`, `SectionsScreen`, `TeachingAssignmentsScreen`, `SectionAdviserScreen`, `Sf1ImportScreen` (assessed)                                                     | **Complete**                                                                                                                   | I       |
+| Official forms      | export entry points (SF1/2/4/5/6/9/10) — disclosure + confirmation pattern audit                                                                                             | **Complete (Part A)**                                                                                                          | J       |
+| Official forms      | new "Official Forms" aggregator workspace; any template-fidelity work                                                                                                        | **Blocked** — owner sign-off + `deped-researcher` primary-source evidence                                                      | —       |
+| Admin / governance  | `AuditLogScreen`, `SchoolMembershipScreen`, `DeviceManagementScreen`, `SchoolBrandingScreen` (assessed); `AdminPasswordResetScreen` (→ `Page`, M.1)                          | **Complete**                                                                                                                   | K, M    |
+| Sync                | `SyncStatusScreen`, `ConflictReviewScreen` — status vocabulary                                                                                                               | **Complete**                                                                                                                   | C       |
+| Status vocabulary   | `docs/design/status-vocabulary.md` + `persistence-status.ts`                                                                                                                 | **Complete**                                                                                                                   | C       |
+| Primitives          | `Page`, `Alert`, `Loading`, `EmptyState`, `StatusChip`, `Card`, `DataTable`, `BentoGrid`, `KpiStrip`/`Kpi`, `icons`                                                          | **Retained / Complete**                                                                                                        | —       |
+| Primitives          | `PageHeader`                                                                                                                                                                 | **Superseded — pending deletion** (M.3)                                                                                        | D, M    |
+| Android             | `viewport-fit=cover`, safe-area insets, ≥44px touch floor                                                                                                                    | **Complete (CSS)**                                                                                                             | L       |
+| Android             | priority-workflow recomposition (not compression)                                                                                                                            | **Blocked** — no device / emulator this session                                                                                | —       |
+
+### M.3 — superseded-file deletion package (OWNER APPROVAL REQUIRED)
+
+Per the owner directive, no file was deleted during the program; this is
+the single consolidated list. Route parity for the one real supersession
+(`TeacherWorkspaceScreen` → `TeacherHome`) is established by the
+owner-approved IA in §10.7 and the test coverage in `HomeScreen.test.tsx`
+
+- `TeacherHome.test.tsx`; it was **not** browser-verified.
+
+On approval, one follow-up commit does exactly:
+
+1. Delete `src/ui/TeacherWorkspaceScreen.tsx` + `.test.tsx`.
+2. Delete `src/ui/components/PageHeader.tsx` + `.test.tsx` (prereq — its
+   last non-`TeacherWorkspaceScreen` consumer — done in M.1).
+3. `src/dev-preview/DevPreviewApp.tsx` — repoint the `workspace` tab
+   from `TeacherWorkspaceScreen` to `TeacherHome`; add a
+   `FixtureSyncStatusRepository` to `src/dev-preview/fixtures.ts`
+   (`TeacherHome` needs `syncStatusService`); drop the now-unused
+   fixture imports.
+4. Rewrite the 4 stale prose comment references
+   (`App.tsx:73`, `AttendanceScreen.tsx:19`, `SectionsScreen.tsx:25`,
+   `workbench-nav-data.ts:127`) from "TeacherWorkspaceScreen" to "the
+   teacher Home".
+5. `npm run quality` + `check:dev-preview-isolation` green; commit.
+
+### M.4 — consolidated "what must run before this branch merges"
+
+Blocked on tooling / harness this session — all still owed:
+
+1. **Independent review** — one accessibility + teacher-UX + security
+   pass over the whole A–M surface (every reviewer subagent returned an
+   empty output this session).
+2. **Native Windows visual pass** — Light / System / Dark across every
+   screen on the compiled Tauri binary (no screenshot tool here).
+3. **`npm run quality:ui`** (Playwright) — browser binary absent.
+4. **`npm run quality:full`** — one run including `cargo fmt --check` /
+   `cargo test` / `cargo clippy` (no Rust changed this program, but the
+   checkpoint gate should run once).
+5. **`npm run quality:security`** — gitleaks + `cargo deny` + OSV (no
+   dependency added this program; run once).
+6. **Wave L Android device / emulator pass** — recomposition vs.
+   compression, on-screen keyboard, rotation, real safe-area insets.
+
+### M.5 — open owner decisions
+
+- **M.3 deletion package** — approve / hold.
+- **Wave J Part B** — build the "Official Forms" aggregator workspace, or
+  keep the per-context export model.
+- **Two `TeacherHome` copy nits** — "homeroom" → DepEd's "advisory
+  class"? and replace "sync hub" jargon in the sync-failed sentence?
+- **`SchoolHeadHome` dedicated pass** — worth its own wave, or leave as
+  is (functional, on primitives)?
+
+### M.6 — local gate actually run (Wave M, this session)
+
+`npm run quality` exit 0 — typecheck, eslint, `prettier --check`,
+architecture-boundary check, `knip`, Vitest **115 files / 1132 tests**.
+`npm run build` exit 0 — CSS 39.04 kB / gzip 6.51 kB, JS 447.55 kB /
+gzip 118.38 kB; **no dependency added across the entire A–M program**
+(JS gzip is +1.1 kB vs. the pre-program baseline). `npm run
+check:dev-preview-isolation` exit 0.

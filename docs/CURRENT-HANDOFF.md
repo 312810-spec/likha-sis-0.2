@@ -1,5 +1,47 @@
 # CURRENT HANDOFF
 
+## Precision Intelligence UI/UX overhaul — Waves A–M complete (2026-09-10)
+
+**All 13 waves (A–M) executed.** `feat/precision-intelligence-shell`
+head is the newest commit; `npm run quality` green at **115 files /
+1132 tests**; `npm run build` ok with **no dependency added across the
+whole program**. The branch is coherent and green but **not
+merge-ready** — see the owed list below.
+
+**Wave M (final)** produced the migration ledger (plan §17.2), migrated
+`AdminPasswordResetScreen` off the legacy `PageHeader` pattern onto
+`Page` (its one code change), and produced the consolidated
+superseded-file **deletion package awaiting owner approval** (plan
+§17.3): delete `TeacherWorkspaceScreen` + `PageHeader` (+ tests),
+repoint the dev-preview `workspace` tab to `TeacherHome`, rewrite 4
+stale comments. Nothing was deleted.
+
+### Before this branch can merge (plan §17.4 — all blocked on tooling this session)
+
+1. Independent **accessibility + teacher-UX + security** review over the
+   whole A–M surface (every reviewer subagent returned an empty output
+   this session).
+2. Native **Windows visual pass** — Light / System / Dark on the
+   compiled binary.
+3. `npm run quality:ui` (Playwright binary absent), `npm run
+quality:full` (one run incl. cargo gates), `npm run quality:security`
+   (one run).
+4. Wave L **Android device / emulator pass** (recomposition vs.
+   compression, on-screen keyboard, rotation, real insets).
+
+### Open owner decisions (plan §17.5)
+
+- **Approve the M.3 deletion package?**
+- **Wave J Part B** — build the "Official Forms" aggregator workspace,
+  or keep the current per-context export model?
+- **Two `TeacherHome` copy nits** — "homeroom" → "advisory class"?
+  replace "sync hub" jargon?
+- **`SchoolHeadHome`** — own wave, or leave functional-as-is?
+
+---
+
+### Prior status (pre-Wave-M)
+
 ## Precision Intelligence UI/UX overhaul — Waves A–L + J(Part A) (2026-09-10)
 
 **Status**: Waves A–K implemented; Wave J Part A (form-export UI audit)

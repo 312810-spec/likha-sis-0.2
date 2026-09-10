@@ -5,7 +5,7 @@ import type { SchoolMember } from "../domain/school-member";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
-import { PageHeader } from "./components/PageHeader";
+import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AdminPasswordResetScreenProps {
@@ -99,19 +99,17 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
   }
 
   return (
-    <section aria-label="Reset a Password">
-      <PageHeader
-        title="Reset a Password"
-        hint={
-          mode === "guided" && (
-            <p className="field-hint">
-              Set a new password for a colleague who has forgotten theirs or is locked out. The new
-              password takes effect immediately, and this action is recorded in Sign-in Activity.
-            </p>
-          )
-        }
-      />
-
+    <Page
+      title="Reset a Password"
+      hint={
+        mode === "guided" ? (
+          <p className="field-hint">
+            Set a new password for a colleague who has forgotten theirs or is locked out. The new
+            password takes effect immediately, and this action is recorded in Sign-in Activity.
+          </p>
+        ) : undefined
+      }
+    >
       {loadError && (
         <Alert tone="error">
           <p>{loadError}</p>
@@ -165,6 +163,6 @@ export function AdminPasswordResetScreen({ schoolMemberService }: AdminPasswordR
           </button>
         </form>
       )}
-    </section>
+    </Page>
   );
 }

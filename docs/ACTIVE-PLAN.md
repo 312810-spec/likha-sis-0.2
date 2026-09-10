@@ -1,5 +1,32 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave M: hardening + migration ledger (2026-09-10)
+
+Full detail: plan §17. Scoped via `prompt-master`. No browser / device /
+reviewer harness this session, so the brief's Wave-M **review passes did
+not run** — synthesis + one cleanup + local gates only.
+
+- **M.1 code change**: `AdminPasswordResetScreen` migrated from the
+  legacy `<section><PageHeader>` pattern to `<Page title=…>` (the
+  ADR-0064 Wave 5 wrapper swap; behavior-preserving, tests pass
+  unchanged). `PageHeader` now has one consumer left:
+  `TeacherWorkspaceScreen`.
+- **M.2 migration ledger** — every screen/component classified
+  Complete / Deferred / Blocked (plan §17.2).
+- **M.3 deletion package** — the single consolidated superseded-file
+  list (`TeacherWorkspaceScreen`, `PageHeader`, DevPreviewApp repoint,
+  4 stale comments) — **awaiting owner approval**, not executed.
+- **M.4 owed-before-merge list** — independent review, native visual
+  pass, `quality:ui`, `quality:full`, `quality:security`, Android device
+  pass — all blocked on tooling.
+- **M.5 open owner decisions** — M.3 approval; Wave J Part B;
+  two copy nits; `SchoolHeadHome` pass.
+
+Verification: `npm run quality` exit 0 — Vitest **115 files / 1132
+tests**. `npm run build` exit 0 — CSS gzip 6.51 kB, JS gzip 118.38 kB,
+**no dependency added across the entire A–M program**.
+`check:dev-preview-isolation` exit 0.
+
 ## Precision Intelligence — Wave L: Android safe-area + touch-target hardening (2026-09-10)
 
 Full detail: plan §16. Scoped via `prompt-master`. No device/emulator/

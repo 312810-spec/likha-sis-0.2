@@ -21,8 +21,21 @@
   layout primitives, the non-color-cue / 24px-target discipline, and the
   three density modes.
 - Work branch `feat/precision-intelligence-shell` (from `main` `f4b75a1`);
-  Waves A–D shipped and pushed (head `c96899f`), `npm run quality` green
-  after each:
+  **all 13 waves A–M executed and pushed**, `npm run quality` green after
+  each (final: 115 files / 1132 tests), **no dependency added across the
+  whole program**. Waves F–K and J-PartA and Wave I were largely
+  "assessed — already on the bar, no code change": the prior ADR-0064
+  redesign had already put every screen on `Page` with `StatusChip`
+  non-color cues, Guided hints, two-step destructive confirms, and
+  honest form-export disclosures. The branch is coherent and green but
+  **not merge-ready** — see plan §17.4 (owed independent review, native
+  visual pass, `quality:ui/full/security`, Android device pass) and
+  §17.3 (owner-approval-gated superseded-file deletion package:
+  `TeacherWorkspaceScreen` + `PageHeader`).
+- Every wave was scoped with a `prompt-master` pass first (owner
+  instruction 2026-09-10) — see `precision-intelligence-wave-workflow`
+  memory.
+- Wave highlights:
   - **A** — device-local Light/System/Dark appearance preference
     (`localStorage` `likha-sis:appearance`, default `system`, applied
     pre-paint from `main.tsx`, switcher in `TopBar` + `Sidebar`).
@@ -39,8 +52,22 @@
     zones: merged homeroom + subject attendance duties / contextual
     Grading / one-line sync signal; one-line "last sign-in" replaces the
     school-wide activity list). Owner approved the IA in plan §10.7.
-    `TeacherWorkspaceScreen` + `PageHeader` are retained unreferenced for
-    a single Wave M deletion.
+  - **E** — `.app-boot` pre-auth card + local-first trust line;
+    `LoginScreen` `notice` tone success→info.
+  - **F** — `MyDayScreen` status-chip alignment (other 5 daily-teaching
+    screens assessed, no change).
+  - **G** — `overflow-wrap: anywhere` on roster name cells for long
+    Filipino names; `DataTable`/`reflowAt` migration deferred.
+  - **H** — `GradingPeriodsScreen` "Saved" chip (rest assessed).
+  - **I** — learner/section screens: assessed, no code change.
+  - **J** — Part A: form-export UI audit (already exceeds the bar);
+    Part B (aggregator screen / template fidelity) blocked on owner.
+  - **K** — admin/governance screens: assessed, no code change.
+  - **L** — `viewport-fit=cover` + `env(safe-area-inset-*)` on the
+    shell + a ≥44px touch-target floor at ≤640px independent of density
+    mode. Device recomposition pass deferred (no device here).
+  - **M** — `AdminPasswordResetScreen` migrated off `PageHeader` onto
+    `Page`; migration ledger; deletion package (owner-gated).
 - Owner directives (2026-09-10): autonomous wave continuation authorised;
   **no file deletions during the program** (one consolidated list at
   Wave M); the expectation prototype at
