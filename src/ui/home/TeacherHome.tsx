@@ -124,7 +124,7 @@ const DEVICE_SENTENCE: Record<PersistenceState, string> = {
   synced: "All your changes have reached the other devices in your school.",
   "pending-sync": "Your work is saved on this device and is waiting to reach the other devices.",
   failed:
-    "Your work is safe on this device. It is having trouble reaching the sync hub and will keep retrying automatically.",
+    "Your work is safe on this device. It is having trouble reaching the other devices in your school and will keep retrying automatically.",
   offline: "This device is not set up to sync. Your work is saved here and stays fully usable.",
   conflict: "A sync conflict needs a person to choose which version to keep.",
   "saved-local": "Your work is saved on this device.",
@@ -431,7 +431,7 @@ function HomeroomDutyRow({
     <li className={`home-duty-item is-${state}`}>
       <div className="home-duty-main">
         <span className="home-duty-what">
-          {duty.section.name} — Grade {duty.section.gradeLevel} · homeroom
+          {duty.section.name} — Grade {duty.section.gradeLevel} · advisory class
         </span>
         <StatusChip tone={chip.tone}>{chip.label(duty.marked, duty.total)}</StatusChip>
       </div>

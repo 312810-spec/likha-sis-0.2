@@ -125,7 +125,7 @@ describe("TeacherHome", () => {
     const [first, second] = items as [HTMLElement, HTMLElement];
     expect(within(first).getByText(/Math — Mabini/)).toBeInTheDocument();
     expect(within(first).getByText("not checked")).toBeInTheDocument();
-    expect(within(second).getByText(/Rizal — Grade 4/)).toBeInTheDocument();
+    expect(within(second).getByText(/Rizal — Grade 4 · advisory class/)).toBeInTheDocument();
     expect(within(second).getByText("all 2 marked")).toBeInTheDocument();
 
     await userEvent.click(within(first).getByRole("button", { name: "Check attendance" }));
