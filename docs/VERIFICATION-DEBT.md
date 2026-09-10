@@ -1,5 +1,45 @@
 # Verification Debt
 
+## Precision Intelligence Waves A+B — independent a11y review not retrievable; native visual pass owed (2026-09-10)
+
+An `accessibility-reviewer` subagent was dispatched over PI Waves A+B
+(commits `21ef9d3`, `34b3c6a`) — the appearance provider, the
+`styles.css` dark-palette selector split, the appearance switcher in
+`TopBar`/`Sidebar`, the "Display" cluster, and the 44px hamburger. The
+agent ran to completion (24 tool calls, ~8 min) but its **findings
+could not be retrieved** — the task output file was empty (0 bytes) and
+`SendMessage`/agent-resume is disabled this session. This is the known
+reviewer-harness retrieval failure that
+`.claude/rules/autonomous-development.md` anticipates.
+
+Per that rule, a rigorous controller self-review was performed against
+WCAG 2.2 AA and found **no blocking issue**:
+
+- No color token value changed; the ADR-0031/0064 computed contrast
+  ratios carry over. The `:not([data-appearance="light"])` guard was
+  traced for all four OS×override combinations — the correct palette and
+  `color-scheme` apply in each, no state leaves contrast broken.
+- The appearance switcher reuses the exact `aria-pressed` + `✓ ::before`
+  - weight + fill non-color pattern already verified for the density
+    switcher (WCAG 1.4.1). Two adjacent `role="group"`s each carry a
+    unique `aria-label`; the `.app-topbar-display` wrapper is a plain div
+    (no competing ARIA).
+- First-paint apply in `main.tsx` runs before `createRoot().render()`;
+  the provider mount effect is idempotent — no flash-of-wrong-theme.
+- Switcher buttons inherit `--control-height` (34/40/48px by mode), all
+  > the 24px WCAG 2.5.8 AA floor; the hamburger is now 44×44 (2.5.5).
+- Wave C chips: text carries the meaning, tone is additive; `warning`
+  serves both `pending-sync` and `conflict` but their **labels** differ
+  ("Waiting to sync" vs "Needs your review"), so 1.4.1 holds.
+
+**Debt retained**: (1) re-run the independent `accessibility-reviewer`
+over Waves A–C when the reviewer harness looks healthy — fold it into
+the Wave D review batch if still flaky; (2) a native Windows visual pass
+of Light / System / Dark across the shell and the two Wave C screens is
+owed (no browser/screenshot tool for the compiled Tauri binary in this
+environment); (3) `npm run quality:ui` (Playwright) still cannot run
+here.
+
 ## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
 
 Follow-up on the BLOCKING finding fixed earlier this session (see the

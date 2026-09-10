@@ -38,8 +38,12 @@ implementation** — Waves B and C proceed autonomously.
 
 **Verified (Wave B)**: `npm run quality` exit 0 — Vitest **112 files /
 1108 tests** (unchanged; Wave B is CSS + wrapper markup + docs).
-Independent `accessibility-reviewer` pass over Waves A+B: _dispatched;
-result to be recorded._
+Independent `accessibility-reviewer` pass over Waves A+B: **ran to
+completion but findings not retrievable** (empty task output; agent
+resume disabled) — the known reviewer-harness retrieval failure. A
+rigorous controller self-review found no blocking issue; full detail +
+retained debt in `docs/VERIFICATION-DEBT.md` (2026-09-10 entry). The
+independent review is re-owed — fold it into the Wave D review batch.
 
 ### Wave C — persistence/sync status vocabulary (commit pending)
 
