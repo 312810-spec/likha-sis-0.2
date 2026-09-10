@@ -452,3 +452,51 @@ any grading or attendance semantic change.
    a one-line "last sign-in" for the current user)?
 3. Approve merging homeroom + subject attendance into one ranked Zone 1
    list (vs. keeping Home to homeroom only, as today)?
+
+---
+
+## 11. Wave F & G execution notes (2026-09-10)
+
+### Wave F — daily teaching workspace (shipped, commit 772c292)
+
+Inspected all six screens (`MyDayScreen`, `TodaysClassesScreen`,
+`ScheduleMeetingsScreen`, `SubjectMonitorScreen`, `AdviserViewScreen`,
+`TeacherLoadScreen`). Five are already action-centred, on the `Page`
+primitive, single-purpose, with restrained (decision-relevant) metrics
+and clear "this is a monitoring tool, not the official record" framing —
+**no valuable low-risk change**, so none was made (scope discipline, not
+capacity-filling). Only `MyDayScreen` had a real consistency gap: its
+"Needs your attention today" rows used a bare
+`<span class="field-hint">` for status. Now `StatusChip` — `warning`
+"Not checked" for pending attendance, the Wave C `conflict` vocabulary
+for pending sync conflicts. Layout / behaviour unchanged.
+
+### Wave G — attendance & roster ops (partially shipped)
+
+**Shipped**: one defensive CSS rule — `overflow-wrap: anywhere` on the
+learner-name cells of `.attendance-roster` and `.section-roster`, so a
+long compound Filipino given name or hyphenated double surname wraps in
+the name column instead of forcing the whole roster to scroll sideways
+(verification-matrix "no horizontal clipping" / "long names").
+
+**Deliberately deferred, with reasons:**
+
+1. **`DataTable` / `reflowAt` migration** of `AttendanceScreen`,
+   `SubjectAttendanceScreen`, `SectionRosterScreen`,
+   `ClassRecordWorkspace`. This was already deferred by ADR-0064 Wave 6's
+   own independent review as "risk disproportionate to the benefit" —
+   each carries a bespoke keyboard-interaction model (P/A/T + ↑/↓ on
+   attendance; Enter/blur-save + `:focus-within` on score entry) whose
+   migration needs an independent keyboard-behaviour review to land
+   safely. That review harness is non-functional this session (see
+   `docs/VERIFICATION-DEBT.md`). The existing per-screen
+   `@media (max-width: 640px)` reflow blocks work and are tested. Revisit
+   when the reviewer harness is healthy.
+2. **`MonthlySummaryScreen` sticky-column long-name handling**
+   (`.monthly-summary th[scope="row"] { white-space: nowrap }`). A very
+   long name widens the sticky first column and squeezes the day grid.
+   Fixing it well (truncate + `title`, or a measured `max-width`) is a
+   layout change to the deliberate sticky-column design (ADR-0033 §5)
+   that must be **visually verified** — and this environment has no
+   browser/screenshot for the compiled binary. Deferred to a session
+   with visual tooling, or to Wave M's native pass.

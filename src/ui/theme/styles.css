@@ -498,6 +498,16 @@ label {
   border-top: 1px solid var(--color-border);
 }
 
+/* Long Philippine learner names (compound given names, hyphenated
+   double surnames) wrap within the name cell rather than forcing the
+   whole roster to scroll sideways (verification-matrix "no horizontal
+   clipping", "long names"). `anywhere` also breaks a pathological
+   unspaced name. Precision Intelligence Wave G. */
+.attendance-roster th[scope="row"],
+.section-roster th[scope="row"] {
+  overflow-wrap: anywhere;
+}
+
 .attendance-roster [role="group"] {
   display: flex;
   gap: calc(var(--spacing-unit) * 0.5);
