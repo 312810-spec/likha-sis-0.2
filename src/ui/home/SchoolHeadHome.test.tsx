@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { LearnerApplicationService } from "../../application/learner-service";
@@ -6,15 +6,14 @@ import type { SchoolAttendanceApplicationService } from "../../application/schoo
 import type { SchoolMemberApplicationService } from "../../application/school-member-service";
 import type { SectionAdvisoryApplicationService } from "../../application/section-advisory-service";
 import type { SectionApplicationService } from "../../application/section-service";
-import type { Sf1ImportApplicationService } from "../../application/sf1-import-service";
 import type { TeachingAssignmentApplicationService } from "../../application/teaching-assignment-service";
 import type { SchoolDayAttendanceTotals } from "../../domain/attendance";
 import type { SchoolMember } from "../../domain/school-member";
 import type { Section } from "../../domain/section";
 import type { SectionAdvisory } from "../../domain/section-advisory";
-import type { Sf1ImportHistoryEntry } from "../../domain/sf1-import";
 import type { TeacherLoad } from "../../domain/teacher-load";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
+import { ModeProvider } from "../theme/ModeContext";
 import { SchoolHeadHome } from "./SchoolHeadHome";
 
 function makeSection(id: string, schoolYear: string): Section {
@@ -25,23 +24,6 @@ function makeSection(id: string, schoolYear: string): Section {
     gradeLevel: "7",
     name: `Section ${id}`,
     createdAt: "2026-01-01T00:00:00Z",
-  };
-}
-
-function makeHistory(overrides: Partial<Sf1ImportHistoryEntry> = {}): Sf1ImportHistoryEntry {
-  return {
-    id: "import-1",
-    schoolId: "school-1",
-    sectionId: "section-a",
-    userId: "user-1",
-    username: "teacher1",
-    sourceFilename: "SF1-Mabini.xlsx",
-    sourceFingerprint: "fingerprint",
-    rowsCommitted: 30,
-    newLearnersCreated: 20,
-    existingLearnersEnrolled: 10,
-    createdAt: "2026-08-01T00:00:00Z",
-    ...overrides,
   };
 }
 
@@ -72,11 +54,9 @@ type FailingService = "sections" | "attendance" | "adviser" | "members" | "load"
 interface RenderOptions {
   sections?: Section[];
   learnerCount?: number;
-  history?: Sf1ImportHistoryEntry[];
   dayTotals?: SchoolDayAttendanceTotals;
-  /** Adviser resolved per section id; a section absent from the map (or
-   * mapped to `null`) is treated as having no adviser. When omitted
-   * entirely, every section gets a fake adviser. */
+  /** Adviser per section id; a section absent from the map (or mapped to
+   * `null`) has no adviser. Omitted entirely => every section has one. */
   advisers?: Record<string, SectionAdvisory | null>;
   members?: SchoolMember[];
   loads?: Record<string, TeacherLoad>;
@@ -85,7 +65,11 @@ interface RenderOptions {
 
 function renderHome(
   options: RenderOptions = {},
-  callbacks: { onManageSections?: () => void; onOpenSf1Import?: () => void } = {},
+  callbacks: {
+    onManageSections?: () => void;
+    onOpenSf1Import?: () => void;
+    onViewTeacherLoad?: () => void;
+  } = {},
 ) {
   const sections = options.sections ?? [
     makeSection("a", "2026-2027"),
@@ -95,7 +79,6 @@ function renderHome(
   const learners = Array.from({ length: options.learnerCount ?? 40 }, (_, index) => ({
     id: `learner-${index}`,
   }));
-  const history = options.history ?? [];
   const dayTotals = options.dayTotals ?? { present: 18, absent: 2, tardy: 0 };
   const members = options.members ?? [];
   const fail = options.failing;
@@ -115,9 +98,6 @@ function renderHome(
   const learnerService = {
     listLearners: vi.fn(() => Promise.resolve(learners)),
   } as unknown as LearnerApplicationService;
-  const sf1ImportService = {
-    listImportHistory: vi.fn(() => Promise.resolve(history)),
-  } as unknown as Sf1ImportApplicationService;
 
   const dayTotalsFn =
     fail === "attendance"
@@ -157,275 +137,154 @@ function renderHome(
 
   const onManageSections = callbacks.onManageSections ?? vi.fn();
   const onOpenSf1Import = callbacks.onOpenSf1Import ?? vi.fn();
+  const onViewTeacherLoad = callbacks.onViewTeacherLoad ?? vi.fn();
 
   const utils = render(
-    <SchoolHeadHome
-      schoolName="Mabini Elementary School"
-      sectionService={sectionService}
-      learnerService={learnerService}
-      sf1ImportService={sf1ImportService}
-      schoolAttendanceService={schoolAttendanceService}
-      sectionAdvisoryService={sectionAdvisoryService}
-      schoolMemberService={schoolMemberService}
-      teachingAssignmentService={teachingAssignmentService}
-      onManageSections={onManageSections}
-      onOpenSf1Import={onOpenSf1Import}
-    />,
+    <ModeProvider>
+      <SchoolHeadHome
+        schoolName="Mabini Elementary School"
+        sectionService={sectionService}
+        learnerService={learnerService}
+        schoolAttendanceService={schoolAttendanceService}
+        sectionAdvisoryService={sectionAdvisoryService}
+        schoolMemberService={schoolMemberService}
+        teachingAssignmentService={teachingAssignmentService}
+        onManageSections={onManageSections}
+        onOpenSf1Import={onOpenSf1Import}
+        onViewTeacherLoad={onViewTeacherLoad}
+      />
+    </ModeProvider>,
   );
 
-  return { ...utils, onManageSections, onOpenSf1Import };
+  return { ...utils, onManageSections, onOpenSf1Import, onViewTeacherLoad };
 }
 
 describe("SchoolHeadHome", () => {
-  it("shows Loading first, then the section and learner counts", async () => {
+  it("shows Loading first, then the context line with learner + section counts and school year", async () => {
     renderHome();
 
     expect(screen.getByText("Loading school overview…")).toBeInTheDocument();
 
-    expect(await screen.findByText("3")).toBeInTheDocument();
-    expect(screen.getByText("40")).toBeInTheDocument();
-    expect(screen.getByText("Sections")).toBeInTheDocument();
-    expect(screen.getByText("Learners")).toBeInTheDocument();
-  });
-
-  it("shows the shared school year when every section matches", async () => {
-    renderHome();
-
-    expect(await screen.findByText("2026-2027")).toBeInTheDocument();
+    const context = await screen.findByText(/40 learners · 3 sections · SY 2026-2027/);
+    expect(context).toBeInTheDocument();
   });
 
   it("shows an em dash for school year when sections disagree", async () => {
     renderHome({
       sections: [makeSection("a", "2026-2027"), makeSection("b", "2025-2026")],
-    });
-
-    await screen.findByText("Sections");
-    expect(screen.getByText("—")).toBeInTheDocument();
-  });
-
-  it("shows an em dash for school year when there are no sections", async () => {
-    renderHome({ sections: [] });
-
-    await screen.findByText("Sections");
-    expect(screen.getByText("—")).toBeInTheDocument();
-  });
-
-  it("renders both card titles", async () => {
-    renderHome();
-
-    expect(await screen.findByText("Recent SF1 imports")).toBeInTheDocument();
-    expect(screen.getByText("Manage")).toBeInTheDocument();
-  });
-
-  it("wires the navigation buttons to their callbacks", async () => {
-    const user = userEvent.setup();
-    const onManageSections = vi.fn();
-    const onOpenSf1Import = vi.fn();
-    renderHome({}, { onManageSections, onOpenSf1Import });
-
-    await screen.findByText("Manage");
-
-    await user.click(screen.getByRole("button", { name: "Manage sections" }));
-    expect(onManageSections).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByRole("button", { name: "History" }));
-    await user.click(screen.getByRole("button", { name: "Import learners (SF1)" }));
-    expect(onOpenSf1Import).toHaveBeenCalledTimes(2);
-  });
-
-  it("shows an empty state when there are no imports", async () => {
-    renderHome({ history: [] });
-
-    expect(await screen.findByText("No imports yet.")).toBeInTheDocument();
-  });
-
-  it("lists recent import filenames, counting learners not 'rows'", async () => {
-    renderHome({
-      history: [
-        makeHistory({ id: "import-9", sourceFilename: "SF1-Rizal.xlsx", rowsCommitted: 30 }),
-      ],
-    });
-
-    expect(await screen.findByText(/SF1-Rizal\.xlsx/)).toBeInTheDocument();
-    // "30 learners", never "30 rows" (redesign teacher-UX review S4).
-    expect(screen.getByText(/30 learners/)).toBeInTheDocument();
-    expect(screen.queryByText(/30 rows/)).not.toBeInTheDocument();
-  });
-
-  it("shows an error with a working Retry after a failed load", async () => {
-    const user = userEvent.setup();
-    const listSections = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("boom"))
-      .mockResolvedValue([makeSection("a", "2026-2027")]);
-    const sectionService = { listSections } as unknown as SectionApplicationService;
-    const learnerService = {
-      listLearners: vi.fn().mockResolvedValue([]),
-    } as unknown as LearnerApplicationService;
-    const sf1ImportService = {
-      listImportHistory: vi.fn().mockResolvedValue([]),
-    } as unknown as Sf1ImportApplicationService;
-    const schoolAttendanceService = {
-      dayTotals: vi.fn().mockResolvedValue({ present: 0, absent: 0, tardy: 0 }),
-    } as unknown as SchoolAttendanceApplicationService;
-    const sectionAdvisoryService = {
-      currentAdviser: vi.fn().mockResolvedValue(null),
-    } as unknown as SectionAdvisoryApplicationService;
-    const schoolMemberService = {
-      listMembers: vi.fn().mockResolvedValue([]),
-    } as unknown as SchoolMemberApplicationService;
-    const teachingAssignmentService = {
-      getLoad: vi.fn().mockResolvedValue(ZERO_LOAD),
-    } as unknown as TeachingAssignmentApplicationService;
-
-    render(
-      <SchoolHeadHome
-        schoolName="Mabini Elementary School"
-        sectionService={sectionService}
-        learnerService={learnerService}
-        sf1ImportService={sf1ImportService}
-        schoolAttendanceService={schoolAttendanceService}
-        sectionAdvisoryService={sectionAdvisoryService}
-        schoolMemberService={schoolMemberService}
-        teachingAssignmentService={teachingAssignmentService}
-        onManageSections={vi.fn()}
-        onOpenSf1Import={vi.fn()}
-      />,
-    );
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not load the school overview.",
-    );
-
-    await user.click(screen.getByRole("button", { name: "Retry" }));
-
-    expect(await screen.findByText("1")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("has no detectable accessibility violations once loaded", async () => {
-    const { container } = renderHome({ history: [makeHistory()] });
-    await screen.findByText("Recent SF1 imports");
-
-    await expectNoAccessibilityViolations(container);
-  });
-
-  // --- Wave 4 Task 4: the three enrichment cards -------------------------
-
-  it("shows the attendance-today KPI value and raw-count foot with a readable date", async () => {
-    renderHome({ dayTotals: { present: 90, absent: 6, tardy: 4 } });
-
-    expect(await screen.findByText("Attendance today")).toBeInTheDocument();
-    expect(screen.getByText("90%")).toBeInTheDocument();
-    // Foot: raw present/marked counts, and the date formatted "4 Sep 2026",
-    // not a bare ISO string (redesign teacher-UX review S4).
-    expect(
-      screen.getByText(/90 present of 100 marked · \d{1,2} [A-Z][a-z]{2} \d{4}/),
-    ).toBeInTheDocument();
-  });
-
-  it("tones the attendance KPI success at roughly 90 percent", async () => {
-    renderHome({ dayTotals: { present: 90, absent: 6, tardy: 4 } });
-
-    const kpi = (await screen.findByText("Attendance today")).closest(".kpi");
-    expect(kpi).toHaveAttribute("data-tone", "success");
-  });
-
-  it("tones the attendance KPI warning at roughly 70 percent", async () => {
-    renderHome({ dayTotals: { present: 70, absent: 20, tardy: 10 } });
-
-    const kpi = (await screen.findByText("Attendance today")).closest(".kpi");
-    expect(kpi).toHaveAttribute("data-tone", "warning");
-    expect(screen.getByText("70%")).toBeInTheDocument();
-  });
-
-  it("tones the attendance KPI danger at roughly 40 percent", async () => {
-    renderHome({ dayTotals: { present: 40, absent: 50, tardy: 10 } });
-
-    const kpi = (await screen.findByText("Attendance today")).closest(".kpi");
-    expect(kpi).toHaveAttribute("data-tone", "danger");
-    expect(screen.getByText("40%")).toBeInTheDocument();
-  });
-
-  it("shows a neutral attendance KPI and 'no attendance recorded yet' foot when nothing is marked", async () => {
-    renderHome({ dayTotals: { present: 0, absent: 0, tardy: 0 } });
-
-    expect(
-      await screen.findByText(/no attendance recorded yet · \d{1,2} [A-Z][a-z]{2} \d{4}/),
-    ).toBeInTheDocument();
-    const kpi = screen.getByText("Attendance today").closest(".kpi") as HTMLElement;
-    expect(kpi).toHaveAttribute("data-tone", "neutral");
-    expect(within(kpi).getByText("—")).toBeInTheDocument();
-  });
-
-  it("lists exactly the sections whose adviser lookup resolved null", async () => {
-    renderHome({
-      sections: [
-        makeSection("a", "2026-2027"),
-        makeSection("b", "2026-2027"),
-        makeSection("c", "2026-2027"),
-      ],
-      advisers: { a: null, b: makeAdvisory("b"), c: null },
-    });
-
-    expect(await screen.findByText("Sections without an adviser")).toBeInTheDocument();
-    expect(screen.getByText("Section a — Grade 7")).toBeInTheDocument();
-    expect(screen.getByText("Section c — Grade 7")).toBeInTheDocument();
-    expect(screen.queryByText("Section b — Grade 7")).not.toBeInTheDocument();
-  });
-
-  it("shows 'Every section has an adviser.' when every section has one", async () => {
-    renderHome({
-      sections: [makeSection("a", "2026-2027"), makeSection("b", "2026-2027")],
       advisers: { a: makeAdvisory("a"), b: makeAdvisory("b") },
     });
 
-    expect(await screen.findByText("Every section has an adviser.")).toBeInTheDocument();
+    expect(await screen.findByText(/SY — ·/)).toBeInTheDocument();
+    expect(screen.getByText("Sections span more than one school year.")).toBeInTheDocument();
   });
 
-  it("wires the adviser-gap Assign button to onManageSections", async () => {
+  it("moves Manage / Import to header actions and wires them", async () => {
     const user = userEvent.setup();
     const onManageSections = vi.fn();
-    renderHome({ advisers: { a: null } }, { onManageSections });
+    const onOpenSf1Import = vi.fn();
+    renderHome(
+      { advisers: { a: makeAdvisory("a"), b: makeAdvisory("b"), c: makeAdvisory("c") } },
+      {
+        onManageSections,
+        onOpenSf1Import,
+      },
+    );
 
-    await screen.findByText("Sections without an adviser");
-    await user.click(screen.getByRole("button", { name: "Assign" }));
+    await screen.findByRole("heading", { name: "Needs your attention" });
+    await user.click(screen.getByRole("button", { name: "Manage sections" }));
+    await user.click(screen.getByRole("button", { name: "Import learners (SF1)" }));
+    expect(onManageSections).toHaveBeenCalledTimes(1);
+    expect(onOpenSf1Import).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a calm empty state when nothing needs attention", async () => {
+    renderHome({
+      sections: [makeSection("a", "2026-2027")],
+      advisers: { a: makeAdvisory("a") },
+      members: [makeMember("t1", "Teacher One")],
+      loads: { t1: ZERO_LOAD },
+    });
+
+    expect(await screen.findByText("Nothing needs your attention right now.")).toBeInTheDocument();
+  });
+
+  it("lists exactly the sections with no adviser, each with an Assign adviser action", async () => {
+    const user = userEvent.setup();
+    const onManageSections = vi.fn();
+    renderHome(
+      {
+        sections: [
+          makeSection("a", "2026-2027"),
+          makeSection("b", "2026-2027"),
+          makeSection("c", "2026-2027"),
+        ],
+        advisers: { a: null, b: makeAdvisory("b"), c: null },
+      },
+      { onManageSections },
+    );
+
+    expect(await screen.findByText("Section a — Grade 7")).toBeInTheDocument();
+    expect(screen.getByText("Section c — Grade 7")).toBeInTheDocument();
+    expect(screen.queryByText("Section b — Grade 7")).not.toBeInTheDocument();
+
+    const chips = screen.getAllByText("No adviser");
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) expect(chip).toHaveClass("status-chip", "status-chip-warning");
+
+    await user.click(screen.getAllByRole("button", { name: "Assign adviser" })[0]!);
     expect(onManageSections).toHaveBeenCalledTimes(1);
   });
 
-  it("lists each teacher with their weekly hours and flags the single outlier", async () => {
-    renderHome({
-      members: [
-        makeMember("t1", "Teacher One"),
-        makeMember("t2", "Teacher Two"),
-        makeMember("t3", "Teacher Three"),
-        makeMember("t4", "Teacher Four"),
-      ],
-      loads: {
-        t1: { assignmentCount: 1, distinctSubjectCount: 1, weeklyInstructionalMinutes: 60 },
-        t2: { assignmentCount: 2, distinctSubjectCount: 2, weeklyInstructionalMinutes: 90 },
-        t3: { assignmentCount: 2, distinctSubjectCount: 2, weeklyInstructionalMinutes: 120 },
-        t4: { assignmentCount: 6, distinctSubjectCount: 4, weeklyInstructionalMinutes: 600 },
+  it("adds the single teaching-load outlier as an attention row wired to onViewTeacherLoad", async () => {
+    const user = userEvent.setup();
+    const onViewTeacherLoad = vi.fn();
+    renderHome(
+      {
+        sections: [makeSection("a", "2026-2027")],
+        advisers: { a: makeAdvisory("a") },
+        members: [
+          makeMember("t1", "Teacher One"),
+          makeMember("t2", "Teacher Two"),
+          makeMember("t3", "Teacher Three"),
+          makeMember("t4", "Teacher Four"),
+        ],
+        loads: {
+          t1: { assignmentCount: 1, distinctSubjectCount: 1, weeklyInstructionalMinutes: 60 },
+          t2: { assignmentCount: 2, distinctSubjectCount: 2, weeklyInstructionalMinutes: 90 },
+          t3: { assignmentCount: 2, distinctSubjectCount: 2, weeklyInstructionalMinutes: 120 },
+          t4: { assignmentCount: 6, distinctSubjectCount: 4, weeklyInstructionalMinutes: 600 },
+        },
       },
-    });
+      { onViewTeacherLoad },
+    );
 
-    expect(await screen.findByText("Teaching load")).toBeInTheDocument();
-    expect(screen.getByText("Teacher One")).toBeInTheDocument();
-    expect(screen.getByText("1h 0m")).toBeInTheDocument();
+    expect(await screen.findByText("Teacher Four — heaviest teaching load")).toBeInTheDocument();
+    expect(screen.getByText("10h 0m / week")).toHaveClass("status-chip", "status-chip-warning");
+    // No non-outlier teacher shows up as an attention row.
+    expect(screen.queryByText(/Teacher One — heaviest/)).not.toBeInTheDocument();
 
-    const outlierRow = screen.getByText("Teacher Four").closest("li") as HTMLElement;
-    expect(outlierRow).toHaveTextContent("10h 0m ⚠ high");
-    expect(outlierRow).toHaveClass("warn");
-    expect(outlierRow).toHaveAttribute("data-tone", "warning");
-
-    const normalRow = screen.getByText("Teacher One").closest("li") as HTMLElement;
-    expect(normalRow).not.toHaveTextContent("⚠ high");
+    await user.click(screen.getByRole("button", { name: "Review teaching load" }));
+    expect(onViewTeacherLoad).toHaveBeenCalledTimes(1);
   });
 
-  it("shows 'No teachers on record.' when no member has the teacher role", async () => {
-    renderHome({ members: [makeMember("r1", "Reggie Registrar", ["registrar"])] });
+  it.each([
+    [{ present: 90, absent: 6, tardy: 4 }, "90%", "status-chip-success"],
+    [{ present: 70, absent: 20, tardy: 10 }, "70%", "status-chip-warning"],
+    [{ present: 40, absent: 50, tardy: 10 }, "40%", "status-chip-danger"],
+  ])("tones the attendance-today chip by rate (%o)", async (dayTotals, label, toneClass) => {
+    renderHome({ dayTotals });
+    const chip = await screen.findByText(label);
+    expect(chip).toHaveClass("status-chip", toneClass);
+  });
 
-    expect(await screen.findByText("No teachers on record.")).toBeInTheDocument();
+  it("shows a neutral 'not recorded' attendance chip when nothing is marked", async () => {
+    renderHome({ dayTotals: { present: 0, absent: 0, tardy: 0 } });
+    const chip = await screen.findByText("not recorded");
+    expect(chip).toHaveClass("status-chip", "status-chip-neutral");
+    expect(
+      screen.getByText(/No attendance recorded yet · \d{1,2} [A-Z][a-z]{2} \d{4}/),
+    ).toBeInTheDocument();
   });
 
   it.each(["sections", "attendance", "adviser", "members", "load"] as const)(
@@ -440,14 +299,15 @@ describe("SchoolHeadHome", () => {
 
       await user.click(screen.getByRole("button", { name: "Retry" }));
 
-      expect(await screen.findByText("Teaching load")).toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { name: "Needs your attention" }),
+      ).toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     },
   );
 
-  it("has no detectable accessibility violations with the enrichment cards populated", async () => {
+  it("has no detectable accessibility violations once loaded", async () => {
     const { container } = renderHome({
-      history: [makeHistory()],
       advisers: { a: null, b: makeAdvisory("b"), c: null },
       members: [makeMember("t1", "Teacher One"), makeMember("t2", "Teacher Two")],
       loads: {
@@ -457,7 +317,7 @@ describe("SchoolHeadHome", () => {
       dayTotals: { present: 40, absent: 50, tardy: 10 },
     });
 
-    await screen.findByText("Teaching load");
+    await screen.findByRole("heading", { name: "Needs your attention" });
     await expectNoAccessibilityViolations(container);
   });
 });

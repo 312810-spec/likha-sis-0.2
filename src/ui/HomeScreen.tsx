@@ -7,7 +7,6 @@ import type { SchoolAttendanceApplicationService } from "../application/school-a
 import type { SchoolMemberApplicationService } from "../application/school-member-service";
 import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SectionApplicationService } from "../application/section-service";
-import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { SyncStatusApplicationService } from "../application/sync-status-service";
 import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
@@ -25,7 +24,6 @@ interface HomeScreenProps {
   gradingService: GradingApplicationService;
   learnerService: LearnerApplicationService;
   sectionService: SectionApplicationService;
-  sf1ImportService: Sf1ImportApplicationService;
   subjectAttendanceService: SubjectAttendanceApplicationService;
   syncStatusService: SyncStatusApplicationService;
   schoolAttendanceService: SchoolAttendanceApplicationService;
@@ -37,6 +35,7 @@ interface HomeScreenProps {
   onManageSections: () => void;
   onOpenClassRecords: () => void;
   onViewSyncStatus: () => void;
+  onViewTeacherLoad: () => void;
   onOpenSf1Import: () => void;
 }
 
@@ -57,7 +56,6 @@ export function HomeScreen({
   gradingService,
   learnerService,
   sectionService,
-  sf1ImportService,
   subjectAttendanceService,
   syncStatusService,
   schoolAttendanceService,
@@ -69,6 +67,7 @@ export function HomeScreen({
   onManageSections,
   onOpenClassRecords,
   onViewSyncStatus,
+  onViewTeacherLoad,
   onOpenSf1Import,
 }: HomeScreenProps): JSX.Element {
   // roles is display-only — see src/domain/session.ts. It only picks
@@ -122,13 +121,13 @@ export function HomeScreen({
           schoolName={schoolName}
           sectionService={sectionService}
           learnerService={learnerService}
-          sf1ImportService={sf1ImportService}
           schoolAttendanceService={schoolAttendanceService}
           sectionAdvisoryService={sectionAdvisoryService}
           schoolMemberService={schoolMemberService}
           teachingAssignmentService={teachingAssignmentService}
           onManageSections={onManageSections}
           onOpenSf1Import={onOpenSf1Import}
+          onViewTeacherLoad={onViewTeacherLoad}
         />
       ) : (
         teaching

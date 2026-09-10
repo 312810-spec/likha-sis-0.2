@@ -1178,6 +1178,19 @@ label {
   margin: 0;
   color: var(--color-text-muted);
 }
+
+/* SchoolHeadHome context line (ADR-0070 §19) -- one quiet line that
+   replaced the 4-tile KPI strip; only the attendance StatusChip carries
+   tone/prominence. Left as normal inline text flow so the chip sits in
+   the sentence. */
+.school-overview-context {
+  margin: 0 0 calc(var(--spacing-unit) * 0.25);
+  color: var(--color-text-muted);
+  line-height: 1.9;
+}
+.school-overview-context .status-chip {
+  vertical-align: middle;
+}
 .home-last-signin {
   margin-top: calc(var(--spacing-unit) * 1.5);
 }

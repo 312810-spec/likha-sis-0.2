@@ -227,7 +227,6 @@ function App() {
                 gradingService={gradingService}
                 learnerService={learnerService}
                 sectionService={sectionService}
-                sf1ImportService={sf1ImportService}
                 subjectAttendanceService={subjectAttendanceService}
                 syncStatusService={syncStatusService}
                 schoolAttendanceService={schoolAttendanceService}
@@ -245,6 +244,7 @@ function App() {
                 onManageSections={() => setActiveTab("sections")}
                 onOpenClassRecords={() => setActiveTab("class-records")}
                 onViewSyncStatus={() => setActiveTab("sync-status")}
+                onViewTeacherLoad={() => setActiveTab("teacher-load")}
                 onOpenSf1Import={() => setActiveTab("sf1-import")}
               />
             ) : activeTab === "learners" ? (

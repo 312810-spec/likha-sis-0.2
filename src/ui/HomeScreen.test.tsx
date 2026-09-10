@@ -102,6 +102,7 @@ function renderHome(roles: string[]) {
         onManageSections={vi.fn()}
         onOpenClassRecords={vi.fn()}
         onViewSyncStatus={vi.fn()}
+        onViewTeacherLoad={vi.fn()}
         onOpenSf1Import={vi.fn()}
       />
     </ModeProvider>,
