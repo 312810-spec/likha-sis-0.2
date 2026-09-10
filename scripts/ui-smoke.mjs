@@ -39,8 +39,8 @@ try {
   const preview = page.getByRole("status").filter({ hasText: "Development preview" });
   if ((await preview.count()) !== 1)
     throw new Error("synthetic-data preview boundary is not visible");
-  await page.getByRole("region", { name: "Workspace" }).waitFor();
-  await page.getByText(/3 learners across 4 sections/).waitFor();
+  await page.getByRole("region", { name: "Home" }).waitFor();
+  await page.getByRole("heading", { name: "What needs you today", exact: true }).waitFor();
   await page.getByRole("button", { name: "Mark attendance", exact: true }).click();
   await page.getByRole("heading", { name: "Attendance", exact: true }).waitFor();
   if ((await page.getByLabel("Section").inputValue()) !== "sec-not-started")
@@ -58,12 +58,10 @@ try {
   );
   if (hasHorizontalOverflow) throw new Error("learner enrollment history overflows at phone width");
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByRole("button", { name: "Home", exact: true }).click();
-  await page.getByRole("button", { name: "View all sign-in activity" }).click();
-  await page
-    .getByText(/Sign-in Activity/i)
-    .first()
-    .waitFor();
+  // The teacher Home no longer carries a "recent sign-in activity" list
+  // or a link into Sign-in Activity (Precision Intelligence Wave D
+  // replaced it with a single "Last sign-in" line); axe runs on the
+  // Learners screen that is already open.
   await page.addScriptTag({ content: axe.source });
   const result = await page.evaluate(async () =>
     window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa"] }),
