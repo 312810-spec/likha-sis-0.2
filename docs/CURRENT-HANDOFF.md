@@ -1,10 +1,44 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Wave A complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A + B complete (2026-09-10)
 
-**Status**: Wave A (appearance foundation) implemented, `npm run quality`
-green, committed locally on `feat/precision-intelligence-shell`. Not
-pushed.
+**Status**: Wave A (appearance foundation) and Wave B (shell finish)
+implemented, `npm run quality` green after each, committed and pushed on
+`feat/precision-intelligence-shell`. Owner directives recorded in the
+plan doc: autonomous continuation authorised; **no file deletions during
+the program** (one consolidated list at Wave M); the expectation
+prototype is behind a ChatGPT sign-in wall and could not be accessed
+(evidence gap recorded, not fabricated around); **Wave D teacher-Home IA
+must be proposed in the plan doc and owner-approved before
+implementation** — Waves B and C proceed autonomously.
+
+### Wave B — shell finish (commit pending)
+
+- `.app-topbar-menu` hamburger 40×40 → **44×44** (WCAG 2.5.5) — closes an
+  ADR-0064 Wave 6 retained minor.
+- Appearance + density switchers wrapped in one **"Display" cluster**
+  (`.app-topbar-display` / `.app-sidebar-display`), two labelled groups
+  joined by a hairline; the whole cluster moves into the phone drawer as
+  before. `TopBar` / `Sidebar` markup + `styles.css`.
+- `DESIGN.md` header now names **Precision Intelligence** as the visual
+  language of record, with the supersession/retention scope.
+- Re-verified from source (not from the stale ADR-0064 Wave 6 backlog):
+  the skip-to-content link, the focus-trap width guard
+  (`if (!drawerOpen || !isPhone) return`), and the post-`inert`
+  focus-restore effect are **already implemented** in `AppLayout.tsx`;
+  the deliberate no-focus-return on destination-select
+  (`restoreFocusOnClose` ref) is by design because each `Page` moves
+  focus to its own `<h2>`. The plan's §3 risk #7 was corrected.
+- `.app-sidebar { overflow: hidden }` focus-ring-clip minor: checked —
+  the `.app-sidebar-scroll` container's ≈9px padding clears the 4px
+  focus ring, so no clip in practice. No change.
+
+**Verified (Wave B)**: `npm run quality` exit 0 — Vitest **112 files /
+1108 tests** (unchanged; Wave B is CSS + wrapper markup + docs).
+Independent `accessibility-reviewer` pass over Waves A+B: _dispatched;
+result to be recorded._
+
+### Wave A — appearance foundation (commit 21ef9d3, pushed)
 
 **Context**: The owner started the "Precision Intelligence" (PI)
 whole-product UI overhaul and chose Option A — bootstrap in this repo
@@ -45,17 +79,18 @@ gzip 6.08 kB). Baseline was 111/1099.
 native Windows visual pass of Light/System/Dark; `accessibility-reviewer`
 pass on the appearance control (scheduled with Wave B).
 
-**Exact next task**: **Wave B — shell finish**. In
-`src/ui/shell/{AppLayout,Sidebar,TopBar}.tsx` + `styles.css`: enlarge
-`.app-topbar-menu` / hamburger to ≥44px (WCAG 2.5.5), add focus-return
-to the drawer toggle when a destination is selected, add a width guard
-to the focus-trap effect, group the appearance + density switchers as
-one labelled "Display" cluster, and update `DESIGN.md` to name Precision
-Intelligence as the visual language of record. Success gate:
-`npm run quality` green + an `accessibility-reviewer` pass with no
-Important findings unaddressed. Wave B triggers no approval gate; Wave D
-(golden teacher flow) will trigger the file-deletion gate for
-`TeacherWorkspaceScreen` + `PageHeader`.
+**Exact next task**: **Wave C — shared primitives audit + persistence /
+status vocabulary**. Formalize saved-local / pending-sync / synced /
+offline / conflict / failed as one documented `StatusChip` + `Alert`
+contract with tests, in a new `docs/design/status-vocabulary.md`, and
+align existing `StatusChip` usages to it without changing any screen's
+behavior. Success gate: `npm run quality` green + the vocabulary doc
+enumerates every state with its text label, icon/shape cue, and tone,
+and at least two real screens consume the aligned contract. No approval
+gate. **Wave D (teacher-Home rebuild) is gated**: its IA must be
+proposed in `docs/design/precision-intelligence-ui-overhaul-plan.md` and
+owner-approved before implementation; it also carries no file deletion
+now (owner directive — deletions deferred to Wave M).
 
 ## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
 

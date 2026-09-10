@@ -1,5 +1,23 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave B: shell finish (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry.
+
+`.app-topbar-menu` 40→44px (WCAG 2.5.5); appearance + density switchers
+wrapped in one "Display" cluster (`.app-topbar-display` /
+`.app-sidebar-display`, two labelled groups + hairline); `DESIGN.md`
+now names Precision Intelligence as the visual language of record.
+Confirmed from source that the skip link, focus-trap width guard, and
+post-`inert` focus restore are already present in `AppLayout.tsx`
+(the ADR-0064 Wave 6 backlog was stale); `.app-sidebar` overflow does
+not clip the focus ring given the scroll container's padding.
+
+Verification: `npm run quality` exit 0 — Vitest **112 files / 1108
+tests** (unchanged: CSS + wrapper markup + docs only). Independent
+`accessibility-reviewer` pass over Waves A+B dispatched; result recorded
+in the handoff. No Rust, no dependency, no approval gate.
+
 ## Precision Intelligence — Wave A: appearance foundation (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry; `docs/adr/0070-*`;

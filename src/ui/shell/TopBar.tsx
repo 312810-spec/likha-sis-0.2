@@ -41,25 +41,30 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
 
       <div className="app-topbar-spacer" />
 
-      <div className="app-topbar-appearance" role="group" aria-label="Appearance">
-        {APPEARANCES.map((a) => (
-          <button
-            key={a}
-            type="button"
-            aria-pressed={appearance === a}
-            onClick={() => setAppearance(a)}
-          >
-            {APPEARANCE_LABELS[a]}
-          </button>
-        ))}
-      </div>
+      {/* Appearance + density: one "Display" cluster (ADR-0070 Wave B).
+          Two labelled groups joined visually; on phone the whole cluster
+          moves into the drawer (see Sidebar). */}
+      <div className="app-topbar-display">
+        <div className="app-topbar-appearance" role="group" aria-label="Appearance">
+          {APPEARANCES.map((a) => (
+            <button
+              key={a}
+              type="button"
+              aria-pressed={appearance === a}
+              onClick={() => setAppearance(a)}
+            >
+              {APPEARANCE_LABELS[a]}
+            </button>
+          ))}
+        </div>
 
-      <div className="app-topbar-modes" role="group" aria-label="Teacher interface mode">
-        {TEACHER_MODES.map((m) => (
-          <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
-            {TEACHER_MODE_LABELS[m]}
-          </button>
-        ))}
+        <div className="app-topbar-modes" role="group" aria-label="Teacher interface mode">
+          {TEACHER_MODES.map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
+              {TEACHER_MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <span className="app-topbar-identity">

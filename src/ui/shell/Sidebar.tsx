@@ -148,25 +148,30 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
         })}
       </div>
 
-      <div className="app-sidebar-appearance" role="group" aria-label="Appearance">
-        {APPEARANCES.map((a) => (
-          <button
-            key={a}
-            type="button"
-            aria-pressed={appearance === a}
-            onClick={() => setAppearance(a)}
-          >
-            {APPEARANCE_LABELS[a]}
-          </button>
-        ))}
-      </div>
+      {/* "Display" cluster (ADR-0070 Wave B) -- the phone-drawer home of
+          the appearance + density switchers the top bar shows at desktop
+          width. */}
+      <div className="app-sidebar-display">
+        <div className="app-sidebar-appearance" role="group" aria-label="Appearance">
+          {APPEARANCES.map((a) => (
+            <button
+              key={a}
+              type="button"
+              aria-pressed={appearance === a}
+              onClick={() => setAppearance(a)}
+            >
+              {APPEARANCE_LABELS[a]}
+            </button>
+          ))}
+        </div>
 
-      <div className="app-sidebar-modes" role="group" aria-label="Teacher interface mode">
-        {TEACHER_MODES.map((m) => (
-          <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
-            {TEACHER_MODE_LABELS[m]}
-          </button>
-        ))}
+        <div className="app-sidebar-modes" role="group" aria-label="Teacher interface mode">
+          {TEACHER_MODES.map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
+              {TEACHER_MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
       </div>
     </nav>
   );

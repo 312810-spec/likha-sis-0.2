@@ -1,5 +1,21 @@
 # Design
 
+**Visual language of record: "Precision Intelligence" (ADR-0070,
+2026-09-10).** Precision Intelligence is the _evolution_ of the "Calm
+Civic Classroom" direction below, not a replacement of its foundation.
+It **supersedes** this document's information-hierarchy guidance — the
+default screen is one dominant work surface with contextual secondary
+regions, not a grid of equally weighted cards; `KpiStrip` is for a
+number that changes a teacher's next decision, never dashboard filler.
+It **retains unchanged** every token value and computed contrast ratio,
+Public Sans, the `AppLayout` shell mechanics and drawer accessibility
+contract, the four layout primitives, the non-color state-cue and
+minimum-target discipline, and the three density modes. Program plan:
+`docs/design/precision-intelligence-ui-overhaul-plan.md`. The rest of
+this file remains accurate for everything it does not supersede.
+
+---
+
 **Status**: chosen direction for the UI-First World-Class Product
 Program (ADR-0030), written at UX-00. **As of UX-01 (ADR-0031), the
 token palette, typography, and shared component set below are

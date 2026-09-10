@@ -13,6 +13,23 @@ evolution of the existing "Calm Civic Classroom" / ADR-0064 redesign
 rather than a throw-away restart. ADR-0070 records the design-language
 supersession scope.
 
+### Owner directives (2026-09-10, after Wave A)
+
+- **Autonomous continuation** through the wave sequence is authorised;
+  stop only at a real approval gate, an unresolvable blocker, or a
+  context boundary.
+- **File deletions: none during the program.** Superseded UI files
+  (`TeacherWorkspaceScreen`, `PageHeader`, per-screen `@media` reflow
+  blocks, etc.) are left in the tree, unreferenced once their
+  replacement ships. A single consolidated deletion list is produced at
+  the end (Wave M) for one approval.
+- **Expectation prototype** (`https://likha-premium-preview.alotski15.chatgpt.site`)
+  is fetched and used as a visual/interaction reference — a promise, not
+  a spec; no code copied. Observations recorded in §9 below.
+- **Teacher Home IA (Wave D)**: the new information architecture is
+  **proposed in this document first and approved by the owner before any
+  Wave D implementation.** Waves B and C proceed autonomously.
+
 ---
 
 ## 1. Verified repository & branch state (Phase 0)
@@ -273,3 +290,23 @@ native visual pass owed to `docs/VERIFICATION-DEBT.md`.
 **Approval gates triggered:** none for Wave A (no dependency, no file
 deletion, no non-UI contract change). Wave D will trip the
 file-deletion gate (`TeacherWorkspaceScreen`, `PageHeader`).
+
+---
+
+## 9. Expectation prototype — access attempt (2026-09-10)
+
+`https://likha-premium-preview.alotski15.chatgpt.site` is served entirely
+behind a **"Continue with ChatGPT" OpenAI sign-in wall** — every path
+(`/`, `/index.html`) returns the same "Sign in required" screen. The
+prototype content is not reachable without authenticating, which is a
+prohibited action for this agent (signing in / entering credentials on
+the owner's behalf).
+
+**Consequence:** Waves B–D proceed from the written `design_philosophy`
+and `visual_direction` in the master brief and from the repository's own
+`DESIGN.md` / ADR-0031 / ADR-0064 decisions — not from the prototype.
+This is recorded as an evidence gap, not fabricated around. If the owner
+wants the prototype used as a reference, options are: (a) paste
+screenshots or an export into the repo under `docs/design/prototype/`,
+(b) make the site publicly reachable, or (c) describe the specific
+treatments they want carried over.

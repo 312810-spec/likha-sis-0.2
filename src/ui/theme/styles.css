@@ -1383,16 +1383,18 @@ label {
   gap: 2px;
 }
 
-.app-sidebar-modes,
-.app-sidebar-appearance {
+.app-sidebar-display {
   display: none; /* desktop shows these controls in the top bar */
+  flex-direction: column;
   gap: calc(var(--spacing-unit) * 0.5);
   padding: var(--spacing-unit);
   border-top: 1px solid var(--color-border-soft);
 }
+.app-sidebar-modes,
 .app-sidebar-appearance {
-  padding-top: 0;
-  border-top: 0;
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-wrap: wrap;
 }
 .app-sidebar-modes button[aria-pressed="true"],
 .app-sidebar-appearance button[aria-pressed="true"] {
@@ -1423,8 +1425,11 @@ label {
   display: none; /* shown only at the phone breakpoint */
   align-items: center;
   justify-content: center;
-  width: 40px;
-  min-height: 40px;
+  /* 44x44 minimum touch target (WCAG 2.5.5). Was 40x40 -- a
+     retained minor from the ADR-0064 Wave 6 review, closed in
+     Precision Intelligence Wave B (ADR-0070). */
+  width: 44px;
+  min-height: 44px;
   padding: 0;
 }
 
@@ -1444,6 +1449,19 @@ label {
 
 .app-topbar-spacer {
   flex: 1;
+}
+
+/* Appearance + density switchers form one "Display" cluster (ADR-0070
+   Wave B) -- two labelled groups, visually joined by a hairline so they
+   read as a single set of view preferences, not two loose button rows. */
+.app-topbar-display {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+}
+.app-topbar-display .app-topbar-appearance {
+  padding-right: var(--spacing-unit);
+  border-right: 1px solid var(--color-border-soft);
 }
 
 .app-topbar-modes,
@@ -1647,15 +1665,13 @@ label {
   .app-topbar-menu {
     display: inline-flex;
   }
-  .app-topbar-modes,
-  .app-topbar-appearance {
-    display: none;
+  .app-topbar-display {
+    display: none; /* the Display cluster moves into the drawer */
   }
   .app-topbar-identity {
     display: none;
   }
-  .app-sidebar-modes,
-  .app-sidebar-appearance {
+  .app-sidebar-display {
     display: flex;
   }
   .app-sidebar-identity {
