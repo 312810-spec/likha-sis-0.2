@@ -858,3 +858,97 @@ TeacherHome teacher-copy nits`). "· homeroom" → "· advisory class";
 Independent A–N review · native Light/System/Dark visual pass ·
 `quality:ui` / `quality:full` / `quality:security` one run each · Wave L
 Android device pass · the wave-completion delivery report.
+
+---
+
+## 19. Wave N — SchoolHeadHome IA proposal (OWNER APPROVAL REQUIRED)
+
+Per the Wave D precedent (§10), a screen's information-architecture
+change is proposed here and approved before implementation. Nothing in
+`SchoolHeadHome.tsx` is touched yet.
+
+### 19.1 Current structure
+
+`src/ui/home/SchoolHeadHome.tsx` (the school-head branch of
+`HomeScreen`) is the **last screen still on the ADR-0064 "Behance
+dashboard" pattern** that ADR-0070 §1 supersedes:
+
+- a `KpiStrip` of four `Kpi` tiles — Sections, Learners, School year,
+  Attendance today;
+- a `BentoGrid` of **four equal `span={6}` cards** — Recent SF1 imports,
+  Manage (two buttons), Sections without an adviser, Teaching load.
+
+Four equally weighted cards + a KPI row is exactly "a grid of equally
+weighted cards" and "every metric in competing cards".
+
+### 19.2 What a school head needs at a glance (ranked, from existing reads)
+
+1. **Sections without an adviser** — an actionable gap; a section with no
+   adviser has no one owning its attendance/records.
+2. **Attendance today** — `present / (present + absent + tardy)` school-
+   wide, the one number that changes a same-day decision.
+3. **Uneven teaching load** — the single teacher whose weekly minutes
+   exceed 1.5× the median (already computed; a display hint, not
+   enforcement).
+4. **Context** — learner + section totals, the shared school year.
+5. **Recent SF1 imports** — history, rarely the next action.
+
+### 19.3 Proposed IA — one dominant surface + quiet context
+
+- **Zone 1 — "Needs attention" (dominant).** One ranked list merging the
+  adviser gaps (one row per section, "Assign adviser" action →
+  `onManageSections`) and, when present, the teaching-load outlier (one
+  row, "View teaching load"). Each row: what it is + a `StatusChip`
+  (`warning` for a gap, `warning` for the outlier) + one action. If
+  there are no gaps and no outlier, a calm `EmptyState` ("Nothing needs
+  your attention right now").
+- **Zone 2 — context line (replaces the KpiStrip).** One line:
+  `{N} learners · {M} sections · SY {year} · Attendance today {X}%`,
+  where the attendance figure carries a `StatusChip` tone (`success`
+  ≥85, `warning` 60–84, `danger` <60, `neutral` if nothing recorded) —
+  the only KPI kept visually prominent, per ADR-0070's KpiStrip
+  re-scoping.
+- **Zone 3 — "Recent imports" (quiet secondary).** The existing
+  `RECENT_IMPORT_LIMIT` list + a "History" link. Omitted entirely when
+  there are no imports.
+- **Header actions** — "Manage sections" and "Import learners (SF1)"
+  move to the `Page` `actions` slot; the standalone "Manage" card is
+  removed.
+
+### 19.4 Drops / merges
+
+- The 4-equal-card `BentoGrid` → the three zones above.
+- The standalone "Manage" card → `Page` header actions.
+- The 4-tile `KpiStrip` → the one context line (only "attendance today"
+  keeps prominence).
+- No capability, read, or action is removed — only regrouped.
+
+### 19.5 Modes & responsive
+
+- **Efficient**: Zone 1 + the context line only. **Comfortable**
+  (default): + Zone 3. **Guided**: + a one-line explanation atop each
+  zone. All keep every action.
+- **Phone**: single column; attention rows become full-width stacked
+  blocks; actions full-width ≥44px (the Wave L floor already covers
+  this).
+
+### 19.6 Data mapping — no new backend read
+
+Every item maps to a read `SchoolHeadHome` already makes in its one
+composite `Promise.all` under a single `requestRef` guard:
+`sectionService.listSections`, `learnerService.listLearners`,
+`sf1ImportService.listImportHistory`,
+`schoolAttendanceService.dayTotals`,
+`sectionAdvisoryService.currentAdviser` (per section),
+`schoolMemberService.listMembers` (→ `teacher` filter),
+`teachingAssignmentService.getLoad` (per teacher). All are
+capability-gated server-side and stay so.
+
+### 19.7 Owner decisions needed
+
+1. Approve the **one-dominant-"Needs attention"-surface** model for
+   `SchoolHeadHome`?
+2. Collapse the **4-tile KpiStrip to a single context line**, keeping
+   only "attendance today" prominent (as a tone-carrying figure) — yes?
+3. **Recent SF1 imports** — keep it on this screen (Zone 3), or drop it
+   here and rely on the SF1 Import screen's own history?

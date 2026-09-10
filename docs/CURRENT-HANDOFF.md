@@ -42,14 +42,24 @@ quality:full` (one run incl. cargo gates), `npm run quality:security`
 - **`SchoolHeadHome` — its own follow-up wave (Wave N)**, scoped with
   `prompt-master`, in the spirit of Wave D.
 
-### Exact next task: Wave N — `SchoolHeadHome` Precision Intelligence pass
+### Wave N — `SchoolHeadHome` rebuild: IA PROPOSED, awaiting owner approval
 
-`src/ui/home/SchoolHeadHome.tsx` (rendered by `HomeScreen`'s school-head
-branch). Give it the dominant-surface hierarchy, the status vocabulary,
-and decision-relevant KPIs only — the same discipline Wave D applied to
-the teacher Home. Start with a `prompt-master` pass. No
-domain/application/repository change; the school-head reads it makes are
-already capability-gated server-side and must stay so.
+Scoped via `prompt-master`. `SchoolHeadHome` is the last screen on the
+superseded ADR-0064 dashboard pattern (KpiStrip(4) + 4 equal `span=6`
+cards). Per the Wave D precedent, the new IA is **proposed in plan §19,
+not built**. Proposal: one dominant "Needs attention" surface (adviser
+gaps + the teaching-load outlier as ranked action rows), a single
+context line replacing the 4-KPI strip (only "attendance today" kept
+prominent, tone-carrying), a quiet "Recent imports" region, and
+"Manage / Import" as header actions. No new backend read; every
+capability-gated read and every action preserved.
+
+**Exact next task**: get owner answers to plan §19.7 (approve the
+dominant-surface model? collapse the KpiStrip to one context line? keep
+Recent SF1 imports here?), then build `SchoolHeadHome` per the approved
+IA — `npm run quality` green vs. the post-M baseline **113 files / 1107
+tests**, `SchoolHeadHome.test.tsx` updated, axe clean, every action
+still reachable.
 
 ---
 
