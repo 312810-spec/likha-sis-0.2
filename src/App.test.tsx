@@ -84,6 +84,8 @@ describe("App", () => {
 
     expect(await screen.findByRole("form", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "LIKHA-SIS" })).toBeInTheDocument();
+    // The pre-auth local-first trust line (ADR-0070 Wave E).
+    expect(screen.getByText(/Runs on this computer\. Works offline\./)).toBeInTheDocument();
   });
 
   it("shows the workspace overview by default when there is an active session", async () => {

@@ -1730,16 +1730,59 @@ label {
 
 /* Pre-auth chrome: Login / First-run setup / the initial status check
    render here, deliberately outside the shell. */
+/* Pre-auth container (ADR-0070 Wave E). The sign-in / first-run / status
+   screens render here, outside the app shell -- a calm centred card, not
+   a full-bleed form. */
 .app-boot {
-  max-width: var(--content-width);
-  margin: 0 auto;
-  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 1.5);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 1.5);
+  padding: calc(var(--spacing-unit) * 3) calc(var(--spacing-unit) * 1.5);
+}
+.app-boot > * {
+  width: 100%;
+  max-width: 26rem;
+}
+.app-boot-head {
+  text-align: center;
 }
 .app-boot-brand {
-  margin: 0 0 var(--spacing-unit);
+  margin: 0;
   font-size: var(--font-size-large);
   font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--color-primary);
+}
+.app-boot-trust {
+  margin: calc(var(--spacing-unit) * 0.5) 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+/* The form / setup panel itself. */
+.app-boot > form,
+.app-boot > div:not(.app-boot-head) {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-large);
+  box-shadow: var(--elevation-1);
+  padding: calc(var(--spacing-unit) * 1.75);
+}
+/* First-run setup carries more fields (incl. a two-up password row) --
+   give it a wider card than the sign-in form. */
+.app-boot > div:not(.app-boot-head) {
+  max-width: 34rem;
+}
+.app-boot h2 {
+  margin-top: 0;
+}
+/* A short-height viewport (landscape phone) must still scroll, not clip. */
+@media (max-height: 640px) {
+  .app-boot {
+    justify-content: flex-start;
+  }
 }
 
 /* Phone: sidebar becomes an off-canvas drawer; a bottom tab bar appears;

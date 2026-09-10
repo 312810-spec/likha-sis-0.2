@@ -177,7 +177,18 @@ function App() {
     setSession(newSession);
   }
 
-  const bootBrand = <h1 className="app-boot-brand">LIKHA-SIS</h1>;
+  // Shown on every pre-auth screen (loading / first-run / sign-in),
+  // which all render outside the app shell in `.app-boot`. The trust
+  // line is the plain-language local-first promise the teacher sees
+  // before they have signed in anywhere — see ADR-0070 Wave E.
+  const bootBrand = (
+    <div className="app-boot-head">
+      <h1 className="app-boot-brand">LIKHA-SIS</h1>
+      <p className="app-boot-trust">
+        Runs on this computer. Works offline. Your school&rsquo;s records stay on this device.
+      </p>
+    </div>
+  );
 
   return (
     <AppearanceProvider>

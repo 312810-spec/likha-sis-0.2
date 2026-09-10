@@ -190,10 +190,13 @@ describe("LoginScreen", () => {
     expect(onLoggedIn).not.toHaveBeenCalled();
   });
 
-  it("shows a notice above the form when one is provided", async () => {
+  it("shows a notice above the form when one is provided, as an informational banner", async () => {
     renderLoginScreen({ notice: "Your session has expired. Please sign in again." });
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/session has expired/i);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/session has expired/i);
+    // A "why you're here" notice is informational, not a success.
+    expect(status).toHaveClass("alert-info");
   });
 
   it("shows no notice banner when none is provided", async () => {

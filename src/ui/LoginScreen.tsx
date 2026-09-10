@@ -94,7 +94,10 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
         Sign in
       </h2>
 
-      {notice && <Alert tone="success">{notice}</Alert>}
+      {/* A `notice` explains why the teacher landed back here (session
+          expired, signed out) — it is informational, not a success, so
+          it uses the `info` tone / `role="status"`. */}
+      {notice && <Alert tone="info">{notice}</Alert>}
       {error && <Alert tone="error">{error}</Alert>}
 
       <div className="field">
