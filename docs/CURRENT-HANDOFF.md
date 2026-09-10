@@ -1,5 +1,62 @@
 # CURRENT HANDOFF
 
+## Precision Intelligence UI/UX overhaul — Wave A complete (2026-09-10)
+
+**Status**: Wave A (appearance foundation) implemented, `npm run quality`
+green, committed locally on `feat/precision-intelligence-shell`. Not
+pushed.
+
+**Context**: The owner started the "Precision Intelligence" (PI)
+whole-product UI overhaul and chose Option A — bootstrap in this repo
+from `main` as the evolution of the ADR-0064 "Calm Civic Classroom"
+redesign. The handoff brief's referenced prior PI checkpoints
+(`ab03d36`, `3b6b5cb`), ADR-0070, and `AppearanceProvider` **did not
+exist** anywhere reachable; `origin/feat/precision-intelligence-shell`
+was byte-identical to `main`. All PI artifacts were authored fresh this
+session.
+
+**Done this session**:
+
+- `docs/design/precision-intelligence-ui-overhaul-plan.md` — canonical
+  plan: verified repo state, UI inventory (26 `SignedInTab`, 8 nav
+  groups, 31 screens), ranked experience risks, token/component
+  architecture, route-to-wave matrix (Waves A–M), retain/evolve/
+  replace/defer table, golden-flow targets.
+- `docs/adr/0070-precision-intelligence-appearance-foundation.md` —
+  design-language supersession scope vs. ADR-0064 + the appearance
+  decision.
+- **Wave A code**: `src/ui/theme/appearance.ts`,
+  `appearance-context-value.ts`, `AppearanceProvider.tsx`,
+  `useAppearance.ts` (+ `AppearanceProvider.test.tsx`);
+  `styles.css` dark-palette selector split (no color value changed);
+  `main.tsx` pre-paint apply; `App.tsx` + `dev-preview/DevPreviewApp.tsx`
+  provider wrap; appearance switcher in `TopBar` + `Sidebar`
+  (+ their tests + `AppLayout.test.tsx` provider wrap).
+- Formatted one pre-existing untracked file
+  (`docs/research/2026-09-07-external-enhancement-research.md`) that was
+  breaking the shared `format:check` gate.
+
+**Verified**: `npm run quality` exit 0 (typecheck, eslint,
+prettier:check, architecture, knip, Vitest **112 files / 1108 tests**);
+`check:dev-preview-isolation` exit 0; `npm run build` ok (no new dep, CSS
+gzip 6.08 kB). Baseline was 111/1099.
+
+**Not verified / owed**: `npm run quality:ui` (Playwright binary absent);
+native Windows visual pass of Light/System/Dark; `accessibility-reviewer`
+pass on the appearance control (scheduled with Wave B).
+
+**Exact next task**: **Wave B — shell finish**. In
+`src/ui/shell/{AppLayout,Sidebar,TopBar}.tsx` + `styles.css`: enlarge
+`.app-topbar-menu` / hamburger to ≥44px (WCAG 2.5.5), add focus-return
+to the drawer toggle when a destination is selected, add a width guard
+to the focus-trap effect, group the appearance + density switchers as
+one labelled "Display" cluster, and update `DESIGN.md` to name Precision
+Intelligence as the visual language of record. Success gate:
+`npm run quality` green + an `accessibility-reviewer` pass with no
+Important findings unaddressed. Wave B triggers no approval gate; Wave D
+(golden teacher flow) will trigger the file-deletion gate for
+`TeacherWorkspaceScreen` + `PageHeader`.
+
 ## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
 
 The legacy pre-0.2 codebase, previously unavailable to any audit on this

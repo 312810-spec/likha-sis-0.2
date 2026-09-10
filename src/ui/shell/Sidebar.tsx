@@ -9,6 +9,8 @@ import {
 } from "../components/workbench-nav-data";
 import { TEACHER_MODES, TEACHER_MODE_LABELS } from "../theme/modes";
 import { useTeacherMode } from "../theme/useTeacherMode";
+import { APPEARANCES, APPEARANCE_LABELS } from "../theme/appearance";
+import { useAppearance } from "../theme/useAppearance";
 
 interface SidebarProps {
   session: CurrentSession;
@@ -62,6 +64,7 @@ function readCollapsed(): Set<string> {
 
 export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProps) {
   const { mode, setMode } = useTeacherMode();
+  const { appearance, setAppearance } = useAppearance();
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsed);
   const current = normalizeTab(activeTab);
 
@@ -143,6 +146,19 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
             </section>
           );
         })}
+      </div>
+
+      <div className="app-sidebar-appearance" role="group" aria-label="Appearance">
+        {APPEARANCES.map((a) => (
+          <button
+            key={a}
+            type="button"
+            aria-pressed={appearance === a}
+            onClick={() => setAppearance(a)}
+          >
+            {APPEARANCE_LABELS[a]}
+          </button>
+        ))}
       </div>
 
       <div className="app-sidebar-modes" role="group" aria-label="Teacher interface mode">

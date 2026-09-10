@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./AppLayout";
 import { ModeProvider } from "../theme/ModeContext";
+import { AppearanceProvider } from "../theme/AppearanceProvider";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
 
@@ -51,21 +52,24 @@ function emitViewportChange(matches: boolean) {
 beforeEach(() => {
   matchMediaResult = false;
   stubMatchMedia();
+  document.documentElement.removeAttribute("data-appearance");
 });
 
 function renderLayout(over: Partial<ComponentProps<typeof AppLayout>> = {}) {
   return render(
-    <ModeProvider>
-      <AppLayout
-        session={session}
-        activeTab="attendance"
-        onNavigate={vi.fn()}
-        onLogout={vi.fn()}
-        {...over}
-      >
-        <div data-testid="screen">screen content</div>
-      </AppLayout>
-    </ModeProvider>,
+    <AppearanceProvider>
+      <ModeProvider>
+        <AppLayout
+          session={session}
+          activeTab="attendance"
+          onNavigate={vi.fn()}
+          onLogout={vi.fn()}
+          {...over}
+        >
+          <div data-testid="screen">screen content</div>
+        </AppLayout>
+      </ModeProvider>
+    </AppearanceProvider>,
   );
 }
 

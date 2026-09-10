@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TopBar } from "./TopBar";
 import { ModeProvider } from "../theme/ModeContext";
+import { AppearanceProvider } from "../theme/AppearanceProvider";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
 
@@ -20,17 +21,29 @@ const session: CurrentSession = {
 
 function renderTopBar(over: Partial<ComponentProps<typeof TopBar>> = {}) {
   return render(
-    <ModeProvider>
-      <TopBar
-        session={session}
-        activeTab="attendance"
-        onLogout={vi.fn()}
-        onOpenDrawer={vi.fn()}
-        {...over}
-      />
-    </ModeProvider>,
+    <AppearanceProvider>
+      <ModeProvider>
+        <TopBar
+          session={session}
+          activeTab="attendance"
+          onLogout={vi.fn()}
+          onOpenDrawer={vi.fn()}
+          {...over}
+        />
+      </ModeProvider>
+    </AppearanceProvider>,
   );
 }
+
+beforeEach(() => {
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-appearance");
+  document.documentElement.removeAttribute("data-teacher-mode");
+});
+afterEach(() => {
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-appearance");
+});
 
 describe("TopBar", () => {
   it("shows the group + screen breadcrumb for the active tab", () => {
@@ -88,5 +101,20 @@ describe("TopBar", () => {
     await user.click(efficient);
     expect(efficient).toHaveAttribute("aria-pressed", "true");
     expect(document.documentElement.dataset.teacherMode).toBe("efficient");
+  });
+
+  it("offers an appearance switcher defaulting to System", () => {
+    renderTopBar();
+    const group = screen.getByRole("group", { name: "Appearance" });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("choosing Dark from the appearance switcher sets html[data-appearance]", async () => {
+    const user = userEvent.setup();
+    renderTopBar();
+    await user.click(screen.getByRole("button", { name: "Dark" }));
+    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement.getAttribute("data-appearance")).toBe("dark");
   });
 });

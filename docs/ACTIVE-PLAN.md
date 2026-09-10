@@ -1,5 +1,42 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave A: appearance foundation (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry; `docs/adr/0070-*`;
+`docs/design/precision-intelligence-ui-overhaul-plan.md`.
+
+Delivered the device-local Light/System/Dark appearance preference and
+the design-language supersession decision vs. ADR-0064. New
+`src/ui/theme/appearance{,-context-value}.ts`, `AppearanceProvider.tsx`,
+`useAppearance.ts` (+ test); `styles.css` dark palette split into
+`@media … :root:not([data-appearance="light"])` **and**
+`:root[data-appearance="dark"]` with **no color value changed**;
+`main.tsx` pre-paint apply; `App.tsx` / `DevPreviewApp.tsx` provider
+wrap; appearance switcher added to `TopBar` + `Sidebar` (+ their tests,
+
+- `AppLayout.test.tsx` provider wrap).
+
+Verification actually run this session:
+
+- Baseline (branch point): `npm run quality` failed only at
+  `format:check` on a pre-existing **untracked** file
+  (`docs/research/2026-09-07-external-enhancement-research.md`) — that
+  file was `prettier --write`-formatted to unblock the shared gate;
+  `npx vitest run` → **111 files / 1099 tests** pass.
+- After Wave A: `npm run quality` → **exit 0** — typecheck, eslint,
+  `prettier --check` (all clean), architecture-boundary check (no
+  restricted imports), `knip` (no findings), Vitest **112 files / 1108
+  tests** pass (+1 file, +9 tests).
+- `npm run check:dev-preview-isolation` → exit 0 (21 dist files scanned,
+  no fixture trace).
+- `npm run build` → ok; CSS 35.83 kB / gzip 6.08 kB, JS 444.14 kB / gzip
+  117.30 kB. No new dependency.
+- **Not run**: `npm run quality:ui` (Playwright browser binary absent —
+  `docs/VERIFICATION-DEBT.md`). Rust gates not run (no Rust touched).
+- **Owed**: native Windows visual pass of Light / System / Dark across
+  the shell; `accessibility-reviewer` pass over the appearance control
+  (scheduled with Wave B).
+
 ## GradingPeriod sync wiring (2026-09-06)
 
 Full detail: `docs/CURRENT-HANDOFF.md`'s matching entry (top of file).

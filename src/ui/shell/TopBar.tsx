@@ -3,6 +3,8 @@ import { Icon } from "../components/icons";
 import { TAB_LABELS, groupLabelForTab, type SignedInTab } from "../components/workbench-nav-data";
 import { TEACHER_MODES, TEACHER_MODE_LABELS } from "../theme/modes";
 import { useTeacherMode } from "../theme/useTeacherMode";
+import { APPEARANCES, APPEARANCE_LABELS } from "../theme/appearance";
+import { useAppearance } from "../theme/useAppearance";
 
 interface TopBarProps {
   session: CurrentSession;
@@ -17,6 +19,7 @@ interface TopBarProps {
 
 export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: TopBarProps) {
   const { mode, setMode } = useTeacherMode();
+  const { appearance, setAppearance } = useAppearance();
   const group = groupLabelForTab(activeTab);
 
   return (
@@ -37,6 +40,19 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
       </div>
 
       <div className="app-topbar-spacer" />
+
+      <div className="app-topbar-appearance" role="group" aria-label="Appearance">
+        {APPEARANCES.map((a) => (
+          <button
+            key={a}
+            type="button"
+            aria-pressed={appearance === a}
+            onClick={() => setAppearance(a)}
+          >
+            {APPEARANCE_LABELS[a]}
+          </button>
+        ))}
+      </div>
 
       <div className="app-topbar-modes" role="group" aria-label="Teacher interface mode">
         {TEACHER_MODES.map((m) => (

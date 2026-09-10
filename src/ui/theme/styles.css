@@ -119,14 +119,32 @@
   --control-height: 48px;
 }
 
+/* Dark palette (Precision Intelligence appearance foundation, ADR-0070).
+   Applied in two situations with IDENTICAL values — only the selector
+   differs:
+     (a) the OS is in dark mode and the teacher has not overridden it
+         (appearance = "system" → no `data-appearance` attribute), and
+     (b) the teacher explicitly chose Dark (`data-appearance="dark"`).
+   Keeping "system" as the ABSENCE of an attribute means dark mode still
+   works with zero JavaScript; an explicit choice only ever overrides
+   the media query. The `:not([data-appearance="light"])` guard lets an
+   explicit Light choice win on a dark-mode OS.
+
+   ADR-0070 changed NO color value here — it only split one selector
+   into two. The contrast ratios verified in ADR-0031 / ADR-0064 carry
+   over unchanged: text/surface-2 12.09:1, muted/surface-2 6.48:1,
+   text/primary-wash 11.99:1, border/surface-2 3.39:1; border 4.12:1 /
+   3.74:1 on bg / surface.
+
+   The two blocks below MUST stay in sync (same declarations, same
+   values). If you change a dark value, change it in both. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-appearance="light"]) {
     --color-bg: #14181d;
     --color-surface: #1c2129;
     --color-surface-2: #222932;
     --color-border-soft: #333c47;
     --color-primary-wash: #1e2a38;
-    /* Verified 4.12:1 / 3.74:1. */
     --color-border: #6f7b87;
     --color-text: #ece9e1;
     --color-text-muted: #a6adb6;
@@ -142,10 +160,35 @@
     --color-warning-surface: #3a2f14;
     --color-focus: #8fb4dd;
     --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
-    /* Verified (dark): text/surface-2 12.09:1, muted/surface-2 6.48:1,
-       text/primary-wash 11.99:1, border/surface-2 3.39:1. */
     color-scheme: dark;
   }
+}
+
+/* Explicit Dark override — wins over the media query above regardless of
+   the OS setting. Kept AFTER the media block so source order is the
+   tiebreak if the two ever drift (both are specificity 0,2,0). */
+:root[data-appearance="dark"] {
+  --color-bg: #14181d;
+  --color-surface: #1c2129;
+  --color-surface-2: #222932;
+  --color-border-soft: #333c47;
+  --color-primary-wash: #1e2a38;
+  --color-border: #6f7b87;
+  --color-text: #ece9e1;
+  --color-text-muted: #a6adb6;
+  --color-primary: #8fb4dd;
+  --color-primary-text: #0d1720;
+  --color-productive: #6fccb9;
+  --color-productive-surface: #163330;
+  --color-danger: #ff9c94;
+  --color-danger-surface: #3a1f1d;
+  --color-success: #8fd1a0;
+  --color-success-surface: #17332c;
+  --color-warning: #e8c07d;
+  --color-warning-surface: #3a2f14;
+  --color-focus: #8fb4dd;
+  --elevation-2: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 * {
@@ -1340,19 +1383,26 @@ label {
   gap: 2px;
 }
 
-.app-sidebar-modes {
-  display: none; /* desktop shows the mode switcher in the top bar */
+.app-sidebar-modes,
+.app-sidebar-appearance {
+  display: none; /* desktop shows these controls in the top bar */
   gap: calc(var(--spacing-unit) * 0.5);
   padding: var(--spacing-unit);
   border-top: 1px solid var(--color-border-soft);
 }
-.app-sidebar-modes button[aria-pressed="true"] {
+.app-sidebar-appearance {
+  padding-top: 0;
+  border-top: 0;
+}
+.app-sidebar-modes button[aria-pressed="true"],
+.app-sidebar-appearance button[aria-pressed="true"] {
   background: var(--color-primary);
   color: var(--color-primary-text);
   border-color: var(--color-primary);
   font-weight: 700;
 }
-.app-sidebar-modes button[aria-pressed="true"]::before {
+.app-sidebar-modes button[aria-pressed="true"]::before,
+.app-sidebar-appearance button[aria-pressed="true"]::before {
   content: "✓ ";
 }
 
@@ -1396,17 +1446,20 @@ label {
   flex: 1;
 }
 
-.app-topbar-modes {
+.app-topbar-modes,
+.app-topbar-appearance {
   display: flex;
   gap: calc(var(--spacing-unit) * 0.5);
 }
-.app-topbar-modes button[aria-pressed="true"] {
+.app-topbar-modes button[aria-pressed="true"],
+.app-topbar-appearance button[aria-pressed="true"] {
   background: var(--color-primary);
   color: var(--color-primary-text);
   border-color: var(--color-primary);
   font-weight: 700;
 }
-.app-topbar-modes button[aria-pressed="true"]::before {
+.app-topbar-modes button[aria-pressed="true"]::before,
+.app-topbar-appearance button[aria-pressed="true"]::before {
   content: "✓ ";
 }
 
@@ -1594,13 +1647,15 @@ label {
   .app-topbar-menu {
     display: inline-flex;
   }
-  .app-topbar-modes {
+  .app-topbar-modes,
+  .app-topbar-appearance {
     display: none;
   }
   .app-topbar-identity {
     display: none;
   }
-  .app-sidebar-modes {
+  .app-sidebar-modes,
+  .app-sidebar-appearance {
     display: flex;
   }
   .app-sidebar-identity {

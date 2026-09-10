@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 import type { SignedInTab } from "../components/workbench-nav-data";
 import { ModeProvider } from "../theme/ModeContext";
+import { AppearanceProvider } from "../theme/AppearanceProvider";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 import type { CurrentSession } from "../../domain/session";
 
@@ -24,14 +25,27 @@ function renderSidebar(
   logoUrl: string | null = null,
 ) {
   return render(
-    <ModeProvider>
-      <Sidebar session={session} activeTab={activeTab} onNavigate={onNavigate} logoUrl={logoUrl} />
-    </ModeProvider>,
+    <AppearanceProvider>
+      <ModeProvider>
+        <Sidebar
+          session={session}
+          activeTab={activeTab}
+          onNavigate={onNavigate}
+          logoUrl={logoUrl}
+        />
+      </ModeProvider>
+    </AppearanceProvider>,
   );
 }
 
-beforeEach(() => window.localStorage.clear());
-afterEach(() => window.localStorage.clear());
+beforeEach(() => {
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-appearance");
+});
+afterEach(() => {
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-appearance");
+});
 
 describe("Sidebar", () => {
   it("renders no logo image by default (no logo uploaded)", () => {
@@ -108,6 +122,15 @@ describe("Sidebar", () => {
   it("has no axe violations on a default render", async () => {
     const { container } = renderSidebar();
     await expectNoAccessibilityViolations(container);
+  });
+
+  it("offers an appearance switcher (phone drawer path) defaulting to System", async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    expect(screen.getByRole("group", { name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Dark" }));
+    expect(document.documentElement.getAttribute("data-appearance")).toBe("dark");
   });
 
   it("survives unreadable localStorage by defaulting to all expanded", () => {

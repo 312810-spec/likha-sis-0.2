@@ -1,5 +1,32 @@
 # PROJECT MEMORY
 
+## Precision Intelligence UI/UX overhaul — program start (2026-09-10)
+
+- Owner authorised a whole-product UI/UX overhaul named **"Precision
+  Intelligence" (PI)** and chose **Option A**: bootstrap it in this repo
+  from `main` as the _evolution_ of the existing "Calm Civic Classroom" /
+  ADR-0064 redesign, not a restart.
+- A handoff brief referenced prior PI work (commits `ab03d36`, `3b6b5cb`,
+  a prior ADR-0070, an `AppearanceProvider`). **None of it existed** on
+  any reachable ref; `origin/feat/precision-intelligence-shell` was
+  byte-identical to `main`. ADR-0070 and the plan doc were authored fresh.
+- Canonical plan: `docs/design/precision-intelligence-ui-overhaul-plan.md`
+  (route-to-wave matrix A–M; retain/evolve/replace/defer table).
+- **ADR-0070** records the design-language supersession scope: PI
+  supersedes the _information-hierarchy guidance_ of ADR-0064 /
+  `DESIGN.md` (one dominant work surface over equal-weight card grids;
+  `KpiStrip` re-scoped to decision-relevant numbers only) but **retains
+  unchanged** every token value + computed contrast ratio, Public Sans,
+  the `AppLayout` shell mechanics + drawer a11y contract, the four
+  layout primitives, the non-color-cue / 24px-target discipline, and the
+  three density modes.
+- Work branch: `feat/precision-intelligence-shell` (from `main` `f4b75a1`).
+- Wave A shipped: device-local **Light / System / Dark** appearance
+  preference (`localStorage` `likha-sis:appearance`, default `system`),
+  applied before first paint from `main.tsx`, switchable from `TopBar`
+  (desktop) and `Sidebar` (phone drawer). "System" = _absence_ of the
+  `data-appearance` attribute, so dark mode still works with zero JS.
+
 ## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
 - Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie) and full reference repository at `E:\likha-sis-master` (React/Firebase/Tailwind).
