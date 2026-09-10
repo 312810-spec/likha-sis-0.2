@@ -88,6 +88,11 @@ describe("ConflictReviewScreen", () => {
     expect(screen.getByText("Name: Ana Cruz")).toBeInTheDocument();
     expect(screen.getByText("Name: Anna Cruz")).toBeInTheDocument();
     expect(screen.getByText("Attendance record conflict")).toBeInTheDocument();
+    // Persistence/sync status vocabulary: each conflict card carries a
+    // "Needs your review" chip (docs/design/status-vocabulary.md).
+    const chips = screen.getAllByText("Needs your review");
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) expect(chip).toHaveClass("status-chip", "status-chip-warning");
   });
 
   it("discloses when the incoming version cannot be decrypted, instead of hiding it", async () => {

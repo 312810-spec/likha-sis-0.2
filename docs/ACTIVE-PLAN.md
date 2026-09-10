@@ -1,5 +1,26 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave C: persistence/sync status vocabulary (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry.
+
+New `docs/design/status-vocabulary.md` — the canonical six-state set
+(saved-local / pending-sync / synced / offline / conflict / failed) with
+label, non-color cue, `StatusChip` tone, and a "may be shown when" rule
+per state, plus the local-first honesty rule (`synced` is never claimed
+on a local write alone). New pure module
+`src/ui/components/persistence-status.ts` (`PERSISTENCE_STATUS` map +
+`mostActionable` precedence helper) with 9 unit tests. Adopted by two
+screens, behavior-preserving (chips are additive non-color cues, all
+existing text unchanged): `SyncStatusScreen` (pending card →
+synced/pending-sync/failed; conflict card → conflict when > 0) and
+`ConflictReviewScreen` (per-conflict `conflict` chip). Two small scoped
+CSS rules so the leading chip does not stretch full-width in the
+column-flex sync card.
+
+Verification: `npm run quality` exit 0 — Vitest **113 files / 1117
+tests** (+1 file, +9 tests). No Rust, no dependency, no approval gate.
+
 ## Precision Intelligence — Wave B: shell finish (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry.

@@ -4,6 +4,8 @@ import type { SyncStatus } from "../domain/sync-status";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { StatusChip } from "./components/StatusChip";
+import { PERSISTENCE_STATUS, type PersistenceState } from "./components/persistence-status";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SyncStatusScreenProps {
@@ -142,6 +144,23 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           </li>
 
           <li className="sync-status-card">
+            {(() => {
+              // Persistence/sync status vocabulary -- see
+              // docs/design/status-vocabulary.md. The <p> text still
+              // carries the meaning; the chip is an additive non-color
+              // cue. No behavior change.
+              const pendingState: PersistenceState =
+                status.pendingChangeCount === 0
+                  ? "synced"
+                  : status.hasPendingSyncTrouble
+                    ? "failed"
+                    : "pending-sync";
+              return (
+                <StatusChip tone={PERSISTENCE_STATUS[pendingState].tone}>
+                  {PERSISTENCE_STATUS[pendingState].label}
+                </StatusChip>
+              );
+            })()}
             <p className="sync-status-card-name">
               {status.pendingChangeCount === 0
                 ? "All changes are synced"
@@ -156,6 +175,11 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           </li>
 
           <li className="sync-status-card">
+            {status.openConflictCount > 0 && (
+              <StatusChip tone={PERSISTENCE_STATUS.conflict.tone}>
+                {PERSISTENCE_STATUS.conflict.label}
+              </StatusChip>
+            )}
             <p className="sync-status-card-name">
               {status.openConflictCount === 0
                 ? "No sync conflicts"

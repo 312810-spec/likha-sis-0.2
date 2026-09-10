@@ -67,6 +67,9 @@ describe("SyncStatusScreen", () => {
     expect(await screen.findByText("3 changes waiting to sync")).toBeInTheDocument();
     expect(screen.getByText("Received an update 2 minutes ago")).toBeInTheDocument();
     expect(screen.getByText("2 conflicts need your review")).toBeInTheDocument();
+    // Persistence/sync status vocabulary chips (docs/design/status-vocabulary.md).
+    expect(screen.getByText("Waiting to sync")).toHaveClass("status-chip", "status-chip-warning");
+    expect(screen.getByText("Needs your review")).toHaveClass("status-chip", "status-chip-warning");
   });
 
   it("says no changes are pending and no conflicts exist for a fully caught-up device", async () => {
@@ -85,6 +88,9 @@ describe("SyncStatusScreen", () => {
     expect(
       screen.getByText("This device has not received any updates from another device yet."),
     ).toBeInTheDocument();
+    // Caught-up device: the "Synced" chip is shown, and no conflict chip.
+    expect(screen.getByText("Synced")).toHaveClass("status-chip", "status-chip-success");
+    expect(screen.queryByText("Needs your review")).not.toBeInTheDocument();
   });
 
   it("surfaces sync trouble in plain language when pending changes are failing to send", async () => {
@@ -100,6 +106,8 @@ describe("SyncStatusScreen", () => {
         exact: false,
       }),
     ).toBeInTheDocument();
+    // A recorded push failure escalates the chip from "Waiting to sync" to "Sync failed".
+    expect(screen.getByText("Sync failed")).toHaveClass("status-chip", "status-chip-danger");
   });
 
   it("navigates to conflict review when the review-conflicts action is used", async () => {

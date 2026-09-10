@@ -5,6 +5,8 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { StatusChip } from "./components/StatusChip";
+import { PERSISTENCE_STATUS } from "./components/persistence-status";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ConflictReviewScreenProps {
@@ -203,6 +205,12 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
             return (
               <li key={conflict.id} className="conflict-review-card">
                 <div className="conflict-review-card-main">
+                  {/* Persistence/sync status vocabulary --
+                      docs/design/status-vocabulary.md. Additive non-color
+                      cue; the heading text still carries the meaning. */}
+                  <StatusChip tone={PERSISTENCE_STATUS.conflict.tone}>
+                    {PERSISTENCE_STATUS.conflict.label}
+                  </StatusChip>
                   <p className="conflict-review-card-name">
                     {entityKindLabel(conflict.entityKind)} conflict
                   </p>

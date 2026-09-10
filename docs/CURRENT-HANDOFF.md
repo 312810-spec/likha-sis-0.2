@@ -1,10 +1,13 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A + B complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A + B + C complete (2026-09-10)
 
-**Status**: Wave A (appearance foundation) and Wave B (shell finish)
-implemented, `npm run quality` green after each, committed and pushed on
-`feat/precision-intelligence-shell`. Owner directives recorded in the
+**Status**: Wave A (appearance foundation), Wave B (shell finish), and
+Wave C (persistence/sync status vocabulary) implemented, `npm run
+quality` green after each, committed and pushed on
+`feat/precision-intelligence-shell`. **Next is Wave D (teacher-Home
+rebuild), which is gated**: its information architecture must be drafted
+in the plan doc and owner-approved before implementation. Owner directives recorded in the
 plan doc: autonomous continuation authorised; **no file deletions during
 the program** (one consolidated list at Wave M); the expectation
 prototype is behind a ChatGPT sign-in wall and could not be accessed
@@ -37,6 +40,19 @@ implementation** — Waves B and C proceed autonomously.
 1108 tests** (unchanged; Wave B is CSS + wrapper markup + docs).
 Independent `accessibility-reviewer` pass over Waves A+B: _dispatched;
 result to be recorded._
+
+### Wave C — persistence/sync status vocabulary (commit pending)
+
+- New `docs/design/status-vocabulary.md`: the canonical six states
+  (saved-local / pending-sync / synced / offline / conflict / failed) —
+  label, non-color cue, `StatusChip` tone, "may be shown when" rule, and
+  the local-first honesty rule.
+- New `src/ui/components/persistence-status.ts` (`PERSISTENCE_STATUS`
+  map + `mostActionable` precedence helper) + 9 unit tests.
+- Behavior-preserving adoption in `SyncStatusScreen` (pending +
+  conflict cards) and `ConflictReviewScreen` (per-conflict chip); two
+  scoped CSS rules for chip layout.
+- `npm run quality` exit 0 — Vitest **113 files / 1117 tests**.
 
 ### Wave A — appearance foundation (commit 21ef9d3, pushed)
 

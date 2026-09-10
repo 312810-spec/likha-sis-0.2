@@ -2071,6 +2071,18 @@ label {
   gap: calc(var(--spacing-unit) * 0.5);
 }
 
+/* Persistence/sync status vocabulary chips (Precision Intelligence
+   Wave C) sit as a leading label above a card's text -- see
+   docs/design/status-vocabulary.md. Keep the pill its own width inside
+   the column-flex card rather than letting it stretch full-width. */
+.sync-status-card > .status-chip {
+  align-self: flex-start;
+}
+.conflict-review-card-main > .status-chip {
+  display: inline-block;
+  margin-bottom: calc(var(--spacing-unit) * 0.4);
+}
+
 .sync-status-card-name {
   margin: 0;
   font-weight: 700;
