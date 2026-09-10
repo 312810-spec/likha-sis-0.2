@@ -29,6 +29,8 @@ import type { LearnerRepository } from "../domain/ports/learner-repository";
 import type { LearnerScoreRepository } from "../domain/ports/learner-score-repository";
 import type { SectionRepository } from "../domain/ports/section-repository";
 import type { SubjectRepository } from "../domain/ports/subject-repository";
+import type { SyncStatusRepository } from "../domain/ports/sync-status-repository";
+import type { SyncStatus } from "../domain/sync-status";
 import type {
   AssessmentCategory,
   AssessmentCategorySet,
@@ -1757,6 +1759,21 @@ export class FixtureSubjectAttendanceRepository implements SubjectAttendanceRepo
       subjectCount: assignments.length,
       heldSessionCount,
       rows,
+    };
+  }
+}
+
+/** This device's sync status for the dev preview. A "waiting to sync"
+ * state so `TeacherHome`'s "Your device" zone renders something
+ * meaningful. No network, no Tauri -- a plain object. */
+export class FixtureSyncStatusRepository implements SyncStatusRepository {
+  async getStatus(): Promise<SyncStatus> {
+    return {
+      enrolled: true,
+      lastPullAt: null,
+      pendingChangeCount: 2,
+      hasPendingSyncTrouble: false,
+      openConflictCount: 0,
     };
   }
 }

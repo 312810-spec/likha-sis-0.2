@@ -70,7 +70,7 @@ function App() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
-  // Set only by TeacherWorkspaceScreen's "mark/continue/review attendance"
+  // Set only by the teacher Home's "mark/continue/review attendance"
   // action, so AttendanceScreen can open with that section already
   // selected -- a narrowly-typed prop, not a router/URL param/global
   // store. See docs/adr/0032-teacher-workspace-polish.md.

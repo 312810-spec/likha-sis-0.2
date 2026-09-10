@@ -123,9 +123,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 ];
 
 /** The pinned Home destination, rendered above the groups in the sidebar
- * and first in the bottom nav. Wave 1: this is still the existing
- * `workspace` tab (TeacherWorkspaceScreen). Wave 3 repoints it at the new
- * role-adaptive HomeScreen. */
+ * and first in the bottom nav. The `workspace` tab renders the
+ * role-adaptive `HomeScreen` (teacher branch: `TeacherHome`). */
 export const HOME_DESTINATION: { id: SignedInTab; label: string } = {
   id: "workspace",
   label: "Home",

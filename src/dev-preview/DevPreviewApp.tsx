@@ -13,6 +13,7 @@ import { SectionAdvisoryApplicationService } from "../application/section-adviso
 import { SectionApplicationService } from "../application/section-service";
 import { SubjectApplicationService } from "../application/subject-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { SyncStatusApplicationService } from "../application/sync-status-service";
 import { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { AdviserViewScreen } from "../ui/AdviserViewScreen";
 import { AttendanceScreen } from "../ui/AttendanceScreen";
@@ -26,7 +27,7 @@ import { SectionsScreen } from "../ui/SectionsScreen";
 import { SubjectAttendanceScreen } from "../ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "../ui/SubjectMonitorScreen";
 import { TeacherLoadScreen } from "../ui/TeacherLoadScreen";
-import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
+import { TeacherHome } from "../ui/home/TeacherHome";
 import { TeachingAssignmentsScreen } from "../ui/TeachingAssignmentsScreen";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
 import { AppLayout } from "../ui/shell/AppLayout";
@@ -49,6 +50,7 @@ import {
   FixtureSectionRepository,
   FixtureSubjectAttendanceRepository,
   FixtureSubjectRepository,
+  FixtureSyncStatusRepository,
   FixtureTeachingAssignmentRepository,
 } from "./fixtures";
 
@@ -115,6 +117,7 @@ const subjectAttendanceService = new SubjectAttendanceApplicationService(
   new FixtureSubjectAttendanceRepository(),
   teachingAssignmentRepository,
 );
+const syncStatusService = new SyncStatusApplicationService(new FixtureSyncStatusRepository());
 
 export function DevPreviewApp() {
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
@@ -155,19 +158,24 @@ export function DevPreviewApp() {
             </p>
           </div>
           {activeTab === "workspace" ? (
-            <TeacherWorkspaceScreen
+            <TeacherHome
               displayName={FIXTURE_SESSION.displayName}
+              username={FIXTURE_SESSION.username}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
               attendanceService={attendanceService}
               authService={authService}
               gradingService={gradingService}
-              learnerService={learnerService}
               sectionService={sectionService}
+              subjectAttendanceService={subjectAttendanceService}
+              syncStatusService={syncStatusService}
               onOpenAttendance={(sectionId) => {
                 setAttendanceSectionId(sectionId);
                 setActiveTab("attendance");
               }}
+              onOpenSubjectAttendance={() => setActiveTab("subject-attendance")}
               onManageSections={() => setActiveTab("sections")}
-              onViewAuditLog={() => setActiveTab("audit-log")}
+              onOpenClassRecords={() => setActiveTab("class-records")}
+              onViewSyncStatus={() => setActiveTab("sync-status")}
             />
           ) : activeTab === "attendance" ? (
             <AttendanceScreen

@@ -16,7 +16,7 @@ interface AttendanceScreenProps {
   attendanceService: AttendanceApplicationService;
   sectionService: SectionApplicationService;
   /** A section to select by default instead of the first loaded section
-   * -- set when a teacher arrives here via TeacherWorkspaceScreen's
+   * -- set when a teacher arrives here via the teacher Home's
    * "mark/continue/review attendance" action for a specific section.
    * Verified against the actually-loaded section list before use (never
    * trusted blindly): if this section no longer exists, this screen

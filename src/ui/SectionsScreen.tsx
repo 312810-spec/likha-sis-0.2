@@ -22,7 +22,7 @@ interface SectionsScreenProps {
   exportService?: ExportApplicationService;
   /** Open the read-only roster for one section (Wave 2O). A callback +
    * parent state handoff, not a route -- the same pattern
-   * TeacherWorkspaceScreen uses for "open attendance for this section". */
+   * the teacher Home uses for "open attendance for this section". */
   onOpenRoster: (sectionId: string) => void;
   /** Open Teaching Assignments for one section (Wave 2Y). Same handoff
    * pattern as `onOpenRoster`; `sectionName` is passed along too since
