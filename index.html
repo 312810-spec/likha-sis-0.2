@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: makes env(safe-area-inset-*) return real
+         values in the Android WebView so the shell's safe-area padding
+         (bottom nav, top bar) actually clears the notch and gesture
+         bar. See ADR-0070 Wave L. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>LIKHA-SIS</title>
   </head>
   <body>

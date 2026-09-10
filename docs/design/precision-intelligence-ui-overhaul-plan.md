@@ -672,3 +672,49 @@ green **115 files / 1132 tests** (Wave H).
    scope; not attempted.
 
 Until Part B is decided, Wave J is **Part A complete / Part B blocked**.
+
+---
+
+## 16. Wave L execution notes (2026-09-10)
+
+**Wave L — Android-specific adaptation.** Scoped via `prompt-master`
+first. This environment has no Android device, emulator, or
+real-viewport browser, so the brief's core Wave-L verification
+("intentionally recomposed, not compressed") could not run — it is
+recorded as debt (`docs/VERIFICATION-DEBT.md`). Only inspection-
+verifiable, standard mobile hardening was done.
+
+### Shipped (CSS + one `index.html` meta attribute)
+
+1. **`index.html`** — `viewport-fit=cover` added to the viewport meta.
+   Without it, `env(safe-area-inset-*)` returns `0` in the Android
+   WebView, so the safe-area padding **already present** in
+   `styles.css` (`.app-bottomnav`) was inert. This one attribute
+   activates it. No visual change on desktop / static preview
+   (`env()` → 0 there).
+2. **`.app-topbar` (≤860px)** — `padding-top` now includes
+   `env(safe-area-inset-top)` for notch clearance on the sticky bar.
+3. **`.app-canvas` (≤860px)** — phone `padding-bottom` now adds
+   `env(safe-area-inset-bottom)` so the last row clears both the fixed
+   bottom nav and the device home indicator.
+4. **Touch-target floor (≤640px)** — `button, input, select, textarea,
+a.button-primary, [role="button"]` get `min-height: 44px`
+   **regardless of teacher-mode density**. Rationale: the brief
+   requires ≥44px mobile targets and forbids inferring behaviour from
+   the device, but Efficient mode shrinks `--control-height` to 34px.
+   Checkboxes/radios are exempted (they keep their own ≥24px sizing);
+   `.link-button` keeps `min-height: 0` (higher specificity) so an
+   inline text link is not stretched.
+
+`npm run quality` exit 0 — Vitest **115 files / 1132 tests** (unchanged).
+`npm run build` ok, CSS gzip 6.51 kB, no new dependency.
+
+### Deferred to a real device / emulator pass (VERIFICATION-DEBT)
+
+- Whether each priority workflow is genuinely recomposed vs. merely
+  compressed at 360–412px.
+- On-screen-keyboard overlap of inputs and any sticky action; rotation
+  / landscape layout; gesture-nav-bar overlap in practice; scroll
+  performance on modest hardware; touch-vs-hover state correctness.
+- Bottom sheets / additional sticky action bars were **not** added —
+  they need device UX validation first.

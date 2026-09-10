@@ -1,15 +1,21 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–K + J(Part A) (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–L + J(Part A) (2026-09-10)
 
-**Status**: Waves A–K implemented, `npm run quality` green (last run
-115 files / 1132 tests at H). Wave J **Part A** (audit of the existing
-DepEd-form export UI) assessed — **no code change**: the export UI
-already carries explicit "not verified against an official DepEd
-source / not submission-ready" disclosures, a structured
-`disclosure.omittedFields` list rendered to the teacher, the consistent
-"Saved to {path}" + "Open folder" pattern, and permission-aware failure
-copy. Plan §15. All pushed to `origin/feat/precision-intelligence-shell`.
+**Status**: Waves A–K implemented; Wave J Part A (form-export UI audit)
+assessed no-code; **Wave L (Android hardening) shipped** —
+`viewport-fit=cover` in `index.html` (this activates safe-area CSS that
+was already present but inert), `env(safe-area-inset-*)` on the sticky
+top bar and phone canvas, and a ≥44px touch-target floor at ≤640px
+independent of teacher-mode density (Efficient mode's 34px controls
+violated the brief on a phone). `npm run quality` green **115 files /
+1132 tests**; build ok, no new dependency. Plan §16. All pushed to
+`origin/feat/precision-intelligence-shell`.
+
+**The "recomposed not compressed" Wave-L verification could not run**
+(no device/emulator/real-viewport here) — recorded as debt. Bottom
+sheets / extra sticky bars deliberately not added (need device UX
+validation).
 
 **Wave J Part B is blocked on an owner decision** (plan §15.B): build a
 new "Official Forms" aggregator workspace (a net-new nav destination
@@ -17,8 +23,18 @@ listing every form with readiness/validation/disclosure/preview/export/
 history), or keep the current per-context model where each form is
 exported from the screen that owns its data? Template-fidelity work
 additionally needs a `deped-researcher` primary-source pass +
-authorization. **L (Android) and M (hardening + ledger + owed reviews)
-remain.**
+authorization.
+
+**Remaining: Wave M** (product-wide hardening + migration ledger) — a
+route/theme/mode/responsive/a11y sweep, the consolidated
+superseded-file deletion list (owner directive: deletions land here —
+`TeacherWorkspaceScreen`, `PageHeader`, and any now-dead per-screen
+`@media` reflow blocks superseded by earlier waves), verification-debt
+reconciliation, and the final Complete/Deferred/Blocked migration
+ledger. **M must not be called "done" until the owed independent
+reviews (A–L a11y + teacher-UX + security) and a native Light/System/
+Dark visual pass and the Wave L Android device pass have run** — all
+blocked on tooling/harness this session.
 
 **Process (owner instruction, 2026-09-10)**: every wave now starts with
 a `prompt-master` pass to scope what that wave covers, then executes.

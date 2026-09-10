@@ -1,5 +1,28 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave L: Android safe-area + touch-target hardening (2026-09-10)
+
+Full detail: plan §16. Scoped via `prompt-master`. No device/emulator/
+real-viewport here, so the "recomposed not compressed" verification was
+deferred (VERIFICATION-DEBT); only inspection-verifiable hardening
+shipped:
+
+1. `index.html` — `viewport-fit=cover` (activates the `env(safe-area-*)`
+   CSS already present in `styles.css` but inert without it).
+2. `.app-topbar` (≤860px) — `env(safe-area-inset-top)` for notch
+   clearance.
+3. `.app-canvas` (≤860px) — `env(safe-area-inset-bottom)` folded into
+   the phone padding so the last row clears the bottom nav + home
+   indicator.
+4. `@media (max-width: 640px)` — every real control floored at
+   `min-height: 44px` regardless of teacher-mode density (Efficient's
+   34px controls violated the brief on a phone). Checkboxes/radios and
+   `.link-button` exempted.
+
+Verification: `npm run quality` exit 0 — Vitest **115 files / 1132
+tests** (unchanged). `npm run build` ok, CSS gzip 6.51 kB, no new
+dependency. Self-review only (harness down). Android device pass owed.
+
 ## Precision Intelligence — Wave J Part A: official-forms export audit (2026-09-10)
 
 Full detail: plan §15. Scoped via `prompt-master`; split into an

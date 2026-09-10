@@ -1,5 +1,30 @@
 # Verification Debt
 
+## Precision Intelligence Wave L — Android device pass owed (2026-09-10)
+
+Wave L shipped only inspection-verifiable mobile hardening
+(`viewport-fit=cover`; `env(safe-area-inset-*)` on `.app-topbar` /
+`.app-canvas`; a ≥44px touch-target floor at ≤640px independent of
+teacher-mode density). This environment has **no Android device,
+emulator, or real-viewport browser**, so the brief's core Wave-L
+requirement — priority workflows _intentionally recomposed_ for small
+screens, not just compressed — was **not verified and not attempted**.
+
+**Owed (real device or emulator):**
+
+- Confirm each priority workflow (Home, attendance marking, subject
+  attendance, class records score entry, section roster) is usable and
+  recomposed — not a shrunk desktop screen — at 360–412px portrait and
+  in landscape.
+- On-screen-keyboard behaviour: does it cover the focused input or any
+  primary action? Is there a sticky-action or scroll-into-view need?
+- Gesture-nav-bar and notch overlap in practice (the CSS is in place;
+  needs a device with insets to confirm).
+- Touch-vs-hover state correctness (hover states must not stick on
+  touch); scroll performance on modest hardware; rotation.
+- Whether bottom sheets / additional sticky action bars are warranted
+  (deliberately not added this wave — need device UX validation).
+
 ## Precision Intelligence Waves F–K — no independent review run (2026-09-10)
 
 Waves F (My Day chip), G (roster long-name CSS), H (`GradingPeriodsScreen`

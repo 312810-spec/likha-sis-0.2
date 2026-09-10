@@ -1846,6 +1846,13 @@ label {
     display: block;
   }
 
+  /* Notch / status-bar clearance for the sticky top bar on notched
+     Android devices (needs index.html's viewport-fit=cover to take
+     effect). Precision Intelligence Wave L. */
+  .app-topbar {
+    padding-top: calc(var(--spacing-unit) * 0.75 + env(safe-area-inset-top));
+  }
+
   .app-bottomnav {
     display: flex;
     position: fixed;
@@ -1859,7 +1866,33 @@ label {
   }
 
   .app-canvas {
-    padding-bottom: calc(var(--spacing-unit) * 6);
+    /* Clear both the fixed bottom nav and the device home indicator. */
+    padding-bottom: calc(var(--spacing-unit) * 6 + env(safe-area-inset-bottom));
+  }
+}
+
+/* Touch-target floor for phone width (Precision Intelligence Wave L).
+   The master brief requires >=44px mobile interaction targets and
+   forbids inferring anything from the device -- but Efficient mode
+   shrinks --control-height to 34px, which would violate both on a
+   phone. Floor every real control at 44px here, regardless of the
+   teacher-mode density, without changing desktop density. Icon-only
+   controls (e.g. .app-topbar-menu, already 44x44) are unaffected. */
+@media (max-width: 640px) {
+  button,
+  input,
+  select,
+  textarea,
+  a.button-primary,
+  [role="button"] {
+    min-height: 44px;
+  }
+  /* Checkboxes / radios keep their own >=24px sizing rule (they are not
+     hit-area-extended by min-height); the 24px floor already scales
+     independent of density -- see the --control-height comment above. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 0;
   }
 }
 
