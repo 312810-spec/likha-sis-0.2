@@ -310,3 +310,145 @@ wants the prototype used as a reference, options are: (a) paste
 screenshots or an export into the repo under `docs/design/prototype/`,
 (b) make the site publicly reachable, or (c) describe the specific
 treatments they want carried over.
+
+---
+
+## 10. Wave D — Teacher Home IA proposal (OWNER APPROVAL REQUIRED)
+
+Per the owner directive, Wave D does not start until this section is
+approved. Nothing below is implemented yet.
+
+### 10.1 What the teacher Home is today
+
+`HomeScreen` renders `TeacherWorkspaceScreen` (still on the legacy
+`PageHeader`, not the `Page` primitive; no mount-focus — a focus-model
+outlier). Its structure:
+
+1. `PageHeader` — "Welcome, {displayName}" + a Guided-only hint paragraph.
+2. `workspace-summary` — one sentence: "N learners across M sections."
+3. **"Today's attendance"** — a priority rail (`ul.workspace-priority-rail`)
+   of the teacher's sections, sorted `not-started → partial → complete →
+no-learners`, then alphabetical. Each row: section name + grade, a
+   `StatusChip` (not-started/partial/complete/no-learners), the open
+   grading period (or "no grading period currently open"), and one
+   primary action (Mark / Continue / Review attendance, or Manage
+   sections when no learners).
+4. **"Recent sign-in activity"** — last 5 audit-log entries + "View all".
+
+Data sources (all already fetched elsewhere, no new backend read):
+`learnerService.listLearners`, `sectionService.listSections`,
+`gradingService.listPeriodsBySchoolYear`, `attendanceService.rosterForDate`,
+`authService.listAuditLog`. Split loading: the attendance overview and
+the activity list fail/retry independently.
+
+### 10.2 Problems to fix (not "make it prettier")
+
+- **Marketing-style greeting** ("Welcome, {name}") as the page's largest
+  element — PI anti-pattern (oversized headings in work screens).
+- **`<h3>` section headings under a `PageHeader` `<h1/h2>`** with nothing
+  at the intervening level, and **no mount focus** — inconsistent with
+  every `Page`-based screen.
+- **Recent sign-in activity is given equal visual weight** to today's
+  attendance, though it is rarely the teacher's next action. It is also
+  school-wide auth noise, not this teacher's work.
+- **Grading-period status is buried** as muted text per row; a teacher
+  who needs to enter grades has no path from Home.
+- **No "today's classes" (subject attendance) presence** — the golden
+  flow names Class/Workspace, and `TodaysClassesScreen` /
+  `SubjectAttendanceScreen` exist, but Home only surfaces homeroom
+  (daily) attendance.
+- **No persistence/offline signal** — Home never tells the teacher
+  whether their device is syncing (the Wave C vocabulary now exists to
+  express this).
+
+### 10.3 Proposed IA — "one operational brief, one dominant surface"
+
+One `Page` (`title="Home"`, mount-focus, Guided `hint`). Below it, a
+single dominant work surface plus two quiet secondary regions. **No KPI
+strip. No bento grid of equal cards.**
+
+**Zone 1 — Primary: "What needs you today" (the dominant surface).**
+A single ordered list that merges _both_ attendance duties the teacher
+actually has, ranked by urgency:
+
+- Homeroom (daily) attendance per advisory section — the current
+  `not-started → partial → complete` ranking, unchanged.
+- Subject attendance per class scheduled today (from
+  `subjectAttendanceService` / today's classes) — same
+  not-started/partial/complete idea.
+
+Each row: what it is (section/subject + grade), a `StatusChip` state
+label (non-color, unchanged tone mapping), and **one** primary action
+(Mark / Continue / Review). Rows the teacher has finished collapse to a
+quiet "done" style but stay visible (Guided/Comfortable parity — nothing
+is removed). If the teacher has no advisory and no classes today, this
+zone shows a calm `EmptyState`, not an error.
+
+**Zone 2 — Secondary: "Grading" (contextual, only when relevant).**
+A compact line per section with an _open_ grading period: "{period} is
+open — {n} class records" + a "Open class records" action. Sections with
+no open period are not listed here. If no period is open anywhere, the
+whole zone is omitted (progressive disclosure). Data:
+`gradingService.listPeriodsBySchoolYear` (already fetched) +
+`sectionService`. No new read.
+
+**Zone 3 — Secondary: "Your device" (one line).**
+A single `StatusChip` + sentence using the Wave C vocabulary:
+`synced` / `pending-sync` / `failed` / `offline`, from
+`syncStatusService.getStatus` (the read `SyncStatusScreen` already
+uses). One line, not a card. Links to Sync Status for detail. This is
+the local-first honesty signal the brief asks Home to carry.
+
+**Removed from Home:** "Recent sign-in activity". It moves entirely to
+`Sign-in Activity` (`AuditLogScreen`), which already exists and is
+linked from the nav. Rationale: it is school-wide security telemetry,
+not this teacher's work, and it competed with the primary zone. (If the
+owner wants a security presence on Home, the smallest honest version is
+a single line — "Last sign-in: {when}" for _this_ user — but the
+proposal is to remove it.)
+
+**School-head branch:** unchanged this wave — `HomeScreen` still offers
+the "School overview" / "My teaching" toggle; only the "My teaching"
+side is the rebuilt surface above. `SchoolHeadHome` is a later wave (K).
+
+### 10.4 Modes & responsive
+
+- **Efficient**: Zone 1 only, denser rows, grading + device zones
+  collapse to a single link line each. **Comfortable** (default): all
+  three zones, comfortable spacing. **Guided**: adds the `hint` and a
+  one-line explanation atop each zone. All three keep every action —
+  parity preserved.
+- **Phone**: the three zones stack; Zone 1 rows become full-width
+  stacked blocks (existing `.workspace-priority-item` pattern extended,
+  not a new one); primary action is a full-width button. No horizontal
+  scroll at 360px.
+
+### 10.5 Data / architecture
+
+- **No new backend read.** Reuses `learnerService`, `sectionService`,
+  `gradingService`, `attendanceService`, `subjectAttendanceService`,
+  `syncStatusService` — all already wired into `App.tsx` and passed to
+  screens. `HomeScreen` gains `syncStatusService` +
+  `subjectAttendanceService` props (both already constructed in
+  `composition.ts`).
+- Split, independent loading per zone (extends the existing two-path
+  pattern to three) — one zone failing never blanks another.
+- `TeacherWorkspaceScreen.tsx` and `PageHeader.tsx` are **not deleted**
+  this wave (owner directive); the rebuilt surface lives in a new
+  component (`src/ui/home/TeacherHome.tsx`) that `HomeScreen` renders
+  instead of `TeacherWorkspaceScreen`. The old files become unreferenced
+  and go on the Wave M deletion list.
+
+### 10.6 Out of scope for Wave D
+
+Attendance screen internals (Wave G), class-records internals (Wave H),
+`SchoolHeadHome` (Wave K), any new domain/application/repository method,
+any grading or attendance semantic change.
+
+### 10.7 Owner decision needed
+
+1. Approve the three-zone IA (Primary duties / Grading / Your device)?
+2. Approve **removing** "Recent sign-in activity" from Home (vs. keeping
+   a one-line "last sign-in" for the current user)?
+3. Approve merging homeroom + subject attendance into one ranked Zone 1
+   list (vs. keeping Home to homeroom only, as today)?
