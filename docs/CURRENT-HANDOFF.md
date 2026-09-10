@@ -1,32 +1,54 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–D complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–E complete (2026-09-10)
 
 **Status**: Waves A (appearance foundation), B (shell finish), C
-(persistence/sync status vocabulary), and D (teacher Home rebuild)
-implemented, `npm run quality` green after each, committed and pushed on
-`feat/precision-intelligence-shell`. Head: `c96899f`.
+(persistence/sync status vocabulary), D (teacher Home rebuild), and E
+(pre-auth trust & sign-in presentation) implemented, `npm run quality`
+green after each. Waves A–D pushed (`c96899f`); **Wave E commit
+`36fa068` is LOCAL ONLY** — `git push` failed on a network outage
+("Could not resolve host: github.com"). Push `feat/precision-intelligence-shell`
+when connectivity returns; nothing else is blocked.
+
+### Wave E — pre-auth trust & sign-in presentation (commit 36fa068, local)
+
+- `.app-boot` (the out-of-shell container for loading / first-run /
+  sign-in) is now a calm vertically-centred layout: brand wordmark + a
+  plain-language local-first trust line above a single `surface-2` card.
+  First-run setup gets a wider card; short-height viewports scroll.
+- `LoginScreen`: the `notice` banner tone `success` → `info` (it
+  explains why the teacher is back here; it is not a success). Still
+  `role="status"`.
+- No security behavior change — authz stays server-side, nothing hidden,
+  shared-computer model untouched.
+- `npm run quality` exit 0 — Vitest **115 files / 1132 tests**. Build ok.
 
 **Owner decisions on Wave D IA (2026-09-10, plan §10.7)**: all three
 approved — three-zone IA; keep a one-line "last sign-in" for the current
 user (5-row school-wide list removed); merge homeroom + subject
 attendance into one ranked Zone 1 list.
 
-**Next is Wave E — authentication / session / onboarding / trust**
-(`LoginScreen`, `FirstRunSetupScreen`, `IdleTimeoutWarning`, `.app-boot`
-container). Restyle onto the token system + Precision Intelligence
-language; preserve the shared-computer security model exactly; explain
-privacy / local-first / active-scope in plain language without leaking
-technical internals. No approval gate expected. Success gate:
-`npm run quality` green + a `security-reviewer` pass (auth-adjacent UI)
+**Next is Wave F — daily teaching workspace** (plan §5 matrix):
+`MyDayScreen`, `TodaysClassesScreen`, `ScheduleMeetingsScreen`,
+`SubjectMonitorScreen`, `AdviserViewScreen`, `TeacherLoadScreen`. Prefer
+action-centred layouts over analytics-heavy dashboards; show only
+metrics that change a decision; align these screens to the Wave C status
+vocabulary and the Wave D duty-row pattern where they overlap. Depends
+on Wave D (done). No approval gate expected. Success gate:
+`npm run quality` green + `accessibility-reviewer` + `teacher-ux-reviewer`.
 
-- `accessibility-reviewer` + `teacher-ux-reviewer`. Owner directives recorded in the
-  plan doc: autonomous continuation authorised; **no file deletions during
-  the program** (one consolidated list at Wave M); the expectation
-  prototype is behind a ChatGPT sign-in wall and could not be accessed
-  (evidence gap recorded, not fabricated around); **Wave D teacher-Home IA
-  must be proposed in the plan doc and owner-approved before
-  implementation** — Waves B and C proceed autonomously.
+**Before Wave F**: push the local Wave E commit (`36fa068`) once the
+network is back, and record the results of the three pending independent
+reviews (Waves A–D accessibility, Wave D teacher-ux) — fold any
+Important/High findings in first.
+
+Owner directives recorded in the plan doc: autonomous continuation
+authorised; **no file deletions during
+the program** (one consolidated list at Wave M); the expectation
+prototype is behind a ChatGPT sign-in wall and could not be accessed
+(evidence gap recorded, not fabricated around); **Wave D teacher-Home IA
+must be proposed in the plan doc and owner-approved before
+implementation** — Waves B and C proceed autonomously.
 
 ### Wave B — shell finish (commit pending)
 

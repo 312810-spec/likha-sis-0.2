@@ -1,5 +1,21 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave E: pre-auth trust & sign-in presentation (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry.
+
+`.app-boot` (out-of-shell container for loading / first-run / sign-in)
+restyled from a bare max-width wrapper into a calm centred layout: brand
+wordmark + a plain-language local-first trust line above a single
+`surface-2` card. `LoginScreen` `notice` tone `success` → `info`. No
+security behavior change (authz server-side, nothing hidden). Commit
+`36fa068` — **local only**, push failed on a network outage.
+
+Verification: `npm run quality` exit 0 — Vitest **115 files / 1132
+tests** (CSS + copy + one tone attr; existing tests gained assertions,
+no net-new test). `check:dev-preview-isolation` exit 0. `npm run build`
+ok, no new dependency.
+
 ## Precision Intelligence — Wave D: teacher Home rebuild (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry; plan §10 (owner-
