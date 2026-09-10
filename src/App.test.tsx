@@ -26,6 +26,34 @@ const session: CurrentSession = {
   roles: ["teacher"],
 };
 
+/** The reads the signed-in teacher Home (`TeacherHome`, ADR-0070 §10)
+ * makes on mount, all resolving to "nothing yet". Each test layers its
+ * own `installation_status` / `current_session` (and any
+ * failure-injecting override) in front of this. */
+function teacherHomeCommand(command: string): Promise<unknown> {
+  switch (command) {
+    case "list_sections_by_school":
+    case "list_teacher_assignments":
+    case "list_schedule_meetings_by_assignment":
+    case "list_subject_attendance_sessions":
+    case "list_grading_periods_by_school_year":
+    case "list_audit_log":
+    case "list_learners_by_school":
+    case "list_sf1_import_history":
+      return Promise.resolve([]);
+    case "get_sync_status":
+      return Promise.resolve({
+        enrolled: true,
+        lastPullAt: null,
+        pendingChangeCount: 0,
+        hasPendingSyncTrouble: false,
+        openConflictCount: 0,
+      });
+    default:
+      return Promise.reject(new Error(`unexpected command: ${command}`));
+  }
+}
+
 beforeEach(() => {
   mockInvoke.mockReset();
 });
@@ -62,16 +90,13 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
 
     render(<App />);
 
-    expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Home" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What needs you today" })).toBeInTheDocument();
     expect(screen.getAllByText(/Rizal Elementary/).length).toBeGreaterThan(0);
   });
 
@@ -83,11 +108,7 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(schoolHeadSession);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_sf1_import_history") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
 
     render(<App />);
@@ -101,14 +122,11 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
 
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
+    await screen.findByRole("region", { name: "Home" });
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(nav).toBeInTheDocument();
@@ -136,15 +154,12 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
+    await screen.findByRole("region", { name: "Home" });
     await waitFor(() => expect(document.title).toBe("Home · LIKHA-SIS"));
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
@@ -157,15 +172,12 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
+    await screen.findByRole("region", { name: "Home" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
     await user.click(within(nav).getByRole("button", { name: "Learners" }));
 
@@ -180,11 +192,11 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.reject("unauthorized");
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
+      // The first protected read the teacher Home makes discovers the
+      // session is no longer valid.
+      if (command === "list_sections_by_school") return Promise.reject("unauthorized");
       if (command === "list_schools") return Promise.resolve([]);
-      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+      return teacherHomeCommand(command);
     });
 
     render(<App />);

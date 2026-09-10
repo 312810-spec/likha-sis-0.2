@@ -208,6 +208,8 @@ function App() {
               <HomeScreen
                 roles={session.roles}
                 displayName={session.displayName}
+                username={session.username}
+                userId={session.userId}
                 schoolName={session.schoolName}
                 attendanceService={attendanceService}
                 authService={authService}
@@ -215,6 +217,8 @@ function App() {
                 learnerService={learnerService}
                 sectionService={sectionService}
                 sf1ImportService={sf1ImportService}
+                subjectAttendanceService={subjectAttendanceService}
+                syncStatusService={syncStatusService}
                 schoolAttendanceService={schoolAttendanceService}
                 sectionAdvisoryService={sectionAdvisoryService}
                 schoolMemberService={schoolMemberService}
@@ -223,8 +227,13 @@ function App() {
                   setAttendanceSectionId(sectionId);
                   setActiveTab("attendance");
                 }}
+                onOpenSubjectAttendance={(teachingAssignmentId) => {
+                  setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                  setActiveTab("subject-attendance");
+                }}
                 onManageSections={() => setActiveTab("sections")}
-                onViewAuditLog={() => setActiveTab("audit-log")}
+                onOpenClassRecords={() => setActiveTab("class-records")}
+                onViewSyncStatus={() => setActiveTab("sync-status")}
                 onOpenSf1Import={() => setActiveTab("sf1-import")}
               />
             ) : activeTab === "learners" ? (

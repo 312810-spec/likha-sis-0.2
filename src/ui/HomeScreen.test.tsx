@@ -10,6 +10,8 @@ import type { SchoolMemberApplicationService } from "../application/school-membe
 import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SectionApplicationService } from "../application/section-service";
 import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
+import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import type { SyncStatusApplicationService } from "../application/sync-status-service";
 import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
@@ -34,6 +36,22 @@ function makeServices() {
   const sf1ImportService = {
     listImportHistory: vi.fn(() => Promise.resolve([])),
   } as unknown as Sf1ImportApplicationService;
+  const subjectAttendanceService = {
+    listMyAssignments: vi.fn(() => Promise.resolve([])),
+    listMeetings: vi.fn(() => Promise.resolve([])),
+    listSessions: vi.fn(() => Promise.resolve([])),
+  } as unknown as SubjectAttendanceApplicationService;
+  const syncStatusService = {
+    getStatus: vi.fn(() =>
+      Promise.resolve({
+        enrolled: true,
+        lastPullAt: null,
+        pendingChangeCount: 0,
+        hasPendingSyncTrouble: false,
+        openConflictCount: 0,
+      }),
+    ),
+  } as unknown as SyncStatusApplicationService;
   const schoolAttendanceService = {
     dayTotals: vi.fn(() => Promise.resolve({ present: 0, absent: 0, tardy: 0 })),
   } as unknown as SchoolAttendanceApplicationService;
@@ -59,6 +77,8 @@ function makeServices() {
     learnerService,
     sectionService,
     sf1ImportService,
+    subjectAttendanceService,
+    syncStatusService,
     schoolAttendanceService,
     sectionAdvisoryService,
     schoolMemberService,
@@ -73,11 +93,15 @@ function renderHome(roles: string[]) {
       <HomeScreen
         roles={roles}
         displayName="Ana Cruz"
+        username="ana.cruz"
+        userId="u-ana"
         schoolName="Mabini Elementary School"
         {...services}
         onOpenAttendance={vi.fn()}
+        onOpenSubjectAttendance={vi.fn()}
         onManageSections={vi.fn()}
-        onViewAuditLog={vi.fn()}
+        onOpenClassRecords={vi.fn()}
+        onViewSyncStatus={vi.fn()}
         onOpenSf1Import={vi.fn()}
       />
     </ModeProvider>,
@@ -86,10 +110,11 @@ function renderHome(roles: string[]) {
 }
 
 describe("HomeScreen", () => {
-  it("renders the teacher workspace and no view switch for a non-school-head", () => {
+  it("renders the teacher Home and no view switch for a non-school-head", async () => {
     renderHome(["teacher"]);
 
-    expect(screen.getByRole("region", { name: "Workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Home" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What needs you today" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Home view" })).not.toBeInTheDocument();
   });
 
@@ -105,17 +130,17 @@ describe("HomeScreen", () => {
     expect(teachingButton).toHaveAttribute("aria-pressed", "false");
 
     expect(await screen.findByRole("heading", { name: "School overview" })).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Workspace" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Home" })).not.toBeInTheDocument();
   });
 
-  it("switches to the teacher workspace when the school head picks My teaching", async () => {
+  it("switches to the teacher Home when the school head picks My teaching", async () => {
     const user = userEvent.setup();
     renderHome(["school_head", "teacher"]);
 
     await screen.findByRole("heading", { name: "School overview" });
     await user.click(screen.getByRole("button", { name: "My teaching" }));
 
-    expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "My teaching" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -128,7 +153,7 @@ describe("HomeScreen", () => {
 
   it("has no detectable accessibility violations for the teacher view", async () => {
     const { container } = renderHome(["teacher"]);
-    await screen.findByRole("heading", { name: "Welcome, Ana Cruz" });
+    await screen.findByRole("heading", { name: "What needs you today" });
 
     await expectNoAccessibilityViolations(container);
   });

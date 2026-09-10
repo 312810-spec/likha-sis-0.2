@@ -8,13 +8,17 @@ import type { SchoolMemberApplicationService } from "../application/school-membe
 import type { SectionAdvisoryApplicationService } from "../application/section-advisory-service";
 import type { SectionApplicationService } from "../application/section-service";
 import type { Sf1ImportApplicationService } from "../application/sf1-import-service";
+import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import type { SyncStatusApplicationService } from "../application/sync-status-service";
 import type { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
 import { SchoolHeadHome } from "./home/SchoolHeadHome";
-import { TeacherWorkspaceScreen } from "./TeacherWorkspaceScreen";
+import { TeacherHome } from "./home/TeacherHome";
 
 interface HomeScreenProps {
   roles: string[];
   displayName: string;
+  username: string;
+  userId: string;
   schoolName: string;
   attendanceService: AttendanceApplicationService;
   authService: AuthApplicationService;
@@ -22,25 +26,31 @@ interface HomeScreenProps {
   learnerService: LearnerApplicationService;
   sectionService: SectionApplicationService;
   sf1ImportService: Sf1ImportApplicationService;
+  subjectAttendanceService: SubjectAttendanceApplicationService;
+  syncStatusService: SyncStatusApplicationService;
   schoolAttendanceService: SchoolAttendanceApplicationService;
   sectionAdvisoryService: SectionAdvisoryApplicationService;
   schoolMemberService: SchoolMemberApplicationService;
   teachingAssignmentService: TeachingAssignmentApplicationService;
   onOpenAttendance: (sectionId: string) => void;
+  onOpenSubjectAttendance: (teachingAssignmentId: string) => void;
   onManageSections: () => void;
-  onViewAuditLog: () => void;
+  onOpenClassRecords: () => void;
+  onViewSyncStatus: () => void;
   onOpenSf1Import: () => void;
 }
 
 /**
- * The role-adaptive Home tab. A plain teacher gets the
- * `TeacherWorkspaceScreen` directly. A school head additionally gets a
- * local, non-persisted view switch between a school-wide overview and
- * that same teaching workspace (school heads commonly also teach).
+ * The role-adaptive Home tab. A plain teacher gets `TeacherHome`
+ * directly. A school head additionally gets a local, non-persisted view
+ * switch between a school-wide overview and that same teaching Home
+ * (school heads commonly also teach).
  */
 export function HomeScreen({
   roles,
   displayName,
+  username,
+  userId,
   schoolName,
   attendanceService,
   authService,
@@ -48,13 +58,17 @@ export function HomeScreen({
   learnerService,
   sectionService,
   sf1ImportService,
+  subjectAttendanceService,
+  syncStatusService,
   schoolAttendanceService,
   sectionAdvisoryService,
   schoolMemberService,
   teachingAssignmentService,
   onOpenAttendance,
+  onOpenSubjectAttendance,
   onManageSections,
-  onViewAuditLog,
+  onOpenClassRecords,
+  onViewSyncStatus,
   onOpenSf1Import,
 }: HomeScreenProps): JSX.Element {
   // roles is display-only — see src/domain/session.ts. It only picks
@@ -62,22 +76,27 @@ export function HomeScreen({
   const isSchoolHead = roles.includes("school_head");
   const [view, setView] = useState<"overview" | "teaching">("overview");
 
-  const workspace = (
-    <TeacherWorkspaceScreen
+  const teaching = (
+    <TeacherHome
       displayName={displayName}
+      username={username}
+      teacherUserId={userId}
       attendanceService={attendanceService}
       authService={authService}
       gradingService={gradingService}
-      learnerService={learnerService}
       sectionService={sectionService}
+      subjectAttendanceService={subjectAttendanceService}
+      syncStatusService={syncStatusService}
       onOpenAttendance={onOpenAttendance}
+      onOpenSubjectAttendance={onOpenSubjectAttendance}
       onManageSections={onManageSections}
-      onViewAuditLog={onViewAuditLog}
+      onOpenClassRecords={onOpenClassRecords}
+      onViewSyncStatus={onViewSyncStatus}
     />
   );
 
   if (!isSchoolHead) {
-    return workspace;
+    return teaching;
   }
 
   return (
@@ -112,7 +131,7 @@ export function HomeScreen({
           onOpenSf1Import={onOpenSf1Import}
         />
       ) : (
-        workspace
+        teaching
       )}
     </>
   );

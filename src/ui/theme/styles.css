@@ -1084,6 +1084,121 @@ label {
   }
 }
 
+/* ============================================================
+   Precision Intelligence teacher Home (ADR-0070 §10, Wave D).
+   One dominant surface (Zone 1) + two quiet secondary zones.
+   ============================================================ */
+.home-zone {
+  margin-bottom: calc(var(--spacing-unit) * 1.75);
+}
+.home-zone > h3 {
+  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0;
+}
+/* Zone 1 is the dominant surface -- a single bordered ledger rail, one
+   left-accent bar per row by urgency, not N separate cards. */
+.home-duty-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.home-duty-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-unit);
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.25);
+  background: var(--color-bg);
+  border-left: 4px solid transparent;
+  transition: border-left-color var(--motion-duration-routine) var(--motion-easing-standard);
+}
+.home-duty-item.is-not-started,
+.home-duty-item.is-subject-not_checked {
+  border-left-color: var(--color-warning);
+}
+.home-duty-item.is-partial {
+  border-left-color: var(--color-productive);
+}
+.home-duty-item.is-complete,
+.home-duty-item.is-subject-held {
+  border-left-color: var(--color-success);
+}
+.home-duty-item.is-no-learners,
+.home-duty-item.is-subject-no_class {
+  border-left-color: var(--color-border);
+}
+.home-duty-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.home-duty-what {
+  font-weight: 600;
+}
+
+/* Zone 2 -- contextual grading lines, quiet. */
+.home-grading-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+.home-grading-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+/* Zone 3 -- one-line local-first honesty signal. */
+.home-device-line {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.home-last-signin {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+}
+
+/* An inline text button that reads as a link -- used for the low-weight
+   "View sync status" affordance inside a sentence. */
+.link-button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .home-duty-item {
+    align-items: stretch;
+  }
+  .home-duty-item > button {
+    min-height: 44px;
+    width: 100%;
+  }
+  .home-grading-list li > button {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+
 .form-row {
   display: flex;
   gap: var(--spacing-unit);
