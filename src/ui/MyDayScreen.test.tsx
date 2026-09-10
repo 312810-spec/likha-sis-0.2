@@ -66,8 +66,10 @@ describe("MyDayScreen", () => {
     renderScreen();
 
     expect((await screen.findAllByText(/Mathematics — Mabini/)).length).toBeGreaterThan(0);
-    expect(screen.getByText("attendance not yet checked")).toBeInTheDocument();
+    // Status vocabulary chips (docs/design/status-vocabulary.md).
+    expect(screen.getByText("Not checked")).toHaveClass("status-chip", "status-chip-warning");
     expect(screen.getByText(/1 sync\s*conflict/)).toBeInTheDocument();
+    expect(screen.getByText("Needs your review")).toHaveClass("status-chip", "status-chip-warning");
   });
 
   it("shows an empty state when there is nothing scheduled or pending", async () => {

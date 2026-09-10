@@ -5,6 +5,8 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { StatusChip } from "./components/StatusChip";
+import { PERSISTENCE_STATUS } from "./components/persistence-status";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface MyDayScreenProps {
@@ -130,7 +132,7 @@ export function MyDayScreen({
                     <span className="workspace-priority-section">
                       {task.subjectName} — {task.sectionName}
                     </span>
-                    <span className="field-hint">attendance not yet checked</span>
+                    <StatusChip tone="warning">Not checked</StatusChip>
                   </div>
                   <button
                     type="button"
@@ -148,7 +150,9 @@ export function MyDayScreen({
                       {summary.pendingConflicts.length} sync{" "}
                       {summary.pendingConflicts.length === 1 ? "conflict" : "conflicts"}
                     </span>
-                    <span className="field-hint">waiting on your review</span>
+                    <StatusChip tone={PERSISTENCE_STATUS.conflict.tone}>
+                      {PERSISTENCE_STATUS.conflict.label}
+                    </StatusChip>
                   </div>
                   <button type="button" className="button-primary" onClick={onReviewConflicts}>
                     Review conflicts
