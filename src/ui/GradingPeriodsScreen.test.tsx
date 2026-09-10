@@ -158,7 +158,7 @@ describe("GradingPeriodsScreen", () => {
 
     await screen.findByText("1st Term");
     expect(await screen.findByText("2026-06-08")).toBeInTheDocument();
-    expect(screen.getByText("Saved")).toBeInTheDocument();
+    expect(screen.getByText("Saved")).toHaveClass("status-chip", "status-chip-success");
     // Only the still-unsaved "2nd Term" row should have a Save button.
     expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(1);
   });

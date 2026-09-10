@@ -500,3 +500,36 @@ the name column instead of forcing the whole roster to scroll sideways
    that must be **visually verified** — and this environment has no
    browser/screenshot for the compiled binary. Deferred to a session
    with visual tooling, or to Wave M's native pass.
+
+---
+
+## 12. Wave H execution notes (2026-09-10)
+
+**Wave H — class records, grading, assessment.** Inspected
+`ClassRecordsScreen`, `ClassRecordWorkspace`, `GradingPeriodsScreen`,
+`AssessmentAuthoringScreen`. The brief's Wave-H asks are **already
+satisfied** in this codebase:
+
+- **Calculated vs. entered**: `ClassRecordWorkspace` / `AssessmentAuthoringScreen`
+  use `StatusChip` "Not recorded" for empty scores and a "Saved {time}"
+  note for persisted ones; entered scores sit in labelled inputs.
+- **Policy / version context**: `GradingPeriodsScreen` shows the selected
+  policy's `sourceCitation`; `ClassRecordsScreen` shows the DepEd
+  weighting name on every record and warns "a wrong pick would compute
+  the wrong grade".
+- **Silent data loss prevented**: item deletion is a two-step confirm
+  ("Delete this item? This can't be undone." → "Confirm delete"), and is
+  refused outright once scores exist ("Can't delete — already has
+  recorded scores").
+- **Destructive actions behind confirmation**: as above.
+
+**Shipped** (commit — see git log): the one gap — `GradingPeriodsScreen`'s
+saved-period status cell rendered the bare word "Saved". Now
+`<StatusChip tone="success">Saved</StatusChip>`, matching the status
+vocabulary and adding the non-color cue. No grading math, policy, or
+data contract touched.
+
+`ClassRecordWorkspace`'s score-entry keyboard/commit model
+(Enter/blur-save + `:focus-within`) is deliberately left untouched — same
+reason as the Wave G `DataTable` deferral (needs an independent
+keyboard-behaviour review; harness down this session).

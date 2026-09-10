@@ -1,23 +1,43 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–G complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–H complete (2026-09-10)
 
-**Status**: Waves A (appearance foundation), B (shell finish), C
-(persistence/sync status vocabulary), D (teacher Home rebuild), E
-(pre-auth trust & sign-in), F (daily-teaching workspace — `MyDayScreen`
-aligned to the status vocabulary; the other 5 screens assessed, no
-change needed), and G (attendance/roster — long-name CSS defense; the
-`DataTable` migration deliberately deferred) implemented, `npm run
-quality` green after each. All pushed — head `98ef431` on
-`origin/feat/precision-intelligence-shell`.
+**Status**: Waves A (appearance), B (shell finish), C (status
+vocabulary), D (teacher Home rebuild), E (pre-auth trust & sign-in),
+F (daily-teaching workspace), G (attendance/roster long-name defense),
+and H (grading screens) implemented, `npm run quality` green after each.
+All pushed — head on `origin/feat/precision-intelligence-shell` (see git
+log; H is the newest commit).
+
+**F, G, and H were each small**: those screen families were already
+mostly on the PI bar (on `Page`, `StatusChip` for non-color state,
+Guided hints, two-step delete confirms, policy citations). Each wave
+made the one genuine consistency fix and recorded the rest as
+"assessed, no change needed" rather than manufacturing work.
 
 **Recommendation: pause autonomous execution here.** The
-independent-review harness is non-functional this session (all four
-reviewer subagents returned empty 0-byte outputs). Waves H (grading),
-J (official forms), and the deferred `DataTable` migration all carry
-domain-adjacent or keyboard-model risk that needs a working independent
-review before autonomous implementation. Resume once the harness is
-healthy; run the owed reviews (Waves A–G) first.
+independent-review harness was non-functional this session (all reviewer
+subagents returned empty 0-byte outputs — a fresh attempt should be made
+next session). The remaining waves carry more risk: **J (official
+forms)** must not claim template fidelity without primary-source
+evidence; the deferred **`DataTable` migration** (Waves G/H) needs an
+independent keyboard-behaviour review; **K (admin/governance)** touches
+permission-adjacent surfaces. Resume once the harness is healthy and run
+the owed reviews (Waves A–H) first.
+
+### Wave H — class records / grading / assessment (this session's newest commit)
+
+- The brief's Wave-H asks are **already satisfied**: `StatusChip` "Not
+  recorded" for empty scores, "Saved {time}" notes for entered ones,
+  policy `sourceCitation` shown, "wrong pick would compute the wrong
+  grade" warning, two-step item-delete confirm ("can't be undone"),
+  delete refused once scores exist.
+- Shipped: `GradingPeriodsScreen`'s saved-period cell rendered a bare
+  "Saved" → `<StatusChip tone="success">Saved</StatusChip>`. No grading
+  math / policy / data contract touched.
+- `ClassRecordWorkspace` score-entry keyboard model left untouched
+  (deferred like the Wave G `DataTable` migration — needs an independent
+  keyboard review).
 
 ### Wave F — daily teaching workspace (commit 772c292)
 
@@ -57,23 +77,27 @@ approved — three-zone IA; keep a one-line "last sign-in" for the current
 user (5-row school-wide list removed); merge homeroom + subject
 attendance into one ranked Zone 1 list.
 
-**Next is Wave H — class records, grading, assessment**
-(`ClassRecordsScreen`, `ClassRecordWorkspace`, `GradingPeriodsScreen`,
-`AssessmentAuthoringScreen`). Distinguish calculated vs. entered values;
-surface policy/version context; prevent silent data loss; destructive
-actions behind clear confirmation. **Never** alter grading formulas,
-curriculum rules, or data contracts as part of visual work. Given the
-review-harness situation, treat H as needing an independent
-correctness/teacher-UX review before merge — do not run it fully
-autonomously while the harness is down.
+**Next is Wave I — learner / section / enrollment / transfer**
+(`LearnerListScreen`, `SectionsScreen`, `SectionRosterScreen`,
+`TeachingAssignmentsScreen`, `SectionAdviserScreen`, `Sf1ImportScreen`).
+Minimise PII exposure on shared/compact screens; do not add sensitive
+fields to fill space; align search/filter/history surfaces to the PI
+patterns. Expect it to be another mostly-assessment wave (these screens
+are already on `Page`). No approval gate. Then **J (official forms) is a
+hard stop for autonomous work** — needs primary-source template evidence
+and an independent review.
 
-**Review-harness status**: all four reviewer subagents dispatched this
-session (Waves A+B a11y ×1, Waves A–D a11y ×1, Wave D teacher-ux ×1, and
-a second A+B attempt) returned **empty 0-byte outputs**; agent-resume is
-disabled. Controller self-reviews found no blocking issue (recorded in
-`docs/VERIFICATION-DEBT.md`, 2026-09-10 entries). Owed reviews: Waves
-A–G accessibility + teacher-UX, and a `security-reviewer` glance at Wave
-E's pre-auth copy. Retry when the harness looks healthy.
+**Review-harness status**: every reviewer subagent dispatched this
+session returned an **empty 0-byte output**; agent-resume is disabled.
+Controller self-reviews found no blocking issue (recorded in
+`docs/VERIFICATION-DEBT.md`, 2026-09-10 entries). Owed: Waves A–H
+accessibility + teacher-UX, a `security-reviewer` glance at Wave E's
+pre-auth copy, and a keyboard-behaviour review before any `DataTable`
+migration. Retry the harness next session.
+
+**Two teacher copy nits for the owner** (not blocking): `TeacherHome`
+says "homeroom" where DepEd usually says "advisory class"; the `failed`
+device sentence uses "sync hub" jargon.
 
 **Two teacher copy nits for the owner** (not blocking): `TeacherHome`
 says "homeroom" where DepEd usually says "advisory class"; the `failed`

@@ -1,5 +1,26 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave H: class records / grading / assessment (2026-09-10)
+
+Full detail: plan §12. Inspected `ClassRecordsScreen`,
+`ClassRecordWorkspace`, `GradingPeriodsScreen`,
+`AssessmentAuthoringScreen`. The brief's Wave-H asks (calculated vs.
+entered distinction, policy context, no silent data loss, confirmation
+on destructive actions) are **already satisfied** — `StatusChip` "Not
+recorded", "Saved {time}" notes, policy `sourceCitation` shown, two-step
+delete confirm, delete refused once scores exist.
+
+Shipped: the one gap — `GradingPeriodsScreen`'s saved-period cell
+rendered a bare "Saved"; now `<StatusChip tone="success">Saved</StatusChip>`.
+No grading math / policy / data contract touched.
+`ClassRecordWorkspace`'s score-entry keyboard/commit model left
+untouched (same reason as the Wave G `DataTable` deferral — needs an
+independent keyboard review, harness down).
+
+Verification: `npm run quality` exit 0 — Vitest **115 files / 1132
+tests** (one assertion strengthened, no net-new test). No Rust, no
+dependency, no approval gate.
+
 ## Precision Intelligence — Waves F & G (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry; plan §11.

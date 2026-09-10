@@ -5,6 +5,7 @@ import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domai
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { StatusChip } from "./components/StatusChip";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface GradingPeriodsScreenProps {
@@ -212,7 +213,9 @@ export function GradingPeriodsScreen({ gradingService }: GradingPeriodsScreenPro
                     <>
                       <td>{existing.startsOn}</td>
                       <td>{existing.endsOn}</td>
-                      <td>Saved</td>
+                      <td>
+                        <StatusChip tone="success">Saved</StatusChip>
+                      </td>
                     </>
                   ) : (
                     <>
