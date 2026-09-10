@@ -1,5 +1,29 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave D: teacher Home rebuild (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry; plan §10 (owner-
+approved IA).
+
+`b4631ff` extracted `src/ui/home/todays-classes.ts` from
+`TodaysClassesScreen` (behavior-preserving). `c96899f` added
+`src/ui/home/TeacherHome.tsx` — three zones on `Page`: urgency-ranked
+merged homeroom + subject attendance duties (Zone 1, dominant),
+contextual Grading (Zone 2, shown only when a period is open), one-line
+sync-honesty signal (Zone 3, Wave C vocabulary). One-line "last
+sign-in" for the current user replaces the old school-wide activity
+list. `HomeScreen` renders `TeacherHome`; `TeacherWorkspaceScreen` +
+`PageHeader` retained unreferenced (Wave M deletion). No new backend
+read; each zone loads independently.
+
+Verification: `npm run quality` exit 0 — typecheck / eslint / prettier /
+architecture / knip clean; Vitest **115 files / 1132 tests** (+2 files,
++15 vs. Wave C; +4 helper tests in `b4631ff`).
+`check:dev-preview-isolation` exit 0. `npm run build` ok, no new
+dependency. Independent `teacher-ux-reviewer` + `accessibility-reviewer`
+passes (and the re-owed Waves A+B a11y review) dispatched — results to
+be recorded.
+
 ## Precision Intelligence — Wave C: persistence/sync status vocabulary (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry.

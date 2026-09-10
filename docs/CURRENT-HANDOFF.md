@@ -1,19 +1,32 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A + B + C complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–D complete (2026-09-10)
 
-**Status**: Wave A (appearance foundation), Wave B (shell finish), and
-Wave C (persistence/sync status vocabulary) implemented, `npm run
-quality` green after each, committed and pushed on
-`feat/precision-intelligence-shell`. **Next is Wave D (teacher-Home
-rebuild), which is gated**: its information architecture must be drafted
-in the plan doc and owner-approved before implementation. Owner directives recorded in the
-plan doc: autonomous continuation authorised; **no file deletions during
-the program** (one consolidated list at Wave M); the expectation
-prototype is behind a ChatGPT sign-in wall and could not be accessed
-(evidence gap recorded, not fabricated around); **Wave D teacher-Home IA
-must be proposed in the plan doc and owner-approved before
-implementation** — Waves B and C proceed autonomously.
+**Status**: Waves A (appearance foundation), B (shell finish), C
+(persistence/sync status vocabulary), and D (teacher Home rebuild)
+implemented, `npm run quality` green after each, committed and pushed on
+`feat/precision-intelligence-shell`. Head: `c96899f`.
+
+**Owner decisions on Wave D IA (2026-09-10, plan §10.7)**: all three
+approved — three-zone IA; keep a one-line "last sign-in" for the current
+user (5-row school-wide list removed); merge homeroom + subject
+attendance into one ranked Zone 1 list.
+
+**Next is Wave E — authentication / session / onboarding / trust**
+(`LoginScreen`, `FirstRunSetupScreen`, `IdleTimeoutWarning`, `.app-boot`
+container). Restyle onto the token system + Precision Intelligence
+language; preserve the shared-computer security model exactly; explain
+privacy / local-first / active-scope in plain language without leaking
+technical internals. No approval gate expected. Success gate:
+`npm run quality` green + a `security-reviewer` pass (auth-adjacent UI)
+
+- `accessibility-reviewer` + `teacher-ux-reviewer`. Owner directives recorded in the
+  plan doc: autonomous continuation authorised; **no file deletions during
+  the program** (one consolidated list at Wave M); the expectation
+  prototype is behind a ChatGPT sign-in wall and could not be accessed
+  (evidence gap recorded, not fabricated around); **Wave D teacher-Home IA
+  must be proposed in the plan doc and owner-approved before
+  implementation** — Waves B and C proceed autonomously.
 
 ### Wave B — shell finish (commit pending)
 
@@ -45,7 +58,26 @@ rigorous controller self-review found no blocking issue; full detail +
 retained debt in `docs/VERIFICATION-DEBT.md` (2026-09-10 entry). The
 independent review is re-owed — fold it into the Wave D review batch.
 
-### Wave C — persistence/sync status vocabulary (commit pending)
+### Wave D — teacher Home rebuild (commits b4631ff, c96899f)
+
+- `b4631ff` — extracted `todaysClassesForTeacher` helper (`src/ui/home/
+todays-classes.ts`) from `TodaysClassesScreen` (behavior-preserving,
+  10 screen tests unchanged, +4 helper tests).
+- `c96899f` — `src/ui/home/TeacherHome.tsx`: three zones on `Page` —
+  (1) "What needs you today" = one urgency-ranked list merging homeroom
+  - today's subject classes, one action per row; (2) "Grading" =
+    contextual, shown only when a period is open; (3) "Your device" = one
+    line from the Wave C sync vocabulary. One-line "last sign-in" for the
+    current user replaces the old school-wide activity list.
+    `HomeScreen` renders `TeacherHome` instead of `TeacherWorkspaceScreen`
+    (old file + `PageHeader` retained unreferenced → Wave M deletion
+    list). `App.tsx` wires 2 new services + 3 nav callbacks. `App.test.tsx`
+    updated (shared `teacherHomeCommand` mock helper).
+- `npm run quality` exit 0 — Vitest **115 files / 1132 tests**. Build
+  ok, no new dependency. Independent teacher-ux + accessibility reviews
+  (plus the re-owed A+B a11y review) dispatched.
+
+### Wave C — persistence/sync status vocabulary (commit 5c9f59e)
 
 - New `docs/design/status-vocabulary.md`: the canonical six states
   (saved-local / pending-sync / synced / offline / conflict / failed) —

@@ -20,12 +20,36 @@
   the `AppLayout` shell mechanics + drawer a11y contract, the four
   layout primitives, the non-color-cue / 24px-target discipline, and the
   three density modes.
-- Work branch: `feat/precision-intelligence-shell` (from `main` `f4b75a1`).
-- Wave A shipped: device-local **Light / System / Dark** appearance
-  preference (`localStorage` `likha-sis:appearance`, default `system`),
-  applied before first paint from `main.tsx`, switchable from `TopBar`
-  (desktop) and `Sidebar` (phone drawer). "System" = _absence_ of the
-  `data-appearance` attribute, so dark mode still works with zero JS.
+- Work branch `feat/precision-intelligence-shell` (from `main` `f4b75a1`);
+  Waves A–D shipped and pushed (head `c96899f`), `npm run quality` green
+  after each:
+  - **A** — device-local Light/System/Dark appearance preference
+    (`localStorage` `likha-sis:appearance`, default `system`, applied
+    pre-paint from `main.tsx`, switcher in `TopBar` + `Sidebar`).
+    "System" = _absence_ of the `data-appearance` attribute, so dark
+    mode still works with zero JS.
+  - **B** — shell finish: 44px hamburger, appearance + density grouped
+    as one "Display" cluster, `DESIGN.md` names Precision Intelligence.
+  - **C** — `docs/design/status-vocabulary.md` +
+    `src/ui/components/persistence-status.ts`: the six persistence/sync
+    states (saved-local / pending-sync / synced / offline / conflict /
+    failed) with label + non-color word cue + tone; adopted by
+    `SyncStatusScreen` + `ConflictReviewScreen`.
+  - **D** — teacher Home rebuilt as `src/ui/home/TeacherHome.tsx` (three
+    zones: merged homeroom + subject attendance duties / contextual
+    Grading / one-line sync signal; one-line "last sign-in" replaces the
+    school-wide activity list). Owner approved the IA in plan §10.7.
+    `TeacherWorkspaceScreen` + `PageHeader` are retained unreferenced for
+    a single Wave M deletion.
+- Owner directives (2026-09-10): autonomous wave continuation authorised;
+  **no file deletions during the program** (one consolidated list at
+  Wave M); the expectation prototype at
+  `likha-premium-preview.alotski15.chatgpt.site` is behind a ChatGPT
+  sign-in wall and could not be used as a reference.
+- The independent-review harness is flaky this session — the Waves A+B
+  `accessibility-reviewer` ran to completion but returned an empty
+  output; a controller self-review found no blocking issue. Debt
+  retained in `docs/VERIFICATION-DEBT.md`.
 
 ## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
