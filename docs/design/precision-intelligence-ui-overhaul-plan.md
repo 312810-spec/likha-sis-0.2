@@ -620,3 +620,55 @@ tests** (Wave H).
 
 **Owed** (harness down all session): independent security + a11y review
 of the whole A–K surface. Recorded in `docs/VERIFICATION-DEBT.md`.
+
+---
+
+## 15. Wave J execution notes (2026-09-10)
+
+**Wave J — official-forms & output workspace.** Scoped via `prompt-master`
+first; split into an autonomous Part A (audit the existing export UI)
+and a gated Part B (net-new aggregator screen + template fidelity).
+
+### Part A — export entry points: assessed, no code change
+
+Inspected `Sf1ImportScreen`, `MonthlySummaryScreen`,
+`SectionRosterScreen`, `LearnerListScreen`, `SectionsScreen`. The
+existing DepEd-form export UI **already exceeds the Wave J bar** and was
+clearly built with this exact concern in mind:
+
+- **Honest disclosure everywhere.** MonthlySummary: "not a verified,
+  submission-ready reproduction of the official form"; per-export:
+  "DepEd-SF2-inspired, not a submission-ready reproduction". SectionRoster:
+  "SF1 and SF9 use a synthetic, DepEd-style template — neither has been
+  verified against an official DepEd source. Confirm your school's actual
+  SF1/SF9 requirements…".
+- **Structured omission disclosure.** Each export result carries a
+  `disclosure.omittedFields` list that the screen renders to the teacher
+  — the UI shows exactly what the file leaves out.
+- **Consistent confirmation pattern.** "Saved to `{filePath}`" + an
+  "Open folder" reveal action + reveal errors as `role="alert"`, across
+  SF2 / SF4 / SF5 / SF1 / SF10 / SF6.
+- **Permission-aware failure copy.** e.g. SF5: "you may not have
+  permission to export this section (only the assigned class adviser or
+  School Head can export it), or learning records are incomplete."
+- `Sf1ImportScreen` carries the full `StatusChip` set (New / Already in
+  LIKHA / Need your review / Has an error).
+
+No safe, valuable change exists without touching generated output or its
+disclosures — which is forbidden. `npm run quality` unaffected; last
+green **115 files / 1132 tests** (Wave H).
+
+### Part B — gated, needs owner sign-off before Wave J is "complete"
+
+1. **New "Official Forms" aggregator workspace** — a single
+   screen/nav destination listing every DepEd form with per-form
+   readiness/validation status, disclosure, preview, export, and export
+   history/remediation. This is **net-new product IA**, not a visual
+   pass. Owner decision: build it, or keep the current per-context model
+   (each form exported from the screen that owns its data)?
+2. **Template fidelity** — making any form genuinely
+   template-faithful / submission-ready requires a `deped-researcher`
+   primary-source pass + explicit authorization. Out of autonomous
+   scope; not attempted.
+
+Until Part B is decided, Wave J is **Part A complete / Part B blocked**.

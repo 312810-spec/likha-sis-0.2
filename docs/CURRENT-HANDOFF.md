@@ -1,19 +1,24 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–K complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–K + J(Part A) (2026-09-10)
 
-**Status**: Waves A (appearance), B (shell finish), C (status
-vocabulary), D (teacher Home rebuild), E (pre-auth trust & sign-in),
-F (daily-teaching workspace), G (attendance/roster long-name defense),
-H (grading screens), I (learner/section/enrollment), and
-K (admin/governance/devices/sync) implemented, `npm run quality` green
-(last run 115 files / 1132 tests at H). All pushed to
-`origin/feat/precision-intelligence-shell`.
+**Status**: Waves A–K implemented, `npm run quality` green (last run
+115 files / 1132 tests at H). Wave J **Part A** (audit of the existing
+DepEd-form export UI) assessed — **no code change**: the export UI
+already carries explicit "not verified against an official DepEd
+source / not submission-ready" disclosures, a structured
+`disclosure.omittedFields` list rendered to the teacher, the consistent
+"Saved to {path}" + "Open folder" pattern, and permission-aware failure
+copy. Plan §15. All pushed to `origin/feat/precision-intelligence-shell`.
 
-**Waves J and L–M remain.** J (official forms) is a hard stop for
-autonomous work. L (Android recomposition) and M (product-wide hardening
-
-- migration ledger) are open.
+**Wave J Part B is blocked on an owner decision** (plan §15.B): build a
+new "Official Forms" aggregator workspace (a net-new nav destination
+listing every form with readiness/validation/disclosure/preview/export/
+history), or keep the current per-context model where each form is
+exported from the screen that owns its data? Template-fidelity work
+additionally needs a `deped-researcher` primary-source pass +
+authorization. **L (Android) and M (hardening + ledger + owed reviews)
+remain.**
 
 **Process (owner instruction, 2026-09-10)**: every wave now starts with
 a `prompt-master` pass to scope what that wave covers, then executes.

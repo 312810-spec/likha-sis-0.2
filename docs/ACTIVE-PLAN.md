@@ -1,5 +1,28 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave J Part A: official-forms export audit (2026-09-10)
+
+Full detail: plan §15. Scoped via `prompt-master`; split into an
+autonomous Part A and a gated Part B.
+
+**Part A — no code change.** Audited the DepEd-form export entry points
+(`Sf1ImportScreen`, `MonthlySummaryScreen`, `SectionRosterScreen`,
+`LearnerListScreen`, `SectionsScreen`). The export UI already exceeds
+the Wave J bar: explicit "not verified against an official DepEd source"
+disclosures on every form action, a rendered `disclosure.omittedFields`
+list, the consistent "Saved to {path}" + "Open folder" confirmation
+pattern, permission-aware failure copy, and the full `StatusChip` set in
+`Sf1ImportScreen`. No safe change exists without touching generated
+output or its disclosures (forbidden).
+
+**Part B — blocked on owner sign-off**: (1) build a new "Official Forms"
+aggregator workspace (net-new nav destination) vs. keep the current
+per-context model; (2) any template-fidelity work needs a
+`deped-researcher` pass + authorization.
+
+Verification: no code touched; last green `npm run quality` **115 files
+/ 1132 tests** (Wave H).
+
 ## Precision Intelligence — Wave K: admin / governance / devices / sync (2026-09-10)
 
 Full detail: plan §14. Scoped via `prompt-master` first. Inspected
