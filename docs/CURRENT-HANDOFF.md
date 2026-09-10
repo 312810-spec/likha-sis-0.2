@@ -53,30 +53,40 @@ quality:full` (one run incl. cargo gates), `npm run quality:security`
   §§19–20). Owner approved: dominant "Needs attention" surface; KpiStrip
   → one context line; "Recent SF1 imports" removed.
 
-### Exact next task: the tooling-blocked verification (plan §17.4)
+### Verification status (plan §17.4 / `docs/VERIFICATION-DEBT.md` 2026-09-10)
 
-Every implementable wave is done. Before this branch merges, run — when
-the tooling / harness is available:
+**Ran and passed this session:**
 
-1. **Independent review** — one accessibility + teacher-UX + security
-   pass over the whole A–N surface (every reviewer subagent returned an
-   empty output this session).
-2. **Native Windows visual pass** — Light / System / Dark on the
-   compiled Tauri binary, across every screen.
-3. `npm run quality:ui` (Playwright binary absent here), one run of
-   `npm run quality:full` (incl. `cargo fmt --check` / `cargo test` /
-   `cargo clippy` — no Rust changed, but the checkpoint gate should run
-   once) and `npm run quality:security` (gitleaks + `cargo deny` + OSV;
-   no dependency added, run once).
-4. **Wave L Android device / emulator pass** — priority-workflow
-   recomposition vs. compression, on-screen keyboard, rotation, real
-   safe-area insets.
-5. **Wave-completion delivery report** — per the
-   `wave-completion-delivery-reports` memory, written outside the repo,
-   once 1–4 pass.
+- `npm run quality:full` — exit 0 (harness verify, TS gates, Vitest
+  **113/1097**, `cargo fmt --check`, `cargo test` all pass incl. the
+  auth/isolation integration binaries, `cargo clippy -D warnings`).
+- `npm run quality:ui` — PASS: Playwright drove the workflow + phone
+  reflow and ran **axe WCAG 2.2 A/AA with 0 violations** on Home /
+  Attendance / Learners. (`scripts/ui-smoke.mjs` retargeted off the
+  deleted `TeacherWorkspaceScreen` — commit `55ed39a`.)
+- `npm run quality:security` — `gitleaks` clean; `cargo deny` 0 actual
+  vulnerabilities.
+- `git diff f4b75a1..HEAD -- src-tauri src/application src/domain
+src/infrastructure src/composition.ts` is **EMPTY** — the whole A–N
+  program is presentation-layer only.
 
-If any of 1–4 surfaces a defect, that becomes the next implementation
-slice; otherwise the branch is ready for a PR.
+**Still owed before merge:**
+
+1. **Independent human-style review** — all three reviewer subagents
+   returned empty 0-byte outputs again (confirmed across a fresh session
+   - all three reviewer types). Controller self-review found no blocking
+     issue. Re-run when the reviewer harness is healthy.
+2. **`osv-scanner`** — not installed here (exit 127); no dependency was
+   added in A–N so nothing new to flag, but the scan did not run.
+3. **Native Windows visual pass** — Light / System / Dark on the
+   compiled Tauri binary, full theme×mode matrix.
+4. **Wave L Android device / emulator pass** — recomposition, on-screen
+   keyboard, rotation, real insets.
+5. **Wave-completion delivery report** (outside the repo, per the
+   `wave-completion-delivery-reports` memory) once 1–4 pass.
+
+If any of 1–4 surfaces a defect it becomes the next slice; otherwise the
+branch is PR-ready.
 
 ---
 

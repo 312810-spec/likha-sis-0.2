@@ -1,5 +1,66 @@
 # Verification Debt
 
+## Precision Intelligence A–N — verification pass results (2026-09-10)
+
+Run at the end of the program (a session where Playwright and the Rust
+toolchain worked; the reviewer-subagent harness did not).
+
+### What RAN and passed
+
+- **`npm run quality:full`** — exit 0. `harness:verify` certified;
+  typecheck / eslint / `prettier --check` / architecture-boundary /
+  `knip` clean; Vitest **113 files / 1097 tests**; `cargo fmt --check`
+  clean; `cargo test` — lib + every integration binary pass, 0 failed
+  (the auth/tenant-isolation integration tests all `ok`, confirming no
+  Rust behaviour changed); `cargo clippy --all-targets -- -D warnings`
+  clean.
+- **`npm run quality:ui`** — PASS. Real Chromium via Playwright drove
+  the dev-preview: teacher Home → "Mark attendance" with the
+  section-context handoff → Learners → enrollment history → phone-width
+  (390px) no-horizontal-overflow check → **axe-core WCAG 2.2 A/AA sweep
+  with 0 violations** (serious or critical) on Home / Attendance /
+  Learners. (`scripts/ui-smoke.mjs` had to be retargeted off the deleted
+  `TeacherWorkspaceScreen` first — commit `55ed39a`.)
+- **`npm run quality:security`** — `gitleaks` clean (no secrets in any
+  changed file, fixture, or test). `cargo deny check` reports **0 actual
+  vulnerabilities** (only the project's pre-existing unmaintained-crate
+  advisory _warnings_).
+- **`git diff f4b75a1..HEAD -- src-tauri src/application src/domain
+src/infrastructure src/composition.ts` is EMPTY** — mechanically
+  confirms the whole A–N program is presentation-layer only: no domain,
+  application, repository, Rust, migration, or composition change.
+- Every component with new/changed a11y-relevant markup carries an
+  `expectNoAccessibilityViolations` (axe) unit test; all pass.
+
+### What did NOT run — still owed
+
+1. **Independent human-style review.** All three reviewer subagents
+   (`accessibility-reviewer`, `teacher-ux-reviewer`, `security-reviewer`),
+   dispatched fresh over the full `f4b75a1..HEAD` diff, again returned
+   **empty 0-byte outputs** — the same harness failure seen the previous
+   session, now confirmed across a fresh session and all three reviewer
+   types. Their meta "done" messages are not retrievable findings.
+   Controller self-review (rigorous, whole A–N surface) found **no
+   blocking accessibility, teacher-UX, or security issue**: the
+   appearance selector split changed no colour value and was traced
+   clean for all four OS×override combinations; both rebuilt Homes keep
+   sound heading/landmark structure, non-colour cues, and full
+   Efficient/Comfortable/Guided control parity; `warning`-toned
+   StatusChips are always distinguished by their label text (WCAG
+   1.4.1); the 44px mobile floor overrides Efficient's 34px density; the
+   pre-auth trust copy is accurate to the local-first + SQLCipher model;
+   `HomeScreen`'s `roles` gating stays display-only. Re-run the
+   independent reviews when the reviewer harness is healthy.
+2. **`osv-scanner`** — not installed in this environment (exit 127). No
+   dependency was added anywhere in A–N, so there is nothing new for it
+   to flag, but the scan itself did not run.
+3. **Native Windows visual pass** — Light / System / Dark on the
+   compiled Tauri binary, across every screen. No screenshot tooling for
+   the native binary here. (The Playwright axe sweep covers the web
+   render of a subset of screens, not the compiled binary or the full
+   theme×mode matrix.)
+4. **Wave L Android device / emulator pass** — see the entry below.
+
 ## Precision Intelligence Wave L — Android device pass owed (2026-09-10)
 
 Wave L shipped only inspection-verifiable mobile hardening
