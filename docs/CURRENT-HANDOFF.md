@@ -1,13 +1,19 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–I complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–K complete (2026-09-10)
 
 **Status**: Waves A (appearance), B (shell finish), C (status
 vocabulary), D (teacher Home rebuild), E (pre-auth trust & sign-in),
 F (daily-teaching workspace), G (attendance/roster long-name defense),
-H (grading screens), and I (learner/section/enrollment) implemented,
-`npm run quality` green (last run 115 files / 1132 tests at H). All
-pushed to `origin/feat/precision-intelligence-shell`.
+H (grading screens), I (learner/section/enrollment), and
+K (admin/governance/devices/sync) implemented, `npm run quality` green
+(last run 115 files / 1132 tests at H). All pushed to
+`origin/feat/precision-intelligence-shell`.
+
+**Waves J and L–M remain.** J (official forms) is a hard stop for
+autonomous work. L (Android recomposition) and M (product-wide hardening
+
+- migration ledger) are open.
 
 **Process (owner instruction, 2026-09-10)**: every wave now starts with
 a `prompt-master` pass to scope what that wave covers, then executes.
@@ -29,7 +35,21 @@ independent keyboard-behaviour review; **K (admin/governance)** touches
 permission-adjacent surfaces. Resume once the harness is healthy and run
 the owed reviews (Waves A–H) first.
 
-### Wave I — learner / section / enrollment / transfer (no-code; plan §13 + this docs commit)
+### Wave K — administration / governance / devices / sync (no-code; plan §14)
+
+Scoped via `prompt-master`. Inspected `AuditLogScreen`,
+`AdminPasswordResetScreen`, `SchoolMembershipScreen`,
+`DeviceManagementScreen`, `SchoolBrandingScreen`; re-verified
+`SyncStatusScreen` / `ConflictReviewScreen`. **No code change** — these
+security-sensitive screens already meet the brief's asks: two-step
+plain-language confirmations stating consequence _and_ reversibility
+(`DeviceManagementScreen`, `SchoolMembershipScreen`), fail-closed
+"you may not have permission" copy everywhere (security enforced
+server-side, never by hiding a control), `StatusChip` per-event tones
+(`AuditLogScreen`), Wave C sync-vocabulary chips (`SyncStatusScreen` /
+`ConflictReviewScreen`). Nothing touched.
+
+### Wave I — learner / section / enrollment / transfer (no-code; plan §13)
 
 Scoped via `prompt-master`. Inspected `LearnerListScreen`,
 `SectionsScreen`, `SectionRosterScreen`, `TeachingAssignmentsScreen`,
@@ -92,21 +112,31 @@ approved — three-zone IA; keep a one-line "last sign-in" for the current
 user (5-row school-wide list removed); merge homeroom + subject
 attendance into one ranked Zone 1 list.
 
-**Next is Wave J — official-forms & output workspace** — a **hard stop
-for autonomous work**. Per the master brief: preserve authoritative
-layouts, calculations, disclosures, and export generation exactly;
-never claim an output is official / compliant / template-faithful
-without recorded primary-source evidence; surface known limitations
-honestly. This needs (a) primary-source DepEd template evidence
-(`deped-researcher`), (b) an independent review, and (c) likely owner
-input on the new forms-readiness surface's scope. Start Wave J only on
-an explicit go-ahead. Begin it (like every wave) with a `prompt-master`
-pass.
+**Remaining waves: J, L, M.**
 
-If continuing before J: **K (admin / governance / devices / sync)** is
-lower-risk than J but touches permission-adjacent surfaces — scope it
-tightly with `prompt-master`, and note that "no UI redesign may broaden
-permissions."
+- **J — official-forms & output workspace: HARD STOP for autonomous
+  work.** Preserve authoritative layouts / calculations / disclosures /
+  export generation exactly; never claim an output is official /
+  compliant / template-faithful without recorded primary-source
+  evidence. Needs `deped-researcher` primary-source template evidence,
+  an independent review, and likely owner input on the new
+  forms-readiness surface's scope. Start only on an explicit go-ahead.
+- **L — Android-specific recomposition.** Recompose priority workflows
+  for small screens / touch / on-screen keyboards / rotation / safe
+  areas. Note: this environment has **no device or real-viewport
+  testing** — L can define the responsive/touch approach and adjust
+  breakpoints/targets in `styles.css`, but the "intentionally recomposed,
+  not compressed" verification needs a real device or emulator pass
+  (record as debt). Scope tightly with `prompt-master`.
+- **M — product-wide hardening + migration ledger.** Route sweep,
+  a11y/keyboard/responsive/theme matrix, the consolidated
+  superseded-file deletion list (owner directive: deletions deferred to
+  here), verification-debt reconciliation, final route/component
+  migration ledger (Complete / Deferred / Blocked). M is where the owed
+  A–K independent reviews and the native visual pass must land before
+  the branch is considered done.
+
+Every wave still starts with a `prompt-master` pass (owner instruction).
 
 **Review-harness status**: every reviewer subagent dispatched this
 session returned an **empty 0-byte output**; agent-resume is disabled.

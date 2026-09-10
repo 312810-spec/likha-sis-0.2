@@ -1,5 +1,24 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave K: admin / governance / devices / sync (2026-09-10)
+
+Full detail: plan §14. Scoped via `prompt-master` first. Inspected
+`AuditLogScreen`, `AdminPasswordResetScreen`, `SchoolMembershipScreen`,
+`DeviceManagementScreen`, `SchoolBrandingScreen`; re-verified
+`SyncStatusScreen` / `ConflictReviewScreen`.
+
+**Outcome: no code change.** These security-sensitive screens already
+meet the brief: two-step confirms stating consequence + reversibility,
+fail-closed "you may not have permission" copy (security enforced
+server-side, never by hiding a control), `StatusChip` per-event tones,
+Wave C sync-vocabulary chips. Nothing touched — `SchoolMembershipScreen`'s
+School-Head-safety logic and `DeviceManagementScreen`'s revoke confirm
+flow are exactly the reintroduction risks the security rules warn about.
+
+Verification: no code touched; last green `npm run quality` **115 files /
+1132 tests** (Wave H). Independent security + a11y review of the A–K
+surface owed (harness down) — recorded in `docs/VERIFICATION-DEBT.md`.
+
 ## Precision Intelligence — Wave I: learner / section / enrollment (2026-09-10)
 
 Full detail: plan §13. Wave scoped via `prompt-master` first (owner

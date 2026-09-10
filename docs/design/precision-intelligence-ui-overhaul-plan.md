@@ -574,3 +574,49 @@ No gratuitous PII, no analytics-for-completeness, search/history/
 sensitive-data handling already match the PI patterns. `npm run quality`
 unaffected (no code touched) — last green run: **115 files / 1132
 tests** at Wave H.
+
+---
+
+## 14. Wave K execution notes (2026-09-10)
+
+**Wave K — administration / governance / devices / sync.** Scoped via
+`prompt-master` first. Inspected `AuditLogScreen`,
+`AdminPasswordResetScreen`, `SchoolMembershipScreen`,
+`DeviceManagementScreen`, `SchoolBrandingScreen`; re-verified
+`SyncStatusScreen` and `ConflictReviewScreen` (Wave C).
+
+**Outcome: no code change.** These are the most security-sensitive
+screens in the app and were already built to the bar the brief asks
+for:
+
+- **`AuditLogScreen`** — `Page`; each event row is a `StatusChip` with a
+  per-event tone (`EVENT_TONES`); the label text carries the meaning.
+- **`AdminPasswordResetScreen`** — `Page`; a Guided hint states the
+  action and its purpose ("a colleague who has forgotten theirs or is
+  locked out"); confirmation on success; permission-aware failure copy.
+- **`SchoolMembershipScreen`** — `Page`; **two-step** plain-language
+  confirmations for member removal _and_ role revocation, each stating
+  the consequence in the panel; fail-closed messaging for "would leave
+  the school without a School Head"; `role="group"` on the confirm
+  panels. Untouched — this is exactly the reintroduction risk
+  `.claude/rules/security-privacy.md` warns about.
+- **`DeviceManagementScreen`** — `Page`; two-step confirm with the
+  consequence ("stops syncing right away, and this cannot be undone")
+  _and_ the reversibility ("if it is still in use, it can enroll
+  again") both stated in the panel; focus moves into the confirm panel;
+  generic fail-closed error. Untouched.
+- **`SchoolBrandingScreen`** — `Page`; permission-aware error copy;
+  the DepEd-seal prohibition is documented in the file. Logo removal is
+  low-consequence and trivially reversible (re-upload), so a single
+  action is right — no two-step needed.
+- **`SyncStatusScreen` / `ConflictReviewScreen`** — already carry the
+  Wave C persistence/sync vocabulary chips.
+
+Consequence, reversibility, active scope, and actor are already explicit
+where they matter; security is enforced server-side with fail-closed
+copy, never by hiding a control. No progressive-disclosure gap worth a
+change. `npm run quality` unaffected — last green **115 files / 1132
+tests** (Wave H).
+
+**Owed** (harness down all session): independent security + a11y review
+of the whole A–K surface. Recorded in `docs/VERIFICATION-DEBT.md`.

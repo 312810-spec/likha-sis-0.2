@@ -1,5 +1,23 @@
 # Verification Debt
 
+## Precision Intelligence Waves F–K — no independent review run (2026-09-10)
+
+Waves F (My Day chip), G (roster long-name CSS), H (`GradingPeriodsScreen`
+"Saved" chip), I (no code), and K (no code) shipped without an
+independent reviewer pass — the reviewer-subagent harness returned empty
+outputs on every attempt earlier this session (entries below), so none
+was dispatched for F–K. F/G/H were single, behavior-preserving,
+tested `StatusChip` / CSS changes; I and K changed no code. Controller
+self-review found no blocking issue in any of them.
+
+**Debt retained**: one independent **accessibility + teacher-UX +
+security** review pass over the whole Waves A–K surface, to run in
+Wave M (or an earlier session once the harness is healthy). The
+security angle matters most for K's untouched-but-unreviewed governance
+screens and E's pre-auth copy. A native Windows visual pass of
+Light / System / Dark across every migrated screen is also owed
+(no browser/screenshot tooling for the compiled binary here).
+
 ## Precision Intelligence Waves C–E — independent reviews not retrievable (2026-09-10)
 
 The reviewer-subagent harness stayed non-functional through the rest of
