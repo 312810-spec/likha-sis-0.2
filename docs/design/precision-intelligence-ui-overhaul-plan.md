@@ -533,3 +533,44 @@ data contract touched.
 (Enter/blur-save + `:focus-within`) is deliberately left untouched — same
 reason as the Wave G `DataTable` deferral (needs an independent
 keyboard-behaviour review; harness down this session).
+
+---
+
+## 13. Wave I execution notes (2026-09-10)
+
+**Wave I — learner / section / enrollment / transfer.** Wave scope
+defined via `prompt-master` first (owner instruction: every wave starts
+with a prompt-master pass). Inspected `LearnerListScreen`,
+`SectionsScreen`, `SectionRosterScreen`, `TeachingAssignmentsScreen`,
+`SectionAdviserScreen`, `Sf1ImportScreen`.
+
+**Outcome: no code change.** All six are already on the PI bar:
+
+- **`LearnerListScreen`** — `Page`, client-side name+LRN search (the
+  full roster is already loaded; a filter, not a query), enrollment
+  history collapsed behind a per-row toggle, per-row SF10 export with
+  scoped error/reveal. LRN is shown inline in the roster list — kept: it
+  is load-bearing for disambiguating learners with similar Filipino
+  names, not decoration, and the brief's "minimise PII" rule is about
+  not _adding_ sensitive fields, not hiding a working identifier. No
+  ad-hoc status text.
+- **`SectionsScreen`** — section list + create + enroll panel + SF6
+  export. A section has no record-state to chip. `Page`, clear headings.
+- **`SectionRosterScreen`** — explicitly out of scope (transfer /
+  end-enrollment / correct-placement flows are domain-adjacent and
+  complex; need an independent review, harness down). Already got the
+  Wave G long-name CSS rule.
+- **`TeachingAssignmentsScreen`** — assign / unassign teacher per
+  subject; no status state to represent.
+- **`SectionAdviserScreen`** — "Current adviser" `<h3>` + `<p>` vs.
+  `EmptyState "No adviser is currently assigned"`. The binary state is
+  already communicated with non-color structural cues; a `StatusChip`
+  here would be decoration.
+- **`Sf1ImportScreen`** — already carries a complete, correct
+  `StatusChip` set (New / Already in LIKHA / Need your review / Has an
+  error). Its import/duplicate logic is out of scope.
+
+No gratuitous PII, no analytics-for-completeness, search/history/
+sensitive-data handling already match the PI patterns. `npm run quality`
+unaffected (no code touched) — last green run: **115 files / 1132
+tests** at Wave H.

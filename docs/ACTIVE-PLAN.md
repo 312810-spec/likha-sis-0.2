@@ -1,5 +1,23 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Wave I: learner / section / enrollment (2026-09-10)
+
+Full detail: plan §13. Wave scoped via `prompt-master` first (owner
+instruction). Inspected `LearnerListScreen`, `SectionsScreen`,
+`SectionRosterScreen`, `TeachingAssignmentsScreen`,
+`SectionAdviserScreen`, `Sf1ImportScreen`.
+
+**Outcome: no code change.** All six already meet the PI bar — `Page`,
+client-side name/LRN search, collapsed enrollment-history disclosure,
+correct `StatusChip` set in `Sf1ImportScreen`, no gratuitous PII, no
+analytics-for-completeness. LRN kept inline in the roster list (needed
+for name disambiguation). `SectionRosterScreen`'s transfer/end/correct
+flows left untouched (domain-adjacent; independent review owed).
+
+Verification: no code touched; last green `npm run quality` was **115
+files / 1132 tests** at Wave H. Self-review only (reviewer harness down
+all session).
+
 ## Precision Intelligence — Wave H: class records / grading / assessment (2026-09-10)
 
 Full detail: plan §12. Inspected `ClassRecordsScreen`,

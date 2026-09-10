@@ -1,19 +1,23 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–H complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–I complete (2026-09-10)
 
 **Status**: Waves A (appearance), B (shell finish), C (status
 vocabulary), D (teacher Home rebuild), E (pre-auth trust & sign-in),
 F (daily-teaching workspace), G (attendance/roster long-name defense),
-and H (grading screens) implemented, `npm run quality` green after each.
-All pushed — head on `origin/feat/precision-intelligence-shell` (see git
-log; H is the newest commit).
+H (grading screens), and I (learner/section/enrollment) implemented,
+`npm run quality` green (last run 115 files / 1132 tests at H). All
+pushed to `origin/feat/precision-intelligence-shell`.
 
-**F, G, and H were each small**: those screen families were already
-mostly on the PI bar (on `Page`, `StatusChip` for non-color state,
-Guided hints, two-step delete confirms, policy citations). Each wave
-made the one genuine consistency fix and recorded the rest as
-"assessed, no change needed" rather than manufacturing work.
+**Process (owner instruction, 2026-09-10)**: every wave now starts with
+a `prompt-master` pass to scope what that wave covers, then executes.
+
+**F–I were each small or no-op**: those screen families were already on
+the PI bar (`Page`, `StatusChip` for real states, Guided hints, two-step
+delete confirms, policy citations, collapsed history disclosures). Each
+wave made at most one genuine consistency fix and recorded the rest as
+"assessed, no change needed" — **Wave I was entirely no-code** (all six
+learner/section screens already meet the bar; plan §13).
 
 **Recommendation: pause autonomous execution here.** The
 independent-review harness was non-functional this session (all reviewer
@@ -25,7 +29,18 @@ independent keyboard-behaviour review; **K (admin/governance)** touches
 permission-adjacent surfaces. Resume once the harness is healthy and run
 the owed reviews (Waves A–H) first.
 
-### Wave H — class records / grading / assessment (this session's newest commit)
+### Wave I — learner / section / enrollment / transfer (no-code; plan §13 + this docs commit)
+
+Scoped via `prompt-master`. Inspected `LearnerListScreen`,
+`SectionsScreen`, `SectionRosterScreen`, `TeachingAssignmentsScreen`,
+`SectionAdviserScreen`, `Sf1ImportScreen` — **all six already on the PI
+bar**: `Page`, client-side name/LRN search, collapsed history
+disclosure, correct `StatusChip` set in Sf1Import, no gratuitous PII.
+LRN kept inline in the roster list (load-bearing for name
+disambiguation, not padding). `SectionRosterScreen` transfer/end/correct
+flows left untouched (domain-adjacent, need independent review).
+
+### Wave H — class records / grading / assessment (commit fb6c34a)
 
 - The brief's Wave-H asks are **already satisfied**: `StatusChip` "Not
   recorded" for empty scores, "Saved {time}" notes for entered ones,
@@ -77,15 +92,21 @@ approved — three-zone IA; keep a one-line "last sign-in" for the current
 user (5-row school-wide list removed); merge homeroom + subject
 attendance into one ranked Zone 1 list.
 
-**Next is Wave I — learner / section / enrollment / transfer**
-(`LearnerListScreen`, `SectionsScreen`, `SectionRosterScreen`,
-`TeachingAssignmentsScreen`, `SectionAdviserScreen`, `Sf1ImportScreen`).
-Minimise PII exposure on shared/compact screens; do not add sensitive
-fields to fill space; align search/filter/history surfaces to the PI
-patterns. Expect it to be another mostly-assessment wave (these screens
-are already on `Page`). No approval gate. Then **J (official forms) is a
-hard stop for autonomous work** — needs primary-source template evidence
-and an independent review.
+**Next is Wave J — official-forms & output workspace** — a **hard stop
+for autonomous work**. Per the master brief: preserve authoritative
+layouts, calculations, disclosures, and export generation exactly;
+never claim an output is official / compliant / template-faithful
+without recorded primary-source evidence; surface known limitations
+honestly. This needs (a) primary-source DepEd template evidence
+(`deped-researcher`), (b) an independent review, and (c) likely owner
+input on the new forms-readiness surface's scope. Start Wave J only on
+an explicit go-ahead. Begin it (like every wave) with a `prompt-master`
+pass.
+
+If continuing before J: **K (admin / governance / devices / sync)** is
+lower-risk than J but touches permission-adjacent surfaces — scope it
+tightly with `prompt-master`, and note that "no UI redesign may broaden
+permissions."
 
 **Review-harness status**: every reviewer subagent dispatched this
 session returned an **empty 0-byte output**; agent-resume is disabled.
