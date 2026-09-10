@@ -1,5 +1,29 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — Waves F & G (2026-09-10)
+
+Full detail: `docs/CURRENT-HANDOFF.md` top entry; plan §11.
+
+**F (daily teaching workspace, commit 772c292)** — `MyDayScreen` "Needs
+your attention today" rows moved from a bare `<span class="field-hint">`
+to `StatusChip` (`warning` "Not checked"; Wave C `conflict` vocabulary
+for sync conflicts). The other five Wave-F screens were inspected and
+left unchanged — already action-centred, on `Page`, single-purpose,
+restrained metrics.
+
+**G (attendance & roster ops, commit 98ef431)** — one defensive CSS
+rule: `overflow-wrap: anywhere` on `.attendance-roster` /
+`.section-roster` name cells for long Filipino names. The `DataTable`/
+`reflowAt` migration of the four table screens is **deferred** (ADR-0064
+Wave 6 already deferred it as disproportionate keyboard-model risk; the
+independent review needed to land it is non-functional this session).
+`MonthlySummaryScreen` sticky-column long-name handling deferred pending
+visual verification.
+
+Verification for both: `npm run quality` exit 0 — Vitest **115 files /
+1132 tests** (F: `MyDayScreen` test updated, no net-new; G: CSS + docs
+only). No Rust, no dependency, no approval gate.
+
 ## Precision Intelligence — Wave E: pre-auth trust & sign-in presentation (2026-09-10)
 
 Full detail: `docs/CURRENT-HANDOFF.md` top entry.

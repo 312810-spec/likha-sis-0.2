@@ -1,13 +1,43 @@
 # CURRENT HANDOFF
 
-## Precision Intelligence UI/UX overhaul — Waves A–E complete (2026-09-10)
+## Precision Intelligence UI/UX overhaul — Waves A–G complete (2026-09-10)
 
 **Status**: Waves A (appearance foundation), B (shell finish), C
-(persistence/sync status vocabulary), D (teacher Home rebuild), and E
-(pre-auth trust & sign-in presentation) implemented, `npm run quality`
-green after each. All waves pushed — head `3360e5a` on
-`origin/feat/precision-intelligence-shell` (a transient network outage
-delayed the Wave E push by one retry; it is now on the remote).
+(persistence/sync status vocabulary), D (teacher Home rebuild), E
+(pre-auth trust & sign-in), F (daily-teaching workspace — `MyDayScreen`
+aligned to the status vocabulary; the other 5 screens assessed, no
+change needed), and G (attendance/roster — long-name CSS defense; the
+`DataTable` migration deliberately deferred) implemented, `npm run
+quality` green after each. All pushed — head `98ef431` on
+`origin/feat/precision-intelligence-shell`.
+
+**Recommendation: pause autonomous execution here.** The
+independent-review harness is non-functional this session (all four
+reviewer subagents returned empty 0-byte outputs). Waves H (grading),
+J (official forms), and the deferred `DataTable` migration all carry
+domain-adjacent or keyboard-model risk that needs a working independent
+review before autonomous implementation. Resume once the harness is
+healthy; run the owed reviews (Waves A–G) first.
+
+### Wave F — daily teaching workspace (commit 772c292)
+
+- `MyDayScreen` "Needs your attention today" rows: `<span class="field-hint">`
+  → `StatusChip` (`warning` "Not checked"; Wave C `conflict` vocabulary
+  for pending sync conflicts). Layout/behaviour unchanged.
+- `TodaysClassesScreen`, `ScheduleMeetingsScreen`, `SubjectMonitorScreen`,
+  `AdviserViewScreen`, `TeacherLoadScreen` — inspected, already
+  action-centred and on `Page`; **no change** (scope discipline).
+
+### Wave G — attendance & roster ops (commit 98ef431)
+
+- `overflow-wrap: anywhere` on `.attendance-roster` / `.section-roster`
+  learner-name cells (long Filipino compound/hyphenated names wrap
+  instead of scrolling the roster sideways).
+- **Deferred** (plan §11 + VERIFICATION-DEBT): the `DataTable`/`reflowAt`
+  migration of the four table screens (ADR-0064 Wave 6 already deferred
+  it as disproportionate keyboard-model risk; needs a working review
+  harness); `MonthlySummaryScreen` sticky-column long-name handling
+  (needs visual verification this environment lacks).
 
 ### Wave E — pre-auth trust & sign-in presentation (commit 36fa068, pushed)
 
@@ -27,25 +57,27 @@ approved — three-zone IA; keep a one-line "last sign-in" for the current
 user (5-row school-wide list removed); merge homeroom + subject
 attendance into one ranked Zone 1 list.
 
-**Next is Wave F — daily teaching workspace** (plan §5 matrix):
-`MyDayScreen`, `TodaysClassesScreen`, `ScheduleMeetingsScreen`,
-`SubjectMonitorScreen`, `AdviserViewScreen`, `TeacherLoadScreen`. Prefer
-action-centred layouts over analytics-heavy dashboards; show only
-metrics that change a decision; align these screens to the Wave C status
-vocabulary and the Wave D duty-row pattern where they overlap. Depends
-on Wave D (done). No approval gate expected. Success gate:
-`npm run quality` green + `accessibility-reviewer` + `teacher-ux-reviewer`.
+**Next is Wave H — class records, grading, assessment**
+(`ClassRecordsScreen`, `ClassRecordWorkspace`, `GradingPeriodsScreen`,
+`AssessmentAuthoringScreen`). Distinguish calculated vs. entered values;
+surface policy/version context; prevent silent data loss; destructive
+actions behind clear confirmation. **Never** alter grading formulas,
+curriculum rules, or data contracts as part of visual work. Given the
+review-harness situation, treat H as needing an independent
+correctness/teacher-UX review before merge — do not run it fully
+autonomously while the harness is down.
 
-**Before Wave F**: the independent-review harness is non-functional this
-session — the Waves A+B a11y reviewer, the Waves A–D a11y reviewer, and
-the Wave D teacher-ux reviewer all ran to completion but returned
-**empty output files** (0 bytes; agent-resume disabled). Controller
-self-reviews found no blocking issue (recorded in
-`docs/VERIFICATION-DEBT.md`, 2026-09-10 entries). All three independent
-reviews are re-owed; retry when the harness looks healthy. Two teacher
-copy nits surfaced by self-review, for the owner to weigh (not blocking):
-"homeroom" vs. DepEd's "advisory class"; "sync hub" jargon in the
-`failed` device sentence in `TeacherHome`.
+**Review-harness status**: all four reviewer subagents dispatched this
+session (Waves A+B a11y ×1, Waves A–D a11y ×1, Wave D teacher-ux ×1, and
+a second A+B attempt) returned **empty 0-byte outputs**; agent-resume is
+disabled. Controller self-reviews found no blocking issue (recorded in
+`docs/VERIFICATION-DEBT.md`, 2026-09-10 entries). Owed reviews: Waves
+A–G accessibility + teacher-UX, and a `security-reviewer` glance at Wave
+E's pre-auth copy. Retry when the harness looks healthy.
+
+**Two teacher copy nits for the owner** (not blocking): `TeacherHome`
+says "homeroom" where DepEd usually says "advisory class"; the `failed`
+device sentence uses "sync hub" jargon.
 
 Owner directives recorded in the plan doc: autonomous continuation
 authorised; **no file deletions during
