@@ -826,3 +826,35 @@ architecture-boundary check, `knip`, Vitest **115 files / 1132 tests**.
 gzip 118.38 kB; **no dependency added across the entire A–M program**
 (JS gzip is +1.1 kB vs. the pre-program baseline). `npm run
 check:dev-preview-isolation` exit 0.
+
+---
+
+## 18. Owner decisions on the §17.5 gates (2026-09-10)
+
+1. **M.3 deletion package — APPROVED and EXECUTED** (commit
+   `refactor(ui): delete superseded TeacherWorkspaceScreen + PageHeader`).
+   `TeacherWorkspaceScreen` + `PageHeader` (+ tests) deleted; the
+   dev-preview `workspace` tab now renders `TeacherHome` (new
+   `FixtureSyncStatusRepository`); 4 stale comments rewritten.
+   `npm run quality` 113 files / 1107 tests, `knip` clean, isolation
+   clean, build ok. Ledger §17.2 rows for those two items are now
+   **Deleted / Complete**.
+2. **Wave J Part B — CLOSED, not pursued.** Owner chose to keep the
+   per-context form-export model (each DepEd form exported from the
+   screen that owns its data, with its honest "not verified" disclosure).
+   No aggregator workspace. Wave J is complete: Part A assessed, Part B
+   closed by decision.
+3. **The two `TeacherHome` copy nits — FIXED** (commit `fix(ui):
+TeacherHome teacher-copy nits`). "· homeroom" → "· advisory class";
+   "trouble reaching the sync hub" → "trouble reaching the other devices
+   in your school".
+4. **`SchoolHeadHome` — gets its own follow-up wave (Wave N).** Scoped
+   with `prompt-master`, in the spirit of Wave D's teacher-Home rebuild:
+   dominant-surface hierarchy, status vocabulary, decision-relevant KPIs
+   only. Recorded as the next slice.
+
+### Still owed before the branch merges (unchanged — §17.4)
+
+Independent A–N review · native Light/System/Dark visual pass ·
+`quality:ui` / `quality:full` / `quality:security` one run each · Wave L
+Android device pass · the wave-completion delivery report.

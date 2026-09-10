@@ -29,14 +29,27 @@ quality:full` (one run incl. cargo gates), `npm run quality:security`
 4. Wave L **Android device / emulator pass** (recomposition vs.
    compression, on-screen keyboard, rotation, real insets).
 
-### Open owner decisions (plan §17.5)
+### Owner decisions on §17.5 — all resolved (plan §18)
 
-- **Approve the M.3 deletion package?**
-- **Wave J Part B** — build the "Official Forms" aggregator workspace,
-  or keep the current per-context export model?
-- **Two `TeacherHome` copy nits** — "homeroom" → "advisory class"?
-  replace "sync hub" jargon?
-- **`SchoolHeadHome`** — own wave, or leave functional-as-is?
+- **M.3 deletion package — APPROVED + EXECUTED.**
+  `TeacherWorkspaceScreen` + `PageHeader` deleted; dev-preview repointed
+  to `TeacherHome`; 4 stale comments rewritten. `npm run quality`
+  **113 files / 1107 tests**, knip + isolation + build clean.
+- **Wave J Part B — CLOSED** (keep the per-context form-export model; no
+  aggregator screen). Wave J complete.
+- **Two `TeacherHome` copy nits — FIXED** ("· homeroom" → "· advisory
+  class"; dropped "sync hub" jargon).
+- **`SchoolHeadHome` — its own follow-up wave (Wave N)**, scoped with
+  `prompt-master`, in the spirit of Wave D.
+
+### Exact next task: Wave N — `SchoolHeadHome` Precision Intelligence pass
+
+`src/ui/home/SchoolHeadHome.tsx` (rendered by `HomeScreen`'s school-head
+branch). Give it the dominant-surface hierarchy, the status vocabulary,
+and decision-relevant KPIs only — the same discipline Wave D applied to
+the teacher Home. Start with a `prompt-master` pass. No
+domain/application/repository change; the school-head reads it makes are
+already capability-gated server-side and must stay so.
 
 ---
 

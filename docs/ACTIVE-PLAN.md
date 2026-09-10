@@ -1,5 +1,17 @@
 # ACTIVE PLAN
 
+## Precision Intelligence — §17.5 owner decisions resolved (2026-09-10)
+
+Plan §18. (1) **M.3 deletion package approved + executed** —
+`TeacherWorkspaceScreen` + `PageHeader` (+ tests) deleted, dev-preview
+`workspace` tab repointed to `TeacherHome` (+ `FixtureSyncStatusRepository`),
+4 stale comments rewritten. `npm run quality` **113 files / 1107 tests**,
+knip + `check:dev-preview-isolation` + build clean. (2) **Wave J Part B
+closed** — per-context form-export model kept, no aggregator. (3) **Two
+`TeacherHome` copy nits fixed** ("· homeroom" → "· advisory class";
+dropped "sync hub"). (4) **`SchoolHeadHome` → its own follow-up Wave N**
+(prompt-master-scoped, Wave-D-style).
+
 ## Precision Intelligence — Wave M: hardening + migration ledger (2026-09-10)
 
 Full detail: plan §17. Scoped via `prompt-master`. No browser / device /
