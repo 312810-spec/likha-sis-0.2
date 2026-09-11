@@ -1769,11 +1769,17 @@ label {
    DataTable.tsx from real scrollLeft/scrollWidth), so it only shows on an
    edge when there is genuinely more content that way -- never a static
    always-on hint. pointer-events:none keeps focus rings on table controls
-   unobstructed. */
+   unobstructed. Fades to --color-bg, not --color-surface-2: neither actual
+   consumer (DataTable's callers, MonthlySummaryScreen) renders inside a
+   .card -- both sit directly on the page background, matching the sticky
+   header/row-header cells' own `background: var(--color-bg)` a few rules
+   up. z-index:3 is higher than those sticky cells' z-index:1/2 so the fade
+   isn't painted over by them at the same edge. */
 .data-table-fade {
   position: absolute;
   top: 0;
   bottom: 0;
+  z-index: 3;
   width: calc(var(--spacing-unit) * 2);
   pointer-events: none;
   opacity: 0;
@@ -1781,11 +1787,11 @@ label {
 }
 .data-table-fade-start {
   left: 0;
-  background: linear-gradient(to right, var(--color-surface-2), transparent);
+  background: linear-gradient(to right, var(--color-bg), transparent);
 }
 .data-table-fade-end {
   right: 0;
-  background: linear-gradient(to left, var(--color-surface-2), transparent);
+  background: linear-gradient(to left, var(--color-bg), transparent);
 }
 .data-table-wrap[data-scroll-start] .data-table-fade-start,
 .data-table-wrap[data-scroll-end] .data-table-fade-end {
