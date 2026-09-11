@@ -10,6 +10,7 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { useScrollEdges } from "./components/useScrollEdges";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface MonthlySummaryScreenProps {
@@ -99,6 +100,8 @@ export function MonthlySummaryScreen({
   const reportRequestRef = useRef(0);
   const exportRequestRef = useRef(0);
   const exportSf4RequestRef = useRef(0);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollState = useScrollEdges(tableScrollRef, [report]);
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -428,59 +431,68 @@ export function MonthlySummaryScreen({
             <EmptyState>No learners enrolled in this section yet.</EmptyState>
           ) : (
             <div
-              className="monthly-summary-scroll"
-              tabIndex={0}
-              aria-label="Monthly attendance table, scrollable"
+              className="data-table-wrap"
+              data-scroll-start={tableScrollState.start ? "" : undefined}
+              data-scroll-end={tableScrollState.end ? "" : undefined}
             >
-              <table className="monthly-summary">
-                <caption>
-                  {schoolName}
-                  {selectedSection ? ` — ${selectedSection.name}` : ""} —{" "}
-                  {MONTH_NAMES[report.month - 1]} {report.year}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Learner</th>
-                    {report.schoolDays.map((day) => (
-                      <th scope="col" key={day}>
-                        {day}
-                      </th>
-                    ))}
-                    <th scope="col">Present</th>
-                    <th scope="col">Absent</th>
-                    <th scope="col">Tardy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.learners.map((learner) => (
-                    <tr key={learner.learnerId}>
-                      <th scope="row">
-                        {learner.givenName} {learner.familyName}
-                      </th>
-                      {learner.days.map((status, index) => (
-                        <td key={report.schoolDays[index]}>
-                          {status ? (
-                            <span
-                              aria-label={`${MONTH_NAMES[report.month - 1]} ${report.schoolDays[index]}: ${STATUS_LABELS[status]}`}
-                            >
-                              {STATUS_ABBREVIATIONS[status]}
-                            </span>
-                          ) : (
-                            <span
-                              aria-label={`${MONTH_NAMES[report.month - 1]} ${report.schoolDays[index]}: not recorded`}
-                            >
-                              —
-                            </span>
-                          )}
-                        </td>
+              <div
+                className="monthly-summary-scroll"
+                ref={tableScrollRef}
+                tabIndex={0}
+                aria-label="Monthly attendance table, scrollable"
+              >
+                <table className="monthly-summary">
+                  <caption>
+                    {schoolName}
+                    {selectedSection ? ` — ${selectedSection.name}` : ""} —{" "}
+                    {MONTH_NAMES[report.month - 1]} {report.year}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Learner</th>
+                      {report.schoolDays.map((day) => (
+                        <th scope="col" key={day}>
+                          {day}
+                        </th>
                       ))}
-                      <td>{learner.presentCount}</td>
-                      <td>{learner.absentCount}</td>
-                      <td>{learner.tardyCount}</td>
+                      <th scope="col">Present</th>
+                      <th scope="col">Absent</th>
+                      <th scope="col">Tardy</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {report.learners.map((learner) => (
+                      <tr key={learner.learnerId}>
+                        <th scope="row">
+                          {learner.givenName} {learner.familyName}
+                        </th>
+                        {learner.days.map((status, index) => (
+                          <td key={report.schoolDays[index]}>
+                            {status ? (
+                              <span
+                                aria-label={`${MONTH_NAMES[report.month - 1]} ${report.schoolDays[index]}: ${STATUS_LABELS[status]}`}
+                              >
+                                {STATUS_ABBREVIATIONS[status]}
+                              </span>
+                            ) : (
+                              <span
+                                aria-label={`${MONTH_NAMES[report.month - 1]} ${report.schoolDays[index]}: not recorded`}
+                              >
+                                —
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                        <td>{learner.presentCount}</td>
+                        <td>{learner.absentCount}</td>
+                        <td>{learner.tardyCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <span className="data-table-fade data-table-fade-start" aria-hidden="true" />
+              <span className="data-table-fade data-table-fade-end" aria-hidden="true" />
             </div>
           )}
         </>

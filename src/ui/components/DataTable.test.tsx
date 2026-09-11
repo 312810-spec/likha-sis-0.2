@@ -1,4 +1,4 @@
-import { render, within } from "@testing-library/react";
+import { fireEvent, render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DataTable, type DataColumn, type DataRow } from "./DataTable";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
@@ -133,5 +133,85 @@ describe("DataTable", () => {
       <DataTable caption="Attendance" columns={columns} rows={rows} reflowAt={640} />,
     );
     await expectNoAccessibilityViolations(container);
+  });
+
+  describe("scroll-edge fade affordance", () => {
+    /** jsdom never actually lays out content, so scrollWidth/clientWidth
+     * default to 0 for every element -- stub them the way a real
+     * overflowing/non-overflowing table would report them, then dispatch
+     * the scroll event DataTable.tsx listens for. */
+    function mockScrollMetrics(
+      el: HTMLElement,
+      metrics: { scrollLeft: number; scrollWidth: number; clientWidth: number },
+    ) {
+      Object.defineProperty(el, "scrollWidth", { value: metrics.scrollWidth, configurable: true });
+      Object.defineProperty(el, "clientWidth", { value: metrics.clientWidth, configurable: true });
+      Object.defineProperty(el, "scrollLeft", {
+        value: metrics.scrollLeft,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    it("sets no scroll-state attribute when the table does not overflow", () => {
+      const { container } = render(
+        <DataTable caption="Attendance" columns={columns} rows={rows} />,
+      );
+      const wrap = container.querySelector(".data-table-wrap")!;
+      const scroller = container.querySelector(".data-table-scroll") as HTMLElement;
+      mockScrollMetrics(scroller, { scrollLeft: 0, scrollWidth: 300, clientWidth: 300 });
+      fireEvent.scroll(scroller);
+
+      expect(wrap).not.toHaveAttribute("data-scroll-start");
+      expect(wrap).not.toHaveAttribute("data-scroll-end");
+    });
+
+    it("sets data-scroll-end (not data-scroll-start) when overflowing and scrolled to the start", () => {
+      const { container } = render(
+        <DataTable caption="Attendance" columns={columns} rows={rows} />,
+      );
+      const wrap = container.querySelector(".data-table-wrap")!;
+      const scroller = container.querySelector(".data-table-scroll") as HTMLElement;
+      mockScrollMetrics(scroller, { scrollLeft: 0, scrollWidth: 900, clientWidth: 300 });
+      fireEvent.scroll(scroller);
+
+      expect(wrap).not.toHaveAttribute("data-scroll-start");
+      expect(wrap).toHaveAttribute("data-scroll-end");
+    });
+
+    it("sets data-scroll-start (not data-scroll-end) once scrolled to the end", () => {
+      const { container } = render(
+        <DataTable caption="Attendance" columns={columns} rows={rows} />,
+      );
+      const wrap = container.querySelector(".data-table-wrap")!;
+      const scroller = container.querySelector(".data-table-scroll") as HTMLElement;
+      mockScrollMetrics(scroller, { scrollLeft: 600, scrollWidth: 900, clientWidth: 300 });
+      fireEvent.scroll(scroller);
+
+      expect(wrap).toHaveAttribute("data-scroll-start");
+      expect(wrap).not.toHaveAttribute("data-scroll-end");
+    });
+
+    it("sets both attributes when overflowing and scrolled to the middle", () => {
+      const { container } = render(
+        <DataTable caption="Attendance" columns={columns} rows={rows} />,
+      );
+      const wrap = container.querySelector(".data-table-wrap")!;
+      const scroller = container.querySelector(".data-table-scroll") as HTMLElement;
+      mockScrollMetrics(scroller, { scrollLeft: 300, scrollWidth: 900, clientWidth: 300 });
+      fireEvent.scroll(scroller);
+
+      expect(wrap).toHaveAttribute("data-scroll-start");
+      expect(wrap).toHaveAttribute("data-scroll-end");
+    });
+
+    it("renders the two fade elements as decorative (aria-hidden)", () => {
+      const { container } = render(
+        <DataTable caption="Attendance" columns={columns} rows={rows} />,
+      );
+      const fades = container.querySelectorAll(".data-table-fade");
+      expect(fades).toHaveLength(2);
+      fades.forEach((fade) => expect(fade).toHaveAttribute("aria-hidden", "true"));
+    });
   });
 });

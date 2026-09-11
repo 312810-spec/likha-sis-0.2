@@ -49,6 +49,16 @@ describe("TopBar", () => {
     expect(screen.getByText("Ana Cruz · Rizal Elementary")).toBeInTheDocument();
   });
 
+  it("truncates the identity text instead of wrapping, with the full text on a title attribute", () => {
+    const { container } = renderTopBar();
+    const text = container.querySelector(".app-topbar-identity-text");
+    expect(text).toHaveAttribute("title", "Ana Cruz · Rizal Elementary");
+    // jsdom doesn't compute layout, so this asserts the CSS contract
+    // (truncate-on-overflow) rather than a measured width -- the
+    // dev-preview.html browser check is what proves it visually.
+    expect(text).toHaveClass("app-topbar-identity-text");
+  });
+
   it("renders no logo image by default (no logo uploaded)", () => {
     const { container } = renderTopBar();
     expect(container.querySelector(".app-topbar-logo")).not.toBeInTheDocument();

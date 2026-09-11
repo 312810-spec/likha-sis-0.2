@@ -954,6 +954,13 @@ label {
   gap: var(--spacing-unit);
   flex-wrap: wrap;
 }
+/* The three action buttons must wrap as one group, not interleave with a
+   wrapped title -- see docs/ACTIVE-PLAN.md's Sections-screen UI fix. */
+.section-list-actions {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-wrap: wrap;
+}
 
 /* Teacher Workspace's "Today's priority" rail (UX-02) -- the one
    authored focal treatment for this screen: a ledger-row list, not
@@ -1415,6 +1422,18 @@ label {
   align-items: center;
   gap: calc(var(--spacing-unit) * 0.5);
   color: var(--color-text-muted);
+  /* Guided mode's larger .app-topbar-modes can leave little space here --
+     shrink and truncate the identity text instead of letting it wrap into
+     a tall narrow column (verified via getBoundingClientRect against
+     dev-preview.html: .app-topbar-modes ~412px in an ~785px topbar). */
+  min-width: 0;
+  flex-shrink: 1;
+}
+.app-topbar-identity-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .app-topbar-logo {
   width: 20px;
@@ -1739,8 +1758,38 @@ label {
 
 /* Redesign primitives -- DataTable (ADR-0057 Wave 2). Table-in-card:
    real table semantics always; the reflow is CSS-only. */
+.data-table-wrap {
+  position: relative;
+}
 .data-table-scroll {
   overflow-x: auto;
+}
+/* Scroll-edge fade affordance: purely decorative (aria-hidden), driven by
+   data-scroll-start/data-scroll-end on .data-table-wrap (set in
+   DataTable.tsx from real scrollLeft/scrollWidth), so it only shows on an
+   edge when there is genuinely more content that way -- never a static
+   always-on hint. pointer-events:none keeps focus rings on table controls
+   unobstructed. */
+.data-table-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--spacing-unit) * 2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-duration-routine) var(--motion-easing-standard);
+}
+.data-table-fade-start {
+  left: 0;
+  background: linear-gradient(to right, var(--color-surface-2), transparent);
+}
+.data-table-fade-end {
+  right: 0;
+  background: linear-gradient(to left, var(--color-surface-2), transparent);
+}
+.data-table-wrap[data-scroll-start] .data-table-fade-start,
+.data-table-wrap[data-scroll-end] .data-table-fade-end {
+  opacity: 1;
 }
 .data-table {
   width: 100%;
