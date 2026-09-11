@@ -46,6 +46,14 @@ const TAB_ICON: Partial<Record<SignedInTab, IconName>> = {
   "audit-log": "shield",
 };
 
+/** Sync (2 items) and Security (5 items) are lower-frequency/admin-oriented
+ * next to Daily Teaching/Class Overview/Learner Records/Grading/Creation
+ * Studio, which a teacher touches constantly -- collapsed by default so a
+ * first-time sidebar isn't ~24 destinations deep. Only the zero-state
+ * default: any stored choice (including a teacher re-expanding either
+ * group) always wins, on every later read. */
+const DEFAULT_COLLAPSED = ["Sync", "Security"];
+
 function readCollapsed(): Set<string> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -55,9 +63,11 @@ function readCollapsed(): Set<string> {
         return new Set(parsed.filter((x): x is string => typeof x === "string"));
     }
   } catch {
-    // Unreadable / disabled storage -- default to every group expanded.
+    // Unreadable / disabled storage -- fall back to the same default as
+    // "nothing stored yet", since there's no way to know what the teacher
+    // chose.
   }
-  return new Set();
+  return new Set(DEFAULT_COLLAPSED);
 }
 
 export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProps) {

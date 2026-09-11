@@ -52,15 +52,42 @@ describe("Sidebar", () => {
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByText("Ana Cruz")).toBeInTheDocument();
     expect(screen.getByText("Rizal Elementary")).toBeInTheDocument();
-    for (const g of [
-      "Daily Teaching",
-      "Class Overview",
-      "Learner Records",
-      "Grading",
-      "Security",
-    ]) {
+    for (const g of ["Daily Teaching", "Class Overview", "Learner Records", "Grading"]) {
       expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "true");
     }
+    // Sync and Security are lower-frequency/admin groups -- collapsed by
+    // default so a first-time sidebar isn't ~24 destinations deep.
+    for (const g of ["Sync", "Security"]) {
+      expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "false");
+    }
+  });
+
+  it("collapses Sync and Security by default on fresh storage, leaving the other groups expanded", () => {
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Sync" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Sync Status" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByRole("button", { name: "Sign-in Activity" })).not.toBeInTheDocument();
+  });
+
+  it("a teacher's own choice to expand Security overrides the default and survives a remount", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSidebar();
+    await user.click(screen.getByRole("button", { name: "Security" }));
+    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    unmount();
+
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("marks the active destination with aria-current", () => {
@@ -110,7 +137,7 @@ describe("Sidebar", () => {
     await expectNoAccessibilityViolations(container);
   });
 
-  it("survives unreadable localStorage by defaulting to all expanded", () => {
+  it("survives unreadable localStorage by falling back to the same default as fresh storage", () => {
     const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");
     });
@@ -118,6 +145,14 @@ describe("Sidebar", () => {
     expect(screen.getByRole("button", { name: "Daily Teaching" })).toHaveAttribute(
       "aria-expanded",
       "true",
+    );
+    // There's no way to know what the teacher chose when storage throws --
+    // fall back to the same collapsed-by-default set as fresh storage, not
+    // an empty (all-expanded) one.
+    expect(screen.getByRole("button", { name: "Sync" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
     );
     spy.mockRestore();
   });
