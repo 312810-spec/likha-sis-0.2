@@ -1,5 +1,38 @@
 # CURRENT HANDOFF
 
+## Harness 14-day review refreshed — no drift, PRs #56/#57 unblocked (2026-09-12)
+
+`node scripts/harness/verify.mjs` on `main` was failing two checks
+(`maintainability`, and the age gate itself) because the last recorded
+review (`2026-08-28`) had passed its 14-day interval — this was blocking
+the harness:verify step of every PR's `npm run quality:full`, including
+two otherwise-green UI-polish PRs (#56, #57) whose actual code/test gate
+already passed. Performed a genuine re-review, not a rubber-stamp: read
+`scripts/harness/verify.mjs` in full and independently confirmed every
+inventory dimension it checks against the live repo — `.claude/agents/*.md`
+(8), `.claude/skills/*/SKILL.md` (22), `.claude/hooks/*.cjs` (3),
+`.github/workflows/*.yml` (3), enabled plugins in `.claude/settings.json`
+(4), no `.mcp.json`, `CLAUDE.md` at 116 lines (≤140 budget),
+`package-lock.json` present/non-empty, and the workflow-file substring
+checks (gitleaks/cargo deny/osv-scanner/sha256sum/windows-latest/tauri
+build/playwright/quality:ui) and `package.json` script strings the
+verifier greps for. **No drift found anywhere** — every check other than
+the two age-related ones was already PASSing before any edit. Bumped
+`reviewedOn` in `.harness/state.json` and `.harness/inventory.json` to
+`2026-09-12` (next due `2026-09-26`); `node scripts/harness/verify.mjs`
+now reports 100/100 certified, age 0 days. Full context in
+`docs/adr/0054-final-harness-v2-certification.md`; this is the routine
+interval-refresh maintenance that certification's own rubric expects, so
+no new ADR was written. Landed as its own commit on a small branch cut
+from `main` (not the `ui-polish/phase-4-*` branch this session started
+on) so the fix applies cleanly to both blocked PRs.
+
+**Observed but out of scope, not touched**: this file
+(`docs/CURRENT-HANDOFF.md`) is ~10,400 lines / ~605KB, which is a
+transcript, not the "durable facts, exact next action" doc
+`.claude/rules/project-state.md` calls for. Worth a dedicated pruning
+pass in a future session — not bundled into this maintenance commit.
+
 ## Legacy LIKHA-SIS integration pass: actual codebase now inspectable (2026-09-07)
 
 The legacy pre-0.2 codebase, previously unavailable to any audit on this

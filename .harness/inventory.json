@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-08-28",
+  "reviewedOn": "2026-09-12",
   "reviewIntervalDays": 14,
   "policy": "Keep the smallest non-overlapping set; weak, stale, missing, or overlapping entries fail certification.",
   "components": {

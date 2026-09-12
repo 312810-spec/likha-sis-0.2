@@ -740,6 +740,13 @@ a real Playwright + axe UI gate, and a Windows-native Tauri build gate.
 Corrected candidate `5a4b75d3` passed Quality `33175058626` and Security
 `33175058671`; zero fatal overrides. Future harness changes require a
 new owner-authorized unlock and the same certification protocol.
+**14-day review interval refreshed 2026-09-12** (routine maintenance the
+rubric itself expects, not a new decision): re-verified every inventory
+dimension (agents, skills, hooks, workflows, plugins, MCP surface,
+CLAUDE.md length, package-lock, workflow-file contents, package.json
+script strings) against the live repo with zero drift found, then bumped
+`.harness/state.json` and `.harness/inventory.json` `reviewedOn` to
+`2026-09-12` (next due `2026-09-26`). Score remains 100/100 certified.
 
 ## Development Resource Assumption
 

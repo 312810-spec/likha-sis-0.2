@@ -16,7 +16,7 @@
   },
   "fatalOverrides": [],
   "rubric": "docs/adr/0052-wave2l-production-harness-v1.md",
-  "reviewedOn": "2026-08-28",
+  "reviewedOn": "2026-09-12",
   "reviewIntervalDays": 14,
-  "nextReviewOn": "2026-09-11"
+  "nextReviewOn": "2026-09-26"
 }
