@@ -321,9 +321,24 @@ label {
   color: var(--color-primary);
 }
 
-.loading-state,
-.empty-state {
+.loading-state {
   color: var(--color-text-muted);
+}
+
+/* A deliberate "nothing here yet" card, not easy-to-miss plain text --
+   dashed border signals "empty container" without implying an error
+   (that's --color-danger territory). --color-border-soft is documented as
+   decorative-outline-only, exactly this use. Colors reuse the verified
+   muted/surface-2 contrast pair (5.91:1 light, 6.48:1 dark -- see this
+   file's :root comments), not a new untested combination. */
+.empty-state {
+  margin: 0;
+  padding: calc(var(--spacing-unit) * 1.5);
+  border: 1px dashed var(--color-border-soft);
+  border-radius: var(--radius-large);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .status-chip {
