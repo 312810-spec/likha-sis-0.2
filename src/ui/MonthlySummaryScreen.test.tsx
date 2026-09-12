@@ -282,7 +282,11 @@ describe("MonthlySummaryScreen", () => {
     Object.defineProperty(scroller, "scrollLeft", { value: 0, configurable: true, writable: true });
     fireEvent.scroll(scroller);
 
-    expect(wrap).toHaveAttribute("data-scroll-end");
+    // useScrollEdges' listener is (re)attached by an effect keyed on
+    // `report`, which itself just settled via the findByText above -- poll
+    // instead of asserting synchronously right after fireEvent, so this
+    // isn't racing that effect's own commit.
+    await waitFor(() => expect(wrap).toHaveAttribute("data-scroll-end"));
     expect(wrap).not.toHaveAttribute("data-scroll-start");
   });
 
