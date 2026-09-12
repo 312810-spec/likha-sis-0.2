@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { useScrollEdges } from "./useScrollEdges";
 
 export interface DataColumn {
   key: string;
@@ -41,53 +42,68 @@ export function DataTable({
   rows,
   reflowAt,
 }: DataTableProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollState = useScrollEdges(scrollRef, [rows, columns]);
+
   return (
-    <div className="data-table-scroll">
-      <table role="table" className="data-table" data-reflow={reflowAt ? "" : undefined}>
-        <caption className={captionVisible ? undefined : "visually-hidden"}>{caption}</caption>
-        <thead role="rowgroup">
-          <tr role="row">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                role="columnheader"
-                scope="col"
-                className={column.align === "end" ? "num" : undefined}
-              >
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody role="rowgroup">
-          {rows.map((row) => (
-            <tr key={row.key} role="row">
-              {columns.map((column) => {
-                const content = row.cells[column.key];
-                if (column.key === row.rowHeader) {
-                  return (
-                    <th key={column.key} role="rowheader" scope="row">
-                      {content}
-                    </th>
-                  );
-                }
-                const labelText =
-                  column.label ?? (typeof column.header === "string" ? column.header : "");
-                return (
-                  <td
-                    key={column.key}
-                    role="cell"
-                    className={column.align === "end" ? "num" : undefined}
-                    data-label={labelText}
-                  >
-                    {content}
-                  </td>
-                );
-              })}
+    <div
+      className="data-table-wrap"
+      data-scroll-start={scrollState.start ? "" : undefined}
+      data-scroll-end={scrollState.end ? "" : undefined}
+    >
+      <div className="data-table-scroll" ref={scrollRef}>
+        <table role="table" className="data-table" data-reflow={reflowAt ? "" : undefined}>
+          <caption className={captionVisible ? undefined : "visually-hidden"}>{caption}</caption>
+          <thead role="rowgroup">
+            <tr role="row">
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  role="columnheader"
+                  scope="col"
+                  className={column.align === "end" ? "num" : undefined}
+                >
+                  {column.header}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody role="rowgroup">
+            {rows.map((row) => (
+              <tr key={row.key} role="row">
+                {columns.map((column) => {
+                  const content = row.cells[column.key];
+                  if (column.key === row.rowHeader) {
+                    return (
+                      <th key={column.key} role="rowheader" scope="row">
+                        {content}
+                      </th>
+                    );
+                  }
+                  const labelText =
+                    column.label ?? (typeof column.header === "string" ? column.header : "");
+                  return (
+                    <td
+                      key={column.key}
+                      role="cell"
+                      className={column.align === "end" ? "num" : undefined}
+                      data-label={labelText}
+                    >
+                      {content}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* Purely decorative scroll-edge fades -- see .data-table-wrap in
+          styles.css. Visibility is driven entirely by data-scroll-start/
+          data-scroll-end above, which reflect real scrollLeft/scrollWidth
+          state, not a static always-on hint. */}
+      <span className="data-table-fade data-table-fade-start" aria-hidden="true" />
+      <span className="data-table-fade data-table-fade-end" aria-hidden="true" />
     </div>
   );
 }

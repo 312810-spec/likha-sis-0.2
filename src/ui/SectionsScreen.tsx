@@ -207,27 +207,29 @@ export function SectionsScreen({
               <span>
                 {section.name} — Grade {section.gradeLevel} ({section.schoolYear})
               </span>
-              <button
-                type="button"
-                onClick={() => onOpenRoster(section.id)}
-                aria-label={`Open roster for ${section.name}`}
-              >
-                Open roster
-              </button>{" "}
-              <button
-                type="button"
-                onClick={() => onManageAssignments(section.id, section.name)}
-                aria-label={`Manage teaching assignments for ${section.name}`}
-              >
-                Manage assignments
-              </button>{" "}
-              <button
-                type="button"
-                onClick={() => onManageAdviser(section.id, section.name)}
-                aria-label={`Manage adviser for ${section.name}`}
-              >
-                Manage adviser
-              </button>
+              <div className="section-list-actions">
+                <button
+                  type="button"
+                  onClick={() => onOpenRoster(section.id)}
+                  aria-label={`Open roster for ${section.name}`}
+                >
+                  Open roster
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onManageAssignments(section.id, section.name)}
+                  aria-label={`Manage teaching assignments for ${section.name}`}
+                >
+                  Manage assignments
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onManageAdviser(section.id, section.name)}
+                  aria-label={`Manage adviser for ${section.name}`}
+                >
+                  Manage adviser
+                </button>
+              </div>
             </li>
           ))}
         </ul>

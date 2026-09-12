@@ -48,7 +48,12 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
 
       <span className="app-topbar-identity">
         {logoUrl && <img src={logoUrl} alt="" className="app-topbar-logo" />}
-        {session.displayName} · {session.schoolName}
+        <span
+          className="app-topbar-identity-text"
+          title={`${session.displayName} · ${session.schoolName}`}
+        >
+          {session.displayName} · {session.schoolName}
+        </span>
       </span>
       <button type="button" onClick={onLogout}>
         Log out

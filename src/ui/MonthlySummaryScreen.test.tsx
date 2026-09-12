@@ -264,6 +264,32 @@ describe("MonthlySummaryScreen", () => {
     expect(screen.getByLabelText("August 3: Present")).toHaveTextContent("P");
   });
 
+  it("wires the attendance table's scroll container to a real, scroll-state-driven fade affordance", async () => {
+    const { container } = renderScreen(reportWith("present"));
+    await screen.findByText("Ana Santos");
+
+    const wrap = container.querySelector(".data-table-wrap")!;
+    const scroller = container.querySelector(".monthly-summary-scroll") as HTMLElement;
+    expect(wrap).not.toBeNull();
+    expect(scroller).not.toBeNull();
+    expect(container.querySelectorAll(".data-table-fade")).toHaveLength(2);
+
+    // No overflow yet (jsdom reports 0/0 by default) -- no affordance.
+    expect(wrap).not.toHaveAttribute("data-scroll-end");
+
+    Object.defineProperty(scroller, "scrollWidth", { value: 900, configurable: true });
+    Object.defineProperty(scroller, "clientWidth", { value: 300, configurable: true });
+    Object.defineProperty(scroller, "scrollLeft", { value: 0, configurable: true, writable: true });
+    fireEvent.scroll(scroller);
+
+    // useScrollEdges' listener is (re)attached by an effect keyed on
+    // `report`, which itself just settled via the findByText above -- poll
+    // instead of asserting synchronously right after fireEvent, so this
+    // isn't racing that effect's own commit.
+    await waitFor(() => expect(wrap).toHaveAttribute("data-scroll-end"));
+    expect(wrap).not.toHaveAttribute("data-scroll-start");
+  });
+
   it("shows the SF2-inspired disclaimer", async () => {
     renderScreen();
 

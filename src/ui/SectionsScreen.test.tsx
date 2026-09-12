@@ -333,6 +333,29 @@ describe("SectionsScreen", () => {
     expect(manageAdviserCalls).toEqual([["sec-1", "Mabini"]]);
   });
 
+  it("groups a section's three action buttons in one container so they never split from a wrapped title", async () => {
+    const section: Section = {
+      id: "sec-1",
+      schoolId: "s1",
+      schoolYear: "2025-2026",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    renderScreen([section]);
+    await screen.findByText(/Mabini — Grade 7 \(2025-2026\)/);
+
+    const openRoster = screen.getByRole("button", { name: "Open roster for Mabini" });
+    const actionsGroup = openRoster.closest(".section-list-actions");
+    expect(actionsGroup).not.toBeNull();
+    expect(actionsGroup).toContainElement(
+      screen.getByRole("button", { name: "Manage teaching assignments for Mabini" }),
+    );
+    expect(actionsGroup).toContainElement(
+      screen.getByRole("button", { name: "Manage adviser for Mabini" }),
+    );
+  });
+
   it("moves focus to the heading on mount", async () => {
     renderScreen();
 
