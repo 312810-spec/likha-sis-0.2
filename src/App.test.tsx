@@ -112,12 +112,19 @@ describe("App", () => {
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
     expect(nav).toBeInTheDocument();
-    for (const groupName of ["Daily Teaching", "Learner Records", "Grading", "Security"]) {
+    for (const groupName of ["Daily Teaching", "Learner Records", "Grading"]) {
       expect(within(nav).getByRole("button", { name: groupName })).toHaveAttribute(
         "aria-expanded",
         "true",
       );
     }
+    // Security is collapsed by default (Sidebar.tsx's readCollapsed()) --
+    // this test asserts the group exists and its destinations are still in
+    // the DOM below, not its expand state.
+    expect(within(nav).getByRole("button", { name: "Security" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
     for (const destination of [
       "Home",
       "Attendance",
@@ -126,10 +133,13 @@ describe("App", () => {
       "Sections",
       "Grading Periods",
       "Class Records",
-      "Sign-in Activity",
     ]) {
       expect(within(nav).getByRole("button", { name: destination })).toBeInTheDocument();
     }
+    // "Sign-in Activity" lives in the collapsed-by-default Security group --
+    // expand it to prove the destination is preserved, not dropped.
+    await userEvent.click(within(nav).getByRole("button", { name: "Security" }));
+    expect(within(nav).getByRole("button", { name: "Sign-in Activity" })).toBeInTheDocument();
   });
 
   it("sets the browser tab title to the active destination", async () => {
