@@ -15,6 +15,7 @@ const pkg = json("package.json");
 const quality = read(".github/workflows/quality.yml");
 const security = read(".github/workflows/security.yml");
 const health = read(".github/workflows/harness-health.yml");
+const windowsJob = quality.split("  quality-windows:")[1] ?? "";
 const failures = [];
 
 function rule(id, ok, detail) {
@@ -79,8 +80,11 @@ rule(
 );
 rule(
   "product-quality-preserved",
-  quality.includes("run: npm run quality") && pkg.scripts.quality?.includes("typecheck") &&
-    pkg.scripts.quality?.includes("check:architecture") && pkg.scripts.quality?.includes("test"),
+  quality.includes("run: npm run quality") &&
+    pkg.scripts.quality?.includes("typecheck") &&
+    pkg.scripts.quality?.includes("check:architecture") &&
+    pkg.scripts.quality?.includes("check:deadcode") &&
+    pkg.scripts.quality?.includes("test"),
   "affected JS/TS work must retain type, lint, architecture, dead-code, format, and unit checks",
 );
 rule(
@@ -97,9 +101,10 @@ rule(
 rule(
   "no-duplicate-full-suite",
   !quality.includes("npm run quality:full") &&
-    !quality.includes("npm run quality\n") &&
-    quality.includes("name: Quality (Windows)"),
-  "the PR workflow must not restore the old monolithic quality:full execution on both runners",
+    !windowsJob.includes("run: npm run quality") &&
+    !windowsJob.includes("cargo test") &&
+    !windowsJob.includes("cargo clippy"),
+  "the Windows job must not duplicate the JS/TS or Rust quality suite",
 );
 rule(
   "full-checkpoint-command-available",
