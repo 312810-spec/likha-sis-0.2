@@ -90,13 +90,13 @@ jobs:
         if: needs.classify.outputs.docs_only == 'true'
         run: npm run format:check
 
-      - name: Verify harness policy for harness-only documentation
-        if: needs.classify.outputs.docs_only == 'true' && needs.classify.outputs.harness == 'true'
+      - name: Verify harness contract
+        if: needs.classify.outputs.harness == 'true'
         run: npm run harness:verify
 
       - name: Run JavaScript and TypeScript quality gate
         if: needs.classify.outputs.javascript == 'true'
-        run: npm run harness:verify && npm run quality
+        run: npm run quality
 
       - name: Install Chromium for deterministic UI verification
         if: needs.classify.outputs.ui == 'true'
