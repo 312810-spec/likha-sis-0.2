@@ -1,22 +1,20 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "LIKHA Production Harness",
-  "version": "2.0.0",
-  "state": "locked",
-  "ownerAuthorization": "Owner-authorized final update in active session on 2026-08-28",
-  "unlockedOn": "2026-08-28",
-  "lockedOn": "2026-08-28",
-  "lockReason": "All immutable ADR-0052 criteria passed the deterministic verifier and the corrected candidate passed authoritative Ubuntu, Windows-native, UI/accessibility, and security CI.",
-  "certification": "certified",
-  "score": 100,
+  "version": "3.0.0-evolving",
+  "state": "evolving",
+  "ownerAuthorization": "Owner authorized replacement of the locked legacy harness rules on 2026-09-15 so verification follows affected work, measured risk, and the Minimum Sufficient Harness.",
+  "assurance": "contract",
+  "score": null,
   "evidence": {
-    "candidateCommit": "5a4b75d3fae256ceb2eb23916d11f1d88512c914",
-    "qualityRun": 33175058626,
-    "securityRun": 33175058671
+    "checkpointCommit": null,
+    "qualityRun": null,
+    "securityRun": null
   },
   "fatalOverrides": [],
-  "rubric": "docs/adr/0052-wave2l-production-harness-v1.md",
-  "reviewedOn": "2026-09-12",
+  "rubric": "docs/adr/0060-affected-work-quality-gates.md",
+  "reviewedOn": "2026-09-15",
   "reviewIntervalDays": 14,
-  "nextReviewOn": "2026-09-26"
+  "nextReviewOn": "2026-09-29",
+  "philosophy": "verify the affected boundary, fail conservative on uncertainty, and keep the harness evolving"
 }
