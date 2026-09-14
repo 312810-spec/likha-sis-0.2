@@ -86,6 +86,14 @@ jobs:
         if: needs.classify.outputs.docs_only == 'true' || needs.classify.outputs.harness == 'true' || needs.classify.outputs.javascript == 'true' || needs.classify.outputs.ui == 'true'
         run: npm ci
 
+      - name: Show canonical verifier formatting
+        if: needs.classify.outputs.harness == 'true'
+        shell: bash
+        run: |
+          npx prettier --write scripts/harness/verify.mjs
+          git diff -- scripts/harness/verify.mjs
+          git checkout -- scripts/harness/verify.mjs
+
       - name: Run documentation formatting gate
         if: needs.classify.outputs.docs_only == 'true'
         run: npm run format:check
