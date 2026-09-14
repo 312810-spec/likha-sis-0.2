@@ -8,6 +8,7 @@ export type SignedInTab =
   | "schedule-meetings"
   | "sf1-import"
   | "my-day"
+  | "class-workspace"
   | "today-classes"
   | "attendance"
   | "subject-attendance"
@@ -29,9 +30,8 @@ export type SignedInTab =
 /**
  * The display label for every tab. An explicit object literal, not a
  * derived map, so the compiler enforces that every `SignedInTab` has a
- * label — including `section-roster`, which is a contextual sub-screen
- * reached from Sections (it needs a selected section) and therefore has no
- * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
+ * label — including contextual workspaces that intentionally have no
+ * standalone navigation item.
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
   workspace: "Home",
@@ -43,6 +43,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "schedule-meetings": "Class Schedule",
   "sf1-import": "Import Learners (SF1)",
   "my-day": "My Day",
+  "class-workspace": "Class Workspace",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
@@ -73,13 +74,12 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 
 /** Groups every navigable destination into a teacher's actual daily
  * rhythm instead of one flat button row -- see
- * docs/adr/0031-design-system-and-app-shell.md. `section-roster`,
- * `teaching-assignments`, and `schedule-meetings` are deliberately
- * absent: each is only ever reached contextually, from the screen one
- * level up with its own selection already made. Kept as a data-only
- * module, separate from the shell components that consume it
- * (`src/ui/shell/Sidebar.tsx`, `BottomNav.tsx`), so those files stay
- * component-only for React Fast Refresh. */
+ * docs/adr/0031-design-system-and-app-shell.md. Contextual workspaces are
+ * deliberately absent: each is reached from a parent destination with its
+ * selection already made. Kept as a data-only module, separate from the
+ * shell components that consume it (`src/ui/shell/Sidebar.tsx`,
+ * `BottomNav.tsx`), so those files stay component-only for React Fast
+ * Refresh. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
@@ -146,6 +146,7 @@ const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
   "teaching-assignments": "sections",
   "section-adviser": "sections",
   "schedule-meetings": "sections",
+  "class-workspace": "my-day",
 };
 
 /** Collapses a contextual sub-screen tab to the group destination it was
