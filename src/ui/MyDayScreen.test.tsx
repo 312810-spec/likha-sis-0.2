@@ -47,18 +47,20 @@ class FakeMyDayRepository implements MyDayRepository {
 function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   const repo = new FakeMyDayRepository(result);
   const service = new MyDayApplicationService(repo);
+  const onOpenClass = vi.fn();
   const onCheckAttendance = vi.fn();
   const onReviewConflicts = vi.fn();
   const rendered = render(
     <ModeProvider>
       <MyDayScreen
         myDayService={service}
+        onOpenClass={onOpenClass}
         onCheckAttendance={onCheckAttendance}
         onReviewConflicts={onReviewConflicts}
       />
     </ModeProvider>,
   );
-  return { ...rendered, repo, onCheckAttendance, onReviewConflicts };
+  return { ...rendered, repo, onOpenClass, onCheckAttendance, onReviewConflicts };
 }
 
 describe("MyDayScreen", () => {
@@ -75,6 +77,22 @@ describe("MyDayScreen", () => {
 
     expect(await screen.findByText("No classes scheduled for you today.")).toBeInTheDocument();
     expect(screen.getByText(/Nothing pending/)).toBeInTheDocument();
+  });
+
+  it("opens a scheduled class with its existing authorized read context", async () => {
+    const user = userEvent.setup();
+    const { onOpenClass } = renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+
+    expect(onOpenClass).toHaveBeenCalledWith({
+      teachingAssignmentId: "ta-1",
+      subjectName: "Mathematics",
+      sectionName: "Mabini",
+      startsAt: "08:00",
+      endsAt: "08:50",
+      room: "Room 101",
+    });
   });
 
   it("calls onCheckAttendance with the assignment id when its button is clicked", async () => {
