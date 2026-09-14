@@ -83,7 +83,8 @@ export function classifyChanges(paths, { forceFull = false } = {}) {
   const unknown = normalized.filter((path) => !isRecognized(path));
   const ciControl = normalized.some(isCiControl);
   const packageManifest = normalized.some(isPackageManifest);
-  const full = forceFull || normalized.length === 0 || ciControl || packageManifest || unknown.length > 0;
+  const full =
+    forceFull || normalized.length === 0 || ciControl || packageManifest || unknown.length > 0;
   const docsOnly = !full && normalized.every(isDocs);
   const harness = full || normalized.some(isHarness);
   const native = full || normalized.some(isNative);
@@ -113,7 +114,9 @@ function writeOutput(name, value) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const input = fs.readFileSync(0, "utf8");
   const paths = input.split(/\r?\n/);
-  const result = classifyChanges(paths, { forceFull: process.env.FORCE_FULL_CI === "true" });
+  const result = classifyChanges(paths, {
+    forceFull: process.env.FORCE_FULL_CI === "true",
+  });
 
   for (const [name, value] of Object.entries({
     full: result.full,
