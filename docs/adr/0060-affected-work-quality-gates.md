@@ -19,6 +19,8 @@ The governing principle is now:
 
 Replace the old locked-score harness rules with a contract model and use a deterministic, dependency-free changed-path classifier in `scripts/ci/classify-changes.mjs`.
 
+The previous locked certification, immutable weighted score requirement, and historical workflow-shape checks are superseded by this ADR. They are retained only as historical evidence in earlier ADRs and must not be used as current merge criteria.
+
 The harness is no longer considered correct because it preserves a historical score or workflow shape. It is correct when its current invariants are directly proven from repository evidence.
 
 ### New harness rules
