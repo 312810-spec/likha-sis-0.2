@@ -143,8 +143,11 @@ const checks = {
     currentPlugins.includes("rust-analyzer-lsp@claude-plugins-official"),
   determinism:
     pkg.scripts["harness:verify"] === "node scripts/harness/verify.mjs" &&
-    pkg.scripts["quality:full"]?.includes("npm run harness:verify") &&
-    qualityWorkflow.includes("npm run quality:full"),
+    present("scripts/ci/classify-changes.mjs") &&
+    present("scripts/ci/classify-changes.test.mjs") &&
+    qualityWorkflow.includes("classify affected work") &&
+    qualityWorkflow.includes("Verify classifier behavior") &&
+    qualityWorkflow.includes("npm run harness:verify && npm run quality"),
   "context-token": claude.split("\n").length <= 140 && currentSkills.length >= 20,
   maintainability:
     same(currentAgents, inventory.components.agents) &&
