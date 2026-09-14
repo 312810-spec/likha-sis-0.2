@@ -36,7 +36,8 @@ const evolvingState =
 const contractMode =
   contract.mode === "contract" && Array.isArray(contract.rules) && contract.rules.length >= 8;
 const classifierPresent =
-  present("scripts/ci/classify-changes.mjs") && present("scripts/ci/classify-changes.test.mjs");
+  present("scripts/ci/classify-changes.mjs") &&
+  present("scripts/ci/classify-changes.node-test.mjs");
 const uiFastPath = !ui.full && ui.javascript && ui.ui && !ui.native && !ui.windows;
 const docsFastPath =
   !docs.full && docs.docsOnly && !docs.javascript && !docs.ui && !docs.native && !docs.windows;
@@ -44,7 +45,7 @@ const nativePath = !native.full && native.native && native.windows;
 const conservativeFallback =
   workflow.full && workflow.native && workflow.windows && unknown.full && manual.full;
 const classifierTestedInCi = hasAll(quality, [
-  "node --test scripts/ci/classify-changes.test.mjs",
+  "node --test scripts/ci/classify-changes.node-test.mjs",
   "node scripts/ci/classify-changes.mjs",
 ]);
 const normalPrSkipsHarnessAudit =
