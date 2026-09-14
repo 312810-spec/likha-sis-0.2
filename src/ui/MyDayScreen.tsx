@@ -5,13 +5,12 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { ClassWorkspaceScreen } from "./ClassWorkspaceScreen";
 import { useTeacherMode } from "./theme/useTeacherMode";
 import type { TeacherClassWorkContext } from "./work-context";
 
 interface MyDayScreenProps {
   myDayService: MyDayApplicationService;
-  /** Opens the selected scheduled class as a persistent work context. */
-  onOpenClass: (context: TeacherClassWorkContext) => void;
   /** Opens Subject Attendance for this teaching assignment, already
    * selected -- same narrow callback shape `TodaysClassesScreen`'s own
    * `onCheckAttendance` established. */
@@ -33,18 +32,22 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
 /**
  * "My Day" — the existing read model that begins LIKHA's Legacy Soul
  * "Today" transition. It combines today's schedule with conservative,
- * read-only-derived pending work and now opens a selected class as one
- * bounded work context rather than forcing the teacher to select that class
- * again on every downstream screen.
+ * read-only-derived pending work and can enter a selected class without
+ * asking the teacher to choose that class again.
+ *
+ * This first Golden Journey slice deliberately keeps the selected class
+ * context local to Today. Once this interaction is verified, a later small
+ * slice can promote the same bounded context to app-level resume/navigation
+ * state without coupling academic truth to UI state.
  */
 export function MyDayScreen({
   myDayService,
-  onOpenClass,
   onCheckAttendance,
   onReviewConflicts,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
   const [summary, setSummary] = useState<MyDaySummary | null>(null);
+  const [selectedClass, setSelectedClass] = useState<TeacherClassWorkContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
@@ -76,6 +79,16 @@ export function MyDayScreen({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDayService]);
+
+  if (selectedClass) {
+    return (
+      <ClassWorkspaceScreen
+        context={selectedClass}
+        onCheckAttendance={onCheckAttendance}
+        onBackToToday={() => setSelectedClass(null)}
+      />
+    );
+  }
 
   return (
     <Page
@@ -125,7 +138,7 @@ export function MyDayScreen({
                     type="button"
                     className="button-primary"
                     onClick={() =>
-                      onOpenClass({
+                      setSelectedClass({
                         teachingAssignmentId: item.teachingAssignmentId,
                         subjectName: item.subjectName,
                         sectionName: item.sectionName,
