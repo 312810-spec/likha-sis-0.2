@@ -1,20 +1,19 @@
 {
-  "schemaVersion": 1,
-  "rubricSource": "docs/adr/0052-wave2l-production-harness-v1.md",
-  "antiGamingRule": "Weights are immutable from ADR-0052; every point is computed by scripts/harness/verify.mjs from repository evidence; any fatal override forces zero.",
-  "criteria": [
-    { "id": "security", "weight": 18 },
-    { "id": "correctness", "weight": 15 },
-    { "id": "productivity", "weight": 15 },
-    { "id": "determinism", "weight": 10 },
-    { "id": "context-token", "weight": 10 },
-    { "id": "maintainability", "weight": 8 },
-    { "id": "local-offline", "weight": 6 },
-    { "id": "supply-chain", "weight": 5 },
-    { "id": "zero-cost", "weight": 5 },
-    { "id": "native", "weight": 3 },
-    { "id": "ui-verify", "weight": 3 },
-    { "id": "provider-independence", "weight": 2 }
+  "schemaVersion": 2,
+  "mode": "contract",
+  "rulesSource": "docs/adr/0060-affected-work-quality-gates.md",
+  "antiGamingRule": "Harness verification proves current invariants directly from repository evidence. It does not award points, preserve a locked certification, or require obsolete workflow shapes.",
+  "rules": [
+    "affected-work-routing",
+    "conservative-fallback",
+    "normal-product-pr-skips-harness-audit",
+    "ui-work-runs-ui-verification",
+    "native-work-runs-rust-and-windows-verification",
+    "security-remains-independent-and-fail-closed",
+    "manual-dispatch-can-force-full-verification",
+    "windows-does-not-duplicate-the-full-quality-suite",
+    "harness-health-runs-scheduled-or-manual",
+    "full-quality-command-remains-available-for-checkpoints"
   ],
   "fatalOverrides": [
     "privacy-exposure",
