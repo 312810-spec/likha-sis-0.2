@@ -58,7 +58,7 @@ jobs:
           cat "$changed_file"
 
       - name: Verify classifier behavior
-        run: node --test scripts/ci/classify-changes.test.mjs
+        run: node --test scripts/ci/classify-changes.node-test.mjs
 
       - name: Classify affected work
         id: classify
