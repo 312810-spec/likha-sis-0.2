@@ -6,9 +6,12 @@ import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import type { TeacherClassWorkContext } from "./work-context";
 
 interface MyDayScreenProps {
   myDayService: MyDayApplicationService;
+  /** Opens the selected scheduled class as a persistent work context. */
+  onOpenClass: (context: TeacherClassWorkContext) => void;
   /** Opens Subject Attendance for this teaching assignment, already
    * selected -- same narrow callback shape `TodaysClassesScreen`'s own
    * `onCheckAttendance` established. */
@@ -28,18 +31,15 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
 }
 
 /**
- * "My Day" — a teacher's single-glance landing view combining today's
- * schedule (from `TeachingAssignment`/`ScheduleMeeting`) with a
- * conservative, read-only-derived set of pending tasks for today: classes
- * meeting today whose attendance has not been (fully) checked, and this
- * teacher's own open sync conflicts. Both are computed fresh, server-side,
- * by one aggregating command (`get_my_day_summary`) rather than several
- * client-stitched calls — see `repository::my_day` (Rust). Deliberately
- * read-only: nothing here can be marked done from this screen; that
- * happens on the real workflow screens this one only links out to.
+ * "My Day" — the existing read model that begins LIKHA's Legacy Soul
+ * "Today" transition. It combines today's schedule with conservative,
+ * read-only-derived pending work and now opens a selected class as one
+ * bounded work context rather than forcing the teacher to select that class
+ * again on every downstream screen.
  */
 export function MyDayScreen({
   myDayService,
+  onOpenClass,
   onCheckAttendance,
   onReviewConflicts,
 }: MyDayScreenProps) {
@@ -106,11 +106,37 @@ export function MyDayScreen({
           {summary.schedule.length === 0 ? (
             <EmptyState>No classes scheduled for you today.</EmptyState>
           ) : (
-            <ul className="learner-list">
+            <ul className="workspace-priority-rail">
               {summary.schedule.map((item, index) => (
-                <li key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}>
-                  {item.startsAt}–{item.endsAt} · {item.subjectName} — {item.sectionName}
-                  {item.room ? ` · ${item.room}` : ""}
+                <li
+                  key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
+                  className="workspace-priority-item"
+                >
+                  <div className="workspace-priority-main">
+                    <span className="workspace-priority-section">
+                      {item.subjectName} — {item.sectionName}
+                    </span>
+                    <span className="field-hint">
+                      {item.startsAt}–{item.endsAt}
+                      {item.room ? ` · ${item.room}` : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="button-primary"
+                    onClick={() =>
+                      onOpenClass({
+                        teachingAssignmentId: item.teachingAssignmentId,
+                        subjectName: item.subjectName,
+                        sectionName: item.sectionName,
+                        startsAt: item.startsAt,
+                        endsAt: item.endsAt,
+                        room: item.room,
+                      })
+                    }
+                  >
+                    Open class
+                  </button>
                 </li>
               ))}
             </ul>
