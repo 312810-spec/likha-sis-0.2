@@ -52,7 +52,12 @@ rule(
 );
 rule(
   "docs-fast-path",
-  !docs.full && docs.docsOnly && !docs.javascript && !docs.ui && !docs.native && !docs.windows,
+  !docs.full &&
+    docs.docsOnly &&
+    !docs.javascript &&
+    !docs.ui &&
+    !docs.native &&
+    !docs.windows,
   "ordinary documentation must stay on the documentation-only path",
 );
 rule(
@@ -89,7 +94,8 @@ rule(
 );
 rule(
   "ui-verification-preserved",
-  quality.includes("playwright install --with-deps chromium") && quality.includes("npm run quality:ui"),
+  quality.includes("playwright install --with-deps chromium") &&
+    quality.includes("npm run quality:ui"),
   "affected UI work must retain browser and accessibility verification",
 );
 rule(
@@ -125,7 +131,9 @@ rule(
 );
 rule(
   "scheduled-harness-health",
-  health.includes("schedule:") && health.includes("workflow_dispatch:") && !health.includes("pull_request:"),
+  health.includes("schedule:") &&
+    health.includes("workflow_dispatch:") &&
+    !health.includes("pull_request:"),
   "full harness health belongs on scheduled/manual checks, not every product PR",
 );
 rule(
@@ -140,4 +148,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("\nHarness contract satisfied. No numeric score or locked certification is used.");
+console.log(
+  "\nHarness contract satisfied. No numeric score or locked certification is used.",
+);
