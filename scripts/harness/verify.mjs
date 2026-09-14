@@ -39,12 +39,7 @@ const classifierPresent =
   present("scripts/ci/classify-changes.mjs") && present("scripts/ci/classify-changes.test.mjs");
 const uiFastPath = !ui.full && ui.javascript && ui.ui && !ui.native && !ui.windows;
 const docsFastPath =
-  !docs.full &&
-  docs.docsOnly &&
-  !docs.javascript &&
-  !docs.ui &&
-  !docs.native &&
-  !docs.windows;
+  !docs.full && docs.docsOnly && !docs.javascript && !docs.ui && !docs.native && !docs.windows;
 const nativePath = !native.full && native.native && native.windows;
 const conservativeFallback =
   workflow.full && workflow.native && workflow.windows && unknown.full && manual.full;
@@ -105,11 +100,7 @@ rule(
   docsFastPath,
   "ordinary documentation must stay on the documentation-only path",
 );
-rule(
-  "native-path",
-  nativePath,
-  "native changes must activate Rust and Windows verification",
-);
+rule("native-path", nativePath, "native changes must activate Rust and Windows verification");
 rule(
   "conservative-fallback",
   conservativeFallback,
@@ -172,6 +163,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(
-  "\nHarness contract satisfied. No numeric score or locked certification is used.",
-);
+console.log("\nHarness contract satisfied. No numeric score or locked certification is used.");
