@@ -8,6 +8,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 const json = (path) => JSON.parse(read(path));
 const present = (path) => existsSync(join(root, path));
+const hasAll = (text, needles) => needles.every((needle) => text.includes(needle));
 
 const state = json(".harness/state.json");
 const contract = json(".harness/scorecard.json");
@@ -30,116 +31,138 @@ const workflow = classifyChanges([".github/workflows/quality.yml"]);
 const unknown = classifyChanges(["unclassified-boundary/example.bin"]);
 const manual = classifyChanges([], { forceFull: true });
 
+const evolvingState =
+  state.state === "evolving" && state.assurance === "contract" && state.score === null;
+const contractMode =
+  contract.mode === "contract" && Array.isArray(contract.rules) && contract.rules.length >= 8;
+const classifierPresent =
+  present("scripts/ci/classify-changes.mjs") && present("scripts/ci/classify-changes.test.mjs");
+const uiFastPath = !ui.full && ui.javascript && ui.ui && !ui.native && !ui.windows;
+const docsFastPath =
+  !docs.full &&
+  docs.docsOnly &&
+  !docs.javascript &&
+  !docs.ui &&
+  !docs.native &&
+  !docs.windows;
+const nativePath = !native.full && native.native && native.windows;
+const conservativeFallback =
+  workflow.full && workflow.native && workflow.windows && unknown.full && manual.full;
+const classifierTestedInCi = hasAll(quality, [
+  "node --test scripts/ci/classify-changes.test.mjs",
+  "node scripts/ci/classify-changes.mjs",
+]);
+const normalPrSkipsHarnessAudit =
+  hasAll(quality, [
+    "if: needs.classify.outputs.harness == 'true'",
+    "run: npm run harness:verify",
+  ]) && !quality.includes("npm run harness:verify && npm run quality");
+const productQualityPreserved =
+  quality.includes("run: npm run quality") &&
+  hasAll(pkg.scripts.quality ?? "", ["typecheck", "check:architecture", "check:deadcode", "test"]);
+const uiVerificationPreserved = hasAll(quality, [
+  "playwright install --with-deps chromium",
+  "npm run quality:ui",
+]);
+const nativeVerificationPreserved = hasAll(quality, [
+  "cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings",
+  "npm run tauri build -- --debug",
+]);
+const noDuplicateFullSuite =
+  !quality.includes("npm run quality:full") &&
+  !windowsJob.includes("run: npm run quality") &&
+  !windowsJob.includes("cargo test") &&
+  !windowsJob.includes("cargo clippy");
+const fullCheckpointAvailable =
+  typeof pkg.scripts["quality:full"] === "string" &&
+  hasAll(pkg.scripts["quality:full"], ["cargo test", "cargo clippy"]);
+const securityIndependent =
+  hasAll(security, ["pull_request:", "gitleaks", "cargo-deny", "osv-scanner"]) &&
+  !quality.includes("gitleaks") &&
+  !quality.includes("osv-scanner");
+const scheduledHarnessHealth =
+  hasAll(health, ["schedule:", "workflow_dispatch:"]) && !health.includes("pull_request:");
+const zeroBillingCi = !quality.includes("api-key") && !security.includes("api-key");
+
 rule(
   "evolving-state",
-  state.state === "evolving" && state.assurance === "contract" && state.score === null,
+  evolvingState,
   "the harness must remain evolving and must not restore a locked numeric certification",
 );
 rule(
   "contract-mode",
-  contract.mode === "contract" && Array.isArray(contract.rules) && contract.rules.length >= 8,
+  contractMode,
   "the harness rule file must use contract mode with explicit invariants",
 );
-rule(
-  "classifier-present",
-  present("scripts/ci/classify-changes.mjs") && present("scripts/ci/classify-changes.test.mjs"),
-  "affected-work routing and its tests are required",
-);
+rule("classifier-present", classifierPresent, "affected-work routing and its tests are required");
 rule(
   "ui-fast-path",
-  !ui.full && ui.javascript && ui.ui && !ui.native && !ui.windows,
+  uiFastPath,
   "UI-only work must run JS/UI checks without native or Windows verification",
 );
 rule(
   "docs-fast-path",
-  !docs.full &&
-    docs.docsOnly &&
-    !docs.javascript &&
-    !docs.ui &&
-    !docs.native &&
-    !docs.windows,
+  docsFastPath,
   "ordinary documentation must stay on the documentation-only path",
 );
 rule(
   "native-path",
-  !native.full && native.native && native.windows,
+  nativePath,
   "native changes must activate Rust and Windows verification",
 );
 rule(
   "conservative-fallback",
-  workflow.full && workflow.native && workflow.windows && unknown.full && manual.full,
+  conservativeFallback,
   "CI-control, unknown, and manual full checks must fail conservative",
 );
 rule(
   "classifier-tested-in-ci",
-  quality.includes("node --test scripts/ci/classify-changes.test.mjs") &&
-    quality.includes("node scripts/ci/classify-changes.mjs"),
+  classifierTestedInCi,
   "the PR workflow must test and execute the classifier",
 );
 rule(
   "normal-pr-skips-harness-audit",
-  quality.includes("if: needs.classify.outputs.harness == 'true'") &&
-    quality.includes("run: npm run harness:verify") &&
-    !quality.includes("npm run harness:verify && npm run quality"),
+  normalPrSkipsHarnessAudit,
   "harness verification must be isolated from the normal JS/TS product gate",
 );
 rule(
   "product-quality-preserved",
-  quality.includes("run: npm run quality") &&
-    pkg.scripts.quality?.includes("typecheck") &&
-    pkg.scripts.quality?.includes("check:architecture") &&
-    pkg.scripts.quality?.includes("check:deadcode") &&
-    pkg.scripts.quality?.includes("test"),
+  productQualityPreserved,
   "affected JS/TS work must retain type, lint, architecture, dead-code, format, and unit checks",
 );
 rule(
   "ui-verification-preserved",
-  quality.includes("playwright install --with-deps chromium") &&
-    quality.includes("npm run quality:ui"),
+  uiVerificationPreserved,
   "affected UI work must retain browser and accessibility verification",
 );
 rule(
   "native-verification-preserved",
-  quality.includes(
-    "cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings",
-  ) && quality.includes("npm run tauri build -- --debug"),
+  nativeVerificationPreserved,
   "affected native work must retain Rust checks and the Windows-native build",
 );
 rule(
   "no-duplicate-full-suite",
-  !quality.includes("npm run quality:full") &&
-    !windowsJob.includes("run: npm run quality") &&
-    !windowsJob.includes("cargo test") &&
-    !windowsJob.includes("cargo clippy"),
+  noDuplicateFullSuite,
   "the Windows job must not duplicate the JS/TS or Rust quality suite",
 );
 rule(
   "full-checkpoint-command-available",
-  typeof pkg.scripts["quality:full"] === "string" &&
-    pkg.scripts["quality:full"].includes("cargo test") &&
-    pkg.scripts["quality:full"].includes("cargo clippy"),
+  fullCheckpointAvailable,
   "a complete local/manual checkpoint command must remain available",
 );
 rule(
   "security-independent",
-  security.includes("pull_request:") &&
-    security.includes("gitleaks") &&
-    security.includes("cargo-deny") &&
-    security.includes("osv-scanner") &&
-    !quality.includes("gitleaks") &&
-    !quality.includes("osv-scanner"),
+  securityIndependent,
   "security scanning must remain a separate fail-closed workflow",
 );
 rule(
   "scheduled-harness-health",
-  health.includes("schedule:") &&
-    health.includes("workflow_dispatch:") &&
-    !health.includes("pull_request:"),
+  scheduledHarnessHealth,
   "full harness health belongs on scheduled/manual checks, not every product PR",
 );
 rule(
   "zero-billing-ci",
-  !quality.includes("api-key") && !security.includes("api-key"),
+  zeroBillingCi,
   "quality and security workflows must not depend on paid API credentials",
 );
 
