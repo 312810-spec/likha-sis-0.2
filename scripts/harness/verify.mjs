@@ -100,8 +100,9 @@ rule(
 );
 rule(
   "native-verification-preserved",
-  quality.includes("cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings") &&
-    quality.includes("npm run tauri build -- --debug"),
+  quality.includes(
+    "cargo fmt --check && cargo test && cargo clippy --all-targets -- -D warnings",
+  ) && quality.includes("npm run tauri build -- --debug"),
   "affected native work must retain Rust checks and the Windows-native build",
 );
 rule(
