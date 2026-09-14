@@ -99,7 +99,9 @@ describe("MyDayScreen", () => {
     await user.click(screen.getByRole("button", { name: "Back to Today" }));
 
     expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open class" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open class" }),
+    ).toBeInTheDocument();
   });
 
   it(
