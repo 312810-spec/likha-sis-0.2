@@ -39,7 +39,10 @@ describe("ClassLearnersPanel", () => {
 
     expect(await screen.findByText("Santos, Maya")).toBeInTheDocument();
     expect(service.monitor).toHaveBeenCalledTimes(1);
-    expect(service.monitor).toHaveBeenCalledWith("ta-1", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(service.monitor).toHaveBeenCalledWith(
+      "ta-1",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    );
   });
 
   it("opens class-relevant learner details and returns to the same roster", async () => {
@@ -58,7 +61,9 @@ describe("ClassLearnersPanel", () => {
 
   it("shows the class-roster empty state", async () => {
     renderPanel(serviceWith({ heldSessionCount: 0, rows: [] }));
-    expect(await screen.findByText("No learners are currently in this class roster.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No learners are currently in this class roster."),
+    ).toBeInTheDocument();
   });
 
   it("shows a retryable error when the authorized roster read fails", async () => {
