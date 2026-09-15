@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { MyDayApplicationService } from "../application/my-day-service";
-import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { MyDaySummary } from "../domain/my-day";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
@@ -12,7 +11,6 @@ import type { TeacherClassWorkContext } from "./work-context";
 
 interface MyDayScreenProps {
   myDayService: MyDayApplicationService;
-  subjectAttendanceService: SubjectAttendanceApplicationService;
   selectedClassContext?: TeacherClassWorkContext | null;
   onOpenClassContext: (context: TeacherClassWorkContext) => void;
   onBackToToday: () => void;
@@ -41,13 +39,12 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
  * asking the teacher to choose that class again.
  *
  * Class context is owned one level above this screen so the same bounded
- * context can survive connected workflows. Academic truth never comes from
- * that UI context: trusted application services still re-authorize the
- * teaching assignment before work resumes or learner scope is read.
+ * context can survive a connected workflow such as Subject Attendance.
+ * Academic truth never comes from that UI context: trusted application
+ * services still re-authorize the teaching assignment before work resumes.
  */
 export function MyDayScreen({
   myDayService,
-  subjectAttendanceService,
   selectedClassContext = null,
   onOpenClassContext,
   onBackToToday,
@@ -92,7 +89,6 @@ export function MyDayScreen({
     return (
       <ClassWorkspaceScreen
         context={selectedClassContext}
-        subjectAttendanceService={subjectAttendanceService}
         onCheckAttendance={onCheckAttendance}
         onBackToToday={onBackToToday}
       />
