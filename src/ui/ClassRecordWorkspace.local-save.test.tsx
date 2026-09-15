@@ -82,19 +82,22 @@ function renderWorkspace() {
 }
 
 describe("ClassRecordWorkspace local-save state", () => {
-  it("shows the proven device-save state after a successful score write without claiming sync", async () => {
-    const user = userEvent.setup();
-    const { learnerScoreService } = renderWorkspace();
+  it(
+    "shows the proven device-save state after a successful score write without claiming sync",
+    async () => {
+      const user = userEvent.setup();
+      const { learnerScoreService } = renderWorkspace();
 
-    await user.click(
-      await screen.findByRole("button", { name: /Written Works — Quiz 1/ }),
-    );
-    const scoreInput = await screen.findByLabelText("Score for Ana Cruz");
-    await user.type(scoreInput, "18");
-    await user.keyboard("{Enter}");
+      await user.click(
+        await screen.findByRole("button", { name: /Written Works — Quiz 1/ }),
+      );
+      const scoreInput = await screen.findByLabelText("Score for Ana Cruz");
+      await user.type(scoreInput, "18");
+      await user.keyboard("{Enter}");
 
-    expect(learnerScoreService.recordScore).toHaveBeenCalled();
-    expect(await screen.findByText("Saved on this device")).toBeInTheDocument();
-    expect(screen.queryByText(/synced|waiting to sync/i)).not.toBeInTheDocument();
-  });
+      expect(learnerScoreService.recordScore).toHaveBeenCalled();
+      expect(await screen.findByText("Saved on this device")).toBeInTheDocument();
+      expect(screen.queryByText(/synced|waiting to sync/i)).not.toBeInTheDocument();
+    },
+  );
 });
