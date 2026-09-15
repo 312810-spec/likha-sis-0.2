@@ -5,20 +5,19 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface ClassWorkspaceScreenProps {
   context: TeacherClassWorkContext;
   onCheckAttendance: (teachingAssignmentId: string) => void;
+  onOpenClassRecords: (teachingAssignmentId: string) => void;
   onBackToToday: () => void;
 }
 
 /**
- * First Legacy Soul class workspace slice.
- *
- * The workspace is deliberately small: it proves that a teacher can enter a
- * class once from Today and carry that context into real work. It does not
- * duplicate attendance/class-record domain state and it does not expose
- * placeholder controls for features that have not yet been integrated.
+ * Legacy Soul class workspace rooted in one preserved teaching assignment.
+ * Connected tools keep their existing application/domain ownership; this
+ * screen only carries the teacher into them without asking for the class again.
  */
 export function ClassWorkspaceScreen({
   context,
   onCheckAttendance,
+  onOpenClassRecords,
   onBackToToday,
 }: ClassWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
@@ -52,17 +51,22 @@ export function ClassWorkspaceScreen({
 
       <section aria-labelledby="class-workspace-work">
         <h3 id="class-workspace-work">Class work</h3>
-        <p>
-          Start with attendance. More class tools will move into this same workspace only after
-          their existing behavior is preserved and verified.
-        </p>
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => onCheckAttendance(context.teachingAssignmentId)}
-        >
-          Check attendance
-        </button>
+        <p>Continue the class workflow without selecting this class again.</p>
+        <div className="button-row">
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => onCheckAttendance(context.teachingAssignmentId)}
+          >
+            Check attendance
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenClassRecords(context.teachingAssignmentId)}
+          >
+            Open class record
+          </button>
+        </div>
       </section>
     </Page>
   );
