@@ -5,7 +5,9 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { ClassWorkspaceScreen } from "./ClassWorkspaceScreen";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import type { TeacherClassWorkContext } from "./work-context";
 
 interface MyDayScreenProps {
   myDayService: MyDayApplicationService;
@@ -28,15 +30,15 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
 }
 
 /**
- * "My Day" — a teacher's single-glance landing view combining today's
- * schedule (from `TeachingAssignment`/`ScheduleMeeting`) with a
- * conservative, read-only-derived set of pending tasks for today: classes
- * meeting today whose attendance has not been (fully) checked, and this
- * teacher's own open sync conflicts. Both are computed fresh, server-side,
- * by one aggregating command (`get_my_day_summary`) rather than several
- * client-stitched calls — see `repository::my_day` (Rust). Deliberately
- * read-only: nothing here can be marked done from this screen; that
- * happens on the real workflow screens this one only links out to.
+ * "My Day" — the existing read model that begins LIKHA's Legacy Soul
+ * "Today" transition. It combines today's schedule with conservative,
+ * read-only-derived pending work and can enter a selected class without
+ * asking the teacher to choose that class again.
+ *
+ * This first Golden Journey slice deliberately keeps the selected class
+ * context local to Today. Once this interaction is verified, a later small
+ * slice can promote the same bounded context to app-level resume/navigation
+ * state without coupling academic truth to UI state.
  */
 export function MyDayScreen({
   myDayService,
@@ -45,6 +47,7 @@ export function MyDayScreen({
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
   const [summary, setSummary] = useState<MyDaySummary | null>(null);
+  const [selectedClass, setSelectedClass] = useState<TeacherClassWorkContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
@@ -77,6 +80,16 @@ export function MyDayScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDayService]);
 
+  if (selectedClass) {
+    return (
+      <ClassWorkspaceScreen
+        context={selectedClass}
+        onCheckAttendance={onCheckAttendance}
+        onBackToToday={() => setSelectedClass(null)}
+      />
+    );
+  }
+
   return (
     <Page
       title="My Day"
@@ -106,11 +119,37 @@ export function MyDayScreen({
           {summary.schedule.length === 0 ? (
             <EmptyState>No classes scheduled for you today.</EmptyState>
           ) : (
-            <ul className="learner-list">
+            <ul className="workspace-priority-rail">
               {summary.schedule.map((item, index) => (
-                <li key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}>
-                  {item.startsAt}–{item.endsAt} · {item.subjectName} — {item.sectionName}
-                  {item.room ? ` · ${item.room}` : ""}
+                <li
+                  key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
+                  className="workspace-priority-item"
+                >
+                  <div className="workspace-priority-main">
+                    <span className="workspace-priority-section">
+                      {item.subjectName} — {item.sectionName}
+                    </span>
+                    <span className="field-hint">
+                      {item.startsAt}–{item.endsAt}
+                      {item.room ? ` · ${item.room}` : ""}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="button-primary"
+                    onClick={() =>
+                      setSelectedClass({
+                        teachingAssignmentId: item.teachingAssignmentId,
+                        subjectName: item.subjectName,
+                        sectionName: item.sectionName,
+                        startsAt: item.startsAt,
+                        endsAt: item.endsAt,
+                        room: item.room,
+                      })
+                    }
+                  >
+                    Open class
+                  </button>
                 </li>
               ))}
             </ul>

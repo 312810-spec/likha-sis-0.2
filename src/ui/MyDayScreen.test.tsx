@@ -77,7 +77,40 @@ describe("MyDayScreen", () => {
     expect(screen.getByText(/Nothing pending/)).toBeInTheDocument();
   });
 
-  it("calls onCheckAttendance with the assignment id when its button is clicked", async () => {
+  it("opens the scheduled class without asking for the class again", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+
+    expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Selected class schedule")).toHaveTextContent(
+      "08:00–08:50 · Room 101",
+    );
+  });
+
+  it("can return from the class workspace to today's schedule", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(screen.getByRole("button", { name: "Back to Today" }));
+
+    expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open class" })).toBeInTheDocument();
+  });
+
+  it("opens subject attendance for the selected class from the class workspace", async () => {
+    const user = userEvent.setup();
+    const { onCheckAttendance } = renderScreen();
+
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(screen.getByRole("button", { name: "Check attendance" }));
+
+    expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
+  });
+
+  it("calls onCheckAttendance with the assignment id from Needs Attention", async () => {
     const user = userEvent.setup();
     const { onCheckAttendance } = renderScreen();
 
