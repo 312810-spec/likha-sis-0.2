@@ -2,6 +2,14 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
+Latest checkpoint (2026-09-16): PR #86 merged as
+`9fdc9c01a0a977859df53524d308f9a9e3421b78`. Canonical next slice is
+`test/score-sync-reconnect-proof`: synthetic UI evidence-transition regressions.
+Actual native offline/reconnect/access-change proof remains pending; Cargo and
+packaged Windows execution are unavailable in this runtime. See CURRENT-HANDOFF.
+
+Historical checkpoint:
+
 Main checkpoint: PR #85, `d8bd144a40d21f2f3f4f2f5e7489dc90803d858d`.
 PRs #79–85 merged; #78 closed as superseded. Older entries below are historical.
 Current slice: `feat/score-sync-row-display`, connecting authorized evidence to saved
