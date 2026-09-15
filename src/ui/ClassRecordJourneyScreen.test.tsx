@@ -7,8 +7,8 @@ import type { ExportApplicationService } from "../application/export-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { ClassRecord, GradingWeightPolicy } from "../domain/class-record";
 import type { GradingPeriod } from "../domain/grading";
+import type { ClassRecord, GradingWeightPolicy } from "../domain/class-record";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ClassRecordJourneyScreen } from "./ClassRecordJourneyScreen";
 import { ModeProvider } from "./theme/ModeContext";
@@ -72,9 +72,7 @@ function exportService(): ExportApplicationService {
   return {} as unknown as ExportApplicationService;
 }
 
-function subjectAttendanceServiceWith(
-  assignments: unknown[],
-): SubjectAttendanceApplicationService {
+function subjectAttendanceServiceWith(assignments: unknown[]): SubjectAttendanceApplicationService {
   return {
     listMyAssignments: vi.fn().mockResolvedValue(assignments),
   } as unknown as SubjectAttendanceApplicationService;
@@ -103,9 +101,7 @@ function renderScreen(overrides?: {
   created?: ClassRecord | null;
 }) {
   const onBackToClass = vi.fn();
-  const subjectAttendance = subjectAttendanceServiceWith(
-    overrides?.assignments ?? [ASSIGNMENT],
-  );
+  const subjectAttendance = subjectAttendanceServiceWith(overrides?.assignments ?? [ASSIGNMENT]);
   const grading = gradingServiceWith(overrides?.periods ?? [PERIOD]);
   const classRecord = classRecordServiceWith(
     overrides?.policies ?? [POLICY],
@@ -128,57 +124,31 @@ function renderScreen(overrides?: {
       />
     </ModeProvider>,
   );
-
-  return {
-    ...rendered,
-    onBackToClass,
-    subjectAttendance,
-    grading,
-    classRecord,
-  };
-}
-
-async function choosePolicyAndOpen(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(
-    await screen.findByLabelText("Grading period"),
-    "gp-1",
-  );
-  await user.selectOptions(
-    screen.getByLabelText("DepEd grading weighting"),
-    "wp-1",
-  );
-  await user.click(screen.getByRole("button", { name: "Open class record" }));
+  return { ...rendered, onBackToClass, subjectAttendance, grading, classRecord };
 }
 
 describe("ClassRecordJourneyScreen", () => {
-  it("does not infer a grading period or weighting before opening", async () => {
+  it("requires explicit grading period and weighting before opening", async () => {
     const user = userEvent.setup();
     const { classRecord, grading } = renderScreen();
 
-    const openButton = await screen.findByRole("button", {
-      name: "Open class record",
-    });
+    const openButton = await screen.findByRole("button", { name: "Open class record" });
     expect(openButton).toHaveAttribute("aria-disabled", "true");
     expect(classRecord.createClassRecord).not.toHaveBeenCalled();
     expect(grading.listPeriodsBySchoolYear).toHaveBeenCalledWith("2026-2027");
 
-    await choosePolicyAndOpen(user);
+    await user.selectOptions(screen.getByLabelText("Grading period"), "gp-1");
+    await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+    await user.click(openButton);
 
-    expect(classRecord.createClassRecord).toHaveBeenCalledWith(
-      "sec-1",
-      "subj-1",
-      "gp-1",
-      "wp-1",
-    );
+    expect(classRecord.createClassRecord).toHaveBeenCalledWith("sec-1", "subj-1", "gp-1", "wp-1");
     expect(await screen.findByText(/Term 1/)).toBeInTheDocument();
     expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
   });
 
   it("shows a visible error when the assignment is no longer authorized", async () => {
     renderScreen({ assignments: [] });
-    expect(
-      await screen.findByText("This class is no longer assigned to you."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("This class is no longer assigned to you.")).toBeInTheDocument();
   });
 
   it("shows a visible error when no grading period exists for the school year", async () => {
@@ -203,22 +173,18 @@ describe("ClassRecordJourneyScreen", () => {
     const user = userEvent.setup();
     renderScreen({ created: null });
 
-    await choosePolicyAndOpen(user);
-    expect(
-      await screen.findByText(/Could not open this class record/),
-    ).toBeInTheDocument();
+    await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
+    await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+
+    expect(await screen.findByText(/Could not open this class record/)).toBeInTheDocument();
   });
 
   it("returns to the class workspace with context intact", async () => {
     const user = userEvent.setup();
     const { onBackToClass } = renderScreen();
-
     await screen.findByLabelText("Grading period");
-    await user.click(
-      screen.getByRole("button", {
-        name: "Back to Filipino — Grade 8 – Joy",
-      }),
-    );
+    await user.click(screen.getByRole("button", { name: "Back to Filipino — Grade 8 – Joy" }));
     expect(onBackToClass).toHaveBeenCalledTimes(1);
   });
 
