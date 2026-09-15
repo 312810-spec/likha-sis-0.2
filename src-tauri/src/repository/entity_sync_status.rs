@@ -232,4 +232,99 @@ mod tests {
             EntitySyncState::NotYetSynced
         );
     }
+
+    #[test]
+    fn acknowledging_an_older_change_does_not_hide_a_newer_pending_edit() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Synthetic School").unwrap();
+        let entity_id = Uuid::now_v7();
+        let first = pending_change(entity_id);
+        let second = pending_change(entity_id);
+        sync_outbox::enqueue(&conn, &school.id, &first).unwrap();
+        sync_outbox::enqueue(&conn, &school.id, &second).unwrap();
+        sync_version_cache::record_known_version(
+            &conn,
+            &school.id,
+            EntityKind::LearnerScore,
+            &entity_id.to_string(),
+            1,
+        )
+        .unwrap();
+        assert!(sync_outbox::acknowledge(&conn, &school.id, &first.change_id.to_string()).unwrap());
+
+        assert_eq!(
+            status_for_entity(
+                &conn,
+                &school.id,
+                EntityKind::LearnerScore,
+                &entity_id.to_string(),
+            )
+            .unwrap(),
+            EntitySyncState::WaitingToSync
+        );
+    }
+
+    #[test]
+    fn failed_push_attempts_never_turn_pending_changes_into_synced_evidence() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Synthetic School").unwrap();
+        let entity_id = Uuid::now_v7();
+        let change = pending_change(entity_id);
+        sync_outbox::enqueue(&conn, &school.id, &change).unwrap();
+        for error in [
+            sync_outbox::AttemptErrorCode::Offline,
+            sync_outbox::AttemptErrorCode::Timeout,
+            sync_outbox::AttemptErrorCode::Unauthorized,
+            sync_outbox::AttemptErrorCode::HubUnavailable,
+            sync_outbox::AttemptErrorCode::ProtocolRejected,
+        ] {
+            assert!(sync_outbox::record_attempt(
+                &conn,
+                &school.id,
+                &change.change_id.to_string(),
+                Some(error),
+            )
+            .unwrap());
+            assert_eq!(
+                status_for_entity(
+                    &conn,
+                    &school.id,
+                    EntityKind::LearnerScore,
+                    &entity_id.to_string(),
+                )
+                .unwrap(),
+                EntitySyncState::WaitingToSync
+            );
+        }
+    }
+
+    #[test]
+    fn pending_and_conflict_evidence_do_not_leak_across_school_kind_or_entity() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Synthetic School A").unwrap();
+        let other_school = school::create(&conn, "Synthetic School B").unwrap();
+        let entity_id = Uuid::now_v7();
+        sync_outbox::enqueue(&conn, &school.id, &pending_change(entity_id)).unwrap();
+        for with_conflict in [false, true] {
+            if with_conflict {
+                sync_conflict_review::stage_pull_conflict(
+                    &conn,
+                    &school.id,
+                    0,
+                    &accepted_change(entity_id),
+                )
+                .unwrap();
+            }
+            for (scope, kind, id) in [
+                (&other_school.id, EntityKind::LearnerScore, entity_id),
+                (&school.id, EntityKind::Attendance, entity_id),
+                (&school.id, EntityKind::LearnerScore, Uuid::now_v7()),
+            ] {
+                assert_eq!(
+                    status_for_entity(&conn, scope, kind, &id.to_string()).unwrap(),
+                    EntitySyncState::NotYetSynced
+                );
+            }
+        }
+    }
 }

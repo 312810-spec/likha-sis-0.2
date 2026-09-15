@@ -18,7 +18,35 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current `main`: `fbd3649a6e538f130038b10c87a7204cfa76abc2`.
+Current verified `main`: `027aabebef228edf68c3c4792e151cca481558a5` (PR #80).
+
+PR #79 merged the sync wording correction; PR #78 is closed as superseded.
+PR #80 added internal entity-scoped sync evidence, not teacher-screen integration.
+
+## Canonical continuation (2026-09-15)
+
+This section supersedes the older Active work / Exact next action below.
+No open PRs were present when this slice started. Canonical branch:
+`codex/score-sync-status`.
+
+Implemented three regression tests for the existing entity-sync primitive:
+acknowledging an older queued change must not hide a newer edit; failed
+push attempts (including unauthorized) must remain waiting; pending/conflict
+evidence must not leak across school, entity kind, or entity ID.
+No runtime code, authorization boundary, UI, schema, or protocol changed.
+
+Verification: `git diff --check` passed. Targeted command
+`cargo test --lib repository::entity_sync_status::tests` could not execute:
+`cargo` is not installed in this environment. Rust compilation, formatting,
+test execution, and exact-head Quality/Security remain CI gates, not passes.
+These repository tests do not prove native restart/reconnect or access revocation.
+Independent review of the test diff found no blocking issues; API/type usage and
+assertions were inspected, but compilation, execution, and rustfmt remain unverified.
+
+Next: inspect this branch's canonical PR, required checks, and independent review;
+merge only after exact-head verification is complete. Then expose score sync
+evidence through assignment-owned teacher authorization before UI integration.
+Use the existing hourly loop; do not create additional schedules.
 
 Latest merged product slices:
 
