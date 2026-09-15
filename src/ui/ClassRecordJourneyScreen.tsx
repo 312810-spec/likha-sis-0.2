@@ -5,11 +5,13 @@ import type { ExportApplicationService } from "../application/export-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import type { GradingWeightPolicy } from "../domain/class-record";
 import { ValidationError } from "../domain/errors";
+import type { GradingPeriod } from "../domain/grading";
+import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
-import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import type { TeacherClassWorkContext } from "./work-context";
 
 interface ClassRecordJourneyScreenProps {
@@ -29,33 +31,27 @@ type Resolution =
   | { status: "loading" }
   | {
       status: "ready";
-      classRecordId: string;
-      gradingPeriodLabel: string;
-      weightPolicyName: string;
+      sectionId: string;
+      subjectId: string;
+      schoolYear: string;
+      periods: GradingPeriod[];
+      policies: GradingWeightPolicy[];
     }
   | { status: "error"; message: string };
 
+interface OpenedRecord {
+  classRecordId: string;
+  gradingPeriodLabel: string;
+  weightPolicyName: string;
+}
+
 /**
- * Golden Journey adapter (GJ-6, first slice): opens the class record for
- * the preserved class context's teaching assignment -- its section,
- * subject, and the section's current grading period -- without asking
- * the teacher to pick from dropdowns again.
+ * First GJ-6 class-record entry slice.
  *
- * Resolution is entirely trusted-service driven, never guessed in the
- * UI: the teaching assignment is revalidated through
- * `SubjectAttendanceApplicationService.listMyAssignments` -- the same
- * call the app already uses to revalidate a preserved class context (see
- * `docs/adr/0060-golden-journey-app-class-context.md`) -- and the class
- * record itself is opened through `ClassRecordApplicationService
- * .createClassRecord`'s existing find-or-create semantics, which keeps
- * every grading-policy and cross-school-year/ownership decision a
- * domain/service concern. This screen never computes or guesses a
- * grade; it only supplies resolved identifiers to the existing
- * `ClassRecordWorkspace`.
- *
- * A grading period or weight policy that cannot be resolved, or a class
- * record that `createClassRecord` refuses, is shown as a visible,
- * retryable error -- never a silent failure or a guessed fallback.
+ * The teaching assignment is revalidated below the UI before section and
+ * subject identifiers are used. The teacher must then explicitly choose the
+ * grading period and DepEd grading weighting. LIKHA never guesses either
+ * academic choice from array order, a default flag, or a subject name.
  */
 export function ClassRecordJourneyScreen({
   teachingAssignmentId,
@@ -70,11 +66,20 @@ export function ClassRecordJourneyScreen({
   onBackToClass,
 }: ClassRecordJourneyScreenProps) {
   const [resolution, setResolution] = useState<Resolution>({ status: "loading" });
+  const [periodId, setPeriodId] = useState("");
+  const [policyId, setPolicyId] = useState("");
+  const [openedRecord, setOpenedRecord] = useState<OpenedRecord | null>(null);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
   const requestRef = useRef(0);
 
   function resolve() {
     const requestId = ++requestRef.current;
     setResolution({ status: "loading" });
+    setPeriodId("");
+    setPolicyId("");
+    setOpenedRecord(null);
+    setOpenError(null);
 
     async function run(): Promise<Resolution> {
       const assignments = await subjectAttendanceService.listMyAssignments(teacherUserId);
@@ -83,18 +88,19 @@ export function ClassRecordJourneyScreen({
         return { status: "error", message: "This class is no longer assigned to you." };
       }
 
-      const periods = await gradingService.listPeriodsBySchoolYear(assignment.schoolYear);
-      const currentPeriod = periods[0];
-      if (!currentPeriod) {
+      const [periods, policies] = await Promise.all([
+        gradingService.listPeriodsBySchoolYear(assignment.schoolYear),
+        classRecordService.listGradingWeightPolicies(),
+      ]);
+
+      if (periods.length === 0) {
         return {
           status: "error",
           message: "No grading period has been set up yet for this class's school year.",
         };
       }
 
-      const policies = await classRecordService.listGradingWeightPolicies();
-      const defaultPolicy = policies.find((policy) => policy.isDefault) ?? policies[0];
-      if (!defaultPolicy) {
+      if (policies.length === 0) {
         return {
           status: "error",
           message:
@@ -102,25 +108,13 @@ export function ClassRecordJourneyScreen({
         };
       }
 
-      const created = await classRecordService.createClassRecord(
-        assignment.sectionId,
-        assignment.subjectId,
-        currentPeriod.id,
-        defaultPolicy.id,
-      );
-      if (!created) {
-        return {
-          status: "error",
-          message:
-            "Could not open this class record — the section, subject, grading period, and grading weighting must belong to your school and share the same school year.",
-        };
-      }
-
       return {
         status: "ready",
-        classRecordId: created.id,
-        gradingPeriodLabel: currentPeriod.label,
-        weightPolicyName: defaultPolicy.name,
+        sectionId: assignment.sectionId,
+        subjectId: assignment.subjectId,
+        schoolYear: assignment.schoolYear,
+        periods,
+        policies,
       };
     }
 
@@ -129,13 +123,9 @@ export function ClassRecordJourneyScreen({
         if (requestRef.current !== requestId) return;
         setResolution(result);
       })
-      .catch((err) => {
+      .catch(() => {
         if (requestRef.current !== requestId) return;
-        setResolution({
-          status: "error",
-          message:
-            err instanceof ValidationError ? err.message : "Could not open this class record.",
-        });
+        setResolution({ status: "error", message: "Could not prepare this class record." });
       });
   }
 
@@ -153,6 +143,43 @@ export function ClassRecordJourneyScreen({
     classRecordService,
   ]);
 
+  async function openClassRecord() {
+    if (resolution.status !== "ready" || opening || !periodId || !policyId) return;
+
+    const period = resolution.periods.find((candidate) => candidate.id === periodId);
+    const policy = resolution.policies.find((candidate) => candidate.id === policyId);
+    if (!period || !policy) return;
+
+    setOpening(true);
+    setOpenError(null);
+    try {
+      const created = await classRecordService.createClassRecord(
+        resolution.sectionId,
+        resolution.subjectId,
+        period.id,
+        policy.id,
+      );
+      if (!created) {
+        setOpenError(
+          "Could not open this class record — check that the selected term and grading weighting belong to this school year.",
+        );
+        return;
+      }
+
+      setOpenedRecord({
+        classRecordId: created.id,
+        gradingPeriodLabel: period.label,
+        weightPolicyName: policy.name,
+      });
+    } catch (err) {
+      setOpenError(
+        err instanceof ValidationError ? err.message : "Could not open this class record.",
+      );
+    } finally {
+      setOpening(false);
+    }
+  }
+
   const backLabel = `Back to ${classContext.subjectName} — ${classContext.sectionName}`;
   const backButton = (
     <button type="button" onClick={() => void onBackToClass()}>
@@ -166,7 +193,7 @@ export function ClassRecordJourneyScreen({
         title={`${classContext.subjectName} — ${classContext.sectionName}`}
         actions={backButton}
       >
-        <Loading label="Opening class record…" />
+        <Loading label="Preparing class record…" />
       </Page>
     );
   }
@@ -187,20 +214,77 @@ export function ClassRecordJourneyScreen({
     );
   }
 
+  if (openedRecord) {
+    return (
+      <>
+        {backButton}
+        <p className="field-hint">
+          <strong>{classContext.sectionName}</strong> — {classContext.subjectName} —{" "}
+          {openedRecord.gradingPeriodLabel} — weighting: {openedRecord.weightPolicyName}
+        </p>
+        <ClassRecordWorkspace
+          classRecordId={openedRecord.classRecordId}
+          weightPolicyName={openedRecord.weightPolicyName}
+          assessmentService={assessmentService}
+          learnerScoreService={learnerScoreService}
+          exportService={exportService}
+        />
+      </>
+    );
+  }
+
   return (
-    <>
-      {backButton}
-      <p className="field-hint">
-        <strong>{classContext.sectionName}</strong> — {classContext.subjectName} —{" "}
-        {resolution.gradingPeriodLabel} — weighting: {resolution.weightPolicyName}
-      </p>
-      <ClassRecordWorkspace
-        classRecordId={resolution.classRecordId}
-        weightPolicyName={resolution.weightPolicyName}
-        assessmentService={assessmentService}
-        learnerScoreService={learnerScoreService}
-        exportService={exportService}
-      />
-    </>
+    <Page
+      title={`${classContext.subjectName} — ${classContext.sectionName}`}
+      actions={backButton}
+      hint={
+        <p className="field-hint">
+          Your class is already selected. Choose the grading period and DepEd grading weighting
+          explicitly before opening its scoring workspace.
+        </p>
+      }
+    >
+      {openError ? <Alert tone="error">{openError}</Alert> : null}
+      <p className="field-hint">School year: {resolution.schoolYear}</p>
+      <div className="form-row">
+        <div className="field">
+          <label htmlFor="journey-class-record-period">Grading period</label>
+          <select
+            id="journey-class-record-period"
+            value={periodId}
+            onChange={(event) => setPeriodId(event.target.value)}
+          >
+            <option value="">Choose a grading period</option>
+            {resolution.periods.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="journey-class-record-policy">DepEd grading weighting</label>
+          <select
+            id="journey-class-record-policy"
+            value={policyId}
+            onChange={(event) => setPolicyId(event.target.value)}
+          >
+            <option value="">Choose a grading weighting</option>
+            {resolution.policies.map((policy) => (
+              <option key={policy.id} value={policy.id}>
+                {policy.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-disabled={opening || !periodId || !policyId}
+        onClick={() => void openClassRecord()}
+      >
+        {opening ? "Opening…" : "Open class record"}
+      </button>
+    </Page>
   );
 }
