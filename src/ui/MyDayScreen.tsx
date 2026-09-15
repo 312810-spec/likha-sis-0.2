@@ -14,10 +14,8 @@ interface MyDayScreenProps {
   selectedClassContext?: TeacherClassWorkContext | null;
   onOpenClassContext: (context: TeacherClassWorkContext) => void;
   onBackToToday: () => void;
-  /** Opens Subject Attendance for this teaching assignment, already
-   * selected -- same narrow callback shape `TodaysClassesScreen`'s own
-   * `onCheckAttendance` established. */
   onCheckAttendance: (teachingAssignmentId: string) => void;
+  onOpenClassRecords: (teachingAssignmentId: string) => void;
   /** Opens the sync conflict review queue -- see `ConflictReviewScreen`. */
   onReviewConflicts: () => void;
 }
@@ -33,15 +31,10 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
 }
 
 /**
- * "My Day" — the existing read model that begins LIKHA's Legacy Soul
- * "Today" transition. It combines today's schedule with conservative,
- * read-only-derived pending work and can enter a selected class without
- * asking the teacher to choose that class again.
- *
- * Class context is owned one level above this screen so the same bounded
- * context can survive a connected workflow such as Subject Attendance.
- * Academic truth never comes from that UI context: trusted application
- * services still re-authorize the teaching assignment before work resumes.
+ * "My Day" — the read model that begins LIKHA's Golden Journey. Class
+ * context is owned above this screen so the same bounded assignment can move
+ * into connected attendance and class-record work without becoming an
+ * authorization source itself.
  */
 export function MyDayScreen({
   myDayService,
@@ -49,6 +42,7 @@ export function MyDayScreen({
   onOpenClassContext,
   onBackToToday,
   onCheckAttendance,
+  onOpenClassRecords,
   onReviewConflicts,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
@@ -90,6 +84,7 @@ export function MyDayScreen({
       <ClassWorkspaceScreen
         context={selectedClassContext}
         onCheckAttendance={onCheckAttendance}
+        onOpenClassRecords={onOpenClassRecords}
         onBackToToday={onBackToToday}
       />
     );
