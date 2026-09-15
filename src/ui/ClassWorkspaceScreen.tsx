@@ -1,27 +1,34 @@
+import { useState } from "react";
+import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { ClassLearnersPanel } from "./ClassLearnersPanel";
 import type { TeacherClassWorkContext } from "./work-context";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ClassWorkspaceScreenProps {
   context: TeacherClassWorkContext;
+  subjectAttendanceService: SubjectAttendanceApplicationService;
   onCheckAttendance: (teachingAssignmentId: string) => void;
   onBackToToday: () => void;
 }
 
 /**
- * First Legacy Soul class workspace slice.
+ * Golden Journey class workspace rooted in one teaching assignment.
  *
- * The workspace is deliberately small: it proves that a teacher can enter a
- * class once from Today and carry that context into real work. It does not
- * duplicate attendance/class-record domain state and it does not expose
- * placeholder controls for features that have not yet been integrated.
+ * Connected work is added here only when its trusted authorization path and
+ * existing behavior can be preserved. Attendance remains its own workflow;
+ * Learners uses the assignment-owned Subject Attendance monitor as a scoped
+ * roster read so the workspace never broadens access merely because it knows
+ * a section label/id.
  */
 export function ClassWorkspaceScreen({
   context,
+  subjectAttendanceService,
   onCheckAttendance,
   onBackToToday,
 }: ClassWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
+  const [showLearners, setShowLearners] = useState(false);
   const scheduleLabel =
     context.startsAt && context.endsAt
       ? `${context.startsAt}–${context.endsAt}${context.room ? ` · ${context.room}` : ""}`
@@ -52,18 +59,27 @@ export function ClassWorkspaceScreen({
 
       <section aria-labelledby="class-workspace-work">
         <h3 id="class-workspace-work">Class work</h3>
-        <p>
-          Start with attendance. More class tools will move into this same workspace only after
-          their existing behavior is preserved and verified.
-        </p>
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => onCheckAttendance(context.teachingAssignmentId)}
-        >
-          Check attendance
-        </button>
+        <p>Choose the next task without selecting this class again.</p>
+        <div className="button-row">
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => onCheckAttendance(context.teachingAssignmentId)}
+          >
+            Check attendance
+          </button>
+          <button type="button" onClick={() => setShowLearners((current) => !current)}>
+            {showLearners ? "Hide learners" : "View learners"}
+          </button>
+        </div>
       </section>
+
+      {showLearners ? (
+        <ClassLearnersPanel
+          subjectAttendanceService={subjectAttendanceService}
+          teachingAssignmentId={context.teachingAssignmentId}
+        />
+      ) : null}
     </Page>
   );
 }
