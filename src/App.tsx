@@ -33,6 +33,7 @@ import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
+import { ClassRecordsJourneyScreen } from "./ui/ClassRecordsJourneyScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
@@ -70,56 +71,25 @@ function App() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(null);
-  // Set only by TeacherWorkspaceScreen's "mark/continue/review attendance"
-  // action, so AttendanceScreen can open with that section already
-  // selected -- a narrowly-typed prop, not a router/URL param/global
-  // store. See docs/adr/0032-teacher-workspace-polish.md.
   const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
-  // Set only by SectionsScreen's "Open roster" action, so
-  // SectionRosterScreen opens for that section -- same narrowly-typed
-  // handoff as attendanceSectionId above, not a router/global store.
   const [rosterSectionId, setRosterSectionId] = useState<string | null>(null);
-  // Set only by AttendanceScreen's "View monthly summary" action, so
-  // MonthlySummaryScreen can open with the same section and year/month
-  // already selected -- same narrowly-typed handoff pattern as above, not
-  // a router/global store. See
-  // docs/adr/0033-daily-attendance-and-monthly-summary-polish.md.
   const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
     sectionId: string;
     year: number;
     month: number;
   } | null>(null);
-  // Set only when Subject Attendance is opened from a known assignment.
-  // The id is still revalidated by SubjectAttendanceScreen against the
-  // signed-in teacher's authorized assignments before it is selected.
   const [subjectAttendanceAssignmentId, setSubjectAttendanceAssignmentId] = useState<string | null>(
     null,
   );
-  // Bounded Golden Journey context. The assignment id is canonical; the
-  // labels are display hints copied from an already-authorized read model.
-  // No academic decision trusts this UI state without application-service
-  // revalidation.
   const [classWorkContext, setClassWorkContext] = useState<TeacherClassWorkContext | null>(null);
-  // Set only by SectionsScreen's "Manage assignments" action, so
-  // TeachingAssignmentsScreen opens for that section -- same
-  // narrowly-typed handoff pattern as rosterSectionId above, not a
-  // router/global store. sectionName travels alongside it since
-  // SectionsScreen already has the full Section in hand.
   const [teachingAssignmentsSection, setTeachingAssignmentsSection] = useState<{
     sectionId: string;
     sectionName: string;
   } | null>(null);
-  // Set only by SectionsScreen's "Manage adviser" action, so
-  // SectionAdviserScreen opens for that section -- same narrowly-typed
-  // handoff pattern as teachingAssignmentsSection above, not a
-  // router/global store.
   const [sectionAdviserSection, setSectionAdviserSection] = useState<{
     sectionId: string;
     sectionName: string;
   } | null>(null);
-  // Set only by TeachingAssignmentsScreen's "Manage schedule" action, so
-  // ScheduleMeetingsScreen opens for that assignment -- same
-  // narrowly-typed handoff pattern as above, not a router/global store.
   const [scheduleMeetingsAssignment, setScheduleMeetingsAssignment] = useState<{
     teachingAssignmentId: string;
     subjectName: string;
@@ -137,26 +107,15 @@ function App() {
   }
 
   useEffect(() => {
-    // Fires from any command, on any screen, that fails because the
-    // session is no longer valid (idle timeout, absolute TTL, or
-    // revocation) — see ADR-0022. Without this, each screen was left to
-    // fail its own in-flight request with a generic, unexplained error;
-    // this returns the teacher to sign-in with a clear reason instead.
     return onSessionExpired(handleSessionExpired);
   }, []);
 
   useEffect(() => {
-    // Gives a teacher an obvious sense of current location beyond the
-    // active nav item's own highlight -- visible in the browser tab
-    // and read aloud by some screen readers on navigation.
     document.title = session ? `${TAB_LABELS[activeTab]} · LIKHA-SIS` : "LIKHA-SIS";
   }, [session, activeTab]);
 
   useEffect(() => {
     let cancelled = false;
-    // The setup screen is only ever shown because the backend says so
-    // (installationStatus), never from a client-side-only guess — see
-    // ADR-0006.
     Promise.all([setupService.installationStatus(), authService.currentSession()])
       .then(([status, currentSession]) => {
         if (cancelled) return;
@@ -205,8 +164,6 @@ function App() {
       );
       if (!stillAuthorized) clearClassWorkContext();
     } catch {
-      // A context that cannot be revalidated is never trusted. Falling
-      // back to Today is safer than restoring a stale/unauthorized class.
       clearClassWorkContext();
     }
 
@@ -426,6 +383,11 @@ function App() {
                 setSubjectAttendanceAssignmentId(teachingAssignmentId);
                 setActiveTab("subject-attendance");
               }}
+              onOpenClassRecords={(teachingAssignmentId) => {
+                if (classWorkContext?.teachingAssignmentId === teachingAssignmentId) {
+                  setActiveTab("class-records");
+                }
+              }}
               onReviewConflicts={() => setActiveTab("conflict-review")}
             />
           ) : activeTab === "today-classes" ? (
@@ -476,15 +438,29 @@ function App() {
           ) : activeTab === "grading-periods" ? (
             <GradingPeriodsScreen gradingService={gradingService} />
           ) : activeTab === "class-records" ? (
-            <ClassRecordsScreen
-              classRecordService={classRecordService}
-              sectionService={sectionService}
-              subjectService={subjectService}
-              gradingService={gradingService}
-              assessmentService={assessmentService}
-              learnerScoreService={learnerScoreService}
-              exportService={exportService}
-            />
+            classWorkContext ? (
+              <ClassRecordsJourneyScreen
+                classContext={classWorkContext}
+                teacherUserId={session.userId}
+                subjectAttendanceService={subjectAttendanceService}
+                classRecordService={classRecordService}
+                gradingService={gradingService}
+                assessmentService={assessmentService}
+                learnerScoreService={learnerScoreService}
+                exportService={exportService}
+                onBackToClass={handleReturnToClass}
+              />
+            ) : (
+              <ClassRecordsScreen
+                classRecordService={classRecordService}
+                sectionService={sectionService}
+                subjectService={subjectService}
+                gradingService={gradingService}
+                assessmentService={assessmentService}
+                learnerScoreService={learnerScoreService}
+                exportService={exportService}
+              />
+            )
           ) : activeTab === "lesson-plans" ? (
             <LessonPlanScreen
               lessonPlanService={lessonPlanService}
