@@ -6,28 +6,24 @@ This inventory classifies the major work visible in PR #55. It is a recovery ind
 
 ## Recover first if the gap still exists
 
-| Area | Class | Required proof before adoption |
-| --- | --- | --- |
-| School-logo content validation | P0 security/correctness | Confirm current `main` still lacks real byte-signature validation; add focused tests |
-| Trusted-boundary authorization fixes | P0 security/correctness | Compare current commands/capabilities; fresh negative authorization tests |
-| Migration/data-loss protections | P0 correctness | Migration path/idempotency/recovery tests against current schema |
-| Backup / DR | P1 core reliability | Encrypted-data handling, backup exposure, restore drill, failure recovery |
-| Sync correctness / resilience | P1 core reliability | Offline writes, replay/idempotency, authorization scope, recovery |
-| Master Teacher RBAC + two-tier grade review | P1 core SIS | Fresh independent auth/security review; self-approval denial; role/scope tests |
-| Transfers registry | P1 learner lifecycle | Required workflow, school/section scope, history correctness |
-| SF8 / nutrition | P1 compliance-sensitive | Current DepEd evidence, domain tests, authoritative form/data mapping |
-| Child-protection authorization | P1 security-sensitive | Strict least privilege, local-data protection, audit/recovery expectations |
-| Configurable sync hub address | P1/P2 infrastructure | Current topology need, secure transport/credential handling, safe defaults |
+- **School-logo content validation — P0 security/correctness.** Confirm current `main` still lacks real byte-signature validation; add focused tests.
+- **Trusted-boundary authorization fixes — P0 security/correctness.** Compare current commands/capabilities; add fresh negative authorization tests.
+- **Migration/data-loss protections — P0 correctness.** Verify migration path, idempotency, and recovery against the current schema.
+- **Backup / DR — P1 core reliability.** Verify encrypted-data handling, backup exposure, restore drills, and failure recovery.
+- **Sync correctness / resilience — P1 core reliability.** Verify offline writes, replay/idempotency, authorization scope, and recovery.
+- **Master Teacher RBAC + two-tier grade review — P1 core SIS.** Require a fresh independent authorization/security review, self-approval denial, and role/scope tests.
+- **Transfers registry — P1 learner lifecycle.** Confirm the required workflow, school/section scope, and history correctness.
+- **SF8 / nutrition — P1 compliance-sensitive.** Require current DepEd evidence, domain tests, and authoritative form/data mapping.
+- **Child-protection authorization — P1 security-sensitive.** Require strict least privilege, local-data protection, and audit/recovery expectations.
+- **Configurable sync hub address — P1/P2 infrastructure.** Confirm the current topology need, secure transport/credential handling, and safe defaults.
 
 ## Gated optional recovery
 
-| Area | Class | Gate |
-| --- | --- | --- |
-| Microsoft 365 / SharePoint school repository | P2 optional adapter | Fresh OAuth/token-custody/egress security review; school tenant availability; offline independence |
-| Grade-review UI / oversight | P2 | Core RBAC/domain accepted first |
-| Anecdotal / guidance records | P2 | Release-scope admission + privacy/authorization review |
-| Award eligibility using anecdotal data | P2 | Verified policy source and conservative business-rule review |
-| Scholastic workbook importer | P2 | Real workflow need + import validation/rollback tests |
+- **Microsoft 365 / SharePoint school repository — P2 optional adapter.** Require a fresh OAuth/token-custody/egress security review, school tenant availability, and offline independence.
+- **Grade-review UI / oversight — P2.** Recover only after the core RBAC/domain model is accepted.
+- **Anecdotal / guidance records — P2.** Require release-scope admission plus privacy/authorization review.
+- **Award eligibility using anecdotal data — P2.** Require a verified policy source and conservative business-rule review.
+- **Scholastic workbook importer — P2.** Require a real workflow need plus import validation and rollback tests.
 
 ## Archive unless later admitted
 
