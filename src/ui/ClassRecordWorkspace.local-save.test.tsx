@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { AssessmentApplicationService } from "../application/assessment-service";
 import type { ExportApplicationService } from "../application/export-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
-import type { AssessmentCategorySet, AssessmentItemDetail } from "../domain/assessment";
+import type {
+  AssessmentCategorySet,
+  AssessmentItemDetail,
+} from "../domain/assessment";
 import type { LearnerScoreRosterEntry } from "../domain/learner-score";
 import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { ModeProvider } from "./theme/ModeContext";
@@ -83,7 +86,9 @@ describe("ClassRecordWorkspace local-save state", () => {
     const user = userEvent.setup();
     const { learnerScoreService } = renderWorkspace();
 
-    await user.click(await screen.findByRole("button", { name: /Written Works — Quiz 1/ }));
+    await user.click(
+      await screen.findByRole("button", { name: /Written Works — Quiz 1/ }),
+    );
     const scoreInput = await screen.findByLabelText("Score for Ana Cruz");
     await user.type(scoreInput, "18");
     await user.keyboard("{Enter}");
