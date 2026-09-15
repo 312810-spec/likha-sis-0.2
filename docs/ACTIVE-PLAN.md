@@ -2,11 +2,11 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
-Main checkpoint: PR #83, `9297d8426ad33686a14201782f7f8ff725159af6`.
-PRs #79–83 merged; #78 closed as superseded. Older entries below are historical.
-Current slice: `fix/score-sync-permission-classification`, correcting false session
-expiration on a denied assignment-owned score-status read. Native denial propagates.
-Next: composition and truthful row evidence in the assignment-owned Class Record
+Main checkpoint: PR #84, `a3a2f91996168b18c8555eba9f87964cc58dc34e`.
+PRs #79–84 merged; #78 closed as superseded. Older entries below are historical.
+Current slice: `feat/score-sync-composition`, wiring the existing evidence service
+and testing the complete TypeScript composition-to-native-command boundary.
+Next: truthful row evidence in the assignment-owned Class Record
 journey. No teacher-screen sync integration is claimed yet.
 Use CI time for bounded preparation, then recheck once and continue in the same run
 when green. The hourly production schedule is a fallback, not a stage barrier.
