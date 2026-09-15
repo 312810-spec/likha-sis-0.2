@@ -7,8 +7,8 @@ import type { ExportApplicationService } from "../application/export-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { GradingPeriod } from "../domain/grading";
 import type { ClassRecord, GradingWeightPolicy } from "../domain/class-record";
+import type { GradingPeriod } from "../domain/grading";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ClassRecordJourneyScreen } from "./ClassRecordJourneyScreen";
 import { ModeProvider } from "./theme/ModeContext";
@@ -34,16 +34,16 @@ const PERIOD: GradingPeriod = {
   schoolId: "s1",
   schoolYear: "2026-2027",
   policyPeriodId: "pp-1",
-  label: "1st Quarter",
+  label: "Term 1",
   startsOn: "2026-06-01",
-  endsOn: "2026-08-31",
+  endsOn: "2026-09-30",
   createdAt: "now",
 };
 
 const POLICY: GradingWeightPolicy = {
   id: "wp-1",
   name: "Core Weighting",
-  sourceCitation: "DepEd Order No. 8, s. 2015",
+  sourceCitation: "Synthetic policy fixture",
   isDefault: true,
 };
 
@@ -124,17 +124,36 @@ function renderScreen(overrides?: {
       />
     </ModeProvider>,
   );
+
   return { ...rendered, onBackToClass, subjectAttendance, grading, classRecord };
 }
 
+async function choosePolicyAndOpen(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
+  await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+  await user.click(screen.getByRole("button", { name: "Open class record" }));
+}
+
 describe("ClassRecordJourneyScreen", () => {
-  it("finds-or-creates the class record from the teaching assignment and opens the workspace", async () => {
+  it("does not infer a grading period or weighting before opening", async () => {
+    const user = userEvent.setup();
     const { classRecord, grading } = renderScreen();
 
-    expect(await screen.findByText(/1st Quarter/)).toBeInTheDocument();
-    expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
+    const openButton = await screen.findByRole("button", { name: "Open class record" });
+    expect(openButton).toHaveAttribute("aria-disabled", "true");
+    expect(classRecord.createClassRecord).not.toHaveBeenCalled();
     expect(grading.listPeriodsBySchoolYear).toHaveBeenCalledWith("2026-2027");
-    expect(classRecord.createClassRecord).toHaveBeenCalledWith("sec-1", "subj-1", "gp-1", "wp-1");
+
+    await choosePolicyAndOpen(user);
+
+    expect(classRecord.createClassRecord).toHaveBeenCalledWith(
+      "sec-1",
+      "subj-1",
+      "gp-1",
+      "wp-1",
+    );
+    expect(await screen.findByText(/Term 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
   });
 
   it("shows a visible error when the assignment is no longer authorized", async () => {
@@ -151,7 +170,7 @@ describe("ClassRecordJourneyScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a visible error when no default weight policy exists", async () => {
+  it("shows a visible error when no grading weighting exists", async () => {
     renderScreen({ policies: [] });
     expect(
       await screen.findByText(
@@ -160,31 +179,28 @@ describe("ClassRecordJourneyScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a visible error when the class record cannot be opened (cross-school-year/ownership mismatch)", async () => {
-    renderScreen({ created: null });
-    expect(await screen.findByText(/Could not open this class record/)).toBeInTheDocument();
-  });
-
-  it("retries resolution from the error state", async () => {
+  it("shows a visible error when the selected class record cannot be opened", async () => {
     const user = userEvent.setup();
-    const { classRecord } = renderScreen({ created: null });
-    await screen.findByText(/Could not open this class record/);
-    (classRecord.createClassRecord as ReturnType<typeof vi.fn>).mockResolvedValueOnce(CLASS_RECORD);
-    await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText(/1st Quarter/)).toBeInTheDocument();
+    renderScreen({ created: null });
+
+    await choosePolicyAndOpen(user);
+    expect(await screen.findByText(/Could not open this class record/)).toBeInTheDocument();
   });
 
   it("returns to the class workspace with context intact", async () => {
     const user = userEvent.setup();
     const { onBackToClass } = renderScreen();
-    await screen.findByText(/1st Quarter/);
-    await user.click(screen.getByRole("button", { name: "Back to Filipino — Grade 8 – Joy" }));
+
+    await screen.findByLabelText("Grading period");
+    await user.click(
+      screen.getByRole("button", { name: "Back to Filipino — Grade 8 – Joy" }),
+    );
     expect(onBackToClass).toHaveBeenCalledTimes(1);
   });
 
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen();
-    await screen.findByText(/1st Quarter/);
+    await screen.findByLabelText("Grading period");
     await expectNoAccessibilityViolations(container);
   });
 });
