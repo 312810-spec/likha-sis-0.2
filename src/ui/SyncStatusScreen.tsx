@@ -18,7 +18,7 @@ interface SyncStatusScreenProps {
  * once it's no longer recent -- a raw ISO storage timestamp is never
  * shown to a teacher, matching `DeviceManagementScreen`/`ConflictReviewScreen`'s
  * established `formatWhen` convention, extended here with a relative
- * phrasing for the common "just synced" case. */
+ * phrasing for the common "recently received" case. */
 function formatRelative(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -101,8 +101,9 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
         mode === "guided" ? (
           <p className="field-hint">
             This shows whether this device is set up to sync your school&rsquo;s records with your
-            other devices, and how up to date it is. It does not change anything -- to remove a
-            device, use Devices; to resolve a conflict, use Review Sync Conflicts.
+            other devices, and what sync work this device can prove is still pending. It does not
+            change anything -- to remove a device, use Devices; to resolve a conflict, use Review
+            Sync Conflicts.
           </p>
         ) : undefined
       }
@@ -133,7 +134,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           </li>
 
           <li className="sync-status-card">
-            <p className="sync-status-card-name">Last synced</p>
+            <p className="sync-status-card-name">Last received update</p>
             <p className="sync-status-card-detail">
               {status.lastPullAt
                 ? `Received an update ${formatRelative(status.lastPullAt)}`
@@ -144,7 +145,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           <li className="sync-status-card">
             <p className="sync-status-card-name">
               {status.pendingChangeCount === 0
-                ? "All changes are synced"
+                ? "No changes waiting to sync"
                 : `${status.pendingChangeCount} change${status.pendingChangeCount === 1 ? "" : "s"} waiting to sync`}
             </p>
             {status.pendingChangeCount > 0 && status.hasPendingSyncTrouble && (
