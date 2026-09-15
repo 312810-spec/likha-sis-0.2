@@ -85,8 +85,13 @@ describe("SubjectAttendanceJourneyScreen", () => {
     await user.click(await screen.findByRole("button", { name: "View Mathematics learners" }));
 
     expect(await screen.findByText("Santos, Maya")).toBeInTheDocument();
-    expect(service.monitor).toHaveBeenCalledWith("ta-1", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
-    expect(screen.getByRole("button", { name: "Back to Mathematics — Mabini" })).toBeInTheDocument();
+    expect(service.monitor).toHaveBeenCalledWith(
+      "ta-1",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    );
+    expect(
+      screen.getByRole("button", { name: "Back to Mathematics — Mabini" }),
+    ).toBeInTheDocument();
   });
 
   it("does not offer class return or learner access when the preserved context differs", async () => {
