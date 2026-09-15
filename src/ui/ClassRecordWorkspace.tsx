@@ -15,6 +15,7 @@ import type {
   LearnerScoreStatus,
 } from "../domain/learner-score";
 import { Alert } from "./components/Alert";
+import { ClassRecordLocalSaveStatus } from "./components/ClassRecordLocalSaveStatus";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
@@ -38,15 +39,6 @@ const STATUS_LABELS: Record<LearnerScoreStatus, string> = {
   excused: "Excused",
   not_applicable: "N/A",
 };
-
-/** Formats an ISO timestamp as a short local time for the "Saved HH:MM"
- * note. Returns `null` for anything that doesn't parse as a real date
- * rather than surfacing "Invalid Date" to a teacher. */
-function formatSavedTime(updatedAt: string): string | null {
-  const date = new Date(updatedAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 export function ClassRecordWorkspace({
   classRecordId,
@@ -204,9 +196,6 @@ export function ClassRecordWorkspace({
   }
 
   useEffect(() => {
-    // Clear the previous item's roster immediately -- a failed load must
-    // never leave a different assessment item's roster rendered as if it
-    // belongs to the newly selected item.
     setRoster([]);
     setRowErrors({});
     setTermGrades({});
@@ -250,13 +239,6 @@ export function ClassRecordWorkspace({
     setEditMaxScore(String(item.maxScore));
   }
 
-  /** Saves an in-progress item edit. An already-scored item only ever
-   * calls `renameItem` (always safe -- see `assessment_item::rename`'s
-   * doc comment) regardless of what the now-hidden category/max-score
-   * fields hold, since those controls are not rendered for a scored item
-   * in the first place. An unscored item calls the full `updateItem`,
-   * which the Rust layer itself re-verifies is still unscored and
-   * resolves to a valid leaf category before accepting the change. */
   async function handleSaveEdit(item: AssessmentItemDetail) {
     if (savingEdit || editName.trim().length === 0) return;
     const isScored = item.recordedCount > 0;
@@ -290,9 +272,6 @@ export function ClassRecordWorkspace({
     }
   }
 
-  /** Deletes an item after the two-step confirmation below has already
-   * armed for this item's id. Only ever reachable for an unscored item --
-   * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
     if (deletingItemId === item.id) return;
     setDeletingItemId(item.id);
@@ -322,13 +301,6 @@ export function ClassRecordWorkspace({
     return scoreDrafts[learnerId] ?? (currentScore === null ? "" : String(currentScore));
   }
 
-  /** After grades have been shown at least once this session, keep the
-   * one affected learner's grade from silently going stale when their
-   * score changes -- cheap (one round trip for one learner, not the
-   * whole roster) and safe (compute_term_grade is deterministic). If
-   * grades were never shown, there is nothing to keep fresh, so this is
-   * a genuine no-op, not a hidden background cost every score-entry
-   * teacher pays. See ADR-0034 for the full reasoning. */
   function maybeRefreshTermGrade(learnerId: string) {
     if (Object.keys(termGrades).length === 0) return;
     void learnerScoreService
@@ -339,22 +311,9 @@ export function ClassRecordWorkspace({
         if (updateFlashTimeoutRef.current) clearTimeout(updateFlashTimeoutRef.current);
         updateFlashTimeoutRef.current = setTimeout(() => setJustUpdatedLearnerId(null), 2500);
       })
-      .catch(() => {
-        // Best-effort background refresh -- a failure here must not
-        // surface as a page-level error over an otherwise-successful
-        // score save. The teacher can always click "Show term grades"
-        // again for an explicit retry.
-      });
+      .catch(() => {});
   }
 
-  /** Saves one learner's status/score. Errors are surfaced inline on that
-   * learner's row (not the page-level banner) so a mistake on one row
-   * during rapid entry never interrupts the rest of the roster. Returns
-   * whether the save succeeded, so callers can decide whether it's safe
-   * to move keyboard focus away from a row that still needs fixing. Both
-   * the score-input commit path and the Excused/N/A exception buttons
-   * call this — the per-learner write-generation guard below protects
-   * both equally, since neither path otherwise knows about the other. */
   async function handleRecord(
     learnerId: string,
     status: LearnerScoreStatus,
@@ -364,9 +323,6 @@ export function ClassRecordWorkspace({
     const selectedItem = items.find((i) => i.id === selectedItemId);
     if (!selectedItem) return false;
 
-    // Selecting the already-active exception status is a no-op, not a
-    // write (the score-input path has its own analogous check in
-    // commitScoreDraft, since "scored" always carries a value to compare).
     const currentEntry = roster.find((entry) => entry.learnerId === learnerId);
     if (status !== "scored" && currentEntry && currentEntry.status === status) {
       return true;
@@ -385,9 +341,6 @@ export function ClassRecordWorkspace({
         score,
         selectedItem.maxScore,
       );
-      // An older write's response must never overwrite a newer one's
-      // result -- only apply this response if nothing newer started for
-      // this learner while it was in flight.
       if (writeGenerationRef.current.get(learnerId) !== generation) return false;
       if (recorded === null) {
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
@@ -425,20 +378,8 @@ export function ClassRecordWorkspace({
     }
   }
 
-  /** Commits a learner's in-progress score-input text on Enter/blur/arrow
-   * navigation. Two safety properties, both deliberate: (1) a value that
-   * is unchanged from what's already saved is never re-sent — avoids a
-   * no-op write bumping `updatedAt` and misleading the "Saved HH:MM" note;
-   * (2) an emptied field is never committed — clearing the box does not
-   * erase a previously recorded score, since that isn't a real status
-   * this domain has (excused/not-applicable must be chosen explicitly via
-   * their own buttons, not implied by a blank box). Only moves focus to
-   * `moveFocusTo` when the save actually succeeded, so a validation error
-   * keeps focus on the row that needs fixing. */
   async function commitScoreDraft(entry: LearnerScoreRosterEntry, moveFocusTo?: string) {
-    if (committingRef.current.has(entry.learnerId)) {
-      return;
-    }
+    if (committingRef.current.has(entry.learnerId)) return;
     const text = draftScoreFor(entry.learnerId, entry.score).trim();
     const previousText = entry.score === null ? "" : String(entry.score);
     if (text === previousText || text === "") {
@@ -448,22 +389,12 @@ export function ClassRecordWorkspace({
     committingRef.current.add(entry.learnerId);
     try {
       const saved = await handleRecord(entry.learnerId, "scored", text);
-      if (saved) {
-        focusScoreInput(moveFocusTo);
-      }
+      if (saved) focusScoreInput(moveFocusTo);
     } finally {
       committingRef.current.delete(entry.learnerId);
     }
   }
 
-  /** Computes each currently-loaded roster learner's DepEd term grade,
-   * on demand rather than automatically — this is a per-learner Tauri
-   * round trip, and re-running it on every item selection or keystroke
-   * would be wasteful for a class of many learners and would show a
-   * number that's misleadingly still updating mid-entry. A teacher asks
-   * for it once they believe entry for this grading period is complete.
-   * Once shown, an individual score change afterward keeps just that one
-   * learner's grade fresh automatically — see `maybeRefreshTermGrade`. */
   async function handleShowTermGrades() {
     if (termGradesLoading) return;
     setTermGradesLoading(true);
@@ -805,11 +736,8 @@ export function ClassRecordWorkspace({
                   </thead>
                   <tbody>
                     {roster.map((entry) => {
-                      const savedNote =
-                        entry.updatedAt && !rowErrors[entry.learnerId]
-                          ? formatSavedTime(entry.updatedAt)
-                          : null;
                       const isSaving = savingLearnerIds.has(entry.learnerId);
+                      const hasRowError = Boolean(rowErrors[entry.learnerId]);
                       return (
                         <tr key={entry.learnerId}>
                           <th scope="row">
@@ -829,11 +757,9 @@ export function ClassRecordWorkspace({
                               inputMode="decimal"
                               min="0"
                               max={selectedItem.maxScore}
-                              aria-invalid={Boolean(rowErrors[entry.learnerId])}
+                              aria-invalid={hasRowError}
                               aria-describedby={
-                                rowErrors[entry.learnerId]
-                                  ? `score-error-${entry.learnerId}`
-                                  : undefined
+                                hasRowError ? `score-error-${entry.learnerId}` : undefined
                               }
                               placeholder={
                                 entry.status === "excused"
@@ -881,7 +807,7 @@ export function ClassRecordWorkspace({
                                 Saving…
                               </span>
                             )}
-                            {rowErrors[entry.learnerId] && (
+                            {hasRowError && (
                               <p
                                 id={`score-error-${entry.learnerId}`}
                                 className="field-error"
@@ -890,7 +816,11 @@ export function ClassRecordWorkspace({
                                 {rowErrors[entry.learnerId]}
                               </p>
                             )}
-                            {savedNote && <p className="score-saved-note">Saved {savedNote}</p>}
+                            <ClassRecordLocalSaveStatus
+                              savedAt={entry.updatedAt}
+                              hasError={hasRowError}
+                              isSaving={isSaving}
+                            />
                           </td>
                           <td>
                             <div
