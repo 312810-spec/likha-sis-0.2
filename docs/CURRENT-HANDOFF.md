@@ -18,53 +18,51 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current `main` at this handoff is `ab5957ccc90d25cfc24501392019ba01db8f9979`.
+Current `main` at this handoff is `1ffc5e2223c467b6dfe0de212ce92036ba167f6b`.
 
-Latest merged product slice: PR #73, GJ-6 Assessment Creation Studio continuity.
+Latest merged product slice: PR #75, explicit local-save status primitive.
 
-- Exact PR #73 head `598cef071cbb52b0f3a1c59215ff69ad3c6e2a3d` passed authoritative Quality and Security before squash merge.
-- The teacher can enter the real Class Record from preserved class context.
-- Grading period and DepEd weighting remain explicit choices.
-- Creation Studio uses the validated class record and returns to the same class, term, and weighting context.
-- Assignment revalidation remains below UI.
+- Exact PR #75 head `e8f86103c2976048ff5bacda737b0cf2078d0c9e` passed authoritative Quality and Security before squash merge.
+- `LocalSaveStatus` now provides the evidence-bounded teacher-facing state `Saved on this device`.
+- It deliberately does not claim `Synced` or `Waiting to sync` without sync-boundary evidence.
+- GJ-6 remains intact: validated class context, explicit grading period and DepEd weighting, trusted grade computation, and assignment revalidation below UI.
 
-Current `ClassRecordWorkspace` already computes term grades through `learnerScoreService.computeTermGrade`. It does not use UI formulas. Incomplete grades fail closed. A successful score correction refreshes the affected learner's computed term grade. The selected DepEd weighting is visibly disclosed.
-
-Do not create a duplicate grade-calculation implementation. Grade-state work must improve continuity and clarity around trusted recomputation.
+Current `ClassRecordWorkspace` still renders the older ambiguous `Saved HH:MM` score-row note after a successful local write. The next bounded product step is to integrate the proven `LocalSaveStatus` component there without changing write ownership or academic logic.
 
 Recent harness decisions:
 
-- PR #72 compacted this handoff.
+- PR #75 established the reusable local-save vocabulary.
+- PR #74 was the bounded handoff checkpoint after GJ-6.
 - PR #68 removed duplicate feature-branch Quality runs.
 - PR Quality is authoritative and Security remains independent.
 - PR #55 remains selective-recovery source only; tracking issue #64.
 
 ## Active work
 
-Branch: `feat/golden-journey-grade-state`
+Branch: `feat/gj-local-save-class-record`
 
-Purpose: identify the smallest safe grade-state continuity improvement after GJ-6 without duplicating the existing grade engine.
+Purpose: replace the ambiguous Class Record score-row `Saved HH:MM` presentation with the proven `LocalSaveStatus` primitive after a successful local write.
 
 Guardrails:
 
-- preserve validated class-record context;
-- recompute only through `LearnerScoreApplicationService` and trusted domain logic;
-- never cache or calculate an authoritative grade in navigation or UI state;
-- retain explicit grading period and weighting disclosure;
-- stale or unauthorized class context fails closed.
-
-If grade-state continuity is already sufficiently covered, advance directly to explicit local-save and offline state.
+- local persistence evidence may claim only `Saved on this device`;
+- do not invent `Waiting to sync`, `Synced`, `Needs review`, or `Access changed` without their owning boundary evidence;
+- do not add cloud dependency to normal saves or duplicate sync logic;
+- preserve `LearnerScoreApplicationService` write and grade-computation ownership;
+- preserve explicit grading period and DepEd weighting;
+- preserve assignment revalidation below UI;
+- never move grade formulas into UI or navigation state.
 
 ## Exact next action
 
-1. Inspect grade-state tests and the Creation Studio return path.
-2. Identify the smallest user-visible continuity gap, if any.
-3. Add a focused regression test first where practical.
-4. Implement only bounded continuity behavior.
-5. Do not change formulas, transmutation, grading policy, schema, or authorization.
-6. Run one authoritative PR Quality workflow plus independent Security.
+1. Add a focused Class Record regression test for the local-save wording where practical.
+2. Import and render `LocalSaveStatus` from `ClassRecordWorkspace` using the row's proven `updatedAt` after successful persistence.
+3. Remove only the now-redundant local `formatSavedTime` helper and ambiguous `Saved HH:MM` rendering.
+4. Do not change score-write, grade-computation, sync, schema, authorization, or cloud behavior.
+5. Run one authoritative PR Quality workflow plus independent Security.
+6. Fix only evidence-backed failures.
 7. Merge only on exact-current-head green evidence.
-8. Continue to explicit local-save and offline state on a fresh branch.
+8. Continue to the next offline/reconnect state only where its evidence boundary is proven.
 
 ## Golden Journey
 
@@ -83,10 +81,12 @@ Completed:
 - GJ-5: learner context uses assignment-owned access, not raw section authorization.
 - GJ-6a: Class Record and scoring open with explicit term and weighting.
 - GJ-6b: Creation Studio opens from the validated class record and returns to the same context.
+- Grade-state continuity: existing trusted computation remains current after successful score correction.
+- Offline-save primitive: `LocalSaveStatus` truthfully identifies a locally committed write.
 
-Current: grade-state continuity using existing trusted term-grade computation.
+Current: integrate explicit local-save state into Class Record score rows.
 
-Next: explicit local-save and offline state, reconnect and sync continuation, then Adviser Room and form continuation according to release priority.
+Next: evidence-backed reconnect/sync continuation, then Adviser Room and form continuation according to release priority.
 
 Do not jump to unrelated backlog work unless a verified P0/P1 security, data-loss, grading-correctness, or compliance defect interrupts.
 
@@ -135,11 +135,12 @@ For ordinary feature work:
 After opening a PR:
 
 1. Keep the LIKHA continuation schedule targeted to one canonical PR.
-2. Inspect exact-head Quality and Security.
-3. Fix only evidence-backed failures with the smallest reversible change.
-4. Merge when the exact head is green and mergeable.
-5. Start the next highest-value Golden Journey slice.
-6. Stop only for a real product, policy, security, or external blocker.
+2. Schedule the next exact-head check about 15 minutes after a new PR/head rather than condition monitoring.
+3. Inspect exact-head Quality and Security.
+4. Fix only evidence-backed failures with the smallest reversible change.
+5. Merge when the exact head is green and mergeable.
+6. Start the next highest-value Golden Journey slice.
+7. Stop only for a real product, policy, security, or external blocker.
 
 Do not create competing implementations. If another agent opens overlapping work, compare them, select one canonical path, preserve useful ideas, and supersede the duplicate.
 
