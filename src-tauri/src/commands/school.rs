@@ -38,21 +38,15 @@ pub struct SchoolLogoDto {
     pub bytes: Vec<u8>,
 }
 
-/// Uploads or replaces the caller's own school's branding logo. School
-/// Head only (`ManageSchoolBranding`) -- `school_id` is always
-/// session-derived, never a parameter, matching every other tenant-write
-/// command in this codebase. Rejects an oversized upload or a MIME type
-/// outside `ALLOWED_LOGO_MIME_TYPES` at this layer, before any bytes
-/// reach the repository -- this codebase's established convention that
-/// validation lives at the command/application boundary, not the
-/// repository (see `.claude/rules/architecture.md`).
-#[tauri::command]
-pub fn set_school_logo(
-    db: State<'_, Mutex<Connection>>,
-    sessions: State<'_, SessionManager>,
-    mime: String,
-    bytes: Vec<u8>,
-) -> AppResult<()> {
+fn magic_bytes_for(mime: &str) -> Option<&'static [u8]> {
+    match mime {
+        "image/png" => Some(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]),
+        "image/jpeg" => Some(&[0xFF, 0xD8, 0xFF]),
+        _ => None,
+    }
+}
+
+fn validate_logo_upload(mime: &str, bytes: &[u8]) -> AppResult<()> {
     if bytes.is_empty() {
         return Err(AppError::Database(rusqlite::Error::InvalidParameterName(
             "logo upload must not be empty".to_string(),
@@ -66,11 +60,41 @@ pub fn set_school_logo(
             ),
         )));
     }
-    if !ALLOWED_LOGO_MIME_TYPES.contains(&mime.as_str()) {
+    if !ALLOWED_LOGO_MIME_TYPES.contains(&mime) {
         return Err(AppError::Database(rusqlite::Error::InvalidParameterName(
             format!("unsupported logo type '{mime}'"),
         )));
     }
+
+    let signature_matches = if mime == "image/webp" {
+        bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP"
+    } else {
+        magic_bytes_for(mime).is_some_and(|signature| bytes.starts_with(signature))
+    };
+
+    if !signature_matches {
+        return Err(AppError::Database(rusqlite::Error::InvalidParameterName(
+            format!("logo bytes do not match the declared '{mime}' file signature"),
+        )));
+    }
+
+    Ok(())
+}
+
+/// Uploads or replaces the caller's own school's branding logo. School
+/// Head only (`ManageSchoolBranding`) -- `school_id` is always
+/// session-derived, never a parameter, matching every other tenant-write
+/// command in this codebase. Rejects an oversized upload, a MIME type
+/// outside `ALLOWED_LOGO_MIME_TYPES`, or bytes whose signature does not
+/// match the declared image type before any bytes reach the repository.
+#[tauri::command]
+pub fn set_school_logo(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    mime: String,
+    bytes: Vec<u8>,
+) -> AppResult<()> {
+    validate_logo_upload(&mime, &bytes)?;
 
     let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding)?;
@@ -106,4 +130,61 @@ pub fn clear_school_logo(
     let conn = lock_db(&db);
     let school_id = auth::authorize_capability(&conn, &sessions, Capability::ManageSchoolBranding)?;
     school::clear_logo(&conn, &school_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const REAL_PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+    const REAL_JPEG: &[u8] = &[0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3];
+
+    fn real_webp() -> Vec<u8> {
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend_from_slice(&[0, 0, 0, 0]);
+        bytes.extend_from_slice(b"WEBP");
+        bytes.extend_from_slice(&[1, 2, 3]);
+        bytes
+    }
+
+    #[test]
+    fn accepts_bytes_whose_signature_matches_the_declared_mime() {
+        assert!(validate_logo_upload("image/png", REAL_PNG).is_ok());
+        assert!(validate_logo_upload("image/jpeg", REAL_JPEG).is_ok());
+        assert!(validate_logo_upload("image/webp", &real_webp()).is_ok());
+    }
+
+    #[test]
+    fn rejects_bytes_declared_as_png_that_are_not_actually_png() {
+        let not_png = b"<html><script>alert(1)</script></html>";
+        assert!(validate_logo_upload("image/png", not_png).is_err());
+    }
+
+    #[test]
+    fn rejects_a_real_png_mislabeled_as_a_different_allowed_mime() {
+        assert!(validate_logo_upload("image/jpeg", REAL_PNG).is_err());
+    }
+
+    #[test]
+    fn rejects_an_unlisted_mime_type_before_checking_signature() {
+        assert!(validate_logo_upload("image/svg+xml", b"<svg/>").is_err());
+    }
+
+    #[test]
+    fn rejects_an_empty_upload() {
+        assert!(validate_logo_upload("image/png", &[]).is_err());
+    }
+
+    #[test]
+    fn rejects_an_oversized_upload_even_with_a_valid_signature() {
+        let mut oversized = REAL_PNG.to_vec();
+        oversized.resize(MAX_LOGO_BYTES + 1, 0);
+        assert!(validate_logo_upload("image/png", &oversized).is_err());
+    }
+
+    #[test]
+    fn rejects_a_truncated_webp_missing_the_webp_marker() {
+        let truncated = b"RIFF\x00\x00\x00\x00";
+        assert!(validate_logo_upload("image/webp", truncated).is_err());
+    }
 }
