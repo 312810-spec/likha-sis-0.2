@@ -133,7 +133,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           </li>
 
           <li className="sync-status-card">
-            <p className="sync-status-card-name">Last synced</p>
+            <p className="sync-status-card-name">Last received update</p>
             <p className="sync-status-card-detail">
               {status.lastPullAt
                 ? `Received an update ${formatRelative(status.lastPullAt)}`
@@ -144,7 +144,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
           <li className="sync-status-card">
             <p className="sync-status-card-name">
               {status.pendingChangeCount === 0
-                ? "All changes are synced"
+                ? "No changes waiting to sync"
                 : `${status.pendingChangeCount} change${status.pendingChangeCount === 1 ? "" : "s"} waiting to sync`}
             </p>
             {status.pendingChangeCount > 0 && status.hasPendingSyncTrouble && (
