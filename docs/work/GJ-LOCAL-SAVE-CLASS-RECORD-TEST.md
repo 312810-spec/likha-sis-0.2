@@ -1,0 +1,1 @@
+Regression expectation: a locally persisted Class Record score row says `Saved on this device`; a row that is saving or has an error does not claim save success; no Class Record local-save presentation says `Synced` or `Waiting to sync` without sync-boundary evidence.
