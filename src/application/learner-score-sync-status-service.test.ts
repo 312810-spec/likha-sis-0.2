@@ -29,16 +29,11 @@ describe("LearnerScoreSyncStatusApplicationService", () => {
     ["", "item-1", "learner-1"],
     ["assignment-1", " ", "learner-1"],
     ["assignment-1", "item-1", " "],
-  ])(
-    "rejects missing context before crossing the port",
-    async (assignmentId, itemId, learnerId) => {
-      const repository = new FakeRepository();
-      const service = new LearnerScoreSyncStatusApplicationService(repository);
+  ])("rejects missing context before crossing the port", (assignmentId, itemId, learnerId) => {
+    const repository = new FakeRepository();
+    const service = new LearnerScoreSyncStatusApplicationService(repository);
 
-      await expect(service.getStatus(assignmentId, itemId, learnerId)).rejects.toBeInstanceOf(
-        ValidationError,
-      );
-      expect(repository.calls).toEqual([]);
-    },
-  );
+    expect(() => service.getStatus(assignmentId, itemId, learnerId)).toThrow(ValidationError);
+    expect(repository.calls).toEqual([]);
+  });
 });
