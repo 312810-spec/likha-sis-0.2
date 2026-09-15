@@ -127,6 +127,12 @@ function renderScreen(overrides?: {
   return { ...rendered, onBackToClass, subjectAttendance, grading, classRecord };
 }
 
+async function openRecord(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
+  await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+  await user.click(screen.getByRole("button", { name: "Open class record" }));
+}
+
 describe("ClassRecordJourneyScreen", () => {
   it("requires explicit grading period and weighting before opening", async () => {
     const user = userEvent.setup();
@@ -143,6 +149,23 @@ describe("ClassRecordJourneyScreen", () => {
 
     expect(classRecord.createClassRecord).toHaveBeenCalledWith("sec-1", "subj-1", "gp-1", "wp-1");
     expect(await screen.findByText(/Term 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
+  });
+
+  it("continues into Creation Studio and returns to the same class record", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await openRecord(user);
+    await user.click(await screen.findByRole("button", { name: "Creation Studio" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Creation Studio — Assessment Items" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Grade 8 – Joy — Filipino — Term 1/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back to Class Records" }));
+    expect(await screen.findByRole("button", { name: "Creation Studio" })).toBeInTheDocument();
     expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
   });
 
