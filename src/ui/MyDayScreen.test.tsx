@@ -48,6 +48,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   const repo = new FakeMyDayRepository(result);
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
+  const onOpenClassRecord = vi.fn();
   const onReviewConflicts = vi.fn();
 
   function Host() {
@@ -60,6 +61,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
           onOpenClassContext={setContext}
           onBackToToday={() => setContext(null)}
           onCheckAttendance={onCheckAttendance}
+          onOpenClassRecord={onOpenClassRecord}
           onReviewConflicts={onReviewConflicts}
         />
       </ModeProvider>
@@ -67,7 +69,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   }
 
   const rendered = render(<Host />);
-  return { ...rendered, repo, onCheckAttendance, onReviewConflicts };
+  return { ...rendered, repo, onCheckAttendance, onOpenClassRecord, onReviewConflicts };
 }
 
 describe("MyDayScreen", () => {
@@ -116,6 +118,14 @@ describe("MyDayScreen", () => {
     const { onCheckAttendance } = renderScreen();
     await user.click(await screen.findByRole("button", { name: "Check attendance" }));
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
+  });
+
+  it("opens the class record for the selected class from the class workspace", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecord } = renderScreen();
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
   });
 
   it("calls onReviewConflicts when the review-conflicts button is clicked", async () => {
