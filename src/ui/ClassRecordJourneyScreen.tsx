@@ -8,6 +8,7 @@ import type { SubjectAttendanceApplicationService } from "../application/subject
 import type { GradingWeightPolicy } from "../domain/class-record";
 import { ValidationError } from "../domain/errors";
 import type { GradingPeriod } from "../domain/grading";
+import { AssessmentAuthoringScreen } from "./AssessmentAuthoringScreen";
 import { ClassRecordWorkspace } from "./ClassRecordWorkspace";
 import { Alert } from "./components/Alert";
 import { Loading } from "./components/Loading";
@@ -69,6 +70,7 @@ export function ClassRecordJourneyScreen({
   const [periodId, setPeriodId] = useState("");
   const [policyId, setPolicyId] = useState("");
   const [openedRecord, setOpenedRecord] = useState<OpenedRecord | null>(null);
+  const [authoring, setAuthoring] = useState(false);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const requestRef = useRef(0);
@@ -79,6 +81,7 @@ export function ClassRecordJourneyScreen({
     setPeriodId("");
     setPolicyId("");
     setOpenedRecord(null);
+    setAuthoring(false);
     setOpenError(null);
 
     async function run(): Promise<Resolution> {
@@ -214,10 +217,26 @@ export function ClassRecordJourneyScreen({
     );
   }
 
+  if (openedRecord && authoring) {
+    return (
+      <AssessmentAuthoringScreen
+        classRecordId={openedRecord.classRecordId}
+        classRecordLabel={`${classContext.sectionName} — ${classContext.subjectName} — ${openedRecord.gradingPeriodLabel}`}
+        assessmentService={assessmentService}
+        onBack={() => setAuthoring(false)}
+      />
+    );
+  }
+
   if (openedRecord) {
     return (
       <>
-        {backButton}
+        <div className="journey-context-return">
+          {backButton}
+          <button type="button" onClick={() => setAuthoring(true)}>
+            Creation Studio
+          </button>
+        </div>
         <p className="field-hint">
           <strong>{classContext.sectionName}</strong> — {classContext.subjectName} —{" "}
           {openedRecord.gradingPeriodLabel} — weighting: {openedRecord.weightPolicyName}
