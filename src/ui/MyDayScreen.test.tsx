@@ -48,6 +48,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   const repo = new FakeMyDayRepository(result);
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
+  const onOpenClassRecords = vi.fn();
   const onReviewConflicts = vi.fn();
 
   function Host() {
@@ -60,6 +61,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
           onOpenClassContext={setContext}
           onBackToToday={() => setContext(null)}
           onCheckAttendance={onCheckAttendance}
+          onOpenClassRecords={onOpenClassRecords}
           onReviewConflicts={onReviewConflicts}
         />
       </ModeProvider>
@@ -67,7 +69,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   }
 
   const rendered = render(<Host />);
-  return { ...rendered, repo, onCheckAttendance, onReviewConflicts };
+  return { ...rendered, repo, onCheckAttendance, onOpenClassRecords, onReviewConflicts };
 }
 
 describe("MyDayScreen", () => {
@@ -111,6 +113,14 @@ describe("MyDayScreen", () => {
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
   });
 
+  it("opens class records for the selected teaching assignment", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecords } = renderScreen();
+    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecords).toHaveBeenCalledWith("ta-1");
+  });
+
   it("calls onCheckAttendance with the assignment id from Needs Attention", async () => {
     const user = userEvent.setup();
     const { onCheckAttendance } = renderScreen();
@@ -121,7 +131,7 @@ describe("MyDayScreen", () => {
   it("calls onReviewConflicts when the review-conflicts button is clicked", async () => {
     const user = userEvent.setup();
     const { onReviewConflicts } = renderScreen();
-    await user.click(await screen.findByRole("button", { name: "Review conflicts" }));
+    await user.click(screen.getByRole("button", { name: "Review conflicts" }));
     expect(onReviewConflicts).toHaveBeenCalled();
   });
 
