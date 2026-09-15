@@ -5031,3 +5031,12 @@ unit-test coverage for wrong-key/no-key rejection, but recovery behavior
 across a real Windows user-profile change, a different physical machine,
 or DPAPI key rotation has not been exercised on real hardware/accounts —
 only within a single test process on one machine.
+
+# Entity-sync regression slice (2026-09-15)
+
+Branch: `codex/score-sync-status`. Three repository regression tests added for
+partial acknowledgment, failed push attempts, and pending/conflict isolation.
+Local targeted Rust test execution was blocked (`cargo: command not found`).
+Compilation, rustfmt, test execution, and Quality/Security must be verified by CI
+on the exact PR head. `git diff --check` passed. No native reconnect/restart,
+teacher access-change, UI integration, or production-readiness claim is made.
