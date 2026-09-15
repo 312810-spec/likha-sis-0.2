@@ -18,77 +18,51 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified `main`: `b2d98dfc755726ed1be6781ccbb2226f44e827ec` (PR #81).
+Current verified `main`: `9297d8426ad33686a14201782f7f8ff725159af6` (PR #83).
 
-PR #79 merged the sync wording correction; PR #78 is closed as superseded.
-PR #80 added internal entity-scoped sync evidence, not teacher-screen integration.
-PR #81 added regression coverage for pending edits, failures, and tenant/entity
-isolation, then squash-merged after exact-head Quality and Security passed.
+PRs #79–83 are merged; #78 is closed as superseded. The native score-status
+command checks assignment ownership, section and subject before returning persisted
+entity evidence. The TypeScript port, application service and Tauri adapter are merged.
+Quality and independent Security passed on PR #83 head `1b02acef12f6cef301288b3072c4d82f24243087`.
+Teacher-screen sync integration is still pending.
 
 ## Canonical continuation (2026-09-15)
 
-This section supersedes the older Active work / Exact next action below.
-Canonical branch: `codex/class-record-sync-status`.
+Canonical branch: `fix/score-sync-permission-classification`.
 
-Current bounded slice exposes a read-only native command for one persisted learner
-score's sync evidence. The score entity ID is resolved below the UI only after the
-active session user is proven to own the supplied teaching assignment and the
-assessment item's class record matches that assignment's section and subject.
-Unknown/unrecorded scores return no evidence; changed ownership or mismatched context
-fails closed as unauthorized. No UI, schema, write path, sync protocol, grading logic,
-or cloud dependency changes.
+Integration review found that an assignment-denied score-status lookup incorrectly
+triggered the global session-expired callback. The adapter regression reproduced
+this failure before the fix. Add the command to the existing permission-denial
+classification list: the rejection still propagates, native authorization stays
+fail-closed, and session-only reads still trigger expiration handling.
 
-Focused Rust coverage proves owned resolution, denial for another teacher, denial for
-a mismatched subject assignment, and the no-entity-yet result for an unrecorded row.
-Local execution remains blocked because this checkout has neither Cargo nor installed
-npm dependencies. `git diff --check` is the available local gate; exact-head Quality
-and independent Security in CI are required before merge.
+Limitation: native `unauthorized` conflates expired sessions and permission denial.
+This follows the existing classification policy; this one read cannot independently
+identify session expiry. A typed native error distinction remains future work.
 
-Next: open one canonical PR for this trusted-boundary slice. After it merges, add the
-TypeScript port/application adapter without displaying a status yet; then integrate
-truthful row states in a separate bounded slice. Use the existing hourly loop only.
+Dependencies are now installed in the active worktree, so run local formatting and
+focused tests before pushing instead of relying on CI to find avoidable failures.
+See the PR for actual validation. Exact-current-head Quality and Security are still
+required before merge. No UI, sync protocol, grading or authorization rules changed.
 
-Latest merged product slices:
+Next: composition and assignment-owned Class Record row integration. Reuse the
+existing service; preserve local-save evidence independently of sync status. Hide
+stale evidence on edit, item/class changes and denied access. Do not use connectivity
+or an empty queue as proof of synchronization. Scope the request to the existing
+ClassRecordJourneyScreen teaching assignment; the general ClassRecordsScreen has no
+assignment context and must not invent one.
 
-- PR #75 established the evidence-bounded `Saved on this device` vocabulary.
-- PR #76 added the Class Record local-save adapter seam and focused adapter tests.
-- PR #77 wired truthful device-save status into actual Class Record score rows and merged after exact-head Quality + Security passed.
+## Productive CI continuation
 
-PR #77 merge SHA: `fbd3649a6e538f130038b10c87a7204cfa76abc2`.
-
-The standalone `ClassRecordWorkspace.local-save.test.tsx` was deliberately removed after repeated formatter-only failures. Do not recreate it. Coverage remains through existing Class Record score-save tests plus `ClassRecordLocalSaveStatus.test.tsx` truthfulness tests.
-
-## Active work
-
-Branch: `fix/gj-sync-status-truthfulness`
-
-Purpose: align the shipped Sync Status screen with `docs/product/OFFLINE-CONTRACT.md` and the actual trusted Rust sync-status evidence.
-
-Live evidence inspected:
-
-- `SyncStatus.pendingChangeCount` is backed by `sync_outbox::count_pending_for_school` and can truthfully support **Waiting to sync** at this-device/school scope.
-- `SyncStatus.openConflictCount` is backed by unresolved conflict storage and can truthfully support **Needs review** at this-device/school scope.
-- `SyncStatus.lastPullAt` means the last pull that actually applied or staged a change; it is not a generic sync-success or connectivity timestamp.
-- `pendingChangeCount === 0` does **not** prove that a particular record or write is `Synced`.
-
-Current bounded correction:
-
-- replace `All changes are synced` with `No changes waiting to sync`;
-- replace the misleading `Last synced` label with `Last received update`;
-- keep `N changes waiting to sync` only when the trusted outbox count is positive;
-- preserve existing conflict-review and sync-trouble behavior;
-- add regression tests that reject unsupported global `Synced` claims.
-
-No sync protocol, queue semantics, cloud provider, schema, authorization, grading, or local-save behavior changes are in this slice.
-
-## Exact next action
-
-1. Open one canonical PR from `fix/gj-sync-status-truthfulness`.
-2. Immediately schedule its exact-head continuation about 15 minutes later.
-3. Inspect authoritative Quality and independent Security for the exact current head.
-4. Fix only evidence-backed failures with the smallest reversible change.
-5. If both gates are green and the head is unchanged/mergeable, squash-merge.
-6. Then continue GJ-7 with the next smallest proven reconnect/sync state. Do not claim per-record `Synced` until the owning acknowledgment evidence is exposed safely.
+The production automation has been updated: hourly is a fallback wake-up, not a
+mandatory pause between stages. Continue immediately after a verified merge.
+While checks run, prepare the next bounded slice, acceptance criteria and regression
+cases in isolation, or restore local verification tools. Then recheck CI once after
+useful work. Publish only one canonical PR; never overwrite another worker.
+If CI is still pending and useful preparation is exhausted, record the checkpoint.
+Do not use busy waits, recursive automation invocations, chained schedules or relay
+comments to circumvent scheduler limits. Available GitHub webhook events do not
+include workflow completion, so a PR-event trigger is not a reliable CI wake-up.
 
 ## Golden Journey
 
@@ -171,13 +145,13 @@ For ordinary feature work:
 
 After opening a PR:
 
-1. Keep one canonical continuation schedule targeted to that PR.
-2. Schedule the next exact-head check about 15 minutes after a new PR/head rather than condition monitoring.
-3. Inspect exact-head Quality and Security.
+1. Keep one canonical PR and the existing production automation.
+2. Use pending-CI time for bounded preparation and local verification.
+3. Recheck exact-head Quality and independent Security after useful work.
 4. Fix only evidence-backed failures with the smallest reversible change.
-5. Merge when the exact head is green and mergeable.
-6. Start the next highest-value Golden Journey slice.
-7. Stop only for a real product, policy, security, or external blocker.
+5. Merge when the exact head is green, reviewed and mergeable.
+6. Start the next highest-value Golden Journey slice in the same run.
+7. Use the hourly wake-up only when verification remains pending or work is blocked.
 
 Do not create competing implementations. If another agent opens overlapping work, compare them, select one canonical path, preserve useful ideas, and supersede the duplicate.
 
