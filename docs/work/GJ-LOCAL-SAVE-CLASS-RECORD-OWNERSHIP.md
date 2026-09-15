@@ -1,1 +1,0 @@
-Local-save truth comes from the successful local repository/application write. Sync truth remains owned by the sync boundary. Class Record may present local-save evidence but must not derive sync success, authorization, or academic computation in UI state.
