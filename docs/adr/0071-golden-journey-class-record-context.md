@@ -1,4 +1,4 @@
-# ADR-0071: Golden Journey class record entry resolves from the preserved class context
+# ADR-0071: Golden Journey class record entry resolves from preserved class context
 
 Status: Accepted for implementation slice
 
@@ -6,102 +6,75 @@ Date: 2026-09-15
 
 ## Context
 
-The Golden Journey implementation plan sequences Class Record (GJ-6) after
-Subject Attendance (GJ-4) and learner context (GJ-5). A teacher already
-inside the preserved class workspace (`docs/adr/0060-golden-journey-app-class-context.md`)
-should be able to reach that class's scoring workspace without re-selecting
-a section, subject, grading period, and grading weighting from
-`ClassRecordsScreen`'s standalone dropdown flow.
+The Golden Journey sequences Class Record work after Subject Attendance and learner context. A teacher already inside a preserved class should be able to reach that class's scoring workspace without selecting the section and subject again.
 
-`ClassRecordsScreen` already opens a class record through
-`ClassRecordApplicationService.createClassRecord`, whose find-or-create
-semantics, cross-school-year/ownership validation, and weight-policy
-resolution are domain/service concerns and return `null` on a mismatch it
-refuses. `TeacherClassWorkContext` carries only `teachingAssignmentId` plus
-display-name labels -- it deliberately does not carry a section or subject
-id, so a class-context entry point must resolve those through a trusted
-service rather than guessing them in the UI.
+`TeacherClassWorkContext` intentionally carries only the canonical `teachingAssignmentId` plus display labels. It is navigation state, not authorization. The section and subject therefore must be resolved again through a trusted assignment-owned application path.
+
+The existing standalone `ClassRecordsScreen` also requires two academic choices that materially affect correctness:
+
+- grading period / term;
+- DepEd grading weighting policy.
+
+Those choices must not be silently inferred from array order, a default flag, or a subject name.
 
 ## Decision
 
-Add a second, additive entry point into the existing class-record
-capabilities, reached only from inside the preserved class context.
+Add a bounded class-context entry into the existing Class Record capability.
 
-- `ClassWorkspaceScreen` gains an "Open class record" action next to
-  "Check attendance", calling a new `onOpenClassRecord(teachingAssignmentId)`
-  prop -- the same shape as the existing `onCheckAttendance` prop.
-- A new `ClassRecordJourneyScreen` resolves the class record for that
-  teaching assignment:
-  - the assignment is revalidated through
-    `SubjectAttendanceApplicationService.listMyAssignments` -- the same
-    trusted call the app already uses to revalidate a preserved class
-    context -- which supplies the assignment's `sectionId`, `subjectId`,
-    and `schoolYear`;
-  - the section's current grading period comes from
-    `GradingApplicationService.listPeriodsBySchoolYear(schoolYear)`;
-  - the grading weighting comes from
-    `ClassRecordApplicationService.listGradingWeightPolicies()`'s default
-    policy;
-  - the class record itself is opened through
-    `ClassRecordApplicationService.createClassRecord`, unchanged.
-- Once resolved, the screen renders the existing `ClassRecordWorkspace`
-  directly (roster/scoring UI), with a "Back to class" action that returns
-  to `ClassWorkspaceScreen` with the preserved `TeacherClassWorkContext`
-  intact.
-- `App` holds the resolution as local state scoped to the `my-day` tab
-  (`classRecordAssignmentId`), the same narrowly-typed handoff pattern as
-  every other contextual id in `App.tsx` -- not a new tab, route, or
-  global store.
-- `ClassRecordsScreen`'s standalone section/subject/grading-period/
-  weight-policy picker is unchanged and remains independently reachable
-  from the `class-records` tab.
+- `ClassWorkspaceScreen` exposes `Open class record` for the preserved teaching assignment.
+- `ClassRecordJourneyScreen` revalidates that assignment through `SubjectAttendanceApplicationService.listMyAssignments` before using its section, subject, or school year.
+- The screen loads the grading periods for the assignment's school year and the available grading-weight policies.
+- The teacher explicitly selects both the grading period and grading weighting before opening the record.
+- No period is selected merely because it is first in a list.
+- No weighting is selected merely because it is marked default.
+- No weighting is inferred from subject name.
+- `ClassRecordApplicationService.createClassRecord` remains the find-or-create boundary and keeps its existing school, ownership, school-year, and validation behavior.
+- Once a valid record is returned, the existing `ClassRecordWorkspace` is reused for scoring.
+- Returning from the journey restores the exact preserved class context.
+- The standalone `ClassRecordsScreen` remains independently reachable and unchanged.
 
-Every resolution failure is a visible, retryable error rather than a
-silent failure or a guessed fallback:
+## Failure behavior
 
-- the assignment is no longer authorized (revalidation fails or the
-  assignment is missing from the current list);
-- no grading period exists yet for the section's school year;
-- no default grading weight policy exists yet;
-- `createClassRecord` returns `null` (cross-school-year or ownership
-  mismatch).
+The flow fails visibly and retryably when:
 
-No grade formula, weighting rule, or validation policy is implemented or
-duplicated in this screen -- resolution only supplies identifiers to
-services that already own those decisions.
+- the teaching assignment is no longer authorized;
+- no grading period exists for the school year;
+- no grading-weight policy exists;
+- the selected period or weighting is invalid/stale;
+- `createClassRecord` refuses the combination;
+- an application-service call fails.
+
+A stale or forged UI context never grants access.
 
 ## Security and privacy
 
-`TeacherClassWorkContext` and `classRecordAssignmentId` remain UI
-navigation state only. The teaching assignment is revalidated against the
-signed-in teacher's own authorized assignments before any section/subject
-id is used, so a stale or forged id cannot open another teacher's class
-record. `createClassRecord`'s existing school/ownership/school-year checks
-are untouched.
+`TeacherClassWorkContext` and the app's `classRecordAssignmentId` are navigation state only. Authorization remains below the UI. Before section/subject identifiers are used, the assignment is revalidated against the signed-in teacher's own authorized assignments.
+
+No new learner fields, PII, cloud dependency, repository method, schema, or migration are introduced.
+
+## Academic correctness
+
+This slice deliberately keeps academic policy explicit:
+
+- term selection is teacher-visible and explicit;
+- grading weighting is teacher-visible and explicit;
+- grade formulas remain in existing application/domain/repository logic;
+- the UI does not duplicate grade computation or infer policy from labels.
+
+This supersedes the earlier draft of this ADR that proposed automatically using the first grading period and a default weighting policy.
 
 ## Consequences
 
 Positive:
 
-- a teacher reaches class-record scoring from the same class they are
-  already working in, without repeated section/subject/grading-period
-  selection;
-- every grading-policy and cross-school-year decision stays a
-  domain/service concern, matching GJ-6's "no UI-owned grade formulas"
-  requirement;
-- `ClassRecordsScreen` and `ClassRecordWorkspace` remain independently
-  usable and unchanged;
-- no new schema, repository method, or global state mechanism is
-  introduced.
+- the teacher keeps the class context and avoids repeated class selection;
+- trusted assignment scope is preserved;
+- academic choices that can change grade outcomes remain explicit;
+- the mature `ClassRecordWorkspace` is reused rather than duplicated;
+- the implementation stays small and reversible.
 
-Deliberate limitations retained for this first slice:
+Deliberate limitations for this first GJ-6 slice:
 
-- only the section's first/current grading period is used -- multi-period
-  selection from class context is a later slice;
-- Creation Studio (`AssessmentAuthoringScreen`) is not yet reachable from
-  class context;
-- keyboard-first Windows entry and purpose-built Android quick entry
-  remain properties of `ClassRecordWorkspace` itself and are not
-  redesigned by this slice;
-- offline/local-save-state visibility beyond what `ClassRecordWorkspace`
-  already shows is deferred to GJ-7.
+- Creation Studio / assessment authoring is not yet entered directly from this class-context path;
+- grade-state continuity and explicit offline/local-save visibility remain later Golden Journey slices;
+- Android-specific quick-entry refinements are not redesigned here.
