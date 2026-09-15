@@ -11,6 +11,7 @@ import { FormGenerationApplicationService } from "./application/form-generation-
 import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
+import { LearnerScoreSyncStatusApplicationService } from "./application/learner-score-sync-status-service";
 import { MyDayApplicationService } from "./application/my-day-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
@@ -39,6 +40,7 @@ import { TauriFormGenerationRepository } from "./infrastructure/tauri/form-gener
 import { TauriGradingRepository } from "./infrastructure/tauri/grading-repository";
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
+import { TauriLearnerScoreSyncStatusRepository } from "./infrastructure/tauri/learner-score-sync-status-repository";
 import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
@@ -96,6 +98,10 @@ export const assessmentService = new AssessmentApplicationService(new TauriAsses
 export const lessonPlanService = new LessonPlanApplicationService(new TauriLessonPlanRepository());
 export const learnerScoreService = new LearnerScoreApplicationService(
   new TauriLearnerScoreRepository(),
+);
+/** @public Assignment-scoped evidence seam for the Class Record journey integration. */
+export const learnerScoreSyncStatusService = new LearnerScoreSyncStatusApplicationService(
+  new TauriLearnerScoreSyncStatusRepository(),
 );
 export const sf1ImportService = new Sf1ImportApplicationService(
   new TauriSf1ImportRepository(),

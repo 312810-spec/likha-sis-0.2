@@ -18,7 +18,12 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified `main`: `9297d8426ad33686a14201782f7f8ff725159af6` (PR #83).
+Current verified `main`: `a3a2f91996168b18c8555eba9f87964cc58dc34e` (PR #84).
+
+PR #84 merged after exact-head Quality and all three independent Security jobs
+passed; there were no blocking reviews or unresolved threads. Its permission-denial
+fix is now on main. Windows/native jobs were not selected for this TypeScript-only
+change; no new native or packaged-app verification is claimed.
 
 PRs #79–83 are merged; #78 is closed as superseded. The native score-status
 command checks assignment ownership, section and subject before returning persisted
@@ -28,7 +33,24 @@ Teacher-screen sync integration is still pending.
 
 ## Canonical continuation (2026-09-15)
 
-Canonical branch: `fix/score-sync-permission-classification`.
+Canonical branch: `feat/score-sync-composition`.
+
+Current slice wires the existing learner-score evidence service into composition.
+Three composition regression cases cover exact assignment/item/learner forwarding,
+missing evidence remaining null, and denied access propagating unchanged. They failed
+before wiring was added. UI display is still pending; this slice changes no write,
+authorization, synchronization protocol or grading behavior.
+
+Acceptance: composed service delegates through the existing native adapter without
+inventing evidence or bypassing assignment validation. Require exact-head Quality
+and independent Security before merge. See the PR for executed local checks.
+
+Next UI regression cases: hide evidence immediately on draft edits; ignore delayed
+responses after item/class/assignment changes; hide prior evidence on denial; preserve
+successful local-save evidence when the separate evidence read fails; render only
+the status returned for the current saved row. Never infer status from connectivity.
+
+Prior slice (merged):
 
 Integration review found that an assignment-denied score-status lookup incorrectly
 triggered the global session-expired callback. The adapter regression reproduced
