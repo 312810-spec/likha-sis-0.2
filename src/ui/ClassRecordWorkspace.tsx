@@ -14,6 +14,8 @@ import type {
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
+import type { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
+import { ScoreSyncEvidence } from "./components/ScoreSyncEvidence";
 import { Alert } from "./components/Alert";
 import { ClassRecordLocalSaveStatus } from "./components/ClassRecordLocalSaveStatus";
 import { EmptyState } from "./components/EmptyState";
@@ -24,6 +26,8 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ClassRecordWorkspaceProps {
   classRecordId: string;
+  teachingAssignmentId?: string;
+  learnerScoreSyncStatusService?: LearnerScoreSyncStatusApplicationService;
   /** The DepEd weighting policy this class record was explicitly opened
    * under (see `ClassRecordsScreen`'s create form) — shown so a teacher
    * always knows which weighting a computed grade reflects, never left
@@ -42,12 +46,15 @@ const STATUS_LABELS: Record<LearnerScoreStatus, string> = {
 
 export function ClassRecordWorkspace({
   classRecordId,
+  teachingAssignmentId,
+  learnerScoreSyncStatusService,
   weightPolicyName,
   assessmentService,
   learnerScoreService,
   exportService,
 }: ClassRecordWorkspaceProps) {
   const { mode } = useTeacherMode();
+  const [syncCheckRevision, setSyncCheckRevision] = useState(0);
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
@@ -200,9 +207,14 @@ export function ClassRecordWorkspace({
     // never leave a different assessment item's roster rendered as if it
     // belongs to the newly selected item.
     setRoster([]);
+    setScoreDrafts({});
+    setSavingLearnerIds(new Set());
     setRowErrors({});
     setTermGrades({});
     loadRoster();
+    return () => {
+      rosterRequestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [learnerScoreService, selectedItemId]);
 
@@ -365,6 +377,7 @@ export function ClassRecordWorkspace({
     }
 
     setRowErrors((current) => ({ ...current, [learnerId]: "" }));
+    const rosterRequest = rosterRequestRef.current;
     const generation = (writeGenerationRef.current.get(learnerId) ?? 0) + 1;
     writeGenerationRef.current.set(learnerId, generation);
     setSavingLearnerIds((current) => new Set(current).add(learnerId));
@@ -380,7 +393,11 @@ export function ClassRecordWorkspace({
       // An older write's response must never overwrite a newer one's
       // result -- only apply this response if nothing newer started for
       // this learner while it was in flight.
-      if (writeGenerationRef.current.get(learnerId) !== generation) return false;
+      if (
+        writeGenerationRef.current.get(learnerId) !== generation ||
+        rosterRequestRef.current !== rosterRequest
+      )
+        return false;
       if (recorded === null) {
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
         return false;
@@ -400,14 +417,21 @@ export function ClassRecordWorkspace({
       maybeRefreshTermGrade(learnerId);
       return true;
     } catch (err) {
-      if (writeGenerationRef.current.get(learnerId) !== generation) return false;
+      if (
+        writeGenerationRef.current.get(learnerId) !== generation ||
+        rosterRequestRef.current !== rosterRequest
+      )
+        return false;
       setRowErrors((current) => ({
         ...current,
         [learnerId]: err instanceof ValidationError ? err.message : "Could not save this score.",
       }));
       return false;
     } finally {
-      if (writeGenerationRef.current.get(learnerId) === generation) {
+      if (
+        writeGenerationRef.current.get(learnerId) === generation &&
+        rosterRequestRef.current === rosterRequest
+      ) {
         setSavingLearnerIds((current) => {
           const next = new Set(current);
           next.delete(learnerId);
@@ -434,6 +458,14 @@ export function ClassRecordWorkspace({
     const text = draftScoreFor(entry.learnerId, entry.score).trim();
     const previousText = entry.score === null ? "" : String(entry.score);
     if (text === previousText || text === "") {
+      if (text === previousText) {
+        setScoreDrafts((current) => {
+          if (current[entry.learnerId] === undefined) return current;
+          const next = { ...current };
+          delete next[entry.learnerId];
+          return next;
+        });
+      }
       focusScoreInput(moveFocusTo);
       return;
     }
@@ -787,6 +819,11 @@ export function ClassRecordWorkspace({
                 · {remainingCount} remaining
               </p>
               <div className="score-entry-scroll">
+                {teachingAssignmentId && learnerScoreSyncStatusService && (
+                  <button type="button" onClick={() => setSyncCheckRevision((value) => value + 1)}>
+                    Refresh sync checks
+                  </button>
+                )}
                 <table className="attendance-roster score-entry">
                   <thead>
                     <tr>
@@ -877,11 +914,37 @@ export function ClassRecordWorkspace({
                                 {rowErrors[entry.learnerId]}
                               </p>
                             )}
-                            <ClassRecordLocalSaveStatus
-                              savedAt={entry.updatedAt}
-                              hasError={hasRowError}
-                              isSaving={isSaving}
-                            />
+                            {scoreDrafts[entry.learnerId] === undefined && (
+                              <ClassRecordLocalSaveStatus
+                                savedAt={entry.updatedAt}
+                                hasError={hasRowError}
+                                isSaving={isSaving}
+                              />
+                            )}
+                            {teachingAssignmentId &&
+                              learnerScoreSyncStatusService &&
+                              entry.updatedAt &&
+                              entry.status !== null &&
+                              !isSaving &&
+                              !hasRowError &&
+                              scoreDrafts[entry.learnerId] === undefined && (
+                                <ScoreSyncEvidence
+                                  key={JSON.stringify([
+                                    classRecordId,
+                                    teachingAssignmentId,
+                                    selectedItem.id,
+                                    entry.learnerId,
+                                    entry.updatedAt,
+                                    entry.status,
+                                    entry.score,
+                                    syncCheckRevision,
+                                  ])}
+                                  service={learnerScoreSyncStatusService}
+                                  teachingAssignmentId={teachingAssignmentId}
+                                  assessmentItemId={selectedItem.id}
+                                  learnerId={entry.learnerId}
+                                />
+                              )}
                           </td>
                           <td>
                             <div

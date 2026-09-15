@@ -1,5 +1,13 @@
 # PROJECT MEMORY
 
+## Continuation policy — 2026-09-15
+
+Owner rejected hourly production execution. Disabled the hourly task and created
+one owner-PR merge-event continuation for this repository. Continue useful work
+within each run; no polling fallback or chained timers. CI completion is not a
+supported event and branch protections were unreadable through the connector, so
+unattended auto-merge is not enabled. See CURRENT-HANDOFF for the live work slice.
+
 ## Legacy LIKHA-SIS and Master Codebase UI & Features Audit (2026-09-07)
 
 - Audited legacy predecessor codebase at `E:\TNHS LIKHA-SIS\tnhs-likha-sis` (Next.js/Supabase/Dexie) and full reference repository at `E:\likha-sis-master` (React/Firebase/Tailwind).
