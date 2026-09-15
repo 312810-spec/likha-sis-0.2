@@ -101,17 +101,13 @@ pub fn get_learner_score_sync_status(
         &teaching_assignment_id,
         &assessment_item_id,
         &learner_id,
-    )? else {
+    )?
+    else {
         return Ok(None);
     };
 
-    entity_sync_status::status_for_entity(
-        &conn,
-        &school_id,
-        EntityKind::LearnerScore,
-        &score_id,
-    )
-    .map(Some)
+    entity_sync_status::status_for_entity(&conn, &school_id, EntityKind::LearnerScore, &score_id)
+        .map(Some)
 }
 
 /// Resolves the SSPK only if this school has already completed the
