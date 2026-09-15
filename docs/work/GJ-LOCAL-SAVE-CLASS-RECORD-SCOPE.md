@@ -1,1 +1,0 @@
-Scope is limited to truthful Class Record local-save presentation. Out of scope: sync protocol, cloud state, schema, authorization changes, grading formulas, weighting inference, and Creation Studio permissions.
