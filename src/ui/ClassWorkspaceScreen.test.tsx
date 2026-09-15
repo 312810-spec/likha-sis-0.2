@@ -16,17 +16,19 @@ const CONTEXT = {
 
 function renderScreen() {
   const onCheckAttendance = vi.fn();
+  const onOpenClassRecords = vi.fn();
   const onBackToToday = vi.fn();
   const rendered = render(
     <ModeProvider>
       <ClassWorkspaceScreen
         context={CONTEXT}
         onCheckAttendance={onCheckAttendance}
+        onOpenClassRecords={onOpenClassRecords}
         onBackToToday={onBackToToday}
       />
     </ModeProvider>,
   );
-  return { ...rendered, onCheckAttendance, onBackToToday };
+  return { ...rendered, onCheckAttendance, onOpenClassRecords, onBackToToday };
 }
 
 describe("ClassWorkspaceScreen", () => {
@@ -43,6 +45,13 @@ describe("ClassWorkspaceScreen", () => {
     const { onCheckAttendance } = renderScreen();
     await user.click(screen.getByRole("button", { name: "Check attendance" }));
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
+  });
+
+  it("opens class records for the selected teaching assignment", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecords } = renderScreen();
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecords).toHaveBeenCalledWith("ta-1");
   });
 
   it("returns to Today without losing control to a placeholder route", async () => {
