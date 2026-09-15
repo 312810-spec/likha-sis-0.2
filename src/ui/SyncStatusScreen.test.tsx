@@ -61,7 +61,7 @@ describe("SyncStatusScreen", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows last-synced, pending change count, and open conflict count for an enrolled device", async () => {
+  it("shows received-update evidence, pending change count, and open conflict count for an enrolled device", async () => {
     renderScreen();
 
     expect(await screen.findByText("3 changes waiting to sync")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("SyncStatusScreen", () => {
     expect(screen.getByText("2 conflicts need your review")).toBeInTheDocument();
   });
 
-  it("says no changes are pending and no conflicts exist for a fully caught-up device", async () => {
+  it("does not claim synced merely because the local outbox is empty", async () => {
     renderScreen(
       new FakeSyncStatusRepository({
         enrolled: true,
@@ -80,7 +80,8 @@ describe("SyncStatusScreen", () => {
       }),
     );
 
-    expect(await screen.findByText("All changes are synced")).toBeInTheDocument();
+    expect(await screen.findByText("No changes waiting to sync")).toBeInTheDocument();
+    expect(screen.queryByText(/all changes are synced/i)).not.toBeInTheDocument();
     expect(screen.getByText("No sync conflicts")).toBeInTheDocument();
     expect(
       screen.getByText("This device has not received any updates from another device yet."),
