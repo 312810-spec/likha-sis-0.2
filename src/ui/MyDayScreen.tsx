@@ -11,6 +11,9 @@ import type { TeacherClassWorkContext } from "./work-context";
 
 interface MyDayScreenProps {
   myDayService: MyDayApplicationService;
+  selectedClassContext?: TeacherClassWorkContext | null;
+  onOpenClassContext: (context: TeacherClassWorkContext) => void;
+  onBackToToday: () => void;
   /** Opens Subject Attendance for this teaching assignment, already
    * selected -- same narrow callback shape `TodaysClassesScreen`'s own
    * `onCheckAttendance` established. */
@@ -35,19 +38,21 @@ function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
  * read-only-derived pending work and can enter a selected class without
  * asking the teacher to choose that class again.
  *
- * This first Golden Journey slice deliberately keeps the selected class
- * context local to Today. Once this interaction is verified, a later small
- * slice can promote the same bounded context to app-level resume/navigation
- * state without coupling academic truth to UI state.
+ * Class context is owned one level above this screen so the same bounded
+ * context can survive a connected workflow such as Subject Attendance.
+ * Academic truth never comes from that UI context: trusted application
+ * services still re-authorize the teaching assignment before work resumes.
  */
 export function MyDayScreen({
   myDayService,
+  selectedClassContext = null,
+  onOpenClassContext,
+  onBackToToday,
   onCheckAttendance,
   onReviewConflicts,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
   const [summary, setSummary] = useState<MyDaySummary | null>(null);
-  const [selectedClass, setSelectedClass] = useState<TeacherClassWorkContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
@@ -80,12 +85,12 @@ export function MyDayScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDayService]);
 
-  if (selectedClass) {
+  if (selectedClassContext) {
     return (
       <ClassWorkspaceScreen
-        context={selectedClass}
+        context={selectedClassContext}
         onCheckAttendance={onCheckAttendance}
-        onBackToToday={() => setSelectedClass(null)}
+        onBackToToday={onBackToToday}
       />
     );
   }
@@ -138,7 +143,7 @@ export function MyDayScreen({
                     type="button"
                     className="button-primary"
                     onClick={() =>
-                      setSelectedClass({
+                      onOpenClassContext({
                         teachingAssignmentId: item.teachingAssignmentId,
                         subjectName: item.subjectName,
                         sectionName: item.sectionName,

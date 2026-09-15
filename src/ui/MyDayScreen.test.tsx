@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +8,7 @@ import type { MyDaySummary } from "../domain/my-day";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { MyDayScreen } from "./MyDayScreen";
+import type { TeacherClassWorkContext } from "./work-context";
 
 const SUMMARY: MyDaySummary = {
   schedule: [
@@ -37,9 +39,7 @@ class FakeMyDayRepository implements MyDayRepository {
 
   async getSummary(todayWeekday: number, todayDate: string): Promise<MyDaySummary> {
     this.calls.push([todayWeekday, todayDate]);
-    if (this.result === "reject") {
-      throw new Error("boom");
-    }
+    if (this.result === "reject") throw new Error("boom");
     return this.result;
   }
 }
@@ -49,22 +49,30 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
   const onReviewConflicts = vi.fn();
-  const rendered = render(
-    <ModeProvider>
-      <MyDayScreen
-        myDayService={service}
-        onCheckAttendance={onCheckAttendance}
-        onReviewConflicts={onReviewConflicts}
-      />
-    </ModeProvider>,
-  );
+
+  function Host() {
+    const [context, setContext] = useState<TeacherClassWorkContext | null>(null);
+    return (
+      <ModeProvider>
+        <MyDayScreen
+          myDayService={service}
+          selectedClassContext={context}
+          onOpenClassContext={setContext}
+          onBackToToday={() => setContext(null)}
+          onCheckAttendance={onCheckAttendance}
+          onReviewConflicts={onReviewConflicts}
+        />
+      </ModeProvider>
+    );
+  }
+
+  const rendered = render(<Host />);
   return { ...rendered, repo, onCheckAttendance, onReviewConflicts };
 }
 
 describe("MyDayScreen", () => {
   it("shows today's schedule and pending tasks", async () => {
     renderScreen();
-
     expect((await screen.findAllByText(/Mathematics — Mabini/)).length).toBeGreaterThan(0);
     expect(screen.getByText("attendance not yet checked")).toBeInTheDocument();
     expect(screen.getByText(/1 sync\s*conflict/)).toBeInTheDocument();
@@ -72,7 +80,6 @@ describe("MyDayScreen", () => {
 
   it("shows an empty state when there is nothing scheduled or pending", async () => {
     renderScreen(EMPTY_SUMMARY);
-
     expect(await screen.findByText("No classes scheduled for you today.")).toBeInTheDocument();
     expect(screen.getByText(/Nothing pending/)).toBeInTheDocument();
   });
@@ -80,9 +87,7 @@ describe("MyDayScreen", () => {
   it("opens the scheduled class without asking for the class again", async () => {
     const user = userEvent.setup();
     renderScreen();
-
     await user.click(await screen.findByRole("button", { name: "Open class" }));
-
     expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
     expect(screen.getByLabelText("Selected class schedule")).toHaveTextContent(
       "08:00–08:50 · Room 101",
@@ -92,10 +97,8 @@ describe("MyDayScreen", () => {
   it("can return from the class workspace to today's schedule", async () => {
     const user = userEvent.setup();
     renderScreen();
-
     await user.click(await screen.findByRole("button", { name: "Open class" }));
     await user.click(screen.getByRole("button", { name: "Back to Today" }));
-
     expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open class" })).toBeInTheDocument();
   });
@@ -103,35 +106,28 @@ describe("MyDayScreen", () => {
   it("opens subject attendance for the selected class from the class workspace", async () => {
     const user = userEvent.setup();
     const { onCheckAttendance } = renderScreen();
-
     await user.click(await screen.findByRole("button", { name: "Open class" }));
     await user.click(screen.getByRole("button", { name: "Check attendance" }));
-
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
   });
 
   it("calls onCheckAttendance with the assignment id from Needs Attention", async () => {
     const user = userEvent.setup();
     const { onCheckAttendance } = renderScreen();
-
     await user.click(await screen.findByRole("button", { name: "Check attendance" }));
-
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
   });
 
   it("calls onReviewConflicts when the review-conflicts button is clicked", async () => {
     const user = userEvent.setup();
     const { onReviewConflicts } = renderScreen();
-
     await user.click(await screen.findByRole("button", { name: "Review conflicts" }));
-
     expect(onReviewConflicts).toHaveBeenCalled();
   });
 
   it("shows a retryable error when loading fails", async () => {
     const user = userEvent.setup();
     const { repo } = renderScreen("reject");
-
     expect(await screen.findByText("Could not load My Day.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(repo.calls.length).toBeGreaterThanOrEqual(2);
@@ -140,7 +136,6 @@ describe("MyDayScreen", () => {
   it("has no detectable accessibility violations", async () => {
     const { container } = renderScreen();
     await screen.findAllByText(/Mathematics — Mabini/);
-
     await expectNoAccessibilityViolations(container);
   });
 });

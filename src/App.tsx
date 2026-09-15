@@ -52,12 +52,13 @@ import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
 import { SectionsScreen } from "./ui/SectionsScreen";
 import { Sf1ImportScreen } from "./ui/Sf1ImportScreen";
-import { SubjectAttendanceScreen } from "./ui/SubjectAttendanceScreen";
+import { SubjectAttendanceJourneyScreen } from "./ui/SubjectAttendanceJourneyScreen";
 import { SubjectMonitorScreen } from "./ui/SubjectMonitorScreen";
 import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
+import type { TeacherClassWorkContext } from "./ui/work-context";
 import { AppLayout } from "./ui/shell/AppLayout";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
@@ -88,13 +89,17 @@ function App() {
     year: number;
     month: number;
   } | null>(null);
-  // Set only by TodaysClassesScreen's "Check attendance" action, so
-  // SubjectAttendanceScreen opens with that class already selected --
-  // same narrowly-typed handoff pattern as above, not a router/global
-  // store.
+  // Set only when Subject Attendance is opened from a known assignment.
+  // The id is still revalidated by SubjectAttendanceScreen against the
+  // signed-in teacher's authorized assignments before it is selected.
   const [subjectAttendanceAssignmentId, setSubjectAttendanceAssignmentId] = useState<string | null>(
     null,
   );
+  // Bounded Golden Journey context. The assignment id is canonical; the
+  // labels are display hints copied from an already-authorized read model.
+  // No academic decision trusts this UI state without application-service
+  // revalidation.
+  const [classWorkContext, setClassWorkContext] = useState<TeacherClassWorkContext | null>(null);
   // Set only by SectionsScreen's "Manage assignments" action, so
   // TeachingAssignmentsScreen opens for that section -- same
   // narrowly-typed handoff pattern as rosterSectionId above, not a
@@ -120,7 +125,13 @@ function App() {
     subjectName: string;
   } | null>(null);
 
+  function clearClassWorkContext() {
+    setClassWorkContext(null);
+    setSubjectAttendanceAssignmentId(null);
+  }
+
   function handleSessionExpired() {
+    clearClassWorkContext();
     setSession(null);
     setSessionExpiredNotice("Your session has expired. Please sign in again.");
   }
@@ -162,18 +173,44 @@ function App() {
 
   async function handleLogout() {
     await authService.logout();
+    clearClassWorkContext();
     setSessionExpiredNotice(null);
     setSession(null);
   }
 
   function handleSetupComplete(newSession: CurrentSession) {
+    clearClassWorkContext();
     setNeedsSetup(false);
     setSession(newSession);
   }
 
   function handleLoggedIn(newSession: CurrentSession) {
+    clearClassWorkContext();
     setSessionExpiredNotice(null);
     setSession(newSession);
+  }
+
+  async function handleReturnToClass() {
+    const context = classWorkContext;
+    if (!session || !context) {
+      clearClassWorkContext();
+      setActiveTab("my-day");
+      return;
+    }
+
+    try {
+      const assignments = await subjectAttendanceService.listMyAssignments(session.userId);
+      const stillAuthorized = assignments.some(
+        (assignment) => assignment.id === context.teachingAssignmentId,
+      );
+      if (!stillAuthorized) clearClassWorkContext();
+    } catch {
+      // A context that cannot be revalidated is never trusted. Falling
+      // back to Today is safer than restoring a stale/unauthorized class.
+      clearClassWorkContext();
+    }
+
+    setActiveTab("my-day");
   }
 
   const bootBrand = <h1 className="app-boot-brand">LIKHA-SIS</h1>;
@@ -260,9 +297,6 @@ function App() {
                 }}
               />
             ) : (
-              // Reached only if the roster tab is active with no section
-              // context (e.g. a stale state after a reload) -- fall back
-              // to Sections rather than render a blank or wrong screen.
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
@@ -296,9 +330,6 @@ function App() {
                 }}
               />
             ) : (
-              // Reached only if this tab is active with no section
-              // context (e.g. a stale state after a reload) -- fall back
-              // to Sections rather than render a blank or wrong screen.
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
@@ -327,9 +358,6 @@ function App() {
                 onBack={() => setActiveTab("sections")}
               />
             ) : (
-              // Reached only if this tab is active with no section
-              // context (e.g. a stale state after a reload) -- fall back
-              // to Sections rather than render a blank or wrong screen.
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
@@ -358,9 +386,6 @@ function App() {
                 onBack={() => setActiveTab("teaching-assignments")}
               />
             ) : (
-              // Reached only if this tab is active with no assignment
-              // context (e.g. a stale state after a reload) -- fall back
-              // to Sections rather than render a blank or wrong screen.
               <SectionsScreen
                 sectionService={sectionService}
                 learnerService={learnerService}
@@ -394,6 +419,9 @@ function App() {
           ) : activeTab === "my-day" ? (
             <MyDayScreen
               myDayService={myDayService}
+              selectedClassContext={classWorkContext}
+              onOpenClassContext={setClassWorkContext}
+              onBackToToday={() => setClassWorkContext(null)}
               onCheckAttendance={(teachingAssignmentId) => {
                 setSubjectAttendanceAssignmentId(teachingAssignmentId);
                 setActiveTab("subject-attendance");
@@ -405,15 +433,18 @@ function App() {
               subjectAttendanceService={subjectAttendanceService}
               teacherUserId={session.userId}
               onCheckAttendance={(teachingAssignmentId) => {
+                setClassWorkContext(null);
                 setSubjectAttendanceAssignmentId(teachingAssignmentId);
                 setActiveTab("subject-attendance");
               }}
             />
           ) : activeTab === "subject-attendance" ? (
-            <SubjectAttendanceScreen
+            <SubjectAttendanceJourneyScreen
               subjectAttendanceService={subjectAttendanceService}
               teacherUserId={session.userId}
               initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
+              classContext={classWorkContext}
+              onBackToClass={classWorkContext ? handleReturnToClass : undefined}
             />
           ) : activeTab === "subject-monitor" ? (
             <SubjectMonitorScreen
