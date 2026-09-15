@@ -72,7 +72,9 @@ function exportService(): ExportApplicationService {
   return {} as unknown as ExportApplicationService;
 }
 
-function subjectAttendanceServiceWith(assignments: unknown[]): SubjectAttendanceApplicationService {
+function subjectAttendanceServiceWith(
+  assignments: unknown[],
+): SubjectAttendanceApplicationService {
   return {
     listMyAssignments: vi.fn().mockResolvedValue(assignments),
   } as unknown as SubjectAttendanceApplicationService;
@@ -101,7 +103,9 @@ function renderScreen(overrides?: {
   created?: ClassRecord | null;
 }) {
   const onBackToClass = vi.fn();
-  const subjectAttendance = subjectAttendanceServiceWith(overrides?.assignments ?? [ASSIGNMENT]);
+  const subjectAttendance = subjectAttendanceServiceWith(
+    overrides?.assignments ?? [ASSIGNMENT],
+  );
   const grading = gradingServiceWith(overrides?.periods ?? [PERIOD]);
   const classRecord = classRecordServiceWith(
     overrides?.policies ?? [POLICY],
@@ -125,12 +129,24 @@ function renderScreen(overrides?: {
     </ModeProvider>,
   );
 
-  return { ...rendered, onBackToClass, subjectAttendance, grading, classRecord };
+  return {
+    ...rendered,
+    onBackToClass,
+    subjectAttendance,
+    grading,
+    classRecord,
+  };
 }
 
 async function choosePolicyAndOpen(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
-  await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+  await user.selectOptions(
+    await screen.findByLabelText("Grading period"),
+    "gp-1",
+  );
+  await user.selectOptions(
+    screen.getByLabelText("DepEd grading weighting"),
+    "wp-1",
+  );
   await user.click(screen.getByRole("button", { name: "Open class record" }));
 }
 
@@ -139,7 +155,9 @@ describe("ClassRecordJourneyScreen", () => {
     const user = userEvent.setup();
     const { classRecord, grading } = renderScreen();
 
-    const openButton = await screen.findByRole("button", { name: "Open class record" });
+    const openButton = await screen.findByRole("button", {
+      name: "Open class record",
+    });
     expect(openButton).toHaveAttribute("aria-disabled", "true");
     expect(classRecord.createClassRecord).not.toHaveBeenCalled();
     expect(grading.listPeriodsBySchoolYear).toHaveBeenCalledWith("2026-2027");
@@ -158,7 +176,9 @@ describe("ClassRecordJourneyScreen", () => {
 
   it("shows a visible error when the assignment is no longer authorized", async () => {
     renderScreen({ assignments: [] });
-    expect(await screen.findByText("This class is no longer assigned to you.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("This class is no longer assigned to you."),
+    ).toBeInTheDocument();
   });
 
   it("shows a visible error when no grading period exists for the school year", async () => {
@@ -184,7 +204,9 @@ describe("ClassRecordJourneyScreen", () => {
     renderScreen({ created: null });
 
     await choosePolicyAndOpen(user);
-    expect(await screen.findByText(/Could not open this class record/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Could not open this class record/),
+    ).toBeInTheDocument();
   });
 
   it("returns to the class workspace with context intact", async () => {
@@ -193,7 +215,9 @@ describe("ClassRecordJourneyScreen", () => {
 
     await screen.findByLabelText("Grading period");
     await user.click(
-      screen.getByRole("button", { name: "Back to Filipino — Grade 8 – Joy" }),
+      screen.getByRole("button", {
+        name: "Back to Filipino — Grade 8 – Joy",
+      }),
     );
     expect(onBackToClass).toHaveBeenCalledTimes(1);
   });
