@@ -54,6 +54,8 @@ export function ClassLearnersPanel({
   }
 
   useEffect(() => {
+    // Same initial external-service synchronization pattern used by MyDayScreen.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectAttendanceService, teachingAssignmentId]);
@@ -90,14 +92,31 @@ export function ClassLearnersPanel({
           <button type="button" onClick={() => setSelectedLearnerId(null)}>
             Back to learners
           </button>
-          <h4>{selected.givenName} {selected.familyName}</h4>
+          <h4>
+            {selected.givenName} {selected.familyName}
+          </h4>
           <p className="field-hint">Class attendance signals as of today</p>
           <dl>
-            <div><dt>Present</dt><dd>{selected.presentCount}</dd></div>
-            <div><dt>Absent</dt><dd>{selected.absentCount}</dd></div>
-            <div><dt>Late</dt><dd>{selected.lateCount}</dd></div>
-            <div><dt>Excused</dt><dd>{selected.excusedCount}</dd></div>
-            <div><dt>Current consecutive absences</dt><dd>{selected.currentConsecutiveAbsences}</dd></div>
+            <div>
+              <dt>Present</dt>
+              <dd>{selected.presentCount}</dd>
+            </div>
+            <div>
+              <dt>Absent</dt>
+              <dd>{selected.absentCount}</dd>
+            </div>
+            <div>
+              <dt>Late</dt>
+              <dd>{selected.lateCount}</dd>
+            </div>
+            <div>
+              <dt>Excused</dt>
+              <dd>{selected.excusedCount}</dd>
+            </div>
+            <div>
+              <dt>Current consecutive absences</dt>
+              <dd>{selected.currentConsecutiveAbsences}</dd>
+            </div>
           </dl>
         </div>
       ) : rows.length === 0 ? (
