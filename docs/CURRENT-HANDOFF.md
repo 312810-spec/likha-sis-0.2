@@ -24,47 +24,52 @@ Do not infer that a test passed in the current session merely because a handoff 
 
 Current `main` at this handoff:
 
-`b02ae027bb25463a1d27e5eb8b396bde24ac7bdd`
+`18560051d51e7e68f944c10d3c1447bcb76b036c`
 
 Latest merged product slice:
 
-- PR #69 — assignment-scoped learner context inside the Golden Journey.
+- PR #71 — class-context entry into the real Class Record workspace.
+- The reconciled implementation requires the teacher to explicitly choose the grading period/term and DepEd grading weighting before the class record is opened.
 - Golden Journey now supports:
-  `Today → Class Workspace → Subject Attendance → assignment-authorized learner context → return to exact class`.
+  `Today → Class Workspace → Subject Attendance → learner context → Class Record/scoring → return to exact class`.
 
-Recent infrastructure/harness decisions already merged:
+Recent project/harness decisions already merged:
 
-- PR #68 — feature branches no longer duplicate Quality Gate on push; the pull request is the authoritative Quality run. `main` still verifies after merge. Security remains independent.
+- PR #72 — `docs/CURRENT-HANDOFF.md` compacted from transcript scale into this bounded live-state handoff.
+- PR #68 — feature branches no longer duplicate Quality Gate on push; the PR is the authoritative Quality run. Security remains independent.
 - PR #66 — school logo bytes are validated against PNG/JPEG/WebP signatures at the trusted boundary.
 - PR #65 — PR #55 mega-branch retired as a merge candidate; selective recovery only.
+
+Superseded work:
+
+- PR #70 is closed without merge. Its broader GJ-6 implementation was superseded by the smaller reconciled #71 path.
 
 ## 3. Active work right now
 
 Canonical active product PR:
 
-- **PR #70 — `feat(ux): carry Golden Journey class context into Class Records`**
-- Branch: `feat/golden-journey-class-records`
-- Purpose: advance GJ-6 without making the teacher reselect the class.
-- Security Gate on the latest inspected head was green.
-- Quality Gate failed on formatting/style after earlier typecheck issues were fixed.
+- **PR #73 — `feat(ux): continue Golden Journey into Creation Studio`**
+- Branch: `feat/golden-journey-assessment-authoring`
+- Purpose: continue GJ-6 from the already-opened class record into the existing Assessment Creation Studio and back without losing class/term/weighting context.
+- Reuses the already-validated `classRecordId`; no new authorization path is introduced.
+- Returning from Creation Studio remounts the existing Class Record workspace so newly-authored assessment items can be refreshed.
 - Do not merge until the exact current head has a green authoritative Quality run and green Security run.
-
-A duplicate Claude Code attempt was opened as PR #71 and is now closed without merge.
-Useful ideas from #71 may be selectively reused, but its automatic `periods[0]` grading-period selection and automatic default grading-weight selection are **not accepted** because LIKHA must not silently choose an academic term or weighting policy that can change grade correctness.
 
 ## 4. Exact next action
 
-Resume PR #70.
+Continue PR #73.
 
-1. Inspect its exact current head and latest failed Quality log.
-2. Fix only evidence-backed formatting/style failures and any concrete test failures.
-3. Keep grading period/term explicit.
-4. Keep DepEd grading weighting explicit; never infer from subject name.
-5. Preserve assignment revalidation below UI before restoring/opening class-scoped work.
-6. Run one authoritative PR Quality workflow plus independent Security.
-7. If both are green and PR is mergeable, squash-merge #70.
-8. After merge, update this handoff if the next active slice changes materially.
-9. Continue the Golden Journey on a fresh branch.
+1. Inspect the exact current PR head and its Quality/Security checks.
+2. Fix only evidence-backed failures with the smallest reversible change.
+3. Preserve explicit grading period/term selection.
+4. Preserve explicit DepEd grading weighting selection; never infer from subject name.
+5. Preserve assignment revalidation below UI before class-record access.
+6. Keep Creation Studio scoped to the validated `classRecordId`.
+7. Run one authoritative PR Quality workflow plus independent Security.
+8. If both are green and the exact head is mergeable, squash-merge #73.
+9. After merge, refresh this handoff and continue the Golden Journey on a fresh branch.
+
+Likely next slice after #73: **grade-state continuity inside the preserved class context**, unless a verified P0/P1 security, data-loss, grading-correctness, or compliance defect interrupts.
 
 ## 5. Golden Journey product spine
 
@@ -85,12 +90,13 @@ Completed journey slices:
 - GJ-1/2: Today/My Day can open a class once and preserve bounded class context.
 - GJ-3/4: class context survives Subject Attendance and is revalidated before return.
 - GJ-5: learner context uses the assignment-owned Subject Attendance monitor path and does not broaden access through a raw section id.
+- GJ-6a: Class Record/scoring opens from preserved class context with explicit term + weighting selection.
 
 Current:
 
-- GJ-6: Class Record / assessment / scoring continuity from the preserved class.
+- GJ-6b: Assessment Creation Studio continuity from the validated class record.
 
-Likely next after GJ-6:
+Likely next:
 
 - grade-state continuity;
 - explicit local-save/offline state;
@@ -125,13 +131,7 @@ Rules:
 
 ## 7. Teacher experience constraints
 
-Major workflows support:
-
-- Efficient
-- Comfortable (default)
-- Guided
-
-All modes retain functional parity.
+Major workflows support Efficient, Comfortable (default), and Guided with functional parity.
 Never infer mode from age, role, years of service, or device.
 
 Design from the teacher’s job:
@@ -159,11 +159,8 @@ Known correctness debt that may interrupt feature work if independently re-verif
 
 ## 9. PR #55 selective-recovery rule
 
-PR #55 is archived source, not a merge source.
-Tracking issue: #64.
-
-Recover only small current-main-compatible slices after verifying the need still exists.
-Current `main` wins.
+PR #55 is archived source, not a merge source. Tracking issue: #64.
+Recover only small current-main-compatible slices after verifying the need still exists. Current `main` wins.
 
 Priority recovery classes:
 
@@ -190,7 +187,7 @@ The owner has explicitly asked for an autonomous development loop.
 
 After opening a PR:
 
-1. ensure the LIKHA PR continuation schedule remains active;
+1. ensure the LIKHA PR continuation schedule remains active and targets the canonical PR;
 2. inspect current-head Quality + Security;
 3. fix evidence-backed failures with the smallest reversible change;
 4. merge when the exact head is green and mergeable;
@@ -215,6 +212,7 @@ Read only when relevant:
 - `docs/adr/0059-golden-journey-work-context.md`
 - `docs/adr/0060-golden-journey-app-class-context.md`
 - `docs/adr/0070-golden-journey-class-learner-context.md`
+- `docs/adr/0071-golden-journey-class-record-context.md`
 
 ## 13. Handoff maintenance rule
 
