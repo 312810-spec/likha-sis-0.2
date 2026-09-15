@@ -282,12 +282,9 @@ pub fn score_entity_id_for_owned_assignment(
     assessment_item_id: &str,
     learner_id: &str,
 ) -> AppResult<Option<String>> {
-    let assignment = teaching_assignment::find_by_id_in_school(
-        conn,
-        school_id,
-        teaching_assignment_id,
-    )?
-    .ok_or(AppError::Unauthorized)?;
+    let assignment =
+        teaching_assignment::find_by_id_in_school(conn, school_id, teaching_assignment_id)?
+            .ok_or(AppError::Unauthorized)?;
     if assignment.teacher_user_id != user_id {
         return Err(AppError::Unauthorized);
     }
@@ -408,8 +405,7 @@ mod tests {
     fn owned_assignment_resolves_the_persisted_score_entity_id() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
-        let assignment_id =
-            assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
         let score = record(
             &conn,
             &school_id,
@@ -439,10 +435,8 @@ mod tests {
     fn assignment_owned_by_another_teacher_is_rejected() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
-        let assignment_id =
-            assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
-        let other_teacher = user::create_user(&conn, "teacher.b", "password", "B Teacher")
-            .unwrap();
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let other_teacher = user::create_user(&conn, "teacher.b", "password", "B Teacher").unwrap();
 
         let result = score_entity_id_for_owned_assignment(
             &conn,
@@ -501,8 +495,7 @@ mod tests {
     fn unrecorded_owned_score_has_no_sync_entity_yet() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
-        let assignment_id =
-            assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
 
         let resolved = score_entity_id_for_owned_assignment(
             &conn,
