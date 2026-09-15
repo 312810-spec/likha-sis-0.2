@@ -27,11 +27,7 @@ describe("TauriLearnerScoreSyncStatusRepository", () => {
     mockInvoke.mockResolvedValueOnce(null);
 
     await expect(
-      new TauriLearnerScoreSyncStatusRepository().getStatus(
-        "assignment-1",
-        "item-1",
-        "learner-1",
-      ),
+      new TauriLearnerScoreSyncStatusRepository().getStatus("assignment-1", "item-1", "learner-1"),
     ).resolves.toBeNull();
   });
 });
