@@ -22,3 +22,7 @@ Do not change `LearnerScoreApplicationService`, score-write semantics, grade com
 ## Verification
 
 One authoritative PR Quality workflow plus independent Security. Merge only when both are successful for the exact current head and the PR is mergeable.
+
+### CI recovery note
+
+Quality Gate #755 on the previous PR head remained queued without creating any jobs and could not be cancelled from GitHub. This documentation-only head refresh intentionally changes no product behavior; it exists only to request fresh exact-head Quality and Security runs before the bounded workspace integration proceeds.
