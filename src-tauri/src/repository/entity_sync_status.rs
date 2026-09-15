@@ -60,8 +60,7 @@ pub fn status_for_entity(
         return Ok(EntitySyncState::WaitingToSync);
     }
 
-    let known_version =
-        sync_version_cache::known_version(conn, school_id, entity_kind, entity_id)?;
+    let known_version = sync_version_cache::known_version(conn, school_id, entity_kind, entity_id)?;
     if known_version > 0 {
         return Ok(EntitySyncState::Synced);
     }
