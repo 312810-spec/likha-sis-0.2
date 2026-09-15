@@ -1,1 +1,0 @@
-Exact next edit: import `ClassRecordLocalSaveStatus` in `ClassRecordWorkspace`, replace the local `savedNote`/`Saved HH:MM` rendering with the adapter using `entry.updatedAt`, `Boolean(rowErrors[entry.learnerId])`, and `isSaving`, then remove the redundant workspace-local timestamp formatter. No service/domain changes.
