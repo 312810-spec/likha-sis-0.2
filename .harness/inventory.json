@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 1,
-  "reviewedOn": "2026-09-12",
+  "schemaVersion": 3,
+  "reviewedOn": "2026-09-15",
   "reviewIntervalDays": 14,
-  "policy": "Keep the smallest non-overlapping set; weak, stale, missing, or overlapping entries fail certification.",
+  "policy": "Minimum Sufficient Harness: provider-neutral, content-aware, risk-shaped, fail-fast, measured growth, delete overlap before adding machinery.",
   "components": {
     "agents": [
       "accessibility-reviewer",
@@ -27,6 +27,7 @@
       "impeccable",
       "local-database",
       "memory-health",
+      "model-routing",
       "official-forms",
       "offline-sync",
       "planning-with-files",
@@ -38,13 +39,8 @@
       "security-privacy",
       "tauri-windows"
     ],
-    "hooks": ["check-bash.cjs", "check-write-edit.cjs", "format-write-edit.cjs"],
-    "plugins": [
-      "claude-code-setup@claude-plugins-official",
-      "claude-security@claude-plugins-official",
-      "rust-analyzer-lsp@claude-plugins-official",
-      "typescript-lsp@claude-plugins-official"
-    ],
+    "hooks": [],
+    "plugins": [],
     "projectMcps": [],
     "deterministicGates": [
       "check:architecture",
