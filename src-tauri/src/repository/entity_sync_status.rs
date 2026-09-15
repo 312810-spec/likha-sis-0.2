@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use serde::Serialize;
 
 use crate::error::AppResult;
 use crate::repository::sync_version_cache;
@@ -17,7 +18,8 @@ use crate::sync::EntityKind;
 /// `NeedsReview` must win over `WaitingToSync`. A pending change must win over a
 /// previously-known hub version because the local entity has changed again since that
 /// earlier acknowledgment.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum EntitySyncState {
     NeedsReview,
     WaitingToSync,

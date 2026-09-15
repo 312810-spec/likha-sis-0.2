@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::repository::{assessment_item, class_record, section_membership};
+use crate::repository::{assessment_item, class_record, section_membership, teaching_assignment};
 
 /// Every state a learner's score for one assessment item can be in.
 /// Absence of a `learner_scores` row is a fourth, implicit state — "not
@@ -266,6 +266,50 @@ pub fn roster_for_item(
     Ok(Some(entries))
 }
 
+/// Resolves the persisted score entity behind one Class Record row, but only
+/// after proving that `user_id` owns the supplied teaching assignment and that
+/// the assessment item belongs to that assignment's section and subject.
+///
+/// This is the trusted authorization boundary for record-level sync evidence.
+/// Client navigation state is never sufficient authority. `Ok(None)` means
+/// either the score has not been recorded yet or the item/score is unknown;
+/// assignment ownership or context mismatches fail closed as `Unauthorized`.
+pub fn score_entity_id_for_owned_assignment(
+    conn: &Connection,
+    school_id: &str,
+    user_id: &str,
+    teaching_assignment_id: &str,
+    assessment_item_id: &str,
+    learner_id: &str,
+) -> AppResult<Option<String>> {
+    let assignment =
+        teaching_assignment::find_by_id_in_school(conn, school_id, teaching_assignment_id)?
+            .ok_or(AppError::Unauthorized)?;
+    if assignment.teacher_user_id != user_id {
+        return Err(AppError::Unauthorized);
+    }
+
+    let item = assessment_item::find_by_id_in_school(conn, school_id, assessment_item_id)?
+        .ok_or(AppError::Unauthorized)?;
+    let record = class_record::find_by_id_in_school(conn, school_id, &item.class_record_id)?
+        .ok_or(AppError::Unauthorized)?;
+    if record.section_id != assignment.section_id || record.subject_id != assignment.subject_id {
+        return Err(AppError::Unauthorized);
+    }
+
+    conn.query_row(
+        "SELECT id FROM learner_scores \
+         WHERE school_id = ?1 AND assessment_item_id = ?2 AND learner_id = ?3",
+        (school_id, assessment_item_id, learner_id),
+        |row| row.get(0),
+    )
+    .map(Some)
+    .or_else(|error| match error {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other.into()),
+    })
+}
+
 fn row_to_score(row: &rusqlite::Row) -> rusqlite::Result<LearnerScore> {
     let status: String = row.get(4)?;
     Ok(LearnerScore {
@@ -322,6 +366,148 @@ mod tests {
         section_membership::enroll(conn, &s.id, &sec.id, &l.id, "2026-06-08").unwrap();
         let teacher = user::create_user(conn, "teacher.a", "password", "A Teacher").unwrap();
         (s.id, item.id, l.id, teacher.id)
+    }
+
+    fn assign_item_class_to_teacher(
+        conn: &Connection,
+        school_id: &str,
+        item_id: &str,
+        teacher_id: &str,
+    ) -> String {
+        let (section_id, subject_id): (String, String) = conn
+            .query_row(
+                "SELECT cr.section_id, cr.subject_id \
+                 FROM assessment_items ai \
+                 JOIN class_records cr ON cr.id = ai.class_record_id \
+                 WHERE ai.id = ?1 AND ai.school_id = ?2 AND cr.school_id = ?2",
+                (item_id, school_id),
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        let assignment_id = Uuid::now_v7().to_string();
+        conn.execute(
+            "INSERT INTO teaching_assignments \
+             (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            (
+                &assignment_id,
+                school_id,
+                teacher_id,
+                &section_id,
+                &subject_id,
+            ),
+        )
+        .unwrap();
+        assignment_id
+    }
+
+    #[test]
+    fn owned_assignment_resolves_the_persisted_score_entity_id() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let score = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            &teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let resolved = score_entity_id_for_owned_assignment(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            &item_id,
+            &learner_id,
+        )
+        .unwrap();
+
+        assert_eq!(resolved, Some(score.id));
+    }
+
+    #[test]
+    fn assignment_owned_by_another_teacher_is_rejected() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let other_teacher = user::create_user(&conn, "teacher.b", "password", "B Teacher").unwrap();
+
+        let result = score_entity_id_for_owned_assignment(
+            &conn,
+            &school_id,
+            &other_teacher.id,
+            &assignment_id,
+            &item_id,
+            &learner_id,
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn owned_assignment_for_a_different_subject_cannot_read_score_evidence() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let section_id: String = conn
+            .query_row(
+                "SELECT cr.section_id FROM assessment_items ai \
+                 JOIN class_records cr ON cr.id = ai.class_record_id \
+                 WHERE ai.id = ?1",
+                [&item_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let other_subject = subject::create(&conn, &school_id, "Synthetic Science").unwrap();
+        let assignment_id = Uuid::now_v7().to_string();
+        conn.execute(
+            "INSERT INTO teaching_assignments \
+             (id, school_id, teacher_user_id, section_id, subject_id) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            (
+                &assignment_id,
+                &school_id,
+                &teacher_id,
+                &section_id,
+                &other_subject.id,
+            ),
+        )
+        .unwrap();
+
+        let result = score_entity_id_for_owned_assignment(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            &item_id,
+            &learner_id,
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn unrecorded_owned_score_has_no_sync_entity_yet() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+
+        let resolved = score_entity_id_for_owned_assignment(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &assignment_id,
+            &item_id,
+            &learner_id,
+        )
+        .unwrap();
+
+        assert_eq!(resolved, None);
     }
 
     #[test]
