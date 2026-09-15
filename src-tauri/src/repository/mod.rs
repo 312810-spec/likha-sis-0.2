@@ -7,6 +7,7 @@ pub mod curriculum;
 pub mod device_credential;
 pub mod device_identity;
 pub mod device_sync_client_credential;
+pub mod entity_sync_status;
 pub mod grading;
 pub mod grading_computation;
 pub mod installation;
