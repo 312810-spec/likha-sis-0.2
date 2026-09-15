@@ -1,96 +1,61 @@
-# LIKHA-SIS 0.2 — Codex
+# LIKHA-SIS 0.2 — Agent Guide
 
 ## Mission
 
 Build a production-grade, teacher-centered SIS for Philippine DepEd schools.
 
-Priority:
-security/privacy → correctness → DepEd compliance → teacher usability → offline reliability → maintainability → zero billing → performance → speed
+Priority: privacy/security → correctness → DepEd compliance → teacher usability → offline reliability → maintainability → zero billing → performance → speed.
 
-## Product
+## Product invariants
 
-- Native-first, local-first, offline-capable
-- Windows first; Android later
-- React + TypeScript + Tauri 2
-- SQLite is the device working database
-- Cloud sync is separate
-- Provider-specific code stays behind interfaces/adapters
-- Synthetic data only
+- Native-first, local-first, offline-capable; Windows workstation first, Android teacher companion later.
+- React + TypeScript + Tauri 2; SQLite is the device working database; sync is separate.
+- UI/domain do not depend directly on Tauri, SQLite, Cloudflare, or another provider.
+- Offline writes save locally first; business logic stays outside UI.
+- Security is enforced at trusted boundaries; school isolation is mandatory.
+- Synthetic data only in development, tests, demos, screenshots, and AI prompts.
+- Efficient / Comfortable / Guided retain functional parity.
 
-## Architecture
+## Context rule
 
-UI → Application Services → Domain → Repository Ports → Infrastructure/Platform Adapters → SyncProvider → Cloud
+Do not reread the repository or giant project-memory files by default.
 
-Rules:
+1. Start from the task, current diff, and changed paths.
+2. Search/find the smallest relevant sections of project memory, handoff, active plan, ADRs, code, and tests.
+3. Read the matching skill in `.agents/skills/` only when needed.
+4. Expand context only when evidence is insufficient, conflicting, or stale.
+5. Reuse settled evidence; do not rediscover it without a reason.
 
-- UI/domain must not directly depend on Tauri, SQLite, Cloudflare, or another provider.
-- Offline writes save locally first.
-- Business logic stays outside UI.
-- Security must not rely on UI hiding.
-- School isolation must be enforced at a trusted boundary.
+## Harness philosophy
 
-## Teacher Experience
+Read `docs/harness/HARNESS-PRINCIPLES.md` for substantial harness work and `.agents/skills/model-routing/SKILL.md` for major/high-risk planning.
 
-Efficient / Comfortable / Guided. Comfortable is default. All modes keep functional parity.
+The harness is living and provider-neutral. It grows only when measured value exceeds its context, maintenance, CI, and failure cost. Prefer deleting overlap over adding another layer.
 
-## Engineering
+Prompt Master prepares major plans from compact evidence packets. Use the cheapest capable worker for bounded tasks and stronger reasoning only when risk, ambiguity, or failed bounded attempts justify it. Model/provider names are runtime bindings, not architecture.
 
-At session start read:
+## Debugging
 
-1. `docs/PROJECT-MEMORY.md`
-2. `docs/CURRENT-HANDOFF.md`
-3. `docs/ACTIVE-PLAN.md`
-4. only ADRs/docs relevant to the current task
+For one failure mechanism, allow at most two evidence-based attempts. Attempt 2 requires new evidence or a materially different hypothesis. Then change mechanism, use a safe workaround, escalate, or mark blocked. Never weaken privacy, security, architecture, data integrity, or required verification to pass.
 
-Detailed, topic-specific rules live in `.claude/rules/` (architecture,
-security-privacy, testing, project-state, autonomous-development) and
-narrowly-triggered procedures live in `.claude/skills/` — read the
-relevant one when the task matches it rather than expecting this file to
-contain everything.
+## Tool freshness
 
-Inspect code before changing it.
+When adding, replacing, or materially revisiting a tool/dependency/action/skill/framework, check its current stable official release plus relevant security/compatibility notes. Do not churn unrelated tools merely because a newer version exists.
 
-Method:
-Inspect → Research if needed → Specify → Implement → Test → Review → Record
+## Engineering loop
 
-Rules:
+Inspect → Research if needed → Specify → Implement → Test → Review → Record.
 
-- Small, reversible changes.
-- No unrelated refactors.
-- TDD for important domain, security, persistence, and sync logic.
-- Never claim checks passed unless they actually ran.
-- Never add paid infrastructure/APIs without explicit approval.
-- Record durable decisions in ADRs.
-- Keep this file concise.
-- Never reopen a milestone already marked complete without a new
-  instruction to do so.
-
-**Default mode is Autonomous Continuous Development** — see
-`.claude/rules/autonomous-development.md` for the full loop and rules.
-In short: a completed milestone is a checkpoint, not a stopping point.
-Verify it, record it, then autonomously select and continue to the next
-highest-value work using LIKHA's priority order above. Stop only for a
-genuine human approval gate (irreducible product-policy choice, external
-material only the user can provide, paid infrastructure, a production
-PII/security gate, a destructive/irreversible operation, unresolvable
-missing compliance evidence, explicit user instruction to stop) or a
-practical session/context boundary — never merely because an M-number
-completed.
+- Small reversible changes; no unrelated refactors.
+- TDD for important domain/security/persistence/sync logic.
+- Narrow checks first; expand verification with risk.
+- CI fails cheap and fast before expensive native/browser work.
+- Never claim a check passed unless it ran.
+- No paid infrastructure/API without explicit approval.
+- Record durable architecture/product decisions in ADRs.
 
 ## Completion
 
-Before marking work complete:
+Run relevant tests/checks, inspect failure/offline states, review privacy/security impact, and update durable project state when materially changed.
 
-- run relevant tests;
-- run affected lint/type/build checks;
-- inspect edge/error states;
-- review security/privacy impact;
-- update project state docs when the milestone materially changes.
-
-Report only:
-
-- Completed
-- Verified
-- Blockers/Risks
-- Memory/ADR changes
-- Exact next task
+Report only the useful summary: completed, verified, blockers/risks, durable changes, next task.
