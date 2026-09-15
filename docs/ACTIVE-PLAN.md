@@ -2,14 +2,15 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
-Main checkpoint: PR #80, `027aabebef228edf68c3c4792e151cca481558a5`.
-PR #79 merged; #78 closed as superseded. Older pending entries below are historical.
-One active slice: `codex/score-sync-status`, regression coverage for older
-acknowledgments, failed push attempts, and entity/school isolation of sync evidence.
-See CURRENT-HANDOFF's canonical continuation for actual verification and debt.
-No teacher-screen sync integration is claimed. After exact-head Quality/Security
-and independent review pass, merge this slice, then implement assignment-authorized
-Class Record evidence access. Do not create competing PRs or additional schedules.
+Main checkpoint: PR #83, `9297d8426ad33686a14201782f7f8ff725159af6`.
+PRs #79–83 merged; #78 closed as superseded. Older entries below are historical.
+Current slice: `fix/score-sync-permission-classification`, correcting false session
+expiration on a denied assignment-owned score-status read. Native denial propagates.
+Next: composition and truthful row evidence in the assignment-owned Class Record
+journey. No teacher-screen sync integration is claimed yet.
+Use CI time for bounded preparation, then recheck once and continue in the same run
+when green. The hourly production schedule is a fallback, not a stage barrier.
+See CURRENT-HANDOFF for the live checkpoint and remaining verification.
 
 ## GradingPeriod sync wiring (2026-09-06)
 

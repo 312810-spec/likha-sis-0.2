@@ -84,6 +84,8 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "subject_attendance_roster_for_session",
   "list_subject_attendance_sessions",
   "subject_attendance_monitor",
+  // Assignment ownership can be denied while the session remains valid.
+  "get_learner_score_sync_status",
   "adviser_subject_attendance_overview",
   "export_section_eosy_sf5",
   "assign_section_adviser",

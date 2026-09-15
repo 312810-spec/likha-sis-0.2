@@ -1,11 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { onSessionExpired } from "./invoke";
 import { TauriLearnerScoreSyncStatusRepository } from "./learner-score-sync-status-repository";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 const mockInvoke = vi.mocked(invoke);
 
 describe("TauriLearnerScoreSyncStatusRepository", () => {
+  afterEach(() => {
+    mockInvoke.mockReset();
+    onSessionExpired(() => {})();
+  });
+
+  it("preserves an assignment denial without logging out a valid session", async () => {
+    mockInvoke.mockRejectedValueOnce("unauthorized");
+    const expired = vi.fn();
+    onSessionExpired(expired);
+
+    await expect(
+      new TauriLearnerScoreSyncStatusRepository().getStatus("assignment-1", "item-1", "learner-1"),
+    ).rejects.toBe("unauthorized");
+    expect(expired).not.toHaveBeenCalled();
+  });
+
   it("passes assignment-owned Class Record context to the native command", async () => {
     mockInvoke.mockResolvedValueOnce("needsReview");
 
