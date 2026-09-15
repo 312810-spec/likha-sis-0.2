@@ -18,35 +18,35 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified `main`: `b2d98dfc755726ed1be6781ccbb2226f44e827ec` (PR #81).
+Current verified `main`: `027aabebef228edf68c3c4792e151cca481558a5` (PR #80).
 
 PR #79 merged the sync wording correction; PR #78 is closed as superseded.
 PR #80 added internal entity-scoped sync evidence, not teacher-screen integration.
-PR #81 added regression coverage for pending edits, failures, and tenant/entity
-isolation, then squash-merged after exact-head Quality and Security passed.
 
 ## Canonical continuation (2026-09-15)
 
 This section supersedes the older Active work / Exact next action below.
-Canonical branch: `codex/class-record-sync-status`.
+No open PRs were present when this slice started. Canonical branch:
+`codex/score-sync-status`.
 
-Current bounded slice exposes a read-only native command for one persisted learner
-score's sync evidence. The score entity ID is resolved below the UI only after the
-active session user is proven to own the supplied teaching assignment and the
-assessment item's class record matches that assignment's section and subject.
-Unknown/unrecorded scores return no evidence; changed ownership or mismatched context
-fails closed as unauthorized. No UI, schema, write path, sync protocol, grading logic,
-or cloud dependency changes.
+Implemented three regression tests for the existing entity-sync primitive:
+acknowledging an older queued change must not hide a newer edit; failed
+push attempts (including unauthorized) must remain waiting; pending/conflict
+evidence must not leak across school, entity kind, or entity ID.
+No runtime code, authorization boundary, UI, schema, or protocol changed.
 
-Focused Rust coverage proves owned resolution, denial for another teacher, denial for
-a mismatched subject assignment, and the no-entity-yet result for an unrecorded row.
-Local execution remains blocked because this checkout has neither Cargo nor installed
-npm dependencies. `git diff --check` is the available local gate; exact-head Quality
-and independent Security in CI are required before merge.
+Verification: `git diff --check` passed. Targeted command
+`cargo test --lib repository::entity_sync_status::tests` could not execute:
+`cargo` is not installed in this environment. Rust compilation, formatting,
+test execution, and exact-head Quality/Security remain CI gates, not passes.
+These repository tests do not prove native restart/reconnect or access revocation.
+Independent review of the test diff found no blocking issues; API/type usage and
+assertions were inspected, but compilation, execution, and rustfmt remain unverified.
 
-Next: open one canonical PR for this trusted-boundary slice. After it merges, add the
-TypeScript port/application adapter without displaying a status yet; then integrate
-truthful row states in a separate bounded slice. Use the existing hourly loop only.
+Next: inspect this branch's canonical PR, required checks, and independent review;
+merge only after exact-head verification is complete. Then expose score sync
+evidence through assignment-owned teacher authorization before UI integration.
+Use the existing hourly loop; do not create additional schedules.
 
 Latest merged product slices:
 
