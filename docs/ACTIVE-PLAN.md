@@ -2,15 +2,14 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
-Main checkpoint: PR #84, `a3a2f91996168b18c8555eba9f87964cc58dc34e`.
-PRs #79–84 merged; #78 closed as superseded. Older entries below are historical.
-Current slice: `feat/score-sync-composition`, wiring the existing evidence service
-and testing the complete TypeScript composition-to-native-command boundary.
-Next: truthful row evidence in the assignment-owned Class Record
-journey. No teacher-screen sync integration is claimed yet.
-Use CI time for bounded preparation, then recheck once and continue in the same run
-when green. The hourly production schedule is a fallback, not a stage barrier.
-See CURRENT-HANDOFF for the live checkpoint and remaining verification.
+Main checkpoint: PR #85, `d8bd144a40d21f2f3f4f2f5e7489dc90803d858d`.
+PRs #79–85 merged; #78 closed as superseded. Older entries below are historical.
+Current slice: `feat/score-sync-row-display`, connecting authorized evidence to saved
+Class Record rows with draft, stale-response and access-denial safeguards.
+Next: offline/reconnect/access-change journey proof, then Adviser Room integration.
+The hourly task is disabled by owner request. GitHub merge events resume work;
+CI-completion wake-ups are unsupported. Continue useful work within each run and
+never replace verification with timing assumptions. See CURRENT-HANDOFF.
 
 ## GradingPeriod sync wiring (2026-09-06)
 

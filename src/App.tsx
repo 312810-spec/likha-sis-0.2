@@ -11,6 +11,7 @@ import {
   formGenerationService,
   gradingService,
   learnerScoreService,
+  learnerScoreSyncStatusService,
   lessonPlanService,
   learnerService,
   myDayService,
@@ -428,6 +429,8 @@ function App() {
           ) : activeTab === "my-day" ? (
             classWorkContext && classRecordAssignmentId ? (
               <ClassRecordJourneyScreen
+                key={JSON.stringify([session.userId, classRecordAssignmentId])}
+                learnerScoreSyncStatusService={learnerScoreSyncStatusService}
                 teachingAssignmentId={classRecordAssignmentId}
                 classContext={classWorkContext}
                 teacherUserId={session.userId}

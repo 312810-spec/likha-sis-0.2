@@ -1,9 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
 import { ExportApplicationService } from "../application/export-service";
 import { LearnerScoreApplicationService } from "../application/learner-score-service";
+import { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
 import type {
   AssessmentCategory,
   AssessmentCategorySet,
@@ -286,6 +287,7 @@ function renderScreen(
     assessmentRepo?: FakeAssessmentRepository;
     scoreRepo?: FakeLearnerScoreRepository;
     exportRepo?: FakeExportRepository;
+    syncService?: LearnerScoreSyncStatusApplicationService;
   } = {},
 ) {
   const assessmentRepo = options.assessmentRepo ?? new FakeAssessmentRepository();
@@ -295,6 +297,8 @@ function renderScreen(
     <ModeProvider>
       <ClassRecordWorkspace
         classRecordId="cr-1"
+        teachingAssignmentId={options.syncService ? "ta-1" : undefined}
+        learnerScoreSyncStatusService={options.syncService}
         weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
         assessmentService={new AssessmentApplicationService(assessmentRepo)}
         learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
@@ -1198,5 +1202,87 @@ describe("ClassRecordWorkspace", () => {
     await screen.findByText("Quiz 1 scores");
 
     await expectNoAccessibilityViolations(container);
+  });
+});
+
+describe("assignment-owned score sync evidence", () => {
+  const saved = {
+    ...ROSTER_ENTRY,
+    status: "scored" as const,
+    score: 18,
+    updatedAt: "2026-09-15T12:00:00Z",
+  };
+  async function openItem(user: ReturnType<typeof userEvent.setup>, name = "Quiz 1") {
+    await user.click(
+      await screen.findByRole("button", { name: `Written Works — ${name} (max 20)` }),
+    );
+    await screen.findByText(`${name} scores`);
+  }
+  it("hides evidence during drafts and restores it for an unchanged commit without writing", async () => {
+    const user = userEvent.setup();
+    const getStatus = vi.fn().mockResolvedValue("synced");
+    const { scoreRepo } = renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([saved]),
+      syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }),
+    });
+    await openItem(user);
+    await screen.findByText("Last sync check: Synced");
+    const input = screen.getByLabelText("Score for Ana Cruz");
+    await user.clear(input);
+    expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Saved on this device/)).not.toBeInTheDocument();
+    await user.type(input, "18{Enter}");
+    await screen.findByText("Last sync check: Synced");
+    expect(scoreRepo.recordCalls).toEqual([]);
+  });
+  it("clears a previous snapshot on access denial while preserving the local save", async () => {
+    const user = userEvent.setup();
+    const getStatus = vi.fn().mockResolvedValueOnce("synced").mockRejectedValue("unauthorized");
+    renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([saved]),
+      syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }),
+    });
+    await openItem(user);
+    await screen.findByText("Last sync check: Synced");
+    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Saved on this device/)).toBeInTheDocument();
+  });
+  it("keeps a successful save when the separate evidence lookup fails", async () => {
+    const user = userEvent.setup();
+    const getStatus = vi.fn().mockRejectedValue(new Error("offline"));
+    renderScreen({ syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }) });
+    await openItem(user);
+    expect(getStatus).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Enter}");
+    await screen.findByText(/Saved on this device/);
+    await waitFor(() => expect(getStatus).toHaveBeenCalledExactlyOnceWith("ta-1", "ai-1", "l1"));
+    expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Could not save/)).not.toBeInTheDocument();
+  });
+  it("discards a saved response from an assessment item that was left", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeLearnerScoreRepository();
+    let resolve!: (value: LearnerScore | null) => void;
+    vi.spyOn(repo, "record").mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const getStatus = vi.fn().mockResolvedValue("synced");
+    renderScreen({
+      assessmentRepo: new FakeAssessmentRepository([ITEM, { ...ITEM, id: "ai-2", name: "Quiz 2" }]),
+      scoreRepo: repo,
+      syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }),
+    });
+    await openItem(user);
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Enter}");
+    await openItem(user, "Quiz 2");
+    await act(async () => resolve(repo.recordResult));
+    expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(null);
+    expect(screen.queryByText(/Saved on this device|Last sync check/)).not.toBeInTheDocument();
+    expect(getStatus).not.toHaveBeenCalled();
   });
 });

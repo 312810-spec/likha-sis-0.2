@@ -4,6 +4,7 @@ import type { ClassRecordApplicationService } from "../application/class-record-
 import type { ExportApplicationService } from "../application/export-service";
 import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
+import type { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { GradingWeightPolicy } from "../domain/class-record";
 import { ValidationError } from "../domain/errors";
@@ -24,6 +25,7 @@ interface ClassRecordJourneyScreenProps {
   classRecordService: ClassRecordApplicationService;
   assessmentService: AssessmentApplicationService;
   learnerScoreService: LearnerScoreApplicationService;
+  learnerScoreSyncStatusService?: LearnerScoreSyncStatusApplicationService;
   exportService: ExportApplicationService;
   onBackToClass: () => void | Promise<void>;
 }
@@ -63,6 +65,7 @@ export function ClassRecordJourneyScreen({
   classRecordService,
   assessmentService,
   learnerScoreService,
+  learnerScoreSyncStatusService,
   exportService,
   onBackToClass,
 }: ClassRecordJourneyScreenProps) {
@@ -242,6 +245,9 @@ export function ClassRecordJourneyScreen({
           {openedRecord.gradingPeriodLabel} — weighting: {openedRecord.weightPolicyName}
         </p>
         <ClassRecordWorkspace
+          key={JSON.stringify([teacherUserId, teachingAssignmentId, openedRecord.classRecordId])}
+          teachingAssignmentId={teachingAssignmentId}
+          learnerScoreSyncStatusService={learnerScoreSyncStatusService}
           classRecordId={openedRecord.classRecordId}
           weightPolicyName={openedRecord.weightPolicyName}
           assessmentService={assessmentService}

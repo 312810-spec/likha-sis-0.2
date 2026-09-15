@@ -18,37 +18,46 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified `main`: `a3a2f91996168b18c8555eba9f87964cc58dc34e` (PR #84).
-
-PR #84 merged after exact-head Quality and all three independent Security jobs
-passed; there were no blocking reviews or unresolved threads. Its permission-denial
-fix is now on main. Windows/native jobs were not selected for this TypeScript-only
-change; no new native or packaged-app verification is claimed.
-
-PRs #79–83 are merged; #78 is closed as superseded. The native score-status
-command checks assignment ownership, section and subject before returning persisted
-entity evidence. The TypeScript port, application service and Tauri adapter are merged.
-Quality and independent Security passed on PR #83 head `1b02acef12f6cef301288b3072c4d82f24243087`.
-Teacher-screen sync integration is still pending.
+Current verified main: `d8bd144a40d21f2f3f4f2f5e7489dc90803d858d` (PR #85).
+PRs #79–85 are merged; #78 is closed as superseded. PR #85's exact head passed
+Quality and independent Security, with no reviews or unresolved threads.
 
 ## Canonical continuation (2026-09-15)
 
-Canonical branch: `feat/score-sync-composition`.
+Canonical branch: `feat/score-sync-row-display`.
 
-Current slice wires the existing learner-score evidence service into composition.
-Three composition regression cases cover exact assignment/item/learner forwarding,
-missing evidence remaining null, and denied access propagating unchanged. They failed
-before wiring was added. UI display is still pending; this slice changes no write,
-authorization, synchronization protocol or grading behavior.
+The assignment-owned Class Record journey now injects the composed authorized
+score-evidence service. Saved rows show persisted evidence as a last-check snapshot,
+with one explicit refresh control. No connectivity-derived sync claim or polling.
+The generic Class Records screen does not gain an unscoped evidence lookup.
+Drafts, pending writes and row errors hide evidence. Saved-row keys and cancelled
+reads discard old results; teacher/assignment/record changes remount the workspace.
+A late save from a previous assessment no longer mutates the new assessment roster.
+Failed evidence reads preserve successful local-save confirmation. Returning an
+edited score to its original value restores evidence without another write.
 
-Acceptance: composed service delegates through the existing native adapter without
-inventing evidence or bypassing assignment validation. Require exact-head Quality
-and independent Security before merge. See the PR for executed local checks.
+Independent security/teacher-comfort review found the unchanged-draft cleanup and
+service-replacement snapshot issues; both were corrected. Focused component and
+workspace tests cover evidence vocabulary, absent/denied evidence, delayed results,
+draft restoration, access-denied refresh, read failure after save and late old-item
+writes. See the PR for actual checks. Fresh Quality and independent Security are
+required before merge. No new native, packaged-Windows or hardware proof is claimed.
 
-Next UI regression cases: hide evidence immediately on draft edits; ignore delayed
-responses after item/class/assignment changes; hide prior evidence on denial; preserve
-successful local-save evidence when the separate evidence read fails; render only
-the status returned for the current saved row. Never infer status from connectivity.
+Next slice: offline/reconnect and changed-access journey proof, including a full
+native end-to-end run when the platform is available. Snapshot status is deliberately
+not live; background changes require refresh or reopening the saved row.
+
+## Continuation execution policy
+
+The owner explicitly rejected hourly execution. The hourly production task is
+disabled. One GitHub merge-event continuation task is enabled for owner-authored
+PRs in this repository, with no time-based fallback. Continue useful bounded work
+within the current run during CI, and recheck once after that work.
+CI completion is not a supported automation wake-up. Do not claim an uninterrupted
+green-to-merge loop. Branch protection could not be read (connector 403), so do not
+enable unattended auto-merge on an assumption about required checks. No chained
+short schedules, recursive run-now calls, artificial events or bot-comment relays.
+A real merge event resumes the next bounded slice; never duplicate an active worker.
 
 Prior slice (merged):
 
