@@ -18,30 +18,31 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current `main` at this handoff is `1ffc5e2223c467b6dfe0de212ce92036ba167f6b`.
+Current `main` before PR #77 is `14072f9a213853666d1fb8d4f4d90fec9b37c1f8`.
 
-Latest merged product slice: PR #75, explicit local-save status primitive.
+Latest merged product slices:
 
-- Exact PR #75 head `e8f86103c2976048ff5bacda737b0cf2078d0c9e` passed authoritative Quality and Security before squash merge.
-- `LocalSaveStatus` now provides the evidence-bounded teacher-facing state `Saved on this device`.
-- It deliberately does not claim `Synced` or `Waiting to sync` without sync-boundary evidence.
-- GJ-6 remains intact: validated class context, explicit grading period and DepEd weighting, trusted grade computation, and assignment revalidation below UI.
+- PR #75 established the evidence-bounded `Saved on this device` vocabulary.
+- PR #76 added the Class Record local-save adapter seam and focused adapter tests.
 
-Current `ClassRecordWorkspace` still renders the older ambiguous `Saved HH:MM` score-row note after a successful local write. The next bounded product step is to integrate the proven `LocalSaveStatus` component there without changing write ownership or academic logic.
+Canonical open PR: #77 — `feat(offline): show truthful save state in Class Record`.
 
-Recent harness decisions:
+Current PR #77 exact head: `be3016f6c06341f3fb0b4aa7cec821ca875eb661`.
 
-- PR #75 established the reusable local-save vocabulary.
-- PR #74 was the bounded handoff checkpoint after GJ-6.
-- PR #68 removed duplicate feature-branch Quality runs.
-- PR Quality is authoritative and Security remains independent.
-- PR #55 remains selective-recovery source only; tracking issue #64.
+PR #77 integrates `ClassRecordLocalSaveStatus` into actual Class Record score rows after a successful persisted write. It replaces the ambiguous `Saved HH:MM` note and still deliberately does not claim `Synced`, `Waiting to sync`, `Needs review`, or `Access changed` without owning-boundary evidence.
+
+The repeatedly failing standalone integration-test file was removed as redundant after three exact-head Quality runs showed only Prettier disagreement. Coverage remains split across:
+
+- existing `ClassRecordWorkspace.test.tsx` score-save path tests; and
+- already-merged `ClassRecordLocalSaveStatus.test.tsx` truthfulness tests.
+
+No product, sync, authorization, grading, schema, or cloud behavior was weakened to work around the formatter issue.
 
 ## Active work
 
-Branch: `feat/gj-local-save-class-record`
+Branch: `feat/gj-class-record-local-save-ui`
 
-Purpose: replace the ambiguous Class Record score-row `Saved HH:MM` presentation with the proven `LocalSaveStatus` primitive after a successful local write.
+Purpose: finish PR #77 and merge only after the exact current head passes authoritative Quality and independent Security.
 
 Guardrails:
 
@@ -55,14 +56,11 @@ Guardrails:
 
 ## Exact next action
 
-1. Add a focused Class Record regression test for the local-save wording where practical.
-2. Import and render `LocalSaveStatus` from `ClassRecordWorkspace` using the row's proven `updatedAt` after successful persistence.
-3. Remove only the now-redundant local `formatSavedTime` helper and ambiguous `Saved HH:MM` rendering.
-4. Do not change score-write, grade-computation, sync, schema, authorization, or cloud behavior.
-5. Run one authoritative PR Quality workflow plus independent Security.
-6. Fix only evidence-backed failures.
-7. Merge only on exact-current-head green evidence.
-8. Continue to the next offline/reconnect state only where its evidence boundary is proven.
+1. Recheck PR #77 exact head `be3016f6c06341f3fb0b4aa7cec821ca875eb661` Quality and Security.
+2. If both are green and the head is unchanged/mergeable, squash-merge #77.
+3. If Quality fails, inspect the exact failing job/log and fix only evidence-backed issues.
+4. After merge, inspect `docs/product/OFFLINE-CONTRACT.md` and existing sync subsystem for the first reconnect/sync state with a proven owning boundary.
+5. Create one fresh canonical PR for that next Golden Journey slice and schedule its exact-head check about 15 minutes later.
 
 ## Golden Journey
 
@@ -83,8 +81,9 @@ Completed:
 - GJ-6b: Creation Studio opens from the validated class record and returns to the same context.
 - Grade-state continuity: existing trusted computation remains current after successful score correction.
 - Offline-save primitive: `LocalSaveStatus` truthfully identifies a locally committed write.
+- Class Record adapter: reusable save-state presentation is covered independently and wired by PR #77.
 
-Current: integrate explicit local-save state into Class Record score rows.
+Current: finish exact-head verification and merge of the Class Record local-save UI integration.
 
 Next: evidence-backed reconnect/sync continuation, then Adviser Room and form continuation according to release priority.
 
@@ -134,7 +133,7 @@ For ordinary feature work:
 
 After opening a PR:
 
-1. Keep the LIKHA continuation schedule targeted to one canonical PR.
+1. Keep one canonical continuation schedule targeted to that PR.
 2. Schedule the next exact-head check about 15 minutes after a new PR/head rather than condition monitoring.
 3. Inspect exact-head Quality and Security.
 4. Fix only evidence-backed failures with the smallest reversible change.

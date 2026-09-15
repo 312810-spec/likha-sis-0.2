@@ -15,6 +15,7 @@ import type {
   LearnerScoreStatus,
 } from "../domain/learner-score";
 import { Alert } from "./components/Alert";
+import { ClassRecordLocalSaveStatus } from "./components/ClassRecordLocalSaveStatus";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
@@ -38,15 +39,6 @@ const STATUS_LABELS: Record<LearnerScoreStatus, string> = {
   excused: "Excused",
   not_applicable: "N/A",
 };
-
-/** Formats an ISO timestamp as a short local time for the "Saved HH:MM"
- * note. Returns `null` for anything that doesn't parse as a real date
- * rather than surfacing "Invalid Date" to a teacher. */
-function formatSavedTime(updatedAt: string): string | null {
-  const date = new Date(updatedAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 export function ClassRecordWorkspace({
   classRecordId,
@@ -428,7 +420,7 @@ export function ClassRecordWorkspace({
   /** Commits a learner's in-progress score-input text on Enter/blur/arrow
    * navigation. Two safety properties, both deliberate: (1) a value that
    * is unchanged from what's already saved is never re-sent — avoids a
-   * no-op write bumping `updatedAt` and misleading the "Saved HH:MM" note;
+   * no-op write bumping `updatedAt` and misleading the "Saved on this device" state;
    * (2) an emptied field is never committed — clearing the box does not
    * erase a previously recorded score, since that isn't a real status
    * this domain has (excused/not-applicable must be chosen explicitly via
@@ -805,11 +797,8 @@ export function ClassRecordWorkspace({
                   </thead>
                   <tbody>
                     {roster.map((entry) => {
-                      const savedNote =
-                        entry.updatedAt && !rowErrors[entry.learnerId]
-                          ? formatSavedTime(entry.updatedAt)
-                          : null;
                       const isSaving = savingLearnerIds.has(entry.learnerId);
+                      const hasRowError = Boolean(rowErrors[entry.learnerId]);
                       return (
                         <tr key={entry.learnerId}>
                           <th scope="row">
@@ -829,11 +818,9 @@ export function ClassRecordWorkspace({
                               inputMode="decimal"
                               min="0"
                               max={selectedItem.maxScore}
-                              aria-invalid={Boolean(rowErrors[entry.learnerId])}
+                              aria-invalid={hasRowError}
                               aria-describedby={
-                                rowErrors[entry.learnerId]
-                                  ? `score-error-${entry.learnerId}`
-                                  : undefined
+                                hasRowError ? `score-error-${entry.learnerId}` : undefined
                               }
                               placeholder={
                                 entry.status === "excused"
@@ -881,7 +868,7 @@ export function ClassRecordWorkspace({
                                 Saving…
                               </span>
                             )}
-                            {rowErrors[entry.learnerId] && (
+                            {hasRowError && (
                               <p
                                 id={`score-error-${entry.learnerId}`}
                                 className="field-error"
@@ -890,7 +877,11 @@ export function ClassRecordWorkspace({
                                 {rowErrors[entry.learnerId]}
                               </p>
                             )}
-                            {savedNote && <p className="score-saved-note">Saved {savedNote}</p>}
+                            <ClassRecordLocalSaveStatus
+                              savedAt={entry.updatedAt}
+                              hasError={hasRowError}
+                              isSaving={isSaving}
+                            />
                           </td>
                           <td>
                             <div
