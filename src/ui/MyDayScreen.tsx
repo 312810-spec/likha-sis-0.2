@@ -18,6 +18,10 @@ interface MyDayScreenProps {
    * selected -- same narrow callback shape `TodaysClassesScreen`'s own
    * `onCheckAttendance` established. */
   onCheckAttendance: (teachingAssignmentId: string) => void;
+  /** Opens the class record for this teaching assignment -- same narrow
+   * callback shape as `onCheckAttendance`, passed through unchanged to
+   * `ClassWorkspaceScreen`. */
+  onOpenClassRecord: (teachingAssignmentId: string) => void;
   /** Opens the sync conflict review queue -- see `ConflictReviewScreen`. */
   onReviewConflicts: () => void;
 }
@@ -49,6 +53,7 @@ export function MyDayScreen({
   onOpenClassContext,
   onBackToToday,
   onCheckAttendance,
+  onOpenClassRecord,
   onReviewConflicts,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
@@ -90,6 +95,7 @@ export function MyDayScreen({
       <ClassWorkspaceScreen
         context={selectedClassContext}
         onCheckAttendance={onCheckAttendance}
+        onOpenClassRecord={onOpenClassRecord}
         onBackToToday={onBackToToday}
       />
     );

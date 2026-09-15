@@ -5,6 +5,7 @@ import { useTeacherMode } from "./theme/useTeacherMode";
 interface ClassWorkspaceScreenProps {
   context: TeacherClassWorkContext;
   onCheckAttendance: (teachingAssignmentId: string) => void;
+  onOpenClassRecord: (teachingAssignmentId: string) => void;
   onBackToToday: () => void;
 }
 
@@ -19,6 +20,7 @@ interface ClassWorkspaceScreenProps {
 export function ClassWorkspaceScreen({
   context,
   onCheckAttendance,
+  onOpenClassRecord,
   onBackToToday,
 }: ClassWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
@@ -62,6 +64,9 @@ export function ClassWorkspaceScreen({
           onClick={() => onCheckAttendance(context.teachingAssignmentId)}
         >
           Check attendance
+        </button>{" "}
+        <button type="button" onClick={() => onOpenClassRecord(context.teachingAssignmentId)}>
+          Open class record
         </button>
       </section>
     </Page>

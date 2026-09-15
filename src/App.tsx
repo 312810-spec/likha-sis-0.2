@@ -33,6 +33,7 @@ import { AttendanceScreen } from "./ui/AttendanceScreen";
 import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
+import { ClassRecordJourneyScreen } from "./ui/ClassRecordJourneyScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
@@ -100,6 +101,13 @@ function App() {
   // No academic decision trusts this UI state without application-service
   // revalidation.
   const [classWorkContext, setClassWorkContext] = useState<TeacherClassWorkContext | null>(null);
+  // Set only by ClassWorkspaceScreen's "Open class record" action (via
+  // MyDayScreen), so My Day can swap in ClassRecordJourneyScreen for the
+  // same preserved class context without switching tabs or asking for
+  // the class again -- same narrowly-typed handoff pattern as the other
+  // ids in this file, not a router/global store. Cleared alongside
+  // classWorkContext everywhere that context is cleared.
+  const [classRecordAssignmentId, setClassRecordAssignmentId] = useState<string | null>(null);
   // Set only by SectionsScreen's "Manage assignments" action, so
   // TeachingAssignmentsScreen opens for that section -- same
   // narrowly-typed handoff pattern as rosterSectionId above, not a
@@ -128,6 +136,7 @@ function App() {
   function clearClassWorkContext() {
     setClassWorkContext(null);
     setSubjectAttendanceAssignmentId(null);
+    setClassRecordAssignmentId(null);
   }
 
   function handleSessionExpired() {
@@ -417,17 +426,35 @@ function App() {
               }}
             />
           ) : activeTab === "my-day" ? (
-            <MyDayScreen
-              myDayService={myDayService}
-              selectedClassContext={classWorkContext}
-              onOpenClassContext={setClassWorkContext}
-              onBackToToday={() => setClassWorkContext(null)}
-              onCheckAttendance={(teachingAssignmentId) => {
-                setSubjectAttendanceAssignmentId(teachingAssignmentId);
-                setActiveTab("subject-attendance");
-              }}
-              onReviewConflicts={() => setActiveTab("conflict-review")}
-            />
+            classWorkContext && classRecordAssignmentId ? (
+              <ClassRecordJourneyScreen
+                teachingAssignmentId={classRecordAssignmentId}
+                classContext={classWorkContext}
+                teacherUserId={session.userId}
+                subjectAttendanceService={subjectAttendanceService}
+                gradingService={gradingService}
+                classRecordService={classRecordService}
+                assessmentService={assessmentService}
+                learnerScoreService={learnerScoreService}
+                exportService={exportService}
+                onBackToClass={() => setClassRecordAssignmentId(null)}
+              />
+            ) : (
+              <MyDayScreen
+                myDayService={myDayService}
+                selectedClassContext={classWorkContext}
+                onOpenClassContext={setClassWorkContext}
+                onBackToToday={() => setClassWorkContext(null)}
+                onCheckAttendance={(teachingAssignmentId) => {
+                  setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                  setActiveTab("subject-attendance");
+                }}
+                onOpenClassRecord={(teachingAssignmentId) => {
+                  setClassRecordAssignmentId(teachingAssignmentId);
+                }}
+                onReviewConflicts={() => setActiveTab("conflict-review")}
+              />
+            )
           ) : activeTab === "today-classes" ? (
             <TodaysClassesScreen
               subjectAttendanceService={subjectAttendanceService}
