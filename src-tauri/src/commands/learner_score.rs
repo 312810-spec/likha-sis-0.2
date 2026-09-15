@@ -13,7 +13,9 @@ use crate::repository::grading_computation::{self, ComputedTermGrade};
 use crate::repository::learner_score::{
     self, LearnerScore, LearnerScoreRosterEntry, LearnerScoreStatus,
 };
-use crate::repository::{device_credential, device_identity, sync_outbox, sync_version_cache};
+use crate::repository::{
+    device_credential, device_identity, entity_sync_status, sync_outbox, sync_version_cache,
+};
 use crate::sync::{ChangeOperation, EntityKind, PendingChange};
 
 /// `assessment_item_id` is client-supplied the same legitimate way
@@ -76,6 +78,40 @@ pub fn record_learner_score(
         score,
         sspk.as_ref(),
     )
+}
+
+/// Returns conservative sync evidence for one persisted Class Record score.
+/// The score id is never accepted from the client: it is resolved only after
+/// the session user is revalidated as owner of the matching teaching
+/// assignment and that assignment matches the assessment item's class record.
+#[tauri::command]
+pub fn get_learner_score_sync_status(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    teaching_assignment_id: String,
+    assessment_item_id: String,
+    learner_id: String,
+) -> AppResult<Option<entity_sync_status::EntitySyncState>> {
+    let conn = lock_db(&db);
+    let (user_id, school_id) = sessions.require_active_session(&conn)?;
+    let Some(score_id) = learner_score::score_entity_id_for_owned_assignment(
+        &conn,
+        &school_id,
+        &user_id,
+        &teaching_assignment_id,
+        &assessment_item_id,
+        &learner_id,
+    )? else {
+        return Ok(None);
+    };
+
+    entity_sync_status::status_for_entity(
+        &conn,
+        &school_id,
+        EntityKind::LearnerScore,
+        &score_id,
+    )
+    .map(Some)
 }
 
 /// Resolves the SSPK only if this school has already completed the
