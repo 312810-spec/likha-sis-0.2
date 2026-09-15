@@ -1218,6 +1218,64 @@ describe("assignment-owned score sync evidence", () => {
     );
     await screen.findByText(`${name} scores`);
   }
+  it("requires refreshed persisted evidence after reconnect, not an online event", async () => {
+    const user = userEvent.setup();
+    const getStatus = vi.fn().mockResolvedValue("waitingToSync");
+    const { scoreRepo } = renderScreen({
+      syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }),
+    });
+    await openItem(user);
+    await act(async () => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Enter}");
+    await screen.findByText("Last sync check: Waiting to sync");
+    expect(screen.getByText(/Saved on this device/)).toBeInTheDocument();
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(getStatus).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Last sync check: Synced")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await screen.findByText("Last sync check: Waiting to sync");
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    getStatus.mockResolvedValue("synced");
+    expect(screen.queryByText("Last sync check: Synced")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await screen.findByText("Last sync check: Synced");
+    expect(getStatus).toHaveBeenLastCalledWith("ta-1", "ai-1", "l1");
+    expect(scoreRepo.recordCalls).toHaveLength(1);
+  });
+  it("discards a late pre-denial refresh without losing the local save", async () => {
+    const user = userEvent.setup();
+    let resolve!: (status: "synced") => void;
+    const getStatus = vi
+      .fn()
+      .mockResolvedValueOnce("waitingToSync")
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolve = r;
+          }),
+      )
+      .mockRejectedValue("unauthorized");
+    const { scoreRepo } = renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([saved]),
+      syncService: new LearnerScoreSyncStatusApplicationService({ getStatus }),
+    });
+    await openItem(user);
+    await screen.findByText("Last sync check: Waiting to sync");
+    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh sync checks" }));
+    await waitFor(() => expect(getStatus).toHaveBeenCalledTimes(3));
+    await act(async () => resolve("synced"));
+    expect(screen.queryByText(/Last sync check/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Saved on this device/)).toBeInTheDocument();
+    expect(scoreRepo.recordCalls).toHaveLength(0);
+  });
   it("hides evidence during drafts and restores it for an unchanged commit without writing", async () => {
     const user = userEvent.setup();
     const getStatus = vi.fn().mockResolvedValue("synced");

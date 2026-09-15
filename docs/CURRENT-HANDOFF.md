@@ -1,6 +1,6 @@
 # CURRENT HANDOFF — LIKHA-SIS 0.2
 
-Updated: 2026-09-15
+Updated: 2026-09-16
 
 Canonical repository: `312810-spec/likha-sis-0.2`
 
@@ -18,7 +18,19 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified main: `d8bd144a40d21f2f3f4f2f5e7489dc90803d858d` (PR #85).
+Current verified main: `9fdc9c01a0a977859df53524d308f9a9e3421b78` (PR #86).
+GitHub confirms PR #86 merged on 2026-09-15 at 21:41 UTC.
+
+Current slice: `test/score-sync-reconnect-proof`, adding two synthetic workspace
+regressions: offline/online events cannot manufacture synchronization evidence;
+explicit refresh must obtain persisted status; a late pre-denial refresh cannot
+restore evidence after a newer denied read. No production behavior changed.
+These are mocked TypeScript UI journey tests, not native authorization, actual
+transport, durable SQLite, or packaged Windows proof. Cargo is unavailable here.
+Next: native offline/reconnect/access-change proof on a supported runtime, then
+Adviser Room. Do not treat the UI tests as completion of native verification.
+
+Historical row-display handoff follows:
 PRs #79–85 are merged; #78 is closed as superseded. PR #85's exact head passed
 Quality and independent Security, with no reviews or unresolved threads.
 
@@ -85,8 +97,8 @@ assignment context and must not invent one.
 
 ## Productive CI continuation
 
-The production automation has been updated: hourly is a fallback wake-up, not a
-mandatory pause between stages. Continue immediately after a verified merge.
+Continue immediately after a verified merge. Hourly execution is disabled;
+the continuation execution policy above supersedes historical scheduling notes.
 While checks run, prepare the next bounded slice, acceptance criteria and regression
 cases in isolation, or restore local verification tools. Then recheck CI once after
 useful work. Publish only one canonical PR; never overwrite another worker.
@@ -182,7 +194,7 @@ After opening a PR:
 4. Fix only evidence-backed failures with the smallest reversible change.
 5. Merge when the exact head is green, reviewed and mergeable.
 6. Start the next highest-value Golden Journey slice in the same run.
-7. Use the hourly wake-up only when verification remains pending or work is blocked.
+7. If verification remains pending, checkpoint honestly; no hourly fallback.
 
 Do not create competing implementations. If another agent opens overlapping work, compare them, select one canonical path, preserve useful ideas, and supersede the duplicate.
 
