@@ -217,16 +217,16 @@ export function AdviserViewScreen({
       hint={
         mode === "guided" ? (
           <p className="field-hint">
-            Record official daily attendance for your advisory section, then review subject-attendance
-            patterns separately. Subject signals are for follow-up only and never become official
-            attendance automatically.
+            Record official daily attendance for your advisory section, then review
+            subject-attendance patterns separately. Subject signals are for follow-up only and never
+            become official attendance automatically.
           </p>
         ) : undefined
       }
     >
       <p className="field-hint">
-        Official daily attendance and Subject Attendance are separate records. Subject signals are not
-        SF2.
+        Official daily attendance and Subject Attendance are separate records. Subject signals are
+        not SF2.
       </p>
 
       <div className="form-row">
@@ -293,8 +293,8 @@ export function AdviserViewScreen({
                 <h2 id="advisory-roster-heading">Advisory roster</h2>
                 <p className="attendance-count" role="status">
                   <strong>{dailyRoster.length}</strong> learner
-                  {dailyRoster.length === 1 ? "" : "s"} enrolled in {selectedSection?.name ?? "this section"} as of{" "}
-                  {date}.
+                  {dailyRoster.length === 1 ? "" : "s"} enrolled in{" "}
+                  {selectedSection?.name ?? "this section"} as of {date}.
                 </p>
                 <p className="field-hint">
                   This roster comes from current section enrollment. Official daily attendance below
@@ -305,12 +305,14 @@ export function AdviserViewScreen({
               <section aria-labelledby="official-daily-attendance-heading">
                 <h2 id="official-daily-attendance-heading">Official daily attendance</h2>
                 <p className="field-hint">
-                  Record the advisory section&apos;s official Present, Absent, or Tardy mark for this
-                  date. Existing marks are never overwritten by “Mark unmarked Present.”
+                  Record the advisory section&apos;s official Present, Absent, or Tardy mark for
+                  this date. Existing marks are never overwritten by “Mark unmarked Present.”
                 </p>
 
                 {dailyRoster.length === 0 ? (
-                  <EmptyState>No active learners are available for official attendance on this date.</EmptyState>
+                  <EmptyState>
+                    No active learners are available for official attendance on this date.
+                  </EmptyState>
                 ) : (
                   <>
                     <button
@@ -322,7 +324,8 @@ export function AdviserViewScreen({
                     </button>
                     <table className="attendance-roster">
                       <caption className="visually-hidden">
-                        Official daily attendance for {selectedSection?.name ?? "this advisory section"} on {date}
+                        Official daily attendance for{" "}
+                        {selectedSection?.name ?? "this advisory section"} on {date}
                       </caption>
                       <thead>
                         <tr>
@@ -372,8 +375,8 @@ export function AdviserViewScreen({
           <section aria-labelledby="advisory-subject-signals-heading">
             <h2 id="advisory-subject-signals-heading">Subject Attendance signals</h2>
             <p className="field-hint">
-              Read-only follow-up evidence from subject teachers. These signals never become official
-              daily attendance or SF2 automatically.
+              Read-only follow-up evidence from subject teachers. These signals never become
+              official daily attendance or SF2 automatically.
             </p>
 
             {overviewError && (
@@ -388,7 +391,9 @@ export function AdviserViewScreen({
             {overviewLoading ? (
               <Loading label="Loading Subject Attendance signals…" />
             ) : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
-              <EmptyState>No enrolled learners have Subject Attendance signals on this date.</EmptyState>
+              <EmptyState>
+                No enrolled learners have Subject Attendance signals on this date.
+              </EmptyState>
             ) : (
               <>
                 <p className="attendance-count">
