@@ -3572,18 +3572,17 @@ mod tests {
         .unwrap();
         let entity_id = Uuid::parse_str(&score.id).unwrap();
         let evidence = || {
-            status_for_entity(conn, &fixture.school_id, EntityKind::LearnerScore, &score.id)
-                .unwrap()
+            status_for_entity(
+                conn,
+                &fixture.school_id,
+                EntityKind::LearnerScore,
+                &score.id,
+            )
+            .unwrap()
         };
         assert_eq!(evidence(), EntitySyncState::NotYetSynced);
-        let change = make_learner_score_change(
-            &fixture,
-            entity_id,
-            &item_id,
-            &learner_id,
-            &teacher_id,
-            0,
-        );
+        let change =
+            make_learner_score_change(&fixture, entity_id, &item_id, &learner_id, &teacher_id, 0);
         sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
         assert_eq!(evidence(), EntitySyncState::WaitingToSync);
 
@@ -3624,9 +3623,11 @@ mod tests {
         assert!(!accepted.failed);
         assert_eq!(accepted.acknowledged, 1);
         assert_eq!(evidence(), EntitySyncState::Synced);
-        assert!(sync_outbox::pending_for_school(conn, &fixture.school_id, 10)
-            .unwrap()
-            .is_empty());
+        assert!(
+            sync_outbox::pending_for_school(conn, &fixture.school_id, 10)
+                .unwrap()
+                .is_empty()
+        );
         let stored: f64 = conn
             .query_row(
                 "SELECT score FROM learner_scores WHERE id = ?1",
@@ -3634,7 +3635,10 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(stored, 18.0, "failed attempts must preserve the local score");
+        assert_eq!(
+            stored, 18.0,
+            "failed attempts must preserve the local score"
+        );
     }
 
     #[test]
