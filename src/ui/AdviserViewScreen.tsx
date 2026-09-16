@@ -133,8 +133,8 @@ export function AdviserViewScreen({
         mode === "guided" ? (
           <p className="field-hint">
             Review your current advisory roster alongside subject-attendance patterns. These signals
-            are for follow-up only: you cannot edit a subject teacher&apos;s record here, and nothing
-            on this screen changes official attendance.
+            are for follow-up only: you cannot edit a subject teacher&apos;s record here, and
+            nothing on this screen changes official attendance.
           </p>
         ) : undefined
       }
