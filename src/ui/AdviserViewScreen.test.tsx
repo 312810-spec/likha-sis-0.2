@@ -3,11 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdviserDailyAttendanceApplicationService } from "../application/adviser-daily-attendance-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type {
-  AttendanceRecord,
-  AttendanceRosterEntry,
-  AttendanceStatus,
-} from "../domain/attendance";
+import type { AttendanceRecord, AttendanceRosterEntry, AttendanceStatus } from "../domain/attendance";
 import type { AdviserDailyAttendanceRepository } from "../domain/ports/adviser-daily-attendance-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
@@ -277,34 +273,37 @@ describe("AdviserViewScreen", () => {
     expect(screen.getByLabelText("Official attendance for Ben Santos")).toHaveValue("present");
   });
 
-  it("keeps an enrolled advisory learner visible when no subject session has been held", async () => {
-    renderScreen(
-      new FakeSubjectAttendanceRepository([SECTION], {
-        ...OVERVIEW,
-        subjectCount: 0,
-        heldSessionCount: 0,
-        rows: [
-          {
-            ...OVERVIEW.rows[0]!,
-            presentCount: 0,
-            absentCount: 0,
-            lateCount: 0,
-            excusedCount: 0,
-            subjectsWithAbsences: [],
-            highestCurrentSubjectAbsenceStreak: 0,
-          },
-        ],
-      }),
-    );
+  it(
+    "keeps an enrolled advisory learner visible when no subject session has been held",
+    async () => {
+      renderScreen(
+        new FakeSubjectAttendanceRepository([SECTION], {
+          ...OVERVIEW,
+          subjectCount: 0,
+          heldSessionCount: 0,
+          rows: [
+            {
+              ...OVERVIEW.rows[0]!,
+              presentCount: 0,
+              absentCount: 0,
+              lateCount: 0,
+              excusedCount: 0,
+              subjectsWithAbsences: [],
+              highestCurrentSubjectAbsenceStreak: 0,
+            },
+          ],
+        }),
+      );
 
-    expect((await screen.findAllByText("Ana Cruz")).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "1 learner enrolled in Mabini as of 2026-08-29.",
-    );
-    expect(
-      screen.getByRole("heading", { name: "Subject Attendance signals" }).parentElement,
-    ).toHaveTextContent("0 subject sessions held across 0 subjects");
-  });
+      expect((await screen.findAllByText("Ana Cruz")).length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "1 learner enrolled in Mabini as of 2026-08-29.",
+      );
+      expect(
+        screen.getByRole("heading", { name: "Subject Attendance signals" }).parentElement,
+      ).toHaveTextContent("0 subject sessions held across 0 subjects");
+    },
+  );
 
   it("restores an initial advisory context only after that section is authorized", async () => {
     const onContextChange = vi.fn();
@@ -326,12 +325,16 @@ describe("AdviserViewScreen", () => {
     renderScreen(repository, { sectionId: "stale-section" }, onContextChange, dailyRepository);
 
     await screen.findByLabelText("Official attendance for Ana Cruz");
-    expect(repository.overviewCalls.some(([selectedSectionId]) => selectedSectionId === "stale-section")).toBe(
-      false,
-    );
-    expect(dailyRepository.rosterCalls.some(([selectedSectionId]) => selectedSectionId === "stale-section")).toBe(
-      false,
-    );
+    expect(
+      repository.overviewCalls.some(
+        ([selectedSectionId]) => selectedSectionId === "stale-section",
+      ),
+    ).toBe(false);
+    expect(
+      dailyRepository.rosterCalls.some(
+        ([selectedSectionId]) => selectedSectionId === "stale-section",
+      ),
+    ).toBe(false);
     expect(repository.overviewCalls).toContainEqual([SECTION.id, "2026-08-29"]);
     expect(dailyRepository.rosterCalls).toContainEqual([SECTION.id, "2026-08-29"]);
     await waitFor(() => expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECTION.id }));
@@ -354,38 +357,44 @@ describe("AdviserViewScreen", () => {
     );
   });
 
-  it("shows a calm empty state and clears stale context when no advisory section is active", async () => {
-    const onContextChange = vi.fn();
-    renderScreen(
-      new FakeSubjectAttendanceRepository([], null),
-      { sectionId: SECTION.id },
-      onContextChange,
-    );
+  it(
+    "shows a calm empty state and clears stale context when no advisory section is active",
+    async () => {
+      const onContextChange = vi.fn();
+      renderScreen(
+        new FakeSubjectAttendanceRepository([], null),
+        { sectionId: SECTION.id },
+        onContextChange,
+      );
 
-    expect(
-      await screen.findByText(/No advisory section is assigned to you for this date/),
-    ).toBeInTheDocument();
-    await waitFor(() => expect(onContextChange).toHaveBeenCalledWith(null));
-  });
+      expect(
+        await screen.findByText(/No advisory section is assigned to you for this date/),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(onContextChange).toHaveBeenCalledWith(null));
+    },
+  );
 
-  it("reloads authorized sections, official attendance, and subject signals when the date changes", async () => {
-    const user = userEvent.setup();
-    const dailyRepository = new FakeAdviserDailyAttendanceRepository();
-    const { repository } = renderScreen(
-      new FakeSubjectAttendanceRepository(),
-      null,
-      undefined,
-      dailyRepository,
-    );
-    await screen.findByLabelText("Official attendance for Ana Cruz");
+  it(
+    "reloads authorized sections, official attendance, and subject signals when the date changes",
+    async () => {
+      const user = userEvent.setup();
+      const dailyRepository = new FakeAdviserDailyAttendanceRepository();
+      const { repository } = renderScreen(
+        new FakeSubjectAttendanceRepository(),
+        null,
+        undefined,
+        dailyRepository,
+      );
+      await screen.findByLabelText("Official attendance for Ana Cruz");
 
-    await user.clear(screen.getByLabelText("As of"));
-    await user.type(screen.getByLabelText("As of"), "2026-08-20");
+      await user.clear(screen.getByLabelText("As of"));
+      await user.type(screen.getByLabelText("As of"), "2026-08-20");
 
-    expect(repository.sectionDates).toContain("2026-08-20");
-    expect(repository.overviewCalls).toContainEqual(["sec-1", "2026-08-20"]);
-    expect(dailyRepository.rosterCalls).toContainEqual(["sec-1", "2026-08-20"]);
-  });
+      expect(repository.sectionDates).toContain("2026-08-20");
+      expect(repository.overviewCalls).toContainEqual(["sec-1", "2026-08-20"]);
+      expect(dailyRepository.rosterCalls).toContainEqual(["sec-1", "2026-08-20"]);
+    },
+  );
 
   it("has no accessibility violations", async () => {
     const { container } = renderScreen();
