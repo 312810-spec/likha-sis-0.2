@@ -432,6 +432,121 @@ mod tests {
     }
 
     #[test]
+    fn score_and_pending_evidence_survive_encrypted_database_reopen() {
+        use crate::repository::entity_sync_status::{status_for_entity, EntitySyncState};
+        use crate::repository::{sync_outbox, sync_version_cache};
+        use crate::sync::{ChangeOperation, EntityKind, PendingChange};
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("score-restart.db");
+        let key = crate::crypto::generate_key();
+        let conn = db::open(&path, &key).unwrap();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let other_school = school::create(&conn, "Synthetic Other School").unwrap();
+        let score = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            &teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        // Seed repository evidence, not the command enqueue or transport path.
+        // An older accepted version must not mask a newer durable pending edit.
+        sync_version_cache::record_known_version(
+            &conn,
+            &school_id,
+            EntityKind::LearnerScore,
+            &score.id,
+            1,
+        )
+        .unwrap();
+        let change = PendingChange {
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::parse_str(&teacher_id).unwrap(),
+            entity_kind: EntityKind::LearnerScore,
+            entity_id: Uuid::parse_str(&score.id).unwrap(),
+            base_version: 1,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![7, 8, 9],
+        };
+        sync_outbox::enqueue(&conn, &school_id, &change).unwrap();
+        assert!(sync_outbox::record_attempt(
+            &conn,
+            &school_id,
+            &change.change_id.to_string(),
+            Some(sync_outbox::AttemptErrorCode::Timeout),
+        )
+        .unwrap());
+        let pending_before = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(pending_before.len(), 1);
+        conn.close().unwrap();
+
+        // A clean connection close/reopen exercises file-backed persistence,
+        // not an OS crash, process restart, DPAPI or session restoration.
+        let conn = db::open(&path, &key).unwrap();
+        assert_eq!(
+            score_entity_id_for_owned_assignment(
+                &conn,
+                &school_id,
+                &teacher_id,
+                &assignment_id,
+                &item_id,
+                &learner_id,
+            )
+            .unwrap(),
+            Some(score.id.clone())
+        );
+        let stored = conn
+            .query_row(
+                "SELECT id, school_id, assessment_item_id, learner_id, status, score, \
+                 recorded_by_user_id, recorded_at, updated_at FROM learner_scores WHERE id = ?1",
+                [&score.id],
+                row_to_score,
+            )
+            .unwrap();
+        assert_eq!(stored.score, Some(18.0));
+        assert_eq!(stored.status, LearnerScoreStatus::Scored);
+        assert_eq!(stored.recorded_by_user_id, teacher_id);
+        assert_eq!(
+            sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap(),
+            pending_before
+        );
+        assert_eq!(pending_before[0].attempt_count, 1);
+        assert_eq!(
+            pending_before[0].last_error_code.as_deref(),
+            Some("timeout")
+        );
+        assert_eq!(
+            sync_version_cache::known_version(
+                &conn,
+                &school_id,
+                EntityKind::LearnerScore,
+                &score.id
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            status_for_entity(&conn, &school_id, EntityKind::LearnerScore, &score.id).unwrap(),
+            EntitySyncState::WaitingToSync
+        );
+        assert!(sync_outbox::pending_for_school(&conn, &other_school.id, 10)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            status_for_entity(&conn, &other_school.id, EntityKind::LearnerScore, &score.id)
+                .unwrap(),
+            EntitySyncState::NotYetSynced
+        );
+    }
+
+    #[test]
     fn previously_authorized_score_lookup_is_denied_after_assignment_reassignment() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
