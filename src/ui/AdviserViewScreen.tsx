@@ -69,7 +69,9 @@ export function AdviserViewScreen({
         if (sectionsRequestRef.current !== requestId) return;
         setSections([]);
         setSectionId("");
-        setSectionsError("Could not load the sections available to My Advisory.");
+        setSectionsError(
+          "Could not load the sections available to My Advisory.",
+        );
       })
       .finally(() => {
         if (sectionsRequestRef.current !== requestId) return;
@@ -89,7 +91,13 @@ export function AdviserViewScreen({
     const nextSectionId = selectedSection?.id ?? null;
     if ((initialContext?.sectionId ?? null) === nextSectionId) return;
     onContextChange?.(nextSectionId ? { sectionId: nextSectionId } : null);
-  }, [sections, sectionId, sectionsLoading, initialContext?.sectionId, onContextChange]);
+  }, [
+    sections,
+    sectionId,
+    sectionsLoading,
+    initialContext?.sectionId,
+    onContextChange,
+  ]);
 
   function loadOverview() {
     if (!sectionId) return;
