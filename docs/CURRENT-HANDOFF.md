@@ -1,6 +1,6 @@
 # CURRENT HANDOFF — LIKHA-SIS 0.2
 
-Updated: 2026-09-16
+Updated: 2026-09-17
 
 Canonical repository: `312810-spec/likha-sis-0.2`
 
@@ -18,39 +18,46 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current main: `bb4b78678911dca7a9dcd49026e2abf0ec87a5c0` (PR #91).
-PR #91's exact head `b664cf3c2b06f10396bd3f72fef66c2883837828` passed Quality
-#811 and independent Security #910 before squash merge.
+Current main: `4ff1518cda0752e0a3d13fe91533920478f5d662` (PR #92).
+PR #92's exact head `682ab3f882d7fa93c4b2c52bc9a36de70f8ce5e2` passed Quality #819 and independent Security #928 before squash merge.
 
-PR #91 established GJ-8 My Advisory context continuity:
+PR #92 completed the read-only My Advisory roster composition:
 
-- `AdvisoryWorkContext` carries only an opaque `sectionId` navigation pointer.
-- My Advisory restores that pointer only after `listAdviserViewSections` proves the section is currently authorized.
-- A stale section id never reaches `adviserOverview`; fallback is limited to another section returned by the trusted adviser-authorized list.
-- Session transitions clear advisory context.
-- Native `section_advisories`/`authorize_adviser_of_section` authority remains unchanged.
-- Subject Teaching Assignment is not used as advisory authority.
-- My Advisory remains read-only and explicitly does not convert Subject Attendance into SF2.
+- the existing adviser-authorized `adviserOverview` remains the sole source for the advisory roster shown there;
+- the overview already begins from `section_membership::current_roster` for the selected date, so no general `section_roster` command was exposed to My Advisory;
+- enrolled learners remain visible even when zero Subject Attendance sessions have been held;
+- the UI separates **Advisory roster** from **Subject Attendance signals**;
+- Subject Attendance remains read-only follow-up evidence and is explicitly not SF2;
+- `AdvisoryWorkContext` remains navigation state only and stale section context still fails closed.
 
 GJ-7 software recovery evidence remains valid from PR #90: persisted score/outbox evidence survives clean encrypted reopen and command enqueue failure rolls back atomically. Actual process crash/power-loss, DPAPI/session recovery, transport retry after restart, and packaged Windows hardware/runtime proof remain verification debt.
 
 ## Current slice
 
-Branch: `feat/advisory-roster-context`.
+Branch: `feat/adviser-daily-attendance-boundary`.
 
-Use the existing adviser-authorized `adviserOverview` result to make the advisory enrollment roster explicit in My Advisory. No new native command or authorization surface is needed: `repository::subject_attendance::adviser_overview_for_section` already starts from `section_membership::current_roster` for the selected date, then layers read-only Subject Attendance counts over those roster rows.
+Build the smallest trusted boundary for **official daily attendance owned by the active section adviser**, without changing the existing school-scoped Attendance APIs and without deriving official records from Subject Attendance.
 
-Acceptance boundary:
+Current implementation scope:
 
-- show a clear **Advisory roster** count/context for the authorized section/date;
-- keep enrolled learners visible even when no subject session has been held;
-- label the following table as **Subject Attendance signals**;
-- state clearly that the roster comes from section enrollment and Subject Attendance signals do not become SF2;
-- keep all existing adviser authorization and stale-context revalidation intact;
-- do not link My Advisory directly to the general `section_roster` command, because that command is intentionally school-scoped for any authenticated member rather than adviser-scoped;
-- no schema, sync, grading, cloud, write-path, or real learner PII changes.
+- add `adviser_attendance_roster_for_date`;
+- add `adviser_record_attendance`;
+- add `adviser_bulk_mark_attendance_present`;
+- each command revalidates `section_id + attendance_date` through the existing `auth::authorize_adviser_of_section` boundary, so only the active adviser or a School Head may proceed;
+- cross-school and stale/future advisory context continue to fail closed through that existing authorization primitive;
+- the adviser write reuses the existing `record_attendance_with_optional_sync` transaction, preserving local-first persistence plus the same enrollment-gated encrypted outbox behavior as ordinary attendance;
+- bulk Present preserves the existing non-overwrite behavior;
+- commands are registered alongside, not instead of, the existing general attendance commands;
+- no schema, provider, sync protocol, grading, cloud, Subject Attendance, SF2, monthly-summary, or real learner PII changes.
 
-Next after this slice: the smallest official adviser-owned daily-attendance/form continuation that has its own trusted authorization and preserves the Subject Attendance / SF2 boundary. Do not infer official SF2 state from Subject Attendance signals.
+Security/correctness tests in this slice prove:
+
+- an active adviser can read the official roster, record official attendance, and use bulk Present;
+- the adviser write still emits the existing encrypted `Attendance` outbox change attributed to the logged-in adviser;
+- an unrelated teacher is rejected before sync-key resolution or any attendance write;
+- a future-dated advisory assignment does not authorize an earlier attendance date.
+
+Next after this slice: compose an adviser-specific TypeScript/application boundary and My Advisory daily-attendance UI using these commands. Do not reuse the general Attendance screen's school-wide section picker. Monthly/SF2 continuation remains separate until its adviser-authorization rule is explicitly defined and verified against authoritative form behavior.
 
 ## Continuation execution policy
 
@@ -58,7 +65,7 @@ The owner explicitly rejected hourly execution. One GitHub merge-event continuat
 
 Continue useful bounded work within the current run during CI, then recheck once after that work. CI completion is not itself a supported wake-up. Do not create chained short schedules, recursive run-now calls, artificial events, bot-comment relays, competing branches, or duplicate PRs.
 
-Branch protection could not previously be read through the connector, so never enable unattended auto-merge on an assumption about required checks. Merge only on exact-current-head Quality and independent Security success, unchanged head, mergeable PR, and no real review blocker.
+Never enable unattended auto-merge on an assumption about required checks. Merge only on exact-current-head Quality and independent Security success, unchanged head, mergeable PR, and no real review blocker.
 
 Astra Max is the preferred planner/reviewer and implementation worker when available. If it is unavailable in the active runtime, continue through the available coding path without waiting or duplicating work.
 
@@ -83,11 +90,11 @@ Completed:
 - Offline-save primitive: `LocalSaveStatus` truthfully identifies a locally committed write.
 - Class Record local-save integration: actual score rows use `Saved on this device` only after persistence evidence.
 - GJ-7 software proof: persisted score/outbox evidence survives clean encrypted reopen and command enqueue failure rolls back atomically; process/hardware recovery remains unverified.
-- GJ-8 entry/context: My Advisory is rooted in actual `section_advisories`, preserves bounded authorized section context, and fails closed on stale access.
+- GJ-8 entry/context: My Advisory is rooted in actual `section_advisories`, preserves bounded authorized section context, fails closed on stale access, and explicitly presents the authorized enrollment roster separately from Subject Attendance signals.
 
-Current: GJ-8 adviser-owned roster/attendance composition using the already-authorized overview's current-roster rows.
+Current: GJ-8 trusted official daily-attendance boundary for active advisers/School Heads.
 
-Next: official adviser daily-attendance/form continuation according to release priority and authoritative form evidence.
+Next: adviser-specific daily-attendance application/UI composition, then the appropriate form continuation only after authoritative authorization/form semantics are clear.
 
 Do not jump to unrelated backlog work unless a verified P0/P1 security, data-loss, grading-correctness, or compliance defect interrupts.
 
@@ -115,6 +122,7 @@ Rules:
 - `section_advisories` plus trusted backend commands remain the advisory authority.
 - Subject Teaching Assignment authority and advisory authority must remain separate.
 - Subject Attendance is an internal subject-level monitoring record; it must never be silently treated as official SF2 attendance.
+- Official attendance writes must remain official attendance records; Subject Attendance must not be converted into them.
 
 ## Offline/sync truthfulness guardrails
 
