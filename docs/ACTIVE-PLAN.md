@@ -2,22 +2,18 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
-Latest checkpoint (2026-09-16): PR #86 merged as
-`9fdc9c01a0a977859df53524d308f9a9e3421b78`. Canonical next slice is
-`test/score-sync-reconnect-proof`: synthetic UI evidence-transition regressions.
-Actual native offline/reconnect/access-change proof remains pending; Cargo and
-packaged Windows execution are unavailable in this runtime. See CURRENT-HANDOFF.
+Latest checkpoint (2026-09-16): PR #87 merged as
+`85e5953201c6965e35131af76684e9971f4871e8`. Canonical current slice is
+`test/native-score-evidence-lifecycle`: real HTTP timeout/rejected-credential/retry
+score-evidence regression and repository authorization revalidation after
+assignment reassignment/deletion. No production behavior changes.
 
-Historical checkpoint:
+Native tests are written but await CI execution: Cargo/rustfmt are unavailable
+locally. File-backed restart, OS network interruption, session expiry and packaged
+Windows proof remain pending. Do not claim GJ-7 complete. See CURRENT-HANDOFF.
 
-Main checkpoint: PR #85, `d8bd144a40d21f2f3f4f2f5e7489dc90803d858d`.
-PRs #79–85 merged; #78 closed as superseded. Older entries below are historical.
-Current slice: `feat/score-sync-row-display`, connecting authorized evidence to saved
-Class Record rows with draft, stale-response and access-denial safeguards.
-Next: offline/reconnect/access-change journey proof, then Adviser Room integration.
-The hourly task is disabled by owner request. GitHub merge events resume work;
-CI-completion wake-ups are unsupported. Continue useful work within each run and
-never replace verification with timing assumptions. See CURRENT-HANDOFF.
+The hourly task remains disabled. Continue bounded work during CI; merge only
+after exact-head Quality and Security pass. No scheduler changes in this slice.
 
 ## GradingPeriod sync wiring (2026-09-06)
 

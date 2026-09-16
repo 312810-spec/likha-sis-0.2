@@ -3553,6 +3553,91 @@ mod tests {
     }
 
     #[test]
+    fn score_evidence_requires_hub_acknowledgment_after_transport_and_access_failures() {
+        use crate::repository::entity_sync_status::{status_for_entity, EntitySyncState};
+
+        let fixture = setup();
+        let conn = &fixture.conn;
+        let (item_id, learner_id, teacher_id) = setup_assessment_item_and_learner(&fixture);
+        let score = learner_score::record(
+            conn,
+            &fixture.school_id,
+            &item_id,
+            &learner_id,
+            learner_score::LearnerScoreStatus::Scored,
+            Some(18.0),
+            &teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let entity_id = Uuid::parse_str(&score.id).unwrap();
+        let evidence = || {
+            status_for_entity(conn, &fixture.school_id, EntityKind::LearnerScore, &score.id)
+                .unwrap()
+        };
+        assert_eq!(evidence(), EntitySyncState::NotYetSynced);
+        let change = make_learner_score_change(
+            &fixture,
+            entity_id,
+            &item_id,
+            &learner_id,
+            &teacher_id,
+            0,
+        );
+        sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
+        assert_eq!(evidence(), EntitySyncState::WaitingToSync);
+
+        // Keep an unserved listener alive: no port-reuse race, no network toggle,
+        // and a real bounded HTTP timeout rather than a mocked transport result.
+        let unavailable = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut offline = config_for(&fixture);
+        offline.base_url = format!("http://{}", unavailable.local_addr().unwrap());
+        let short_client = reqwest::blocking::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_millis(100))
+            .build()
+            .unwrap();
+        let failed = push_once(conn, &short_client, &offline).unwrap();
+        assert!(failed.failed);
+        assert_eq!(failed.acknowledged, 0);
+        assert_eq!(evidence(), EntitySyncState::WaitingToSync);
+        let pending = sync_outbox::pending_for_school(conn, &fixture.school_id, 10).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].change.change_id, change.change_id);
+        assert_eq!(pending[0].last_error_code.as_deref(), Some("timeout"));
+        drop(unavailable);
+
+        // Reaching the real hub with rejected credentials is still not synced.
+        let client = http_client();
+        let mut denied = config_for(&fixture);
+        denied.device_secret_hex = "00".repeat(32);
+        let rejected = push_once(conn, &client, &denied).unwrap();
+        assert!(rejected.failed);
+        assert_eq!(rejected.acknowledged, 0);
+        assert_eq!(evidence(), EntitySyncState::WaitingToSync);
+        let pending = sync_outbox::pending_for_school(conn, &fixture.school_id, 10).unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].attempt_count, 2);
+        assert_eq!(pending[0].last_error_code.as_deref(), Some("unauthorized"));
+
+        let accepted = push_once(conn, &client, &config_for(&fixture)).unwrap();
+        assert!(!accepted.failed);
+        assert_eq!(accepted.acknowledged, 1);
+        assert_eq!(evidence(), EntitySyncState::Synced);
+        assert!(sync_outbox::pending_for_school(conn, &fixture.school_id, 10)
+            .unwrap()
+            .is_empty());
+        let stored: f64 = conn
+            .query_row(
+                "SELECT score FROM learner_scores WHERE id = ?1",
+                [&score.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, 18.0, "failed attempts must preserve the local score");
+    }
+
+    #[test]
     fn pull_once_applies_a_non_conflicting_learner_score_change() {
         let fixture = setup();
         let entity_id = Uuid::now_v7();
