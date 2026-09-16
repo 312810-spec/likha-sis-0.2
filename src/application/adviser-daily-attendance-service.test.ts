@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  AttendanceRecord,
-  AttendanceRosterEntry,
-  AttendanceStatus,
-} from "../domain/attendance";
+import type { AttendanceRecord, AttendanceRosterEntry, AttendanceStatus } from "../domain/attendance";
 import { ValidationError } from "../domain/errors";
 import type { AdviserDailyAttendanceRepository } from "../domain/ports/adviser-daily-attendance-repository";
 import { AdviserDailyAttendanceApplicationService } from "./adviser-daily-attendance-service";
@@ -26,7 +22,10 @@ class FakeAdviserDailyAttendanceRepository implements AdviserDailyAttendanceRepo
     return null;
   }
 
-  async bulkMarkPresent(sectionId: string, attendanceDate: string): Promise<AttendanceRosterEntry[]> {
+  async bulkMarkPresent(
+    sectionId: string,
+    attendanceDate: string,
+  ): Promise<AttendanceRosterEntry[]> {
     this.calls.push(["bulk", sectionId, attendanceDate]);
     return [];
   }
