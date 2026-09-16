@@ -232,12 +232,7 @@ pub fn adviser_attendance_roster_for_date(
     attendance_date: String,
 ) -> AppResult<Vec<AttendanceRosterEntry>> {
     let conn = lock_db(&db);
-    adviser_attendance_roster_for_date_authorized(
-        &conn,
-        &sessions,
-        &section_id,
-        &attendance_date,
-    )
+    adviser_attendance_roster_for_date_authorized(&conn, &sessions, &section_id, &attendance_date)
 }
 
 fn adviser_attendance_roster_for_date_authorized(
@@ -316,12 +311,7 @@ pub fn adviser_bulk_mark_attendance_present(
     attendance_date: String,
 ) -> AppResult<Vec<AttendanceRosterEntry>> {
     let conn = lock_db(&db);
-    adviser_bulk_mark_attendance_present_authorized(
-        &conn,
-        &sessions,
-        &section_id,
-        &attendance_date,
-    )
+    adviser_bulk_mark_attendance_present_authorized(&conn, &sessions, &section_id, &attendance_date)
 }
 
 fn adviser_bulk_mark_attendance_present_authorized(
@@ -373,9 +363,7 @@ pub fn school_attendance_day_totals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{
-        learner, school, section, section_advisory, section_membership, user,
-    };
+    use crate::repository::{learner, school, section, section_advisory, section_membership, user};
     use std::path::Path;
 
     fn open_test_db() -> Connection {
@@ -405,40 +393,16 @@ mod tests {
         let school = school::create(&conn, "Rizal Elementary").unwrap();
         let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
         let learner = learner::create(&conn, &school.id, "Juan", "Dela Cruz", None, None).unwrap();
-        section_membership::enroll(
-            &conn,
-            &school.id,
-            &section.id,
-            &learner.id,
-            "2026-06-01",
-        )
-        .unwrap();
+        section_membership::enroll(&conn, &school.id, &section.id, &learner.id, "2026-06-01")
+            .unwrap();
         let adviser = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &adviser.id, &school.id).unwrap();
-        section_advisory::assign(
-            &conn,
-            &school.id,
-            &section.id,
-            &adviser.id,
-            "2026-06-01",
-        )
-        .unwrap();
+        section_advisory::assign(&conn, &school.id, &section.id, &adviser.id, "2026-06-01")
+            .unwrap();
         let sessions = SessionManager::new();
-        auth::login(
-            &conn,
-            &sessions,
-            "ana.cruz",
-            "password",
-            &school.id,
-        )
-        .unwrap();
+        auth::login(&conn, &sessions, "ana.cruz", "password", &school.id).unwrap();
         (
-            conn,
-            sessions,
-            school.id,
-            section.id,
-            learner.id,
-            adviser.id,
+            conn, sessions, school.id, section.id, learner.id, adviser.id,
         )
     }
 
@@ -626,14 +590,7 @@ mod tests {
             setup_adviser_attendance();
         let other = user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
         user::add_school_membership(&conn, &other.id, &school_id).unwrap();
-        auth::login(
-            &conn,
-            &sessions,
-            "other.teacher",
-            "password",
-            &school_id,
-        )
-        .unwrap();
+        auth::login(&conn, &sessions, "other.teacher", "password", &school_id).unwrap();
 
         let read_result = adviser_attendance_roster_for_date_authorized(
             &conn,
@@ -678,23 +635,10 @@ mod tests {
         let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
         let adviser = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&conn, &adviser.id, &school.id).unwrap();
-        section_advisory::assign(
-            &conn,
-            &school.id,
-            &section.id,
-            &adviser.id,
-            "2026-09-01",
-        )
-        .unwrap();
+        section_advisory::assign(&conn, &school.id, &section.id, &adviser.id, "2026-09-01")
+            .unwrap();
         let sessions = SessionManager::new();
-        auth::login(
-            &conn,
-            &sessions,
-            "ana.cruz",
-            "password",
-            &school.id,
-        )
-        .unwrap();
+        auth::login(&conn, &sessions, "ana.cruz", "password", &school.id).unwrap();
 
         let result = adviser_attendance_roster_for_date_authorized(
             &conn,
