@@ -219,6 +219,122 @@ pub fn bulk_mark_attendance_present(
     attendance::bulk_mark_present(&conn, &school_id, &section_id, &attendance_date)
 }
 
+/// Official daily attendance roster for the caller's advisory section.
+/// Unlike the general school-scoped attendance read above, this command
+/// revalidates that the caller is the active adviser of `section_id` on
+/// `attendance_date` (or a School Head) at the trusted Rust boundary.
+/// `section_id` is navigation/input context only; it never grants access.
+#[tauri::command]
+pub fn adviser_attendance_roster_for_date(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    attendance_date: String,
+) -> AppResult<Vec<AttendanceRosterEntry>> {
+    let conn = lock_db(&db);
+    adviser_attendance_roster_for_date_authorized(
+        &conn,
+        &sessions,
+        &section_id,
+        &attendance_date,
+    )
+}
+
+fn adviser_attendance_roster_for_date_authorized(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    attendance_date: &str,
+) -> AppResult<Vec<AttendanceRosterEntry>> {
+    let (_actor_user_id, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, attendance_date)?;
+    attendance::roster_for_section_date(conn, &school_id, section_id, attendance_date)
+}
+
+/// Records official daily attendance through the same persistence and
+/// encrypted-outbox transaction as `record_attendance`, but only after
+/// adviser/School-Head authorization is revalidated for this section and
+/// exact attendance date. Subject Attendance is not consulted or converted.
+#[tauri::command]
+pub fn adviser_record_attendance(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    learner_id: String,
+    attendance_date: String,
+    status: AttendanceStatus,
+) -> AppResult<Option<AttendanceRecord>> {
+    let conn = lock_db(&db);
+    adviser_record_attendance_with_sync_resolver(
+        &conn,
+        &sessions,
+        &section_id,
+        &learner_id,
+        &attendance_date,
+        status,
+        |school_id| resolve_sspk_if_enrolled(&app, &conn, school_id),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn adviser_record_attendance_with_sync_resolver<F>(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    learner_id: &str,
+    attendance_date: &str,
+    status: AttendanceStatus,
+    resolve_sspk: F,
+) -> AppResult<Option<AttendanceRecord>>
+where
+    F: FnOnce(&str) -> AppResult<Option<[u8; PAYLOAD_KEY_LEN]>>,
+{
+    let (actor_user_id, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, attendance_date)?;
+    let sspk = resolve_sspk(&school_id)?;
+    record_attendance_with_optional_sync(
+        conn,
+        &school_id,
+        &actor_user_id,
+        section_id,
+        learner_id,
+        attendance_date,
+        status,
+        sspk.as_ref(),
+    )
+}
+
+/// Bulk-marks still-unmarked learners Present for an official advisory
+/// attendance date. The adviser/School-Head relationship is revalidated
+/// before the existing non-overwriting bulk operation runs.
+#[tauri::command]
+pub fn adviser_bulk_mark_attendance_present(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    attendance_date: String,
+) -> AppResult<Vec<AttendanceRosterEntry>> {
+    let conn = lock_db(&db);
+    adviser_bulk_mark_attendance_present_authorized(
+        &conn,
+        &sessions,
+        &section_id,
+        &attendance_date,
+    )
+}
+
+fn adviser_bulk_mark_attendance_present_authorized(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    attendance_date: &str,
+) -> AppResult<Vec<AttendanceRosterEntry>> {
+    let (_actor_user_id, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, attendance_date)?;
+    attendance::bulk_mark_present(conn, &school_id, section_id, attendance_date)
+}
+
 /// `school_id` is derived from the session, never a parameter — same
 /// convention as every other command here. `section_id` is client-supplied
 /// for the same reason as `attendance_roster_for_date` above. `year`/`month`
@@ -257,7 +373,9 @@ pub fn school_attendance_day_totals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{learner, school, section, section_membership, user};
+    use crate::repository::{
+        learner, school, section, section_advisory, section_membership, user,
+    };
     use std::path::Path;
 
     fn open_test_db() -> Connection {
@@ -280,6 +398,48 @@ mod tests {
         section_membership::enroll(&conn, &s.id, &sec.id, &l.id, "2026-08-01").unwrap();
         let actor = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         (conn, s.id, sec.id, l.id, actor.id)
+    }
+
+    fn setup_adviser_attendance() -> (Connection, SessionManager, String, String, String, String) {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+        let learner = learner::create(&conn, &school.id, "Juan", "Dela Cruz", None, None).unwrap();
+        section_membership::enroll(
+            &conn,
+            &school.id,
+            &section.id,
+            &learner.id,
+            "2026-06-01",
+        )
+        .unwrap();
+        let adviser = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &school.id).unwrap();
+        section_advisory::assign(
+            &conn,
+            &school.id,
+            &section.id,
+            &adviser.id,
+            "2026-06-01",
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        auth::login(
+            &conn,
+            &sessions,
+            "ana.cruz",
+            "password",
+            &school.id,
+        )
+        .unwrap();
+        (
+            conn,
+            sessions,
+            school.id,
+            section.id,
+            learner.id,
+            adviser.id,
+        )
     }
 
     #[test]
@@ -408,5 +568,141 @@ mod tests {
         let expected_device_id = device_identity::current_or_create(&conn).unwrap();
         let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
         assert_eq!(queued[0].change.device_id.to_string(), expected_device_id);
+    }
+
+    #[test]
+    fn current_adviser_can_use_official_daily_attendance_and_preserve_sync_wiring() {
+        let (conn, sessions, school_id, section_id, learner_id, adviser_id) =
+            setup_adviser_attendance();
+
+        let roster = adviser_attendance_roster_for_date_authorized(
+            &conn,
+            &sessions,
+            &section_id,
+            "2026-08-24",
+        )
+        .unwrap();
+        assert_eq!(roster.len(), 1);
+        assert_eq!(roster[0].learner_id, learner_id);
+        assert_eq!(roster[0].status, None);
+
+        let sspk = test_sspk();
+        let recorded = adviser_record_attendance_with_sync_resolver(
+            &conn,
+            &sessions,
+            &section_id,
+            &learner_id,
+            "2026-08-24",
+            AttendanceStatus::Absent,
+            |_| Ok(Some(sspk)),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(recorded.status, AttendanceStatus::Absent);
+
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].change.entity_kind, EntityKind::Attendance);
+        assert_eq!(queued[0].change.actor_user_id.to_string(), adviser_id);
+        let decrypted =
+            payload_key::decrypt_payload(&sspk, &queued[0].change.encrypted_payload).unwrap();
+        let round_tripped: AttendanceRecord = serde_json::from_slice(&decrypted).unwrap();
+        assert_eq!(round_tripped, recorded);
+
+        let bulk = adviser_bulk_mark_attendance_present_authorized(
+            &conn,
+            &sessions,
+            &section_id,
+            "2026-08-24",
+        )
+        .unwrap();
+        assert_eq!(bulk.len(), 1);
+        assert_eq!(bulk[0].status, Some(AttendanceStatus::Absent));
+    }
+
+    #[test]
+    fn non_adviser_is_rejected_before_official_attendance_write_or_sync_resolution() {
+        let (conn, sessions, school_id, section_id, learner_id, _adviser_id) =
+            setup_adviser_attendance();
+        let other = user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &other.id, &school_id).unwrap();
+        auth::login(
+            &conn,
+            &sessions,
+            "other.teacher",
+            "password",
+            &school_id,
+        )
+        .unwrap();
+
+        let read_result = adviser_attendance_roster_for_date_authorized(
+            &conn,
+            &sessions,
+            &section_id,
+            "2026-08-24",
+        );
+        assert!(matches!(read_result, Err(AppError::Unauthorized)));
+
+        let write_result = adviser_record_attendance_with_sync_resolver(
+            &conn,
+            &sessions,
+            &section_id,
+            &learner_id,
+            "2026-08-24",
+            AttendanceStatus::Present,
+            |_| panic!("sync key resolution must not run before adviser authorization"),
+        );
+        assert!(matches!(write_result, Err(AppError::Unauthorized)));
+
+        let bulk_result = adviser_bulk_mark_attendance_present_authorized(
+            &conn,
+            &sessions,
+            &section_id,
+            "2026-08-24",
+        );
+        assert!(matches!(bulk_result, Err(AppError::Unauthorized)));
+
+        let roster =
+            attendance::roster_for_section_date(&conn, &school_id, &section_id, "2026-08-24")
+                .unwrap();
+        assert_eq!(roster[0].status, None);
+        assert!(sync_outbox::pending_for_school(&conn, &school_id, 10)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn future_advisory_assignment_does_not_authorize_an_earlier_attendance_date() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Rizal Elementary").unwrap();
+        let section = section::create(&conn, &school.id, "2026-2027", "7", "Mabini").unwrap();
+        let adviser = user::create_user(&conn, "ana.cruz", "password", "Ana Cruz").unwrap();
+        user::add_school_membership(&conn, &adviser.id, &school.id).unwrap();
+        section_advisory::assign(
+            &conn,
+            &school.id,
+            &section.id,
+            &adviser.id,
+            "2026-09-01",
+        )
+        .unwrap();
+        let sessions = SessionManager::new();
+        auth::login(
+            &conn,
+            &sessions,
+            "ana.cruz",
+            "password",
+            &school.id,
+        )
+        .unwrap();
+
+        let result = adviser_attendance_roster_for_date_authorized(
+            &conn,
+            &sessions,
+            &section.id,
+            "2026-08-24",
+        );
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
     }
 }
