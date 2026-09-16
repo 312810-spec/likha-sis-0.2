@@ -15,3 +15,11 @@ export interface TeacherClassWorkContext {
   endsAt?: string;
   room?: string | null;
 }
+
+export interface AdvisoryWorkContext {
+  /**
+   * Navigation pointer only. Every use must first be revalidated through the
+   * adviser-authorized section list; it never grants access by itself.
+   */
+  sectionId: string;
+}
