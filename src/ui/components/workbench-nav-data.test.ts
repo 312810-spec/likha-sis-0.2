@@ -15,7 +15,7 @@ describe("workbench-nav-data", () => {
 
   it("uses plain-language labels for specialist teacher views", () => {
     expect(TAB_LABELS["subject-monitor"]).toBe("My Subject Attendance");
-    expect(TAB_LABELS["adviser-view"]).toBe("My Advisory Overview");
+    expect(TAB_LABELS["adviser-view"]).toBe("My Advisory");
     expect(TAB_LABELS["sf1-import"]).toBe("Import Learners (SF1)");
   });
 
