@@ -2,17 +2,18 @@
 
 ## Canonical GJ-7 continuation (2026-09-15)
 
-Latest checkpoint (2026-09-16): PR #88 merged as
-`520d26d996a17b0a289c7c167a9de289a97ea6e6`, with exact-head Quality and Security
-successful. Canonical current slice is `test/score-evidence-restart`: file-backed
-encrypted database close/reopen regression for saved scores and pending evidence.
-No production behavior changes.
+Latest checkpoint (2026-09-16): PR #89 merged as
+`54a68a08d3dfc90208b3b1254f097e6005c230e8`, with exact-head Quality and Security
+successful. Canonical current slice is `test/score-command-recovery`: exercise
+the shared command save path, encrypted outbox recovery and rollback on enqueue
+failure (first score and correction), followed by a successful retry.
+No production behavior changes. Native execution awaits CI; Cargo/rustfmt absent.
 
-The new native test awaits CI: Cargo/rustfmt are unavailable locally. This is
-clean connection reopen, not process/crash recovery, command enqueue atomicity,
-DPAPI, session restoration or packaged Windows proof. See CURRENT-HANDOFF and
-VERIFICATION-DEBT. Next software slice: command-level save/outbox recovery proof;
-then Adviser Room, preserving hardware-only blockers. Do not claim GJ-7 complete.
+This is clean SQLCipher close/reopen, not process/crash recovery, Tauri session
+or key-resolution ceremony, DPAPI, transport restart or packaged Windows proof.
+See CURRENT-HANDOFF and VERIFICATION-DEBT. Next: smallest assignment-owned
+Adviser Room entry/context slice, preserving runtime/hardware blockers. Do not
+claim GJ-7 complete.
 
 The hourly task remains disabled. Continue bounded work during CI; merge only
 after exact-head Quality and Security pass. No scheduler changes in this slice.

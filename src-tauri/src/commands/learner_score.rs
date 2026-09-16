@@ -280,7 +280,10 @@ mod tests {
     /// the minimum fixture `record_learner_score_with_optional_sync`
     /// needs. Returns (school_id, item_id, learner_id, teacher_id).
     fn setup() -> (Connection, String, String, String, String) {
-        let conn = open_test_db();
+        setup_with_connection(open_test_db())
+    }
+
+    fn setup_with_connection(conn: Connection) -> (Connection, String, String, String, String) {
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let sec = section::create(&conn, &s.id, "2026-2027", "7", "Mabini").unwrap();
         let sub = subject::create(&conn, &s.id, "Mathematics").unwrap();
@@ -304,6 +307,155 @@ mod tests {
         section_membership::enroll(&conn, &s.id, &sec.id, &l.id, "2026-06-08").unwrap();
         let teacher = user::create_user(&conn, "teacher.a", "password", "A Teacher").unwrap();
         (conn, s.id, item.id, l.id, teacher.id)
+    }
+
+    #[test]
+    fn command_score_and_encrypted_outbox_survive_database_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("command-score-recovery.db");
+        let key = crate::crypto::generate_key();
+        let (conn, school_id, item_id, learner_id, teacher_id) =
+            setup_with_connection(crate::db::open(&path, &key).unwrap());
+        let sspk = test_sspk();
+        let recorded = record_learner_score_with_optional_sync(
+            &conn,
+            &school_id,
+            &teacher_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            Some(&sspk),
+        )
+        .unwrap()
+        .unwrap();
+        let queued_before = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued_before.len(), 1);
+        let device_id = device_identity::current_or_create(&conn).unwrap();
+        conn.close().unwrap();
+
+        // Exercise the command's shared save logic, not the Tauri session/key
+        // ceremony, OS process recovery or a real hub acknowledgment.
+        let conn = crate::db::open(&path, &key).unwrap();
+        let roster = learner_score::roster_for_item(&conn, &school_id, &item_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(roster.len(), 1);
+        assert_eq!(roster[0].learner_id, learner_id);
+        assert_eq!(roster[0].score, Some(18.0));
+        assert_eq!(roster[0].status, Some(LearnerScoreStatus::Scored));
+        let queued = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+        assert_eq!(queued, queued_before);
+        let change = &queued[0].change;
+        assert_eq!(change.entity_id.to_string(), recorded.id);
+        assert_eq!(change.entity_kind, EntityKind::LearnerScore);
+        assert_eq!(change.actor_user_id.to_string(), teacher_id);
+        assert_eq!(change.device_id.to_string(), device_id);
+        assert_eq!(
+            device_identity::current_or_create(&conn).unwrap(),
+            device_id
+        );
+        let plaintext = payload_key::decrypt_payload(&sspk, &change.encrypted_payload).unwrap();
+        let recovered: LearnerScore = serde_json::from_slice(&plaintext).unwrap();
+        assert_eq!(recovered, recorded);
+        assert_eq!(
+            entity_sync_status::status_for_entity(
+                &conn,
+                &school_id,
+                EntityKind::LearnerScore,
+                &recorded.id,
+            )
+            .unwrap(),
+            entity_sync_status::EntitySyncState::WaitingToSync
+        );
+    }
+
+    #[test]
+    fn failed_command_enqueue_preserves_prior_score_and_queue_after_reopen() {
+        // Cover both a first score and a correction to an existing score.
+        for has_prior_score in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("command-score-rollback.db");
+            let key = crate::crypto::generate_key();
+            let (conn, school_id, item_id, learner_id, teacher_id) =
+                setup_with_connection(crate::db::open(&path, &key).unwrap());
+            let sspk = test_sspk();
+            if has_prior_score {
+                record_learner_score_with_optional_sync(
+                    &conn,
+                    &school_id,
+                    &teacher_id,
+                    &item_id,
+                    &learner_id,
+                    LearnerScoreStatus::Scored,
+                    Some(10.0),
+                    Some(&sspk),
+                )
+                .unwrap()
+                .unwrap();
+            }
+            let roster_before =
+                learner_score::roster_for_item(&conn, &school_id, &item_id).unwrap();
+            let queue_before = sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap();
+            assert_eq!(queue_before.len(), usize::from(has_prior_score));
+            // Fail only at enqueue, after the domain write has succeeded.
+            // A TEMP trigger is scoped to this connection, not the reopened DB.
+            conn.execute_batch(
+                "CREATE TEMP TRIGGER reject_score_enqueue BEFORE INSERT ON sync_outbox
+                 BEGIN SELECT RAISE(ABORT, 'synthetic enqueue failure'); END;",
+            )
+            .unwrap();
+            let error = record_learner_score_with_optional_sync(
+                &conn,
+                &school_id,
+                &teacher_id,
+                &item_id,
+                &learner_id,
+                LearnerScoreStatus::Scored,
+                Some(19.0),
+                Some(&sspk),
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("synthetic enqueue failure"));
+            assert!(
+                conn.is_autocommit(),
+                "failed save must release its savepoint"
+            );
+            conn.close().unwrap();
+
+            let conn = crate::db::open(&path, &key).unwrap();
+            assert_eq!(
+                learner_score::roster_for_item(&conn, &school_id, &item_id).unwrap(),
+                roster_before
+            );
+            assert_eq!(
+                sync_outbox::pending_for_school(&conn, &school_id, 10).unwrap(),
+                queue_before
+            );
+            // Recovery remains writable; retry creates exactly one new change.
+            record_learner_score_with_optional_sync(
+                &conn,
+                &school_id,
+                &teacher_id,
+                &item_id,
+                &learner_id,
+                LearnerScoreStatus::Scored,
+                Some(19.0),
+                Some(&sspk),
+            )
+            .unwrap()
+            .unwrap();
+            let roster = learner_score::roster_for_item(&conn, &school_id, &item_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(roster[0].score, Some(19.0));
+            assert_eq!(
+                sync_outbox::pending_for_school(&conn, &school_id, 10)
+                    .unwrap()
+                    .len(),
+                queue_before.len() + 1
+            );
+        }
     }
 
     #[test]
