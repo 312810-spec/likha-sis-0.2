@@ -18,32 +18,29 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current main: `85e5953201c6965e35131af76684e9971f4871e8` (PR #87).
-GitHub confirms PR #87 merged on 2026-09-15 at 22:18 UTC; no open PRs were
-present when this slice began. PRs #79–87 are merged; #78 was superseded.
+Current main: `520d26d996a17b0a289c7c167a9de289a97ea6e6` (PR #88).
+GitHub confirms PR #88 merged on 2026-09-16 at 04:32:36 UTC; its exact head
+`d10f2bb6ea72b033fa2aed04f4d5ac7f274e2584` passed Quality and Security.
+No open PRs were present when this slice began. PRs #79–88 are merged.
 
-Current slice: `test/native-score-evidence-lifecycle`. Two native Rust regressions
-extend GJ-7 beyond mocked UI behavior:
+Current slice: `test/score-evidence-restart`. One native regression closes and
+reopens a file-backed SQLCipher database with the same throwaway key, then checks
+the saved score, assignment-owned lookup, full pending change and retry metadata,
+older known hub version, conservative WaitingToSync state and other-school scope.
+The pending edit must remain visible despite the older acknowledgment evidence.
 
-- A real loopback HTTP timeout and real hub credential rejection retain the
-  pending score; successful retry must receive hub acknowledgment before the
-  persisted evidence becomes Synced. The local score survives failed attempts.
-- A previously authorized score lookup fails after assignment reassignment;
-  the new owner can resolve it, then loses access when the assignment is deleted.
-
-No production behavior, dependencies or quality gates change. The transport test
-uses the existing real hub fixture and separate in-memory databases; it seeds the
-outbox directly, so it does not prove the command enqueue path, disk restart,
-OS network interruption, credential revocation or packaged Windows behavior.
-The access test exercises the repository boundary, not Tauri session expiry.
+No production behavior, dependencies or quality gates change. The test directly
+seeds repository evidence with a synthetic opaque payload; it does not prove
+command enqueue atomicity, payload decryption, actual process/crash recovery,
+DPAPI, restored sessions, transport retry after restart or packaged Windows.
 Cargo/rustfmt are unavailable locally; native execution and formatting must pass
-CI before merge. See the PR for actual checks, not inferred success.
+CI before merge. See the canonical PR for actual checks and review evidence.
 
-Next: file-backed restart/recovery proof and packaged Windows verification, then
-Adviser Room. Do not mark GJ-7 or native release verification complete from these
-two regressions alone. Current row evidence remains a last-check snapshot;
-refresh or reopen to see background changes. Drafts, pending writes, denied reads
-and stale responses cannot restore prior evidence.
+Next: command-level save/outbox recovery proof, followed by Adviser Room while
+hardware-only packaged Windows verification remains explicitly blocked. Do not
+mark GJ-7 or native release verification complete from repository tests alone.
+Current row evidence remains a last-check snapshot; refresh or reopen to see
+background changes. Drafts, denied reads and stale responses hide prior evidence.
 
 ## Continuation execution policy
 

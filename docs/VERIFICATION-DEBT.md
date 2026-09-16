@@ -1,5 +1,20 @@
 # Verification Debt
 
+## GJ-7 score recovery boundary (2026-09-16)
+
+PR #88's native transport and assignment-access tests passed CI before merge.
+The `test/score-evidence-restart` slice adds a synthetic file-backed SQLCipher
+close/reopen test for score data, pending payload/identity/retry metadata, stale
+acknowledgment precedence and school-scoped evidence. It awaits native CI; Cargo
+and rustfmt are unavailable in the current workspace.
+
+Still unproven by this slice: command-level score/outbox atomicity across reopen,
+real process crash/power loss, transport retry after process restart, DPAPI key
+recovery, session reauthentication and packaged Windows teacher workflow.
+Directly seeded repository payload bytes are not payload-encryption validation.
+Continue software-verifiable command coverage; keep hardware/runtime checks
+blocked until their actual environment is available. No release-readiness claim.
+
 ## Confirmed the natural-key-collision fix is generic across entities, not per-entity (2026-09-07)
 
 Follow-up on the BLOCKING finding fixed earlier this session (see the
