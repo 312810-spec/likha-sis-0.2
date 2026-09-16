@@ -107,14 +107,9 @@ mod tests {
         )
         .unwrap();
 
-        let report = adviser_monthly_attendance_summary_authorized(
-            &conn,
-            &sessions,
-            &section_id,
-            2026,
-            8,
-        )
-        .unwrap();
+        let report =
+            adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section_id, 2026, 8)
+                .unwrap();
 
         assert_eq!(report.year, 2026);
         assert_eq!(report.month, 8);
@@ -130,13 +125,8 @@ mod tests {
         user::add_school_membership(&conn, &other.id, &school_id).unwrap();
         auth::login(&conn, &sessions, "other.teacher", "password", &school_id).unwrap();
 
-        let result = adviser_monthly_attendance_summary_authorized(
-            &conn,
-            &sessions,
-            &section_id,
-            2026,
-            8,
-        );
+        let result =
+            adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section_id, 2026, 8);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
@@ -153,13 +143,8 @@ mod tests {
         let sessions = SessionManager::new();
         auth::login(&conn, &sessions, "ana.cruz", "password", &school.id).unwrap();
 
-        let result = adviser_monthly_attendance_summary_authorized(
-            &conn,
-            &sessions,
-            &section.id,
-            2026,
-            8,
-        );
+        let result =
+            adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section.id, 2026, 8);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
@@ -168,13 +153,8 @@ mod tests {
     fn invalid_month_fails_closed_before_any_monthly_report_is_returned() {
         let (conn, sessions, _school_id, section_id, _learner_id) = setup_adviser_monthly();
 
-        let result = adviser_monthly_attendance_summary_authorized(
-            &conn,
-            &sessions,
-            &section_id,
-            2026,
-            13,
-        );
+        let result =
+            adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section_id, 2026, 13);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
