@@ -193,7 +193,9 @@ describe("AdviserViewScreen", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "1 learner enrolled in Mabini as of 2026-08-29.",
     );
-    expect(screen.getByText(/0 subject sessions held across/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Subject Attendance signals" }).parentElement,
+    ).toHaveTextContent("0 subject sessions held across 0 subjects");
   });
 
   it("restores an initial advisory context only after that section is authorized", async () => {
