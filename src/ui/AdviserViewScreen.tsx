@@ -64,6 +64,8 @@ export function AdviserViewScreen({
   const [savingLearnerId, setSavingLearnerId] = useState<string | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
 
+  const selectedSection = sections.find((section) => section.id === sectionId) ?? null;
+
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
     setSectionsLoading(true);
@@ -101,8 +103,8 @@ export function AdviserViewScreen({
 
   useEffect(() => {
     if (sectionsLoading) return;
-    const selectedSection = sections.find((section) => section.id === sectionId);
-    const nextSectionId = selectedSection?.id ?? null;
+    const currentSection = sections.find((section) => section.id === sectionId);
+    const nextSectionId = currentSection?.id ?? null;
     if ((initialContext?.sectionId ?? null) === nextSectionId) return;
     onContextChange?.(nextSectionId ? { sectionId: nextSectionId } : null);
   }, [sections, sectionId, sectionsLoading, initialContext?.sectionId, onContextChange]);
@@ -122,7 +124,7 @@ export function AdviserViewScreen({
         if (overviewRequestRef.current !== requestId) return;
         setOverview(null);
         setOverviewError(
-          "Could not open My Advisory. Your advisory assignment or permission may have changed.",
+          "Could not load Subject Attendance signals. Your advisory assignment or permission may have changed.",
         );
       })
       .finally(() => {
@@ -274,27 +276,25 @@ export function AdviserViewScreen({
         </EmptyState>
       ) : (
         <>
-          {overviewError && (
+          {dailyAttendanceError && (
             <Alert tone="error">
-              <p>{overviewError}</p>
-              <button type="button" onClick={loadOverview}>
+              <p>{dailyAttendanceError}</p>
+              <button type="button" onClick={() => void loadDailyAttendance()}>
                 Retry
               </button>
             </Alert>
           )}
 
-          {overviewLoading ? (
-            <Loading label="Loading advisory roster and subject-attendance signals…" />
-          ) : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
-            <EmptyState>No learners are enrolled in this advisory section on this date.</EmptyState>
-          ) : (
+          {dailyAttendanceLoading ? (
+            <Loading label="Loading official daily attendance…" />
+          ) : dailyAttendanceError ? null : (
             <>
               <section aria-labelledby="advisory-roster-heading">
                 <h2 id="advisory-roster-heading">Advisory roster</h2>
                 <p className="attendance-count" role="status">
-                  <strong>{overview.rows.length}</strong> learner
-                  {overview.rows.length === 1 ? "" : "s"} enrolled in {overview.sectionName} as of{" "}
-                  {overview.asOfDate}.
+                  <strong>{dailyRoster.length}</strong> learner
+                  {dailyRoster.length === 1 ? "" : "s"} enrolled in {selectedSection?.name ?? "this section"} as of{" "}
+                  {date}.
                 </p>
                 <p className="field-hint">
                   This roster comes from current section enrollment. Official daily attendance below
@@ -309,18 +309,7 @@ export function AdviserViewScreen({
                   date. Existing marks are never overwritten by “Mark unmarked Present.”
                 </p>
 
-                {dailyAttendanceError && (
-                  <Alert tone="error">
-                    <p>{dailyAttendanceError}</p>
-                    <button type="button" onClick={() => void loadDailyAttendance()}>
-                      Retry
-                    </button>
-                  </Alert>
-                )}
-
-                {dailyAttendanceLoading ? (
-                  <Loading label="Loading official daily attendance…" />
-                ) : dailyRoster.length === 0 ? (
+                {dailyRoster.length === 0 ? (
                   <EmptyState>No active learners are available for official attendance on this date.</EmptyState>
                 ) : (
                   <>
@@ -333,7 +322,7 @@ export function AdviserViewScreen({
                     </button>
                     <table className="attendance-roster">
                       <caption className="visually-hidden">
-                        Official daily attendance for {overview.sectionName} on {date}
+                        Official daily attendance for {selectedSection?.name ?? "this advisory section"} on {date}
                       </caption>
                       <thead>
                         <tr>
@@ -377,9 +366,31 @@ export function AdviserViewScreen({
                   </>
                 )}
               </section>
+            </>
+          )}
 
-              <section aria-labelledby="advisory-subject-signals-heading">
-                <h2 id="advisory-subject-signals-heading">Subject Attendance signals</h2>
+          <section aria-labelledby="advisory-subject-signals-heading">
+            <h2 id="advisory-subject-signals-heading">Subject Attendance signals</h2>
+            <p className="field-hint">
+              Read-only follow-up evidence from subject teachers. These signals never become official
+              daily attendance or SF2 automatically.
+            </p>
+
+            {overviewError && (
+              <Alert tone="error">
+                <p>{overviewError}</p>
+                <button type="button" onClick={loadOverview}>
+                  Retry subject signals
+                </button>
+              </Alert>
+            )}
+
+            {overviewLoading ? (
+              <Loading label="Loading Subject Attendance signals…" />
+            ) : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
+              <EmptyState>No enrolled learners have Subject Attendance signals on this date.</EmptyState>
+            ) : (
+              <>
                 <p className="attendance-count">
                   <strong>{overview.heldSessionCount}</strong> subject session
                   {overview.heldSessionCount === 1 ? "" : "s"} held across{" "}
@@ -422,9 +433,9 @@ export function AdviserViewScreen({
                     ))}
                   </tbody>
                 </table>
-              </section>
-            </>
-          )}
+              </>
+            )}
+          </section>
         </>
       )}
     </Page>
