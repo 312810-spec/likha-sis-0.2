@@ -518,10 +518,18 @@ mod tests {
             pending_before
         );
         assert_eq!(pending_before[0].attempt_count, 1);
-        assert_eq!(pending_before[0].last_error_code.as_deref(), Some("timeout"));
         assert_eq!(
-            sync_version_cache::known_version(&conn, &school_id, EntityKind::LearnerScore, &score.id)
-                .unwrap(),
+            pending_before[0].last_error_code.as_deref(),
+            Some("timeout")
+        );
+        assert_eq!(
+            sync_version_cache::known_version(
+                &conn,
+                &school_id,
+                EntityKind::LearnerScore,
+                &score.id
+            )
+            .unwrap(),
             1
         );
         assert_eq!(
@@ -532,7 +540,8 @@ mod tests {
             .unwrap()
             .is_empty());
         assert_eq!(
-            status_for_entity(&conn, &other_school.id, EntityKind::LearnerScore, &score.id).unwrap(),
+            status_for_entity(&conn, &other_school.id, EntityKind::LearnerScore, &score.id)
+                .unwrap(),
             EntitySyncState::NotYetSynced
         );
     }
