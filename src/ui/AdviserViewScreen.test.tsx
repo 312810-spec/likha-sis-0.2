@@ -1,7 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AdviserDailyAttendanceApplicationService } from "../application/adviser-daily-attendance-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import type {
+  AttendanceRecord,
+  AttendanceRosterEntry,
+  AttendanceStatus,
+} from "../domain/attendance";
+import type { AdviserDailyAttendanceRepository } from "../domain/ports/adviser-daily-attendance-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
 import type { CreateMeetingOutcome } from "../domain/schedule-meeting";
@@ -53,6 +60,16 @@ const OVERVIEW: AdviserAttendanceOverview = {
   ],
 };
 
+const DAILY_ROSTER: AttendanceRosterEntry[] = [
+  {
+    learnerId: "learner-1",
+    givenName: "Ana",
+    familyName: "Cruz",
+    status: null,
+    recordedAt: null,
+  },
+];
+
 class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   sectionDates: string[] = [];
   overviewCalls: Array<[string, string]> = [];
@@ -93,6 +110,49 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   }
 }
 
+class FakeAdviserDailyAttendanceRepository implements AdviserDailyAttendanceRepository {
+  rosterCalls: Array<[string, string]> = [];
+  recordCalls: Array<[string, string, string, AttendanceStatus]> = [];
+  bulkCalls: Array<[string, string]> = [];
+
+  constructor(private roster: AttendanceRosterEntry[] = DAILY_ROSTER.map((row) => ({ ...row }))) {}
+
+  async rosterForDate(sectionId: string, attendanceDate: string) {
+    this.rosterCalls.push([sectionId, attendanceDate]);
+    return this.roster.map((row) => ({ ...row }));
+  }
+
+  async record(
+    sectionId: string,
+    learnerId: string,
+    attendanceDate: string,
+    status: AttendanceStatus,
+  ): Promise<AttendanceRecord | null> {
+    this.recordCalls.push([sectionId, learnerId, attendanceDate, status]);
+    const row = this.roster.find((candidate) => candidate.learnerId === learnerId);
+    if (!row) return null;
+    row.status = status;
+    row.recordedAt = "now";
+    return {
+      id: "attendance-1",
+      schoolId: "school-1",
+      sectionId,
+      learnerId,
+      attendanceDate,
+      status,
+      recordedAt: "now",
+    };
+  }
+
+  async bulkMarkPresent(sectionId: string, attendanceDate: string) {
+    this.bulkCalls.push([sectionId, attendanceDate]);
+    this.roster = this.roster.map((row) =>
+      row.status === null ? { ...row, status: "present", recordedAt: "now" } : row,
+    );
+    return this.roster.map((row) => ({ ...row }));
+  }
+}
+
 class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   async listMine() {
     return [];
@@ -124,21 +184,24 @@ function renderScreen(
   repository = new FakeSubjectAttendanceRepository(),
   initialContext: AdvisoryWorkContext | null = null,
   onContextChange?: (context: AdvisoryWorkContext | null) => void,
+  dailyRepository = new FakeAdviserDailyAttendanceRepository(),
 ) {
   const service = new SubjectAttendanceApplicationService(
     repository,
     new FakeTeachingAssignmentRepository(),
   );
+  const dailyService = new AdviserDailyAttendanceApplicationService(dailyRepository);
   const result = render(
     <ModeProvider>
       <AdviserViewScreen
         subjectAttendanceService={service}
+        adviserDailyAttendanceService={dailyService}
         initialContext={initialContext}
         onContextChange={onContextChange}
       />
     </ModeProvider>,
   );
-  return { ...result, repository };
+  return { ...result, repository, dailyRepository };
 }
 
 beforeEach(() => {
@@ -152,24 +215,67 @@ afterEach(() => {
 });
 
 describe("AdviserViewScreen", () => {
-  it("shows the trusted advisory roster alongside read-only Subject Attendance signals", async () => {
+  it("separates official daily attendance from read-only Subject Attendance signals", async () => {
     renderScreen();
 
-    expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
+    expect((await screen.findAllByText("Ana Cruz")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Advisory roster" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
       "1 learner enrolled in Mabini as of 2026-08-29.",
     );
+    expect(screen.getByRole("heading", { name: "Official daily attendance" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Official attendance for Ana Cruz")).toHaveValue("");
     expect(screen.getByRole("heading", { name: "Subject Attendance signals" })).toBeInTheDocument();
     expect(
-      screen.getByText("Advisory roster + Subject Attendance signals — not SF2."),
+      screen.getByText(/Official daily attendance and Subject Attendance are separate records/),
     ).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /edit|save|convert/i })).not.toBeInTheDocument();
   });
 
-  it("keeps an enrolled advisory learner visible when no subject session has been held", async () => {
+  it("records an official mark through the adviser-only daily service", async () => {
+    const user = userEvent.setup();
+    const dailyRepository = new FakeAdviserDailyAttendanceRepository();
+    renderScreen(new FakeSubjectAttendanceRepository(), null, undefined, dailyRepository);
+
+    const select = await screen.findByLabelText("Official attendance for Ana Cruz");
+    await user.selectOptions(select, "absent");
+
+    await waitFor(() =>
+      expect(dailyRepository.recordCalls).toContainEqual([
+        "sec-1",
+        "learner-1",
+        "2026-08-29",
+        "absent",
+      ]),
+    );
+    await waitFor(() => expect(select).toHaveValue("absent"));
+  });
+
+  it("bulk-marks only unrecorded official attendance Present", async () => {
+    const user = userEvent.setup();
+    const dailyRepository = new FakeAdviserDailyAttendanceRepository([
+      { ...DAILY_ROSTER[0]!, status: "absent", recordedAt: "earlier" },
+      {
+        learnerId: "learner-2",
+        givenName: "Ben",
+        familyName: "Santos",
+        status: null,
+        recordedAt: null,
+      },
+    ]);
+    renderScreen(new FakeSubjectAttendanceRepository(), null, undefined, dailyRepository);
+
+    await screen.findByLabelText("Official attendance for Ana Cruz");
+    await user.click(screen.getByRole("button", { name: "Mark unmarked Present" }));
+
+    await waitFor(() => expect(dailyRepository.bulkCalls).toContainEqual(["sec-1", "2026-08-29"]));
+    expect(screen.getByLabelText("Official attendance for Ana Cruz")).toHaveValue("absent");
+    expect(screen.getByLabelText("Official attendance for Ben Santos")).toHaveValue("present");
+  });
+
+  it("keeps enrolled learners visible without subject sessions", async () => {
     renderScreen(
       new FakeSubjectAttendanceRepository([SECTION], {
         ...OVERVIEW,
@@ -189,7 +295,7 @@ describe("AdviserViewScreen", () => {
       }),
     );
 
-    expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
+    expect((await screen.findAllByText("Ana Cruz")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole("status")).toHaveTextContent(
       "1 learner enrolled in Mabini as of 2026-08-29.",
     );
@@ -201,24 +307,33 @@ describe("AdviserViewScreen", () => {
   it("restores an initial advisory context only after that section is authorized", async () => {
     const onContextChange = vi.fn();
     const repository = new FakeSubjectAttendanceRepository([SECTION, SECOND_SECTION]);
-    renderScreen(repository, { sectionId: SECOND_SECTION.id }, onContextChange);
+    const dailyRepository = new FakeAdviserDailyAttendanceRepository();
+    renderScreen(repository, { sectionId: SECOND_SECTION.id }, onContextChange, dailyRepository);
 
-    await screen.findByText("Ana Cruz");
+    await screen.findByLabelText("Official attendance for Ana Cruz");
     expect(screen.getByLabelText("Advisory section")).toHaveValue(SECOND_SECTION.id);
     expect(repository.overviewCalls).toContainEqual([SECOND_SECTION.id, "2026-08-29"]);
+    expect(dailyRepository.rosterCalls).toContainEqual([SECOND_SECTION.id, "2026-08-29"]);
     expect(onContextChange).not.toHaveBeenCalledWith(null);
   });
 
   it("never queries a stale advisory context and falls back to an authorized section", async () => {
     const onContextChange = vi.fn();
     const repository = new FakeSubjectAttendanceRepository([SECTION]);
-    renderScreen(repository, { sectionId: "stale-section" }, onContextChange);
+    const dailyRepository = new FakeAdviserDailyAttendanceRepository();
+    renderScreen(repository, { sectionId: "stale-section" }, onContextChange, dailyRepository);
 
-    await screen.findByText("Ana Cruz");
-    expect(repository.overviewCalls.some(([sectionId]) => sectionId === "stale-section")).toBe(
-      false,
+    await screen.findByLabelText("Official attendance for Ana Cruz");
+    const queriedStaleOverview = repository.overviewCalls.some(
+      ([selectedSectionId]) => selectedSectionId === "stale-section",
     );
+    const queriedStaleDailyRoster = dailyRepository.rosterCalls.some(
+      ([selectedSectionId]) => selectedSectionId === "stale-section",
+    );
+    expect(queriedStaleOverview).toBe(false);
+    expect(queriedStaleDailyRoster).toBe(false);
     expect(repository.overviewCalls).toContainEqual([SECTION.id, "2026-08-29"]);
+    expect(dailyRepository.rosterCalls).toContainEqual([SECTION.id, "2026-08-29"]);
     await waitFor(() => expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECTION.id }));
   });
 
@@ -230,7 +345,7 @@ describe("AdviserViewScreen", () => {
       { sectionId: SECTION.id },
       onContextChange,
     );
-    await screen.findByText("Ana Cruz");
+    await screen.findByLabelText("Official attendance for Ana Cruz");
 
     await user.selectOptions(screen.getByLabelText("Advisory section"), SECOND_SECTION.id);
 
@@ -239,7 +354,7 @@ describe("AdviserViewScreen", () => {
     );
   });
 
-  it("shows a calm empty state and clears stale context when no advisory section is active", async () => {
+  it("clears stale context when no advisory section is active", async () => {
     const onContextChange = vi.fn();
     renderScreen(
       new FakeSubjectAttendanceRepository([], null),
@@ -253,21 +368,28 @@ describe("AdviserViewScreen", () => {
     await waitFor(() => expect(onContextChange).toHaveBeenCalledWith(null));
   });
 
-  it("reloads authorized sections and the overview when the date changes", async () => {
+  it("reloads advisory data when the date changes", async () => {
     const user = userEvent.setup();
-    const { repository } = renderScreen();
-    await screen.findByText("Ana Cruz");
+    const dailyRepository = new FakeAdviserDailyAttendanceRepository();
+    const { repository } = renderScreen(
+      new FakeSubjectAttendanceRepository(),
+      null,
+      undefined,
+      dailyRepository,
+    );
+    await screen.findByLabelText("Official attendance for Ana Cruz");
 
     await user.clear(screen.getByLabelText("As of"));
     await user.type(screen.getByLabelText("As of"), "2026-08-20");
 
     expect(repository.sectionDates).toContain("2026-08-20");
     expect(repository.overviewCalls).toContainEqual(["sec-1", "2026-08-20"]);
+    expect(dailyRepository.rosterCalls).toContainEqual(["sec-1", "2026-08-20"]);
   });
 
   it("has no accessibility violations", async () => {
     const { container } = renderScreen();
-    await screen.findByText("Ana Cruz");
+    await screen.findByLabelText("Official attendance for Ana Cruz");
 
     await expectNoAccessibilityViolations(container);
   });
