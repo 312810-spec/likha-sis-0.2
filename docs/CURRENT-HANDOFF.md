@@ -18,27 +18,31 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current main: `520d26d996a17b0a289c7c167a9de289a97ea6e6` (PR #88).
-GitHub confirms PR #88 merged on 2026-09-16 at 04:32:36 UTC; its exact head
-`d10f2bb6ea72b033fa2aed04f4d5ac7f274e2584` passed Quality and Security.
-No open PRs were present when this slice began. PRs #79–88 are merged.
+Current main: `54a68a08d3dfc90208b3b1254f097e6005c230e8` (PR #89).
+GitHub confirms owner-authored PR #89 merged on 2026-09-16 at 12:05:08 UTC;
+its exact head `2c5c8dc7715bd17e1806d7587c50bfbb01dd069d` passed Quality
+(run 35092336172) and Security (run 35092336175). No open PRs or overlapping
+local changes were present when this slice began. PRs #79–89 are merged.
 
-Current slice: `test/score-evidence-restart`. One native regression closes and
-reopens a file-backed SQLCipher database with the same throwaway key, then checks
-the saved score, assignment-owned lookup, full pending change and retry metadata,
-older known hub version, conservative WaitingToSync state and other-school scope.
-The pending edit must remain visible despite the older acknowledgment evidence.
+Current slice: `test/score-command-recovery`. Two native regressions exercise
+the existing shared command save logic against file-backed SQLCipher databases:
 
-No production behavior, dependencies or quality gates change. The test directly
-seeds repository evidence with a synthetic opaque payload; it does not prove
-command enqueue atomicity, payload decryption, actual process/crash recovery,
-DPAPI, restored sessions, transport retry after restart or packaged Windows.
-Cargo/rustfmt are unavailable locally; native execution and formatting must pass
-CI before merge. See the canonical PR for actual checks and review evidence.
+- Saved score and real encrypted pending payload survive close/reopen; payload
+  decrypts to the returned score, device identity persists, status stays WaitingToSync.
+- A connection-local trigger rejects enqueue after the score write, for both a
+  first score and a correction. Reopen must preserve the prior roster and complete
+  queue, and a subsequent retry must succeed with exactly one new queued change.
 
-Next: command-level save/outbox recovery proof, followed by Adviser Room while
-hardware-only packaged Windows verification remains explicitly blocked. Do not
-mark GJ-7 or native release verification complete from repository tests alone.
+No production behavior, dependencies or gates change. Cargo/rustfmt are absent
+locally; native execution, formatting and Clippy require exact-head CI before
+merge. See the canonical PR for actual local checks and independent review.
+These tests bypass the Tauri session and key-resolution ceremony. They prove no
+OS crash/power-loss recovery, DPAPI, restored session, actual process restart,
+transport retry after restart or packaged Windows workflow.
+
+Next: Adviser Room's smallest assignment-owned entry/context slice, retaining
+the hardware/runtime recovery blockers in VERIFICATION-DEBT. Do not mark GJ-7
+or native release verification complete from software tests alone.
 Current row evidence remains a last-check snapshot; refresh or reopen to see
 background changes. Drafts, denied reads and stale responses hide prior evidence.
 
