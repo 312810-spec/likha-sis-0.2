@@ -351,7 +351,10 @@ mod tests {
         assert_eq!(change.entity_kind, EntityKind::LearnerScore);
         assert_eq!(change.actor_user_id.to_string(), teacher_id);
         assert_eq!(change.device_id.to_string(), device_id);
-        assert_eq!(device_identity::current_or_create(&conn).unwrap(), device_id);
+        assert_eq!(
+            device_identity::current_or_create(&conn).unwrap(),
+            device_id
+        );
         let plaintext = payload_key::decrypt_payload(&sspk, &change.encrypted_payload).unwrap();
         let recovered: LearnerScore = serde_json::from_slice(&plaintext).unwrap();
         assert_eq!(recovered, recorded);
@@ -414,7 +417,10 @@ mod tests {
             )
             .unwrap_err();
             assert!(error.to_string().contains("synthetic enqueue failure"));
-            assert!(conn.is_autocommit(), "failed save must release its savepoint");
+            assert!(
+                conn.is_autocommit(),
+                "failed save must release its savepoint"
+            );
             conn.close().unwrap();
 
             let conn = crate::db::open(&path, &key).unwrap();
