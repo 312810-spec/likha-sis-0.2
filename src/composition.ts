@@ -1,4 +1,5 @@
 import { AssessmentApplicationService } from "./application/assessment-service";
+import { AdviserDailyAttendanceApplicationService } from "./application/adviser-daily-attendance-service";
 import { LessonPlanApplicationService } from "./application/lesson-plan-service";
 import { AttendanceApplicationService } from "./application/attendance-service";
 import { AuthApplicationService } from "./application/auth-service";
@@ -27,6 +28,7 @@ import { SyncStatusApplicationService } from "./application/sync-status-service"
 import { TeachingAssignmentApplicationService } from "./application/teaching-assignment-service";
 import { UserApplicationService } from "./application/user-service";
 import { TauriAssessmentRepository } from "./infrastructure/tauri/assessment-repository";
+import { TauriAdviserDailyAttendanceRepository } from "./infrastructure/tauri/adviser-daily-attendance-repository";
 import { TauriLessonPlanRepository } from "./infrastructure/tauri/lesson-plan-repository";
 import { TauriAttendanceRepository } from "./infrastructure/tauri/attendance-repository";
 import { TauriAuthRepository } from "./infrastructure/tauri/auth-repository";
@@ -79,6 +81,9 @@ export const learnerService = new LearnerApplicationService(new TauriLearnerRepo
 export const userService = new UserApplicationService(new TauriUserRepository());
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());
+export const adviserDailyAttendanceService = new AdviserDailyAttendanceApplicationService(
+  new TauriAdviserDailyAttendanceRepository(),
+);
 const sectionRepository = new TauriSectionRepository();
 export const sectionService = new SectionApplicationService(sectionRepository);
 export const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
