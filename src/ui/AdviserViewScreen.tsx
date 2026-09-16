@@ -84,11 +84,12 @@ export function AdviserViewScreen({
   }, [subjectAttendanceService, date]);
 
   useEffect(() => {
+    if (sectionsLoading) return;
     const selectedSection = sections.find((section) => section.id === sectionId);
     const nextSectionId = selectedSection?.id ?? null;
     if ((initialContext?.sectionId ?? null) === nextSectionId) return;
     onContextChange?.(nextSectionId ? { sectionId: nextSectionId } : null);
-  }, [sections, sectionId, initialContext?.sectionId, onContextChange]);
+  }, [sections, sectionId, sectionsLoading, initialContext?.sectionId, onContextChange]);
 
   function loadOverview() {
     if (!sectionId) return;
