@@ -60,7 +60,7 @@ import { SyncStatusScreen } from "./ui/SyncStatusScreen";
 import { TeacherLoadScreen } from "./ui/TeacherLoadScreen";
 import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
-import type { TeacherClassWorkContext } from "./ui/work-context";
+import type { AdvisoryWorkContext, TeacherClassWorkContext } from "./ui/work-context";
 import { AppLayout } from "./ui/shell/AppLayout";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
@@ -102,6 +102,10 @@ function App() {
   // No academic decision trusts this UI state without application-service
   // revalidation.
   const [classWorkContext, setClassWorkContext] = useState<TeacherClassWorkContext | null>(null);
+  // Advisory context is only an opaque navigation pointer. My Advisory
+  // revalidates it against the current adviser-authorized section list
+  // before using it, and native commands independently recheck access.
+  const [advisoryWorkContext, setAdvisoryWorkContext] = useState<AdvisoryWorkContext | null>(null);
   // Set only by ClassWorkspaceScreen's "Open class record" action (via
   // MyDayScreen), so My Day can swap in ClassRecordJourneyScreen for the
   // same preserved class context without switching tabs or asking for
@@ -140,8 +144,13 @@ function App() {
     setClassRecordAssignmentId(null);
   }
 
-  function handleSessionExpired() {
+  function clearSessionWorkContexts() {
     clearClassWorkContext();
+    setAdvisoryWorkContext(null);
+  }
+
+  function handleSessionExpired() {
+    clearSessionWorkContexts();
     setSession(null);
     setSessionExpiredNotice("Your session has expired. Please sign in again.");
   }
@@ -183,19 +192,19 @@ function App() {
 
   async function handleLogout() {
     await authService.logout();
-    clearClassWorkContext();
+    clearSessionWorkContexts();
     setSessionExpiredNotice(null);
     setSession(null);
   }
 
   function handleSetupComplete(newSession: CurrentSession) {
-    clearClassWorkContext();
+    clearSessionWorkContexts();
     setNeedsSetup(false);
     setSession(newSession);
   }
 
   function handleLoggedIn(newSession: CurrentSession) {
-    clearClassWorkContext();
+    clearSessionWorkContexts();
     setSessionExpiredNotice(null);
     setSession(newSession);
   }
@@ -482,7 +491,11 @@ function App() {
               teacherUserId={session.userId}
             />
           ) : activeTab === "adviser-view" ? (
-            <AdviserViewScreen subjectAttendanceService={subjectAttendanceService} />
+            <AdviserViewScreen
+              subjectAttendanceService={subjectAttendanceService}
+              initialContext={advisoryWorkContext}
+              onContextChange={setAdvisoryWorkContext}
+            />
           ) : activeTab === "teacher-load" ? (
             <TeacherLoadScreen
               teachingAssignmentService={teachingAssignmentService}
