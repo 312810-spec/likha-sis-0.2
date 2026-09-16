@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { AdviserDailyAttendanceApplicationService } from "../application/adviser-daily-attendance-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
+import { adviserDailyAttendanceService as composedAdviserDailyAttendanceService } from "../composition";
+import type { AttendanceRosterEntry, AttendanceStatus } from "../domain/attendance";
 import type { Section } from "../domain/section";
 import type { AdviserAttendanceOverview } from "../domain/subject-attendance";
 import { Alert } from "./components/Alert";
@@ -11,6 +14,7 @@ import type { AdvisoryWorkContext } from "./work-context";
 
 interface AdviserViewScreenProps {
   subjectAttendanceService: SubjectAttendanceApplicationService;
+  adviserDailyAttendanceService?: AdviserDailyAttendanceApplicationService;
   initialContext?: AdvisoryWorkContext | null;
   onContextChange?: (context: AdvisoryWorkContext | null) => void;
 }
@@ -23,18 +27,28 @@ function todayAsIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-/** Read-only, section-wide Subject Attendance signals for active
- * advisers and School Heads. The Rust command independently enforces
- * that relationship; this screen's filtered picker and advisory context
- * are usability aids, not security boundaries. */
+function attendanceLabel(status: AttendanceStatus): string {
+  if (status === "tardy") return "Tardy";
+  return status === "present" ? "Present" : "Absent";
+}
+
+/**
+ * Adviser Room for the currently authorized advisory section/date.
+ *
+ * Official Daily Attendance and Subject Attendance signals are intentionally
+ * separate. The former writes only through adviser-authorized native commands;
+ * the latter remains read-only follow-up evidence and never becomes SF2.
+ */
 export function AdviserViewScreen({
   subjectAttendanceService,
+  adviserDailyAttendanceService = composedAdviserDailyAttendanceService,
   initialContext = null,
   onContextChange,
 }: AdviserViewScreenProps) {
   const { mode } = useTeacherMode();
   const sectionsRequestRef = useRef(0);
   const overviewRequestRef = useRef(0);
+  const dailyAttendanceRequestRef = useRef(0);
 
   const [date, setDate] = useState(todayAsIsoDate);
   const [sections, setSections] = useState<Section[]>([]);
@@ -44,6 +58,11 @@ export function AdviserViewScreen({
   const [overview, setOverview] = useState<AdviserAttendanceOverview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [dailyRoster, setDailyRoster] = useState<AttendanceRosterEntry[]>([]);
+  const [dailyAttendanceLoading, setDailyAttendanceLoading] = useState(false);
+  const [dailyAttendanceError, setDailyAttendanceError] = useState<string | null>(null);
+  const [savingLearnerId, setSavingLearnerId] = useState<string | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   function loadSections() {
     const requestId = ++sectionsRequestRef.current;
@@ -112,19 +131,83 @@ export function AdviserViewScreen({
       });
   }
 
+  async function loadDailyAttendance() {
+    if (!sectionId) return;
+    const requestId = ++dailyAttendanceRequestRef.current;
+    setDailyAttendanceLoading(true);
+    setDailyAttendanceError(null);
+    try {
+      const result = await adviserDailyAttendanceService.rosterForDate(sectionId, date);
+      if (dailyAttendanceRequestRef.current !== requestId) return;
+      setDailyRoster(result);
+    } catch {
+      if (dailyAttendanceRequestRef.current !== requestId) return;
+      setDailyRoster([]);
+      setDailyAttendanceError(
+        "Could not load official daily attendance. Your advisory assignment or permission may have changed.",
+      );
+    } finally {
+      if (dailyAttendanceRequestRef.current === requestId) setDailyAttendanceLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!sectionId) {
-      // Invalidate an in-flight overview if a date change leaves the
-      // caller with no authorized section. A late rejection must not
-      // replace the correct empty state with a stale permission error.
+      // Invalidate in-flight requests if a date change leaves the caller
+      // with no authorized section. Late results must never repopulate stale data.
       overviewRequestRef.current += 1;
+      dailyAttendanceRequestRef.current += 1;
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOverview(null);
     setOverviewError(null);
+    setDailyRoster([]);
+    setDailyAttendanceError(null);
     loadOverview();
+    void loadDailyAttendance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectAttendanceService, sectionId, date]);
+  }, [subjectAttendanceService, adviserDailyAttendanceService, sectionId, date]);
+
+  async function recordOfficialAttendance(learnerId: string, status: AttendanceStatus) {
+    setSavingLearnerId(learnerId);
+    setDailyAttendanceError(null);
+    try {
+      const recorded = await adviserDailyAttendanceService.recordAttendance(
+        sectionId,
+        learnerId,
+        date,
+        status,
+      );
+      if (!recorded) {
+        setDailyAttendanceError(
+          "Attendance was not saved because the learner is no longer active in this advisory section for this date.",
+        );
+        return;
+      }
+      await loadDailyAttendance();
+    } catch {
+      setDailyAttendanceError(
+        "Could not save official attendance. Your advisory assignment, learner enrollment, or permission may have changed.",
+      );
+    } finally {
+      setSavingLearnerId(null);
+    }
+  }
+
+  async function markUnmarkedPresent() {
+    setBulkSaving(true);
+    setDailyAttendanceError(null);
+    try {
+      const result = await adviserDailyAttendanceService.bulkMarkPresent(sectionId, date);
+      setDailyRoster(result);
+    } catch {
+      setDailyAttendanceError(
+        "Could not mark unrecorded learners Present. Your advisory assignment or permission may have changed.",
+      );
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   return (
     <Page
@@ -132,14 +215,17 @@ export function AdviserViewScreen({
       hint={
         mode === "guided" ? (
           <p className="field-hint">
-            Review your current advisory roster alongside subject-attendance patterns. These signals
-            are for follow-up only: you cannot edit a subject teacher&apos;s record here, and
-            nothing on this screen changes official attendance.
+            Record official daily attendance for your advisory section, then review subject-attendance
+            patterns separately. Subject signals are for follow-up only and never become official
+            attendance automatically.
           </p>
         ) : undefined
       }
     >
-      <p className="field-hint">Advisory roster + Subject Attendance signals — not SF2.</p>
+      <p className="field-hint">
+        Official daily attendance and Subject Attendance are separate records. Subject signals are not
+        SF2.
+      </p>
 
       <div className="form-row">
         <div className="field">
@@ -211,9 +297,85 @@ export function AdviserViewScreen({
                   {overview.asOfDate}.
                 </p>
                 <p className="field-hint">
-                  This roster comes from current section enrollment. The Subject Attendance signals
-                  below are read-only follow-up data and do not become SF2.
+                  This roster comes from current section enrollment. Official daily attendance below
+                  is a separate record from the read-only Subject Attendance signals.
                 </p>
+              </section>
+
+              <section aria-labelledby="official-daily-attendance-heading">
+                <h2 id="official-daily-attendance-heading">Official daily attendance</h2>
+                <p className="field-hint">
+                  Record the advisory section&apos;s official Present, Absent, or Tardy mark for this
+                  date. Existing marks are never overwritten by “Mark unmarked Present.”
+                </p>
+
+                {dailyAttendanceError && (
+                  <Alert tone="error">
+                    <p>{dailyAttendanceError}</p>
+                    <button type="button" onClick={() => void loadDailyAttendance()}>
+                      Retry
+                    </button>
+                  </Alert>
+                )}
+
+                {dailyAttendanceLoading ? (
+                  <Loading label="Loading official daily attendance…" />
+                ) : dailyRoster.length === 0 ? (
+                  <EmptyState>No active learners are available for official attendance on this date.</EmptyState>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void markUnmarkedPresent()}
+                      disabled={bulkSaving || savingLearnerId !== null}
+                    >
+                      {bulkSaving ? "Marking…" : "Mark unmarked Present"}
+                    </button>
+                    <table className="attendance-roster">
+                      <caption className="visually-hidden">
+                        Official daily attendance for {overview.sectionName} on {date}
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Learner</th>
+                          <th scope="col">Official mark</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyRoster.map((row) => {
+                          const learnerName = `${row.givenName} ${row.familyName}`;
+                          return (
+                            <tr key={row.learnerId}>
+                              <th scope="row">{learnerName}</th>
+                              <td>
+                                <select
+                                  aria-label={`Official attendance for ${learnerName}`}
+                                  value={row.status ?? ""}
+                                  disabled={bulkSaving || savingLearnerId !== null}
+                                  onChange={(event) =>
+                                    void recordOfficialAttendance(
+                                      row.learnerId,
+                                      event.target.value as AttendanceStatus,
+                                    )
+                                  }
+                                >
+                                  <option value="" disabled>
+                                    Not marked
+                                  </option>
+                                  {(["present", "absent", "tardy"] as const).map((status) => (
+                                    <option key={status} value={status}>
+                                      {attendanceLabel(status)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </>
+                )}
               </section>
 
               <section aria-labelledby="advisory-subject-signals-heading">
