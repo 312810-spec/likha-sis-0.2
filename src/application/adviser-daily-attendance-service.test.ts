@@ -22,10 +22,7 @@ class FakeAdviserDailyAttendanceRepository implements AdviserDailyAttendanceRepo
     return null;
   }
 
-  async bulkMarkPresent(
-    sectionId: string,
-    attendanceDate: string,
-  ): Promise<AttendanceRosterEntry[]> {
+  async bulkMarkPresent(sectionId: string, attendanceDate: string) {
     this.calls.push(["bulk", sectionId, attendanceDate]);
     return [];
   }
