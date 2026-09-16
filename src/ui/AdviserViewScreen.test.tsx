@@ -158,7 +158,9 @@ describe("AdviserViewScreen", () => {
     expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Advisory roster" })).toBeInTheDocument();
-    expect(screen.getByText(/1 learner enrolled in Mabini as of 2026-08-29/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 learner enrolled in Mabini as of 2026-08-29.",
+    );
     expect(screen.getByRole("heading", { name: "Subject Attendance signals" })).toBeInTheDocument();
     expect(
       screen.getByText("Advisory roster + Subject Attendance signals — not SF2."),
@@ -188,7 +190,9 @@ describe("AdviserViewScreen", () => {
     );
 
     expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
-    expect(screen.getByText(/1 learner enrolled in Mabini as of 2026-08-29/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 learner enrolled in Mabini as of 2026-08-29.",
+    );
     expect(screen.getByText(/0 subject sessions held across/)).toBeInTheDocument();
   });
 
