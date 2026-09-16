@@ -18,46 +18,32 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current verified main: `9fdc9c01a0a977859df53524d308f9a9e3421b78` (PR #86).
-GitHub confirms PR #86 merged on 2026-09-15 at 21:41 UTC.
+Current main: `85e5953201c6965e35131af76684e9971f4871e8` (PR #87).
+GitHub confirms PR #87 merged on 2026-09-15 at 22:18 UTC; no open PRs were
+present when this slice began. PRs #79–87 are merged; #78 was superseded.
 
-Current slice: `test/score-sync-reconnect-proof`, adding two synthetic workspace
-regressions: offline/online events cannot manufacture synchronization evidence;
-explicit refresh must obtain persisted status; a late pre-denial refresh cannot
-restore evidence after a newer denied read. No production behavior changed.
-These are mocked TypeScript UI journey tests, not native authorization, actual
-transport, durable SQLite, or packaged Windows proof. Cargo is unavailable here.
-Next: native offline/reconnect/access-change proof on a supported runtime, then
-Adviser Room. Do not treat the UI tests as completion of native verification.
+Current slice: `test/native-score-evidence-lifecycle`. Two native Rust regressions
+extend GJ-7 beyond mocked UI behavior:
 
-Historical row-display handoff follows:
-PRs #79–85 are merged; #78 is closed as superseded. PR #85's exact head passed
-Quality and independent Security, with no reviews or unresolved threads.
+- A real loopback HTTP timeout and real hub credential rejection retain the
+  pending score; successful retry must receive hub acknowledgment before the
+  persisted evidence becomes Synced. The local score survives failed attempts.
+- A previously authorized score lookup fails after assignment reassignment;
+  the new owner can resolve it, then loses access when the assignment is deleted.
 
-## Canonical continuation (2026-09-15)
+No production behavior, dependencies or quality gates change. The transport test
+uses the existing real hub fixture and separate in-memory databases; it seeds the
+outbox directly, so it does not prove the command enqueue path, disk restart,
+OS network interruption, credential revocation or packaged Windows behavior.
+The access test exercises the repository boundary, not Tauri session expiry.
+Cargo/rustfmt are unavailable locally; native execution and formatting must pass
+CI before merge. See the PR for actual checks, not inferred success.
 
-Canonical branch: `feat/score-sync-row-display`.
-
-The assignment-owned Class Record journey now injects the composed authorized
-score-evidence service. Saved rows show persisted evidence as a last-check snapshot,
-with one explicit refresh control. No connectivity-derived sync claim or polling.
-The generic Class Records screen does not gain an unscoped evidence lookup.
-Drafts, pending writes and row errors hide evidence. Saved-row keys and cancelled
-reads discard old results; teacher/assignment/record changes remount the workspace.
-A late save from a previous assessment no longer mutates the new assessment roster.
-Failed evidence reads preserve successful local-save confirmation. Returning an
-edited score to its original value restores evidence without another write.
-
-Independent security/teacher-comfort review found the unchanged-draft cleanup and
-service-replacement snapshot issues; both were corrected. Focused component and
-workspace tests cover evidence vocabulary, absent/denied evidence, delayed results,
-draft restoration, access-denied refresh, read failure after save and late old-item
-writes. See the PR for actual checks. Fresh Quality and independent Security are
-required before merge. No new native, packaged-Windows or hardware proof is claimed.
-
-Next slice: offline/reconnect and changed-access journey proof, including a full
-native end-to-end run when the platform is available. Snapshot status is deliberately
-not live; background changes require refresh or reopening the saved row.
+Next: file-backed restart/recovery proof and packaged Windows verification, then
+Adviser Room. Do not mark GJ-7 or native release verification complete from these
+two regressions alone. Current row evidence remains a last-check snapshot;
+refresh or reopen to see background changes. Drafts, pending writes, denied reads
+and stale responses cannot restore prior evidence.
 
 ## Continuation execution policy
 

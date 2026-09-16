@@ -432,6 +432,54 @@ mod tests {
     }
 
     #[test]
+    fn previously_authorized_score_lookup_is_denied_after_assignment_reassignment() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let assignment_id = assign_item_class_to_teacher(&conn, &school_id, &item_id, &teacher_id);
+        let score = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(18.0),
+            &teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let resolve = |user_id: &str| {
+            score_entity_id_for_owned_assignment(
+                &conn,
+                &school_id,
+                user_id,
+                &assignment_id,
+                &item_id,
+                &learner_id,
+            )
+        };
+        assert_eq!(resolve(&teacher_id).unwrap(), Some(score.id.clone()));
+        let replacement = user::create_user(&conn, "teacher.b", "password", "B Teacher").unwrap();
+        // Model a trusted assignment update arriving between two reads. The
+        // previously successful caller must not retain cached ownership.
+        conn.execute(
+            "UPDATE teaching_assignments SET teacher_user_id = ?1 WHERE id = ?2",
+            (&replacement.id, &assignment_id),
+        )
+        .unwrap();
+        assert!(matches!(resolve(&teacher_id), Err(AppError::Unauthorized)));
+        assert_eq!(resolve(&replacement.id).unwrap(), Some(score.id));
+        conn.execute(
+            "DELETE FROM teaching_assignments WHERE id = ?1",
+            [&assignment_id],
+        )
+        .unwrap();
+        assert!(matches!(
+            resolve(&replacement.id),
+            Err(AppError::Unauthorized)
+        ));
+    }
+
+    #[test]
     fn assignment_owned_by_another_teacher_is_rejected() {
         let conn = open_test_db();
         let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
