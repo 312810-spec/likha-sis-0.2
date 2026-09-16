@@ -175,7 +175,7 @@ describe("AdviserViewScreen", () => {
         heldSessionCount: 0,
         rows: [
           {
-            ...OVERVIEW.rows[0],
+            ...OVERVIEW.rows[0]!,
             presentCount: 0,
             absentCount: 0,
             lateCount: 0,
