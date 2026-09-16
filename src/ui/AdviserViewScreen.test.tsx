@@ -163,12 +163,14 @@ describe("AdviserViewScreen", () => {
   });
 
   it("restores an initial advisory context only after that section is authorized", async () => {
+    const onContextChange = vi.fn();
     const repository = new FakeSubjectAttendanceRepository([SECTION, SECOND_SECTION]);
-    renderScreen(repository, { sectionId: SECOND_SECTION.id });
+    renderScreen(repository, { sectionId: SECOND_SECTION.id }, onContextChange);
 
     await screen.findByText("Ana Cruz");
     expect(screen.getByLabelText("Advisory section")).toHaveValue(SECOND_SECTION.id);
     expect(repository.overviewCalls).toContainEqual([SECOND_SECTION.id, "2026-08-29"]);
+    expect(onContextChange).not.toHaveBeenCalledWith(null);
   });
 
   it("never queries a stale advisory context and falls back to an authorized section", async () => {
