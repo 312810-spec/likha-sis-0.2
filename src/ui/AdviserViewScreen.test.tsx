@@ -156,9 +156,7 @@ describe("AdviserViewScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "My Advisory" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
     expect(screen.getByText("Subject attendance — not SF2.")).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /edit|save|convert/i })).not.toBeInTheDocument();
@@ -171,10 +169,7 @@ describe("AdviserViewScreen", () => {
 
     await screen.findByText("Ana Cruz");
     expect(screen.getByLabelText("Advisory section")).toHaveValue(SECOND_SECTION.id);
-    expect(repository.overviewCalls).toContainEqual([
-      SECOND_SECTION.id,
-      "2026-08-29",
-    ]);
+    expect(repository.overviewCalls).toContainEqual([SECOND_SECTION.id, "2026-08-29"]);
     expect(onContextChange).not.toHaveBeenCalledWith(null);
   });
 
@@ -184,15 +179,11 @@ describe("AdviserViewScreen", () => {
     renderScreen(repository, { sectionId: "stale-section" }, onContextChange);
 
     await screen.findByText("Ana Cruz");
-    expect(
-      repository.overviewCalls.some(
-        ([sectionId]) => sectionId === "stale-section",
-      ),
-    ).toBe(false);
-    expect(repository.overviewCalls).toContainEqual([SECTION.id, "2026-08-29"]);
-    await waitFor(() =>
-      expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECTION.id }),
+    expect(repository.overviewCalls.some(([sectionId]) => sectionId === "stale-section")).toBe(
+      false,
     );
+    expect(repository.overviewCalls).toContainEqual([SECTION.id, "2026-08-29"]);
+    await waitFor(() => expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECTION.id }));
   });
 
   it("updates advisory context when the authorized picker changes", async () => {
@@ -205,10 +196,7 @@ describe("AdviserViewScreen", () => {
     );
     await screen.findByText("Ana Cruz");
 
-    await user.selectOptions(
-      screen.getByLabelText("Advisory section"),
-      SECOND_SECTION.id,
-    );
+    await user.selectOptions(screen.getByLabelText("Advisory section"), SECOND_SECTION.id);
 
     await waitFor(() =>
       expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECOND_SECTION.id }),
