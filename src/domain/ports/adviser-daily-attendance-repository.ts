@@ -1,8 +1,4 @@
-import type {
-  AttendanceRecord,
-  AttendanceRosterEntry,
-  AttendanceStatus,
-} from "../attendance";
+import type { AttendanceRecord, AttendanceRosterEntry, AttendanceStatus } from "../attendance";
 
 /**
  * Daily-only official attendance port for My Advisory.
