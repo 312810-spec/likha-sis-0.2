@@ -270,9 +270,7 @@ describe("AdviserViewScreen", () => {
     await screen.findByLabelText("Official attendance for Ana Cruz");
     await user.click(screen.getByRole("button", { name: "Mark unmarked Present" }));
 
-    await waitFor(() =>
-      expect(dailyRepository.bulkCalls).toContainEqual(["sec-1", "2026-08-29"]),
-    );
+    await waitFor(() => expect(dailyRepository.bulkCalls).toContainEqual(["sec-1", "2026-08-29"]));
     expect(screen.getByLabelText("Official attendance for Ana Cruz")).toHaveValue("absent");
     expect(screen.getByLabelText("Official attendance for Ben Santos")).toHaveValue("present");
   });
