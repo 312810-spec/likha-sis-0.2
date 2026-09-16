@@ -15,7 +15,7 @@
     "tauri": "tauri",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/ui/AdviserViewScreen.tsx src/ui/AdviserViewScreen.test.tsx && git diff -- src/ui/AdviserViewScreen.tsx src/ui/AdviserViewScreen.test.tsx && exit 1",
+    "format:check": "prettier --check .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
