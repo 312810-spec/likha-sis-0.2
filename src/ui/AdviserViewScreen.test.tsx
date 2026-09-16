@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdviserDailyAttendanceApplicationService } from "../application/adviser-daily-attendance-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { AttendanceRecord, AttendanceRosterEntry, AttendanceStatus } from "../domain/attendance";
+import type {
+  AttendanceRecord,
+  AttendanceRosterEntry,
+  AttendanceStatus,
+} from "../domain/attendance";
 import type { AdviserDailyAttendanceRepository } from "../domain/ports/adviser-daily-attendance-repository";
 import type { SubjectAttendanceRepository } from "../domain/ports/subject-attendance-repository";
 import type { TeachingAssignmentRepository } from "../domain/ports/teaching-assignment-repository";
