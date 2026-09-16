@@ -132,14 +132,14 @@ export function AdviserViewScreen({
       hint={
         mode === "guided" ? (
           <p className="field-hint">
-            Review subject-attendance patterns across your advisory class. These signals are for
-            follow-up only: you cannot edit a subject teacher&apos;s record here, and nothing on
-            this screen changes official attendance.
+            Review your current advisory roster alongside subject-attendance patterns. These signals
+            are for follow-up only: you cannot edit a subject teacher&apos;s record here, and
+            nothing on this screen changes official attendance.
           </p>
         ) : undefined
       }
     >
-      <p className="field-hint">Subject attendance — not SF2.</p>
+      <p className="field-hint">Advisory roster + Subject Attendance signals — not SF2.</p>
 
       <div className="form-row">
         <div className="field">
@@ -198,53 +198,69 @@ export function AdviserViewScreen({
           )}
 
           {overviewLoading ? (
-            <Loading label="Loading subject-attendance signals…" />
+            <Loading label="Loading advisory roster and subject-attendance signals…" />
           ) : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
-            <EmptyState>No learners enrolled in this section on this date.</EmptyState>
+            <EmptyState>No learners are enrolled in this advisory section on this date.</EmptyState>
           ) : (
             <>
-              <p className="attendance-count" role="status">
-                <strong>{overview.heldSessionCount}</strong> subject session
-                {overview.heldSessionCount === 1 ? "" : "s"} held across{" "}
-                <strong>{overview.subjectCount}</strong> subject
-                {overview.subjectCount === 1 ? "" : "s"}
-              </p>
-              <table className="attendance-roster">
-                <caption className="visually-hidden">
-                  Read-only Subject Attendance signals for {overview.sectionName} as of{" "}
-                  {overview.asOfDate}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Learner</th>
-                    <th scope="col">Present</th>
-                    <th scope="col">Absent</th>
-                    <th scope="col">Late</th>
-                    <th scope="col">Excused</th>
-                    <th scope="col">Subjects with absences</th>
-                    <th scope="col">Highest current subject absence streak</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.rows.map((row) => (
-                    <tr key={row.membershipId}>
-                      <th scope="row">
-                        {row.givenName} {row.familyName}
-                      </th>
-                      <td>{row.presentCount}</td>
-                      <td>{row.absentCount}</td>
-                      <td>{row.lateCount}</td>
-                      <td>{row.excusedCount}</td>
-                      <td>
-                        {row.subjectsWithAbsences.length > 0
-                          ? row.subjectsWithAbsences.join(", ")
-                          : "None"}
-                      </td>
-                      <td>{row.highestCurrentSubjectAbsenceStreak}</td>
+              <section aria-labelledby="advisory-roster-heading">
+                <h2 id="advisory-roster-heading">Advisory roster</h2>
+                <p className="attendance-count" role="status">
+                  <strong>{overview.rows.length}</strong> learner
+                  {overview.rows.length === 1 ? "" : "s"} enrolled in {overview.sectionName} as of{" "}
+                  {overview.asOfDate}.
+                </p>
+                <p className="field-hint">
+                  This roster comes from current section enrollment. The Subject Attendance signals
+                  below are read-only follow-up data and do not become SF2.
+                </p>
+              </section>
+
+              <section aria-labelledby="advisory-subject-signals-heading">
+                <h2 id="advisory-subject-signals-heading">Subject Attendance signals</h2>
+                <p className="attendance-count">
+                  <strong>{overview.heldSessionCount}</strong> subject session
+                  {overview.heldSessionCount === 1 ? "" : "s"} held across{" "}
+                  <strong>{overview.subjectCount}</strong> subject
+                  {overview.subjectCount === 1 ? "" : "s"}
+                </p>
+                <table className="attendance-roster">
+                  <caption className="visually-hidden">
+                    Current advisory roster with read-only Subject Attendance signals for{" "}
+                    {overview.sectionName} as of {overview.asOfDate}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Learner</th>
+                      <th scope="col">Present</th>
+                      <th scope="col">Absent</th>
+                      <th scope="col">Late</th>
+                      <th scope="col">Excused</th>
+                      <th scope="col">Subjects with absences</th>
+                      <th scope="col">Highest current subject absence streak</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {overview.rows.map((row) => (
+                      <tr key={row.membershipId}>
+                        <th scope="row">
+                          {row.givenName} {row.familyName}
+                        </th>
+                        <td>{row.presentCount}</td>
+                        <td>{row.absentCount}</td>
+                        <td>{row.lateCount}</td>
+                        <td>{row.excusedCount}</td>
+                        <td>
+                          {row.subjectsWithAbsences.length > 0
+                            ? row.subjectsWithAbsences.join(", ")
+                            : "None"}
+                        </td>
+                        <td>{row.highestCurrentSubjectAbsenceStreak}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
             </>
           )}
         </>

@@ -152,14 +152,50 @@ afterEach(() => {
 });
 
 describe("AdviserViewScreen", () => {
-  it("shows only read-only signals and the Subject Attendance boundary", async () => {
+  it("shows the trusted advisory roster alongside read-only Subject Attendance signals", async () => {
     renderScreen();
 
     expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
-    expect(screen.getByText("Subject attendance — not SF2.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Advisory roster" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 learner enrolled in Mabini as of 2026-08-29.",
+    );
+    expect(screen.getByRole("heading", { name: "Subject Attendance signals" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Advisory roster + Subject Attendance signals — not SF2."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /edit|save|convert/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps an enrolled advisory learner visible when no subject session has been held", async () => {
+    renderScreen(
+      new FakeSubjectAttendanceRepository([SECTION], {
+        ...OVERVIEW,
+        subjectCount: 0,
+        heldSessionCount: 0,
+        rows: [
+          {
+            ...OVERVIEW.rows[0]!,
+            presentCount: 0,
+            absentCount: 0,
+            lateCount: 0,
+            excusedCount: 0,
+            subjectsWithAbsences: [],
+            highestCurrentSubjectAbsenceStreak: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "1 learner enrolled in Mabini as of 2026-08-29.",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Subject Attendance signals" }).parentElement,
+    ).toHaveTextContent("0 subject sessions held across 0 subjects");
   });
 
   it("restores an initial advisory context only after that section is authorized", async () => {
