@@ -18,33 +18,34 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current main: `54a68a08d3dfc90208b3b1254f097e6005c230e8` (PR #89).
-GitHub confirms owner-authored PR #89 merged on 2026-09-16 at 12:05:08 UTC;
-its exact head `2c5c8dc7715bd17e1806d7587c50bfbb01dd069d` passed Quality
-(run 35092336172) and Security (run 35092336175). No open PRs or overlapping
-local changes were present when this slice began. PRs #79–89 are merged.
+Current main: `0ddf38670626b483cab7b83c1fb5452d0b1a1377` (PR #90).
+PR #90's exact head `eb9e0556534adfbde2fb69b8a1c85336321616f9` passed Quality
+(run 35103486275 / #799) and independent Security (run 35103486286 / #881)
+before squash merge. Its native tests prove the shared score-save path preserves
+a real encrypted outbox entry across SQLCipher close/reopen, rolls back both first
+scores and corrections when enqueue fails, releases its savepoint, and remains
+writable for retry. These are software recovery proofs only; GJ-7 runtime/hardware
+blockers remain in VERIFICATION-DEBT.
 
-Current slice: `test/score-command-recovery`. Two native regressions exercise
-the existing shared command save logic against file-backed SQLCipher databases:
+Current slice: `feat/my-advisory-context`. Reuse the existing trusted
+`section_advisories` authority and adviser-view commands; do not add schema or use
+subject Teaching Assignment as advisory authority. `AdvisoryWorkContext` carries
+only an opaque `sectionId` navigation pointer. My Advisory must first load the
+trusted adviser-authorized section list, restore the pointer only when it remains
+in that list, fall back only to another authorized section, and never issue an
+overview request for a stale pointer. Native overview commands independently
+reauthorize the section. Session transitions clear the context. No learner PII,
+sync protocol, grading, cloud, or authorization rule changes.
 
-- Saved score and real encrypted pending payload survive close/reopen; payload
-  decrypts to the returned score, device identity persists, status stays WaitingToSync.
-- A connection-local trigger rejects enqueue after the score write, for both a
-  first score and a correction. Reopen must preserve the prior roster and complete
-  queue, and a subsequent retry must succeed with exactly one new queued change.
+The existing Adviser View remains read-only Subject Attendance signals, explicitly
+not SF2. This slice renames the destination to My Advisory and establishes bounded
+adviser-owned navigation continuity; it does not yet create official adviser
+daily-attendance/form behavior.
 
-No production behavior, dependencies or gates change. Cargo/rustfmt are absent
-locally; native execution, formatting and Clippy require exact-head CI before
-merge. See the canonical PR for actual local checks and independent review.
-These tests bypass the Tauri session and key-resolution ceremony. They prove no
-OS crash/power-loss recovery, DPAPI, restored session, actual process restart,
-transport retry after restart or packaged Windows workflow.
-
-Next: Adviser Room's smallest assignment-owned entry/context slice, retaining
-the hardware/runtime recovery blockers in VERIFICATION-DEBT. Do not mark GJ-7
-or native release verification complete from software tests alone.
-Current row evidence remains a last-check snapshot; refresh or reopen to see
-background changes. Drafts, denied reads and stale responses hide prior evidence.
+Next: after exact-head Quality and Security verify this slice, continue with the
+smallest adviser-owned roster/attendance composition that can reuse the preserved
+AdvisoryWorkContext without weakening the Subject Attendance / SF2 boundary.
+Runtime/hardware recovery blockers remain explicitly unresolved.
 
 ## Continuation execution policy
 
@@ -114,10 +115,11 @@ Completed:
 - Grade-state continuity: trusted computation remains current after successful score correction.
 - Offline-save primitive: `LocalSaveStatus` truthfully identifies a locally committed write.
 - Class Record local-save integration: actual score rows now use `Saved on this device` only after persistence evidence.
+- GJ-7 software proof: persisted score/outbox evidence survives clean encrypted reopen and command enqueue failure rolls back atomically; process/hardware recovery remains unverified.
 
-Current: GJ-7 reconnect/sync truthfulness using existing trusted queue/conflict evidence.
+Current: GJ-8 My Advisory entry/context continuity rooted in actual `section_advisories`, not subject Teaching Assignment authority.
 
-Next: continue evidence-backed reconnect/sync proof, then Adviser Room and form continuation according to release priority.
+Next: adviser-owned roster/attendance composition, then appropriate form continuation according to release priority and authoritative form evidence.
 
 Do not jump to unrelated backlog work unless a verified P0/P1 security, data-loss, grading-correctness, or compliance defect interrupts.
 
@@ -160,6 +162,7 @@ Rules:
 - grade formulas remain in domain, application, or repository logic;
 - stale or unauthorized class context fails closed;
 - `TeacherClassWorkContext` is navigation state only, never an authorization source;
+- `AdvisoryWorkContext` is navigation state only; `section_advisories` plus trusted backend commands remain the advisory authority;
 - after a transition that may change assessment inputs, do not present an old computed grade as current without trusted recomputation.
 
 Known correctness debt: Grade 12 SY 2026–2027 transmutation has prior research suggesting a hybrid legacy-weight/new-transmutation rule. Treat it as unresolved until verified against sufficiently authoritative evidence and the current code path.

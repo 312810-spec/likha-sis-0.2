@@ -6,7 +6,7 @@ import { DevPreviewApp } from "./DevPreviewApp";
 /**
  * Renders the dev-preview app and walks it to each of the seven
  * previously-unwired `SignedInTab` destinations tracked as fixture
- * coverage debt in `docs/VERIFICATION-DEBT.md` (Adviser View, Subject
+ * coverage debt in `docs/VERIFICATION-DEBT.md` (My Advisory, Subject
  * Attendance, Subject Monitor, Teacher Load, Teaching Assignments,
  * Schedule Meetings) — proving the new fixture repositories in
  * `./fixtures.ts` genuinely load and render through the exact same
@@ -30,11 +30,11 @@ describe("DevPreviewApp — new fixture destinations render", () => {
     expect(await screen.findByRole("heading", { name: "Subject Monitor" })).toBeInTheDocument();
   });
 
-  it("renders Adviser View via the sidebar", async () => {
+  it("renders My Advisory via the sidebar", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
-    await user.click(screen.getByRole("button", { name: "My Advisory Overview" }));
-    expect(await screen.findByRole("heading", { name: "Adviser View" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "My Advisory" }));
+    expect(await screen.findByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
   });
 
   it("renders Teacher Load via the sidebar", async () => {

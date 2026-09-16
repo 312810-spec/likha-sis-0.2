@@ -47,7 +47,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
   "subject-monitor": "My Subject Attendance",
-  "adviser-view": "My Advisory Overview",
+  "adviser-view": "My Advisory",
   "teacher-load": "My Teaching Load",
   "monthly-summary": "Monthly Summary",
   "grading-periods": "Grading Periods",

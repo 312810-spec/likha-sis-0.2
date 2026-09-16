@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
@@ -10,6 +10,7 @@ import type { AdviserAttendanceOverview } from "../domain/subject-attendance";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ModeProvider } from "./theme/ModeContext";
 import { AdviserViewScreen } from "./AdviserViewScreen";
+import type { AdvisoryWorkContext } from "./work-context";
 
 const SECTION: Section = {
   id: "sec-1",
@@ -17,6 +18,15 @@ const SECTION: Section = {
   schoolYear: "2026-2027",
   gradeLevel: "7",
   name: "Mabini",
+  createdAt: "now",
+};
+
+const SECOND_SECTION: Section = {
+  id: "sec-2",
+  schoolId: "school-1",
+  schoolYear: "2026-2027",
+  gradeLevel: "8",
+  name: "Rizal",
   createdAt: "now",
 };
 
@@ -110,14 +120,22 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   }
 }
 
-function renderScreen(repository = new FakeSubjectAttendanceRepository()) {
+function renderScreen(
+  repository = new FakeSubjectAttendanceRepository(),
+  initialContext: AdvisoryWorkContext | null = null,
+  onContextChange?: (context: AdvisoryWorkContext | null) => void,
+) {
   const service = new SubjectAttendanceApplicationService(
     repository,
     new FakeTeachingAssignmentRepository(),
   );
   const result = render(
     <ModeProvider>
-      <AdviserViewScreen subjectAttendanceService={service} />
+      <AdviserViewScreen
+        subjectAttendanceService={service}
+        initialContext={initialContext}
+        onContextChange={onContextChange}
+      />
     </ModeProvider>,
   );
   return { ...result, repository };
@@ -138,17 +156,65 @@ describe("AdviserViewScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Ana Cruz")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
     expect(screen.getByText("Subject attendance — not SF2.")).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /edit|save|convert/i })).not.toBeInTheDocument();
   });
 
-  it("shows a calm empty state when no advisory section is active", async () => {
-    renderScreen(new FakeSubjectAttendanceRepository([], null));
+  it("restores an initial advisory context only after that section is authorized", async () => {
+    const onContextChange = vi.fn();
+    const repository = new FakeSubjectAttendanceRepository([SECTION, SECOND_SECTION]);
+    renderScreen(repository, { sectionId: SECOND_SECTION.id }, onContextChange);
+
+    await screen.findByText("Ana Cruz");
+    expect(screen.getByLabelText("Advisory section")).toHaveValue(SECOND_SECTION.id);
+    expect(repository.overviewCalls).toContainEqual([SECOND_SECTION.id, "2026-08-29"]);
+    expect(onContextChange).not.toHaveBeenCalledWith(null);
+  });
+
+  it("never queries a stale advisory context and falls back to an authorized section", async () => {
+    const onContextChange = vi.fn();
+    const repository = new FakeSubjectAttendanceRepository([SECTION]);
+    renderScreen(repository, { sectionId: "stale-section" }, onContextChange);
+
+    await screen.findByText("Ana Cruz");
+    expect(repository.overviewCalls.some(([sectionId]) => sectionId === "stale-section")).toBe(
+      false,
+    );
+    expect(repository.overviewCalls).toContainEqual([SECTION.id, "2026-08-29"]);
+    await waitFor(() => expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECTION.id }));
+  });
+
+  it("updates advisory context when the authorized picker changes", async () => {
+    const user = userEvent.setup();
+    const onContextChange = vi.fn();
+    renderScreen(
+      new FakeSubjectAttendanceRepository([SECTION, SECOND_SECTION]),
+      { sectionId: SECTION.id },
+      onContextChange,
+    );
+    await screen.findByText("Ana Cruz");
+
+    await user.selectOptions(screen.getByLabelText("Advisory section"), SECOND_SECTION.id);
+
+    await waitFor(() =>
+      expect(onContextChange).toHaveBeenCalledWith({ sectionId: SECOND_SECTION.id }),
+    );
+  });
+
+  it("shows a calm empty state and clears stale context when no advisory section is active", async () => {
+    const onContextChange = vi.fn();
+    renderScreen(
+      new FakeSubjectAttendanceRepository([], null),
+      { sectionId: SECTION.id },
+      onContextChange,
+    );
 
     expect(
       await screen.findByText(/No advisory section is assigned to you for this date/),
     ).toBeInTheDocument();
+    await waitFor(() => expect(onContextChange).toHaveBeenCalledWith(null));
   });
 
   it("reloads authorized sections and the overview when the date changes", async () => {

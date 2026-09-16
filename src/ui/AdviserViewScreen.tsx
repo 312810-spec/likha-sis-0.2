@@ -7,9 +7,12 @@ import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
+import type { AdvisoryWorkContext } from "./work-context";
 
 interface AdviserViewScreenProps {
   subjectAttendanceService: SubjectAttendanceApplicationService;
+  initialContext?: AdvisoryWorkContext | null;
+  onContextChange?: (context: AdvisoryWorkContext | null) => void;
 }
 
 function todayAsIsoDate(): string {
@@ -22,9 +25,13 @@ function todayAsIsoDate(): string {
 
 /** Read-only, section-wide Subject Attendance signals for active
  * advisers and School Heads. The Rust command independently enforces
- * that relationship; this screen's filtered picker is usability, not a
- * security boundary. */
-export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScreenProps) {
+ * that relationship; this screen's filtered picker and advisory context
+ * are usability aids, not security boundaries. */
+export function AdviserViewScreen({
+  subjectAttendanceService,
+  initialContext = null,
+  onContextChange,
+}: AdviserViewScreenProps) {
   const { mode } = useTeacherMode();
   const sectionsRequestRef = useRef(0);
   const overviewRequestRef = useRef(0);
@@ -47,15 +54,19 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
       .then((result) => {
         if (sectionsRequestRef.current !== requestId) return;
         setSections(result);
-        setSectionId((current) =>
-          result.some((section) => section.id === current) ? current : (result[0]?.id ?? ""),
-        );
+        setSectionId((current) => {
+          if (result.some((section) => section.id === current)) return current;
+          if (initialContext && result.some((section) => section.id === initialContext.sectionId)) {
+            return initialContext.sectionId;
+          }
+          return result[0]?.id ?? "";
+        });
       })
       .catch(() => {
         if (sectionsRequestRef.current !== requestId) return;
         setSections([]);
         setSectionId("");
-        setSectionsError("Could not load the sections available to Adviser View.");
+        setSectionsError("Could not load the sections available to My Advisory.");
       })
       .finally(() => {
         if (sectionsRequestRef.current !== requestId) return;
@@ -68,6 +79,14 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
     loadSections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectAttendanceService, date]);
+
+  useEffect(() => {
+    if (sectionsLoading) return;
+    const selectedSection = sections.find((section) => section.id === sectionId);
+    const nextSectionId = selectedSection?.id ?? null;
+    if ((initialContext?.sectionId ?? null) === nextSectionId) return;
+    onContextChange?.(nextSectionId ? { sectionId: nextSectionId } : null);
+  }, [sections, sectionId, sectionsLoading, initialContext?.sectionId, onContextChange]);
 
   function loadOverview() {
     if (!sectionId) return;
@@ -84,7 +103,7 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
         if (overviewRequestRef.current !== requestId) return;
         setOverview(null);
         setOverviewError(
-          "Could not open this Adviser View. Your advisory assignment or permission may have changed.",
+          "Could not open My Advisory. Your advisory assignment or permission may have changed.",
         );
       })
       .finally(() => {
@@ -109,7 +128,7 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
 
   return (
     <Page
-      title="Adviser View"
+      title="My Advisory"
       hint={
         mode === "guided" ? (
           <p className="field-hint">
@@ -161,7 +180,7 @@ export function AdviserViewScreen({ subjectAttendanceService }: AdviserViewScree
       )}
 
       {sectionsLoading ? (
-        <Loading label="Loading Adviser View sections…" />
+        <Loading label="Loading My Advisory sections…" />
       ) : sectionsError ? null : sections.length === 0 ? (
         <EmptyState>
           No advisory section is assigned to you for this date. A School Head can assign the section
