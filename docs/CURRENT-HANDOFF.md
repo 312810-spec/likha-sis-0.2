@@ -18,51 +18,47 @@ This is a bounded current-state handoff, not a transcript. Historical detail bel
 
 ## Current verified checkpoint
 
-Current main: `fe6c0ab8f4e83c4c02501837c5ad78f57e35b90d` (PR #93).
-PR #93's exact head `0ccceffbaa520a42cbd4b8f8b850fabd20ec90ca` passed Quality #822 and independent Security #936 before squash merge.
+Current main: `59246a53bf4cd12506ef7e01972be59b8ca4f84b` (PR #94).
+PR #94's exact head `2e07800b07ffef2454b26f1a7741271c6f74c98e` passed Quality #835 and independent Security #971 before squash merge.
 
-PR #93 established the trusted native boundary for **official daily attendance owned by the active section adviser**:
+PRs #93–#94 now complete the adviser-owned **official daily attendance** vertical slice:
 
-- `adviser_attendance_roster_for_date`, `adviser_record_attendance`, and `adviser_bulk_mark_attendance_present` are registered alongside the existing general attendance commands;
-- every adviser command revalidates `section_id + attendance_date` through `auth::authorize_adviser_of_section`, so only the active adviser or a School Head may proceed;
-- cross-school and stale/future advisory context fail closed through the existing authorization primitive;
-- adviser writes reuse `record_attendance_with_optional_sync`, preserving local-first persistence and enrollment-gated encrypted outbox behavior;
-- bulk Present preserves the existing non-overwrite behavior;
-- an unrelated teacher is rejected before sync-key resolution or attendance mutation;
-- Subject Attendance remains separate and is never converted into official attendance.
+- trusted native commands revalidate `section_id + attendance_date` through `auth::authorize_adviser_of_section`, so only the active adviser or a School Head may proceed;
+- adviser writes reuse the existing local persistence + enrollment-gated encrypted outbox transaction;
+- My Advisory uses a dedicated daily-only application/repository path rather than the general school-wide Attendance surface;
+- Present, Absent, Tardy, and non-overwriting **Mark unmarked Present** are available inside My Advisory;
+- stale advisory context is revalidated before official daily attendance or Subject Attendance is queried;
+- Subject Attendance remains a separate read-only signal and is never converted into official attendance or SF2;
+- official attendance rendering is independent from Subject Attendance rendering, so a subject-signal failure cannot block official attendance work.
 
 GJ-7 software recovery evidence remains valid from PR #90: persisted score/outbox evidence survives clean encrypted reopen and command enqueue failure rolls back atomically. Actual process crash/power-loss, DPAPI/session recovery, transport retry after restart, and packaged Windows hardware/runtime proof remain verification debt.
 
 ## Current slice
 
-Branch: `feat/adviser-daily-attendance-ui`.
+Branch: `feat/adviser-monthly-attendance-preview`.
 
-Compose the adviser-native daily-attendance boundary into My Advisory without exposing the general school-wide Attendance surface.
+Add the smallest trusted monthly adviser continuation before touching SF2 export behavior.
 
 Current implementation scope:
 
-- add a dedicated `AdviserDailyAttendanceRepository` that exposes only daily roster, record, and bulk-Present operations;
-- add `AdviserDailyAttendanceApplicationService` with section/learner/date/status validation and no monthly/SF2 API;
-- add a Tauri adapter mapped only to the three adviser-authorized native commands from PR #93;
-- wire the service through `composition.ts` without changing the existing general `attendanceService`;
-- add an **Official daily attendance** panel inside My Advisory using the already-revalidated advisory section/date context;
-- allow Present, Absent, and Tardy marks plus **Mark unmarked Present**;
-- keep **Subject Attendance signals** read-only and visibly separate beneath official attendance;
-- never add a second school-wide section picker, never infer official attendance from subject signals, and never add monthly/SF2 behavior in this slice;
+- add a read-only `adviser_monthly_attendance_summary` Tauri command;
+- authorize the caller against the section on the **last calendar day of the requested month**, reusing `auth::authorize_adviser_of_section`;
+- allow only the active month-end adviser or a School Head in the same school;
+- reuse the existing `attendance::monthly_grid_for_section` report shape;
+- keep this explicitly a **monthly attendance preview**, not an official SF2 form;
+- invalid months fail closed at the native boundary;
+- do not change schema, sync, daily attendance behavior, Subject Attendance, filesystem export behavior, or SF2 fidelity claims in this slice;
 - use synthetic test data only.
 
 Tests in this slice cover:
 
-- daily-only application validation and delegation;
-- exact Tauri command mapping to the adviser-authorized native commands;
-- official daily roster display inside My Advisory;
-- recording an official mark through the adviser-only service;
-- bulk Present preserving an existing Absent mark while filling an unmarked learner;
-- stale advisory context never reaching either official attendance or Subject Attendance queries;
-- date changes reload authorized sections, official attendance, and subject signals together;
-- accessibility verification remains required.
+- normal and leap-year month-end calculation;
+- active month-end adviser access to the existing monthly grid;
+- non-adviser denial;
+- a future advisory assignment not authorizing an earlier month;
+- malformed/invalid month failing closed.
 
-Next after this slice: choose the smallest appropriate official-form continuation only after authoritative adviser authorization/form semantics are verified. Do not turn the existing subject-level signals or an unverified monthly summary into SF2 by inference.
+Next after this slice: if the monthly authorization boundary is green, add an adviser-authorized wrapper around the existing **SF2-inspired CSV** export with the same truthful `FieldDisclosure`. Do not label that CSV as a submission-ready official SF2. A real official-form path requires authoritative template/layout evidence and must preserve the project's official-form fidelity rules.
 
 ## Continuation execution policy
 
@@ -97,10 +93,11 @@ Completed:
 - GJ-7 software proof: persisted score/outbox evidence survives clean encrypted reopen and command enqueue failure rolls back atomically; process/hardware recovery remains unverified.
 - GJ-8 entry/context: My Advisory is rooted in actual `section_advisories`, preserves bounded authorized section context, fails closed on stale access, and explicitly presents the authorized enrollment roster separately from Subject Attendance signals.
 - GJ-8 trusted write boundary: active advisers/School Heads have a distinct native boundary for official daily attendance that preserves the existing local-save/sync transaction.
+- GJ-8 daily application/UI: My Advisory records official daily attendance through a dedicated adviser-only service while Subject Attendance stays separate and read-only.
 
-Current: GJ-8 adviser-specific daily-attendance application/UI composition inside My Advisory.
+Current: GJ-8 trusted adviser monthly-attendance preview boundary.
 
-Next: the appropriate adviser-owned form continuation only after authoritative form and authorization semantics are verified.
+Next: adviser-authorized truthful SF2-inspired preview/export, then official-template work only if authoritative form evidence is sufficient.
 
 Do not jump to unrelated backlog work unless a verified P0/P1 security, data-loss, grading-correctness, or compliance defect interrupts.
 
@@ -129,6 +126,7 @@ Rules:
 - Subject Teaching Assignment authority and advisory authority must remain separate.
 - Subject Attendance is an internal subject-level monitoring record; it must never be silently treated as official SF2 attendance.
 - Official attendance writes must remain official attendance records; Subject Attendance must not be converted into them.
+- The existing section monthly CSV is **SF2-inspired**, not submission-ready official SF2; preserve its `FieldDisclosure` and do not overclaim fidelity.
 
 ## Offline/sync truthfulness guardrails
 
@@ -185,6 +183,7 @@ Read only when relevant:
 - `docs/product/GOLDEN-JOURNEY-IMPLEMENTATION-PLAN.md`
 - `docs/product/OFFLINE-CONTRACT.md`
 - `docs/product/SUBJECT-ATTENDANCE-SPEC.md`
+- `docs/adr/0009-sf2-export-and-official-form-engine.md`
 - `docs/adr/0056-section-advisory-foundation.md`
 - `docs/adr/0059-golden-journey-work-context.md`
 - `docs/adr/0060-golden-journey-app-class-context.md`

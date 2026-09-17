@@ -1,3 +1,4 @@
+pub mod adviser_monthly_attendance;
 pub mod assessment_category;
 pub mod assessment_item;
 pub mod attendance;
