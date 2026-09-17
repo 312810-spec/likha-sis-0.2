@@ -76,11 +76,11 @@ Keep the tested application service, repository port, Tauri adapter, and authori
 
 **Verification**
 
-Applied on PR #98 branch after Quality #857 remained red on exact head `2b5e556b6d99d8f95c81afadd9480c88f2e3dfb5` while Security #1040 passed. Fresh exact-head Quality and Security are required before this workaround is considered verified.
+The structural correction was applied after Quality #857 remained red on exact head `2b5e556b6d99d8f95c81afadd9480c88f2e3dfb5` while Security #1040 passed. Quality #859 on head `07fbba57e72cac42e55d220012ee4c1bb531b26b` did not reach `knip`: typecheck and ESLint passed, then Prettier stopped on `src/composition.ts`. Inspection of the PR patch exposed the concrete formatting defect introduced by the correction: the file had no final newline. A newline-only correction was committed on the same canonical branch. Fresh exact-head Quality and Security remain required before the dead-code workaround is considered verified.
 
 **Reuse condition**
 
-Do not stage exported composition instances ahead of their first production consumer. Land the seam without unused runtime composition, then compose it in the bounded UI slice that actually consumes it. Preserve the dead-code gate instead of suppressing it.
+Do not stage exported composition instances ahead of their first production consumer. Land the seam without unused runtime composition, then compose it in the bounded UI slice that actually consumes it. Preserve the dead-code gate instead of suppressing it. After direct file rewrites, also verify the final newline/formatter contract before push; a semantically correct edit can still stop the composite quality gate before dead-code verification.
 
 ## Template
 
