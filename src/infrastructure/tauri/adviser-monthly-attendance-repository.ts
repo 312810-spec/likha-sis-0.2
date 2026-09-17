@@ -4,7 +4,9 @@ import type { AdviserMonthlyAttendanceRepository } from "../../domain/ports/advi
 import { invoke } from "./invoke";
 
 /** Tauri adapter for adviser-authorized monthly preview and SF2-inspired export. */
-export class TauriAdviserMonthlyAttendanceRepository implements AdviserMonthlyAttendanceRepository {
+export class TauriAdviserMonthlyAttendanceRepository
+  implements AdviserMonthlyAttendanceRepository
+{
   summary(sectionId: string, year: number, month: number): Promise<MonthlyAttendanceReport> {
     return invoke<MonthlyAttendanceReport>("adviser_monthly_attendance_summary", {
       sectionId,
