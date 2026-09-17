@@ -67,7 +67,8 @@ export const authService = new AuthApplicationService(new TauriAuthRepository())
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
 export const schoolLogoService = new SchoolLogoApplicationService(new TauriSchoolLogoRepository());
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
-export const userService = new UserApplicationService(new TauriUserRepository());
+const userService = new UserApplicationService(new TauriUserRepository());
+void userService;
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());
 export const adviserDailyAttendanceService = new AdviserDailyAttendanceApplicationService(
