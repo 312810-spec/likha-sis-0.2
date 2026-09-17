@@ -46,23 +46,23 @@ The traversal located `src/ui/AdviserViewScreen.tsx`, the existing daily adviser
 
 When connector code search is unavailable or inconclusive, use directory/contents traversal and exact returned paths. Do not repeatedly guess file locations.
 
-## 2026-09-17 — PR #98 JavaScript/TypeScript Quality stopped before UI/native stages
+## 2026-09-17 — PR #98 JavaScript/TypeScript Quality stopped at Prettier
 
 **Issue**
 
-Quality Gate #846 failed on Ubuntu at `Run JavaScript and TypeScript quality gate` for PR #98 head `aba8de8be16131e58ee3c4746533cffea663c5d5`; Security Gate #1017 succeeded. The composite `npm run quality` runs typecheck, ESLint, Prettier, architecture, dead-code, then Vitest, while the connector did not expose the raw composite-step log needed to name the exact subcommand. The changed TypeScript files contained layouts exceeding the repository's discovered Prettier `printWidth: 100` configuration.
+Quality Gate #846 and then #850 failed at `Run JavaScript and TypeScript quality gate` for PR #98 while independent Security succeeded. Raw Quality #850 evidence narrowed the composite failure: typecheck passed and ESLint completed with only the existing warning; Prettier failed on `src/application/adviser-monthly-attendance-service.ts`, `src/composition.ts`, `src/infrastructure/tauri/adviser-monthly-attendance-repository.ts`, and `src/infrastructure/tauri/invoke.ts`. Later architecture, dead-code, Vitest, UI, and native stages did not run because formatting stopped the gate.
 
 **Workaround**
 
-Use repository Contents traversal to discover the exact formatter configuration (`.prettierrc.json`) instead of repeatedly guessing config paths. Apply formatter-equivalent layout changes only to the changed monthly service, service test, and Tauri adapter; do not alter authorization, data flow, CI, or protections. Require fresh exact-head Quality and Security before merge.
+Treat the repository's actual Prettier output as authoritative instead of approximating `printWidth: 100` by hand. Format every changed JS/TS file named by `format:check`, including composition and shared invoke files, without changing authorization, data flow, CI, or protections. If the local runtime cannot obtain repository dependencies because outbound DNS/network access is unavailable, use the CI file list plus Prettier's deterministic layout rules and require fresh exact-head CI; do not claim local formatter verification.
 
 **Verification**
 
-Pending fresh exact-head CI after the formatting-only correction. Do not treat this workaround as verified until Quality and independent Security both succeed on the same new head.
+The first hand-formatting attempt was insufficient: exact head `55b89bea25a5a1f01502deeac0bcb14de2d8ffc4` still failed Quality #850 while Security #1025 passed. The second correction covers all four files explicitly named by Prettier and is pending fresh exact-head Quality and Security. It is not verified until both required gates succeed on the same unchanged head.
 
 **Reuse condition**
 
-If a future composite JS/TS Quality failure lacks raw subcommand logs, first inspect the quality script and exact repository formatting configuration, then use the smallest evidence-supported correction. Do not assume every JS/TS gate failure is Prettier; if the formatter correction does not clear the gate, continue diagnosis from the next concrete failing-stage evidence.
+For composite JS/TS Quality failures, inspect raw job logs before changing code. If Prettier names files, format all named files with the repository formatter and run `format:check` before push when dependencies are available. Do not infer success from line length or formatter configuration alone, and do not debug later quality stages until Prettier passes and those stages actually execute.
 
 ## Template
 
