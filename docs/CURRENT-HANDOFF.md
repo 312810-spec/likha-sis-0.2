@@ -1,6 +1,6 @@
 # CURRENT HANDOFF — LIKHA-SIS 0.2
 
-Updated: 2026-09-17
+Updated: 2026-09-18
 
 Canonical repository: `312810-spec/likha-sis-0.2`
 Canonical development version: **LIKHA-SIS 0.2**
@@ -17,20 +17,20 @@ GJ-7 software recovery evidence from PR #90 remains valid. Real process crash/po
 
 ## Current slice
 
-Branch: `feat/adviser-monthly-ui`.
+Branch: `feat/adviser-monthly-ui` (PR #98).
 
 Build the smallest TypeScript seam needed to expose the already-authorized monthly preview/export capability in My Advisory without weakening the trusted Rust boundary:
 
 - add a narrow monthly adviser repository port and application service;
 - validate section/year/month for teacher feedback before IPC, while native Rust remains authoritative;
 - add a Tauri adapter for `adviser_monthly_attendance_summary` and `adviser_export_section_monthly_sf2`;
-- compose the service centrally;
+- do not pre-compose/export the monthly service until the visible My Advisory slice introduces its first production consumer, preserving the dead-code contract;
 - classify those adviser-authorized commands as action-specific permission boundaries so an unrelated-teacher denial does not masquerade as global session expiry;
 - preserve the export's returned `FieldDisclosure` unchanged;
 - synthetic application/adapter tests only in this slice;
 - no schema, sync, official-template, daily-attendance, or Subject Attendance changes.
 
-After this seam is exact-head verified and merged, the next bounded slice is the visible My Advisory monthly preview/export panel using this service.
+After this seam is exact-head verified and merged, the next bounded slice is the visible My Advisory monthly preview/export panel. That slice should compose the monthly service centrally when the first real runtime consumer is added.
 
 ## Continuation policy
 
