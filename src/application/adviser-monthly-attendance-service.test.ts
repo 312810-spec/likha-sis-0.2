@@ -23,7 +23,9 @@ describe("AdviserMonthlyAttendanceApplicationService", () => {
   it("rejects an invalid month before native invocation", async () => {
     const repo = repository();
     const service = new AdviserMonthlyAttendanceApplicationService(repo);
-    await expect(service.summary("section-1", 2026, 13)).rejects.toThrow("Month must be from 1 to 12.");
+    await expect(service.summary("section-1", 2026, 13)).rejects.toThrow(
+      "Month must be from 1 to 12.",
+    );
     expect(repo.summary).not.toHaveBeenCalled();
   });
 
