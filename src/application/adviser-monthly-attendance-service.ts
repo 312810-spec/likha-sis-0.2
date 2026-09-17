@@ -32,8 +32,16 @@ function requireMonth(month: number): number {
 export class AdviserMonthlyAttendanceApplicationService {
   constructor(private readonly attendance: AdviserMonthlyAttendanceRepository) {}
 
-  summary(sectionId: string, year: number, month: number): Promise<MonthlyAttendanceReport> {
-    return this.attendance.summary(requireSectionId(sectionId), requireYear(year), requireMonth(month));
+  summary(
+    sectionId: string,
+    year: number,
+    month: number,
+  ): Promise<MonthlyAttendanceReport> {
+    return this.attendance.summary(
+      requireSectionId(sectionId),
+      requireYear(year),
+      requireMonth(month),
+    );
   }
 
   exportSf2(sectionId: string, year: number, month: number): Promise<Sf2ExportResult> {
