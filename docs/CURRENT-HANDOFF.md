@@ -9,15 +9,16 @@ This is a bounded current-state handoff. Current code, tests, migrations, PR sta
 
 ## Current verified checkpoint
 
-Current main: `7f1442c28f718451d577b9a1bc220d3b82f73bd9` (PR #95).
+Current main: `69474fc341004dcfc6d791114f481daf0539b0fa` (PR #96).
 
-PR #95 completed the trusted Adviser Room monthly-attendance preview boundary:
+PR #96 completed the trusted Adviser Room SF2-inspired monthly export boundary:
 
-- `adviser_monthly_attendance_summary` revalidates advisory authority in native Rust;
-- authorization is evaluated on the last calendar day of the requested month;
-- active adviser or same-school School Head may read the existing monthly attendance grid;
-- invalid months fail closed;
-- the preview is explicitly not an official SF2 form.
+- `adviser_export_section_monthly_sf2` revalidates advisory authority at the same month-end trusted Rust boundary as monthly preview;
+- active adviser or same-school School Head only;
+- existing monthly attendance grid and SF2-inspired formatter are reused;
+- existing `FieldDisclosure` remains truthful and unchanged;
+- invalid months and non-advisers fail closed before export data is built;
+- the export remains explicitly SF2-inspired, not a submission-ready official SF2.
 
 Earlier Adviser Room daily attendance remains separate from Subject Attendance. Subject Attendance is read-only signal data and must never be converted into official attendance or SF2.
 
@@ -25,29 +26,17 @@ GJ-7 software recovery evidence remains valid from PR #90. Real process crash/po
 
 ## Current slice
 
-Branch: `feat/adviser-sf2-export-authorization`.
+Branch: `docs/issue-workaround-memory`.
 
-Add the smallest trusted Adviser Room wrapper around the existing SF2-inspired monthly CSV export.
+Establish the owner-required **Issue → Workaround → Record** troubleshooting memory before the next functional slice. `docs/ISSUE-WORKAROUND-LOG.md` records concrete failure evidence, the smallest safe workaround, verification, and reuse conditions so recurring failures are not repeatedly rediscovered.
 
-Implementation scope:
-
-- add `adviser_export_section_monthly_sf2`;
-- use the same month-end `auth::authorize_adviser_of_section` boundary as the monthly preview;
-- reuse the existing monthly attendance repository grid and `export::sf2::build_sf2_export` formatter;
-- preserve the formatter's existing `FieldDisclosure` unchanged;
-- return the disclosure with the generated file path;
-- invalid month and non-adviser calls fail closed before export data is built;
-- keep the output explicitly **SF2-inspired**, not submission-ready official SF2;
-- synthetic tests only;
-- no schema, sync, daily attendance, Subject Attendance, or official-template changes.
-
-Tests added in the command module prove an active adviser can build the existing truthful export, a non-adviser cannot, and an invalid month fails closed. Existing monthly-preview tests remain in place.
+The first entry records PR #96's rustfmt-only native Quality failure and its verified formatter-only recovery. This documentation must never be used to bypass Quality, Security, branch protections, or hardware-only verification debt.
 
 ## Continuation policy
 
-The owner now wants hourly continuation because merge-event-only continuation did not reliably advance work without manual notice.
-
 Each run must inspect live main, open PRs, current handoff/plan, and exact-head CI. Maintain one canonical slice/PR. Merge only when Quality and independent Security are successful on the exact unchanged head, the PR is mergeable/not draft, and no real review blocker exists. Never weaken protections or gates.
+
+When an issue occurs: **Issue → Workaround → Record**. Diagnose from evidence, apply the smallest safe workaround, verify it, record it durably, and consult the log before repeating investigation.
 
 Astra Max is preferred for substantial planning/review and may implement when available. If unavailable, continue through the available coding/review path rather than waiting.
 
@@ -63,11 +52,10 @@ Completed through current main:
 - My Advisory rooted in real `section_advisories` with stale-context failure closed;
 - adviser-only official daily attendance writes using existing local persistence/sync transaction;
 - separate read-only Subject Attendance signals;
-- trusted month-end-authorized monthly attendance preview.
+- trusted month-end-authorized monthly attendance preview;
+- trusted adviser-authorized truthful SF2-inspired monthly export wrapper.
 
-Current: adviser-authorized truthful SF2-inspired export wrapper.
-
-Next: after exact-head verification and merge, inspect live Adviser Room journey and choose the next smallest high-value slice. Official-template work begins only with sufficient authoritative form/layout evidence.
+Next after this documentation slice: connect the already-authorized monthly preview/export capability into the live Adviser Room as the smallest context-aware form/export journey, without treating `AdvisoryWorkContext` as authorization evidence. Preserve truthful SF2-inspired labeling and `FieldDisclosure`. Official-template work begins only with sufficient authoritative form/layout evidence.
 
 ## Locked constraints
 
@@ -102,6 +90,7 @@ Rules:
 Read only when relevant:
 
 - `docs/ACTIVE-PLAN.md`
+- `docs/ISSUE-WORKAROUND-LOG.md`
 - `docs/VERIFICATION-DEBT.md`
 - `docs/PROJECT-MEMORY.md`
 - `docs/product/GOLDEN-JOURNEY.md`
