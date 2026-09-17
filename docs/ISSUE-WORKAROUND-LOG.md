@@ -82,6 +82,24 @@ The structural correction was applied after Quality #857 remained red on exact h
 
 Do not stage exported composition instances ahead of their first production consumer. Land the seam without unused runtime composition, then compose it in the bounded UI slice that actually consumes it. Preserve the dead-code gate instead of suppressing it. After direct file rewrites, also verify the final newline/formatter contract before push; a semantically correct edit can still stop the composite quality gate before dead-code verification.
 
+## 2026-09-18 — PR #98 validation escaped the promised async service boundary
+
+**Issue**
+
+Quality Gate #862 reached Vitest after typecheck, ESLint, Prettier, architecture, and dead-code all passed. One new test failed: `rejects an invalid month before native invocation`. The service methods were typed to return `Promise`, but argument validation ran while constructing the repository call, before a Promise was returned. `ValidationError: Month must be from 1 to 12.` therefore escaped synchronously instead of becoming the rejected Promise expected by the async application boundary. The repository was not invoked, so the fail-before-native behavior itself was correct.
+
+**Workaround**
+
+Make `summary` and `exportSf2` explicit `async` methods and await their repository calls. This keeps local validation before IPC while making validation failures obey the service's Promise contract. Do not weaken the validation, change the trusted Rust authorization boundary, or rewrite the test to accept an inconsistent synchronous throw.
+
+**Verification**
+
+The correction was committed to the same canonical PR branch. Fresh exact-head Quality and independent Security are required before this workaround is considered verified.
+
+**Reuse condition**
+
+When an application-service method advertises a Promise contract but performs synchronous validation before returning a repository Promise, keep validation inside an explicit async method so callers consistently receive rejection semantics. Tests should continue to prove invalid input never reaches the repository/native boundary.
+
 ## Template
 
 ### YYYY-MM-DD — Short issue name
