@@ -83,27 +83,46 @@ export const enrollmentHistoryService = new EnrollmentHistoryApplicationService(
   sectionRepository,
 );
 export const exportService = new ExportApplicationService(new TauriExportRepository());
-export const formGenerationService = new FormGenerationApplicationService(new TauriFormGenerationRepository());
+export const formGenerationService = new FormGenerationApplicationService(
+  new TauriFormGenerationRepository(),
+);
 export const gradingService = new GradingApplicationService(new TauriGradingRepository());
 export const subjectService = new SubjectApplicationService(new TauriSubjectRepository());
-export const classRecordService = new ClassRecordApplicationService(new TauriClassRecordRepository());
+export const classRecordService = new ClassRecordApplicationService(
+  new TauriClassRecordRepository(),
+);
 export const assessmentService = new AssessmentApplicationService(new TauriAssessmentRepository());
 export const lessonPlanService = new LessonPlanApplicationService(new TauriLessonPlanRepository());
-export const learnerScoreService = new LearnerScoreApplicationService(new TauriLearnerScoreRepository());
+export const learnerScoreService = new LearnerScoreApplicationService(
+  new TauriLearnerScoreRepository(),
+);
 export const learnerScoreSyncStatusService = new LearnerScoreSyncStatusApplicationService(
   new TauriLearnerScoreSyncStatusRepository(),
 );
-export const sf1ImportService = new Sf1ImportApplicationService(new TauriSf1ImportRepository(), new TauriFilePicker());
+export const sf1ImportService = new Sf1ImportApplicationService(
+  new TauriSf1ImportRepository(),
+  new TauriFilePicker(),
+);
 const teachingAssignmentRepository = new TauriTeachingAssignmentRepository();
 export const subjectAttendanceService = new SubjectAttendanceApplicationService(
   new TauriSubjectAttendanceRepository(),
   teachingAssignmentRepository,
 );
-export const teachingAssignmentService = new TeachingAssignmentApplicationService(teachingAssignmentRepository);
-export const schoolMemberService = new SchoolMemberApplicationService(new TauriSchoolMemberRepository());
-export const schoolAttendanceService = new SchoolAttendanceApplicationService(new TauriSchoolAttendanceRepository());
-export const sectionAdvisoryService = new SectionAdvisoryApplicationService(new TauriSectionAdvisoryRepository());
+export const teachingAssignmentService = new TeachingAssignmentApplicationService(
+  teachingAssignmentRepository,
+);
+export const schoolMemberService = new SchoolMemberApplicationService(
+  new TauriSchoolMemberRepository(),
+);
+export const schoolAttendanceService = new SchoolAttendanceApplicationService(
+  new TauriSchoolAttendanceRepository(),
+);
+export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
+  new TauriSectionAdvisoryRepository(),
+);
 export const deviceSyncService = new DeviceSyncApplicationService(new TauriDeviceSyncRepository());
-export const conflictReviewService = new ConflictReviewApplicationService(new TauriConflictReviewRepository());
+export const conflictReviewService = new ConflictReviewApplicationService(
+  new TauriConflictReviewRepository(),
+);
 export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());
 export const myDayService = new MyDayApplicationService(new TauriMyDayRepository());
