@@ -28,6 +28,24 @@ The formatter-only correction produced head `f38eb7bbc2b92e0bd5dcbdbc1cc06ee74ea
 
 When a future native Quality failure stops specifically at `cargo fmt --check` and the evidence is formatting-only, apply the exact formatter output first, then rerun the complete required exact-head gates. Do not spend time debugging compilation/runtime behavior until formatting passes and later stages actually run.
 
+## 2026-09-17 — Connector code search unavailable for Adviser Room discovery
+
+**Issue**
+
+Repository code search did not return usable results while locating the live Adviser Room screen and its application/infrastructure seams. Guessing a feature-directory path produced a 404.
+
+**Workaround**
+
+Traverse the repository through GitHub Contents (`src` → `src/ui`, `src/application`, `src/infrastructure/tauri`) and fetch exact discovered paths instead of retrying guessed paths or treating search failure as missing code.
+
+**Verification**
+
+The traversal located `src/ui/AdviserViewScreen.tsx`, the existing daily adviser service/adapter, and confirmed there was no TypeScript monthly adviser service/adapter before the current slice. It also exposed the session-expiry exemption list that monthly adviser commands must join because their trusted Rust boundary can return action-specific `Unauthorized` for a still-valid session.
+
+**Reuse condition**
+
+When connector code search is unavailable or inconclusive, use directory/contents traversal and exact returned paths. Do not repeatedly guess file locations.
+
 ## Template
 
 ### YYYY-MM-DD — Short issue name
