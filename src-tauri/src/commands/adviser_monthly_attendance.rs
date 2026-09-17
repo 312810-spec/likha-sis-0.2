@@ -1,12 +1,17 @@
 use std::sync::Mutex;
 
 use rusqlite::Connection;
-use tauri::State;
+use serde::Serialize;
+use tauri::{AppHandle, Manager, State};
 
 use crate::auth::{self, SessionManager};
 use crate::commands::lock_db;
 use crate::error::{AppError, AppResult};
+use crate::export::sanitize_filename_component;
+use crate::export::sf2::{self, Sf2Export};
+use crate::export::FieldDisclosure;
 use crate::repository::attendance::{self, MonthlyAttendanceReport};
+use crate::repository::{school, section, section_advisory, user};
 
 /// Returns the last calendar date in `year`/`month`, or `None` for an
 /// invalid month. The adviser monthly boundary uses one explicit point in
@@ -58,6 +63,82 @@ fn adviser_monthly_attendance_summary_authorized(
     let (_actor_user_id, school_id) =
         auth::authorize_adviser_of_section(conn, sessions, section_id, &as_of_date)?;
     attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdviserSf2ExportResult {
+    pub file_path: String,
+    pub disclosure: FieldDisclosure,
+}
+
+/// Writes the existing SF2-inspired CSV for the caller's advisory section.
+///
+/// Unlike the legacy school-scoped export command, this Adviser Room wrapper
+/// revalidates the advisory assignment at the trusted Rust boundary using the
+/// same month-end authorization point as the preview. It does not make the
+/// CSV an official/submission-ready DepEd form; the existing disclosure is
+/// returned unchanged and remains the source of truth for omitted fields.
+#[tauri::command]
+pub fn adviser_export_section_monthly_sf2(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    section_id: String,
+    year: i32,
+    month: u32,
+) -> AppResult<AdviserSf2ExportResult> {
+    let conn = lock_db(&db);
+    let (export, section_name) =
+        adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, year, month)?;
+
+    let export_dir = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| std::io::Error::other(e.to_string()))?
+        .join("LIKHA-SIS");
+    std::fs::create_dir_all(&export_dir)?;
+    let file_name = format!(
+        "SF2_{}_{year}-{month:02}.csv",
+        sanitize_filename_component(&section_name.replace(' ', "_"))
+    );
+    let file_path = export_dir.join(file_name);
+    std::fs::write(&file_path, export.csv)?;
+
+    Ok(AdviserSf2ExportResult {
+        file_path: file_path.to_string_lossy().to_string(),
+        disclosure: export.disclosure,
+    })
+}
+
+fn adviser_monthly_sf2_export_authorized(
+    conn: &Connection,
+    sessions: &SessionManager,
+    section_id: &str,
+    year: i32,
+    month: u32,
+) -> AppResult<(Sf2Export, String)> {
+    let Some(as_of_date) = month_end_date(year, month) else {
+        return Err(AppError::Unauthorized);
+    };
+    let (_actor_user_id, school_id) =
+        auth::authorize_adviser_of_section(conn, sessions, section_id, &as_of_date)?;
+
+    let school = school::find_by_id(conn, &school_id)?.ok_or(AppError::Unauthorized)?;
+    let section = section::find_by_id_in_school(conn, &school_id, section_id)?
+        .ok_or(AppError::Unauthorized)?;
+    let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
+    let adviser =
+        section_advisory::current_adviser_for_section(conn, &school_id, section_id, &as_of_date)?;
+    let adviser_name = if let Some(assignment) = adviser {
+        user::find_by_id(conn, &assignment.teacher_user_id)?.map(|u| u.display_name)
+    } else {
+        None
+    };
+    let section_name = section.name.clone();
+    let export = sf2::build_sf2_export(&school, &section, adviser_name.as_deref(), &report);
+    Ok((export, section_name))
 }
 
 #[cfg(test)]
@@ -119,6 +200,30 @@ mod tests {
     }
 
     #[test]
+    fn active_adviser_can_build_the_existing_sf2_inspired_export() {
+        let (conn, sessions, school_id, section_id, learner_id) = setup_adviser_monthly();
+        attendance::record(
+            &conn,
+            &school_id,
+            &section_id,
+            &learner_id,
+            "2026-08-24",
+            attendance::AttendanceStatus::Absent,
+        )
+        .unwrap();
+
+        let (export, section_name) =
+            adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8).unwrap();
+
+        assert_eq!(section_name, "Mabini");
+        assert!(export.csv.contains("School Name,Rizal Elementary"));
+        assert!(export.csv.contains("Class Adviser,Ana Cruz"));
+        assert!(export.csv.contains("Report for the Month of,August 2026"));
+        assert!(export.csv.contains("# This is a DepEd-SF2-inspired export"));
+        assert!(!export.disclosure.omitted_fields.is_empty());
+    }
+
+    #[test]
     fn non_adviser_cannot_read_an_advisory_monthly_grid() {
         let (conn, sessions, school_id, section_id, _learner_id) = setup_adviser_monthly();
         let other = user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
@@ -127,6 +232,18 @@ mod tests {
 
         let result =
             adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section_id, 2026, 8);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn non_adviser_cannot_build_the_adviser_sf2_export() {
+        let (conn, sessions, school_id, section_id, _learner_id) = setup_adviser_monthly();
+        let other = user::create_user(&conn, "other.teacher", "password", "Other Teacher").unwrap();
+        user::add_school_membership(&conn, &other.id, &school_id).unwrap();
+        auth::login(&conn, &sessions, "other.teacher", "password", &school_id).unwrap();
+
+        let result = adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
@@ -155,6 +272,15 @@ mod tests {
 
         let result =
             adviser_monthly_attendance_summary_authorized(&conn, &sessions, &section_id, 2026, 13);
+
+        assert!(matches!(result, Err(AppError::Unauthorized)));
+    }
+
+    #[test]
+    fn invalid_month_fails_closed_before_any_sf2_export_is_built() {
+        let (conn, sessions, _school_id, section_id, _learner_id) = setup_adviser_monthly();
+
+        let result = adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 13);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }

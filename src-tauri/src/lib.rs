@@ -111,6 +111,7 @@ pub fn run() {
             commands::attendance::adviser_record_attendance,
             commands::attendance::adviser_bulk_mark_attendance_present,
             commands::adviser_monthly_attendance::adviser_monthly_attendance_summary,
+            commands::adviser_monthly_attendance::adviser_export_section_monthly_sf2,
             commands::attendance::monthly_attendance_summary,
             commands::attendance::school_attendance_day_totals,
             commands::section::list_sections_by_school,
