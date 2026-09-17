@@ -58,11 +58,29 @@ Treat the repository's actual Prettier output as authoritative instead of approx
 
 **Verification**
 
-The first hand-formatting attempt was insufficient: exact head `55b89bea25a5a1f01502deeac0bcb14de2d8ffc4` still failed Quality #850 while Security #1025 passed. The second correction covers all four files explicitly named by Prettier and is pending fresh exact-head Quality and Security. It is not verified until both required gates succeed on the same unchanged head.
+The first hand-formatting attempt was insufficient: exact head `55b89bea25a5a1f01502deeac0bcb14de2d8ffc4` still failed Quality #850 while Security #1025 passed. Later Quality #856 progressed past Prettier and architecture, proving the formatter correction worked; the gate then exposed a separate dead-code issue.
 
 **Reuse condition**
 
 For composite JS/TS Quality failures, inspect raw job logs before changing code. If Prettier names files, format all named files with the repository formatter and run `format:check` before push when dependencies are available. Do not infer success from line length or formatter configuration alone, and do not debug later quality stages until Prettier passes and those stages actually execute.
+
+## 2026-09-18 — PR #98 staged composition export rejected by dead-code gate
+
+**Issue**
+
+After Prettier and architecture passed, the JS/TS Quality gate reached `knip` and reported the newly staged `adviserMonthlyAttendanceService` composition export as unused. The visible My Advisory panel that will consume the service is intentionally the next bounded slice, so exporting a composed instance before a production consumer exists violates the repository's dead-code contract.
+
+**Workaround**
+
+Keep the tested application service, repository port, Tauri adapter, and authorization classification in this seam, but do not pre-compose/export an unused runtime instance. Remove the monthly service/adapter imports and unused composition export. The next My Advisory UI slice must compose the service when it introduces the first real runtime consumer. Do not add a `knip` exemption, dummy reference, or CI suppression.
+
+**Verification**
+
+Applied on PR #98 branch after Quality #857 remained red on exact head `2b5e556b6d99d8f95c81afadd9480c88f2e3dfb5` while Security #1040 passed. Fresh exact-head Quality and Security are required before this workaround is considered verified.
+
+**Reuse condition**
+
+Do not stage exported composition instances ahead of their first production consumer. Land the seam without unused runtime composition, then compose it in the bounded UI slice that actually consumes it. Preserve the dead-code gate instead of suppressing it.
 
 ## Template
 
