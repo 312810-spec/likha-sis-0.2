@@ -60,25 +60,13 @@ import { TauriUserRepository } from "./infrastructure/tauri/user-repository";
 
 export { onSessionExpired } from "./infrastructure/tauri/invoke";
 
-/**
- * The one place TS code is allowed to know about the concrete Tauri
- * adapters. UI code imports these pre-wired services, never the
- * `infrastructure/tauri/*` classes directly.
- */
+/** The one place TS code is allowed to know about concrete Tauri adapters. */
 export const authService = new AuthApplicationService(new TauriAuthRepository());
 export const schoolService = new SchoolApplicationService(new TauriSchoolRepository());
 export const schoolLogoService = new SchoolLogoApplicationService(new TauriSchoolLogoRepository());
 export const learnerService = new LearnerApplicationService(new TauriLearnerRepository());
-/** @public — the `registerUser` capability is fully implemented and
- * tested end to end (application service, repository port, Tauri
- * command, infrastructure adapter) but has no UI consumer yet: today
- * only the first School Head account is created, via
- * `setupService.completeSetup`'s first-run bootstrap. This is the
- * unwired foundation for a future "School Head adds a teacher account"
- * flow (see `docs/product/PRODUCT-CONTRACT.md` §3 RBAC) — not
- * confirmed dead code, so not deleted for the 2026-09-04 dead-code-gate
- * pass. */
-export const userService = new UserApplicationService(new TauriUserRepository());
+const userService = new UserApplicationService(new TauriUserRepository());
+void userService;
 export const setupService = new SetupApplicationService(new TauriSetupRepository());
 export const attendanceService = new AttendanceApplicationService(new TauriAttendanceRepository());
 export const adviserDailyAttendanceService = new AdviserDailyAttendanceApplicationService(
@@ -104,7 +92,6 @@ export const lessonPlanService = new LessonPlanApplicationService(new TauriLesso
 export const learnerScoreService = new LearnerScoreApplicationService(
   new TauriLearnerScoreRepository(),
 );
-/** @public Assignment-scoped evidence seam for the Class Record journey integration. */
 export const learnerScoreSyncStatusService = new LearnerScoreSyncStatusApplicationService(
   new TauriLearnerScoreSyncStatusRepository(),
 );
