@@ -26,40 +26,13 @@ pub fn run() {
                         .build(),
                 )?;
             }
-            // Native "choose an Excel workbook" file dialog for SF1 import
-            // (Wave 2C) -- the official first-party Tauri plugin, not a
-            // free-text path the frontend invents on its own.
             app.handle().plugin(tauri_plugin_dialog::init())?;
-            // "Reveal in file manager" for exported files -- official
-            // first-party Tauri plugin. Only ever called with a path this
-            // app itself just wrote (an export's own returned filePath),
-            // never a user-typed or otherwise untrusted string -- see
-            // CVE-2025-31477 (fixed upstream in 2.2.1+, we pin 2.5.5) for
-            // why that discipline matters for this plugin's open-family
-            // APIs. Unsupported on Android/iOS; this app is Windows-first,
-            // Android later, so that's a future feature-gate, not a bug now.
             app.handle().plugin(tauri_plugin_opener::init())?;
 
             let conn = db::open_app_db(app.handle())?;
             app.manage(Mutex::new(conn));
             app.manage(auth::SessionManager::new());
 
-            // ADR-0067 network listener: only starts if this installation
-            // has ever enrolled a device for some school (see
-            // `hub_server::should_listen`'s own doc comment) -- a no-op,
-            // not a startup failure, for a plain non-syncing installation.
-            // Bind failures are logged, not fatal -- see
-            // `hub_server::spawn`'s own doc comment for why sync must
-            // never be able to crash app startup.
-            //
-            // The shared SSPK cell is always managed, regardless of
-            // whether the listener actually spawns -- see `SspkCell`'s
-            // own doc comment. This is what lets
-            // `commands::device_sync::revoke_device_sync_credential` push
-            // a freshly-rotated key into an ALREADY-RUNNING hub process,
-            // not just the on-disk DPAPI file (the BLOCKING gap this
-            // project's first genuinely independent security review
-            // found: `docs/reviews/2026-09-07-sync-payload-encryption-review.md`).
             let sspk_cell: hub_server::SharedSspk =
                 std::sync::Arc::new(hub_server::SspkCell(std::sync::RwLock::new(None)));
             app.manage(sspk_cell.clone());
@@ -67,11 +40,6 @@ pub fn run() {
                 log::error!("hub sync listener setup failed: {error}");
             }
 
-            // ADR-0067 client-side sync loop: only starts if this
-            // installation has a locally stored sync client credential
-            // (see `sync_client::should_run`'s own doc comment) -- a
-            // no-op for a never-enrolled installation, symmetric with
-            // the hub-listener gate immediately above.
             if let Err(error) = sync_client::maybe_spawn_loop(app.handle()) {
                 log::error!("sync client loop setup failed: {error}");
             }
@@ -111,6 +79,7 @@ pub fn run() {
             commands::attendance::adviser_record_attendance,
             commands::attendance::adviser_bulk_mark_attendance_present,
             commands::adviser_monthly_attendance::adviser_monthly_attendance_summary,
+            commands::adviser_monthly_attendance::adviser_export_section_monthly_sf2,
             commands::attendance::monthly_attendance_summary,
             commands::attendance::school_attendance_day_totals,
             commands::section::list_sections_by_school,
