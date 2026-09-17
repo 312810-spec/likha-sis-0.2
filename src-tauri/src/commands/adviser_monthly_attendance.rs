@@ -89,13 +89,8 @@ pub fn adviser_export_section_monthly_sf2(
     month: u32,
 ) -> AppResult<AdviserSf2ExportResult> {
     let conn = lock_db(&db);
-    let (export, section_name) = adviser_monthly_sf2_export_authorized(
-        &conn,
-        &sessions,
-        &section_id,
-        year,
-        month,
-    )?;
+    let (export, section_name) =
+        adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, year, month)?;
 
     let export_dir = app
         .path()
@@ -134,12 +129,8 @@ fn adviser_monthly_sf2_export_authorized(
     let section = section::find_by_id_in_school(conn, &school_id, section_id)?
         .ok_or(AppError::Unauthorized)?;
     let report = attendance::monthly_grid_for_section(conn, &school_id, section_id, year, month)?;
-    let adviser = section_advisory::current_adviser_for_section(
-        conn,
-        &school_id,
-        section_id,
-        &as_of_date,
-    )?;
+    let adviser =
+        section_advisory::current_adviser_for_section(conn, &school_id, section_id, &as_of_date)?;
     let adviser_name = if let Some(assignment) = adviser {
         user::find_by_id(conn, &assignment.teacher_user_id)?.map(|u| u.display_name)
     } else {
@@ -222,8 +213,7 @@ mod tests {
         .unwrap();
 
         let (export, section_name) =
-            adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8)
-                .unwrap();
+            adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8).unwrap();
 
         assert_eq!(section_name, "Mabini");
         assert!(export.csv.contains("School Name,Rizal Elementary"));
@@ -253,8 +243,7 @@ mod tests {
         user::add_school_membership(&conn, &other.id, &school_id).unwrap();
         auth::login(&conn, &sessions, "other.teacher", "password", &school_id).unwrap();
 
-        let result =
-            adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8);
+        let result = adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 8);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
@@ -291,8 +280,7 @@ mod tests {
     fn invalid_month_fails_closed_before_any_sf2_export_is_built() {
         let (conn, sessions, _school_id, section_id, _learner_id) = setup_adviser_monthly();
 
-        let result =
-            adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 13);
+        let result = adviser_monthly_sf2_export_authorized(&conn, &sessions, &section_id, 2026, 13);
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
     }
