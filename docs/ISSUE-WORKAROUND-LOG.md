@@ -46,6 +46,24 @@ The traversal located `src/ui/AdviserViewScreen.tsx`, the existing daily adviser
 
 When connector code search is unavailable or inconclusive, use directory/contents traversal and exact returned paths. Do not repeatedly guess file locations.
 
+## 2026-09-17 — PR #98 JavaScript/TypeScript Quality stopped before UI/native stages
+
+**Issue**
+
+Quality Gate #846 failed on Ubuntu at `Run JavaScript and TypeScript quality gate` for PR #98 head `aba8de8be16131e58ee3c4746533cffea663c5d5`; Security Gate #1017 succeeded. The composite `npm run quality` runs typecheck, ESLint, Prettier, architecture, dead-code, then Vitest, while the connector did not expose the raw composite-step log needed to name the exact subcommand. The changed TypeScript files contained layouts exceeding the repository's discovered Prettier `printWidth: 100` configuration.
+
+**Workaround**
+
+Use repository Contents traversal to discover the exact formatter configuration (`.prettierrc.json`) instead of repeatedly guessing config paths. Apply formatter-equivalent layout changes only to the changed monthly service, service test, and Tauri adapter; do not alter authorization, data flow, CI, or protections. Require fresh exact-head Quality and Security before merge.
+
+**Verification**
+
+Pending fresh exact-head CI after the formatting-only correction. Do not treat this workaround as verified until Quality and independent Security both succeed on the same new head.
+
+**Reuse condition**
+
+If a future composite JS/TS Quality failure lacks raw subcommand logs, first inspect the quality script and exact repository formatting configuration, then use the smallest evidence-supported correction. Do not assume every JS/TS gate failure is Prettier; if the formatter correction does not clear the gate, continue diagnosis from the next concrete failing-stage evidence.
+
 ## Template
 
 ### YYYY-MM-DD — Short issue name
