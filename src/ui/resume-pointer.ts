@@ -46,9 +46,7 @@ function isResumePointer(value: unknown): value is ResumePointer {
     );
   }
 
-  return (
-    typeof candidate.advisorySectionId === "string" && !!candidate.advisorySectionId.trim()
-  );
+  return (typeof candidate.advisorySectionId === "string" && !!candidate.advisorySectionId.trim());
 }
 
 export function readResumePointer(storage = defaultStorage()): ResumePointer | null {
