@@ -33,7 +33,11 @@ describe("resume pointer recovery", () => {
     const storage = memoryStorage();
     writeClassResumePointer(
       "teacher-1",
-      { teachingAssignmentId: "assignment-1", subjectName: "Old label", sectionName: "Old label" },
+      {
+        teachingAssignmentId: "assignment-1",
+        subjectName: "Old label",
+        sectionName: "Old label",
+      },
       storage,
     );
     const current = {
@@ -63,7 +67,11 @@ describe("resume pointer recovery", () => {
     const storage = memoryStorage();
     writeClassResumePointer(
       "teacher-1",
-      { teachingAssignmentId: "assignment-1", subjectName: "Synthetic", sectionName: "Synthetic" },
+      {
+        teachingAssignmentId: "assignment-1",
+        subjectName: "Synthetic",
+        sectionName: "Synthetic",
+      },
       storage,
     );
 
@@ -86,7 +94,9 @@ describe("resume pointer recovery", () => {
     const storage = memoryStorage();
     writeAdvisoryResumePointer("teacher-1", { sectionId: "section-1" }, storage);
     const auth = authority({
-      isAuthorizedAdvisorySection: vi.fn().mockRejectedValue(new Error("offline boundary unavailable")),
+      isAuthorizedAdvisorySection: vi
+        .fn()
+        .mockRejectedValue(new Error("offline boundary unavailable")),
     });
 
     await expect(recoverResumePointer("teacher-1", auth, storage)).resolves.toBeNull();
