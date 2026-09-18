@@ -37,7 +37,10 @@ function isResumePointer(value: unknown): value is ResumePointer {
   }
 
   if (candidate.destination === "class") {
-    return typeof candidate.teachingAssignmentId === "string" && !!candidate.teachingAssignmentId.trim();
+    return (
+      typeof candidate.teachingAssignmentId === "string" &&
+      !!candidate.teachingAssignmentId.trim()
+    );
   }
 
   return typeof candidate.advisorySectionId === "string" && !!candidate.advisorySectionId.trim();
