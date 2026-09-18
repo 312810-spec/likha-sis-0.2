@@ -9,28 +9,30 @@ Current code, tests, migrations, PR state, and CI override stale prose.
 
 ## Current verified checkpoint
 
-Current main: `ac05aff81f91ad27dd7fd0ee26f2c91c949cc449` (PR #97).
+Current main: `f37412a70bf708e9296ab6de102e65377a3dff68` (PR #98).
 
-PR #96 completed the trusted Adviser Room SF2-inspired monthly export boundary. PR #97 established durable **Issue → Workaround → Record** troubleshooting memory. Earlier Adviser Room daily attendance remains separate from Subject Attendance; Subject Attendance is read-only signal data and must never become official attendance or SF2.
+PR #98 merged the TypeScript monthly Adviser Room application seam: narrow repository port, application validation, Tauri adapter, action-specific permission classification, unchanged export `FieldDisclosure`, and synthetic tests. Native Rust remains the authorization authority. Earlier official daily attendance remains separate from read-only Subject Attendance signals.
 
 GJ-7 software recovery evidence from PR #90 remains valid. Real process crash/power-loss, DPAPI/session recovery, transport retry after restart, and packaged Windows proof remain verification debt.
 
 ## Current slice
 
-Branch: `feat/adviser-monthly-ui` (PR #98).
+Branch: `feat/adviser-monthly-panel`.
 
-Build the smallest TypeScript seam needed to expose the already-authorized monthly preview/export capability in My Advisory without weakening the trusted Rust boundary:
+Expose the merged monthly capability in My Advisory without weakening trusted boundaries:
 
-- add a narrow monthly adviser repository port and application service;
-- validate section/year/month for teacher feedback before IPC, while native Rust remains authoritative;
-- add a Tauri adapter for `adviser_monthly_attendance_summary` and `adviser_export_section_monthly_sf2`;
-- do not pre-compose/export the monthly service until the visible My Advisory slice introduces its first production consumer, preserving the dead-code contract;
-- classify those adviser-authorized commands as action-specific permission boundaries so an unrelated-teacher denial does not masquerade as global session expiry;
-- preserve the export's returned `FieldDisclosure` unchanged;
-- synthetic application/adapter tests only in this slice;
-- no schema, sync, official-template, daily-attendance, or Subject Attendance changes.
+- compose the monthly service only now that a real production consumer exists;
+- derive preview/export year and month from the selected advisory date;
+- load only for the currently selected authorized advisory section;
+- invalidate stale monthly preview requests when section/month changes;
+- render the school-day grid and per-learner Present/Absent/Tardy totals;
+- keep Subject Attendance separate from official attendance;
+- export only through the adviser-authorized monthly service;
+- render the returned `FieldDisclosure` rather than reconstructing export claims;
+- state explicitly that the CSV is SF2-inspired, not a submission-ready official SF2;
+- synthetic UI tests only; no schema, sync, official-template, or native authorization changes.
 
-After this seam is exact-head verified and merged, the next bounded slice is the visible My Advisory monthly preview/export panel. That slice should compose the monthly service centrally when the first real runtime consumer is added.
+After this panel is exact-head verified and merged, continue the documented Golden Journey with safe resume/recovery, then school-year lifecycle. Official-template work begins only with sufficient authoritative form/layout evidence.
 
 ## Continuation policy
 
@@ -42,9 +44,9 @@ When an issue occurs: **Issue → Workaround → Record**. Diagnose from evidenc
 
 North Star: **LIKHA should feel like a calm digital teacher’s desk that already knows what work belongs here.**
 
-Completed through current main: class/learner context, class record/scoring, local-save truth, clean encrypted reopen recovery evidence, real advisory context, adviser-only official daily attendance, separate read-only Subject Attendance signals, trusted monthly preview, trusted SF2-inspired monthly export wrapper, and durable troubleshooting memory.
+Completed through current main: class/learner context, class record/scoring, local-save truth, clean encrypted reopen recovery evidence, real advisory context, adviser-only official daily attendance, separate read-only Subject Attendance signals, trusted monthly preview, trusted SF2-inspired monthly export wrapper, TypeScript monthly application seam, and durable troubleshooting memory.
 
-Current: TypeScript monthly Adviser Room application seam. Next: visible context-aware monthly preview/export panel. Then continue safe resume/recovery and school-year lifecycle. Official-template work begins only with sufficient authoritative form/layout evidence.
+Current: visible context-aware monthly preview/export panel. Next: safe resume/recovery, then school-year lifecycle. Official-template work begins only with sufficient authoritative form/layout evidence.
 
 ## Locked constraints
 
