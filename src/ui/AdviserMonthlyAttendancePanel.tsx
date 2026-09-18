@@ -111,16 +111,23 @@ export function AdviserMonthlyAttendancePanel({
         <EmptyState>No enrolled learners are available in this monthly preview.</EmptyState>
       ) : (
         <>
-          <div className="table-scroll" tabIndex={0} aria-label="Scrollable monthly attendance grid">
+          <div
+            className="table-scroll"
+            tabIndex={0}
+            aria-label="Scrollable monthly attendance grid"
+          >
             <table className="attendance-roster">
               <caption className="visually-hidden">
-                Monthly official attendance preview for {sectionName}, {year}-{String(month).padStart(2, "0")}
+                Monthly official attendance preview for {sectionName}, {year}-
+                {String(month).padStart(2, "0")}
               </caption>
               <thead>
                 <tr>
                   <th scope="col">Learner</th>
                   {report.schoolDays.map((day) => (
-                    <th key={day} scope="col">{day}</th>
+                    <th key={day} scope="col">
+                      {day}
+                    </th>
                   ))}
                   <th scope="col">P</th>
                   <th scope="col">A</th>
@@ -130,7 +137,9 @@ export function AdviserMonthlyAttendancePanel({
               <tbody>
                 {report.learners.map((learner) => (
                   <tr key={learner.learnerId}>
-                    <th scope="row">{learner.givenName} {learner.familyName}</th>
+                    <th scope="row">
+                      {learner.givenName} {learner.familyName}
+                    </th>
                     {learner.days.map((status, index) => (
                       <td key={report.schoolDays[index] ?? index}>{statusLabel(status)}</td>
                     ))}
@@ -153,12 +162,15 @@ export function AdviserMonthlyAttendancePanel({
         <Alert tone="info">
           <p>Export created: {exportResult.filePath}</p>
           <p>
-            Populated fields: {exportResult.disclosure.populatedFields.length}. Omitted fields: {exportResult.disclosure.omittedFields.length}.
+            Populated fields: {exportResult.disclosure.populatedFields.length}. Omitted fields:{" "}
+            {exportResult.disclosure.omittedFields.length}.
           </p>
           {exportResult.disclosure.omittedFields.length > 0 && (
             <ul>
               {exportResult.disclosure.omittedFields.map((item) => (
-                <li key={`${item.field}:${item.reason}`}><strong>{item.field}</strong>: {item.reason}</li>
+                <li key={`${item.field}:${item.reason}`}>
+                  <strong>{item.field}</strong>: {item.reason}
+                </li>
               ))}
             </ul>
           )}
