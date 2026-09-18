@@ -52,7 +52,9 @@ function isResumePointer(value: unknown): value is ResumePointer {
   );
 }
 
-export function readResumePointer(storage = defaultStorage()): ResumePointer | null {
+export function readResumePointer(
+  storage = defaultStorage(),
+): ResumePointer | null {
   if (!storage) return null;
   const raw = storage.getItem(RESUME_POINTER_KEY);
   if (!raw) return null;
