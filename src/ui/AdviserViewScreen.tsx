@@ -226,49 +226,134 @@ export function AdviserViewScreen({
       <div className="form-row">
         <div className="field">
           <label htmlFor="adviser-view-date">As of</label>
-          <input id="adviser-view-date" type="date" value={date} max={todayAsIsoDate()} onChange={(event) => setDate(event.target.value)} />
+          <input
+            id="adviser-view-date"
+            type="date"
+            value={date}
+            max={todayAsIsoDate()}
+            onChange={(event) => setDate(event.target.value)}
+          />
         </div>
         {sections.length > 0 && (
           <div className="field">
             <label htmlFor="adviser-view-section">Advisory section</label>
-            <select id="adviser-view-section" value={sectionId} onChange={(event) => setSectionId(event.target.value)}>
+            <select
+              id="adviser-view-section"
+              value={sectionId}
+              onChange={(event) => setSectionId(event.target.value)}
+            >
               {sections.map((section) => (
-                <option key={section.id} value={section.id}>Grade {section.gradeLevel} — {section.name} ({section.schoolYear})</option>
+                <option key={section.id} value={section.id}>
+                  Grade {section.gradeLevel} — {section.name} ({section.schoolYear})
+                </option>
               ))}
             </select>
           </div>
         )}
       </div>
-      {sectionsError && <Alert tone="error"><p>{sectionsError}</p><button type="button" onClick={loadSections}>Retry</button></Alert>}
+      {sectionsError && (
+        <Alert tone="error">
+          <p>{sectionsError}</p>
+          <button type="button" onClick={loadSections}>
+            Retry
+          </button>
+        </Alert>
+      )}
       {sectionsLoading ? (
         <Loading label="Loading My Advisory sections…" />
       ) : sectionsError ? null : sections.length === 0 ? (
-        <EmptyState>No advisory section is assigned to you for this date. A School Head can assign the section adviser.</EmptyState>
+        <EmptyState>
+          No advisory section is assigned to you for this date. A School Head can assign the section
+          adviser.
+        </EmptyState>
       ) : (
         <>
-          {dailyAttendanceError && <Alert tone="error"><p>{dailyAttendanceError}</p><button type="button" onClick={() => void loadDailyAttendance()}>Retry</button></Alert>}
+          {dailyAttendanceError && (
+            <Alert tone="error">
+              <p>{dailyAttendanceError}</p>
+              <button type="button" onClick={() => void loadDailyAttendance()}>
+                Retry
+              </button>
+            </Alert>
+          )}
           {dailyAttendanceLoading ? (
             <Loading label="Loading official daily attendance…" />
           ) : dailyAttendanceError ? null : (
             <>
               <section aria-labelledby="advisory-roster-heading">
                 <h2 id="advisory-roster-heading">Advisory roster</h2>
-                <p className="attendance-count" role="status"><strong>{dailyRoster.length}</strong> learner{dailyRoster.length === 1 ? "" : "s"} enrolled in {selectedSection?.name ?? "this section"} as of {date}.</p>
-                <p className="field-hint">This roster comes from current section enrollment. Official daily attendance below is separate from read-only Subject Attendance signals.</p>
+                <p className="attendance-count" role="status">
+                  <strong>{dailyRoster.length}</strong> learner
+                  {dailyRoster.length === 1 ? "" : "s"} enrolled in{" "}
+                  {selectedSection?.name ?? "this section"} as of {date}.
+                </p>
+                <p className="field-hint">
+                  This roster comes from current section enrollment. Official daily attendance below
+                  is separate from read-only Subject Attendance signals.
+                </p>
               </section>
               <section aria-labelledby="official-daily-attendance-heading">
                 <h2 id="official-daily-attendance-heading">Official daily attendance</h2>
-                <p className="field-hint">Record the advisory section&apos;s official Present, Absent, or Tardy mark for this date. Existing marks are never overwritten by “Mark unmarked Present.”</p>
-                {dailyRoster.length === 0 ? <EmptyState>No active learners are available for official attendance on this date.</EmptyState> : (
+                <p className="field-hint">
+                  Record the advisory section&apos;s official Present, Absent, or Tardy mark for
+                  this date. Existing marks are never overwritten by “Mark unmarked Present.”
+                </p>
+                {dailyRoster.length === 0 ? (
+                  <EmptyState>
+                    No active learners are available for official attendance on this date.
+                  </EmptyState>
+                ) : (
                   <>
-                    <button type="button" onClick={() => void markUnmarkedPresent()} disabled={bulkSaving || savingLearnerId !== null}>{bulkSaving ? "Marking…" : "Mark unmarked Present"}</button>
+                    <button
+                      type="button"
+                      onClick={() => void markUnmarkedPresent()}
+                      disabled={bulkSaving || savingLearnerId !== null}
+                    >
+                      {bulkSaving ? "Marking…" : "Mark unmarked Present"}
+                    </button>
                     <table className="attendance-roster">
-                      <caption className="visually-hidden">Official daily attendance for {selectedSection?.name ?? "this advisory section"} on {date}</caption>
-                      <thead><tr><th scope="col">Learner</th><th scope="col">Official mark</th></tr></thead>
-                      <tbody>{dailyRoster.map((row) => {
-                        const learnerName = `${row.givenName} ${row.familyName}`;
-                        return <tr key={row.learnerId}><th scope="row">{learnerName}</th><td><select aria-label={`Official attendance for ${learnerName}`} value={row.status ?? ""} disabled={bulkSaving || savingLearnerId !== null} onChange={(event) => void recordOfficialAttendance(row.learnerId, event.target.value as AttendanceStatus)}><option value="" disabled>Not marked</option>{(["present", "absent", "tardy"] as const).map((status) => <option key={status} value={status}>{attendanceLabel(status)}</option>)}</select></td></tr>;
-                      })}</tbody>
+                      <caption className="visually-hidden">
+                        Official daily attendance for{" "}
+                        {selectedSection?.name ?? "this advisory section"} on {date}
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Learner</th>
+                          <th scope="col">Official mark</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyRoster.map((row) => {
+                          const learnerName = `${row.givenName} ${row.familyName}`;
+                          return (
+                            <tr key={row.learnerId}>
+                              <th scope="row">{learnerName}</th>
+                              <td>
+                                <select
+                                  aria-label={`Official attendance for ${learnerName}`}
+                                  value={row.status ?? ""}
+                                  disabled={bulkSaving || savingLearnerId !== null}
+                                  onChange={(event) =>
+                                    void recordOfficialAttendance(
+                                      row.learnerId,
+                                      event.target.value as AttendanceStatus,
+                                    )
+                                  }
+                                >
+                                  <option value="" disabled>
+                                    Not marked
+                                  </option>
+                                  {(["present", "absent", "tardy"] as const).map((status) => (
+                                    <option key={status} value={status}>
+                                      {attendanceLabel(status)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
                     </table>
                   </>
                 )}
@@ -276,21 +361,76 @@ export function AdviserViewScreen({
             </>
           )}
           {selectedSection && (
-            <AdviserMonthlyAttendancePanel service={adviserMonthlyAttendanceService} sectionId={selectedSection.id} asOfDate={date} sectionName={selectedSection.name} />
+            <AdviserMonthlyAttendancePanel
+              service={adviserMonthlyAttendanceService}
+              sectionId={selectedSection.id}
+              asOfDate={date}
+              sectionName={selectedSection.name}
+            />
           )}
           <section aria-labelledby="advisory-subject-signals-heading">
             <h2 id="advisory-subject-signals-heading">Subject Attendance signals</h2>
-            <p className="field-hint">Read-only follow-up evidence from subject teachers. These signals never become official daily attendance or SF2 automatically.</p>
-            {overviewError && <Alert tone="error"><p>{overviewError}</p><button type="button" onClick={loadOverview}>Retry subject signals</button></Alert>}
-            {overviewLoading ? <Loading label="Loading Subject Attendance signals…" /> : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
-              <EmptyState>No enrolled learners have Subject Attendance signals on this date.</EmptyState>
+            <p className="field-hint">
+              Read-only follow-up evidence from subject teachers. These signals never become
+              official daily attendance or SF2 automatically.
+            </p>
+            {overviewError && (
+              <Alert tone="error">
+                <p>{overviewError}</p>
+                <button type="button" onClick={loadOverview}>
+                  Retry subject signals
+                </button>
+              </Alert>
+            )}
+            {overviewLoading ? (
+              <Loading label="Loading Subject Attendance signals…" />
+            ) : overviewError ? null : !overview ? null : overview.rows.length === 0 ? (
+              <EmptyState>
+                No enrolled learners have Subject Attendance signals on this date.
+              </EmptyState>
             ) : (
               <>
-                <p className="attendance-count"><strong>{overview.heldSessionCount}</strong> subject session{overview.heldSessionCount === 1 ? "" : "s"} held across <strong>{overview.subjectCount}</strong> subject{overview.subjectCount === 1 ? "" : "s"}</p>
+                <p className="attendance-count">
+                  <strong>{overview.heldSessionCount}</strong> subject session
+                  {overview.heldSessionCount === 1 ? "" : "s"} held across{" "}
+                  <strong>{overview.subjectCount}</strong> subject
+                  {overview.subjectCount === 1 ? "" : "s"}
+                </p>
                 <table className="attendance-roster">
-                  <caption className="visually-hidden">Current advisory roster with read-only Subject Attendance signals for {overview.sectionName} as of {overview.asOfDate}</caption>
-                  <thead><tr><th scope="col">Learner</th><th scope="col">Present</th><th scope="col">Absent</th><th scope="col">Late</th><th scope="col">Excused</th><th scope="col">Subjects with absences</th><th scope="col">Highest current subject absence streak</th></tr></thead>
-                  <tbody>{overview.rows.map((row) => <tr key={row.membershipId}><th scope="row">{row.givenName} {row.familyName}</th><td>{row.presentCount}</td><td>{row.absentCount}</td><td>{row.lateCount}</td><td>{row.excusedCount}</td><td>{row.subjectsWithAbsences.length > 0 ? row.subjectsWithAbsences.join(", ") : "None"}</td><td>{row.highestCurrentSubjectAbsenceStreak}</td></tr>)}</tbody>
+                  <caption className="visually-hidden">
+                    Current advisory roster with read-only Subject Attendance signals for{" "}
+                    {overview.sectionName} as of {overview.asOfDate}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Learner</th>
+                      <th scope="col">Present</th>
+                      <th scope="col">Absent</th>
+                      <th scope="col">Late</th>
+                      <th scope="col">Excused</th>
+                      <th scope="col">Subjects with absences</th>
+                      <th scope="col">Highest current subject absence streak</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.rows.map((row) => (
+                      <tr key={row.membershipId}>
+                        <th scope="row">
+                          {row.givenName} {row.familyName}
+                        </th>
+                        <td>{row.presentCount}</td>
+                        <td>{row.absentCount}</td>
+                        <td>{row.lateCount}</td>
+                        <td>{row.excusedCount}</td>
+                        <td>
+                          {row.subjectsWithAbsences.length > 0
+                            ? row.subjectsWithAbsences.join(", ")
+                            : "None"}
+                        </td>
+                        <td>{row.highestCurrentSubjectAbsenceStreak}</td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </>
             )}
