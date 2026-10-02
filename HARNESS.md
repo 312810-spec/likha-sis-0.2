@@ -1,78 +1,53 @@
-# LIKHA-SIS 0.2 — Development Harness
+# LIKHA-SIS lean development harness
 
-## Mission
+Effective 2026-10-02. The user authorized replacement of the whole development
+harness and removal of blanket legal-policy development gates. This replaces
+older freezes, rubric certification, M0-only scope and universal approval rules.
 
-Build a production-grade, teacher-centered SIS for Philippine DepEd schools.
+## One execution loop
 
-Priority: privacy/security → correctness → DepEd compliance → teacher usability → offline reliability → maintainability → zero billing → performance → speed.
+Understand the teacher outcome -> inspect targeted evidence -> implement ->
+verify affected behavior -> record the next useful step. Start directly for a
+clear fix; use a short plan for multi-step features; use independent expert
+challenge for architecture decisions. Planning is a tool, not a permission gate.
 
-## Product invariants
+Routine reversible work proceeds autonomously within the user's requested scope.
+Changing a development rule does not authorize deleting live records, exposing
+credentials, changing unrelated accounts, or purchasing services. Keep production
+changes explicit. This distinction is practical data protection, not a legal
+review prerequisite for ordinary app development.
 
-- Native-first, local-first, offline-capable.
-- Windows workstation first; Android teacher companion later.
-- React + TypeScript + Tauri 2; SQLite is the device working database.
-- UI → Application Services → Domain → Repository Ports → Infrastructure/Platform Adapters → SyncProvider → Cloud.
-- Offline writes save locally first. Provider code stays behind adapters. Business logic stays outside UI.
-- Synthetic data only in development, tests, demos, screenshots, and AI prompts.
-- Security is enforced at trusted boundaries. School isolation is mandatory.
-- Efficient / Comfortable / Guided retain functional parity; Comfortable is default.
+## Minimal context
 
-## AI/app independence
+`AGENTS.md` is startup guidance. `TASK.md` is continuation state. Read the
+architecture study or current source only when the task needs it. Historical
+plans, reports and archived harness skills never become mandatory startup input.
+Useful domain/testing skills remain available on demand; their process rules
+yield to this guide and the current user task. Missing current forms or policy
+sources do not block prototypes, configurable rules or clearly labeled reports.
 
-The harness belongs to LIKHA, not to an AI vendor, model, IDE, coding app, or agent runtime.
-The owner chooses the active AI/app at runtime. Repository rules must not require Claude, ChatGPT, Codex, Gemini, Copilot, or another provider to function.
-Provider-specific folders/configuration may exist only as optional adapters. Deterministic tests, CI, architecture, security rules, planning packets, and durable project knowledge remain provider-neutral.
-Never assume the current AI/app from historical files or prior sessions.
+No model pinning, provider-required control plane, automatic ten-perspective
+exercise, hard retry count, scorecard, frozen baseline, scheduled certification,
+machine-specific tool hook or custom push-approval hook remains active.
+Codex platform settings stay under the user's/runtime's control.
 
-## Context discipline
+## Engineering evidence
 
-Do not reread the repository. Build context progressively:
+Retain existing affected-work CI and product security scans. These test actual
+code rather than certify the harness. Consider dependency impact, not only changed
+filenames. Grades, auth, migrations, keys, sync and backup need integration and
+failure tests. Keep `quality:full` available for checkpoints; no harness audit
+precedes it. Native release proof is separate from source lint/test success.
 
-1. inspect the task and current diff;
-2. search/find the exact concept, symbol, decision, or failure;
-3. read the smallest useful ranges;
-4. expand only when evidence is insufficient, stale, or conflicting.
+`harness:verify` is a lightweight usability check for current documents and
+referenced scripts. It does not enforce exact prose, architecture selection,
+agent count, score, review interval, law, or framework installation.
 
-Never load whole large memory/plan files by default. Carry forward compact evidence, not transcript history.
+## Adoption and measurement
 
-## Living harness
-
-The harness stays `evolving`. Keep verified checkpoints but never freeze improvement because a score once reached 100.
-Prefer fewer, stronger, reusable capabilities over overlapping agents, skills, hooks, plugins, or scripts.
-Add tooling only when measured value exceeds context, maintenance, security, and CI cost.
-
-When adding/replacing/materially revisiting an external tool, fetch its current stable version and relevant official release/security/compatibility notes. Upgrade only when beneficial and compatible. Do not churn unrelated dependencies.
-
-## Capability routing
-
-Route by capability and risk, not vendor/model name. See `docs/harness/MODEL-ROUTING.md`.
-
-- Scout: cheap/fast discovery and extraction.
-- Specialist/builder: normal implementation from a bounded contract.
-- Senior reviewer: difficult debugging and high-risk challenge.
-- Apex planner: only major/high-risk/cross-domain planning where stronger reasoning materially reduces risk or rework.
-
-The owner/runtime may map any available AI/model/app to these roles.
-
-## Debugging budget
-
-For one failure mechanism, allow at most two evidence-based attempts. Attempt 2 requires new evidence or a materially different hypothesis. After two failures, change mechanism, use a safe workaround, escalate, or mark blocked.
-Never weaken privacy, security, architecture, data integrity, or required verification to make a workaround pass.
-
-## Engineering loop
-
-Inspect → Research if needed → Specify → Implement → Test → Review → Record.
-
-- Small reversible changes; no unrelated refactors.
-- TDD for important domain/security/persistence/sync logic.
-- Narrow checks first; expand verification with risk.
-- CI fails fast before expensive native/browser work.
-- Never claim a check passed unless it ran.
-- No paid infrastructure/API without explicit approval.
-- Durable decisions go to ADRs; durable project state goes to memory/plan/handoff.
-
-## Completion
-
-Before completion: run relevant checks; inspect edge/error/offline states; review security/privacy impact; use independent review where risk requires it; update durable state when materially changed.
-
-User-facing summary is non-technical by default: what improved, what was verified, remaining risk/blocker, and what comes next.
+Base: native Codex, concise repository instructions, targeted retrieval, task
+state and optional specialists. Superpowers/BMAD/GSD are references to pilot,
+not required installations. Measure total tokens including subagents, successful
+completion, rework, elapsed time and defects across three comparable tasks.
+Smaller instructions are a measurable change; token savings are unproven until
+measured. See `docs/research/WINDOWS-ANDROID-STUDY.md`.

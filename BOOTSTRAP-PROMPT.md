@@ -1,50 +1,22 @@
-# Claude Code Bootstrap Prompt
+# Continue LIKHA-SIS with Codex
 
-This is a GREENFIELD LIKHA-SIS 0.2 repository. Do not assume, search for, or depend on an older implementation.
+Work in the existing repository. Read AGENTS.md and TASK.md, inspect the current
+diff and relevant source, and continue the next unfinished teacher workflow.
+Do not restart M0 or rebuild implemented business logic merely because an old
+plan calls this repository greenfield.
 
-Before changing code, read:
+Windows and Android development are both in scope. First prove Tauri Android
+encrypted startup, lifecycle recovery and portable backup; compare Kotlin only
+if evidence shows Tauri's integration is unsuitable. Preserve the working
+Windows path and current school-hub authority during the experiment.
 
-- `CLAUDE.md`
-- `docs/PROJECT-MEMORY.md`
-- `docs/CURRENT-HANDOFF.md`
-- `docs/ACTIVE-PLAN.md`
-- relevant ADRs only
+Use synthetic data and reversible experiments. No harness freeze, legal-policy
+development gate, mandatory prompt framework or repeated permission ceremony.
+Clearly label assumptions/prototypes. Run checks appropriate to the changed
+boundary, record actual results, and carry work forward until the task is done
+or a concrete environment limitation blocks it.
 
-Then inspect the repository and execute the next unfinished M0 task.
-
-Goal: complete M0 Workspace Foundation only.
-
-Use:
-
-- React
-- TypeScript
-- Vite
-- Tauri 2
-- Rust
-- npm unless repository evidence clearly justifies otherwise
-
-Keep dependencies minimal.
-
-Establish:
-
-- strict TypeScript
-- linting
-- formatting
-- unit tests
-- production/build scripts
-- `.gitignore`
-- canonical `npm run quality`
-
-Actually run all checks you report as successful.
-
-Do not implement cloud, auth, encryption, learner features, attendance, grading, forms, sync, or Android workflows during M0.
-
-Do not ask about routine setup choices you can safely resolve yourself.
-
-At the end report only:
-
-- Completed
-- Verified
-- Blockers/Risks
-- Memory/ADR changes
-- Exact next task
+For major choices apply: explore alternatives, infer the teacher's underlying
+need, challenge assumptions, work backwards from usable outputs, identify blind
+spots, and compare screen -> workflow -> teacher outcome. Use five experts only
+when requested or when the major decision warrants independent perspectives.

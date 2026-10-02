@@ -56,7 +56,5 @@ school_id)`). Role membership must always be a fresh DB lookup
   must be timing-comparable (no username-enumeration oracle).
 - Plaintext password `String`s are zeroized at the command boundary.
 
-For substantial changes to authentication or authorization, use a fresh
-independent review when it would resolve a concrete risk. Verify affected
-invariants with appropriate checks and report remaining uncertainty;
-reviewer availability is not a blanket development or completion gate.
+Any change here requires an independent security review before being
+marked complete (fresh context — not the session that implemented it).

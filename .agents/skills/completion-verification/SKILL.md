@@ -1,30 +1,16 @@
 ---
 name: completion-verification
-description: Use before claiming any task, feature, or milestone is complete, fixed, or passing — before writing a completion report or updating docs/CURRENT-HANDOFF.md to say something is done.
+description: Verify relevant behavior and report evidence before claiming a change complete, fixed or passing.
 ---
 
 # Completion Verification
 
-Default assumption: **not done** until proven. Do not self-certify a
-milestone that touches auth, persistence, encryption, or sync — those
-require the `evaluator` agent (fresh context, starts at FAIL, inspects
-evidence, does not trust the builder's summary) and/or a relevant
-reviewer agent (`security-reviewer`, `architecture-reviewer`,
-`reliability-reviewer`) before being marked complete.
+Run the checks appropriate to the affected boundary in current AGENTS.md.
+Inspect edge/error/offline behavior where the change can affect it. Use a fresh
+reviewer when useful, rather than requiring a particular named agent or platform.
 
-Before claiming complete:
-
-- Run the actual checks — `npm run quality` (or the tier that applies,
-  see `.Codex/rules/testing.md`), `cargo test`, `cargo clippy -D
-warnings` for Rust changes. Never write "tests pass" without having run
-  them in this session.
-- Inspect edge/error states, not just the happy path.
-- State plainly what could NOT be verified (no browser tool, no device,
-  no hardware) rather than implying coverage that didn't happen — log
-  real gaps in `docs/VERIFICATION-DEBT.md`.
-- Update `docs/CURRENT-HANDOFF.md`/`docs/ACTIVE-PLAN.md` only after the
-  above, not before.
-
-Report format (matches `AGENTS.md` Completion section): Completed /
-Verified / Blockers-Risks / Memory-ADR changes / Exact next task. Nothing
-else.
+Report actual results and distinguish passed, failed, blocked and not run.
+A compiled package is not a native-device workflow pass. Record material unresolved
+checks in TASK.md or the existing verification-debt register; do not duplicate
+large status documents. No legal-policy review or harness certification is a
+prerequisite for implementation or a truthful development completion report.

@@ -58,3 +58,19 @@ test("manual dispatch can force full verification", () => {
   assert.equal(result.full, true);
   assert.equal(result.windows, true);
 });
+
+test("Codex configuration changes request harness checks without native rebuilds", () => {
+  const result = classifyChanges([".codex/hooks.json", ".codex/agents/reviewer.toml"]);
+  assert.equal(result.full, false);
+  assert.equal(result.harness, true);
+  assert.equal(result.native, false);
+  assert.equal(result.windows, false);
+});
+
+test("archived hooks are documentation rather than executable JavaScript", () => {
+  const result = classifyChanges(["docs/harness/archive/codex-hooks/check-bash.cjs"]);
+  assert.equal(result.full, false);
+  assert.equal(result.docsOnly, true);
+  assert.equal(result.javascript, false);
+  assert.equal(result.native, false);
+});

@@ -5,8 +5,7 @@ description: Use before adding an import across UI/application/domain/infrastruc
 
 # Architecture Boundaries
 
-Use current `AGENTS.md`, the relevant source and `scripts/check-architecture.mjs`.
-No missing historical rules file or extra approval is a prerequisite.
+Full rules: `.Codex/rules/architecture.md`. Read it before acting.
 
 Quick check before writing an import:
 

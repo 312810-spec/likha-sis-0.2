@@ -10,3 +10,6 @@ package-lock.json
 
 # Subagent-driven-development workspace (disposable scratch, git-ignored)
 .superpowers/
+
+# Historical harness assets are retained verbatim, including upstream licenses.
+docs/harness/archive/

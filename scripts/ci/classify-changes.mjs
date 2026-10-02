@@ -14,6 +14,7 @@ function isDocs(path) {
 function isHarness(path) {
   return (
     path === "AGENTS.md" ||
+    path.startsWith(".codex/") ||
     path.startsWith(".agents/") ||
     path.startsWith(".harness/") ||
     path.startsWith("scripts/harness/") ||
@@ -89,7 +90,10 @@ export function classifyChanges(paths, { forceFull = false } = {}) {
   const harness = full || normalized.some(isHarness);
   const native = full || normalized.some(isNative);
   const ui = full || normalized.some(isUi);
-  const javascript = full || normalized.some(isJavaScript) || ui;
+  const javascript =
+    full ||
+    normalized.some((path) => !path.startsWith("docs/harness/archive/") && isJavaScript(path)) ||
+    ui;
 
   return {
     full,
