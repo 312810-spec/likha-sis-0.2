@@ -493,8 +493,19 @@ pub fn pull_once(
             break;
         };
 
-        let tx = conn.unchecked_transaction()?;
-        match apply_decrypted_change(&tx, &config.school_id, change, &key) {
+        let mut tx = conn.unchecked_transaction()?;
+        let application = {
+            let mut savepoint = tx.savepoint()?;
+            let result = apply_decrypted_change(&savepoint, &config.school_id, change, &key);
+            if result.is_ok() {
+                savepoint.commit()?;
+            } else {
+                savepoint.rollback()?;
+            }
+            // Rejected partial writes cannot leak into the retained review transaction.
+            result
+        };
+        match application {
             Ok(()) => {
                 sync_version_cache::record_known_version(
                     &tx,

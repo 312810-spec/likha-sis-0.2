@@ -135,6 +135,20 @@ pub fn acknowledge(conn: &Connection, school_id: &str, change_id: &str) -> AppRe
     )? == 1)
 }
 
+/// Cancels superseded queued edits after an explicit incoming-version choice.
+pub fn discard_pending_for_entity(
+    conn: &Connection,
+    school_id: &str,
+    kind: EntityKind,
+    entity_id: &str,
+) -> AppResult<usize> {
+    conn.execute(
+        "DELETE FROM sync_outbox WHERE school_id = ?1 AND entity_kind = ?2 AND entity_id = ?3",
+        (school_id, kind.as_db_str(), entity_id),
+    )
+    .map_err(Into::into)
+}
+
 pub fn record_attempt(
     conn: &Connection,
     school_id: &str,

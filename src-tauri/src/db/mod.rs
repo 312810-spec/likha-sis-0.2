@@ -103,6 +103,51 @@ pub fn rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
 mod tests {
     use super::*;
 
+    struct TestKeyStore {
+        fail: bool,
+    }
+    impl KeyStore for TestKeyStore {
+        fn load_or_create_key(&self, _path: &Path) -> AppResult<[u8; KEY_LEN]> {
+            if self.fail {
+                Err(crate::error::AppError::key_store("injected unwrap failure"))
+            } else {
+                Ok([0x27; KEY_LEN])
+            }
+        }
+        fn rotate_key(&self, path: &Path) -> AppResult<[u8; KEY_LEN]> {
+            self.load_or_create_key(path)
+        }
+    }
+
+    #[test]
+    fn platform_adapter_reopens_persisted_encrypted_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TestKeyStore { fail: false };
+        let conn = open_with_key_store(dir.path(), &store).unwrap();
+        crate::repository::school::create(&conn, "Synthetic School").unwrap();
+        drop(conn);
+        let reopened = open_with_key_store(dir.path(), &store).unwrap();
+        let count: i64 = reopened
+            .query_row("SELECT COUNT(*) FROM schools", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn failed_key_unwrap_never_changes_or_creates_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let failure = TestKeyStore { fail: true };
+        assert!(open_with_key_store(dir.path(), &failure).is_err());
+        assert!(!dir.path().join(DB_FILE_NAME).exists());
+        drop(open_with_key_store(dir.path(), &TestKeyStore { fail: false }).unwrap());
+        let before = std::fs::read(dir.path().join(DB_FILE_NAME)).unwrap();
+        assert!(open_with_key_store(dir.path(), &failure).is_err());
+        assert_eq!(
+            std::fs::read(dir.path().join(DB_FILE_NAME)).unwrap(),
+            before
+        );
+    }
+
     #[test]
     fn open_creates_expected_schema() {
         let conn =
