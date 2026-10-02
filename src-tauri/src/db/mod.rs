@@ -67,13 +67,43 @@ pub fn open(path: &Path, key: &[u8; KEY_LEN]) -> AppResult<Connection> {
     Ok(conn)
 }
 
-fn app_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
+pub(crate) fn base_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|e| std::io::Error::other(e.to_string()))?;
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
+}
+
+pub(crate) const RECOVERY_POINTER: &str = "active-recovery";
+
+/// A recovery pointer is published only after the recovered database and
+/// device-protected keys have been validated. Never accept an arbitrary path.
+pub(crate) fn selected_data_dir(base: &Path) -> AppResult<std::path::PathBuf> {
+    let pointer = base.join(RECOVERY_POINTER);
+    if !pointer.exists() {
+        return Ok(base.to_path_buf());
+    }
+    if std::fs::metadata(&pointer)?.len() > 36 {
+        return Err(crate::error::AppError::key_store(
+            "invalid recovery pointer",
+        ));
+    }
+    let id = std::fs::read_to_string(pointer)?;
+    let id = uuid::Uuid::parse_str(&id)
+        .map_err(|_| crate::error::AppError::key_store("invalid recovery pointer"))?;
+    let dir = base.join(format!("recovery-{id}"));
+    if !dir.join(DB_FILE_NAME).is_file() || !dir.join(KEY_FILE_NAME).is_file() {
+        return Err(crate::error::AppError::key_store(
+            "recovery installation is incomplete",
+        ));
+    }
+    Ok(dir)
+}
+
+pub(crate) fn app_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
+    selected_data_dir(&base_data_dir(app)?)
 }
 
 /// Opens using a platform adapter. A key failure must not replace the existing database.
@@ -102,6 +132,24 @@ pub fn rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recovery_selection_rejects_paths_and_incomplete_installations() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(selected_data_dir(dir.path()).unwrap(), dir.path());
+        let pointer = dir.path().join(RECOVERY_POINTER);
+        std::fs::write(&pointer, "../some-other-installation").unwrap();
+        assert!(selected_data_dir(dir.path()).is_err());
+        let id = uuid::Uuid::now_v7();
+        std::fs::write(&pointer, id.to_string()).unwrap();
+        assert!(selected_data_dir(dir.path()).is_err());
+        let recovered = dir.path().join(format!("recovery-{id}"));
+        std::fs::create_dir(&recovered).unwrap();
+        std::fs::write(recovered.join(DB_FILE_NAME), b"fixture").unwrap();
+        assert!(selected_data_dir(dir.path()).is_err());
+        std::fs::write(recovered.join(KEY_FILE_NAME), b"fixture").unwrap();
+        assert_eq!(selected_data_dir(dir.path()).unwrap(), recovered);
+    }
 
     struct TestKeyStore {
         fail: bool,

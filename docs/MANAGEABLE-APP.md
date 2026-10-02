@@ -32,7 +32,9 @@ validation remain separate; see TASK.md for current evidence.
 A compiled installer needs an installed-device check, including standard-user
 startup, offline operation, upgrades and reopening real persisted data.
 Spreadsheet exports are readable records, not a portable encrypted database/key
-backup. Portable backup/restore is unfinished.
+backup. Portable backup/recovery is now implemented; use Devices to create a backup
+and the first-run screen to recover on a replacement Windows installation. See
+[the recovery guide](PORTABLE-BACKUP.md). Installed-device recovery remains a pilot check.
 
 Android is not yet a usable app. The platform key-store boundary is prepared,
 but real Android Keystore protection and native startup integration are still

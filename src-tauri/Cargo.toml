@@ -29,6 +29,7 @@ rusqlite_migration = "2.6.0"
 uuid = { version = "1.26.1", features = ["v7", "serde"] }
 rand = "0.10.3"
 zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
+tempfile = "3.27.0"
 argon2 = { version = "0.6.0", features = ["zeroize"] }
 password-hash = { version = "0.6.1", features = ["getrandom"] }
 calamine = { version = "0.36.1", features = ["dates"] }
@@ -126,7 +127,6 @@ if-addrs = { version = "0.15.0", default-features = false }
 windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 
 [dev-dependencies]
-tempfile = "3.27.0"
 proptest = "1.11.0"
 tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }

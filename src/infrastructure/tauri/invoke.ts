@@ -13,6 +13,7 @@ export function onSessionExpired(listener: SessionExpiredListener): () => void {
 /** Commands whose Unauthorized result can mean a valid session lacks action-specific authority. */
 const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "login",
+  "create_portable_backup",
   "register_user",
   "add_user_to_school",
   "admin_reset_teacher_password",

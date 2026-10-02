@@ -1,6 +1,6 @@
 # Current task
 
-Updated: 2026-10-02.
+Updated: 2026-10-03.
 
 ## Goal
 
@@ -33,8 +33,24 @@ Use current stable tools and preserve teacher work during sync failures.
 
 Check final Windows CI and exercise its installer on a Windows device.
 Implement real Android Keystore/startup integration before claiming Android use.
-Portable encrypted backup/restore and installed-device upgrade tests are pending.
+Portable encrypted backup/recovery is implemented in the Devices and first-run screens.
+Installed-device recovery and upgrade tests are pending; Android remains unsupported.
+See docs/PORTABLE-BACKUP.md for the format, scope and replacement-device workflow.
 The teacher pilot guide is docs/MANAGEABLE-APP.md.
 
 Application edits and test checkpoints are now saved on PR101. The first workspace
 reset is recorded as history; verification above was rerun on restored source.
+
+## Portable recovery checkpoint
+
+- Password-protected SQLCipher snapshot includes committed WAL records and schema version.
+- Destination keys are freshly generated/reprotected; existing installations are not overwritten.
+- Full backup requires School Head authority in every school on the installation.
+- First-run recovery is staged and selected on full restart; client sync requires re-enrollment.
+- Focused UI tests pass; full frontend suite: 128 files / 1,192 tests.
+- Native full suite: 1,099 Linux unit tests plus integration suites pass.
+- Browser workflow/accessibility smoke passes with zero findings.
+- Formatting of changed files, native formatting and Clippy are checked.
+- Local whole-repo formatting encounters a pre-existing uncommitted change in
+  docs/SOURCE-REGISTRY.md; it is preserved and excluded from this checkpoint.
+- Windows CI must verify DPAPI recovery and build refreshed test installers.

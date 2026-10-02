@@ -22,6 +22,20 @@ use crate::error::{AppError, AppResult};
 pub struct DpapiKeyStore;
 
 impl KeyStore for DpapiKeyStore {
+    fn store_recovery_key(&self, key_file: &Path, key: &[u8; KEY_LEN]) -> AppResult<()> {
+        use std::io::Write;
+        // Protect before creating a file, so a protection failure leaves no stub.
+        let protected = protect(key)
+            .map_err(|e| AppError::key_store(format!("could not protect recovery key: {e}")))?;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(key_file)?;
+        file.write_all(&protected)?;
+        file.sync_all()?;
+        Ok(())
+    }
+
     fn load_or_create_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]> {
         match create_new_key_file(key_file) {
             Ok(key) => Ok(key),
@@ -307,5 +321,25 @@ mod tests {
         let protected = std::fs::read(&key_file).unwrap();
         let recovered = unprotect(&protected).unwrap();
         assert_eq!(recovered.as_slice(), &rotated[..]);
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    #[test]
+    fn recovered_keys_are_dpapi_protected_and_never_overwrite_an_existing_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("recovered.key");
+        let key = generate_key();
+        DpapiKeyStore.store_recovery_key(&path, &key).unwrap();
+        let protected = std::fs::read(&path).unwrap();
+        assert_ne!(protected.as_slice(), key.as_slice());
+        assert_eq!(DpapiKeyStore.load_or_create_key(&path).unwrap(), key);
+        assert!(DpapiKeyStore
+            .store_recovery_key(&path, &generate_key())
+            .is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), protected);
+        assert_eq!(DpapiKeyStore.load_or_create_key(&path).unwrap(), key);
     }
 }

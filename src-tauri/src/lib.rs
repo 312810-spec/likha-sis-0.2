@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod backup;
 mod commands;
 pub mod crypto;
 pub mod db;
@@ -98,6 +99,8 @@ pub fn run() {
             commands::user::grant_school_member_role,
             commands::user::revoke_school_member_role,
             commands::setup::installation_status,
+            commands::backup::create_portable_backup,
+            commands::backup::stage_portable_recovery,
             commands::setup::bootstrap_installation,
             commands::auth::login,
             commands::auth::logout,
