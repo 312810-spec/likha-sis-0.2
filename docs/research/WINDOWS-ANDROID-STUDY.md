@@ -4,6 +4,8 @@ Date: 2026-10-02, Asia/Manila. Repository inspected: `312810-spec/likha-sis-0.2`
 
 ## Executive decision
 
+The follow-up [deeper idea-mining study](IDEA-MINING-AND-PRIORITIES.md) examines donor implementation paths, identifies three LIKHA sync investigations and prioritizes fifteen improvement experiments.
+
 Keep the existing Tauri/React/TypeScript/Rust Windows implementation. Prove a focused Tauri Android companion before making a framework commitment. Use Kotlin/Compose for Android if the encrypted-storage and lifecycle integration fails. Consider Flutter only if a comparative prototype shows that replacing both interfaces is worth the migration cost.
 
 Replace the development harness with native Codex, concise repository guidance, targeted source retrieval, a compact task handoff, and optional independent specialists. Remove blanket legal-policy development prerequisites, ceremonial approval loops, machine-specific hooks, frozen/certified harness concepts, and obsolete M0-only scope. Retain checks that establish correct application behavior. External laws and platform/runtime constraints are not changed by editing project instructions.
