@@ -7,9 +7,7 @@
  * edit to an entity the sync hub also has a newer accepted version of —
  * ADR-0067's protocol contract point 6 ("Learner identity, enrollment,
  * attendance, and grading records never use silent last-write-wins").
- * Only Learner, Attendance, and Section currently produce staged
- * conflicts (the only entity kinds with a working pull-side decrypt/apply
- * path today).
+ * All synchronized entity kinds can produce conflicts or retained apply rejections.
  */
 
 /** One entity's field values, shaped differently per `kind` — a teacher
@@ -35,7 +33,8 @@ export type ConflictEntityPreview =
       name: string;
       gradeLevel: string;
       schoolYear: string;
-    };
+    }
+  | { kind: "details"; fields: { label: string; value: string }[] };
 
 /** One staged, not-yet-resolved conflict. */
 export interface ConflictReviewSummary {
@@ -48,6 +47,7 @@ export interface ConflictReviewSummary {
   createdAt: string;
   submittedBaseVersion: number;
   currentHubVersion: number;
+  reviewReason?: "concurrent_edit" | "apply_rejected";
   /** The other device's edit, decrypted for display. `null` only if it
    * could not be decrypted right now (see `incomingUnavailableReason`) —
    * never silently treated as "no incoming change." */

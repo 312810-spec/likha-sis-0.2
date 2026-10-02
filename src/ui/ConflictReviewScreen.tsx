@@ -18,6 +18,14 @@ const ENTITY_KIND_LABELS: Record<string, string> = {
   learner: "Learner",
   attendance: "Attendance record",
   section: "Section",
+  subject: "Subject",
+  learner_score: "Learner score",
+  assessment_item: "Assessment",
+  teaching_assignment: "Teaching assignment",
+  section_membership: "Section enrollment",
+  grading_period: "Grading period",
+  subject_attendance: "Class attendance session",
+  subject_attendance_entry: "Class attendance entry",
 };
 
 function entityKindLabel(entityKind: string): string {
@@ -58,6 +66,8 @@ function describePreview(preview: ConflictEntityPreview): string[] {
         `Grade level: ${preview.gradeLevel}`,
         `School year: ${preview.schoolYear}`,
       ];
+    case "details":
+      return preview.fields.map((field) => `${field.label}: ${field.value}`);
   }
 }
 
@@ -152,7 +162,9 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
       if (succeeded) {
         setConfirmation(
           keepLocal
-            ? `Kept this device's own version of the ${entityKindLabel(conflict.entityKind).toLowerCase()}.`
+            ? conflict.reviewReason === "apply_rejected"
+              ? "Dismissed the incoming change. Local records were left unchanged."
+              : `Kept this device's own version of the ${entityKindLabel(conflict.entityKind).toLowerCase()}.`
             : `Used the incoming version of the ${entityKindLabel(conflict.entityKind).toLowerCase()}.`,
         );
         setConflicts((current) => current.filter((c) => c.id !== conflict.id));
@@ -210,6 +222,12 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
                     Detected {formatWhen(conflict.createdAt)} · from another device
                   </p>
 
+                  {conflict.reviewReason === "apply_rejected" && (
+                    <Alert tone="warning">
+                      This incoming record could not be saved because it conflicts with local data.
+                      Correct the conflicting record, then retry, or dismiss this incoming change.
+                    </Alert>
+                  )}
                   <div className="conflict-review-versions">
                     <div className="conflict-review-version">
                       <h3>This device&rsquo;s version</h3>
@@ -220,7 +238,7 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
                           ))}
                         </ul>
                       ) : (
-                        <p>This device no longer has its own copy of this record.</p>
+                        <p>No local preview is available for this record.</p>
                       )}
                     </div>
                     <div className="conflict-review-version">
@@ -248,7 +266,9 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
                     aria-label={`Resolve this ${entityKindLabel(conflict.entityKind).toLowerCase()} conflict?`}
                   >
                     <p className="conflict-review-card-confirm-text">
-                      Choose which version to keep. This cannot be undone.
+                      {conflict.reviewReason === "apply_rejected"
+                        ? "Retry saving the incoming record, or dismiss it without changing local records."
+                        : "Choose which version to keep. This cannot be undone."}
                     </p>
                     <div className="conflict-review-card-confirm-actions">
                       <button type="button" onClick={cancelResolve} aria-disabled={resolving}>
@@ -259,7 +279,11 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
                         onClick={() => resolve(conflict, true)}
                         aria-disabled={resolving}
                       >
-                        {resolving ? "Resolving…" : "Keep this device's version"}
+                        {resolving
+                          ? "Resolving…"
+                          : conflict.reviewReason === "apply_rejected"
+                            ? "Dismiss incoming change"
+                            : "Keep this device's version"}
                       </button>
                       <button
                         type="button"
@@ -267,7 +291,11 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
                         onClick={() => resolve(conflict, false)}
                         aria-disabled={resolving || !conflict.incoming}
                       >
-                        {resolving ? "Resolving…" : "Use the incoming version"}
+                        {resolving
+                          ? "Resolving…"
+                          : conflict.reviewReason === "apply_rejected"
+                            ? "Retry incoming change"
+                            : "Use the incoming version"}
                       </button>
                     </div>
                   </div>

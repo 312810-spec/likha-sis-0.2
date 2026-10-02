@@ -104,9 +104,7 @@ describe("ConflictReviewScreen", () => {
     renderScreen(repo);
     await screen.findByText("Learner conflict");
 
-    expect(
-      screen.getByText("This device no longer has its own copy of this record."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No local preview is available for this record.")).toBeInTheDocument();
   });
 
   it("requires a confirmation step before resolving, and offers both choices", async () => {

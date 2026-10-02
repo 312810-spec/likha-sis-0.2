@@ -4,13 +4,11 @@ use std::path::Path;
 
 use rusqlite::Connection;
 use tauri::AppHandle;
-#[cfg(windows)]
 use tauri::Manager;
 use zeroize::Zeroize;
 
+use crate::crypto::KeyStore;
 use crate::crypto::{self, KEY_LEN};
-#[cfg(windows)]
-use crate::crypto::{DpapiKeyStore, KeyStore};
 use crate::error::AppResult;
 
 pub const DB_FILE_NAME: &str = "likha-sis.db";
@@ -69,100 +67,36 @@ pub fn open(path: &Path, key: &[u8; KEY_LEN]) -> AppResult<Connection> {
     Ok(conn)
 }
 
-/// Resolves the per-user application data directory, loads (or creates) the
-/// encryption key from the Windows-protected key file there, and opens the
-/// working database. Creates the app data directory if it does not exist.
-#[cfg(windows)]
-pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
+fn app_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|e| std::io::Error::other(e.to_string()))?;
     std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
 
-    let mut key = DpapiKeyStore.load_or_create_key(&dir.join(KEY_FILE_NAME))?;
+/// Opens using a platform adapter. A key failure must not replace the existing database.
+pub(crate) fn open_with_key_store(dir: &Path, store: &dyn KeyStore) -> AppResult<Connection> {
+    let mut key = store.load_or_create_key(&dir.join(KEY_FILE_NAME))?;
     let result = open(&dir.join(DB_FILE_NAME), &key);
     key.zeroize();
     result
 }
 
-/// Windows is currently LIKHA's only shipping desktop target (see
-/// CLAUDE.md); the key store is DPAPI-backed and Windows-only (see
-/// `crate::crypto::dpapi`). Fails closed rather than falling back to an
-/// unprotected key store on any other host, matching this module's
-/// existing invariant that a key-protection failure must never be silently
-/// downgraded.
-#[cfg(not(windows))]
-pub fn open_app_db(_app: &AppHandle) -> AppResult<Connection> {
-    Err(crate::error::AppError::key_store(
-        "no encryption key store is implemented for this platform; \
-         LIKHA-SIS currently ships on Windows only",
-    ))
+pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
+    let store = crypto::platform::key_store()?;
+    open_with_key_store(&app_data_dir(app)?, store.as_ref())
 }
 
-/// Resolves (creating if needed) this installation's local copy of the
-/// school sync-payload key (ADR-0069). Reuses `DpapiKeyStore` exactly like
-/// the SQLCipher key, only under a different filename
-/// (`SSPK_KEY_FILE_NAME`) -- never the same file, never the same value.
-///
-/// On a fresh installation with no existing SSPK file, this MINTS a brand
-/// new key: this process is the party performing this school's very first
-/// device enrollment (ADR-0069 mechanism, point 1 -- "generated lazily...
-/// the first time a school has zero existing wraps"). On every later call
-/// (a second enrollment, or a future domain write encrypting an outbox
-/// entry), `DpapiKeyStore::load_or_create_key` transparently reloads the
-/// SAME already-persisted value instead of minting a new one -- exactly
-/// the "mint once per school, reuse forever" semantics the SSPK requires,
-/// and the piece ADR-0069 left as "not yet decided" (client-side local
-/// persistence) for this single-installation architecture.
-#[cfg(windows)]
 pub fn load_or_mint_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
-    std::fs::create_dir_all(&dir)?;
-    DpapiKeyStore.load_or_create_key(&dir.join(SSPK_KEY_FILE_NAME))
+    let store = crypto::platform::key_store()?;
+    store.load_or_create_key(&app_data_dir(app)?.join(SSPK_KEY_FILE_NAME))
 }
 
-/// See `open_app_db`'s non-Windows counterpart -- same fail-closed
-/// reasoning applies to the SSPK key store.
-#[cfg(not(windows))]
-pub fn load_or_mint_sspk(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
-    Err(crate::error::AppError::key_store(
-        "no encryption key store is implemented for this platform; \
-         LIKHA-SIS currently ships on Windows only",
-    ))
-}
-
-/// Overwrites this installation's local SSPK file with a genuinely NEW
-/// key (ADR-0069's device-revocation addendum) -- the piece that
-/// addendum left as "not yet decided": `repository::sync_payload_key::rotate_for_school`
-/// already clears every stored per-device wrap on revocation, but until
-/// this function exists and is called, that DB-side rotation still hands
-/// out fresh wraps of the SAME old plaintext SSPK, not a genuinely new
-/// one. Unlike `load_or_mint_sspk`, this never reuses the existing value
-/// -- see `DpapiKeyStore::rotate_key`'s own doc comment for the atomic
-/// overwrite guarantee (never a half-written file, even on a crash
-/// mid-rotation).
-#[cfg(windows)]
 pub fn rotate_sspk(app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
-    std::fs::create_dir_all(&dir)?;
-    DpapiKeyStore.rotate_key(&dir.join(SSPK_KEY_FILE_NAME))
-}
-
-/// See `load_or_mint_sspk`'s non-Windows counterpart -- same fail-closed
-/// reasoning applies to rotation.
-#[cfg(not(windows))]
-pub fn rotate_sspk(_app: &AppHandle) -> AppResult<[u8; KEY_LEN]> {
-    Err(crate::error::AppError::key_store(
-        "no encryption key store is implemented for this platform; \
-         LIKHA-SIS currently ships on Windows only",
-    ))
+    let store = crypto::platform::key_store()?;
+    store.rotate_key(&app_data_dir(app)?.join(SSPK_KEY_FILE_NAME))
 }
 
 #[cfg(test)]

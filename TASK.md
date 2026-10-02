@@ -1,31 +1,29 @@
 # Current task
 
-Updated: 2026-10-02. Baseline main: `3e7a2508da0f82c662b133e28117a9be4f0f06e6`.
+Updated: 2026-10-02.
 
-## Objective
+## Goal
 
-Replace development bureaucracy and establish a researched Windows/Android
-delivery path. Preserve the implemented Windows app and school data behavior.
+Make the Windows teacher app manageable and establish a real Android path.
+Use current stable tools and preserve teacher work during sync failures.
 
-## Completed in this branch
+## Restored implementation
 
-- Five independent expert proposals plus a challenge round.
-- Current platform and GitHub workflow research, with popularity limits disclosed.
-- New AGENTS/HARNESS/bootstrap; old hooks, certifications and process/policy
-  skills retired from automatic discovery. Useful engineering skills retained.
-- Separate release checklist; legal-policy prerequisites removed from development.
+- Full-queue entity conflict checks.
+- Retained encrypted rejected incoming records and explicit human review.
+- Atomic pull application/version/cursor updates and atomic review resolution.
+- Clear local-save vs hub-transfer status with manual/foreground refresh.
+- Correct camelCase preview serialization and selected extra entity previews.
+- Platform key-store adapter boundary; Android is still unsupported.
+- Latest stable npm/Rust dependencies and Windows installer artifact CI.
 
-## Next implementation
+## Next work
 
-Build one Tauri Android feasibility slice: Android Keystore-backed local DB key,
-SQLCipher opening, offline attendance + atomic outbox, process-death recovery,
-foreground sync against the existing school hub, backup export/restore and
-signed upgrade. See `docs/ACTIVE-PLAN.md` and the study for acceptance criteria.
+Revalidate restored frontend/native source and inspect Windows CI installers.
+Add/verify rollback, migration-preservation and queue-over-100 regressions.
+Implement real Android Keystore/startup integration before claiming Android use.
+Portable encrypted backup/restore and installed-device upgrade tests are pending.
 
-## Concrete limitations
-
-`src-tauri/src/db/mod.rs` currently rejects non-Windows database startup. Android
-is not implemented by this harness replacement. No Windows installer or Android
-APK has been built/tested by this study; this executor has no Rust toolchain.
-Current native/hardware recovery debt remains open. Do not infer production
-readiness from the research or the removal of development gates.
+The temporary workspace reset before application edits reached GitHub; research
+and the harness reset were preserved on PR101. Reconstructed edits are checkpointed
+early. Previous test counts are historical until re-run on the new checkpoint.

@@ -48,3 +48,10 @@ Retry with a changed hypothesis and new evidence; stop repeating unchanged failu
 
 Report what changed, what actually ran and the next unresolved step. A browser
 mock, compiled package or green scan alone does not establish native readiness.
+
+## Current stable tools
+
+Use latest stable releases regardless of earlier preferences. Verify official
+metadata and adapt source for compatibility. Preserve reproducible lockfiles.
+Do not force invalid peer resolutions; document real upstream compatibility
+constraints while using the latest supported compiler and tools.

@@ -1,9 +1,8 @@
 use std::sync::LazyLock;
 
-use argon2::password_hash::{
-    rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-};
+use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use argon2::Argon2;
+use password_hash::phc::PasswordHash;
 
 use crate::error::{AppError, AppResult};
 
@@ -19,9 +18,8 @@ static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
 /// returning a self-describing PHC string (`$argon2id$v=19$...`) with the
 /// salt embedded. Never store or compare raw passwords — only this.
 pub fn hash_password(password: &str) -> AppResult<String> {
-    let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.as_bytes())
         .map(|hash| hash.to_string())
         .map_err(|e| {
             log::error!("password hashing failed: {e}");

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SyncStatusApplicationService } from "../application/sync-status-service";
 import type { SyncStatus } from "../domain/sync-status";
 import { Alert } from "./components/Alert";
@@ -68,7 +68,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
 
   const requestRef = useRef(0);
 
-  function load() {
+  const load = useCallback(() => {
     const requestId = ++requestRef.current;
     setLoading(true);
     setLoadError(null);
@@ -86,13 +86,20 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
         if (requestRef.current !== requestId) return;
         setLoading(false);
       });
-  }
+  }, [syncStatusService]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncStatusService]);
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      requestRef.current += 1;
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, [load]);
 
   return (
     <Page
@@ -108,18 +115,27 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
         ) : undefined
       }
     >
+      <p>Your edits are saved on this device first. Transfer to the school hub is separate.</p>
+      <button type="button" onClick={load} disabled={loading}>
+        {loading ? "Refreshing…" : "Refresh status"}
+      </button>
+      <p className="field-hint">
+        Refresh checks recorded status; it does not start a sync transfer.
+      </p>
       {loadError && (
         <Alert tone="error">
-          <p>{loadError}</p>
+          <p>
+            {loadError} {status ? "The status below may be outdated." : ""}
+          </p>
           <button type="button" onClick={load}>
             Retry
           </button>
         </Alert>
       )}
 
-      {loading ? (
+      {loading && !status ? (
         <Loading label="Loading sync status…" />
-      ) : loadError || !status ? null : !status.enrolled ? (
+      ) : !status ? null : !status.enrolled ? (
         <Alert tone="info">
           <p>
             This device is not set up to sync your school&rsquo;s records with other devices. See
@@ -151,7 +167,8 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
             {status.pendingChangeCount > 0 && status.hasPendingSyncTrouble && (
               <p className="sync-status-card-detail">
                 This device is having trouble reaching the sync hub. It will keep trying
-                automatically -- no action is needed unless this continues for a long time.
+                automatically. If this continues, check that the hub is open and both devices can
+                reach the school network.
               </p>
             )}
           </li>

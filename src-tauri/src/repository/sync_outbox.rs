@@ -83,6 +83,20 @@ pub fn pending_for_school(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Checks all queued changes for an entity, independently of transfer page size.
+pub fn has_pending_for_entity(
+    conn: &Connection,
+    school_id: &str,
+    kind: EntityKind,
+    entity_id: &str,
+) -> AppResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sync_outbox WHERE school_id = ?1 AND entity_kind = ?2 AND entity_id = ?3)",
+        (school_id, kind.as_db_str(), entity_id),
+        |row| row.get(0),
+    ).map_err(Into::into)
+}
+
 /// Count of changes still queued (not yet acknowledged by the hub) for
 /// one school -- the sync-status screen's "N changes waiting to sync"
 /// figure. Not bounded by `pending_for_school`'s 100-row page limit;

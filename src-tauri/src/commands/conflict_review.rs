@@ -49,7 +49,11 @@ use crate::sync_client::{self, SyncClientConfig};
 /// boundary (`find_open_by_id_in_school`/`mark_resolved`), never by UI
 /// hiding, matching `.claude/rules/security-privacy.md`.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ConflictEntityPreview {
     Learner {
         given_name: String,
@@ -67,6 +71,50 @@ pub enum ConflictEntityPreview {
         grade_level: String,
         school_year: String,
     },
+    Details {
+        fields: Vec<ConflictPreviewField>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ConflictPreviewField {
+    pub label: String,
+    pub value: String,
+}
+
+fn details_preview(plaintext: &[u8]) -> Option<ConflictEntityPreview> {
+    let value: serde_json::Value = serde_json::from_slice(plaintext).ok()?;
+    let fields: Vec<_> = [
+        ("name", "Name"),
+        ("title", "Title"),
+        ("score", "Score"),
+        ("status", "Status"),
+        ("maxScore", "Maximum score"),
+        ("attendanceDate", "Date"),
+        ("schoolYear", "School year"),
+        ("gradeLevel", "Grade level"),
+        ("sectionId", "Section"),
+        ("learnerId", "Learner"),
+        ("subjectId", "Subject"),
+        ("assessmentItemId", "Assessment"),
+        ("userId", "Teacher"),
+    ]
+    .into_iter()
+    .filter_map(|(key, label)| {
+        let scalar = value.get(key)?;
+        let text = match scalar {
+            serde_json::Value::String(text) => text.clone(),
+            serde_json::Value::Number(number) => number.to_string(),
+            serde_json::Value::Bool(boolean) => boolean.to_string(),
+            _ => return None,
+        };
+        Some(ConflictPreviewField {
+            label: label.into(),
+            value: text,
+        })
+    })
+    .collect();
+    (!fields.is_empty()).then_some(ConflictEntityPreview::Details { fields })
 }
 
 fn learner_preview(l: &learner::Learner) -> ConflictEntityPreview {
@@ -135,7 +183,7 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
             .ok()
             .as_ref()
             .map(section_preview),
-        _ => None,
+        _ => details_preview(plaintext),
     }
 }
 
@@ -151,6 +199,7 @@ pub struct ConflictReviewSummary {
     pub created_at: String,
     pub submitted_base_version: u64,
     pub current_hub_version: u64,
+    pub review_reason: String,
     /// The other device's incoming edit, decrypted for display. `None`
     /// only if it could not be decrypted (e.g. the SSPK was rotated by a
     /// revocation since this conflict was staged) -- disclosed via
@@ -202,6 +251,7 @@ fn to_summary(
         created_at: row.created_at.clone(),
         submitted_base_version: row.submitted_base_version,
         current_hub_version: row.current_hub_version,
+        review_reason: row.review_reason.clone(),
         incoming,
         incoming_unavailable_reason,
         local,
@@ -304,19 +354,24 @@ pub fn resolve_conflict_review(
 
     match resolution {
         ConflictResolutionChoice::KeepLocal => {
-            sync_outbox::correct_base_version_for_entity(
-                &conn,
-                &school_id,
-                row.entity_kind,
-                &row.entity_id,
-                row.current_hub_version,
-            )?;
-            sync_conflict_review::mark_resolved(
-                &conn,
+            let tx = conn.unchecked_transaction()?;
+            if row.review_reason != "apply_rejected" {
+                sync_outbox::correct_base_version_for_entity(
+                    &tx,
+                    &school_id,
+                    row.entity_kind,
+                    &row.entity_id,
+                    row.current_hub_version,
+                )?;
+            }
+            let resolved = sync_conflict_review::mark_resolved(
+                &tx,
                 &school_id,
                 &conflict_id,
                 ConflictResolution::KeptLocal,
-            )
+            )?;
+            tx.commit()?;
+            Ok(resolved)
         }
         ConflictResolutionChoice::UseIncoming => {
             // Primary: the same network round trip `pull_once` itself
@@ -348,7 +403,8 @@ pub fn resolve_conflict_review(
                 encrypted_payload: row.encrypted_payload.clone(),
             };
 
-            sync_client::apply_decrypted_change(&conn, &school_id, &change, &sspk).map_err(
+            let tx = conn.unchecked_transaction()?;
+            sync_client::apply_decrypted_change(&tx, &school_id, &change, &sspk).map_err(
                 |_rejection| {
                     AppError::key_store(
                         "the incoming change could not be applied -- it may be corrupted or encrypted under a different key"
@@ -357,19 +413,21 @@ pub fn resolve_conflict_review(
                 },
             )?;
             sync_version_cache::record_known_version(
-                &conn,
+                &tx,
                 &school_id,
                 row.entity_kind,
                 &row.entity_id,
                 row.current_hub_version,
             )?;
 
-            sync_conflict_review::mark_resolved(
-                &conn,
+            let resolved = sync_conflict_review::mark_resolved(
+                &tx,
                 &school_id,
                 &conflict_id,
                 ConflictResolution::UsedIncoming,
-            )
+            )?;
+            tx.commit()?;
+            Ok(resolved)
         }
     }
 }

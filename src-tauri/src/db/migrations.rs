@@ -2002,6 +2002,14 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- Nominal M42, actual schema version 41 (historical labels skip an ordinal).
+        CREATE INDEX idx_sync_outbox_school_entity ON sync_outbox(school_id, entity_kind, entity_id);
+        ALTER TABLE sync_conflict_review ADD COLUMN review_reason TEXT NOT NULL DEFAULT 'concurrent_edit'
+            CHECK (review_reason IN ('concurrent_edit', 'apply_rejected'));
+        "#,
+        ),
     ])
 }
 
