@@ -28,6 +28,9 @@ https://github.com/actions/checkout/releases/tag/v7.0.1
 https://github.com/actions/setup-node/releases/tag/v7.0.0
 https://github.com/actions/upload-artifact/releases/tag/v7.0.1
 
-The previous workspace recorded passing frontend/native/browser tests before
-reset. Restored code must be revalidated; those earlier runs do not certify the
-restored commit. Windows installer/device checks remain separate.
+Restored-source verification: frontend quality passes (1,184 tests), current
+Playwright browser workflow/accessibility smoke passes, full native tests and
+targeted key/password upgrade tests pass, and Clippy passes with warnings denied.
+Windows installer and installed-device evidence remains separate. Existing
+Argon2 0.5.3 PHC hashes were generated in an isolated historical-fixture tool and
+accepted by the shipped Argon2 0.6.0; the old library is not an app dependency.

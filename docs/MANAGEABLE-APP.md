@@ -24,9 +24,10 @@ choice leaves the local record, queue and review available for retry.
 
 ## What is proven and what remains
 
-The frontend suite and latest-browser workflow/accessibility smoke pass on the
-restored implementation. Native recovery tests and Windows installer CI must
-pass on the final commit; see TASK.md for current evidence.
+The frontend suite, latest-browser workflow/accessibility smoke, native tests
+and Clippy pass on the restored implementation. Key failure/reopen and legacy
+password-hash upgrades are tested. Windows installer CI and installed-device
+validation remain separate; see TASK.md for current evidence.
 
 A compiled installer needs an installed-device check, including standard-user
 startup, offline operation, upgrades and reopening real persisted data.

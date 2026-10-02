@@ -56,6 +56,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn upgrade_still_accepts_argon2_05_persisted_hashes() {
+        // Generated once with the previous app's argon2 0.5.3 defaults and a
+        // fixed synthetic salt/password. The shipped dependency remains latest.
+        let legacy = "$argon2id$v=19$m=19456,t=2,p=1$bGVnYWN5LXNhbHQtZm9yLXRlc3Q$qKHgI++bAXEdwMNXeIZeCJKQIgnRxvbw1XVfRreqCBA";
+        assert!(verify_password("synthetic-upgrade-test", legacy));
+        assert!(!verify_password("wrong-password", legacy));
+    }
+
+    #[test]
+    fn malformed_persisted_hash_is_rejected_without_panicking() {
+        assert!(!verify_password("password", "not-a-phc-hash"));
+    }
+
+    #[test]
     fn correct_password_verifies() {
         let hash = hash_password("correct horse battery staple").unwrap();
         assert!(verify_password("correct horse battery staple", &hash));

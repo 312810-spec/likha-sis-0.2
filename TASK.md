@@ -17,13 +17,24 @@ Use current stable tools and preserve teacher work during sync failures.
 - Platform key-store adapter boundary; Android is still unsupported.
 - Latest stable npm/Rust dependencies and Windows installer artifact CI.
 
-## Next work
+## Verified on restored source
 
-Revalidate restored frontend/native source and inspect Windows CI installers.
-Add/verify rollback, migration-preservation and queue-over-100 regressions.
+- Latest Node 26.10/npm 12.2 frontend quality: 126 files, 1,184 tests pass.
+- Playwright 1.63 / Chrome Headless Shell 153.0.8010.12 workflow and accessibility
+  smoke passes, zero findings. Exact bundled browser fetched from official Google
+  storage when the CDN download was unreliable.
+- Full native Rust tests pass, including integration suites; new key reopen,
+  failed-key preservation and legacy Argon2 hash regressions pass.
+- Rust formatting and Clippy all-targets with warnings denied pass.
+- Security CI is green after updating the vulnerable brace-expansion dependency.
+- Windows installer build/native tests/artifact upload run in PR101 CI.
+
+## Remaining work
+
+Check final Windows CI and exercise its installer on a Windows device.
 Implement real Android Keystore/startup integration before claiming Android use.
 Portable encrypted backup/restore and installed-device upgrade tests are pending.
+The teacher pilot guide is docs/MANAGEABLE-APP.md.
 
-The temporary workspace reset before application edits reached GitHub; research
-and the harness reset were preserved on PR101. Reconstructed edits are checkpointed
-early. Previous test counts are historical until re-run on the new checkpoint.
+Application edits and test checkpoints are now saved on PR101. The first workspace
+reset is recorded as history; verification above was rerun on restored source.
