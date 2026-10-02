@@ -476,6 +476,28 @@ mod tests {
     }
 
     #[test]
+    fn preview_ipc_fields_match_frontend_camel_case() {
+        let preview = ConflictEntityPreview::Learner {
+            given_name: "Ana".into(),
+            family_name: "Cruz".into(),
+            lrn: None,
+        };
+        let value = serde_json::to_value(preview).unwrap();
+        assert_eq!(value["givenName"], "Ana");
+        assert!(value.get("given_name").is_none());
+    }
+
+    #[test]
+    fn generic_preview_displays_selected_fields_without_secrets() {
+        let preview =
+            details_preview(br#"{"name":"Math","password":"secret","schoolId":"hidden"}"#).unwrap();
+        let value = serde_json::to_string(&preview).unwrap();
+        assert!(value.contains("Math"));
+        assert!(!value.contains("secret"));
+        assert!(!value.contains("hidden"));
+    }
+
+    #[test]
     fn to_summary_shows_both_the_incoming_and_local_learner_versions() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();

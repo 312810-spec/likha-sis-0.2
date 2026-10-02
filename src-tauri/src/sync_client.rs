@@ -1332,6 +1332,73 @@ mod tests {
     }
 
     #[test]
+    fn cursor_failure_rolls_back_applied_record_and_allows_retry() {
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let entity = Uuid::now_v7();
+        let conn = &fixture.conn;
+        sync_outbox::enqueue(
+            conn,
+            &fixture.school_id,
+            &make_learner_change(&fixture, entity, 0),
+        )
+        .unwrap();
+        push_once(conn, &client, &config).unwrap();
+        conn.execute_batch(
+            "DELETE FROM sync_version_cache;
+            CREATE TEMP TRIGGER fail_cursor BEFORE INSERT ON sync_pull_cursor
+            BEGIN SELECT RAISE(FAIL, 'injected cursor failure'); END;",
+        )
+        .unwrap();
+        assert!(pull_once(conn, &client, &config).is_err());
+        assert!(
+            learner::find_by_id_in_school(conn, &fixture.school_id, &entity.to_string())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            sync_version_cache::known_version(
+                conn,
+                &fixture.school_id,
+                EntityKind::Learner,
+                &entity.to_string()
+            )
+            .unwrap(),
+            0
+        );
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            0
+        );
+        conn.execute_batch("DROP TRIGGER fail_cursor").unwrap();
+        assert_eq!(pull_once(conn, &client, &config).unwrap().applied, 1);
+        assert!(
+            learner::find_by_id_in_school(conn, &fixture.school_id, &entity.to_string())
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn storage_failures_are_not_classified_as_record_collisions() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE t (id INTEGER UNIQUE); INSERT INTO t VALUES (1);")
+            .unwrap();
+        let error = conn.execute("INSERT INTO t VALUES (1)", []).unwrap_err();
+        assert_eq!(
+            classify_repository_rejection(error.into()),
+            ApplyRejection::RepositoryRejected
+        );
+        assert_eq!(
+            classify_repository_rejection(rusqlite::Error::InvalidQuery.into()),
+            ApplyRejection::StorageFailure
+        );
+    }
+
+    #[test]
     fn should_run_is_false_until_a_credential_is_stored() {
         let conn = crate::db::open(
             std::path::Path::new(":memory:"),
@@ -1698,6 +1765,19 @@ mod tests {
         // pushed it yet.
         {
             let conn = &fixture.conn;
+            for _ in 0..100 {
+                sync_outbox::enqueue(
+                    conn,
+                    &fixture.school_id,
+                    &make_change(&fixture, Uuid::now_v7(), 0),
+                )
+                .unwrap();
+            }
+            conn.execute(
+                "UPDATE sync_outbox SET created_at = '2000-01-01T00:00:00Z'",
+                [],
+            )
+            .unwrap();
             sync_outbox::enqueue(
                 conn,
                 &fixture.school_id,
@@ -2331,6 +2411,16 @@ mod tests {
         assert!(
             !colliding_row_exists,
             "the colliding change must never be materialized"
+        );
+        let reviews = sync_conflict_review::list_open_for_school(conn, &fixture.school_id).unwrap();
+        assert_eq!(reviews.len(), 1);
+        assert_eq!(reviews[0].entity_id, colliding_entity_id.to_string());
+        assert_eq!(reviews[0].review_reason, "apply_rejected");
+        assert!(!reviews[0].encrypted_payload.is_empty());
+        assert_eq!(pull_once(conn, &client, &config).unwrap().received, 0);
+        assert_eq!(
+            sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+            1
         );
         let good_materialized =
             subject::find_by_id_in_school(conn, &fixture.school_id, &good_entity_id.to_string())
