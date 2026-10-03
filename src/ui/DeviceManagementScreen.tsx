@@ -5,10 +5,13 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import type { BackupApplicationService } from "../application/backup-service";
+import { BackupPanel } from "./BackupPanel";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface DeviceManagementScreenProps {
   deviceSyncService: DeviceSyncApplicationService;
+  backupService?: BackupApplicationService;
 }
 
 /** A single generic message for every way a revoke can fail to actually
@@ -58,7 +61,10 @@ function deviceName(device: DeviceSyncCredential): string {
  * destructive action" convention. No enrollment/pairing flow here --
  * that is a separate, larger UX question (see `docs/CURRENT-HANDOFF.md`).
  */
-export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementScreenProps) {
+export function DeviceManagementScreen({
+  deviceSyncService,
+  backupService,
+}: DeviceManagementScreenProps) {
   const { mode } = useTeacherMode();
 
   const [devices, setDevices] = useState<DeviceSyncCredential[]>([]);
@@ -157,6 +163,7 @@ export function DeviceManagementScreen({ deviceSyncService }: DeviceManagementSc
         ) : undefined
       }
     >
+      {backupService && <BackupPanel service={backupService} />}
       {loadError && (
         <Alert tone="error">
           <p>{loadError}</p>

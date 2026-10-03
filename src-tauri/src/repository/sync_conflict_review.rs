@@ -33,11 +33,43 @@ pub fn stage_pull_conflict(
     locally_known_version: u64,
     change: &AcceptedChange,
 ) -> AppResult<()> {
+    stage_pull_review(
+        conn,
+        school_id,
+        locally_known_version,
+        change,
+        "concurrent_edit",
+    )
+}
+
+/// Retains the encrypted rejected record before advancing the cursor.
+pub fn stage_apply_rejection(
+    conn: &Connection,
+    school_id: &str,
+    locally_known_version: u64,
+    change: &AcceptedChange,
+) -> AppResult<()> {
+    stage_pull_review(
+        conn,
+        school_id,
+        locally_known_version,
+        change,
+        "apply_rejected",
+    )
+}
+
+fn stage_pull_review(
+    conn: &Connection,
+    school_id: &str,
+    locally_known_version: u64,
+    change: &AcceptedChange,
+    reason: &str,
+) -> AppResult<()> {
     conn.execute(
         "INSERT INTO sync_conflict_review
          (id, change_id, school_id, device_id, actor_user_id, entity_kind, entity_id,
-          submitted_base_version, current_hub_version, operation, encrypted_payload)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+          submitted_base_version, current_hub_version, operation, encrypted_payload, review_reason)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(change_id) DO NOTHING",
         (
             Uuid::now_v7().to_string(),
@@ -51,6 +83,7 @@ pub fn stage_pull_conflict(
             change.version as i64,
             change.operation.as_db_str(),
             &change.encrypted_payload,
+            reason,
         ),
     )?;
     Ok(())
@@ -92,6 +125,7 @@ pub struct ConflictReviewRow {
     pub operation: ChangeOperation,
     pub encrypted_payload: Vec<u8>,
     pub created_at: String,
+    pub review_reason: String,
 }
 
 fn row_to_conflict_review(row: &rusqlite::Row) -> rusqlite::Result<ConflictReviewRow> {
@@ -123,6 +157,7 @@ fn row_to_conflict_review(row: &rusqlite::Row) -> rusqlite::Result<ConflictRevie
         operation,
         encrypted_payload: row.get(9)?,
         created_at: row.get(10)?,
+        review_reason: row.get(11)?,
     })
 }
 
@@ -137,7 +172,7 @@ pub fn list_open_for_school(
 ) -> AppResult<Vec<ConflictReviewRow>> {
     let mut stmt = conn.prepare(
         "SELECT id, change_id, device_id, actor_user_id, entity_kind, entity_id, \
-                submitted_base_version, current_hub_version, operation, encrypted_payload, created_at \
+                submitted_base_version, current_hub_version, operation, encrypted_payload, created_at, review_reason \
          FROM sync_conflict_review \
          WHERE school_id = ?1 AND resolved_at IS NULL \
          ORDER BY created_at ASC",
@@ -181,7 +216,7 @@ pub fn find_open_by_id_in_school(
 ) -> AppResult<Option<ConflictReviewRow>> {
     conn.query_row(
         "SELECT id, change_id, device_id, actor_user_id, entity_kind, entity_id, \
-                submitted_base_version, current_hub_version, operation, encrypted_payload, created_at \
+                submitted_base_version, current_hub_version, operation, encrypted_payload, created_at, review_reason \
          FROM sync_conflict_review \
          WHERE id = ?1 AND school_id = ?2 AND resolved_at IS NULL",
         (id, school_id),

@@ -42,6 +42,19 @@ function renderScreen(
 }
 
 describe("SyncStatusScreen", () => {
+  it("refreshes status without initiating a transfer", async () => {
+    const repo = new FakeSyncStatusRepository();
+    const get = vi.spyOn(repo, "getStatus");
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("3 changes waiting to sync");
+    get.mockResolvedValue({ ...ENROLLED_STATUS, pendingChangeCount: 0 });
+    await user.click(screen.getByRole("button", { name: "Refresh status" }));
+    expect(await screen.findByText("No changes waiting to sync")).toBeInTheDocument();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Transfer to the school hub is separate/)).toBeInTheDocument();
+  });
+
   it("shows a plain-language 'not enrolled' state when this device is not enrolled", async () => {
     renderScreen(
       new FakeSyncStatusRepository({

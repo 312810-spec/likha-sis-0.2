@@ -3,6 +3,7 @@ import {
   assessmentService,
   attendanceService,
   authService,
+  backupService,
   classRecordService,
   conflictReviewService,
   deviceSyncService,
@@ -244,7 +245,11 @@ function App() {
       ) : needsSetup ? (
         <div className="app-boot">
           {bootBrand}
-          <FirstRunSetupScreen setupService={setupService} onSetupComplete={handleSetupComplete} />
+          <FirstRunSetupScreen
+            setupService={setupService}
+            backupService={backupService}
+            onSetupComplete={handleSetupComplete}
+          />
         </div>
       ) : session ? (
         <AppLayout
@@ -541,7 +546,10 @@ function App() {
           ) : activeTab === "school-members" ? (
             <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
           ) : activeTab === "devices" ? (
-            <DeviceManagementScreen deviceSyncService={deviceSyncService} />
+            <DeviceManagementScreen
+              deviceSyncService={deviceSyncService}
+              backupService={backupService}
+            />
           ) : activeTab === "school-branding" ? (
             <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
           ) : activeTab === "conflict-review" ? (

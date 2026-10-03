@@ -5,12 +5,12 @@ description: Use when touching authentication, encryption/key storage, session h
 
 # Security & Privacy
 
-Full rules: `.Codex/rules/security-privacy.md`. Read it before acting.
+Use current `AGENTS.md`, relevant authorization/key-storage source and tests.
+These are application behavior checks, not legal-policy development gates.
 
-Non-negotiables:
+Engineering checks:
 
-- Synthetic data only, everywhere, always — no exceptions for "just a
-  quick test."
+- Use synthetic data in development, tests, demonstrations and AI prompts.
 - `school_id` (tenant scope) is never a client-supplied parameter for
   tenant-data commands — always derived from the authenticated session.
 - Any command creating accounts/memberships must go through the
@@ -18,10 +18,9 @@ Non-negotiables:
   — this exact gap (unauthenticated bootstrap) was found and fixed once;
   do not reintroduce it.
 - Security must never rely on a UI element being hidden.
-- Milestones touching auth, persistence, or sync require an independent
-  review (fresh context, not the implementer) before being marked
-  complete — use the `security-reviewer` and/or `reliability-reviewer`
-  agents, and `completion-verification` before claiming done.
+- Use independent challenge when an auth, persistence or sync change warrants it.
+  Choose available capabilities; no named reviewer, agent definition or approval
+  ceremony is required for ordinary development. Report review limits honestly.
 
 If running secret-scanning or dependency-security tooling, see
 `docs/SOURCE-REGISTRY.md` for what's adopted (Gitleaks, cargo-deny,

@@ -1,9 +1,8 @@
 use std::sync::LazyLock;
 
-use argon2::password_hash::{
-    rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-};
+use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use argon2::Argon2;
+use password_hash::phc::PasswordHash;
 
 use crate::error::{AppError, AppResult};
 
@@ -19,9 +18,8 @@ static DUMMY_HASH: LazyLock<String> = LazyLock::new(|| {
 /// returning a self-describing PHC string (`$argon2id$v=19$...`) with the
 /// salt embedded. Never store or compare raw passwords — only this.
 pub fn hash_password(password: &str) -> AppResult<String> {
-    let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.as_bytes())
         .map(|hash| hash.to_string())
         .map_err(|e| {
             log::error!("password hashing failed: {e}");
@@ -56,6 +54,20 @@ pub fn verify_dummy_password_for_timing_safety(password: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upgrade_still_accepts_argon2_05_persisted_hashes() {
+        // Generated once with the previous app's argon2 0.5.3 defaults and a
+        // fixed synthetic salt/password. The shipped dependency remains latest.
+        let legacy = "$argon2id$v=19$m=19456,t=2,p=1$bGVnYWN5LXNhbHQtZm9yLXRlc3Q$qKHgI++bAXEdwMNXeIZeCJKQIgnRxvbw1XVfRreqCBA";
+        assert!(verify_password("synthetic-upgrade-test", legacy));
+        assert!(!verify_password("wrong-password", legacy));
+    }
+
+    #[test]
+    fn malformed_persisted_hash_is_rejected_without_panicking() {
+        assert!(!verify_password("password", "not-a-phc-hash"));
+    }
 
     #[test]
     fn correct_password_verifies() {

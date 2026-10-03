@@ -77,7 +77,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
 use crate::crypto::payload_key::{self, PAYLOAD_KEY_LEN};
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::{
     assessment_item, attendance, device_credential, device_sync_client_credential, grading,
     learner, learner_score, section, section_membership, subject, subject_attendance,
@@ -393,10 +393,8 @@ fn record_attempts(
 
 /// GETs changes accepted after this device's own last-processed cursor
 /// (`repository::sync_pull_cursor`) and applies each one. An entity this
-/// device has no unsynced local edit for advances
-/// `sync_version_cache`'s known-version watermark (see this module's own
-/// doc comment for why that -- not a domain-table write -- is the extent
-/// of "applying" implemented so far). An entity this device DOES have a
+/// device has no unsynced local edit for applies atomically with its
+/// version cache and pull cursor. An entity this device DOES have a
 /// pending local edit for is routed into
 /// `repository::sync_conflict_review` instead, never silently overwritten
 /// -- ADR-0067's own "never last-write-wins" rule applied on the pull
@@ -460,23 +458,24 @@ pub fn pull_once(
             change.entity_kind,
             &entity_id,
         )?;
-        let has_unsynced_local_edit =
-            sync_outbox::pending_for_school(conn, &config.school_id, 100)?
-                .iter()
-                .any(|entry| {
-                    entry.change.entity_kind == change.entity_kind
-                        && entry.change.entity_id == change.entity_id
-                });
+        let has_unsynced_local_edit = sync_outbox::has_pending_for_entity(
+            conn,
+            &config.school_id,
+            change.entity_kind,
+            &entity_id,
+        )?;
 
         if has_unsynced_local_edit {
+            let tx = conn.unchecked_transaction()?;
             sync_conflict_review::stage_pull_conflict(
-                conn,
+                &tx,
                 &config.school_id,
                 locally_known,
                 change,
             )?;
+            sync_pull_cursor::advance_cursor(&tx, &config.school_id, change.cursor)?;
+            tx.commit()?;
             summary.conflicted += 1;
-            sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
             continue;
         }
 
@@ -494,40 +493,46 @@ pub fn pull_once(
             break;
         };
 
-        match apply_decrypted_change(conn, &config.school_id, change, &key) {
+        let mut tx = conn.unchecked_transaction()?;
+        let application = {
+            let mut savepoint = tx.savepoint()?;
+            let result = apply_decrypted_change(&savepoint, &config.school_id, change, &key);
+            if result.is_ok() {
+                savepoint.commit()?;
+            } else {
+                savepoint.rollback()?;
+            }
+            // Rejected partial writes cannot leak into the retained review transaction.
+            result
+        };
+        match application {
             Ok(()) => {
                 sync_version_cache::record_known_version(
-                    conn,
+                    &tx,
                     &config.school_id,
                     change.entity_kind,
                     &entity_id,
                     change.version,
                 )?;
+                sync_pull_cursor::advance_cursor(&tx, &config.school_id, change.cursor)?;
+                tx.commit()?;
                 summary.applied += 1;
-                sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
             }
-            Err(ApplyRejection::Untrusted) => {
+            Err(ApplyRejection::RepositoryRejected) => {
+                sync_conflict_review::stage_apply_rejection(
+                    &tx,
+                    &config.school_id,
+                    locally_known,
+                    change,
+                )?;
+                sync_pull_cursor::advance_cursor(&tx, &config.school_id, change.cursor)?;
+                tx.commit()?;
+                summary.rejected += 1;
+            }
+            Err(ApplyRejection::Untrusted | ApplyRejection::StorageFailure) => {
                 summary.rejected += 1;
                 summary.failed = true;
                 break;
-            }
-            Err(ApplyRejection::RepositoryRejected) => {
-                // See `ApplyRejection`'s own doc comment: this is a real,
-                // non-malicious data collision (e.g. two devices
-                // independently creating a same-named Subject offline),
-                // not a tampered/undecryptable payload -- advance PAST it
-                // so it cannot wedge every other device's every other
-                // change behind it forever. This one change is not
-                // retried automatically; a human resolves the underlying
-                // collision if it needs fixing.
-                log::warn!(
-                    "sync pull: repository rejected {:?} {} for school {} (likely a legitimate natural-key collision between two devices, e.g. a duplicate Subject name or LearnerScore/SectionMembership natural key) -- skipping without retry, resolve manually if needed",
-                    change.entity_kind,
-                    entity_id,
-                    config.school_id
-                );
-                summary.rejected += 1;
-                sync_pull_cursor::advance_cursor(conn, &config.school_id, change.cursor)?;
             }
         }
     }
@@ -559,11 +564,22 @@ pub(crate) enum ApplyRejection {
     /// reason (e.g. a `UNIQUE` constraint on a natural key distinct
     /// from the row's own `id`, which `ON CONFLICT(id) DO UPDATE` does
     /// not suppress). Not evidence of tampering or a wrong key, so
-    /// `pull_once` advances PAST this one change (never retried
-    /// automatically -- a human must resolve the underlying collision)
-    /// instead of blocking every other device's every other change
-    /// behind it indefinitely.
+    /// `pull_once` retains the encrypted record for human review before
+    /// advancing past it, allowing unrelated records to continue.
     RepositoryRejected,
+    /// Unexpected disk/database failures remain retryable.
+    StorageFailure,
+}
+
+fn classify_repository_rejection(error: AppError) -> ApplyRejection {
+    match error {
+        AppError::Database(rusqlite::Error::SqliteFailure(code, _))
+            if code.code == rusqlite::ErrorCode::ConstraintViolation =>
+        {
+            ApplyRejection::RepositoryRejected
+        }
+        _ => ApplyRejection::StorageFailure,
+    }
 }
 
 /// Decrypts `change.encrypted_payload` under `sspk` and, for the one
@@ -627,8 +643,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            learner::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            learner::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::Attendance => {
             let incoming: attendance::AttendanceRecord =
@@ -636,8 +651,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            attendance::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            attendance::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::Section => {
             let incoming: section::Section =
@@ -645,8 +659,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            section::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            section::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::LearnerScore => {
             let incoming: learner_score::LearnerScore =
@@ -654,8 +667,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            learner_score::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            learner_score::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::AssessmentItem => {
             let incoming: assessment_item::AssessmentItem =
@@ -664,7 +676,7 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             assessment_item::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+                .map_err(classify_repository_rejection)
         }
         EntityKind::Subject => {
             let incoming: subject::Subject =
@@ -672,8 +684,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            subject::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            subject::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::TeachingAssignment => {
             let incoming: teaching_assignment::TeachingAssignment =
@@ -683,10 +694,10 @@ pub(crate) fn apply_decrypted_change(
             }
             match change.operation {
                 ChangeOperation::Upsert => teaching_assignment::upsert_from_sync(conn, &incoming)
-                    .map_err(|_| ApplyRejection::RepositoryRejected),
+                    .map_err(classify_repository_rejection),
                 ChangeOperation::Delete => {
                     teaching_assignment::delete_from_sync(conn, school_id, &incoming.id)
-                        .map_err(|_| ApplyRejection::RepositoryRejected)
+                        .map_err(classify_repository_rejection)
                 }
             }
         }
@@ -696,8 +707,7 @@ pub(crate) fn apply_decrypted_change(
             if incoming.school_id != school_id {
                 return Err(ApplyRejection::Untrusted);
             }
-            grading::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+            grading::upsert_from_sync(conn, &incoming).map_err(classify_repository_rejection)
         }
         EntityKind::SubjectAttendance => {
             let incoming: subject_attendance::SubjectAttendanceSession =
@@ -706,7 +716,7 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             subject_attendance::upsert_session_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+                .map_err(classify_repository_rejection)
         }
         EntityKind::SectionMembership => {
             let incoming: section_membership::SectionMembership =
@@ -715,7 +725,7 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             section_membership::upsert_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+                .map_err(classify_repository_rejection)
         }
         EntityKind::SubjectAttendanceEntry => {
             let incoming: subject_attendance::SubjectAttendanceEntry =
@@ -724,7 +734,7 @@ pub(crate) fn apply_decrypted_change(
                 return Err(ApplyRejection::Untrusted);
             }
             subject_attendance::upsert_entry_from_sync(conn, &incoming)
-                .map_err(|_| ApplyRejection::RepositoryRejected)
+                .map_err(classify_repository_rejection)
         }
     }
 }
@@ -1333,6 +1343,73 @@ mod tests {
     }
 
     #[test]
+    fn cursor_failure_rolls_back_applied_record_and_allows_retry() {
+        let fixture = setup();
+        let config = config_for(&fixture);
+        let client = http_client();
+        let entity = Uuid::now_v7();
+        let conn = &fixture.conn;
+        sync_outbox::enqueue(
+            conn,
+            &fixture.school_id,
+            &make_learner_change(&fixture, entity, 0),
+        )
+        .unwrap();
+        push_once(conn, &client, &config).unwrap();
+        conn.execute_batch(
+            "DELETE FROM sync_version_cache;
+            CREATE TEMP TRIGGER fail_cursor BEFORE INSERT ON sync_pull_cursor
+            BEGIN SELECT RAISE(FAIL, 'injected cursor failure'); END;",
+        )
+        .unwrap();
+        assert!(pull_once(conn, &client, &config).is_err());
+        assert!(
+            learner::find_by_id_in_school(conn, &fixture.school_id, &entity.to_string())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            sync_version_cache::known_version(
+                conn,
+                &fixture.school_id,
+                EntityKind::Learner,
+                &entity.to_string()
+            )
+            .unwrap(),
+            0
+        );
+        assert_eq!(
+            sync_pull_cursor::get_cursor(conn, &fixture.school_id)
+                .unwrap()
+                .0,
+            0
+        );
+        conn.execute_batch("DROP TRIGGER fail_cursor").unwrap();
+        assert_eq!(pull_once(conn, &client, &config).unwrap().applied, 1);
+        assert!(
+            learner::find_by_id_in_school(conn, &fixture.school_id, &entity.to_string())
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn storage_failures_are_not_classified_as_record_collisions() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE t (id INTEGER UNIQUE); INSERT INTO t VALUES (1);")
+            .unwrap();
+        let error = conn.execute("INSERT INTO t VALUES (1)", []).unwrap_err();
+        assert_eq!(
+            classify_repository_rejection(error.into()),
+            ApplyRejection::RepositoryRejected
+        );
+        assert_eq!(
+            classify_repository_rejection(rusqlite::Error::InvalidQuery.into()),
+            ApplyRejection::StorageFailure
+        );
+    }
+
+    #[test]
     fn should_run_is_false_until_a_credential_is_stored() {
         let conn = crate::db::open(
             std::path::Path::new(":memory:"),
@@ -1699,6 +1776,19 @@ mod tests {
         // pushed it yet.
         {
             let conn = &fixture.conn;
+            for _ in 0..100 {
+                sync_outbox::enqueue(
+                    conn,
+                    &fixture.school_id,
+                    &make_change(&fixture, Uuid::now_v7(), 0),
+                )
+                .unwrap();
+            }
+            conn.execute(
+                "UPDATE sync_outbox SET created_at = '2000-01-01T00:00:00Z'",
+                [],
+            )
+            .unwrap();
             sync_outbox::enqueue(
                 conn,
                 &fixture.school_id,
@@ -2332,6 +2422,16 @@ mod tests {
         assert!(
             !colliding_row_exists,
             "the colliding change must never be materialized"
+        );
+        let reviews = sync_conflict_review::list_open_for_school(conn, &fixture.school_id).unwrap();
+        assert_eq!(reviews.len(), 1);
+        assert_eq!(reviews[0].entity_id, colliding_entity_id.to_string());
+        assert_eq!(reviews[0].review_reason, "apply_rejected");
+        assert!(!reviews[0].encrypted_payload.is_empty());
+        assert_eq!(pull_once(conn, &client, &config).unwrap().received, 0);
+        assert_eq!(
+            sync_conflict_review::count_open_for_school(conn, &fixture.school_id).unwrap(),
+            1
         );
         let good_materialized =
             subject::find_by_id_in_school(conn, &fixture.school_id, &good_entity_id.to_string())

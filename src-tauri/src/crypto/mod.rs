@@ -1,6 +1,7 @@
 #[cfg(windows)]
 mod dpapi;
 pub mod payload_key;
+pub(crate) mod platform;
 
 use std::path::Path;
 
@@ -19,6 +20,14 @@ pub const KEY_LEN: usize = 32;
 /// open (or create) a *different* database than the one the existing key
 /// protects, orphaning all previously encrypted data without any warning.
 pub trait KeyStore {
+    /// Protect a supplied recovery key in a NEW file. Never overwrite a key.
+    /// Unsupported adapters fail explicitly; recovery cannot fall back to plaintext.
+    fn store_recovery_key(&self, _key_file: &Path, _key: &[u8; KEY_LEN]) -> AppResult<()> {
+        Err(crate::error::AppError::key_store(
+            "recovery key protection is unsupported by this adapter",
+        ))
+    }
+
     fn load_or_create_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]>;
 
     /// Overwrites `key_file` with a genuinely NEW, freshly generated key,

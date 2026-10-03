@@ -6,7 +6,7 @@ authors = ["LIKHA-SIS contributors"]
 license = ""
 repository = "https://github.com/312810-spec/likha-sis-0.2"
 edition = "2021"
-rust-version = "1.95"
+rust-version = "1.99"
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,23 +16,24 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3", features = [] }
+tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
-tauri = { version = "2.11.3", features = [] }
-tauri-plugin-log = "2"
+serde_json = "1.0.151"
+serde = { version = "1.0.229", features = ["derive"] }
+log = "0.4.34"
+tauri = { version = "2.12.1", features = [] }
+tauri-plugin-log = "2.10.0"
 rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
-rusqlite_migration = "2"
-uuid = { version = "1.20.0", features = ["v7", "serde"] }
-rand = "0.10.2"
+rusqlite_migration = "2.6.0"
+uuid = { version = "1.26.1", features = ["v7", "serde"] }
+rand = "0.10.3"
 zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
-argon2 = { version = "0.5.3", features = ["zeroize"] }
-password-hash = { version = "0.5.0", features = ["rand_core", "getrandom"] }
+tempfile = "3.27.0"
+argon2 = { version = "0.6.0", features = ["zeroize"] }
+password-hash = { version = "0.6.1", features = ["getrandom"] }
 calamine = { version = "0.36.1", features = ["dates"] }
-tauri-plugin-dialog = "2.7.2"
+tauri-plugin-dialog = "2.8.1"
 # Wave 3: official-form (SF1) generation engine. Pure Rust, MIT-licensed,
 # actively maintained (v3.1.0, 1M+ total downloads as of 2026-08 -- see
 # docs/adr/0048-official-form-engine-sf1.md). Opens an EXISTING .xlsx
@@ -44,7 +45,7 @@ tauri-plugin-dialog = "2.7.2"
 # evidence that DepEd's current School Form distribution format is
 # `.xlsx` (a real in-use `CONSO SF v2025.xlsx` workbook, inspected during
 # M8).
-umya-spreadsheet = "3"
+umya-spreadsheet = "3.1.0"
 # Already resolved in this workspace's dependency tree (pulled transitively
 # by tauri-codegen at build time) -- promoting it to a direct runtime
 # dependency adds no new crate to compile, just links the same version into
@@ -54,8 +55,8 @@ umya-spreadsheet = "3"
 # rejected: its docs explicitly disclaim algorithm stability across Rust
 # releases, which would silently break a fingerprint persisted in SQLite
 # after a toolchain upgrade.
-sha2 = "0.11"
-tauri-plugin-opener = "2.5.5"
+sha2 = "0.11.0"
+tauri-plugin-opener = "2.7.0"
 aes-gcm = { version = "0.11.1", features = ["zeroize"] }
 hkdf = "0.13.0"
 # ADR-0067 network listener (school-laptop sync hub). tokio-rs org,
@@ -100,7 +101,7 @@ tokio = { version = "1.53.1", default-features = false, features = ["net", "rt"]
 # own "loopback only, plaintext HTTP inside the trust boundary" decision
 # for `hub_server` -- a TLS backend would be dead weight and a bigger
 # dependency surface for a URL that can never be `https://`.
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "query"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json", "query"] }
 
 # ADR-0067 network listener: enumerates this machine's non-loopback network
 # interfaces so the hub can bind its LAN/Tailscale address(es) instead of
@@ -126,7 +127,6 @@ if-addrs = { version = "0.15.0", default-features = false }
 windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_Foundation"] }
 
 [dev-dependencies]
-tempfile = "3.27.0"
-proptest = "1"
+proptest = "1.11.0"
 tower = { version = "0.5.3", default-features = false, features = ["util"] }
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }

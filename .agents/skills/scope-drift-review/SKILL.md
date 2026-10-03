@@ -28,7 +28,7 @@ actually asked for:
 2. **Unexpected dependencies** — did a new package get added that
    wasn't necessary for this specific task? Check `package.json`/
    `Cargo.toml` diffs specifically.
-3. **Configuration changes** — did `.Codex/settings.json`,
+3. **Configuration changes** — did `.codex` configuration,
    `tsconfig.json`, `vite.config.ts`, or a CI/build file change without
    the task calling for it?
 4. **Public API / interface changes** — did a repository port, domain
@@ -54,7 +54,7 @@ actually asked for:
    silent.
 3. If the same _kind_ of drift keeps recurring across sessions: that's
    a signal to strengthen a rule/boundary/lint check
-   (`.Codex/rules/architecture.md`, `scripts/check-architecture.mjs`),
+   (`AGENTS.md`, `scripts/check-architecture.mjs`),
    not to add another prose reminder — see `docs/learning/ERROR-PATTERNS.md`.
 
 ## What this is not
@@ -64,6 +64,6 @@ use this to justify simplifying away a security boundary, an
 authorization check, the UI → Application Services → Domain →
 Repository layering, an intentional provider interface, offline/
 recovery logic, migration safety, or accessibility — see
-`.Codex/rules/architecture.md` and `.Codex/rules/security-privacy.md`.
+`AGENTS.md` and the relevant implementation/test evidence.
 Generic "this could be simpler" does not override intentional
 architecture recorded in an ADR.

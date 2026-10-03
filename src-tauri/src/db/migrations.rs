@@ -2002,6 +2002,14 @@ pub fn migrations() -> Migrations<'static> {
         ALTER TABLE sync_version_cache_new RENAME TO sync_version_cache;
         "#,
         ),
+        M::up(
+            r#"
+        -- Nominal M42, actual schema version 41 (historical labels skip an ordinal).
+        CREATE INDEX idx_sync_outbox_school_entity ON sync_outbox(school_id, entity_kind, entity_id);
+        ALTER TABLE sync_conflict_review ADD COLUMN review_reason TEXT NOT NULL DEFAULT 'concurrent_edit'
+            CHECK (review_reason IN ('concurrent_edit', 'apply_rejected'));
+        "#,
+        ),
     ])
 }
 
@@ -2016,6 +2024,35 @@ mod tests {
     /// rows are left unsectioned (section_id NULL) rather than backfilled
     /// into a fabricated section, and the new CHECK constraint actually
     /// rejects the retired 'excused' value going forward.
+    #[test]
+    fn schema_41_preserves_existing_review_payload_and_adds_pending_entity_index() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrations().to_version(&mut conn, 40).unwrap();
+        conn.execute_batch("INSERT INTO schools(id,name) VALUES('s','Synthetic');
+            INSERT INTO sync_conflict_review
+            (id,change_id,school_id,device_id,actor_user_id,entity_kind,entity_id,submitted_base_version,current_hub_version,operation,encrypted_payload)
+            VALUES('r','c','s','d','u','subject','e',2,3,'upsert',X'010203');").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+        let row: (String, Vec<u8>, i64) = conn.query_row(
+            "SELECT review_reason, encrypted_payload, current_hub_version FROM sync_conflict_review WHERE id='r'", [],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(row, ("concurrent_edit".into(), vec![1, 2, 3], 3));
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_index_info('idx_sync_outbox_school_entity')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 3);
+        assert!(conn
+            .execute(
+                "UPDATE sync_conflict_review SET review_reason='bad' WHERE id='r'",
+                []
+            )
+            .is_err());
+    }
+
     #[test]
     fn migration_5_converts_legacy_attendance_data_without_loss() {
         let mut conn = Connection::open_in_memory().unwrap();

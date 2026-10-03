@@ -45,7 +45,7 @@ jobs:
       # those commit refs at all, and lets a manual workflow_dispatch run
       # (which the action does scan in full) see everything.
       - name: Checkout (full history)
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -69,7 +69,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # EmbarkStudios/cargo-deny-action v2.1.1, pinned to its release
       # commit. Checks advisories/bans/licenses/sources against
@@ -88,7 +88,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Deliberately NOT google/osv-scanner-action here. That action's
       # own action.yml says "Not intended to be used directly... behavior
@@ -102,12 +102,12 @@ jobs:
       # (docs/VERIFICATION-DEBT.md), pinned to an exact release tag and
       # verified against Google's own published SHA256SUMS before
       # execution — a real supply-chain check, not just a version pin.
-      - name: Download and verify osv-scanner v2.5.1 (linux_amd64)
+      - name: Download and verify osv-scanner v2.6.0 (linux_amd64)
         run: |
           set -euo pipefail
           curl -fsSL -o osv-scanner \
-            https://github.com/google/osv-scanner/releases/download/v2.5.1/osv-scanner_linux_amd64
-          echo "f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be  osv-scanner" | sha256sum -c -
+            https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
 
       - name: Run osv-scanner

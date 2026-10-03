@@ -73,6 +73,39 @@ function renderScreen(repo: FakeConflictReviewRepository = new FakeConflictRevie
 }
 
 describe("ConflictReviewScreen", () => {
+  it("retains rejected changes for retry or explicit dismissal", async () => {
+    const repo = new FakeConflictReviewRepository([
+      {
+        ...CONFLICTS[0]!,
+        entityKind: "subject",
+        reviewReason: "apply_rejected",
+        local: null,
+        incoming: { kind: "details", fields: [{ label: "Name", value: "Mathematics" }] },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderScreen(repo);
+    expect(await screen.findByText("Name: Mathematics")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Resolve this conflict" }));
+    await user.click(screen.getByRole("button", { name: "Dismiss incoming change" }));
+    expect(repo.resolveCalls).toEqual([{ conflictId: "cr-1", resolution: "keep_local" }]);
+    expect(await screen.findByText(/Local records were left unchanged/)).toBeInTheDocument();
+  });
+
+  it("keeps a rejected record visible when retry fails", async () => {
+    const repo = new FakeConflictReviewRepository([
+      { ...CONFLICTS[0]!, reviewReason: "apply_rejected" },
+    ]);
+    repo.resolveResult = "reject";
+    const user = userEvent.setup();
+    renderScreen(repo);
+    await screen.findByText("Learner conflict");
+    await user.click(screen.getByRole("button", { name: "Resolve this conflict" }));
+    await user.click(screen.getByRole("button", { name: "Retry incoming change" }));
+    expect(await screen.findByText(/Could not resolve this conflict/)).toBeInTheDocument();
+    expect(screen.getByText("Learner conflict")).toBeInTheDocument();
+  });
+
   it("shows an empty state when there are no conflicts", async () => {
     renderScreen(new FakeConflictReviewRepository([]));
 
@@ -104,9 +137,7 @@ describe("ConflictReviewScreen", () => {
     renderScreen(repo);
     await screen.findByText("Learner conflict");
 
-    expect(
-      screen.getByText("This device no longer has its own copy of this record."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No local preview is available for this record.")).toBeInTheDocument();
   });
 
   it("requires a confirmation step before resolving, and offers both choices", async () => {

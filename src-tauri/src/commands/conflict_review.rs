@@ -49,7 +49,11 @@ use crate::sync_client::{self, SyncClientConfig};
 /// boundary (`find_open_by_id_in_school`/`mark_resolved`), never by UI
 /// hiding, matching `.claude/rules/security-privacy.md`.
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ConflictEntityPreview {
     Learner {
         given_name: String,
@@ -67,6 +71,50 @@ pub enum ConflictEntityPreview {
         grade_level: String,
         school_year: String,
     },
+    Details {
+        fields: Vec<ConflictPreviewField>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ConflictPreviewField {
+    pub label: String,
+    pub value: String,
+}
+
+fn details_preview(plaintext: &[u8]) -> Option<ConflictEntityPreview> {
+    let value: serde_json::Value = serde_json::from_slice(plaintext).ok()?;
+    let fields: Vec<_> = [
+        ("name", "Name"),
+        ("title", "Title"),
+        ("score", "Score"),
+        ("status", "Status"),
+        ("maxScore", "Maximum score"),
+        ("attendanceDate", "Date"),
+        ("schoolYear", "School year"),
+        ("gradeLevel", "Grade level"),
+        ("sectionId", "Section"),
+        ("learnerId", "Learner"),
+        ("subjectId", "Subject"),
+        ("assessmentItemId", "Assessment"),
+        ("userId", "Teacher"),
+    ]
+    .into_iter()
+    .filter_map(|(key, label)| {
+        let scalar = value.get(key)?;
+        let text = match scalar {
+            serde_json::Value::String(text) => text.clone(),
+            serde_json::Value::Number(number) => number.to_string(),
+            serde_json::Value::Bool(boolean) => boolean.to_string(),
+            _ => return None,
+        };
+        Some(ConflictPreviewField {
+            label: label.into(),
+            value: text,
+        })
+    })
+    .collect();
+    (!fields.is_empty()).then_some(ConflictEntityPreview::Details { fields })
 }
 
 fn learner_preview(l: &learner::Learner) -> ConflictEntityPreview {
@@ -135,7 +183,7 @@ fn decrypt_preview(entity_kind: EntityKind, plaintext: &[u8]) -> Option<Conflict
             .ok()
             .as_ref()
             .map(section_preview),
-        _ => None,
+        _ => details_preview(plaintext),
     }
 }
 
@@ -151,6 +199,7 @@ pub struct ConflictReviewSummary {
     pub created_at: String,
     pub submitted_base_version: u64,
     pub current_hub_version: u64,
+    pub review_reason: String,
     /// The other device's incoming edit, decrypted for display. `None`
     /// only if it could not be decrypted (e.g. the SSPK was rotated by a
     /// revocation since this conflict was staged) -- disclosed via
@@ -202,6 +251,7 @@ fn to_summary(
         created_at: row.created_at.clone(),
         submitted_base_version: row.submitted_base_version,
         current_hub_version: row.current_hub_version,
+        review_reason: row.review_reason.clone(),
         incoming,
         incoming_unavailable_reason,
         local,
@@ -262,6 +312,52 @@ fn parse_uuid(value: &str, what: &str) -> AppResult<Uuid> {
         .map_err(|_| AppError::key_store(format!("stored {what} was not a valid UUID")))
 }
 
+fn apply_incoming_review(
+    conn: &Connection,
+    school_id: &str,
+    row: &ConflictReviewRow,
+    sspk: &[u8; PAYLOAD_KEY_LEN],
+) -> AppResult<bool> {
+    let change = AcceptedChange {
+        cursor: crate::sync::SyncCursor(0),
+        change_id: parse_uuid(&row.change_id, "conflict change id")?,
+        device_id: parse_uuid(&row.device_id, "conflict device id")?,
+        actor_user_id: parse_uuid(&row.actor_user_id, "conflict actor user id")?,
+        entity_kind: row.entity_kind,
+        entity_id: parse_uuid(&row.entity_id, "conflict entity id")?,
+        version: row.current_hub_version,
+        operation: row.operation,
+        encrypted_payload: row.encrypted_payload.clone(),
+    };
+
+    let tx = conn.unchecked_transaction()?;
+    sync_client::apply_decrypted_change(&tx, school_id, &change, sspk).map_err(
+                |_rejection| {
+                    AppError::key_store(
+                        "the incoming record could not be saved; the review and queued edits remain available for retry"
+                            .to_string(),
+                    )
+                },
+            )?;
+    sync_outbox::discard_pending_for_entity(&tx, school_id, row.entity_kind, &row.entity_id)?;
+    sync_version_cache::record_known_version(
+        &tx,
+        school_id,
+        row.entity_kind,
+        &row.entity_id,
+        row.current_hub_version,
+    )?;
+
+    let resolved = sync_conflict_review::mark_resolved(
+        &tx,
+        school_id,
+        &row.id,
+        ConflictResolution::UsedIncoming,
+    )?;
+    tx.commit()?;
+    Ok(resolved)
+}
+
 /// Resolves one staged conflict per the teacher's explicit choice --
 /// never a bulk or automatic resolution (see this module's own scope
 /// boundary in the task that added it). `KeepLocal` marks the conflict
@@ -304,19 +400,24 @@ pub fn resolve_conflict_review(
 
     match resolution {
         ConflictResolutionChoice::KeepLocal => {
-            sync_outbox::correct_base_version_for_entity(
-                &conn,
-                &school_id,
-                row.entity_kind,
-                &row.entity_id,
-                row.current_hub_version,
-            )?;
-            sync_conflict_review::mark_resolved(
-                &conn,
+            let tx = conn.unchecked_transaction()?;
+            if row.review_reason != "apply_rejected" {
+                sync_outbox::correct_base_version_for_entity(
+                    &tx,
+                    &school_id,
+                    row.entity_kind,
+                    &row.entity_id,
+                    row.current_hub_version,
+                )?;
+            }
+            let resolved = sync_conflict_review::mark_resolved(
+                &tx,
                 &school_id,
                 &conflict_id,
                 ConflictResolution::KeptLocal,
-            )
+            )?;
+            tx.commit()?;
+            Ok(resolved)
         }
         ConflictResolutionChoice::UseIncoming => {
             // Primary: the same network round trip `pull_once` itself
@@ -336,40 +437,7 @@ pub fn resolve_conflict_review(
                 ));
             };
 
-            let change = AcceptedChange {
-                cursor: crate::sync::SyncCursor(0),
-                change_id: parse_uuid(&row.change_id, "conflict change id")?,
-                device_id: parse_uuid(&row.device_id, "conflict device id")?,
-                actor_user_id: parse_uuid(&row.actor_user_id, "conflict actor user id")?,
-                entity_kind: row.entity_kind,
-                entity_id: parse_uuid(&row.entity_id, "conflict entity id")?,
-                version: row.current_hub_version,
-                operation: row.operation,
-                encrypted_payload: row.encrypted_payload.clone(),
-            };
-
-            sync_client::apply_decrypted_change(&conn, &school_id, &change, &sspk).map_err(
-                |_rejection| {
-                    AppError::key_store(
-                        "the incoming change could not be applied -- it may be corrupted or encrypted under a different key"
-                            .to_string(),
-                    )
-                },
-            )?;
-            sync_version_cache::record_known_version(
-                &conn,
-                &school_id,
-                row.entity_kind,
-                &row.entity_id,
-                row.current_hub_version,
-            )?;
-
-            sync_conflict_review::mark_resolved(
-                &conn,
-                &school_id,
-                &conflict_id,
-                ConflictResolution::UsedIncoming,
-            )
+            apply_incoming_review(&conn, &school_id, &row, &sspk)
         }
     }
 }
@@ -415,6 +483,84 @@ mod tests {
             .into_iter()
             .next()
             .unwrap()
+    }
+
+    #[test]
+    fn incoming_review_failure_preserves_local_record_queue_and_review() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Synthetic").unwrap();
+        let local = learner::create(&conn, &school.id, "Ana", "Cruz", None, None).unwrap();
+        let incoming = learner::Learner {
+            given_name: "Anna".into(),
+            ..local.clone()
+        };
+        let key = test_sspk();
+        let row = stage_learner_conflict(&conn, &school.id, &incoming, &key);
+        let queued = PendingChange {
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::Learner,
+            entity_id: Uuid::parse_str(&local.id).unwrap(),
+            base_version: 0,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: vec![1],
+        };
+        sync_outbox::enqueue(&conn, &school.id, &queued).unwrap();
+        conn.execute_batch(
+            "CREATE TEMP TRIGGER fail_review BEFORE UPDATE ON sync_conflict_review
+            BEGIN SELECT RAISE(FAIL, 'injected review failure'); END;",
+        )
+        .unwrap();
+        assert!(apply_incoming_review(&conn, &school.id, &row, &key).is_err());
+        assert_eq!(
+            learner::find_by_id_in_school(&conn, &school.id, &local.id)
+                .unwrap()
+                .unwrap()
+                .given_name,
+            "Ana"
+        );
+        assert_eq!(
+            sync_outbox::count_pending_for_school(&conn, &school.id).unwrap(),
+            1
+        );
+        assert_eq!(
+            sync_conflict_review::count_open_for_school(&conn, &school.id).unwrap(),
+            1
+        );
+        assert_eq!(
+            sync_version_cache::known_version(&conn, &school.id, EntityKind::Learner, &local.id)
+                .unwrap(),
+            0
+        );
+        conn.execute_batch("DROP TRIGGER fail_review").unwrap();
+        assert!(apply_incoming_review(&conn, &school.id, &row, &key).unwrap());
+        assert_eq!(
+            sync_outbox::count_pending_for_school(&conn, &school.id).unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn preview_ipc_fields_match_frontend_camel_case() {
+        let preview = ConflictEntityPreview::Learner {
+            given_name: "Ana".into(),
+            family_name: "Cruz".into(),
+            lrn: None,
+        };
+        let value = serde_json::to_value(preview).unwrap();
+        assert_eq!(value["givenName"], "Ana");
+        assert!(value.get("given_name").is_none());
+    }
+
+    #[test]
+    fn generic_preview_displays_selected_fields_without_secrets() {
+        let preview =
+            details_preview(br#"{"name":"Math","password":"secret","schoolId":"hidden"}"#).unwrap();
+        let value = serde_json::to_string(&preview).unwrap();
+        assert!(value.contains("Math"));
+        assert!(!value.contains("secret"));
+        assert!(!value.contains("hidden"));
     }
 
     #[test]
@@ -683,14 +829,9 @@ mod tests {
         assert_eq!(outcome, sync_hub::PushOutcome::Accepted(SyncCursor(2)));
     }
 
-    /// Regression: the "use incoming" path must not touch an unrelated
-    /// pending outbox entry for the same entity -- only `KeepLocal`
-    /// corrects `base_version`, since `UseIncoming` already advances this
-    /// device's applied state via `sync_version_cache`, and the pending
-    /// outbox push is a separate, still-unsynced edit this task's scope
-    /// does not touch.
+    /// The explicit incoming choice cancels superseded edits only for this record.
     #[test]
-    fn using_incoming_leaves_a_pending_outbox_entrys_base_version_untouched() {
+    fn using_incoming_discards_superseded_edits_and_preserves_unrelated_work() {
         let conn = open_test_db();
         let s = school::create(&conn, "Rizal Elementary").unwrap();
         let local = learner::create(&conn, &s.id, "Ana", "Cruz", None, None).unwrap();
@@ -713,39 +854,21 @@ mod tests {
         };
         sync_outbox::enqueue(&conn, &s.id, &outbox_change).unwrap();
 
-        let change = AcceptedChange {
-            cursor: SyncCursor(0),
-            change_id: parse_uuid(&row.change_id, "change id").unwrap(),
-            device_id: parse_uuid(&row.device_id, "device id").unwrap(),
-            actor_user_id: parse_uuid(&row.actor_user_id, "actor id").unwrap(),
-            entity_kind: row.entity_kind,
-            entity_id: parse_uuid(&row.entity_id, "entity id").unwrap(),
-            version: row.current_hub_version,
-            operation: row.operation,
-            encrypted_payload: row.encrypted_payload.clone(),
-        };
-        sync_client::apply_decrypted_change(&conn, &s.id, &change, &sspk).unwrap();
-        sync_version_cache::record_known_version(
-            &conn,
-            &s.id,
-            row.entity_kind,
-            &row.entity_id,
-            row.current_hub_version,
-        )
-        .unwrap();
-        sync_conflict_review::mark_resolved(
-            &conn,
-            &s.id,
-            &row.id,
-            ConflictResolution::UsedIncoming,
-        )
-        .unwrap();
-
+        let mut unrelated = outbox_change.clone();
+        unrelated.change_id = Uuid::now_v7();
+        unrelated.entity_id = Uuid::now_v7();
+        sync_outbox::enqueue(&conn, &s.id, &unrelated).unwrap();
+        assert!(apply_incoming_review(&conn, &s.id, &row, &sspk).unwrap());
         let pending = sync_outbox::pending_for_school(&conn, &s.id, 20).unwrap();
         assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].change.change_id, unrelated.change_id);
+        assert_eq!(pending[0].change.base_version, 0);
         assert_eq!(
-            pending[0].change.base_version, 0,
-            "UseIncoming must not touch an unrelated pending outbox entry's base_version"
+            learner::find_by_id_in_school(&conn, &s.id, &local.id)
+                .unwrap()
+                .unwrap()
+                .given_name,
+            "Anna"
         );
     }
 }

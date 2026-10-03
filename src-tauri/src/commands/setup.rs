@@ -31,6 +31,7 @@ pub fn installation_status(db: State<'_, Mutex<Connection>>) -> AppResult<Instal
 /// transaction rather than before it.
 #[tauri::command]
 pub fn bootstrap_installation(
+    app: tauri::AppHandle,
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     school_name: String,
@@ -39,14 +40,22 @@ pub fn bootstrap_installation(
     display_name: String,
 ) -> AppResult<CurrentSession> {
     let mut conn = lock_db(&db);
-    let result = auth::bootstrap_installation(
-        &mut conn,
-        &sessions,
-        &school_name,
-        &username,
-        &password,
-        &display_name,
-    );
+    let result = (|| {
+        if crate::db::base_data_dir(&app)?
+            .join(crate::db::RECOVERY_POINTER)
+            .exists()
+        {
+            return Err(crate::error::AppError::AlreadyInitialized);
+        }
+        auth::bootstrap_installation(
+            &mut conn,
+            &sessions,
+            &school_name,
+            &username,
+            &password,
+            &display_name,
+        )
+    })();
     password.zeroize();
     let session = result?;
     to_dto(&conn, &session)

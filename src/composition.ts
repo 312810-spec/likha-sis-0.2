@@ -1,4 +1,6 @@
 import { AssessmentApplicationService } from "./application/assessment-service";
+import { BackupApplicationService } from "./application/backup-service";
+import { TauriBackupRepository } from "./infrastructure/tauri/backup-repository";
 import { AdviserDailyAttendanceApplicationService } from "./application/adviser-daily-attendance-service";
 import { AdviserMonthlyAttendanceApplicationService } from "./application/adviser-monthly-attendance-service";
 import { LessonPlanApplicationService } from "./application/lesson-plan-service";
@@ -122,6 +124,7 @@ export const sectionAdvisoryService = new SectionAdvisoryApplicationService(
   new TauriSectionAdvisoryRepository(),
 );
 export const deviceSyncService = new DeviceSyncApplicationService(new TauriDeviceSyncRepository());
+export const backupService = new BackupApplicationService(new TauriBackupRepository());
 export const conflictReviewService = new ConflictReviewApplicationService(
   new TauriConflictReviewRepository(),
 );
