@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { SchoolLogoApplicationService } from "../../application/school-logo-service";
 import type { CurrentSession } from "../../domain/session";
-import type { SignedInTab } from "../components/workbench-nav-data";
+import { TAB_LABELS, type SignedInTab } from "../components/workbench-nav-data";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -170,13 +170,14 @@ export function AppLayout({
           logoUrl={logoUrl}
         />
         <main id="main-content" tabIndex={-1} className="app-canvas">
+          {(activeTab === "workspace" || activeTab === "my-day") && (
+            <h1 className="app-mobile-title">
+              {activeTab === "workspace" ? "Today" : TAB_LABELS[activeTab]}
+            </h1>
+          )}
           {children}
         </main>
-        <BottomNav
-          activeTab={activeTab}
-          onNavigate={navigate}
-          onOpenMore={() => setDrawerOpen(true)}
-        />
+        <BottomNav activeTab={activeTab} onNavigate={navigate} />
       </div>
     </div>
   );

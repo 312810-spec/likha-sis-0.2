@@ -14,8 +14,8 @@ import {
   learnerScoreService,
   learnerScoreSyncStatusService,
   lessonPlanService,
-  learnerService,
   myDayService,
+  learnerService,
   onSessionExpired,
   schoolAttendanceService,
   schoolLogoService,
@@ -45,11 +45,15 @@ import { FirstRunSetupScreen } from "./ui/FirstRunSetupScreen";
 import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
+import { AssignedClassFolio } from "./ui/AssignedClassFolio";
+import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "./ui/WorkspaceHubs";
+import { ShellAccountPreferences } from "./ui/shell/ShellAccountPreferences";
+import { Page } from "./ui/components/Page";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
-import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
+import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
 import { SectionAdviserScreen } from "./ui/SectionAdviserScreen";
 import { SectionRosterScreen } from "./ui/SectionRosterScreen";
@@ -201,12 +205,14 @@ function App() {
   function handleSetupComplete(newSession: CurrentSession) {
     clearSessionWorkContexts();
     setNeedsSetup(false);
+    setActiveTab("workspace");
     setSession(newSession);
   }
 
   function handleLoggedIn(newSession: CurrentSession) {
     clearSessionWorkContexts();
     setSessionExpiredNotice(null);
+    setActiveTab("workspace");
     setSession(newSession);
   }
 
@@ -214,7 +220,7 @@ function App() {
     const context = classWorkContext;
     if (!session || !context) {
       clearClassWorkContext();
-      setActiveTab("my-day");
+      setActiveTab("workspace");
       return;
     }
 
@@ -230,10 +236,50 @@ function App() {
       clearClassWorkContext();
     }
 
-    setActiveTab("my-day");
+    setActiveTab("workspace");
   }
 
   const bootBrand = <h1 className="app-boot-brand">LIKHA-SIS</h1>;
+
+  const folio = session ? (
+    <AssignedClassFolio
+      key={activeTab === "class-records" ? "scores" : "overview"}
+      teacherUserId={session.userId}
+      subjectAttendanceService={subjectAttendanceService}
+      selectedClassContext={classWorkContext}
+      onSelectClass={setClassWorkContext}
+      initialTab={activeTab === "class-records" ? "scores" : "overview"}
+      onCheckAttendance={(context) => {
+        setClassWorkContext(context);
+        setSubjectAttendanceAssignmentId(context.teachingAssignmentId);
+        setActiveTab("subject-attendance");
+      }}
+      onOpenClassRecord={(context) => {
+        setClassWorkContext(context);
+        setActiveTab("class-records");
+      }}
+      onOpenAdvisory={() => setActiveTab("adviser-view")}
+      onOpenForms={() => setActiveTab("school-forms")}
+      renderScores={(context, onBackToOverview) => (
+        <ClassRecordJourneyScreen
+          teachingAssignmentId={context.teachingAssignmentId}
+          classContext={context}
+          teacherUserId={session.userId}
+          subjectAttendanceService={subjectAttendanceService}
+          gradingService={gradingService}
+          classRecordService={classRecordService}
+          assessmentService={assessmentService}
+          learnerScoreService={learnerScoreService}
+          learnerScoreSyncStatusService={learnerScoreSyncStatusService}
+          exportService={exportService}
+          onBackToClass={() => {
+            onBackToOverview();
+            if (activeTab === "class-records") setActiveTab("workspace");
+          }}
+        />
+      )}
+    />
+  ) : null;
 
   return (
     <ModeProvider>
@@ -262,6 +308,7 @@ function App() {
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
           {activeTab === "workspace" ? (
             <HomeScreen
+              teachingWorkspace={folio}
               roles={session.roles}
               displayName={session.displayName}
               schoolName={session.schoolName}
@@ -283,6 +330,26 @@ function App() {
               onViewAuditLog={() => setActiveTab("audit-log")}
               onOpenSf1Import={() => setActiveTab("sf1-import")}
             />
+          ) : activeTab === "school-forms" ? (
+            <SchoolFormsScreen onNavigate={setActiveTab} />
+          ) : activeTab === "more" ? (
+            <MoreScreen onNavigate={setActiveTab} />
+          ) : activeTab === "calendar" ? (
+            <CalendarScreen
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={session.userId}
+              onOpenClass={(context) => {
+                setClassWorkContext(context);
+                setActiveTab("workspace");
+              }}
+            />
+          ) : activeTab === "account" ? (
+            <Page title="Account">
+              <ShellAccountPreferences session={session} onLogout={handleLogout} />
+              <button type="button" onClick={() => setActiveTab("more")}>
+                More tools and settings
+              </button>
+            </Page>
           ) : activeTab === "learners" ? (
             <LearnerListScreen
               learnerService={learnerService}
@@ -441,6 +508,8 @@ function App() {
               }}
             />
           ) : activeTab === "my-day" ? (
+            folio
+          ) : activeTab === "daily-planner" ? (
             classWorkContext && classRecordAssignmentId ? (
               <ClassRecordJourneyScreen
                 key={JSON.stringify([session.userId, classRecordAssignmentId])}
@@ -524,6 +593,8 @@ function App() {
           ) : activeTab === "grading-periods" ? (
             <GradingPeriodsScreen gradingService={gradingService} />
           ) : activeTab === "class-records" ? (
+            folio
+          ) : activeTab === "record-library" ? (
             <ClassRecordsScreen
               classRecordService={classRecordService}
               sectionService={sectionService}

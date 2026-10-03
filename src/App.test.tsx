@@ -58,10 +58,11 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "LIKHA-SIS" })).toBeInTheDocument();
   });
 
-  it("shows the workspace overview by default when there is an active session", async () => {
+  it("shows authorized assigned classes by default when there is an active session", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
       if (command === "list_audit_log") return Promise.resolve([]);
@@ -70,8 +71,10 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Class folio" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My classes" })).toBeInTheDocument();
+    expect(await screen.findByText("No teaching assignments yet.")).toBeInTheDocument();
+    expect(mockInvoke).toHaveBeenCalledWith("list_teacher_assignments", expect.anything());
+    expect(mockInvoke).not.toHaveBeenCalledWith("list_learners_by_school", expect.anything());
     expect(screen.getAllByText(/Rizal Elementary/).length).toBeGreaterThan(0);
   });
 
@@ -83,6 +86,7 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(schoolHeadSession);
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
       if (command === "list_sf1_import_history") return Promise.resolve([]);
@@ -97,55 +101,63 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "School overview" })).toBeInTheDocument();
   });
 
-  it("groups the navigation into named workbench clusters, preserving every destination", async () => {
+  it("keeps six primary destinations and preserves specialist tools in More", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.resolve([]);
-      if (command === "list_sections_by_school") return Promise.resolve([]);
-      if (command === "list_audit_log") return Promise.resolve([]);
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
       return Promise.reject(new Error(`unexpected command: ${String(command)}`));
     });
-
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
-
+    await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(nav).toBeInTheDocument();
-    for (const groupName of ["Daily Teaching", "Learner Records", "Grading"]) {
-      expect(within(nav).getByRole("button", { name: groupName })).toHaveAttribute(
-        "aria-expanded",
-        "true",
-      );
-    }
-    // Security is collapsed by default (Sidebar.tsx's readCollapsed()) --
-    // this test asserts the group exists and its destinations are still in
-    // the DOM below, not its expand state.
-    expect(within(nav).getByRole("button", { name: "Security" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    expect(within(nav).getAllByRole("button")).toHaveLength(6);
     for (const destination of [
-      "Home",
-      "Attendance",
-      "Monthly Summary",
-      "Learners",
-      "Sections",
-      "Grading Periods",
-      "Class Records",
+      "Dashboard",
+      "My Advisory",
+      "Class Record",
+      "School Forms",
+      "Calendar",
+      "More",
     ]) {
       expect(within(nav).getByRole("button", { name: destination })).toBeInTheDocument();
     }
-    // "Sign-in Activity" lives in the collapsed-by-default Security group --
-    // expand it to prove the destination is preserved, not dropped.
-    await userEvent.click(within(nav).getByRole("button", { name: "Security" }));
-    expect(within(nav).getByRole("button", { name: "Sign-in Activity" })).toBeInTheDocument();
+    await userEvent.setup().click(within(nav).getByRole("button", { name: "More" }));
+    const directory = await screen.findByRole("region", { name: "More" });
+    for (const destination of [
+      "Daily teaching planner",
+      "Today's Classes",
+      "Attendance",
+      "Subject Attendance",
+      "My Subject Attendance",
+      "My Advisory",
+      "My Teaching Load",
+      "Monthly Summary",
+      "Learners",
+      "Sections",
+      "Import Learners (SF1)",
+      "Grading Periods",
+      "Record management",
+      "Lesson Plans",
+      "Sync Status",
+      "Review Sync Conflicts",
+      "Sign-in Activity",
+      "Reset a Password",
+      "School Members",
+      "Devices",
+      "School Logo",
+    ]) {
+      expect(
+        within(directory).getAllByRole("button", { name: destination }).length,
+      ).toBeGreaterThan(0);
+    }
   });
 
   it("sets the browser tab title to the active destination", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
       if (command === "list_audit_log") return Promise.resolve([]);
@@ -154,11 +166,13 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
-    await waitFor(() => expect(document.title).toBe("Home · LIKHA-SIS"));
+    await screen.findByRole("heading", { name: "My classes" });
+    await waitFor(() => expect(document.title).toBe("Dashboard · LIKHA-SIS"));
 
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    await user.click(within(nav).getByRole("button", { name: "Learners" }));
+    await user.click(within(nav).getByRole("button", { name: "More" }));
+    const directory = await screen.findByRole("region", { name: "More" });
+    await user.click(within(directory).getByRole("button", { name: "Learners" }));
 
     await waitFor(() => expect(document.title).toBe("Learners · LIKHA-SIS"));
   });
@@ -167,6 +181,7 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
       if (command === "list_audit_log") return Promise.resolve([]);
@@ -175,9 +190,11 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
-    await screen.findByRole("region", { name: "Workspace" });
+    await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    await user.click(within(nav).getByRole("button", { name: "Learners" }));
+    await user.click(within(nav).getByRole("button", { name: "More" }));
+    const directory = await screen.findByRole("region", { name: "More" });
+    await user.click(within(directory).getByRole("button", { name: "Learners" }));
 
     expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
   });
@@ -190,7 +207,8 @@ describe("App", () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
-      if (command === "list_learners_by_school") return Promise.reject("unauthorized");
+      if (command === "list_teacher_assignments") return Promise.resolve([]);
+      if (command === "get_school_logo") return Promise.reject("unauthorized");
       if (command === "list_sections_by_school") return Promise.resolve([]);
       if (command === "list_audit_log") return Promise.resolve([]);
       if (command === "list_schools") return Promise.resolve([]);

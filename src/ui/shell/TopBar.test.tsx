@@ -33,30 +33,22 @@ function renderTopBar(over: Partial<ComponentProps<typeof TopBar>> = {}) {
 }
 
 describe("TopBar", () => {
-  it("shows the group + screen breadcrumb for the active tab", () => {
-    renderTopBar({ activeTab: "attendance" });
-    expect(screen.getByText("Daily Teaching")).toBeInTheDocument();
-    expect(screen.getByText("Attendance", { selector: "strong" })).toBeInTheDocument();
-  });
-
-  it("shows only the screen title for a tab with no group (Home)", () => {
-    renderTopBar({ activeTab: "workspace" });
-    expect(screen.getByText("Home", { selector: "strong" })).toBeInTheDocument();
-  });
-
-  it("renders the identity line", () => {
+  it("shows the current screen without navigation breadcrumbs", () => {
     renderTopBar();
-    expect(screen.getByText("Ana Cruz · Rizal Elementary")).toBeInTheDocument();
+    expect(screen.getByText("Attendance", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.queryByText("Daily Teaching")).not.toBeInTheDocument();
   });
-
-  it("truncates the identity text instead of wrapping, with the full text on a title attribute", () => {
-    const { container } = renderTopBar();
-    const text = container.querySelector(".app-topbar-identity-text");
-    expect(text).toHaveAttribute("title", "Ana Cruz · Rizal Elementary");
-    // jsdom doesn't compute layout, so this asserts the CSS contract
-    // (truncate-on-overflow) rather than a measured width -- the
-    // dev-preview.html browser check is what proves it visually.
-    expect(text).toHaveClass("app-topbar-identity-text");
+  it("shows Dashboard and keeps preferences out of the normal header", () => {
+    renderTopBar({ activeTab: "workspace" });
+    expect(screen.getByText("Dashboard", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Log out" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Efficient" })).not.toBeInTheDocument();
+  });
+  it("shows the teacher name in the account control", () => {
+    renderTopBar();
+    expect(
+      screen.getByRole("button", { name: "Account preferences for Ana Cruz" }),
+    ).toBeInTheDocument();
   });
 
   it("renders no logo image by default (no logo uploaded)", () => {
@@ -74,6 +66,7 @@ describe("TopBar", () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();
     renderTopBar({ onLogout });
+    await user.click(screen.getByRole("button", { name: "Account preferences for Ana Cruz" }));
     await user.click(screen.getByRole("button", { name: "Log out" }));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
@@ -94,9 +87,35 @@ describe("TopBar", () => {
   it("keeps a working density-mode switcher", async () => {
     const user = userEvent.setup();
     renderTopBar();
+    await user.click(screen.getByRole("button", { name: "Account preferences for Ana Cruz" }));
     const efficient = screen.getByRole("button", { name: "Efficient" });
     await user.click(efficient);
     expect(efficient).toHaveAttribute("aria-pressed", "true");
     expect(document.documentElement.dataset.teacherMode).toBe("efficient");
+  });
+  it("opens preferences with focus and closes on Escape, restoring focus", async () => {
+    const user = userEvent.setup();
+    renderTopBar();
+    const trigger = screen.getByRole("button", { name: "Account preferences for Ana Cruz" });
+    await user.click(trigger);
+    expect(screen.getByRole("dialog", { name: "Account preferences" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Appearance" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+  it("dismisses preferences when clicking outside", async () => {
+    const user = userEvent.setup();
+    renderTopBar();
+    await user.click(screen.getByRole("button", { name: "Account preferences for Ana Cruz" }));
+    await user.click(screen.getByText("Attendance", { selector: "strong" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  it("has no axe violations with account preferences open", async () => {
+    const { container } = renderTopBar();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Account preferences for Ana Cruz" }));
+    await expectNoAccessibilityViolations(container);
   });
 });

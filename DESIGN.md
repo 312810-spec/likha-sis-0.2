@@ -17,7 +17,7 @@ All screens use semantic CSS variables in `src/ui/theme/styles.css`, not individ
 | Working sheet    | `#ffffff` | `#222737` |
 | Text             | `#172033` | `#f0f2fa` |
 | Secondary text   | `#586174` | `#b3bbcf` |
-| Primary action   | `#292db0` | `#b8bdf8` |
+| Primary action   | `#2536c4` | `#b8bdf8` |
 | Action text      | `#ffffff` | `#181b40` |
 | Control outline  | `#7a8192` | `#8993aa` |
 
@@ -27,9 +27,9 @@ Decorative dividers use a separate soft token; they are never the only control b
 
 Public Sans stays self-hosted with weights 400, 600, and 700 and tabular figures. No font or image network request is required by production. Use restrained headings, compact labels, generous separation between task groups, and aligned table columns. Body and secondary reading text scale with the teacher's interface mode.
 
-Home labels its existing section data honestly. One selected section shows its school year, open term, attendance status, roster, and relevant attendance action. My Day uses the signed-in teacher's authorized schedule; the index remains visible while the selected class connects to attendance and class records. Academic weighting and term selection remain explicit in the existing class-record workflow.
+Dashboard lists the signed-in teacher’s authorized subject assignments beside a selected worksheet. Overview, Scores, and Forms are working tabs. Overview uses real subject attendance totals; Scores embeds the real class-record journey with explicit term and weighting choices. Visited Scores stays mounted across worksheet tabs so drafts and failed edits remain available. My Advisory owns official advisory attendance. Class Record opens the assigned worksheet in Scores; More keeps the legacy management tools and daily planner reachable.
 
-Phones use a labeled select to change class/section. Keep the selected context and one primary action ahead of the register. Folio touch controls are at least 48px tall. Keep wide monthly grids in bounded scroll regions; do not shrink or obscure learner names. Preserve the existing stacked score-entry and attendance layouts.
+Phones use a compact, scrollable assigned-class list and Today / Classes / Forms / Account navigation. Keep the selected context and one primary action ahead of the register. Folio touch controls are at least 48px tall. Keep wide monthly grids in bounded scroll regions; do not shrink or obscure learner names. Preserve the existing stacked score-entry and attendance layouts.
 
 ## Existing behavioral contracts
 

@@ -1,5 +1,11 @@
 export type SignedInTab =
+  | "daily-planner"
+  | "record-library"
   | "workspace"
+  | "school-forms"
+  | "calendar"
+  | "more"
+  | "account"
   | "learners"
   | "sections"
   | "section-roster"
@@ -34,7 +40,13 @@ export type SignedInTab =
  * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
-  workspace: "Home",
+  "daily-planner": "Daily teaching planner",
+  "record-library": "Record management",
+  workspace: "Dashboard",
+  "school-forms": "School Forms",
+  calendar: "Calendar",
+  more: "More",
+  account: "Account",
   learners: "Learners",
   sections: "Sections",
   "section-roster": "Section Roster",
@@ -42,7 +54,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "section-adviser": "Section Adviser",
   "schedule-meetings": "Class Schedule",
   "sf1-import": "Import Learners (SF1)",
-  "my-day": "My Day",
+  "my-day": "My Classes",
   "today-classes": "Today's Classes",
   attendance: "Attendance",
   "subject-attendance": "Subject Attendance",
@@ -51,7 +63,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "teacher-load": "My Teaching Load",
   "monthly-summary": "Monthly Summary",
   "grading-periods": "Grading Periods",
-  "class-records": "Class Records",
+  "class-records": "Class Record",
   "lesson-plans": "Lesson Plans",
   "audit-log": "Sign-in Activity",
   "admin-password-reset": "Reset a Password",
@@ -83,7 +95,12 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Daily Teaching",
-    tabs: [tab("my-day"), tab("today-classes"), tab("attendance"), tab("subject-attendance")],
+    tabs: [
+      tab("daily-planner"),
+      tab("today-classes"),
+      tab("attendance"),
+      tab("subject-attendance"),
+    ],
   },
   {
     label: "Class Overview",
@@ -100,7 +117,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "Grading",
-    tabs: [tab("grading-periods"), tab("class-records")],
+    tabs: [tab("grading-periods"), tab("record-library")],
   },
   {
     label: "Creation Studio",
@@ -122,24 +139,33 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
 ];
 
-/** The pinned Home destination, rendered above the groups in the sidebar
- * and first in the bottom nav. Wave 1: this is still the existing
- * `workspace` tab (TeacherWorkspaceScreen). Wave 3 repoints it at the new
- * role-adaptive HomeScreen. */
-export const HOME_DESTINATION: { id: SignedInTab; label: string } = {
-  id: "workspace",
-  label: "Home",
-};
-
-/** The four real destinations of the phone bottom-tab bar. `BottomNav.tsx`
- * appends a synthetic fifth "More" control that opens the drawer -- it is
- * not a `SignedInTab`, so it is not listed here. */
-export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
-  { id: "workspace", label: "Home" },
-  { id: "today-classes", label: "Classes" },
-  { id: "learners", label: "Learners" },
-  { id: "class-records", label: "Grades" },
+/** The six deliberately small destinations of the class-folio shell. Detailed
+ * tools remain in NAV_GROUPS and are reached through the More workspace. */
+export const PRIMARY_NAV: readonly { id: SignedInTab; label: string }[] = [
+  tab("workspace"),
+  tab("adviser-view"),
+  tab("class-records"),
+  tab("school-forms"),
+  tab("calendar"),
+  tab("more"),
 ];
+export const HOME_DESTINATION = { id: "workspace" as const, label: "Dashboard" };
+export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
+  { id: "workspace", label: "Today" },
+  { id: "my-day", label: "Classes" },
+  { id: "school-forms", label: "Forms" },
+  { id: "account", label: "Account" },
+];
+
+/** Keeps a meaningful primary destination selected while using its tools. */
+export function primaryTabFor(tab: SignedInTab): SignedInTab {
+  if (tab === "workspace" || tab === "my-day" || tab === "today-classes") return "workspace";
+  if (["adviser-view", "attendance", "section-adviser"].includes(tab)) return "adviser-view";
+  if (["class-records", "grading-periods"].includes(tab)) return "class-records";
+  if (["school-forms", "monthly-summary", "sf1-import"].includes(tab)) return "school-forms";
+  if (["calendar", "schedule-meetings"].includes(tab)) return "calendar";
+  return "more";
+}
 
 const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
   "section-roster": "sections",

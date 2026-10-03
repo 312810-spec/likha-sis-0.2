@@ -57,15 +57,26 @@ reset is recorded as history; verification above was rerun on restored source.
 
 ## Approved school class folio redesign
 
-Branch: `design/premium-school-ui-20261003`, reconciled with main after PR101.
-The owner approved the class-folio concept and requested dark mode.
-Shared school-seal colors now cover Light, Dark, and System appearance; teacher
-Home and My Day use a class/section index and working sheet with compact phone
-pickers. Existing attendance, grading choices, permissions and data services stay
-in place. A failed schedule refresh preserves already selected class work.
+Branch: `design/premium-school-ui-20261003`, based on main through PR101; draft PR102.
+The owner requested complete concept fidelity using Prompt Master to establish the
+frontend engineer role first. The brief is in docs/design/class-folio.
 
-Rendered synthetic screenshots and implementation boundaries are in
-`docs/design/class-folio/README.md` and ADR-0072. Frontend/browser verification is
-recorded in the redesign PR. Next UI release check: exercise appearance, keyboard
-navigation and class-context handoff in the installed Windows app. Physical
-Android validation still depends on the native Android work listed above.
+Dashboard now lists authorized subject assignments beside a worksheet with
+Overview, Scores, and Forms. The real grading journey is embedded and preserves
+work across worksheet tabs. Desktop has six primary destinations; phone has
+Today, Classes, Forms, and Account. School Forms and Calendar use existing real
+services. More preserves specialized management tools and the daily planner.
+Global school theme includes remembered Light/Dark/System; appearance, density,
+and sign-out are in Account. Official advisory attendance stays separate from
+subject records. Login starts on Dashboard.
+
+Two independent design/workflow reviews found and resolved the local Back-to-class
+no-op, retained login destination, and tab-switch draft loss. Actual screenshots
+and implementation boundaries are in docs/design/class-folio/README.md and
+ADR-0073. Core frontend quality: 132 files / 1,225 tests pass. Browser checks cover
+both appearances, three densities, four widths, context and navigation, with zero
+WCAG A/AA findings. Production build and dev-preview isolation pass.
+
+Next release check: exercise the complete redesigned workflow, keyboard use, and
+appearance in the installed Windows app. Native Android remains unsupported
+pending the native work above. Production is not deployed by this redesign.

@@ -1,6 +1,8 @@
 import type { JSX } from "react";
 
 export type IconName =
+  | "document"
+  | "more"
   | "home"
   | "today"
   | "check"
@@ -18,6 +20,18 @@ export type IconName =
 // nav item's text colour (including the active/inverted state). Decorative:
 // every nav destination also renders its text label.
 const PATHS: Record<IconName, JSX.Element> = {
+  document: (
+    <>
+      <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
   home: <path d="M3 11 12 3l9 8M5 10v10h14V10" />,
   today: (
     <>
