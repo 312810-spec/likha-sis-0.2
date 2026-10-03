@@ -1,4 +1,4 @@
-import { useState, type JSX } from "react";
+import { useState, type JSX, type ReactNode } from "react";
 import type { AttendanceApplicationService } from "../application/attendance-service";
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
@@ -13,6 +13,7 @@ import { SchoolHeadHome } from "./home/SchoolHeadHome";
 import { TeacherWorkspaceScreen } from "./TeacherWorkspaceScreen";
 
 interface HomeScreenProps {
+  teachingWorkspace?: ReactNode;
   roles: string[];
   displayName: string;
   schoolName: string;
@@ -39,6 +40,7 @@ interface HomeScreenProps {
  * that same teaching workspace (school heads commonly also teach).
  */
 export function HomeScreen({
+  teachingWorkspace,
   roles,
   displayName,
   schoolName,
@@ -62,7 +64,7 @@ export function HomeScreen({
   const isSchoolHead = roles.includes("school_head");
   const [view, setView] = useState<"overview" | "teaching">("overview");
 
-  const workspace = (
+  const workspace = teachingWorkspace ?? (
     <TeacherWorkspaceScreen
       displayName={displayName}
       attendanceService={attendanceService}
@@ -77,7 +79,7 @@ export function HomeScreen({
   );
 
   if (!isSchoolHead) {
-    return workspace;
+    return <>{workspace}</>;
   }
 
   return (

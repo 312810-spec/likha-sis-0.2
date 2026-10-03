@@ -54,20 +54,30 @@ export function ClassWorkspaceScreen({
 
       <section aria-labelledby="class-workspace-work">
         <h3 id="class-workspace-work">Class work</h3>
-        <p>
-          Start with attendance. More class tools will move into this same workspace only after
-          their existing behavior is preserved and verified.
-        </p>
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => onCheckAttendance(context.teachingAssignmentId)}
-        >
-          Check attendance
-        </button>{" "}
-        <button type="button" onClick={() => onOpenClassRecord(context.teachingAssignmentId)}>
-          Open class record
-        </button>
+        <div className="class-work-actions">
+          <div className="class-work-row">
+            <div>
+              <h4>Attendance</h4>
+              <p>Check learners for this class meeting.</p>
+            </div>
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => onCheckAttendance(context.teachingAssignmentId)}
+            >
+              Check attendance
+            </button>
+          </div>
+          <div className="class-work-row">
+            <div>
+              <h4>Class record</h4>
+              <p>Assessments, learner scores, and grades.</p>
+            </div>
+            <button type="button" onClick={() => onOpenClassRecord(context.teachingAssignmentId)}>
+              Open class record
+            </button>
+          </div>
+        </div>
       </section>
     </Page>
   );

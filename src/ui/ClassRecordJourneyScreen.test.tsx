@@ -8,7 +8,7 @@ import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import type { GradingPeriod } from "../domain/grading";
-import type { ClassRecord, GradingWeightPolicy } from "../domain/class-record";
+import type { ClassRecord, ClassRecordDetail, GradingWeightPolicy } from "../domain/class-record";
 import { expectNoAccessibilityViolations } from "../test/a11y";
 import { ClassRecordJourneyScreen } from "./ClassRecordJourneyScreen";
 import { ModeProvider } from "./theme/ModeContext";
@@ -89,6 +89,7 @@ function classRecordServiceWith(
   created: ClassRecord | null,
 ): ClassRecordApplicationService {
   return {
+    listClassRecords: vi.fn().mockResolvedValue([]),
     listGradingWeightPolicies: vi.fn().mockResolvedValue(policies),
     createClassRecord: vi.fn().mockResolvedValue(created),
   } as unknown as ClassRecordApplicationService;
@@ -99,6 +100,7 @@ function renderScreen(overrides?: {
   periods?: GradingPeriod[];
   policies?: GradingWeightPolicy[];
   created?: ClassRecord | null;
+  records?: ClassRecordDetail[];
 }) {
   const onBackToClass = vi.fn();
   const subjectAttendance = subjectAttendanceServiceWith(overrides?.assignments ?? [ASSIGNMENT]);
@@ -108,6 +110,7 @@ function renderScreen(overrides?: {
     overrides && "created" in overrides ? overrides.created! : CLASS_RECORD,
   );
 
+  vi.mocked(classRecord.listClassRecords).mockResolvedValue(overrides?.records ?? []);
   const rendered = render(
     <ModeProvider>
       <ClassRecordJourneyScreen
@@ -134,6 +137,50 @@ async function openRecord(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("ClassRecordJourneyScreen", () => {
+  const savedRecord: ClassRecordDetail = {
+    ...CLASS_RECORD,
+    weightPolicyId: POLICY.id,
+    weightPolicyName: POLICY.name,
+    sectionName: ASSIGNMENT.sectionName,
+    subjectName: ASSIGNMENT.subjectName,
+    gradingPeriodLabel: PERIOD.label,
+    schoolYear: PERIOD.schoolYear,
+    itemCount: 2,
+    recordedCount: 3,
+    totalEligible: 5,
+  };
+  it("reopens the matching saved record without creating a duplicate", async () => {
+    const { classRecord } = renderScreen({ records: [savedRecord] });
+    await openRecord(userEvent.setup());
+    await screen.findByRole("heading", { name: "Class Record Workspace" });
+    expect(classRecord.createClassRecord).not.toHaveBeenCalled();
+  });
+  it("requires an explicit choice when several saved records match", async () => {
+    const { classRecord } = renderScreen({
+      records: [savedRecord, { ...savedRecord, id: "cr-2", recordedCount: 7 }],
+    });
+    const user = userEvent.setup();
+    await openRecord(user);
+    await screen.findByRole("heading", { name: "Choose a saved class record" });
+    expect(
+      screen.queryByRole("heading", { name: "Class Record Workspace" }),
+    ).not.toBeInTheDocument();
+    expect(classRecord.createClassRecord).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Record 2/ }));
+    await screen.findByRole("heading", { name: "Class Record Workspace" });
+  });
+  it("does not reopen a record from another assignment or weighting", async () => {
+    const { classRecord } = renderScreen({
+      records: [
+        { ...savedRecord, subjectId: "other" },
+        { ...savedRecord, weightPolicyId: "other" },
+      ],
+    });
+    await openRecord(userEvent.setup());
+    await screen.findByRole("heading", { name: "Class Record Workspace" });
+    expect(classRecord.createClassRecord).toHaveBeenCalledOnce();
+  });
+
   it("requires explicit grading period and weighting before opening", async () => {
     const user = userEvent.setup();
     const { classRecord, grading } = renderScreen();

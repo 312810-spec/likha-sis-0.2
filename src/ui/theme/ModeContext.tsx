@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { AppearanceProvider } from "./AppearanceProvider";
 import { ModeContext } from "./mode-context-value";
 import { DEFAULT_TEACHER_MODE, isTeacherMode, type TeacherMode } from "./modes";
 
@@ -41,5 +42,9 @@ export function ModeProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <ModeContext.Provider value={{ mode, setMode }}>{children}</ModeContext.Provider>;
+  return (
+    <AppearanceProvider>
+      <ModeContext.Provider value={{ mode, setMode }}>{children}</ModeContext.Provider>
+    </AppearanceProvider>
+  );
 }

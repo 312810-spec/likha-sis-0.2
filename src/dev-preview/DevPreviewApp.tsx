@@ -1,4 +1,14 @@
+import { ClassRecordJourneyScreen } from "../ui/ClassRecordJourneyScreen";
+import { AssignedClassFolio } from "../ui/AssignedClassFolio";
+import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "../ui/WorkspaceHubs";
+import { ShellAccountPreferences } from "../ui/shell/ShellAccountPreferences";
+import { Page } from "../ui/components/Page";
+import type { TeacherClassWorkContext } from "../ui/work-context";
+import { SchoolLogoApplicationService } from "../application/school-logo-service";
+import schoolSealUrl from "./school-seal.png";
 import { useState } from "react";
+import { AdviserDailyAttendanceApplicationService } from "../application/adviser-daily-attendance-service";
+import { AdviserMonthlyAttendanceApplicationService } from "../application/adviser-monthly-attendance-service";
 import { AssessmentApplicationService } from "../application/assessment-service";
 import { AttendanceApplicationService } from "../application/attendance-service";
 import { AuthApplicationService } from "../application/auth-service";
@@ -26,7 +36,6 @@ import { SectionsScreen } from "../ui/SectionsScreen";
 import { SubjectAttendanceScreen } from "../ui/SubjectAttendanceScreen";
 import { SubjectMonitorScreen } from "../ui/SubjectMonitorScreen";
 import { TeacherLoadScreen } from "../ui/TeacherLoadScreen";
-import { TeacherWorkspaceScreen } from "../ui/TeacherWorkspaceScreen";
 import { TeachingAssignmentsScreen } from "../ui/TeachingAssignmentsScreen";
 import type { SignedInTab } from "../ui/components/workbench-nav-data";
 import { AppLayout } from "../ui/shell/AppLayout";
@@ -115,9 +124,61 @@ const subjectAttendanceService = new SubjectAttendanceApplicationService(
   teachingAssignmentRepository,
 );
 
+// Every advisory operation stays inside synthetic repositories in the browser.
+async function requirePreviewAdvisory(sectionId: string, date: string) {
+  const sections = await subjectAttendanceService.listAdviserViewSections(date);
+  if (!sections.some((section) => section.id === sectionId))
+    throw new Error("Not a synthetic advisory assignment");
+}
+const previewAdviserDailyService = new AdviserDailyAttendanceApplicationService({
+  async rosterForDate(sectionId, date) {
+    await requirePreviewAdvisory(sectionId, date);
+    return attendanceService.rosterForDate(sectionId, date);
+  },
+  async record(sectionId, learnerId, date, status) {
+    await requirePreviewAdvisory(sectionId, date);
+    return attendanceService.recordAttendance(sectionId, learnerId, date, status);
+  },
+  async bulkMarkPresent(sectionId, date) {
+    await requirePreviewAdvisory(sectionId, date);
+    return attendanceService.bulkMarkPresent(sectionId, date);
+  },
+});
+const previewAdviserMonthlyService = new AdviserMonthlyAttendanceApplicationService({
+  async summary(sectionId, year, month) {
+    await requirePreviewAdvisory(sectionId, `${year}-${String(month).padStart(2, "0")}-01`);
+    return attendanceService.monthlySummary(sectionId, year, month);
+  },
+  async exportSf2(sectionId, year, month) {
+    await requirePreviewAdvisory(sectionId, `${year}-${String(month).padStart(2, "0")}-01`);
+    const result = await exportService.exportSectionMonthlySf2(sectionId, year, month);
+    if (!result) throw new Error("Synthetic export unavailable");
+    return result;
+  },
+});
+
+// The supplied school seal is a visual reference only. Records remain synthetic;
+// this repository has no production branding write path.
+const previewLogoService = new SchoolLogoApplicationService({
+  async get() {
+    const response = await fetch(schoolSealUrl);
+    return { mime: "image/png", bytes: new Uint8Array(await response.arrayBuffer()) };
+  },
+  async set() {
+    throw new Error("Preview branding is read-only");
+  },
+  async clear() {
+    throw new Error("Preview branding is read-only");
+  },
+});
+
 export function DevPreviewApp() {
+  const [selectedClassContext, setSelectedClassContext] = useState<TeacherClassWorkContext | null>(
+    null,
+  );
+  const [attendanceAssignmentId, setAttendanceAssignmentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
-  const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
+  const [attendanceSectionId] = useState<string | null>(null);
   const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
     sectionId: string;
     year: number;
@@ -140,33 +201,75 @@ export function DevPreviewApp() {
   return (
     <ModeProvider>
       <AppLayout
-        session={FIXTURE_SESSION}
+        session={{ ...FIXTURE_SESSION, schoolName: "Tingub NHS" }}
+        schoolLogoService={previewLogoService}
         activeTab={activeTab}
-        onNavigate={setActiveTab}
+        onNavigate={(tab) => {
+          setActiveTab(tab);
+        }}
         onLogout={() => {}}
       >
-        <div className="alert alert-info" role="status">
-          <p>
-            <strong>Development preview — synthetic data, not the production app.</strong> No real
-            session, no Tauri, no SQLite. See <code>docs/adr/0032-teacher-workspace-polish.md</code>
-            .
-          </p>
+        <div className="preview-boundary" role="status">
+          Development preview · Synthetic records · School seal used as a design reference
         </div>
-        {activeTab === "workspace" ? (
-          <TeacherWorkspaceScreen
-            displayName={FIXTURE_SESSION.displayName}
-            attendanceService={attendanceService}
-            authService={authService}
-            gradingService={gradingService}
-            learnerService={learnerService}
-            sectionService={sectionService}
-            onOpenAttendance={(sectionId) => {
-              setAttendanceSectionId(sectionId);
-              setActiveTab("attendance");
+        {activeTab === "workspace" || activeTab === "my-day" || activeTab === "class-records" ? (
+          <AssignedClassFolio
+            key={activeTab === "class-records" ? "scores" : "overview"}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
+            subjectAttendanceService={subjectAttendanceService}
+            selectedClassContext={selectedClassContext}
+            onSelectClass={setSelectedClassContext}
+            initialTab={activeTab === "class-records" ? "scores" : "overview"}
+            onCheckAttendance={(context) => {
+              setSelectedClassContext(context);
+              setAttendanceAssignmentId(context.teachingAssignmentId);
+              setActiveTab("subject-attendance");
             }}
-            onManageSections={() => setActiveTab("sections")}
-            onViewAuditLog={() => setActiveTab("audit-log")}
+            onOpenClassRecord={(context) => {
+              setSelectedClassContext(context);
+              setActiveTab("class-records");
+            }}
+            onOpenAdvisory={() => setActiveTab("adviser-view")}
+            onOpenForms={() => setActiveTab("school-forms")}
+            renderScores={(context, onBackToOverview) => (
+              <ClassRecordJourneyScreen
+                embedded
+                teachingAssignmentId={context.teachingAssignmentId}
+                classContext={context}
+                teacherUserId={FIXTURE_TEACHER_USER_ID}
+                subjectAttendanceService={subjectAttendanceService}
+                gradingService={gradingService}
+                classRecordService={classRecordService}
+                assessmentService={assessmentService}
+                learnerScoreService={learnerScoreService}
+                exportService={exportService}
+                onBackToClass={() => {
+                  onBackToOverview();
+                  if (activeTab === "class-records") setActiveTab("workspace");
+                }}
+              />
+            )}
           />
+        ) : activeTab === "school-forms" ? (
+          <SchoolFormsScreen onNavigate={setActiveTab} />
+        ) : activeTab === "more" ? (
+          <MoreScreen onNavigate={setActiveTab} />
+        ) : activeTab === "calendar" ? (
+          <CalendarScreen
+            subjectAttendanceService={subjectAttendanceService}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
+            onOpenClass={(context) => {
+              setSelectedClassContext(context);
+              setActiveTab("workspace");
+            }}
+          />
+        ) : activeTab === "account" ? (
+          <Page title="Account">
+            <ShellAccountPreferences session={FIXTURE_SESSION} onLogout={() => {}} />
+            <button type="button" onClick={() => setActiveTab("more")}>
+              More tools and settings
+            </button>
+          </Page>
         ) : activeTab === "attendance" ? (
           <AttendanceScreen
             attendanceService={attendanceService}
@@ -196,7 +299,7 @@ export function DevPreviewApp() {
             exportService={exportService}
             enrollmentHistoryService={enrollmentHistoryService}
           />
-        ) : activeTab === "class-records" ? (
+        ) : activeTab === "record-library" ? (
           <ClassRecordsScreen
             classRecordService={classRecordService}
             sectionService={sectionService}
@@ -260,6 +363,7 @@ export function DevPreviewApp() {
           <SubjectAttendanceScreen
             subjectAttendanceService={subjectAttendanceService}
             teacherUserId={FIXTURE_TEACHER_USER_ID}
+            initialAssignmentId={attendanceAssignmentId ?? undefined}
           />
         ) : activeTab === "subject-monitor" ? (
           <SubjectMonitorScreen
@@ -267,7 +371,11 @@ export function DevPreviewApp() {
             teacherUserId={FIXTURE_TEACHER_USER_ID}
           />
         ) : activeTab === "adviser-view" ? (
-          <AdviserViewScreen subjectAttendanceService={subjectAttendanceService} />
+          <AdviserViewScreen
+            subjectAttendanceService={subjectAttendanceService}
+            adviserDailyAttendanceService={previewAdviserDailyService}
+            adviserMonthlyAttendanceService={previewAdviserMonthlyService}
+          />
         ) : activeTab === "teacher-load" ? (
           <TeacherLoadScreen
             teachingAssignmentService={teachingAssignmentService}

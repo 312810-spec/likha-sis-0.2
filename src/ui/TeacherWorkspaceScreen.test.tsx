@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttendanceApplicationService } from "../application/attendance-service";
@@ -228,10 +228,10 @@ afterEach(() => {
 });
 
 describe("TeacherWorkspaceScreen", () => {
-  it("greets the teacher by display name", async () => {
+  it("names the working folio", async () => {
     renderScreen({});
 
-    expect(await screen.findByRole("heading", { name: "Welcome, Ana Cruz" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Class folio" })).toBeInTheDocument();
   });
 
   it("shows learner and section counts", async () => {
@@ -564,7 +564,36 @@ describe("TeacherWorkspaceScreen", () => {
     await findSectionListItem(/Mabini/);
 
     expect(screen.getByRole("button", { name: "Continue attendance" })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: /Rizal — Grade/ }));
     expect(screen.getByRole("button", { name: "Review attendance" })).toBeInTheDocument();
+  });
+
+  it("uses the selected section's roster and identifier after changing the phone picker", async () => {
+    const user = userEvent.setup();
+    const onOpenAttendance = vi.fn();
+    const section: Section = {
+      id: "sec-a",
+      schoolId: "s1",
+      schoolYear: "2026-2027",
+      gradeLevel: "7",
+      name: "Mabini",
+      createdAt: "now",
+    };
+    renderScreen({
+      sections: [section, { ...section, id: "sec-b", name: "Rizal" }],
+      rostersBySectionId: {
+        "sec-a": [{ ...anEntry(null), givenName: "First" }],
+        "sec-b": [{ ...anEntry("present"), givenName: "Second" }],
+      },
+      onOpenAttendance,
+    });
+    await findSectionListItem(/Mabini/);
+    await user.selectOptions(screen.getByLabelText("Select a section"), "sec-b");
+    const register = screen.getByRole("table", { name: "Attendance for Rizal today" });
+    expect(register).toHaveTextContent("Second");
+    expect(register).not.toHaveTextContent("First");
+    await user.click(screen.getByRole("button", { name: "Review attendance" }));
+    expect(onOpenAttendance).toHaveBeenCalledWith("sec-b");
   });
 
   it("offers 'Manage sections' instead of an attendance action when a section has no learners", async () => {
@@ -771,7 +800,7 @@ describe("TeacherWorkspaceScreen", () => {
       sections: [section],
       rostersBySectionId: { sec1: [anEntry("present")] },
     });
-    await waitFor(() => screen.getByText(/Mabini/));
+    await findSectionListItem(/Mabini/);
 
     await expectNoAccessibilityViolations(container);
   });
