@@ -80,3 +80,22 @@ WCAG A/AA findings. Production build and dev-preview isolation pass.
 Next release check: exercise the complete redesigned workflow, keyboard use, and
 appearance in the installed Windows app. Native Android remains unsupported
 pending the native work above. Production is not deployed by this redesign.
+
+## Class folio detail refinement
+
+Continued on the same isolated design branch and draft PR102. The refinement adds
+stable keyboard focus in embedded Scores, an announced selected class, a sticky
+bounded desktop class index, density-aware reading text, and a bounded Account
+panel with a close control. Scoring now has draft-preserving assessment disclosure,
+aligned assessment/actions, spaced exports and immediate completion/protection
+feedback after score save. Open class record reuses an exact existing match;
+multiple matches require teacher choice. Grading rules/native authority are unchanged.
+
+Updated actual desktop/phone/light/dark scoring captures are in the design folder.
+Full frontend quality passes: 132 files / 1,233 tests. Production build and
+dev-preview isolation pass. Browser smoke covers both appearances, all three
+densities and four widths, actual keyboard scoring, sticky index and short-screen
+Account, with zero axe WCAG A/AA findings. Independent review caught and resolved
+a delayed-save focus leak across class changes.
+Next release check remains the installed Windows app workflow. No deployment or
+native Android support is implied by browser refinement.
