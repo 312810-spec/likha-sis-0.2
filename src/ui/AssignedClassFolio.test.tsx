@@ -58,6 +58,9 @@ describe("AssignedClassFolio", () => {
     const result = setup();
     await user.click(await screen.findByRole("button", { name: "Mathematics 10 · Compassion" }));
     expect(screen.getByRole("heading", { name: "Compassion" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Selected class: Mathematics 10, Compassion.",
+    );
     expect(screen.getByRole("button", { name: "Mathematics 10 · Kindness" })).toHaveAttribute(
       "aria-pressed",
       "false",

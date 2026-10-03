@@ -61,6 +61,10 @@ export function AssignedClassFolio({
     setActiveSheetTab(next);
     if (next === "scores") setScoresVisited(true);
   }
+  const [overviewFocusRequest, setOverviewFocusRequest] = useState(0);
+  useEffect(() => {
+    if (overviewFocusRequest > 0) tabRefs.current[0]?.focus();
+  }, [overviewFocusRequest]);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
@@ -124,6 +128,9 @@ export function AssignedClassFolio({
 
   return (
     <div className="concept-folio">
+      <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        {context ? `Selected class: ${context.subjectName}, ${context.sectionName}.` : ""}
+      </p>
       <section className="concept-folio-index" aria-labelledby={`${id}-classes`}>
         <h2 id={`${id}-classes`}>My classes</h2>
         {!visible || visible.status === "loading" ? (
@@ -206,7 +213,10 @@ export function AssignedClassFolio({
           >
             {scoresVisited && renderScores ? (
               <div key={selected.id} className="concept-folio-scores" hidden={tab !== "scores"}>
-                {renderScores(context, () => setTab("overview"))}
+                {renderScores(context, () => {
+                  setTab("overview");
+                  setOverviewFocusRequest((request) => request + 1);
+                })}
               </div>
             ) : null}
             {tab === "overview" ? (
@@ -373,7 +383,12 @@ function ClassRosterSummary({
       ) : result.rows.length === 0 ? (
         <p>No learners are currently in this class roster.</p>
       ) : (
-        <div className="concept-folio-table-wrap">
+        <div
+          className="concept-folio-table-wrap"
+          role="region"
+          aria-label="Class attendance roster"
+          tabIndex={0}
+        >
           <table>
             <caption className="visually-hidden">Subject attendance totals</caption>
             <thead>

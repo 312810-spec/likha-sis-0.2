@@ -233,6 +233,7 @@ export function DevPreviewApp() {
             onOpenForms={() => setActiveTab("school-forms")}
             renderScores={(context, onBackToOverview) => (
               <ClassRecordJourneyScreen
+                embedded
                 teachingAssignmentId={context.teachingAssignmentId}
                 classContext={context}
                 teacherUserId={FIXTURE_TEACHER_USER_ID}

@@ -3102,3 +3102,171 @@ label {
 .concept-folio-scores[hidden] {
   display: none;
 }
+
+/* Refinement pass: stable context, legible density, and quiet pointer feedback. */
+.concept-folio-index {
+  align-self: start;
+  position: sticky;
+  top: 12px;
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.concept-folio-index h2,
+.concept-folio-class strong {
+  font-size: 1em;
+}
+.concept-folio-class {
+  font-size: var(--font-size-base);
+}
+.concept-folio-class span {
+  font-size: 0.95em;
+  font-weight: 400;
+}
+.concept-folio-row {
+  padding-block: clamp(12px, calc(var(--spacing-unit) * 1.5), 26px);
+}
+.concept-folio-row p {
+  font-size: 0.95em;
+}
+.concept-folio-roster table {
+  font-size: 0.95em;
+}
+.concept-folio-links button {
+  font-size: 1em;
+}
+.concept-folio-roster thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface-2);
+  z-index: 1;
+}
+.app-account-panel {
+  max-height: calc(100dvh - 112px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.app-account-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.app-account-close {
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  font-weight: 400;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+@media (hover: hover) {
+  .concept-folio-class:not([aria-pressed="true"]):hover,
+  .concept-folio-links button:hover,
+  .workspace-links button:hover,
+  .concept-folio-tabs button:not([aria-selected="true"]):hover,
+  .app-account-trigger:hover {
+    background: var(--color-primary-wash);
+  }
+}
+@media (max-width: 860px) {
+  .concept-folio-index {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .concept-folio-class-list {
+    overscroll-behavior: contain;
+  }
+  .app-account-panel {
+    max-height: calc(100dvh - 164px - env(safe-area-inset-bottom));
+  }
+  .app-account-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+@media print {
+  .concept-folio-index {
+    position: static;
+  }
+}
+
+/* A scoring worksheet keeps authoring tools behind one deliberate action. */
+.assessment-toolbar,
+.worksheet-actions,
+.journey-context-return {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+}
+.assessment-toolbar {
+  justify-content: space-between;
+  margin-block: 16px;
+}
+.assessment-toolbar h3 {
+  margin: 0;
+}
+.assessment-composer:not([hidden]) {
+  padding: 16px;
+  margin-block-end: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.assessment-item-list {
+  list-style: none;
+  padding: 0;
+  margin-block: 16px 24px;
+}
+.assessment-item-list > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.assessment-item-list > li > button {
+  flex: 1 1 240px;
+  text-align: start;
+  white-space: normal;
+  line-height: 1.5;
+}
+.assessment-item-list [role="group"],
+.item-edit-form > button {
+  margin-inline-end: 8px;
+}
+.assessment-item-list [role="group"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.item-edit-form {
+  width: 100%;
+}
+.score-entry tbody th {
+  font-weight: 400;
+}
+.score-entry td > input {
+  margin-inline-end: 8px;
+}
+.worksheet-actions {
+  margin-block: 16px;
+}
+@media (max-width: 640px) {
+  .assessment-item-list > li > button {
+    flex-basis: 100%;
+  }
+  .assessment-composer:not([hidden]) {
+    padding: 12px;
+  }
+  .worksheet-actions > button {
+    width: 100%;
+  }
+}

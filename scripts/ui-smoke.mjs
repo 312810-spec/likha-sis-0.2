@@ -61,6 +61,13 @@ try {
   await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await page.getByRole("heading", { name: "Rizal", exact: true }).waitFor();
   await page.getByRole("tab", { name: "Scores", exact: true }).click();
+  await page.getByLabel("Grading period", { exact: true }).waitFor();
+  if (
+    !(await page
+      .getByRole("tab", { name: "Scores", exact: true })
+      .evaluate((node) => node === document.activeElement))
+  )
+    throw new Error("Loading Scores moved focus away from its worksheet tab");
   await page.getByLabel("Grading period", { exact: true }).selectOption("gp1");
   await page.getByRole("tab", { name: "Forms", exact: true }).click();
   await page.getByRole("tab", { name: "Scores", exact: true }).click();
@@ -164,8 +171,89 @@ try {
   await page.getByLabel("Grading period", { exact: true }).waitFor();
   if (process.env.LIKHA_CAPTURE_UI)
     await page.screenshot({ path: "docs/design/class-folio/class-dark.png", fullPage: true });
+  await page.getByLabel("Grading period", { exact: true }).selectOption("gp1");
+  await page.getByLabel("DepEd grading weighting", { exact: true }).selectOption("wp-k10");
+  await page.getByRole("button", { name: "Open class record", exact: true }).click();
+  await page.addScriptTag({ content: axe.source });
+  await page.getByLabel("Item name", { exact: true }).fill("Review quiz");
+  await page.getByRole("button", { name: "Add item", exact: true }).click();
+  await page.getByRole("button", { name: /Written Works — Review quiz/ }).click();
+  const score = page.getByLabel("Score for Ana Santos", { exact: true });
+  await score.fill("18");
+  await score.press("Enter");
+  await page.getByLabel("Score for Bayani Cruz", { exact: true }).waitFor();
+  if (
+    !(await page
+      .getByLabel("Score for Bayani Cruz", { exact: true })
+      .evaluate((node) => node === document.activeElement))
+  )
+    throw new Error("Enter did not save and move to the next learner");
+  await page.getByRole("tab", { name: "Forms", exact: true }).click();
+  await page.getByRole("tab", { name: "Scores", exact: true }).click();
+  if ((await score.inputValue()) !== "18") throw new Error("Score was lost across worksheet tabs");
+  for (const appearance of ["light", "dark"]) {
+    await page.getByRole("button", { name: /Account preferences for/ }).click();
+    await page
+      .getByRole("dialog", { name: "Account preferences", exact: true })
+      .getByLabel("Appearance")
+      .selectOption(appearance);
+    await page.keyboard.press("Escape");
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    for (const width of [1440, 1024, 390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
+      const result = await page.evaluate(async () => ({
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        violations: (
+          await window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa"] })
+        ).violations.map((v) => ({
+          id: v.id,
+          nodes: v.nodes.map((n) => ({ target: n.target, summary: n.failureSummary })),
+        })),
+      }));
+      if (result.overflow || result.violations.length)
+        throw new Error(`Scoring ${width}/${appearance}: ${JSON.stringify(result)}`);
+      if (width === 1440) {
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const index = await page.locator(".concept-folio-index").boundingBox();
+        if (!index || index.y < 0) throw new Error("Class index scrolled out of view");
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator(".concept-folio-heading").click();
+    if (process.env.LIKHA_CAPTURE_UI)
+      await page.screenshot({
+        path: `docs/design/class-folio/scores-${appearance}.png`,
+        fullPage: true,
+      });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page
+      .getByRole("heading", { name: "Review quiz scores", exact: true })
+      .scrollIntoViewIfNeeded();
+    if (process.env.LIKHA_CAPTURE_UI)
+      await page.screenshot({ path: `docs/design/class-folio/scores-phone-${appearance}.png` });
+  }
+  await page.setViewportSize({ width: 1024, height: 480 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: /Account preferences for/ }).click();
+  const account = page.getByRole("dialog", { name: "Account preferences", exact: true });
+  const accountBox = await account.boundingBox();
+  if (!accountBox || accountBox.y + accountBox.height > 480)
+    throw new Error("Account clips on a short viewport");
+  await account.getByRole("button", { name: "Close account preferences", exact: true }).click();
+  if (
+    !(await page
+      .getByRole("button", { name: /Account preferences for/ })
+      .evaluate((node) => node === document.activeElement))
+  )
+    throw new Error("Closing Account lost trigger focus");
   console.log(
-    "quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, zero axe WCAG A/AA findings.",
+    "quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
   );
 } finally {
   if (browser) await browser.close();

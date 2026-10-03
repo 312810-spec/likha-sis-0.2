@@ -119,3 +119,13 @@ describe("TopBar", () => {
     await expectNoAccessibilityViolations(container);
   });
 });
+
+it("provides an explicit account close control and restores its trigger", async () => {
+  const user = userEvent.setup();
+  renderTopBar();
+  const trigger = screen.getByRole("button", { name: "Account preferences for Ana Cruz" });
+  await user.click(trigger);
+  await user.click(screen.getByRole("button", { name: "Close account preferences" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+});

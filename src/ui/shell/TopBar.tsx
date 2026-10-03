@@ -19,7 +19,7 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
   const panelId = useId();
   useEffect(() => {
     if (!accountOpen) return;
-    panelRef.current?.querySelector<HTMLElement>("select, button")?.focus();
+    panelRef.current?.querySelector<HTMLElement>("select, button:not(.app-account-close)")?.focus();
     function onPointerDown(event: PointerEvent) {
       if (event.target instanceof Node && !accountRef.current?.contains(event.target)) {
         setAccountOpen(false);
@@ -100,6 +100,20 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
             role="dialog"
             aria-label="Account preferences"
           >
+            <div className="app-account-panel-heading">
+              <strong>Account</strong>
+              <button
+                type="button"
+                className="app-account-close"
+                onClick={() => {
+                  setAccountOpen(false);
+                  triggerRef.current?.focus();
+                }}
+                aria-label="Close account preferences"
+              >
+                ×
+              </button>
+            </div>
             <ShellAccountPreferences session={session} onLogout={onLogout} />
           </div>
         )}

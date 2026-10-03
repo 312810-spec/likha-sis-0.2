@@ -62,3 +62,31 @@ describe("Page", () => {
     await expectNoAccessibilityViolations(container);
   });
 });
+
+it("preserves existing focus when used inside an embedded worksheet", () => {
+  const anchor = document.createElement("button");
+  document.body.append(anchor);
+  anchor.focus();
+  render(
+    <Page title="Embedded scores" autoFocus={false}>
+      <p>Content</p>
+    </Page>,
+  );
+  expect(anchor).toHaveFocus();
+  anchor.remove();
+});
+
+it("does not steal focus when a background worksheet finishes loading", () => {
+  const anchor = document.createElement("button");
+  document.body.append(anchor);
+  anchor.focus();
+  render(
+    <div hidden>
+      <Page title="Background scores">
+        <p>Ready</p>
+      </Page>
+    </div>,
+  );
+  expect(anchor).toHaveFocus();
+  anchor.remove();
+});

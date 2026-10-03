@@ -109,6 +109,7 @@ export function AppLayout({
     (tab: SignedInTab) => {
       restoreFocusOnClose.current = false;
       setDrawerOpen(false);
+      document.scrollingElement?.scrollTo?.({ top: 0, left: 0, behavior: "instant" });
       onNavigate(tab);
     },
     [onNavigate],
