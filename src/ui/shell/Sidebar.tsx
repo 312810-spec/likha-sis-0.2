@@ -1,3 +1,4 @@
+import { AppearanceControl } from "../theme/AppearanceControl";
 import { useEffect, useState } from "react";
 import type { CurrentSession } from "../../domain/session";
 import { Icon, type IconName } from "../components/icons";
@@ -155,6 +156,9 @@ export function Sidebar({ session, activeTab, onNavigate, logoUrl }: SidebarProp
         })}
       </div>
 
+      <div className="app-sidebar-appearance">
+        <AppearanceControl />
+      </div>
       <div className="app-sidebar-modes" role="group" aria-label="Teacher interface mode">
         {TEACHER_MODES.map((m) => (
           <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>

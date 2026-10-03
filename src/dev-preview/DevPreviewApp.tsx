@@ -1,3 +1,9 @@
+import { ClassRecordJourneyScreen } from "../ui/ClassRecordJourneyScreen";
+import { MyDayApplicationService } from "../application/my-day-service";
+import { MyDayScreen } from "../ui/MyDayScreen";
+import type { TeacherClassWorkContext } from "../ui/work-context";
+import { SchoolLogoApplicationService } from "../application/school-logo-service";
+import schoolSealUrl from "./school-seal.png";
 import { useState } from "react";
 import { AssessmentApplicationService } from "../application/assessment-service";
 import { AttendanceApplicationService } from "../application/attendance-service";
@@ -115,7 +121,57 @@ const subjectAttendanceService = new SubjectAttendanceApplicationService(
   teachingAssignmentRepository,
 );
 
+// The supplied school seal is a visual reference only. Records remain synthetic;
+// this repository has no production branding write path.
+const previewLogoService = new SchoolLogoApplicationService({
+  async get() {
+    const response = await fetch(schoolSealUrl);
+    return { mime: "image/png", bytes: new Uint8Array(await response.arrayBuffer()) };
+  },
+  async set() {
+    throw new Error("Preview branding is read-only");
+  },
+  async clear() {
+    throw new Error("Preview branding is read-only");
+  },
+});
+
+// Fixed synthetic teaching-day scenario, not a wall-clock schedule claim.
+const previewMyDayService = new MyDayApplicationService({
+  async getSummary() {
+    return {
+      schedule: [
+        {
+          teachingAssignmentId: "ta-1",
+          subjectName: "Mathematics",
+          sectionName: "Mabini",
+          startsAt: "08:00",
+          endsAt: "09:00",
+          room: "Room 1",
+        },
+        {
+          teachingAssignmentId: "ta-2",
+          subjectName: "Science",
+          sectionName: "Rizal",
+          startsAt: "09:00",
+          endsAt: "10:00",
+          room: "Room 2",
+        },
+      ],
+      pendingAttendance: [
+        { teachingAssignmentId: "ta-2", subjectName: "Science", sectionName: "Rizal" },
+      ],
+      pendingConflicts: [],
+    };
+  },
+});
+
 export function DevPreviewApp() {
+  const [selectedClassContext, setSelectedClassContext] = useState<TeacherClassWorkContext | null>(
+    null,
+  );
+  const [recordAssignmentId, setRecordAssignmentId] = useState<string | null>(null);
+  const [attendanceAssignmentId, setAttendanceAssignmentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
   const [attendanceSectionId, setAttendanceSectionId] = useState<string | null>(null);
   const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
@@ -140,17 +196,17 @@ export function DevPreviewApp() {
   return (
     <ModeProvider>
       <AppLayout
-        session={FIXTURE_SESSION}
+        session={{ ...FIXTURE_SESSION, schoolName: "Tingub National High School (Synthetic)" }}
+        schoolLogoService={previewLogoService}
         activeTab={activeTab}
-        onNavigate={setActiveTab}
+        onNavigate={(tab) => {
+          setRecordAssignmentId(null);
+          setActiveTab(tab);
+        }}
         onLogout={() => {}}
       >
-        <div className="alert alert-info" role="status">
-          <p>
-            <strong>Development preview — synthetic data, not the production app.</strong> No real
-            session, no Tauri, no SQLite. See <code>docs/adr/0032-teacher-workspace-polish.md</code>
-            .
-          </p>
+        <div className="preview-boundary" role="status">
+          Development preview · Synthetic records · School seal used as a design reference
         </div>
         {activeTab === "workspace" ? (
           <TeacherWorkspaceScreen
@@ -166,6 +222,22 @@ export function DevPreviewApp() {
             }}
             onManageSections={() => setActiveTab("sections")}
             onViewAuditLog={() => setActiveTab("audit-log")}
+          />
+        ) : activeTab === "my-day" ? (
+          <MyDayScreen
+            myDayService={previewMyDayService}
+            selectedClassContext={selectedClassContext}
+            onOpenClassContext={setSelectedClassContext}
+            onBackToToday={() => setSelectedClassContext(null)}
+            onCheckAttendance={(id) => {
+              setAttendanceAssignmentId(id);
+              setActiveTab("subject-attendance");
+            }}
+            onOpenClassRecord={(id) => {
+              setRecordAssignmentId(id);
+              setActiveTab("class-records");
+            }}
+            onReviewConflicts={() => setActiveTab("conflict-review")}
           />
         ) : activeTab === "attendance" ? (
           <AttendanceScreen
@@ -195,6 +267,22 @@ export function DevPreviewApp() {
             learnerService={learnerService}
             exportService={exportService}
             enrollmentHistoryService={enrollmentHistoryService}
+          />
+        ) : activeTab === "class-records" && selectedClassContext && recordAssignmentId ? (
+          <ClassRecordJourneyScreen
+            teachingAssignmentId={recordAssignmentId}
+            classContext={selectedClassContext}
+            teacherUserId={FIXTURE_TEACHER_USER_ID}
+            subjectAttendanceService={subjectAttendanceService}
+            gradingService={gradingService}
+            classRecordService={classRecordService}
+            assessmentService={assessmentService}
+            learnerScoreService={learnerScoreService}
+            exportService={exportService}
+            onBackToClass={() => {
+              setRecordAssignmentId(null);
+              setActiveTab("my-day");
+            }}
           />
         ) : activeTab === "class-records" ? (
           <ClassRecordsScreen
@@ -260,6 +348,7 @@ export function DevPreviewApp() {
           <SubjectAttendanceScreen
             subjectAttendanceService={subjectAttendanceService}
             teacherUserId={FIXTURE_TEACHER_USER_ID}
+            initialAssignmentId={attendanceAssignmentId ?? undefined}
           />
         ) : activeTab === "subject-monitor" ? (
           <SubjectMonitorScreen

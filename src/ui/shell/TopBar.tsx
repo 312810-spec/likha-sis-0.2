@@ -1,3 +1,4 @@
+import { AppearanceControl } from "../theme/AppearanceControl";
 import type { CurrentSession } from "../../domain/session";
 import { Icon } from "../components/icons";
 import { TAB_LABELS, groupLabelForTab, type SignedInTab } from "../components/workbench-nav-data";
@@ -46,6 +47,9 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
         ))}
       </div>
 
+      <div className="app-topbar-appearance">
+        <AppearanceControl />
+      </div>
       <span className="app-topbar-identity">
         {logoUrl && <img src={logoUrl} alt="" className="app-topbar-logo" />}
         <span

@@ -54,3 +54,18 @@ reset is recorded as history; verification above was rerun on restored source.
 - Local whole-repo formatting encounters a pre-existing uncommitted change in
   docs/SOURCE-REGISTRY.md; it is preserved and excluded from this checkpoint.
 - Windows CI must verify DPAPI recovery and build refreshed test installers.
+
+## Approved school class folio redesign
+
+Branch: `design/premium-school-ui-20261003`, reconciled with main after PR101.
+The owner approved the class-folio concept and requested dark mode.
+Shared school-seal colors now cover Light, Dark, and System appearance; teacher
+Home and My Day use a class/section index and working sheet with compact phone
+pickers. Existing attendance, grading choices, permissions and data services stay
+in place. A failed schedule refresh preserves already selected class work.
+
+Rendered synthetic screenshots and implementation boundaries are in
+`docs/design/class-folio/README.md` and ADR-0072. Frontend/browser verification is
+recorded in the redesign PR. Next UI release check: exercise appearance, keyboard
+navigation and class-context handoff in the installed Windows app. Physical
+Android validation still depends on the native Android work listed above.

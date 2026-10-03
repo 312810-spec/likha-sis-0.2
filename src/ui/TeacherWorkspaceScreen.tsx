@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AttendanceRosterEntry } from "../domain/attendance";
 import type { AttendanceApplicationService } from "../application/attendance-service";
 import type { AuthApplicationService } from "../application/auth-service";
 import type { GradingApplicationService } from "../application/grading-service";
@@ -36,6 +37,7 @@ interface SectionAttendanceSummary {
   section: Section;
   markedCount: number;
   totalCount: number;
+  roster: AttendanceRosterEntry[];
   /** The grading period whose date range covers today, among this
    * section's own school year's periods -- `null` if none is currently
    * open (no period created yet for today's date, or today falls in a
@@ -156,7 +158,6 @@ function todayAsIsoDate(): string {
  * state and its own retry.
  */
 export function TeacherWorkspaceScreen({
-  displayName,
   attendanceService,
   authService,
   gradingService,
@@ -167,6 +168,7 @@ export function TeacherWorkspaceScreen({
   onViewAuditLog,
 }: TeacherWorkspaceScreenProps) {
   const { mode } = useTeacherMode();
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [learnerCount, setLearnerCount] = useState<number | null>(null);
   const [sectionSummaries, setSectionSummaries] = useState<SectionAttendanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,6 +212,7 @@ export function TeacherWorkspaceScreen({
             const periods = periodsByYear.get(section.schoolYear) ?? [];
             return {
               section,
+              roster,
               markedCount: roster.filter((entry) => entry.status !== null).length,
               totalCount: roster.length,
               openGradingPeriod: periods.find((period) => isPeriodOpenOn(period, today)) ?? null,
@@ -252,16 +255,21 @@ export function TeacherWorkspaceScreen({
     };
   }, [authService, activityRetryKey]);
 
+  const selected =
+    sectionSummaries.find((item) => item.section.id === selectedSectionId) ?? sectionSummaries[0];
+  const selectedState = selected
+    ? attendanceState(selected.markedCount, selected.totalCount)
+    : null;
+
   return (
-    <section aria-label="Workspace">
+    <section aria-label="Workspace" className="teacher-folio">
       <PageHeader
-        title={`Welcome, ${displayName}`}
+        title="Class folio"
         hint={
           mode === "guided" && (
             <p className="field-hint">
-              This is your workspace overview — today's attendance-marking status for each of your
-              sections, in the order that needs your attention first, plus recent sign-in activity
-              for your school.
+              Choose a section on the left, then mark or review its attendance. Sections needing
+              attention appear first. Sign-in activity is available below.
             </p>
           )
         }
@@ -283,7 +291,6 @@ export function TeacherWorkspaceScreen({
             section{sectionSummaries.length === 1 ? "" : "s"}.
           </p>
 
-          <h3>Today's attendance</h3>
           {sectionSummaries.length === 0 ? (
             <EmptyState>
               No sections created yet.{" "}
@@ -292,25 +299,69 @@ export function TeacherWorkspaceScreen({
               </button>
             </EmptyState>
           ) : (
-            <ul className="workspace-priority-rail">
-              {sectionSummaries.map(({ section, markedCount, totalCount, openGradingPeriod }) => {
-                const state = attendanceState(markedCount, totalCount);
-                return (
-                  <li key={section.id} className={`workspace-priority-item is-${state}`}>
-                    <div className="workspace-priority-main">
-                      <span className="workspace-priority-section">
+            <div className="class-folio">
+              <aside className="folio-index" aria-label="Section index">
+                <div className="folio-index-heading">
+                  <h3>Sections</h3>
+                  <span>{sectionSummaries.length}</span>
+                </div>
+                <p className="field-hint">Attendance priority</p>
+                <label className="folio-mobile-picker">
+                  <span>Select a section</span>
+                  <select
+                    value={selected?.section.id ?? ""}
+                    onChange={(event) => setSelectedSectionId(event.target.value)}
+                  >
+                    {sectionSummaries.map(({ section }) => (
+                      <option key={section.id} value={section.id}>
                         {section.name} — Grade {section.gradeLevel}
-                      </span>
-                      <StatusChip tone={ATTENDANCE_STATE_TONE[state]}>
-                        {ATTENDANCE_STATE_LABEL[state](markedCount, totalCount)}
-                      </StatusChip>
-                      <span className="field-hint workspace-priority-period">
-                        {openGradingPeriod
-                          ? `${openGradingPeriod.label} is open`
-                          : "no grading period currently open"}
-                      </span>
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <ul className="folio-section-list">
+                  {sectionSummaries.map(
+                    ({ section, markedCount, totalCount, openGradingPeriod }) => {
+                      const state = attendanceState(markedCount, totalCount);
+                      return (
+                        <li key={section.id}>
+                          <button
+                            type="button"
+                            className="folio-section-choice"
+                            aria-pressed={selected?.section.id === section.id}
+                            onClick={() => setSelectedSectionId(section.id)}
+                          >
+                            <span className="folio-section-name">
+                              {section.name} — Grade {section.gradeLevel}
+                            </span>
+                            <span className="folio-section-state">
+                              {ATTENDANCE_STATE_LABEL[state](markedCount, totalCount)}
+                            </span>
+                            <span className="field-hint">
+                              {openGradingPeriod
+                                ? `${openGradingPeriod.label} is open`
+                                : "no grading period currently open"}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    },
+                  )}
+                </ul>
+              </aside>
+              {selected && selectedState && (
+                <section className="folio-sheet" aria-label="Selected section">
+                  <div className="folio-sheet-heading">
+                    <div>
+                      <p className="folio-eyebrow">
+                        Grade {selected.section.gradeLevel} · {selected.section.schoolYear}
+                      </p>
+                      <h3>{selected.section.name}</h3>
+                      <p className="field-hint">
+                        {selected.openGradingPeriod?.label ?? "No grading period currently open"}
+                      </p>
                     </div>
-                    {state === "no-learners" ? (
+                    {selectedState === "no-learners" ? (
                       <button type="button" onClick={onManageSections}>
                         Manage sections
                       </button>
@@ -318,19 +369,77 @@ export function TeacherWorkspaceScreen({
                       <button
                         type="button"
                         className="button-primary"
-                        onClick={() => onOpenAttendance(section.id)}
+                        onClick={() => onOpenAttendance(selected.section.id)}
                       >
-                        {state === "not-started"
+                        {selectedState === "not-started"
                           ? "Mark attendance"
-                          : state === "partial"
+                          : selectedState === "partial"
                             ? "Continue attendance"
                             : "Review attendance"}
                       </button>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
+                  </div>
+                  <div className="folio-register-heading">
+                    <div>
+                      <h4>Today's attendance</h4>
+                      <time dateTime={todayAsIsoDate()}>
+                        {new Date().toLocaleDateString([], {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </time>
+                    </div>
+                    <StatusChip tone={ATTENDANCE_STATE_TONE[selectedState]}>
+                      {selected.markedCount} / {selected.totalCount} marked
+                    </StatusChip>
+                  </div>
+                  {selected.totalCount === 0 ? (
+                    <EmptyState>No learners enrolled in this section.</EmptyState>
+                  ) : (
+                    <div className="folio-register-scroll">
+                      <table className="data-table folio-register">
+                        <caption className="visually-hidden">
+                          Attendance for {selected.section.name} today
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Learner</th>
+                            <th scope="col">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selected.roster.map((entry) => (
+                            <tr key={entry.learnerId}>
+                              <td>
+                                {entry.familyName}, {entry.givenName}
+                              </td>
+                              <td>
+                                {entry.status ? (
+                                  <StatusChip
+                                    tone={
+                                      entry.status === "present"
+                                        ? "success"
+                                        : entry.status === "absent"
+                                          ? "danger"
+                                          : "warning"
+                                    }
+                                  >
+                                    {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
+                                  </StatusChip>
+                                ) : (
+                                  <span className="field-hint">Not marked</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
           )}
         </>
       )}
@@ -340,32 +449,34 @@ export function TeacherWorkspaceScreen({
        * successfully-loaded activity list, matching this screen's own
        * split-loading independence guarantee in both directions. See
        * docs/adr/0032-teacher-workspace-polish.md. */}
-      <h3>Recent sign-in activity</h3>
-      {activityError ? (
-        <Alert tone="error">
-          <p>{activityError}</p>
-          <button type="button" onClick={() => setActivityRetryKey((key) => key + 1)}>
-            Try again
-          </button>
-        </Alert>
-      ) : activityLoading ? (
-        <Loading label="Loading recent activity…" />
-      ) : recentActivity.length === 0 ? (
-        <EmptyState>No sign-in activity recorded yet.</EmptyState>
-      ) : (
-        <>
-          <ul className="learner-list workspace-activity-list">
-            {recentActivity.map((entry) => (
-              <li key={entry.id}>
-                {entry.username} {EVENT_LABELS[entry.eventType]} — {formatWhen(entry.createdAt)}
-              </li>
-            ))}
-          </ul>
-          <button type="button" onClick={onViewAuditLog}>
-            View all sign-in activity
-          </button>
-        </>
-      )}
+      <details className="folio-activity">
+        <summary>Recent sign-in activity</summary>
+        {activityError ? (
+          <Alert tone="error">
+            <p>{activityError}</p>
+            <button type="button" onClick={() => setActivityRetryKey((key) => key + 1)}>
+              Try again
+            </button>
+          </Alert>
+        ) : activityLoading ? (
+          <Loading label="Loading recent activity…" />
+        ) : recentActivity.length === 0 ? (
+          <EmptyState>No sign-in activity recorded yet.</EmptyState>
+        ) : (
+          <>
+            <ul className="learner-list workspace-activity-list">
+              {recentActivity.map((entry) => (
+                <li key={entry.id}>
+                  {entry.username} {EVENT_LABELS[entry.eventType]} — {formatWhen(entry.createdAt)}
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={onViewAuditLog}>
+              View all sign-in activity
+            </button>
+          </>
+        )}
+      </details>
     </section>
   );
 }

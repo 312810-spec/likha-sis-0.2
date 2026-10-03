@@ -71,7 +71,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByRole("region", { name: "Workspace" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Welcome, Ana Cruz" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Class folio" })).toBeInTheDocument();
     expect(screen.getAllByText(/Rizal Elementary/).length).toBeGreaterThan(0);
   });
 

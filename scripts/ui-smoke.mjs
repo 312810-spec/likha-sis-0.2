@@ -30,7 +30,19 @@ async function waitForServer() {
 let browser;
 try {
   await waitForServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    args: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? [
+          "--no-sandbox",
+          "--disable-dev-shm-usage",
+          "--use-gl=angle",
+          "--use-angle=swiftshader",
+          "--enable-unsafe-swiftshader",
+        ]
+      : [],
+  });
   const page = await browser.newPage({
     viewport: { width: 1280, height: 800 },
     reducedMotion: "reduce",
@@ -59,6 +71,7 @@ try {
   if (hasHorizontalOverflow) throw new Error("learner enrollment history overflows at phone width");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByText("Recent sign-in activity", { exact: true }).click();
   await page.getByRole("button", { name: "View all sign-in activity" }).click();
   await page
     .getByText(/Sign-in Activity/i)
@@ -73,8 +86,63 @@ try {
   );
   if (blocking.length)
     throw new Error(`axe found blocking violations: ${blocking.map(({ id }) => id).join(", ")}`);
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  for (const width of [1440, 1024, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const appearance of ["light", "dark"]) {
+      for (const mode of ["Efficient", "Comfortable", "Guided"]) {
+        if (width <= 860) await page.getByRole("button", { name: "Open navigation" }).click();
+        const surface = page.locator(width <= 860 ? ".app-sidebar" : ".app-topbar");
+        await surface.getByLabel("Appearance").selectOption(appearance);
+        await surface.getByRole("button", { name: mode, exact: true }).click();
+        if (width <= 860) await page.keyboard.press("Escape");
+        if (width <= 860) {
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          const footer = await page.locator(".folio-activity summary").boundingBox();
+          const navigation = await page.locator(".app-bottomnav").boundingBox();
+          if (!footer || !navigation || footer.y + footer.height > navigation.y)
+            throw new Error(`Bottom navigation covers the final control at ${width}px in ${mode}`);
+        }
+        const state = await page.evaluate(() => ({
+          overflow: document.documentElement.scrollWidth > innerWidth,
+          theme: document.documentElement.dataset.appearance,
+          mode: document.documentElement.dataset.teacherMode,
+        }));
+        if (state.overflow || state.theme !== appearance || state.mode !== mode.toLowerCase())
+          throw new Error(
+            `Folio reflow/preference failure: ${width}, ${appearance}, ${mode}: ${JSON.stringify(state)}`,
+          );
+      }
+      const findings = await page.evaluate(async () =>
+        window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa"] }),
+      );
+      if (findings.violations.length)
+        throw new Error(
+          `Folio accessibility: ${width}/${appearance}: ${findings.violations.map(({ id }) => id).join(", ")}`,
+        );
+    }
+  }
+  await page.reload();
+  if ((await page.evaluate(() => document.documentElement.dataset.appearance)) !== "dark")
+    throw new Error("Dark appearance did not survive reload");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "My Day", exact: true }).click();
+  await page.getByRole("button", { name: /Mathematics.*Open class/ }).click();
+  await page.getByRole("heading", { name: "Mathematics — Mabini" }).waitFor();
+  await page.getByRole("button", { name: /Science.*Open class/ }).click();
+  await page.getByRole("heading", { name: "Science — Rizal" }).waitFor();
+  await page
+    .getByRole("region", { name: "Science — Rizal" })
+    .getByRole("button", { name: "Check attendance" })
+    .click();
+  await page.getByRole("heading", { name: "Subject Attendance", exact: true }).waitFor();
+  if ((await page.getByLabel("Class", { exact: true }).inputValue()) !== "ta-2")
+    throw new Error("Selected subject class was lost on attendance entry");
+  await page.getByRole("button", { name: "My Day", exact: true }).click();
+  await page.getByRole("button", { name: "Open class record", exact: true }).click();
+  await page.getByRole("heading", { name: /Science.*Rizal/ }).waitFor();
   console.log(
-    `quality:ui PASS — workflow, enrollment history, phone reflow, context handoff, and axe WCAG A/AA (${result.violations.length} non-blocking findings).`,
+    "quality:ui PASS — attendance/context handoff, enrollment history, light/dark × three teacher modes × four widths, preference reload, class switching and axe WCAG A/AA.",
   );
 } finally {
   if (browser) await browser.close();
