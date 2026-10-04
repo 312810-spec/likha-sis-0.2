@@ -55,3 +55,67 @@ pub fn mine(conn:&Connection,school:&str,teacher:&str,date:&str)->AppResult<Vec<
  if let Some(r)=&p.result {for m in &r.meetings {if m.teacher_id!=teacher{continue;}let Some(c)=p.input.courses.iter().find(|c|c.id==m.course_id) else{continue;};let assignment:Option<String>=conn.query_row("SELECT id FROM teaching_assignments WHERE school_id=?1 AND section_id=?2 AND subject_id=?3 AND teacher_user_id=?4",(school,&c.section_id,&c.subject_id,teacher),|row|row.get(0)).optional()?;rows.push(PublishedTeacherMeeting{plan_id:p.id.clone(),plan_label:p.input.label.clone(),published_at:p.published_at.clone().unwrap_or_default(),effective_from:p.input.effective_from.clone(),effective_until:p.input.effective_until.clone(),course_id:m.course_id.clone(),teaching_assignment_id:assignment.unwrap_or_default(),section_id:c.section_id.clone(),subject_id:c.subject_id.clone(),weekday:m.weekday,starts_at:m.starts_at.clone(),ends_at:m.ends_at.clone(),room_id:m.room_id.clone()});}}
  Ok(rows)
 }
+
+/// One authenticated immutable publication: timetable and exact assignment IDs travel together.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchedulePublication {
+    pub school_id: String,
+    pub created_by: String,
+    pub plan: SchedulePlan,
+    pub assignments: Vec<teaching_assignment::TeachingAssignment>,
+}
+
+pub fn publication(conn: &Connection, school: &str, actor: &str, plan: SchedulePlan) -> AppResult<SchedulePublication> {
+    let mut assignments = Vec::new();
+    for course in &plan.input.courses {
+        let assignment = conn.query_row(
+            "SELECT id FROM teaching_assignments WHERE school_id=?1 AND section_id=?2 AND subject_id=?3",
+            (school, &course.section_id, &course.subject_id), |row| row.get::<_, String>(0),
+        )?;
+        assignments.push(teaching_assignment::find_by_id_in_school(conn, school, &assignment)?.ok_or(AppError::Unauthorized)?);
+    }
+    Ok(SchedulePublication { school_id: school.into(), created_by: actor.into(), plan, assignments })
+}
+
+/// Re-check originating authority and all constraints at the receiving trusted boundary.
+pub fn apply_publication(conn: &Connection, school: &str, actor: &str, incoming: &SchedulePublication) -> AppResult<()> {
+    let p = &incoming.plan;
+    let authorized: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM user_school_roles WHERE school_id=?1 AND user_id=?2 AND role='school_head')", (school, actor), |row| row.get(0))?;
+    if !authorized || incoming.school_id != school || incoming.created_by != actor
+        || p.status != "published" || p.published_at.as_ref().is_none_or(|s| s.is_empty())
+        || p.revision < 2 || !p.input.data_confirmed {
+        return Err(AppError::Unauthorized);
+    }
+    refs(conn, school, &p.input)?;
+    let result = p.result.as_ref().ok_or_else(|| issue("Publication has no schedule"))?;
+    if result.status != "feasible" || !scheduling::validate_schedule(&p.input, &result.meetings).is_empty()
+        || incoming.assignments.len() != p.input.courses.len() {
+        return Err(issue("Publication does not match its independently validated schedule"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for course in &p.input.courses {
+        let teacher = &result.meetings.iter().find(|m| m.course_id == course.id).ok_or_else(|| issue("Missing meeting"))?.teacher_id;
+        let assignment = incoming.assignments.iter().find(|a| a.section_id == course.section_id && a.subject_id == course.subject_id).ok_or_else(|| issue("Missing assignment dependency"))?;
+        if assignment.school_id != school || &assignment.teacher_user_id != teacher || !seen.insert(&assignment.id) {
+            return Err(AppError::Unauthorized);
+        }
+        let old: Option<String> = conn.query_row("SELECT id FROM teaching_assignments WHERE school_id=?1 AND section_id=?2 AND subject_id=?3", (school, &course.section_id, &course.subject_id), |row| row.get(0)).optional()?;
+        if old.as_ref().is_some_and(|old| old != &assignment.id) { return Err(issue("Assignment differs; handover required")); }
+        if let Some(old) = teaching_assignment::find_by_id_in_school(conn, school, &assignment.id)? {
+            if old.teacher_user_id != assignment.teacher_user_id || old.section_id != assignment.section_id || old.subject_id != assignment.subject_id { return Err(issue("Existing assignment was preserved")); }
+        }
+    }
+    if let Some(existing) = find(conn, school, &p.id)? {
+        if serde_json::to_value(&existing).ok() == serde_json::to_value(p).ok() { return Ok(()); }
+        return Err(issue("Immutable publication differs from the existing version"));
+    }
+    conn.execute_batch("SAVEPOINT receive_schedule_publication")?;
+    let result = (|| {
+        for assignment in &incoming.assignments { teaching_assignment::upsert_from_sync(conn, assignment)?; }
+        conn.execute("INSERT INTO schedule_plans(id,school_id,revision,status,input_json,result_json,published_at,created_by) VALUES(?1,?2,?3,'published',?4,?5,?6,?7)",
+            (&p.id, school, p.revision, serde_json::to_string(&p.input).map_err(|_|issue("Invalid input"))?, serde_json::to_string(&p.result).map_err(|_|issue("Invalid result"))?, &p.published_at, actor))?;
+        Ok(())
+    })();
+    match result { Ok(()) => { conn.execute_batch("RELEASE receive_schedule_publication")?; Ok(()) }, Err(error) => { let _ = conn.execute_batch("ROLLBACK TO receive_schedule_publication; RELEASE receive_schedule_publication"); Err(error) } }
+}

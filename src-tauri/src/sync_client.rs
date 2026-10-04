@@ -637,6 +637,16 @@ pub(crate) fn apply_decrypted_change(
     }
 
     match change.entity_kind {
+        EntityKind::SchedulePlan => {
+            let incoming: crate::repository::schedule_plan::SchedulePublication = serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.plan.id != change.entity_id.to_string() { return Err(ApplyRejection::Untrusted); }
+            crate::repository::schedule_plan::apply_publication(conn, school_id, &change.actor_user_id.to_string(), &incoming).map_err(classify_repository_rejection)
+        }
+        EntityKind::AssessmentLifecycle => {
+            let incoming: assessment_item::AssessmentLifecycleChange = serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            if incoming.school_id != school_id || incoming.id != change.entity_id.to_string() { return Err(ApplyRejection::Untrusted); }
+            assessment_item::upsert_lifecycle_from_sync(conn, school_id, &change.actor_user_id.to_string(), &incoming).map_err(classify_repository_rejection)
+        }
         EntityKind::Learner => {
             let incoming: learner::Learner =
                 serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;

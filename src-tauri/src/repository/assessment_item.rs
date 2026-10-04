@@ -66,6 +66,24 @@ pub fn lifecycle(conn: &Connection, school_id: &str, id: &str) -> AppResult<Opti
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentLifecycleChange {
+    pub id: String,
+    pub school_id: String,
+    pub value: AssessmentLifecycle,
+}
+
+pub fn upsert_lifecycle_from_sync(conn: &Connection, school_id: &str, actor_user_id: &str, change: &AssessmentLifecycleChange) -> AppResult<()> {
+    if school_id != change.school_id { return Err(crate::error::AppError::Unauthorized); }
+    crate::repository::score_import::authorize(conn, school_id, actor_user_id, &change.id)?;
+    if lifecycle(conn, &change.school_id, &change.id)?.as_ref() == Some(&change.value) { return Ok(()); }
+    if !set_lifecycle(conn, &change.school_id, &change.id, &change.value)? {
+        return Err(crate::error::AppError::Import("Assessment dates were rejected; review scored work before changing them.".into()));
+    }
+    Ok(())
+}
+
 fn valid_iso_date(date: &str) -> bool {
     let bytes = date.as_bytes();
     if bytes.len()!=10 || bytes[4]!=b'-' || bytes[7]!=b'-' || !bytes.iter().enumerate().all(|(i,b)| i==4 || i==7 || b.is_ascii_digit()) { return false; }
@@ -172,6 +190,12 @@ pub fn create(
 /// than insert-only so a future wiring of `rename`/`update` round-trips
 /// correctly without a second materializer needing to be written later.
 pub fn upsert_from_sync(conn: &Connection, item: &AssessmentItem) -> AppResult<()> {
+    if let Some(existing) = find_by_id_in_school(conn, &item.school_id, &item.id)? {
+        if has_any_scores(conn, &item.id)? && (existing.max_score != item.max_score || existing.category_id != item.category_id || existing.class_record_id != item.class_record_id) {
+            return Err(crate::error::AppError::Import("A scored assessment definition cannot be replaced.".into()));
+        }
+    }
+
     conn.execute(
         "INSERT INTO assessment_items \
              (id, school_id, class_record_id, category_id, name, max_score, created_at) \

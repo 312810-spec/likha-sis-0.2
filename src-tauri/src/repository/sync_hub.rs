@@ -100,6 +100,10 @@ pub fn push_change(
         return Err(AppError::Unauthorized);
     }
 
+    if change.entity_kind == EntityKind::SchedulePlan {
+        let authorized: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM user_school_roles WHERE school_id=?1 AND user_id=?2 AND role='school_head')", (&verified.school_id, &verified.user_id), |row| row.get(0))?;
+        if !authorized || change.operation != crate::sync::ChangeOperation::Upsert { return Err(AppError::Unauthorized); }
+    }
     let change_id = change.change_id.to_string();
     conn.execute_batch("SAVEPOINT sync_hub_push")?;
     let outcome = (|| -> AppResult<PushOutcome> {

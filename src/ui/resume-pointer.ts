@@ -1,7 +1,4 @@
-import type {
-  AdvisoryWorkContext,
-  TeacherClassWorkContext,
-} from "./work-context";
+import type { AdvisoryWorkContext, TeacherClassWorkContext } from "./work-context";
 
 const RESUME_POINTER_KEY = "likha.resume-pointer.v1";
 const RESUME_POINTER_VERSION = 1 as const;
@@ -24,7 +21,11 @@ export interface ResumePointerStorage {
 
 function defaultStorage(): ResumePointerStorage | null {
   if (typeof window === "undefined") return null;
-  try { return window.localStorage; } catch { return null; }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function isResumePointer(value: unknown): value is ResumePointer {
@@ -41,23 +42,21 @@ function isResumePointer(value: unknown): value is ResumePointer {
 
   if (candidate.destination === "class") {
     return (
-      typeof candidate.teachingAssignmentId === "string" &&
-      !!candidate.teachingAssignmentId.trim()
+      typeof candidate.teachingAssignmentId === "string" && !!candidate.teachingAssignmentId.trim()
     );
   }
 
-  return (
-    typeof candidate.advisorySectionId === "string" &&
-    !!candidate.advisorySectionId.trim()
-  );
+  return typeof candidate.advisorySectionId === "string" && !!candidate.advisorySectionId.trim();
 }
 
-export function readResumePointer(
-  storage = defaultStorage(),
-): ResumePointer | null {
+export function readResumePointer(storage = defaultStorage()): ResumePointer | null {
   if (!storage) return null;
   let raw: string | null;
-  try { raw = storage.getItem(RESUME_POINTER_KEY); } catch { return null; }
+  try {
+    raw = storage.getItem(RESUME_POINTER_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) return null;
 
   try {
@@ -67,7 +66,11 @@ export function readResumePointer(
     // Corrupt navigation state is disposable. Academic records are not stored here.
   }
 
-  try { storage.removeItem(RESUME_POINTER_KEY); } catch { /* Navigation storage is optional. */ }
+  try {
+    storage.removeItem(RESUME_POINTER_KEY);
+  } catch {
+    /* Navigation storage is optional. */
+  }
   return null;
 }
 
@@ -83,7 +86,11 @@ export function writeClassResumePointer(
     destination: "class",
     teachingAssignmentId: context.teachingAssignmentId,
   };
-  try { storage.setItem(RESUME_POINTER_KEY, JSON.stringify(pointer)); } catch { /* Navigation storage is optional. */ }
+  try {
+    storage.setItem(RESUME_POINTER_KEY, JSON.stringify(pointer));
+  } catch {
+    /* Navigation storage is optional. */
+  }
 }
 
 export function writeAdvisoryResumePointer(
@@ -98,9 +105,17 @@ export function writeAdvisoryResumePointer(
     destination: "advisory",
     advisorySectionId: context.sectionId,
   };
-  try { storage.setItem(RESUME_POINTER_KEY, JSON.stringify(pointer)); } catch { /* Navigation storage is optional. */ }
+  try {
+    storage.setItem(RESUME_POINTER_KEY, JSON.stringify(pointer));
+  } catch {
+    /* Navigation storage is optional. */
+  }
 }
 
 export function clearResumePointer(storage = defaultStorage()): void {
-  try { storage?.removeItem(RESUME_POINTER_KEY); } catch { /* Navigation storage is optional. */ }
+  try {
+    storage?.removeItem(RESUME_POINTER_KEY);
+  } catch {
+    /* Navigation storage is optional. */
+  }
 }

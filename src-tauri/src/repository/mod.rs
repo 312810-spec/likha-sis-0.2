@@ -34,3 +34,7 @@ pub mod sync_pull_cursor;
 pub mod sync_version_cache;
 pub mod teaching_assignment;
 pub mod user;
+
+pub mod schedule_plan;
+pub mod review_workflow;
+pub mod school_planning;

@@ -71,9 +71,18 @@ describe("resume pointer storage", () => {
     expect(readResumePointer(storage)).toBeNull();
   });
   it("treats blocked navigation storage as optional", () => {
-    const storage = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); }, removeItem: () => { throw new Error("blocked"); } };
+    const storage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+    };
     expect(readResumePointer(storage)).toBeNull();
     expect(() => clearResumePointer(storage)).not.toThrow();
   });
-
 });

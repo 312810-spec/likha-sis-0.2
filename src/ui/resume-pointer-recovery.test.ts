@@ -104,9 +104,16 @@ describe("resume pointer recovery", () => {
   });
   it("rejects a lookup that returns a different assignment", async () => {
     const storage = memoryStorage();
-    writeClassResumePointer("teacher-1", { teachingAssignmentId: "requested", subjectName: "", sectionName: "" }, storage);
-    const auth = authority({ findAuthorizedClass: vi.fn().mockResolvedValue({ teachingAssignmentId: "different", subjectName: "", sectionName: "" }) });
+    writeClassResumePointer(
+      "teacher-1",
+      { teachingAssignmentId: "requested", subjectName: "", sectionName: "" },
+      storage,
+    );
+    const auth = authority({
+      findAuthorizedClass: vi
+        .fn()
+        .mockResolvedValue({ teachingAssignmentId: "different", subjectName: "", sectionName: "" }),
+    });
     await expect(recoverResumePointer("teacher-1", auth, storage)).resolves.toBeNull();
   });
-
 });

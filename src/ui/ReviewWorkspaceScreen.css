@@ -1,0 +1,6 @@
+.review-workspace { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); gap: 1.5rem; }
+.review-workspace aside, .review-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-content: start; }
+.review-workspace aside { flex-direction: column; }
+.review-workspace label { display: grid; gap: .3rem; margin-block: .6rem; }
+.review-workspace code { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .review-workspace { grid-template-columns: 1fr; } }

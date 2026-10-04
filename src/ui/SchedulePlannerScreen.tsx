@@ -168,6 +168,13 @@ export function SchedulePlannerScreen({
   return (
     <Page
       title="Teacher load and class schedule"
+      actions={
+        selected?.status === "published" ? (
+          <button type="button" onClick={() => window.print()}>
+            Print published version {selected.revision}
+          </button>
+        ) : undefined
+      }
       hint={
         <p>
           Build a draft from confirmed school information. Suggestions need your review before
@@ -420,6 +427,85 @@ export function SchedulePlannerScreen({
                 Remove room {i + 1}
               </button>
             </div>
+            {room.unavailable.map((block, j) => (
+              <div className="form-row" key={j}>
+                <Field label={`Room ${i + 1} unavailable day ${j + 1}`}>
+                  <Day
+                    value={block.weekday}
+                    change={(weekday) =>
+                      patch({
+                        rooms: input.rooms.map((r, n) =>
+                          n === i
+                            ? {
+                                ...r,
+                                unavailable: r.unavailable.map((b, k) =>
+                                  k === j ? { ...b, weekday } : b,
+                                ),
+                              }
+                            : r,
+                        ),
+                      })
+                    }
+                  />
+                </Field>
+                {(["startsAt", "endsAt"] as const).map((key) => (
+                  <Field
+                    key={key}
+                    label={`Room ${i + 1} block ${j + 1} ${key === "startsAt" ? "start" : "end"}`}
+                  >
+                    <input
+                      type="time"
+                      value={block[key]}
+                      onChange={(e) =>
+                        patch({
+                          rooms: input.rooms.map((r, n) =>
+                            n === i
+                              ? {
+                                  ...r,
+                                  unavailable: r.unavailable.map((b, k) =>
+                                    k === j ? { ...b, [key]: e.target.value } : b,
+                                  ),
+                                }
+                              : r,
+                          ),
+                        })
+                      }
+                    />
+                  </Field>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    patch({
+                      rooms: input.rooms.map((r, n) =>
+                        n === i
+                          ? { ...r, unavailable: r.unavailable.filter((_, k) => k !== j) }
+                          : r,
+                      ),
+                    })
+                  }
+                >
+                  Remove room unavailable block {j + 1}
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                patch({
+                  rooms: input.rooms.map((r, n) =>
+                    n === i
+                      ? {
+                          ...r,
+                          unavailable: [...r.unavailable, { weekday: 1, startsAt: "", endsAt: "" }],
+                        }
+                      : r,
+                  ),
+                })
+              }
+            >
+              Add unavailable time for room {i + 1}
+            </button>
           </fieldset>
         ))}
         <button
@@ -756,6 +842,130 @@ export function SchedulePlannerScreen({
           </ul>
         </section>
       )}
+      <fieldset disabled={readonly || busy}>
+        <legend>Manual fixed meetings</legend>
+        <p>
+          Choose a class meeting, teacher, day, time and room. Save and generate again to check the
+          complete arrangement.
+        </p>
+        {input.locks.map((lock, i) => (
+          <div className="form-row" key={i}>
+            <Field label={`Fixed meeting ${i + 1} class`}>
+              <select
+                value={lock.courseId}
+                onChange={(e) =>
+                  patch({
+                    locks: input.locks.map((l, n) =>
+                      n === i ? { ...l, courseId: e.target.value } : l,
+                    ),
+                  })
+                }
+              >
+                <option value="">Choose a class</option>
+                {input.courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {subjects.find((s) => s.id === c.subjectId)?.name} ·{" "}
+                    {sections.find((s) => s.id === c.sectionId)?.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={`Fixed meeting ${i + 1} number`}>
+              <input
+                type="number"
+                min="1"
+                value={lock.meetingIndex + 1}
+                onChange={(e) =>
+                  patch({
+                    locks: input.locks.map((l, n) =>
+                      n === i ? { ...l, meetingIndex: Number(e.target.value) - 1 } : l,
+                    ),
+                  })
+                }
+              />
+            </Field>
+            <Field label={`Fixed meeting ${i + 1} teacher`}>
+              <select
+                value={lock.teacherId}
+                onChange={(e) =>
+                  patch({
+                    locks: input.locks.map((l, n) =>
+                      n === i ? { ...l, teacherId: e.target.value } : l,
+                    ),
+                  })
+                }
+              >
+                <option value="">Choose a teacher</option>
+                {input.teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {members.find((m) => m.id === t.id)?.displayName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label={`Fixed meeting ${i + 1} day`}>
+              <Day
+                value={lock.weekday}
+                change={(weekday) =>
+                  patch({ locks: input.locks.map((l, n) => (n === i ? { ...l, weekday } : l)) })
+                }
+              />
+            </Field>
+            <Field label={`Fixed meeting ${i + 1} start`}>
+              <input
+                type="time"
+                value={lock.startsAt}
+                onChange={(e) =>
+                  patch({
+                    locks: input.locks.map((l, n) =>
+                      n === i ? { ...l, startsAt: e.target.value } : l,
+                    ),
+                  })
+                }
+              />
+            </Field>
+            <Field label={`Fixed meeting ${i + 1} room`}>
+              <select
+                value={lock.roomId}
+                onChange={(e) =>
+                  patch({
+                    locks: input.locks.map((l, n) =>
+                      n === i ? { ...l, roomId: e.target.value } : l,
+                    ),
+                  })
+                }
+              >
+                <option value="">Choose a room</option>
+                {input.rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            patch({
+              locks: [
+                ...input.locks,
+                {
+                  courseId: "",
+                  meetingIndex: 0,
+                  teacherId: "",
+                  weekday: 1,
+                  startsAt: "",
+                  roomId: "",
+                },
+              ],
+            })
+          }
+        >
+          Add fixed meeting
+        </button>
+      </fieldset>
       {input.locks.length > 0 && (
         <section aria-label="Fixed meetings">
           <h3>Fixed meetings</h3>

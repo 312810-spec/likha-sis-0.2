@@ -78,6 +78,7 @@ object NativeBridge {
     }
     @JvmStatic @Synchronized
     fun execute(context: Context, operation: Int, path: String, payload: ByteArray, extra: String): ByteArray {
+        require(operation in 0..4) { "unknown native storage operation" }
         if (operation <= 2) {
             val file = privateFile(context, path)
             val exists = file.exists() || File(path + ".bak").exists()

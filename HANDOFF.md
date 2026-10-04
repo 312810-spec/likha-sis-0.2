@@ -26,3 +26,9 @@ Empty fresh setup; assigned-teacher/advisory scope; preserve pending work during
 3. Run focused tests, TypeScript/lint/format/architecture/deadcode, full native tests/clippy and UI smoke.
 4. Restore Android SDK/build attempt only after source is checkpointed; do not claim APK from Rust cross-compile.
 5. Update PR103 with verified scope. Reconcile historical branches without restoring superseded cloud/automation/harness code; merging remains authorized after checks pass.
+
+## Active checkpoint update
+
+Saved source now includes restored native lib/module/migration/service wiring, schedule publication transfer work, roster/removal safeguards, review UI, calendar decision fields/UI, attachment ownership fixes and Android backup/key path guards. Source is still a draft. Native/TypeScript integration checks have not yet run on this tree. Platform resume tests: 11 passed; platform key/recovery edits await native verification.
+
+Next: wire App/new workspace navigation with assigned rosters; restore CSV import49, offerings50 and canonical source51 modules; run focused/full checks. Rust and Linux native dependencies are being installed. Keep the next source+handoff checkpoint within five minutes; begin saving early enough for remote latency.

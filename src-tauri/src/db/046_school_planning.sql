@@ -3,6 +3,8 @@ CREATE TABLE school_planning_items (
  kind TEXT NOT NULL CHECK(kind IN ('notice','program')),
  title TEXT NOT NULL, details TEXT NOT NULL, source_reference TEXT NOT NULL DEFAULT '',
  effective_on TEXT NOT NULL DEFAULT '', coordinator_user_id TEXT,
+ calendar_decision TEXT NOT NULL DEFAULT 'noChange' CHECK(calendar_decision IN ('noChange','instructional','nonInstructional')),
+ affected_area TEXT NOT NULL DEFAULT '',
  status TEXT NOT NULL CHECK(status IN ('draft','confirmed','inactive','active')),
  revision INTEGER NOT NULL CHECK(revision > 0), updated_by TEXT NOT NULL REFERENCES users(id),
  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),

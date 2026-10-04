@@ -31,7 +31,8 @@ export async function recoverResumePointer(
   try {
     if (pointer.destination === "class" && pointer.teachingAssignmentId) {
       const context = await authority.findAuthorizedClass(pointer.teachingAssignmentId);
-      if (context?.teachingAssignmentId === pointer.teachingAssignmentId) return { destination: "class", context };
+      if (context?.teachingAssignmentId === pointer.teachingAssignmentId)
+        return { destination: "class", context };
     }
 
     if (pointer.destination === "advisory" && pointer.advisorySectionId) {

@@ -2010,6 +2010,13 @@ pub fn migrations() -> Migrations<'static> {
             CHECK (review_reason IN ('concurrent_edit', 'apply_rejected'));
         "#,
         ),
+        M::up(include_str!("sql/schedule-plans.sql")),
+        M::up(include_str!("043_assessment_lifecycle.sql")),
+        M::up(include_str!("sql/0044_attachments.sql")),
+        M::up(include_str!("sql/045_review_workflow.sql")),
+        M::up(include_str!("046_school_planning.sql")),
+        M::up(include_str!("sql/0047_resource_issues.sql")),
+        M::up(include_str!("sql/0048_learning_support.sql")),
     ])
 }
 

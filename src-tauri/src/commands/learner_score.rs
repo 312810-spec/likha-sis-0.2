@@ -63,21 +63,28 @@ pub fn record_learner_score(
     learner_id: String,
     status: LearnerScoreStatus,
     score: Option<f64>,
+    reason: Option<String>,
 ) -> AppResult<Option<LearnerScore>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
-    record_learner_score_with_optional_sync(
-        &conn,
-        &school_id,
-        &user_id,
-        &assessment_item_id,
-        &learner_id,
-        status,
-        score,
-        sspk.as_ref(),
-    )
+    crate::repository::score_import::authorize(&conn, &school_id, &user_id, &assessment_item_id)?;
+    let before = crate::repository::score_import::previous(&conn, &school_id, &assessment_item_id, &learner_id)?;
+    let reason = reason.unwrap_or_default();
+    if (before.is_some() || status != LearnerScoreStatus::Scored) && reason.trim().is_empty() {
+        return Err(AppError::Import("Give a reason for a correction or assessment exception.".into()));
+    }
+    if reason.len() > 1000 { return Err(AppError::Import("The reason must be at most 1,000 characters.".into())); }
+    conn.execute_batch("SAVEPOINT record_score_history")?;
+    let outcome = (|| {
+        let saved = record_learner_score_with_optional_sync(&conn, &school_id, &user_id, &assessment_item_id, &learner_id, status, score, sspk.as_ref())?;
+        if let Some(next) = &saved {
+            crate::repository::score_import::append_history(&conn, &school_id, &user_id, &assessment_item_id, &learner_id, before.as_deref(), next, if reason.trim().is_empty() { "Initial score entry" } else { reason.trim() })?;
+        }
+        Ok(saved)
+    })();
+    match outcome { Ok(saved) => { conn.execute_batch("RELEASE record_score_history")?; Ok(saved) }, Err(error) => { let _ = conn.execute_batch("ROLLBACK TO record_score_history; RELEASE record_score_history"); Err(error) } }
 }
 
 /// Returns conservative sync evidence for one persisted Class Record score.
@@ -132,7 +139,7 @@ fn resolve_sspk_if_enrolled(
 /// score write and the outbox enqueue are atomic together in one
 /// `SAVEPOINT`.
 #[allow(clippy::too_many_arguments)]
-fn record_learner_score_with_optional_sync(
+pub(crate) fn record_learner_score_with_optional_sync(
     conn: &Connection,
     school_id: &str,
     recorded_by_user_id: &str,

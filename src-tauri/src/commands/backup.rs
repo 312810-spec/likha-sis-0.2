@@ -86,7 +86,7 @@ pub async fn create_portable_backup(
         let key_path = dir.join(db::SSPK_KEY_FILE_NAME);
         // Do not mint a replacement SSPK during backup: unreadable existing keys
         // must fail, and a non-syncing installation has no SSPK to include.
-        let sspk = if key_path.exists() {
+        let sspk = if db::protected_key_exists(&key_path) {
             let store =
                 crypto::platform::key_store().map_err(|_| "backup_storage_error".to_owned())?;
             Some(Zeroizing::new(

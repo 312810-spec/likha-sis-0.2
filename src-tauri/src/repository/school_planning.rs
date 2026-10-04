@@ -11,6 +11,10 @@ pub struct SchoolPlanningInput {
     pub details: String,
     pub source_reference: String,
     pub effective_on: String,
+    #[serde(default = "no_change")]
+    pub calendar_decision: String,
+    #[serde(default)]
+    pub affected_area: String,
     pub coordinator_user_id: Option<String>,
     pub status: String,
 }
@@ -22,16 +26,19 @@ pub struct SchoolPlanningItem {
     pub input: SchoolPlanningInput,
     pub updated_at: String,
 }
+fn no_change() -> String { "noChange".into() }
 fn invalid() -> AppError { AppError::Import("School planning information is incomplete or stale. Reload and review your entries.".into()) }
 fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<SchoolPlanningItem> {
-    Ok(SchoolPlanningItem { id: row.get(0)?, revision: row.get(1)?, input: SchoolPlanningInput { kind: row.get(2)?, title: row.get(3)?, details: row.get(4)?, source_reference: row.get(5)?, effective_on: row.get(6)?, coordinator_user_id: row.get(7)?, status: row.get(8)? }, updated_at: row.get(9)? })
+    Ok(SchoolPlanningItem { id: row.get(0)?, revision: row.get(1)?, input: SchoolPlanningInput { kind: row.get(2)?, title: row.get(3)?, details: row.get(4)?, source_reference: row.get(5)?, effective_on: row.get(6)?, coordinator_user_id: row.get(7)?, status: row.get(8)?, calendar_decision: row.get(10)?, affected_area: row.get(11)? }, updated_at: row.get(9)? })
 }
 pub fn list(conn: &Connection, school_id: &str) -> AppResult<Vec<SchoolPlanningItem>> {
-    let mut stmt = conn.prepare("SELECT id,revision,kind,title,details,source_reference,effective_on,coordinator_user_id,status,updated_at FROM school_planning_items WHERE school_id=?1 ORDER BY updated_at DESC,id")?;
+    let mut stmt = conn.prepare("SELECT id,revision,kind,title,details,source_reference,effective_on,coordinator_user_id,status,updated_at,calendar_decision,affected_area FROM school_planning_items WHERE school_id=?1 ORDER BY updated_at DESC,id")?;
     let rows = stmt.query_map([school_id], read)?;
     rows.collect::<Result<Vec<_>,_>>().map_err(Into::into)
 }
 pub fn save(conn: &Connection, school_id: &str, actor_id: &str, input: &SchoolPlanningInput, id: Option<&str>, expected_revision: Option<u32>) -> AppResult<SchoolPlanningItem> {
+    if !matches!(input.calendar_decision.as_str(), "noChange" | "instructional" | "nonInstructional") || input.affected_area.len() > 500 { return Err(invalid()); }
+    if input.calendar_decision != "noChange" && (input.kind != "notice" || input.affected_area.trim().is_empty()) { return Err(invalid()); }
     let allowed = matches!((input.kind.as_str(), input.status.as_str()), ("notice", "draft" | "confirmed") | ("program", "inactive" | "active"));
     if !allowed || input.title.trim().is_empty() || input.title.len()>200 || input.details.len()>12000 || input.source_reference.len()>2000 { return Err(invalid()); }
     if input.kind == "notice" && input.status == "confirmed" && (input.source_reference.trim().is_empty() || input.effective_on.is_empty()) { return Err(invalid()); }
@@ -43,11 +50,11 @@ pub fn save(conn: &Connection, school_id: &str, actor_id: &str, input: &SchoolPl
     let outcome = (|| -> AppResult<SchoolPlanningItem> {
         let revision = if id.is_some() {
             let expected = expected_revision.ok_or_else(invalid)?;
-            let changed = conn.execute("UPDATE school_planning_items SET title=?1,details=?2,source_reference=?3,effective_on=?4,coordinator_user_id=?5,status=?6,revision=revision+1,updated_by=?7,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?8 AND school_id=?9 AND revision=?10 AND kind=?11", params![input.title.trim(),input.details,input.source_reference.trim(),input.effective_on,input.coordinator_user_id,input.status,actor_id,item_id,school_id,expected,input.kind])?;
+            let changed = conn.execute("UPDATE school_planning_items SET title=?1,details=?2,source_reference=?3,effective_on=?4,coordinator_user_id=?5,status=?6,calendar_decision=?12,affected_area=?13,revision=revision+1,updated_by=?7,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?8 AND school_id=?9 AND revision=?10 AND kind=?11", params![input.title.trim(),input.details,input.source_reference.trim(),input.effective_on,input.coordinator_user_id,input.status,actor_id,item_id,school_id,expected,input.kind,input.calendar_decision,input.affected_area.trim()])?;
             if changed != 1 { return Err(invalid()); } expected + 1
         } else {
             if expected_revision.is_some() { return Err(invalid()); }
-            conn.execute("INSERT INTO school_planning_items(id,school_id,kind,title,details,source_reference,effective_on,coordinator_user_id,status,revision,updated_by) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,1,?10)", params![item_id,school_id,input.kind,input.title.trim(),input.details,input.source_reference.trim(),input.effective_on,input.coordinator_user_id,input.status,actor_id])?; 1
+            conn.execute("INSERT INTO school_planning_items(id,school_id,kind,title,details,source_reference,effective_on,coordinator_user_id,status,revision,updated_by,calendar_decision,affected_area) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,1,?10,?11,?12)", params![item_id,school_id,input.kind,input.title.trim(),input.details,input.source_reference.trim(),input.effective_on,input.coordinator_user_id,input.status,actor_id,input.calendar_decision,input.affected_area.trim()])?; 1
         };
         let item = list(conn,school_id)?.into_iter().find(|i| i.id == item_id).ok_or_else(invalid)?;
         let snapshot = serde_json::to_string(&item).map_err(|_| invalid())?;
@@ -55,6 +62,13 @@ pub fn save(conn: &Connection, school_id: &str, actor_id: &str, input: &SchoolPl
         Ok(item)
     })();
     match outcome { Ok(item) => { conn.execute_batch("RELEASE school_planning_save")?; Ok(item) }, Err(error) => { let _ = conn.execute_batch("ROLLBACK TO school_planning_save; RELEASE school_planning_save"); Err(error) } }
+}
+/// Only a confirmed whole-school decision can alter automatic daily planning.
+/// Conflicting active notices intentionally return no decision for administrator review.
+pub fn confirmed_day_decision(conn: &Connection, school_id: &str, date: &str) -> AppResult<Option<bool>> {
+    let items = list(conn, school_id)?;
+    let decisions: Vec<bool> = items.iter().filter(|item| item.input.kind == "notice" && item.input.status == "confirmed" && item.input.effective_on == date && item.input.affected_area == "wholeSchool" && item.input.calendar_decision != "noChange").map(|item| item.input.calendar_decision == "instructional").collect();
+    Ok(decisions.first().copied().filter(|first| decisions.iter().all(|value| value == first)))
 }
 #[cfg(test)]
 mod tests {
@@ -68,7 +82,7 @@ mod tests {
         let user = crate::repository::user::create_user(&conn,"head","secret","Head").unwrap();
         (conn,school.id,user.id)
     }
-    fn input() -> SchoolPlanningInput { SchoolPlanningInput { kind:"notice".into(),title:"Weather advisory".into(),details:"Await administrator decision".into(),source_reference:"".into(),effective_on:"".into(),coordinator_user_id:None,status:"draft".into() } }
+    fn input() -> SchoolPlanningInput { SchoolPlanningInput { kind:"notice".into(),title:"Weather advisory".into(),details:"Await administrator decision".into(),source_reference:"".into(),effective_on:"".into(),calendar_decision:"noChange".into(),affected_area:"".into(),coordinator_user_id:None,status:"draft".into() } }
     #[test] fn notice_stays_draft_without_authority_and_stale_update_preserves_history() {
         let (conn,school,user)=fixture(); let mut i=input(); let first=save(&conn,&school,&user,&i,None,None).unwrap();
         i.status="confirmed".into(); assert!(save(&conn,&school,&user,&i,Some(&first.id),Some(1)).is_err());
@@ -78,6 +92,18 @@ mod tests {
         assert!(save(&conn,&school,&user,&i,Some(&first.id),Some(1)).is_err());
         assert_eq!(conn.query_row("SELECT count(*) FROM school_planning_history",[],|r|r.get::<_,i64>(0)).unwrap(),2);
         assert!(list(&conn,"another-school").unwrap().is_empty());
+    }
+    #[test] fn only_confirmed_whole_school_decision_changes_the_day() {
+        let (conn,school,user)=fixture(); let mut i=input();
+        i.effective_on="2026-10-05".into();i.calendar_decision="nonInstructional".into();i.affected_area="wholeSchool".into();
+        let first=save(&conn,&school,&user,&i,None,None).unwrap();
+        assert_eq!(confirmed_day_decision(&conn,&school,"2026-10-05").unwrap(),None);
+        i.source_reference="School head instruction".into();i.status="confirmed".into();
+        save(&conn,&school,&user,&i,Some(&first.id),Some(1)).unwrap();
+        assert_eq!(confirmed_day_decision(&conn,&school,"2026-10-05").unwrap(),Some(false));
+        assert_eq!(confirmed_day_decision(&conn,&school,"2026-10-06").unwrap(),None);
+        i.calendar_decision="instructional".into();save(&conn,&school,&user,&i,None,None).unwrap();
+        assert_eq!(confirmed_day_decision(&conn,&school,"2026-10-05").unwrap(),None);
     }
     #[test] fn named_program_cannot_activate_without_instructions_and_local_coordinator() {
         let (conn,school,user)=fixture(); let mut i=input(); i.kind="program".into();i.title="ARAL".into();i.status="inactive".into();
