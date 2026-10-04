@@ -35,6 +35,8 @@ pub mod sync_version_cache;
 pub mod teaching_assignment;
 pub mod user;
 
-pub mod schedule_plan;
 pub mod review_workflow;
+pub mod schedule_plan;
 pub mod school_planning;
+
+pub mod score_import;

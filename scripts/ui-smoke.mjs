@@ -252,6 +252,28 @@ try {
       .evaluate((node) => node === document.activeElement))
   )
     throw new Error("Closing Account lost trigger focus");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  for (const [destination, title] of [
+    ["schedule-planner", "Teacher load and class schedule"],
+    ["published-schedule", "My published schedule"],
+    ["school-planning", "School notices and programs"],
+    ["reviews", "Forms and TANAW review"],
+    ["attachments", "Evidence and attachments"],
+    ["offerings", "School subject offerings"],
+    ["resources", "Resources and learning support"],
+  ]) {
+    await page.getByLabel("Synthetic feature workspace").selectOption(destination);
+    if (title) await page.getByRole("heading", { name: title, exact: true }).waitFor();
+    await page.addScriptTag({ content: axe.source });
+    const violations = await page.evaluate(async () =>
+      (await window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa"] })).violations.map((v) => ({
+        id: v.id,
+        targets: v.nodes.map((n) => n.target),
+      })),
+    );
+    if (violations.length)
+      throw new Error(`${destination} accessibility: ${JSON.stringify(violations)}`);
+  }
   console.log(
     "quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
   );

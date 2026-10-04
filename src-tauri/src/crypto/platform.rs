@@ -1,6 +1,8 @@
 //! Platform key protection. Android requires a real native Keystore adapter.
 use super::KeyStore;
-use crate::error::{AppError, AppResult};
+#[cfg(not(any(windows, target_os = "android")))]
+use crate::error::AppError;
+use crate::error::AppResult;
 
 pub(crate) fn key_store() -> AppResult<Box<dyn KeyStore>> {
     #[cfg(windows)]

@@ -2,7 +2,19 @@ import type { ReviewWorkflowRepository } from "../domain/ports/review-workflow-r
 import type { ReviewHistory, ReviewPacket, ReviewRequest } from "../domain/review-workflow";
 export class ReviewWorkflowApplicationService {
   constructor(private readonly repository: ReviewWorkflowRepository) {}
-  list(): Promise<ReviewPacket[]> { return this.repository.list(); }
-  act(request: ReviewRequest): Promise<ReviewPacket> { return this.repository.act(request); }
-  history(packetId: string): Promise<ReviewHistory[]> { return this.repository.history(packetId); }
+  list(): Promise<ReviewPacket[]> {
+    return this.repository.list();
+  }
+  act(request: ReviewRequest): Promise<ReviewPacket> {
+    return this.repository.act(request);
+  }
+  history(packetId: string): Promise<ReviewHistory[]> {
+    return this.repository.history(packetId);
+  }
+  exportSample(packetId: string): Promise<string> {
+    return this.repository.exportSample(packetId);
+  }
+  importSample(sampleJson: string): Promise<ReviewPacket> {
+    return this.repository.importSample(sampleJson);
+  }
 }

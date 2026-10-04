@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   assessmentService,
   attendanceService,
@@ -18,6 +18,7 @@ import {
   learnerService,
   onSessionExpired,
   schoolAttendanceService,
+  schedulePlanService,
   schoolLogoService,
   schoolMemberService,
   schoolService,
@@ -46,7 +47,7 @@ import { LearnerListScreen } from "./ui/LearnerListScreen";
 import { LoginScreen } from "./ui/LoginScreen";
 import { GradingPeriodsScreen } from "./ui/GradingPeriodsScreen";
 import { AssignedClassFolio } from "./ui/AssignedClassFolio";
-import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "./ui/WorkspaceHubs";
+import { MoreScreen, SchoolFormsScreen } from "./ui/WorkspaceHubs";
 import { ShellAccountPreferences } from "./ui/shell/ShellAccountPreferences";
 import { Page } from "./ui/components/Page";
 import { HomeScreen } from "./ui/HomeScreen";
@@ -70,6 +71,14 @@ import { AppLayout } from "./ui/shell/AppLayout";
 import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
 import "./ui/theme/styles.css";
+import { NewSchoolWorkspace, type NewSchoolDestination } from "./ui/NewSchoolWorkspace";
+import { PublishedScheduleScreen } from "./ui/PublishedScheduleScreen";
+import { ResumeWorkScreen } from "./ui/ResumeWorkScreen";
+import {
+  clearResumePointer,
+  writeClassResumePointer,
+  writeAdvisoryResumePointer,
+} from "./ui/resume-pointer";
 
 function App() {
   const [session, setSession] = useState<CurrentSession | null>(null);
@@ -152,6 +161,12 @@ function App() {
   function clearSessionWorkContexts() {
     clearClassWorkContext();
     setAdvisoryWorkContext(null);
+    setAttendanceSectionId(null);
+    setRosterSectionId(null);
+    setMonthlySummaryContext(null);
+    setTeachingAssignmentsSection(null);
+    setSectionAdviserSection(null);
+    setScheduleMeetingsAssignment(null);
   }
 
   function handleSessionExpired() {
@@ -196,6 +211,7 @@ function App() {
   }, []);
 
   async function handleLogout() {
+    clearResumePointer();
     await authService.logout();
     clearSessionWorkContexts();
     setSessionExpiredNotice(null);
@@ -238,6 +254,42 @@ function App() {
 
     setActiveTab("workspace");
   }
+
+  const resumeAuthority = useMemo(
+    () => ({
+      findAuthorizedClass: async (id: string) => {
+        if (!session) return null;
+        const assignment = (await subjectAttendanceService.listMyAssignments(session.userId)).find(
+          (a) => a.id === id,
+        );
+        return assignment
+          ? {
+              teachingAssignmentId: assignment.id,
+              subjectName: assignment.subjectName,
+              sectionName: assignment.sectionName,
+            }
+          : null;
+      },
+      isAuthorizedAdvisorySection: async (id: string) =>
+        (
+          await subjectAttendanceService.listAdviserViewSections(
+            new Date().toLocaleDateString("en-CA"),
+          )
+        ).some((s) => s.id === id),
+    }),
+    [session?.userId],
+  );
+  useEffect(() => {
+    if (session && classWorkContext) writeClassResumePointer(session.userId, classWorkContext);
+  }, [session?.userId, classWorkContext]);
+  useEffect(() => {
+    if (session && advisoryWorkContext)
+      writeAdvisoryResumePointer(session.userId, advisoryWorkContext);
+  }, [session?.userId, advisoryWorkContext]);
+  const openPublishedClass = (id: string) => {
+    setSubjectAttendanceAssignmentId(id);
+    setActiveTab("subject-attendance");
+  };
 
   const bootBrand = <h1 className="app-boot-brand">LIKHA-SIS</h1>;
 
@@ -300,6 +352,7 @@ function App() {
         </div>
       ) : session ? (
         <AppLayout
+          key={`${session.schoolId}:${session.userId}`}
           session={session}
           activeTab={activeTab}
           onNavigate={setActiveTab}
@@ -307,6 +360,21 @@ function App() {
           schoolLogoService={schoolLogoService}
         >
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
+          {activeTab === "workspace" && (
+            <ResumeWorkScreen
+              userId={session.userId}
+              authority={resumeAuthority}
+              onResume={(result) => {
+                if (result.destination === "class") {
+                  setClassWorkContext(result.context);
+                  setActiveTab("my-day");
+                } else {
+                  setAdvisoryWorkContext(result.context);
+                  setActiveTab("adviser-view");
+                }
+              }}
+            />
+          )}
           {activeTab === "workspace" ? (
             <HomeScreen
               teachingWorkspace={folio}
@@ -332,17 +400,28 @@ function App() {
               onOpenSf1Import={() => setActiveTab("sf1-import")}
             />
           ) : activeTab === "school-forms" ? (
-            <SchoolFormsScreen onNavigate={setActiveTab} />
+            <SchoolFormsScreen onNavigate={setActiveTab} roles={session.roles} />
           ) : activeTab === "more" ? (
-            <MoreScreen onNavigate={setActiveTab} />
+            <MoreScreen onNavigate={setActiveTab} roles={session.roles} />
           ) : activeTab === "calendar" ? (
-            <CalendarScreen
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-              onOpenClass={(context) => {
-                setClassWorkContext(context);
-                setActiveTab("workspace");
-              }}
+            <PublishedScheduleScreen
+              service={schedulePlanService}
+              onOpenClass={openPublishedClass}
+            />
+          ) : [
+              "schedule-planner",
+              "published-schedule",
+              "attachments",
+              "school-resources",
+              "review-workspace",
+              "school-planning",
+              "school-offerings",
+            ].includes(activeTab) ? (
+            <NewSchoolWorkspace
+              key={`${session.schoolId}:${session.userId}:${activeTab}`}
+              destination={activeTab as NewSchoolDestination}
+              session={session}
+              onOpenClass={openPublishedClass}
             />
           ) : activeTab === "account" ? (
             <Page title="Account">
@@ -577,6 +656,7 @@ function App() {
               subjectAttendanceService={subjectAttendanceService}
               schoolMemberService={schoolMemberService}
               teacherUserId={session.userId}
+              canViewColleagues={session.roles.includes("school_head")}
             />
           ) : activeTab === "monthly-summary" ? (
             <MonthlySummaryScreen

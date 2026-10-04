@@ -155,7 +155,14 @@ mod tests {
 
     fn a_grade() -> ComputedTermGrade {
         ComputedTermGrade {
-            completeness: crate::repository::grading_computation::GradeCompleteness { expected_items: 1, scored_items: 1, excused_items: 0, not_applicable_items: 0, unresolved_items: 0, is_complete: true },
+            completeness: crate::repository::grading_computation::GradeCompleteness {
+                expected_items: 1,
+                scored_items: 1,
+                excused_items: 0,
+                not_applicable_items: 0,
+                unresolved_items: 0,
+                is_complete: true,
+            },
             initial_grade: 85.8,
             term_grade: 88,
             was_transmuted: true,

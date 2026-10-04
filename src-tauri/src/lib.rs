@@ -1,6 +1,4 @@
 pub mod attachments;
-pub mod school_resources;
-pub mod scheduling;
 pub mod auth;
 pub mod backup;
 mod commands;
@@ -12,6 +10,9 @@ pub mod formgen;
 pub mod hub_server;
 pub mod import;
 pub mod repository;
+pub mod scheduling;
+pub mod school_offerings;
+pub mod school_resources;
 pub mod sync;
 pub mod sync_client;
 
@@ -103,6 +104,13 @@ pub fn run() {
             school_resources::record_support_session,
             school_resources::list_support_sessions,
             commands::review_workflow::list_review_packets,
+            commands::review_workflow::export_tanaw_sample,
+            commands::review_workflow::import_tanaw_sample,
+            commands::score_import::preview_score_import,
+            commands::score_import::commit_score_import,
+            commands::score_import::list_score_history,
+            school_offerings::save_school_offering,
+            school_offerings::list_school_offerings,
             commands::review_workflow::act_review_packet,
             commands::review_workflow::review_packet_history,
             commands::school_planning::list_school_planning_items,

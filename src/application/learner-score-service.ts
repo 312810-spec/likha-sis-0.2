@@ -1,5 +1,7 @@
 import { ValidationError } from "../domain/errors";
 import type {
+  ScoreImportPreview,
+  ScoreHistoryEntry,
   ComputedTermGrade,
   LearnerScore,
   LearnerScoreRosterEntry,
@@ -23,6 +25,26 @@ import type { LearnerScoreRepository } from "../domain/ports/learner-score-repos
 export class LearnerScoreApplicationService {
   constructor(private readonly scores: LearnerScoreRepository) {}
 
+  previewImport(assessmentItemId: string, csv: string): Promise<ScoreImportPreview> {
+    if (!this.scores.previewImport)
+      throw new ValidationError("Score import is unavailable on this installation.");
+    return this.scores.previewImport(assessmentItemId, csv);
+  }
+  commitImport(
+    assessmentItemId: string,
+    csv: string,
+    expectedSnapshot: string,
+    reason: string,
+  ): Promise<number> {
+    if (!reason.trim()) throw new ValidationError("Give a reason for importing these scores.");
+    if (!this.scores.commitImport)
+      throw new ValidationError("Score import is unavailable on this installation.");
+    return this.scores.commitImport(assessmentItemId, csv, expectedSnapshot, reason.trim());
+  }
+  history(assessmentItemId: string): Promise<ScoreHistoryEntry[]> {
+    return this.scores.history?.(assessmentItemId) ?? Promise.resolve([]);
+  }
+
   rosterForItem(assessmentItemId: string): Promise<LearnerScoreRosterEntry[] | null> {
     return this.scores.rosterForItem(assessmentItemId);
   }
@@ -33,6 +55,7 @@ export class LearnerScoreApplicationService {
     status: LearnerScoreStatus,
     score: number | null,
     maxScore: number,
+    reason?: string,
   ): Promise<LearnerScore | null> {
     const trimmedItemId = assessmentItemId.trim();
     const trimmedLearnerId = learnerId.trim();
@@ -53,7 +76,9 @@ export class LearnerScoreApplicationService {
       throw new ValidationError("Excused/Not Applicable entries must not have a score value.");
     }
 
-    return this.scores.record(trimmedItemId, trimmedLearnerId, status, score);
+    return reason
+      ? this.scores.record(trimmedItemId, trimmedLearnerId, status, score, reason)
+      : this.scores.record(trimmedItemId, trimmedLearnerId, status, score);
   }
 
   /** Computes a learner's DepEd term grade for a class record. Returns
@@ -74,6 +99,15 @@ export class LearnerScoreApplicationService {
     if (trimmedLearnerId.length === 0) {
       throw new ValidationError("Learner is required.");
     }
-    return this.scores.computeTermGrade(trimmedRecordId, trimmedLearnerId);
+    try {
+      return await this.scores.computeTermGrade(trimmedRecordId, trimmedLearnerId);
+    } catch (error) {
+      if (String(error).includes("grade calculation error")) {
+        throw new ValidationError(
+          "A grade falls between the published grading ranges. Confirm the rounding rule before finalizing this grade.",
+        );
+      }
+      throw error;
+    }
   }
 }

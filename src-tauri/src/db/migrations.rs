@@ -2017,6 +2017,9 @@ pub fn migrations() -> Migrations<'static> {
         M::up(include_str!("046_school_planning.sql")),
         M::up(include_str!("sql/0047_resource_issues.sql")),
         M::up(include_str!("sql/0048_learning_support.sql")),
+        M::up(include_str!("049_score_import_history.sql")),
+        M::up(include_str!("sql/0050_school_offerings.sql")),
+        M::up(include_str!("sql/0051_tanaw_receipts.sql")),
     ])
 }
 

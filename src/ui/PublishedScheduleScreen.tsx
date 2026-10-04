@@ -75,8 +75,8 @@ export function PublishedScheduleScreen({
         (meetings.length ? (
           <>
             <p>
-              {meetings[0].planLabel} · Published {meetings[0].publishedAt} · Applies{" "}
-              {meetings[0].effectiveFrom} through {meetings[0].effectiveUntil}
+              {meetings[0]?.planLabel} · Published {meetings[0]?.publishedAt} · Applies{" "}
+              {meetings[0]?.effectiveFrom} through {meetings[0]?.effectiveUntil}
             </p>
             <div className="schedule-table-wrap">
               <table>

@@ -232,8 +232,12 @@ pub fn roster_for_item(
         return Ok(None);
     };
 
-    let Some(meta) = assessment_item::lifecycle(conn, school_id, assessment_item_id)? else { return Ok(None); };
-    if meta.state == "planned" { return Ok(Some(Vec::new())); }
+    let Some(meta) = assessment_item::lifecycle(conn, school_id, assessment_item_id)? else {
+        return Ok(None);
+    };
+    if meta.state == "planned" {
+        return Ok(Some(Vec::new()));
+    }
     let starts_on = meta.event_starts_on.unwrap_or(starts_on);
     let ends_on = meta.event_ends_on.unwrap_or(ends_on);
 

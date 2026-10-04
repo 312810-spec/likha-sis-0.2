@@ -29,6 +29,8 @@ Empty fresh setup; assigned-teacher/advisory scope; preserve pending work during
 
 ## Active checkpoint update
 
-Saved source now includes restored native lib/module/migration/service wiring, schedule publication transfer work, roster/removal safeguards, review UI, calendar decision fields/UI, attachment ownership fixes and Android backup/key path guards. Source is still a draft. Native/TypeScript integration checks have not yet run on this tree. Platform resume tests: 11 passed; platform key/recovery edits await native verification.
+Current source includes App/workspace routing, role-filtered navigation, actor revalidated resume navigation, migrations42-51 and native commands/services. Restored CSV import/correction history, immutable offering manifests, canonical source/evidence form snapshots, TANAW sample exchange, manual schedule locks, atomic encrypted publication and calendar confirmation are wired. Android key/R8/recovery fixes included.
 
-Next: wire App/new workspace navigation with assigned rosters; restore CSV import49, offerings50 and canonical source51 modules; run focused/full checks. Rust and Linux native dependencies are being installed. Keep the next source+handoff checkpoint within five minutes; begin saving early enough for remote latency.
+Fresh focused evidence: 66 grading/import frontend tests, 11 resume tests, 3 forms review tests, planner/planning/navigation tests passed. Scheduling engine six tests and clippy passed; migration SQL smoke passed. UI browser workflow/accessibility smoke passed six new workspaces (offerings being added). No full-app native result yet: prefix dependencies installed, full cargo test currently building. Android NDK30/SDK37 build compiling; missing native code references being fixed by owners. No usable APK/device verification yet.
+
+Next: fix integrated typecheck/lint/native compiler findings, run full quality tests/clippy and browser build isolation, save results. Update PR103 and reconcile/merge authorized branches after exact-head checks. Local recovery source still unverified overall; do not claim all plans complete or reuse pre-pruning tests.

@@ -61,7 +61,9 @@ pub fn subject_term_grades_for_learner(
             Ok(Sf9SubjectTermGrade {
                 subject_name: detail.subject_name,
                 grading_period_label: detail.grading_period_label,
-                term_grade: computed.filter(|c| c.completeness.is_complete).map(|c| c.term_grade),
+                term_grade: computed
+                    .filter(|c| c.completeness.is_complete)
+                    .map(|c| c.term_grade),
             })
         })
         .collect()

@@ -5,10 +5,12 @@ export function AttachmentsScreen({
   service,
   linkKind = "standalone",
   linkId = null,
+  reviewerUserId = null,
 }: {
   service: SchoolResourcesApplicationService;
   linkKind?: AttachmentInput["linkKind"];
   linkId?: string | null;
+  reviewerUserId?: string | null;
 }) {
   const [items, setItems] = useState<Attachment[]>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -28,7 +30,7 @@ export function AttachmentsScreen({
     return () => {
       live = false;
     };
-  }, [service]);
+  }, [service, linkKind, linkId]);
   async function save() {
     if (!file) return;
     setBusy(true);
@@ -41,7 +43,7 @@ export function AttachmentsScreen({
         linkKind,
         linkId,
         previousId: previous || null,
-        reviewerUserId: null,
+        reviewerUserId,
       });
       setItems(await service.listAttachments());
       setFile(null);
@@ -100,12 +102,14 @@ export function AttachmentsScreen({
         {busy ? "Saving…" : "Save attachment"}
       </button>
       <ul>
-        {items.map((i) => (
-          <li key={i.id}>
-            <button onClick={() => void download(i)}>{i.filename}</button> · {i.createdAt}
-            {i.previousId && " · New version"}
-          </li>
-        ))}
+        {items
+          .filter((i) => i.linkKind === linkKind && i.linkId === linkId)
+          .map((i) => (
+            <li key={i.id}>
+              <button onClick={() => void download(i)}>{i.filename}</button> · {i.createdAt}
+              {i.previousId && " · New version"}
+            </li>
+          ))}
       </ul>
     </section>
   );

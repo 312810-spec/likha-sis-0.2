@@ -57,3 +57,6 @@ export interface ComputedTermGrade {
    * the learner's true raw performance. */
   wasFloored: boolean;
 }
+
+export interface ScoreImportPreview { rows: { learnerId: string; status: LearnerScoreStatus; score: number | null }[]; issues: string[]; contentHash: string; snapshot: string; alreadyImported: boolean; }
+export interface ScoreHistoryEntry { id: string; learnerId: string; actorUserId: string; previousJson: string | null; nextJson: string; reason: string; changedAt: string; }

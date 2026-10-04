@@ -1,3 +1,4 @@
+import { emptySchedulePlan } from "./schedule-plan-draft";
 import { useEffect, useState, type ReactNode } from "react";
 import type { SchedulePlanApplicationService } from "../application/schedule-plan-service";
 import type { SchedulePlan, SchedulePlanInput } from "../domain/schedule-plan";
@@ -9,21 +10,6 @@ import { Alert } from "./components/Alert";
 import "./schedule-planner.css";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-export function emptySchedulePlan(): SchedulePlanInput {
-  return {
-    label: "",
-    schoolYear: "",
-    termLabel: "",
-    effectiveFrom: "",
-    effectiveUntil: "",
-    dataConfirmed: false,
-    teachers: [],
-    rooms: [],
-    slots: [],
-    courses: [],
-    locks: [],
-  };
-}
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="field">
@@ -831,7 +817,13 @@ export function SchedulePlannerScreen({
                     .reduce((sum, m) => {
                       const start = m.startsAt.split(":").map(Number);
                       const end = m.endsAt.split(":").map(Number);
-                      return sum + end[0] * 60 + end[1] - start[0] * 60 - start[1];
+                      return (
+                        sum +
+                        (end[0] ?? 0) * 60 +
+                        (end[1] ?? 0) -
+                        (start[0] ?? 0) * 60 -
+                        (start[1] ?? 0)
+                      );
                     }, 0);
                   return minutes ? `${day} ${minutes}/${t.dailyLimitMinutes} min` : "";
                 })

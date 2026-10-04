@@ -37,9 +37,12 @@ fn with_archive_path<T>(
     }
     #[cfg(target_os = "android")]
     {
-        let staging = tempfile::tempdir_in(private_dir).map_err(|_| "backup_storage_error".to_owned())?;
+        let staging =
+            tempfile::tempdir_in(private_dir).map_err(|_| "backup_storage_error".to_owned())?;
         let path = staging.path().join("portable.likhabackup");
-        let path_string = path.to_str().ok_or_else(|| "backup_storage_error".to_owned())?;
+        let path_string = path
+            .to_str()
+            .ok_or_else(|| "backup_storage_error".to_owned())?;
         if importing {
             crate::crypto::android::execute(3, file_path, &[], path_string)
                 .map_err(|_| "backup_storage_error".to_owned())?;

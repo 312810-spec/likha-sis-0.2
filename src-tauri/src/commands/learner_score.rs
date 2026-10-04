@@ -70,21 +70,64 @@ pub fn record_learner_score(
     let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
 
     crate::repository::score_import::authorize(&conn, &school_id, &user_id, &assessment_item_id)?;
-    let before = crate::repository::score_import::previous(&conn, &school_id, &assessment_item_id, &learner_id)?;
+    let before = crate::repository::score_import::previous(
+        &conn,
+        &school_id,
+        &assessment_item_id,
+        &learner_id,
+    )?;
     let reason = reason.unwrap_or_default();
     if (before.is_some() || status != LearnerScoreStatus::Scored) && reason.trim().is_empty() {
-        return Err(AppError::Import("Give a reason for a correction or assessment exception.".into()));
+        return Err(AppError::Import(
+            "Give a reason for a correction or assessment exception.".into(),
+        ));
     }
-    if reason.len() > 1000 { return Err(AppError::Import("The reason must be at most 1,000 characters.".into())); }
+    if reason.len() > 1000 {
+        return Err(AppError::Import(
+            "The reason must be at most 1,000 characters.".into(),
+        ));
+    }
     conn.execute_batch("SAVEPOINT record_score_history")?;
     let outcome = (|| {
-        let saved = record_learner_score_with_optional_sync(&conn, &school_id, &user_id, &assessment_item_id, &learner_id, status, score, sspk.as_ref())?;
+        let saved = record_learner_score_with_optional_sync(
+            &conn,
+            &school_id,
+            &user_id,
+            &assessment_item_id,
+            &learner_id,
+            status,
+            score,
+            sspk.as_ref(),
+        )?;
         if let Some(next) = &saved {
-            crate::repository::score_import::append_history(&conn, &school_id, &user_id, &assessment_item_id, &learner_id, before.as_deref(), next, if reason.trim().is_empty() { "Initial score entry" } else { reason.trim() })?;
+            crate::repository::score_import::append_history(
+                &conn,
+                &school_id,
+                &user_id,
+                &assessment_item_id,
+                &learner_id,
+                before.as_deref(),
+                next,
+                if reason.trim().is_empty() {
+                    "Initial score entry"
+                } else {
+                    reason.trim()
+                },
+            )?;
         }
         Ok(saved)
     })();
-    match outcome { Ok(saved) => { conn.execute_batch("RELEASE record_score_history")?; Ok(saved) }, Err(error) => { let _ = conn.execute_batch("ROLLBACK TO record_score_history; RELEASE record_score_history"); Err(error) } }
+    match outcome {
+        Ok(saved) => {
+            conn.execute_batch("RELEASE record_score_history")?;
+            Ok(saved)
+        }
+        Err(error) => {
+            let _ = conn
+                .execute_batch("ROLLBACK TO record_score_history; RELEASE record_score_history");
+            Err(error)
+        }
+    }
 }
 
 /// Returns conservative sync evidence for one persisted Class Record score.

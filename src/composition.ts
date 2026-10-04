@@ -133,16 +133,30 @@ export const myDayService = new MyDayApplicationService(new TauriMyDayRepository
 
 import { SchedulePlanApplicationService } from "./application/schedule-plan-service";
 import { TauriSchedulePlanRepository } from "./infrastructure/tauri/schedule-plan-repository";
-export const schedulePlanService = new SchedulePlanApplicationService(new TauriSchedulePlanRepository());
+export const schedulePlanService = new SchedulePlanApplicationService(
+  new TauriSchedulePlanRepository(),
+);
 
 import { SchoolResourcesApplicationService } from "./application/school-resources-service";
 import { TauriSchoolResourcesRepository } from "./infrastructure/tauri/school-resources-repository";
-export const schoolResourcesService = new SchoolResourcesApplicationService(new TauriSchoolResourcesRepository());
+export const schoolResourcesService = new SchoolResourcesApplicationService(
+  new TauriSchoolResourcesRepository(),
+);
 
 import { SchoolPlanningApplicationService } from "./application/school-planning-service";
 import { TauriSchoolPlanningRepository } from "./infrastructure/tauri/school-planning-repository";
-export const schoolPlanningService = new SchoolPlanningApplicationService(new TauriSchoolPlanningRepository());
+export const schoolPlanningService = new SchoolPlanningApplicationService(
+  new TauriSchoolPlanningRepository(),
+);
 
 import { ReviewWorkflowApplicationService } from "./application/review-workflow-service";
 import { TauriReviewWorkflowRepository } from "./infrastructure/tauri/review-workflow-repository";
-export const reviewWorkflowService = new ReviewWorkflowApplicationService(new TauriReviewWorkflowRepository());
+export const reviewWorkflowService = new ReviewWorkflowApplicationService(
+  new TauriReviewWorkflowRepository(),
+);
+
+import { SchoolOfferingsApplicationService } from "./application/school-offerings-service";
+import { TauriSchoolOfferingsRepository } from "./infrastructure/tauri/school-offerings-repository";
+export const schoolOfferingsService = new SchoolOfferingsApplicationService(
+  new TauriSchoolOfferingsRepository(),
+);

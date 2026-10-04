@@ -96,14 +96,19 @@ const ADJUSTED_TRANSMUTATION_TABLE: &[(f64, f64, u32)] = &[
 /// Fractional values between its printed ranges require a confirmed rule.
 fn transmute_adjusted(ig: f64) -> AppResult<u32> {
     if !ig.is_finite() || !(0.0..=100.0).contains(&ig) {
-        return Err(AppError::GradeCalculation("initial grade is outside the valid range".into()));
+        return Err(AppError::GradeCalculation(
+            "initial grade is outside the valid range".into(),
+        ));
     }
     for &(min, max, tg) in ADJUSTED_TRANSMUTATION_TABLE {
         if ig >= min - 1e-10 && ig <= max + 1e-10 {
             return Ok(tg);
         }
     }
-    Err(AppError::GradeCalculation("initial grade falls between the published transmutation ranges; confirm the rounding rule".into()))
+    Err(AppError::GradeCalculation(
+        "initial grade falls between the published transmutation ranges; confirm the rounding rule"
+            .into(),
+    ))
 }
 
 /// SY 2027-2028 onward: the Term Grade is the Initial Grade rounded to the
@@ -223,7 +228,10 @@ fn leaf_percentage_score(
 /// Counts every defined weighted item, including unresolved work. A draft
 /// numerical grade must not conceal blanks as if they were recorded zeros.
 pub fn completeness_for_learner(
-    conn: &Connection, school_id: &str, class_record_id: &str, learner_id: &str,
+    conn: &Connection,
+    school_id: &str,
+    class_record_id: &str,
+    learner_id: &str,
 ) -> AppResult<GradeCompleteness> {
     let (expected, scored, excused, not_applicable): (u32, u32, u32, u32) = conn.query_row(
         "SELECT COUNT(*), COALESCE(SUM(ls.status = 'scored'),0), \
@@ -243,9 +251,14 @@ pub fn completeness_for_learner(
         |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
     )?;
     let unresolved = expected.saturating_sub(scored + excused + not_applicable);
-    Ok(GradeCompleteness { expected_items: expected, scored_items: scored,
-        excused_items: excused, not_applicable_items: not_applicable,
-        unresolved_items: unresolved, is_complete: expected > 0 && unresolved == 0 })
+    Ok(GradeCompleteness {
+        expected_items: expected,
+        scored_items: scored,
+        excused_items: excused,
+        not_applicable_items: not_applicable,
+        unresolved_items: unresolved,
+        is_complete: expected > 0 && unresolved == 0,
+    })
 }
 
 struct WeightRow {

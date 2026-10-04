@@ -217,7 +217,14 @@ mod tests {
 
     fn a_grade() -> ComputedTermGrade {
         ComputedTermGrade {
-            completeness: crate::repository::grading_computation::GradeCompleteness { expected_items: 1, scored_items: 1, excused_items: 0, not_applicable_items: 0, unresolved_items: 0, is_complete: true },
+            completeness: crate::repository::grading_computation::GradeCompleteness {
+                expected_items: 1,
+                scored_items: 1,
+                excused_items: 0,
+                not_applicable_items: 0,
+                unresolved_items: 0,
+                is_complete: true,
+            },
             initial_grade: 85.8,
             term_grade: 88,
             was_transmuted: true,
@@ -273,7 +280,14 @@ mod tests {
             family_name: "Cruz".to_string(),
             lrn: None,
             grade: Some(ComputedTermGrade {
-            completeness: crate::repository::grading_computation::GradeCompleteness { expected_items: 1, scored_items: 1, excused_items: 0, not_applicable_items: 0, unresolved_items: 0, is_complete: true },
+                completeness: crate::repository::grading_computation::GradeCompleteness {
+                    expected_items: 1,
+                    scored_items: 1,
+                    excused_items: 0,
+                    not_applicable_items: 0,
+                    unresolved_items: 0,
+                    is_complete: true,
+                },
                 initial_grade: 3.0,
                 term_grade: 60,
                 was_transmuted: false,

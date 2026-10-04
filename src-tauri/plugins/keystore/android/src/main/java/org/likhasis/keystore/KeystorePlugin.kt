@@ -85,7 +85,8 @@ object NativeBridge {
             if (operation == 0 && exists) return readKey(file)
             if (operation == 2) check(!exists) { "recovery key already exists" }
             val key = if (operation == 2) payload.copyOf() else ByteArray(32).also { SecureRandom().nextBytes(it) }
-            try { writeKey(file, key); return key.copyOf() } finally { key.fill(0) }
+            try { writeKey(file, key); return key.copyOf() }
+            finally { key.fill(0); if (operation == 2) payload.fill(0) }
         }
         val uri = Uri.parse(path)
         require(uri.scheme == "content")

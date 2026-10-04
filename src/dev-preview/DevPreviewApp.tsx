@@ -1,3 +1,26 @@
+import { SchoolOfferingsScreen } from "../ui/SchoolOfferingsScreen";
+import { SchoolOfferingsApplicationService } from "../application/school-offerings-service";
+import { previewOfferingsRepository } from "./new-workspaces";
+import { ReviewWorkspaceScreen } from "../ui/ReviewWorkspaceScreen";
+import { ReviewWorkflowApplicationService } from "../application/review-workflow-service";
+import { previewReviewRepository } from "./new-workspaces";
+import { useEffect } from "react";
+import { SchedulePlannerScreen } from "../ui/SchedulePlannerScreen";
+import { PublishedScheduleScreen } from "../ui/PublishedScheduleScreen";
+import { SchoolPlanningScreen } from "../ui/SchoolPlanningScreen";
+import { AttachmentsScreen } from "../ui/AttachmentsScreen";
+import { SchoolResourcesScreen } from "../ui/SchoolResourcesScreen";
+import { SchedulePlanApplicationService } from "../application/schedule-plan-service";
+import { SchoolPlanningApplicationService } from "../application/school-planning-service";
+import { SchoolResourcesApplicationService } from "../application/school-resources-service";
+import {
+  previewScheduleRepository,
+  previewPlanningRepository,
+  previewResourcesRepository,
+} from "./new-workspaces";
+import type { SchoolMember } from "../domain/school-member";
+import type { Section } from "../domain/section";
+import type { Subject } from "../domain/subject";
 import { ClassRecordJourneyScreen } from "../ui/ClassRecordJourneyScreen";
 import { AssignedClassFolio } from "../ui/AssignedClassFolio";
 import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "../ui/WorkspaceHubs";
@@ -172,7 +195,28 @@ const previewLogoService = new SchoolLogoApplicationService({
   },
 });
 
+const previewOfferingsService = new SchoolOfferingsApplicationService(previewOfferingsRepository());
+const previewReviewService = new ReviewWorkflowApplicationService(previewReviewRepository());
+const previewScheduleService = new SchedulePlanApplicationService(previewScheduleRepository());
+const previewPlanningService = new SchoolPlanningApplicationService(previewPlanningRepository());
+const previewResourcesService = new SchoolResourcesApplicationService(previewResourcesRepository());
 export function DevPreviewApp() {
+  const [previewWorkspace, setPreviewWorkspace] = useState("");
+  const [members, setMembers] = useState<SchoolMember[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  useEffect(() => {
+    void Promise.all([
+      schoolMemberService.listMembers(),
+      sectionService.listSections(),
+      subjectService.listSubjects(),
+    ]).then(([m, s, u]) => {
+      setMembers(m);
+      setSections(s);
+      setSubjects(u);
+    });
+  }, []);
+
   const [selectedClassContext, setSelectedClassContext] = useState<TeacherClassWorkContext | null>(
     null,
   );
@@ -206,13 +250,55 @@ export function DevPreviewApp() {
         activeTab={activeTab}
         onNavigate={(tab) => {
           setActiveTab(tab);
+          setPreviewWorkspace("");
         }}
         onLogout={() => {}}
       >
         <div className="preview-boundary" role="status">
           Development preview · Synthetic records · School seal used as a design reference
         </div>
-        {activeTab === "workspace" || activeTab === "my-day" || activeTab === "class-records" ? (
+        <label className="field">
+          Synthetic feature workspace
+          <select value={previewWorkspace} onChange={(e) => setPreviewWorkspace(e.target.value)}>
+            <option value="">Normal teacher workspace</option>
+            <option value="schedule-planner">Teacher load planner</option>
+            <option value="published-schedule">Published schedule</option>
+            <option value="school-planning">School notices and programs</option>
+            <option value="offerings">Subject offerings</option>
+            <option value="reviews">Forms and TANAW review</option>
+            <option value="attachments">Attachments</option>
+            <option value="resources">Resources and learner support</option>
+          </select>
+        </label>
+        {previewWorkspace === "offerings" ? (
+          <SchoolOfferingsScreen service={previewOfferingsService} subjects={subjects} canManage />
+        ) : previewWorkspace === "reviews" ? (
+          <ReviewWorkspaceScreen
+            service={previewReviewService}
+            sections={sections}
+            members={members}
+            userId={FIXTURE_TEACHER_USER_ID}
+            isSchoolHead
+          />
+        ) : previewWorkspace === "schedule-planner" ? (
+          <SchedulePlannerScreen
+            service={previewScheduleService}
+            members={members}
+            sections={sections}
+            subjects={subjects}
+          />
+        ) : previewWorkspace === "published-schedule" ? (
+          <PublishedScheduleScreen service={previewScheduleService} />
+        ) : previewWorkspace === "school-planning" ? (
+          <SchoolPlanningScreen service={previewPlanningService} members={members} canManage />
+        ) : previewWorkspace === "attachments" ? (
+          <AttachmentsScreen service={previewResourcesService} />
+        ) : previewWorkspace === "resources" ? (
+          <SchoolResourcesScreen
+            service={previewResourcesService}
+            learners={[{ id: "synthetic-learner", label: "Synthetic learner" }]}
+          />
+        ) : activeTab === "workspace" || activeTab === "my-day" || activeTab === "class-records" ? (
           <AssignedClassFolio
             key={activeTab === "class-records" ? "scores" : "overview"}
             teacherUserId={FIXTURE_TEACHER_USER_ID}
@@ -251,9 +337,9 @@ export function DevPreviewApp() {
             )}
           />
         ) : activeTab === "school-forms" ? (
-          <SchoolFormsScreen onNavigate={setActiveTab} />
+          <SchoolFormsScreen onNavigate={setActiveTab} roles={["school_head"]} />
         ) : activeTab === "more" ? (
-          <MoreScreen onNavigate={setActiveTab} />
+          <MoreScreen onNavigate={setActiveTab} roles={["school_head"]} />
         ) : activeTab === "calendar" ? (
           <CalendarScreen
             subjectAttendanceService={subjectAttendanceService}

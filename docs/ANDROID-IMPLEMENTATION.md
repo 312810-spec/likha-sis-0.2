@@ -31,3 +31,41 @@ SQLCipher native-library/16-KiB page compatibility checks, fresh install,
 process-death and forced-write interruption, key invalidation, signed upgrade,
 SAF export/import with real document providers and replacement-device recovery.
 No physical-device or APK result is asserted by this checkpoint.
+
+## Recovery and packaging refinements (4 October 2026)
+
+The backup command recognizes both the protected SSPK envelope and its
+`AtomicFile` `.bak` companion. A pending atomic write must not omit the school's
+existing payload key from a portable backup. Recovery selection also rejects
+folders that redirect outside the installation through symbolic links.
+Native regression tests cover these cases; run the full native suite before
+accepting this checkpoint.
+
+The plugin ships consumer ProGuard rules that preserve `NativeBridge` and its
+method names. Release shrinking cannot discover the Rust JNI string references
+on its own. Do not remove those rules when enabling R8.
+
+The current generated Tauri Android project uses Gradle 9.6.1, Android Gradle
+Plugin 9.3.1 and API 37. The restored build environment uses official SDK
+platform 37.0, build tools 37.0.0, NDK 30.0.16248370 and Rust's
+`aarch64-linux-android` target. Archive checksums were checked against Google's
+SDK repository metadata. Generated Android files remain reproducible build
+output; the Kotlin plugin, configuration and consumer rules are committed.
+
+To rebuild after restoring the toolchains:
+
+```sh
+export ANDROID_HOME=/path/to/android-sdk
+export NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+npm ci
+rustup target add aarch64-linux-android
+npm run tauri -- android init --ci --skip-targets-install
+# Linux cross builds of vendored OpenSSL use NDK LLVM archive tools.
+export AR_aarch64_linux_android="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+export RANLIB_aarch64_linux_android="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+npm run tauri -- android build --debug --target aarch64 --apk --ci
+```
+
+These commands generate a debug build for testing. Production release requires
+the school's retained signing key and a tested upgrade path. Never substitute a
+new signing key for an existing installed school's release certificate.
