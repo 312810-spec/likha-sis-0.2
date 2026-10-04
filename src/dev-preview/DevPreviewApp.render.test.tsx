@@ -16,30 +16,33 @@ import { DevPreviewApp } from "./DevPreviewApp";
  * `FilePicker` fixture this dev-preview does not yet have.
  */
 describe("DevPreviewApp — new fixture destinations render", () => {
-  it("renders Subject Attendance via the sidebar", async () => {
+  it("renders Subject Attendance via More", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
+    await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("button", { name: "Subject Attendance" }));
     expect(await screen.findByRole("heading", { name: "Subject Attendance" })).toBeInTheDocument();
   });
 
-  it("renders Subject Monitor via the sidebar", async () => {
+  it("renders Subject Monitor via More", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
+    await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("button", { name: "My Subject Attendance" }));
     expect(await screen.findByRole("heading", { name: "Subject Monitor" })).toBeInTheDocument();
   });
 
-  it("renders My Advisory via the sidebar", async () => {
+  it("renders My Advisory via More", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
     await user.click(screen.getByRole("button", { name: "My Advisory" }));
     expect(await screen.findByRole("heading", { name: "My Advisory" })).toBeInTheDocument();
   });
 
-  it("renders Teacher Load via the sidebar", async () => {
+  it("renders Teacher Load via More", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
+    await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("button", { name: "My Teaching Load" }));
     expect(await screen.findByRole("heading", { name: "My Teaching Load" })).toBeInTheDocument();
   });
@@ -47,6 +50,7 @@ describe("DevPreviewApp — new fixture destinations render", () => {
   it("renders Teaching Assignments and Class Schedule via Sections", async () => {
     const user = userEvent.setup();
     render(<DevPreviewApp />);
+    await user.click(screen.getByRole("button", { name: "More" }));
     await user.click(screen.getByRole("button", { name: "Sections" }));
     await user.click(
       await screen.findByRole("button", { name: "Manage teaching assignments for Mabini" }),

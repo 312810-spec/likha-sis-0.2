@@ -6,7 +6,7 @@ import type { GradingApplicationService } from "../application/grading-service";
 import type { LearnerScoreApplicationService } from "../application/learner-score-service";
 import type { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
-import type { GradingWeightPolicy } from "../domain/class-record";
+import type { ClassRecordDetail, GradingWeightPolicy } from "../domain/class-record";
 import { ValidationError } from "../domain/errors";
 import type { GradingPeriod } from "../domain/grading";
 import { AssessmentAuthoringScreen } from "./AssessmentAuthoringScreen";
@@ -17,6 +17,7 @@ import { Page } from "./components/Page";
 import type { TeacherClassWorkContext } from "./work-context";
 
 interface ClassRecordJourneyScreenProps {
+  embedded?: boolean;
   teachingAssignmentId: string;
   classContext: TeacherClassWorkContext;
   teacherUserId: string;
@@ -57,6 +58,7 @@ interface OpenedRecord {
  * academic choice from array order, a default flag, or a subject name.
  */
 export function ClassRecordJourneyScreen({
+  embedded = false,
   teachingAssignmentId,
   classContext,
   teacherUserId,
@@ -74,6 +76,7 @@ export function ClassRecordJourneyScreen({
   const [policyId, setPolicyId] = useState("");
   const [openedRecord, setOpenedRecord] = useState<OpenedRecord | null>(null);
   const [authoring, setAuthoring] = useState(false);
+  const [matchingRecords, setMatchingRecords] = useState<ClassRecordDetail[]>([]);
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const requestRef = useRef(0);
@@ -86,6 +89,7 @@ export function ClassRecordJourneyScreen({
     setOpenedRecord(null);
     setAuthoring(false);
     setOpenError(null);
+    setMatchingRecords([]);
 
     async function run(): Promise<Resolution> {
       const assignments = await subjectAttendanceService.listMyAssignments(teacherUserId);
@@ -159,6 +163,28 @@ export function ClassRecordJourneyScreen({
     setOpening(true);
     setOpenError(null);
     try {
+      const records = await classRecordService.listClassRecords();
+      const matching = records.filter(
+        (record) =>
+          record.sectionId === resolution.sectionId &&
+          record.subjectId === resolution.subjectId &&
+          record.gradingPeriodId === period.id &&
+          record.weightPolicyId === policy.id &&
+          record.schoolYear === resolution.schoolYear,
+      );
+      if (matching.length > 1) {
+        setMatchingRecords(matching);
+        return;
+      }
+      const saved = matching[0];
+      if (matching.length === 1 && saved) {
+        setOpenedRecord({
+          classRecordId: saved.id,
+          gradingPeriodLabel: period.label,
+          weightPolicyName: policy.name,
+        });
+        return;
+      }
       const created = await classRecordService.createClassRecord(
         resolution.sectionId,
         resolution.subjectId,
@@ -196,6 +222,7 @@ export function ClassRecordJourneyScreen({
   if (resolution.status === "loading") {
     return (
       <Page
+        autoFocus={!embedded}
         title={`${classContext.subjectName} — ${classContext.sectionName}`}
         actions={backButton}
       >
@@ -207,6 +234,7 @@ export function ClassRecordJourneyScreen({
   if (resolution.status === "error") {
     return (
       <Page
+        autoFocus={!embedded}
         title={`${classContext.subjectName} — ${classContext.sectionName}`}
         actions={backButton}
       >
@@ -260,6 +288,7 @@ export function ClassRecordJourneyScreen({
 
   return (
     <Page
+      autoFocus={!embedded}
       title={`${classContext.subjectName} — ${classContext.sectionName}`}
       actions={backButton}
       hint={
@@ -276,8 +305,12 @@ export function ClassRecordJourneyScreen({
           <label htmlFor="journey-class-record-period">Grading period</label>
           <select
             id="journey-class-record-period"
+            disabled={opening}
             value={periodId}
-            onChange={(event) => setPeriodId(event.target.value)}
+            onChange={(event) => {
+              setPeriodId(event.target.value);
+              setMatchingRecords([]);
+            }}
           >
             <option value="">Choose a grading period</option>
             {resolution.periods.map((period) => (
@@ -291,8 +324,12 @@ export function ClassRecordJourneyScreen({
           <label htmlFor="journey-class-record-policy">DepEd grading weighting</label>
           <select
             id="journey-class-record-policy"
+            disabled={opening}
             value={policyId}
-            onChange={(event) => setPolicyId(event.target.value)}
+            onChange={(event) => {
+              setPolicyId(event.target.value);
+              setMatchingRecords([]);
+            }}
           >
             <option value="">Choose a grading weighting</option>
             {resolution.policies.map((policy) => (
@@ -310,6 +347,37 @@ export function ClassRecordJourneyScreen({
       >
         {opening ? "Opening…" : "Open class record"}
       </button>
+      {matchingRecords.length > 1 && (
+        <section aria-labelledby="matching-records-heading">
+          <h3 id="matching-records-heading">Choose a saved class record</h3>
+          <p>
+            Several records match this class, term, and weighting. Choose the one you want to
+            continue.
+          </p>
+          <ul className="assessment-item-list">
+            {matchingRecords.map((record, index) => (
+              <li key={record.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenedRecord({
+                      classRecordId: record.id,
+                      gradingPeriodLabel: record.gradingPeriodLabel,
+                      weightPolicyName: record.weightPolicyName,
+                    })
+                  }
+                >
+                  Record {index + 1} · {record.itemCount} assessment items · {record.recordedCount}{" "}
+                  scores recorded
+                  {Number.isNaN(Date.parse(record.createdAt))
+                    ? ""
+                    : ` · Created ${new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(record.createdAt))}`}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </Page>
   );
 }

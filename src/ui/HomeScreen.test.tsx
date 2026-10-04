@@ -128,7 +128,7 @@ describe("HomeScreen", () => {
 
   it("has no detectable accessibility violations for the teacher view", async () => {
     const { container } = renderHome(["teacher"]);
-    await screen.findByRole("heading", { name: "Welcome, Ana Cruz" });
+    await screen.findByRole("heading", { name: "Class folio" });
 
     await expectNoAccessibilityViolations(container);
   });

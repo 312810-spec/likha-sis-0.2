@@ -6,25 +6,20 @@ import { BottomNav } from "./BottomNav";
 import { expectNoAccessibilityViolations } from "../../test/a11y";
 
 function renderBottomNav(over: Partial<ComponentProps<typeof BottomNav>> = {}) {
-  return render(
-    <BottomNav activeTab="workspace" onNavigate={vi.fn()} onOpenMore={vi.fn()} {...over} />,
-  );
+  return render(<BottomNav activeTab="workspace" onNavigate={vi.fn()} {...over} />);
 }
 
 describe("BottomNav", () => {
-  it("renders four destinations plus More", () => {
+  it("renders the four concept destinations", () => {
     renderBottomNav();
-    for (const name of ["Home", "Classes", "Learners", "Grades", "More"]) {
+    for (const name of ["Today", "Classes", "Forms", "Account"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
   });
 
   it("marks the active destination", () => {
-    renderBottomNav({ activeTab: "learners" });
-    expect(screen.getByRole("button", { name: "Learners" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    renderBottomNav({ activeTab: "account" });
+    expect(screen.getByRole("button", { name: "Account" })).toHaveAttribute("aria-current", "page");
   });
 
   it("normalizes contextual tabs (section-roster -> nothing in the bar is current)", () => {
@@ -39,14 +34,13 @@ describe("BottomNav", () => {
     await expectNoAccessibilityViolations(container);
   });
 
-  it("calls onNavigate / onOpenMore", async () => {
+  it("navigates to Classes and Account without opening a synthetic drawer destination", async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();
-    const onOpenMore = vi.fn();
-    renderBottomNav({ onNavigate, onOpenMore });
+    renderBottomNav({ onNavigate });
     await user.click(screen.getByRole("button", { name: "Classes" }));
-    expect(onNavigate).toHaveBeenCalledWith("today-classes");
-    await user.click(screen.getByRole("button", { name: "More" }));
-    expect(onOpenMore).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith("my-day");
+    await user.click(screen.getByRole("button", { name: "Account" }));
+    expect(onNavigate).toHaveBeenCalledWith("account");
   });
 });

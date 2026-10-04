@@ -314,11 +314,34 @@ beforeEach(() => {
 });
 
 describe("ClassRecordWorkspace", () => {
+  it("updates assessment completion and protection after the first saved score", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await user.click(await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    await user.type(await screen.findByLabelText("Score for Ana Cruz"), "18{Enter}");
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\).*1 of 1 recorded/ });
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Can’t delete — already has recorded scores/)).toBeInTheDocument();
+  });
+  it("keeps an unfinished assessment draft when the editor is collapsed", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
+    const toggle = screen.getByRole("button", { name: "Add assessment item" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
+    await user.type(screen.getByLabelText("Item name"), "Draft quiz");
+    await user.click(screen.getByRole("button", { name: "Close item editor" }));
+    expect(screen.getByLabelText("Item name")).not.toBeVisible();
+    await user.click(toggle);
+    expect(screen.getByLabelText("Item name")).toHaveValue("Draft quiz");
+  });
   it("explains grading categories and links the help to each field in Guided mode", async () => {
     window.localStorage.setItem("likha-sis:teacher-mode", "guided");
     renderScreen();
     await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" });
 
+    await userEvent.click(screen.getByRole("button", { name: "Add assessment item" }));
     const categorySet = screen.getByLabelText("Category set");
     const category = screen.getByLabelText("Category");
     expect(categorySet).toHaveAccessibleDescription(/DepEd grading rules/);
@@ -338,6 +361,7 @@ describe("ClassRecordWorkspace", () => {
     const { assessmentRepo } = renderScreen();
     await screen.findByRole("button", { name: "Written Works — Quiz 1 (max 20)" });
 
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
     await user.type(screen.getByLabelText("Item name"), "Quiz 2");
     await user.clear(screen.getByLabelText("Max score"));
     await user.type(screen.getByLabelText("Max score"), "10");
@@ -1096,6 +1120,7 @@ describe("ClassRecordWorkspace", () => {
     renderScreen({ assessmentRepo });
     await screen.findByRole("button", { name: /Quiz 1 \(max 20\)/ });
 
+    await user.click(screen.getByRole("button", { name: "Add assessment item" }));
     await user.type(screen.getByLabelText("Item name"), "Quiz 2");
     const addButton = screen.getByRole("button", { name: "Add item" });
     await user.click(addButton);

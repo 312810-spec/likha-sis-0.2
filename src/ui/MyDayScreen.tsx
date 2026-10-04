@@ -90,16 +90,16 @@ export function MyDayScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myDayService]);
 
-  if (selectedClassContext) {
-    return (
-      <ClassWorkspaceScreen
-        context={selectedClassContext}
-        onCheckAttendance={onCheckAttendance}
-        onOpenClassRecord={onOpenClassRecord}
-        onBackToToday={onBackToToday}
-      />
-    );
-  }
+  // Scheduling failures must not discard a class already selected before
+  // entering attendance or scores. Trusted services revalidate every action.
+  const classWorkspace = selectedClassContext ? (
+    <ClassWorkspaceScreen
+      context={selectedClassContext}
+      onCheckAttendance={onCheckAttendance}
+      onOpenClassRecord={onOpenClassRecord}
+      onBackToToday={onBackToToday}
+    />
+  ) : null;
 
   return (
     <Page
@@ -123,90 +123,151 @@ export function MyDayScreen({
       )}
 
       {loading ? (
-        <Loading label="Loading My Day…" />
-      ) : error || !summary ? null : (
         <>
-          <h3>Today&rsquo;s schedule</h3>
-          {summary.schedule.length === 0 ? (
-            <EmptyState>No classes scheduled for you today.</EmptyState>
-          ) : (
-            <ul className="workspace-priority-rail">
-              {summary.schedule.map((item, index) => (
-                <li
-                  key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
-                  className="workspace-priority-item"
-                >
-                  <div className="workspace-priority-main">
-                    <span className="workspace-priority-section">
-                      {item.subjectName} — {item.sectionName}
-                    </span>
-                    <span className="field-hint">
-                      {item.startsAt}–{item.endsAt}
-                      {item.room ? ` · ${item.room}` : ""}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="button-primary"
-                    onClick={() =>
-                      onOpenClassContext({
-                        teachingAssignmentId: item.teachingAssignmentId,
-                        subjectName: item.subjectName,
-                        sectionName: item.sectionName,
-                        startsAt: item.startsAt,
-                        endsAt: item.endsAt,
-                        room: item.room,
-                      })
+          <Loading label="Loading My Day…" />
+          {classWorkspace}
+        </>
+      ) : error || !summary ? (
+        classWorkspace
+      ) : (
+        <>
+          <div className="class-folio">
+            <aside className="folio-index" aria-label="Today's class index">
+              <div className="folio-index-heading">
+                <h3>Today&rsquo;s schedule</h3>
+                <span>{summary.schedule.length}</span>
+              </div>
+              {summary.schedule.length > 0 && (
+                <label className="folio-mobile-picker">
+                  <span>Select a class</span>
+                  <select
+                    value={
+                      selectedClassContext
+                        ? summary.schedule.findIndex(
+                            (item) =>
+                              item.teachingAssignmentId ===
+                                selectedClassContext.teachingAssignmentId &&
+                              item.startsAt === selectedClassContext.startsAt,
+                          )
+                        : ""
                     }
+                    onChange={(event) => {
+                      const item = summary.schedule[Number(event.target.value)];
+                      if (item) onOpenClassContext(item);
+                    }}
                   >
-                    Open class
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <h3>Needs your attention today</h3>
-          {summary.pendingAttendance.length === 0 && summary.pendingConflicts.length === 0 ? (
-            <EmptyState>Nothing pending — you&rsquo;re all caught up for today.</EmptyState>
-          ) : (
-            <ul className="workspace-priority-rail">
-              {summary.pendingAttendance.map((task) => (
-                <li
-                  key={task.teachingAssignmentId}
-                  className="workspace-priority-item is-not-started"
-                >
-                  <div className="workspace-priority-main">
-                    <span className="workspace-priority-section">
-                      {task.subjectName} — {task.sectionName}
-                    </span>
-                    <span className="field-hint">attendance not yet checked</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="button-primary"
-                    onClick={() => onCheckAttendance(task.teachingAssignmentId)}
-                  >
-                    Check attendance
-                  </button>
-                </li>
-              ))}
-              {summary.pendingConflicts.length > 0 && (
-                <li className="workspace-priority-item is-not-started">
-                  <div className="workspace-priority-main">
-                    <span className="workspace-priority-section">
-                      {summary.pendingConflicts.length} sync{" "}
-                      {summary.pendingConflicts.length === 1 ? "conflict" : "conflicts"}
-                    </span>
-                    <span className="field-hint">waiting on your review</span>
-                  </div>
-                  <button type="button" className="button-primary" onClick={onReviewConflicts}>
-                    Review conflicts
-                  </button>
-                </li>
+                    <option value="" disabled>
+                      Choose a class
+                    </option>
+                    {summary.schedule.map((item, index) => (
+                      <option key={index} value={index}>
+                        {item.subjectName} — {item.sectionName} · {item.startsAt}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
-            </ul>
-          )}
+              {summary.schedule.length === 0 ? (
+                <EmptyState>No classes scheduled for you today.</EmptyState>
+              ) : (
+                <ul className="folio-section-list">
+                  {summary.schedule.map((item, index) => (
+                    <li
+                      key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
+                      className="folio-schedule-item"
+                    >
+                      <button
+                        type="button"
+                        className="folio-section-choice"
+                        aria-pressed={
+                          selectedClassContext?.teachingAssignmentId ===
+                            item.teachingAssignmentId &&
+                          selectedClassContext?.startsAt === item.startsAt
+                        }
+                        onClick={() =>
+                          onOpenClassContext({
+                            teachingAssignmentId: item.teachingAssignmentId,
+                            subjectName: item.subjectName,
+                            sectionName: item.sectionName,
+                            startsAt: item.startsAt,
+                            endsAt: item.endsAt,
+                            room: item.room,
+                          })
+                        }
+                      >
+                        <span className="folio-section-name">
+                          {item.subjectName} — {item.sectionName}
+                        </span>
+                        <span className="folio-section-state">
+                          {item.startsAt}–{item.endsAt}
+                          {item.room ? ` · ${item.room}` : ""}
+                        </span>
+                        <span className="field-hint">Open class</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </aside>
+            <div className="folio-sheet">
+              {selectedClassContext ? (
+                classWorkspace
+              ) : (
+                <div className="folio-sheet-heading">
+                  <div>
+                    <p className="folio-eyebrow">Your teaching day</p>
+                    <h3>Choose a class</h3>
+                    <p className="field-hint">
+                      Attendance and class records stay connected to your selection.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <details className="folio-pending" open={!selectedClassContext}>
+            <summary>Needs your attention today</summary>
+            {summary.pendingAttendance.length === 0 && summary.pendingConflicts.length === 0 ? (
+              <EmptyState>Nothing pending — you&rsquo;re all caught up for today.</EmptyState>
+            ) : (
+              <ul className="workspace-priority-rail">
+                {summary.pendingAttendance.map((task) => (
+                  <li
+                    key={task.teachingAssignmentId}
+                    className="workspace-priority-item is-not-started"
+                  >
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.subjectName} — {task.sectionName}
+                      </span>
+                      <span className="field-hint">attendance not yet checked</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={() => onCheckAttendance(task.teachingAssignmentId)}
+                    >
+                      Check attendance
+                    </button>
+                  </li>
+                ))}
+                {summary.pendingConflicts.length > 0 && (
+                  <li className="workspace-priority-item is-not-started">
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {summary.pendingConflicts.length} sync{" "}
+                        {summary.pendingConflicts.length === 1 ? "conflict" : "conflicts"}
+                      </span>
+                      <span className="field-hint">waiting on your review</span>
+                    </div>
+                    <button type="button" className="button-primary" onClick={onReviewConflicts}>
+                      Review conflicts
+                    </button>
+                  </li>
+                )}
+              </ul>
+            )}
+          </details>
         </>
       )}
     </Page>

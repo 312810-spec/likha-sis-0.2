@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MyDayApplicationService } from "../application/my-day-service";
@@ -44,7 +44,10 @@ class FakeMyDayRepository implements MyDayRepository {
   }
 }
 
-function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
+function renderScreen(
+  result: MyDaySummary | "reject" = SUMMARY,
+  initialContext: TeacherClassWorkContext | null = null,
+) {
   const repo = new FakeMyDayRepository(result);
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
@@ -52,7 +55,7 @@ function renderScreen(result: MyDaySummary | "reject" = SUMMARY) {
   const onReviewConflicts = vi.fn();
 
   function Host() {
-    const [context, setContext] = useState<TeacherClassWorkContext | null>(null);
+    const [context, setContext] = useState<TeacherClassWorkContext | null>(initialContext);
     return (
       <ModeProvider>
         <MyDayScreen
@@ -89,27 +92,48 @@ describe("MyDayScreen", () => {
   it("opens the scheduled class without asking for the class again", async () => {
     const user = userEvent.setup();
     renderScreen();
-    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(await screen.findByRole("button", { name: /Open class$/ }));
     expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
     expect(screen.getByLabelText("Selected class schedule")).toHaveTextContent(
       "08:00–08:50 · Room 101",
     );
   });
 
+  it("keeps the index and distinguishes repeat meetings of the same class", async () => {
+    const user = userEvent.setup();
+    const first = SUMMARY.schedule[0]!;
+    renderScreen({
+      ...SUMMARY,
+      schedule: [first, { ...first, startsAt: "13:00", endsAt: "13:50" }],
+    });
+    const choices = await screen.findAllByRole("button", { name: /Open class$/ });
+    await user.click(choices[0]!);
+    expect(choices[0]).toHaveAttribute("aria-pressed", "true");
+    expect(choices[1]).toHaveAttribute("aria-pressed", "false");
+    await user.click(choices[1]!);
+    expect(choices[0]).toHaveAttribute("aria-pressed", "false");
+    expect(choices[1]).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Selected class schedule")).toHaveTextContent("13:00–13:50");
+  });
+
   it("can return from the class workspace to today's schedule", async () => {
     const user = userEvent.setup();
     renderScreen();
-    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(await screen.findByRole("button", { name: /Open class$/ }));
     await user.click(screen.getByRole("button", { name: "Back to Today" }));
     expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open class" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open class$/ })).toBeInTheDocument();
   });
 
   it("opens subject attendance for the selected class from the class workspace", async () => {
     const user = userEvent.setup();
     const { onCheckAttendance } = renderScreen();
-    await user.click(await screen.findByRole("button", { name: "Open class" }));
-    await user.click(screen.getByRole("button", { name: "Check attendance" }));
+    await user.click(await screen.findByRole("button", { name: /Open class$/ }));
+    await user.click(
+      within(screen.getByRole("region", { name: "Mathematics — Mabini" })).getByRole("button", {
+        name: "Check attendance",
+      }),
+    );
     expect(onCheckAttendance).toHaveBeenCalledWith("ta-1");
   });
 
@@ -123,7 +147,7 @@ describe("MyDayScreen", () => {
   it("opens the class record for the selected class from the class workspace", async () => {
     const user = userEvent.setup();
     const { onOpenClassRecord } = renderScreen();
-    await user.click(await screen.findByRole("button", { name: "Open class" }));
+    await user.click(await screen.findByRole("button", { name: /Open class$/ }));
     await user.click(screen.getByRole("button", { name: "Open class record" }));
     expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
   });
@@ -133,6 +157,15 @@ describe("MyDayScreen", () => {
     const { onReviewConflicts } = renderScreen();
     await user.click(await screen.findByRole("button", { name: "Review conflicts" }));
     expect(onReviewConflicts).toHaveBeenCalled();
+  });
+
+  it("retains previously selected class work when the schedule refresh fails", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecord } = renderScreen("reject", SUMMARY.schedule[0]);
+    await screen.findByText("Could not load My Day.");
+    expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
   });
 
   it("shows a retryable error when loading fails", async () => {

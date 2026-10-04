@@ -45,115 +45,43 @@ describe("Sidebar", () => {
     expect(img).toHaveAttribute("src", "blob:mock-logo");
   });
 
-  it("renders the brand, signed-in identity, pinned Home, and navigation groups", () => {
+  it("shows school branding and only the six primary destinations", () => {
     renderSidebar();
-    expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "LIKHA-SIS" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
-    expect(screen.getByText("Ana Cruz")).toBeInTheDocument();
+    expect(screen.getByText("LIKHA-SIS")).toBeInTheDocument();
     expect(screen.getByText("Rizal Elementary")).toBeInTheDocument();
-    for (const g of ["Daily Teaching", "Class Overview", "Learner Records", "Grading"]) {
-      expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("button")).toHaveLength(6);
+    for (const name of [
+      "Dashboard",
+      "My Advisory",
+      "Class Record",
+      "School Forms",
+      "Calendar",
+      "More",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
-    // Sync and Security are lower-frequency/admin groups -- collapsed by
-    // default so a first-time sidebar isn't ~24 destinations deep.
-    for (const g of ["Sync", "Security"]) {
-      expect(screen.getByRole("button", { name: g })).toHaveAttribute("aria-expanded", "false");
-    }
+    expect(screen.queryByText("Ana Cruz")).not.toBeInTheDocument();
   });
-
-  it("collapses Sync and Security by default on fresh storage, leaving the other groups expanded", () => {
-    renderSidebar();
-    expect(screen.getByRole("button", { name: "Sync" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: "Sync Status" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(screen.queryByRole("button", { name: "Sign-in Activity" })).not.toBeInTheDocument();
-  });
-
-  it("a teacher's own choice to expand Security overrides the default and survives a remount", async () => {
-    const user = userEvent.setup();
-    const { unmount } = renderSidebar();
-    await user.click(screen.getByRole("button", { name: "Security" }));
-    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    unmount();
-
-    renderSidebar();
-    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-  });
-
-  it("marks the active destination with aria-current", () => {
+  it("keeps My Advisory highlighted while recording advisory attendance", () => {
     renderSidebar("attendance");
-    expect(screen.getByRole("button", { name: "Attendance" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "My Advisory" })).toHaveAttribute(
       "aria-current",
       "page",
     );
   });
-
-  it("normalizes a contextual tab so its parent stays highlighted", () => {
+  it("keeps More highlighted for contextual school setup tools", () => {
     renderSidebar("section-roster");
-    expect(screen.getByRole("button", { name: /Sections/ })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(screen.getByRole("button", { name: "More" })).toHaveAttribute("aria-current", "page");
   });
-
-  it("calls onNavigate with the tab id when a destination is clicked", async () => {
-    const user = userEvent.setup();
+  it("navigates to a real primary destination", async () => {
     const onNavigate = vi.fn();
     renderSidebar("attendance", onNavigate);
-    await user.click(screen.getByRole("button", { name: "Learners" }));
-    expect(onNavigate).toHaveBeenCalledWith("learners");
-  });
-
-  it("collapses a group, hides its items, and persists the choice", async () => {
-    const user = userEvent.setup();
-    const { unmount } = renderSidebar();
-    await user.click(screen.getByRole("button", { name: "Grading" }));
-    expect(screen.getByRole("button", { name: "Grading" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    expect(screen.queryByRole("button", { name: "Class Records" })).not.toBeInTheDocument();
-    expect(window.localStorage.getItem("likha-sis:nav-collapsed")).toContain("Grading");
-    unmount();
-    renderSidebar();
-    expect(screen.getByRole("button", { name: "Grading" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    await userEvent.setup().click(screen.getByRole("button", { name: "School Forms" }));
+    expect(onNavigate).toHaveBeenCalledWith("school-forms");
   });
 
   it("has no axe violations on a default render", async () => {
     const { container } = renderSidebar();
     await expectNoAccessibilityViolations(container);
-  });
-
-  it("survives unreadable localStorage by falling back to the same default as fresh storage", () => {
-    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    renderSidebar();
-    expect(screen.getByRole("button", { name: "Daily Teaching" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    // There's no way to know what the teacher chose when storage throws --
-    // fall back to the same collapsed-by-default set as fresh storage, not
-    // an empty (all-expanded) one.
-    expect(screen.getByRole("button", { name: "Sync" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "Security" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-    spy.mockRestore();
   });
 });

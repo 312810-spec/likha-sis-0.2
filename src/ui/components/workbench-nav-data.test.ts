@@ -9,8 +9,8 @@ import {
 } from "./workbench-nav-data";
 
 describe("workbench-nav-data", () => {
-  it("labels the workspace destination as Home", () => {
-    expect(TAB_LABELS.workspace).toBe("Home");
+  it("labels the workspace destination as Dashboard", () => {
+    expect(TAB_LABELS.workspace).toBe("Dashboard");
   });
 
   it("uses plain-language labels for specialist teacher views", () => {
@@ -20,7 +20,7 @@ describe("workbench-nav-data", () => {
   });
 
   it("pins Home outside the groups", () => {
-    expect(HOME_DESTINATION).toEqual({ id: "workspace", label: "Home" });
+    expect(HOME_DESTINATION).toEqual({ id: "workspace", label: "Dashboard" });
     const inAnyGroup = NAV_GROUPS.some((g) => g.tabs.some((t) => t.id === "workspace"));
     expect(inAnyGroup).toBe(false);
   });
@@ -32,13 +32,8 @@ describe("workbench-nav-data", () => {
     expect(new Set(grouped).size).toBe(grouped.length);
   });
 
-  it("exposes a five-slot bottom nav (four real + synthetic More)", () => {
-    expect(BOTTOM_NAV.map((d) => d.id)).toEqual([
-      "workspace",
-      "today-classes",
-      "learners",
-      "class-records",
-    ]);
+  it("exposes the four concept phone destinations", () => {
+    expect(BOTTOM_NAV.map((d) => d.id)).toEqual(["workspace", "my-day", "school-forms", "account"]);
   });
 
   it("normalizes contextual tabs to their parent list tab", () => {

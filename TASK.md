@@ -54,3 +54,48 @@ reset is recorded as history; verification above was rerun on restored source.
 - Local whole-repo formatting encounters a pre-existing uncommitted change in
   docs/SOURCE-REGISTRY.md; it is preserved and excluded from this checkpoint.
 - Windows CI must verify DPAPI recovery and build refreshed test installers.
+
+## Approved school class folio redesign
+
+Branch: `design/premium-school-ui-20261003`, based on main through PR101; draft PR102.
+The owner requested complete concept fidelity using Prompt Master to establish the
+frontend engineer role first. The brief is in docs/design/class-folio.
+
+Dashboard now lists authorized subject assignments beside a worksheet with
+Overview, Scores, and Forms. The real grading journey is embedded and preserves
+work across worksheet tabs. Desktop has six primary destinations; phone has
+Today, Classes, Forms, and Account. School Forms and Calendar use existing real
+services. More preserves specialized management tools and the daily planner.
+Global school theme includes remembered Light/Dark/System; appearance, density,
+and sign-out are in Account. Official advisory attendance stays separate from
+subject records. Login starts on Dashboard.
+
+Two independent design/workflow reviews found and resolved the local Back-to-class
+no-op, retained login destination, and tab-switch draft loss. Actual screenshots
+and implementation boundaries are in docs/design/class-folio/README.md and
+ADR-0073. Core frontend quality: 132 files / 1,225 tests pass. Browser checks cover
+both appearances, three densities, four widths, context and navigation, with zero
+WCAG A/AA findings. Production build and dev-preview isolation pass.
+
+Next release check: exercise the complete redesigned workflow, keyboard use, and
+appearance in the installed Windows app. Native Android remains unsupported
+pending the native work above. Production is not deployed by this redesign.
+
+## Class folio detail refinement
+
+Continued on the same isolated design branch and draft PR102. The refinement adds
+stable keyboard focus in embedded Scores, an announced selected class, a sticky
+bounded desktop class index, density-aware reading text, and a bounded Account
+panel with a close control. Scoring now has draft-preserving assessment disclosure,
+aligned assessment/actions, spaced exports and immediate completion/protection
+feedback after score save. Open class record reuses an exact existing match;
+multiple matches require teacher choice. Grading rules/native authority are unchanged.
+
+Updated actual desktop/phone/light/dark scoring captures are in the design folder.
+Full frontend quality passes: 132 files / 1,233 tests. Production build and
+dev-preview isolation pass. Browser smoke covers both appearances, all three
+densities and four widths, actual keyboard scoring, sticky index and short-screen
+Account, with zero axe WCAG A/AA findings. Independent review caught and resolved
+a delayed-save focus leak across class changes.
+Next release check remains the installed Windows app workflow. No deployment or
+native Android support is implied by browser refinement.

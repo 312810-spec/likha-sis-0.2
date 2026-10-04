@@ -109,8 +109,8 @@ describe("AppLayout", () => {
     // With the drawer open at phone width the sidebar is the only live
     // navigation landmark (aria-label "Primary", exact).
     const sidebar = screen.getByRole("navigation", { name: "Primary" });
-    await user.click(within(sidebar).getByRole("button", { name: "Learners" }));
-    expect(onNavigate).toHaveBeenCalledWith("learners");
+    await user.click(within(sidebar).getByRole("button", { name: "More" }));
+    expect(onNavigate).toHaveBeenCalledWith("more");
     expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "closed");
   });
 
@@ -126,7 +126,7 @@ describe("AppLayout", () => {
     const hamburger = screen.getByRole("button", { name: "Open navigation" });
     await user.click(hamburger);
     const sidebar = screen.getByRole("navigation", { name: "Primary" });
-    await user.click(within(sidebar).getByRole("button", { name: "Learners" }));
+    await user.click(within(sidebar).getByRole("button", { name: "More" }));
     expect(hamburger).not.toHaveFocus();
   });
 

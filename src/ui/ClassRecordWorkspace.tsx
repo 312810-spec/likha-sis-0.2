@@ -68,6 +68,10 @@ export function ClassRecordWorkspace({
   const [itemName, setItemName] = useState("");
   const [maxScore, setMaxScore] = useState("20");
   const [creatingItem, setCreatingItem] = useState(false);
+  const composerToggleRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const [composerOpen, setComposerOpen] = useState<boolean | null>(null);
+  const composerVisible = composerOpen ?? (!itemsLoading && items.length === 0);
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -236,6 +240,13 @@ export function ClassRecordWorkspace({
         const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
         setItems(refreshed);
         setItemName("");
+        setComposerOpen(false);
+        if (
+          composerRef.current?.contains(document.activeElement) &&
+          !composerRef.current.closest("[hidden]")
+        ) {
+          composerToggleRef.current?.focus();
+        }
         setConfirmation(`${created.name} added.`);
       }
     } catch (err) {
@@ -407,6 +418,17 @@ export function ClassRecordWorkspace({
           entry.learnerId === learnerId
             ? { ...entry, status, score: recorded.score, updatedAt: recorded.updatedAt }
             : entry,
+        ),
+      );
+      setItems((current) =>
+        current.map((item) =>
+          item.id === selectedItemId
+            ? {
+                ...item,
+                recordedCount: item.recordedCount + (currentEntry?.status === null ? 1 : 0),
+                totalEligible: roster.length,
+              }
+            : item,
         ),
       );
       setScoreDrafts((current) => {
@@ -592,78 +614,98 @@ export function ClassRecordWorkspace({
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
-      <div className="form-row">
-        <div className="field">
-          <label htmlFor="workspace-category-set">Category set</label>
-          {mode === "guided" && (
-            <p className="field-hint" id="workspace-category-set-hint">
-              Choose the DepEd grading rules that define how activity types are grouped and weighted
-              for this class record.
-            </p>
-          )}
-          <select
-            id="workspace-category-set"
-            aria-describedby={mode === "guided" ? "workspace-category-set-hint" : undefined}
-            value={categorySetId}
-            onChange={(event) => setCategorySetId(event.target.value)}
-          >
-            {categorySets.map((set) => (
-              <option key={set.id} value={set.id}>
-                {set.name}
-                {set.isDefault ? " (default)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="workspace-category">Category</label>
-          {mode === "guided" && (
-            <p className="field-hint" id="workspace-category-hint">
-              Choose the activity type, such as Written Works or Performance Tasks. This decides
-              which grading weight the scores use.
-            </p>
-          )}
-          <select
-            id="workspace-category"
-            aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-          >
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="workspace-item-name">Item name</label>
-          <input
-            id="workspace-item-name"
-            type="text"
-            placeholder="e.g. Quiz 1"
-            value={itemName}
-            onChange={(event) => setItemName(event.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="workspace-max-score">Max score</label>
-          <input
-            id="workspace-max-score"
-            type="number"
-            min="1"
-            value={maxScore}
-            onChange={(event) => setMaxScore(event.target.value)}
-          />
-        </div>
+      <div className="assessment-toolbar">
+        <h3>Assessment items</h3>
+        <button
+          ref={composerToggleRef}
+          id="assessment-composer-toggle"
+          type="button"
+          aria-expanded={composerVisible}
+          aria-controls="assessment-composer"
+          onClick={() => setComposerOpen(!composerVisible)}
+        >
+          {composerVisible ? "Close item editor" : "Add assessment item"}
+        </button>
       </div>
-      <button
-        type="button"
-        aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
-        onClick={handleCreateItem}
+      <div
+        ref={composerRef}
+        id="assessment-composer"
+        className="assessment-composer"
+        hidden={!composerVisible}
       >
-        {creatingItem ? "Adding…" : "Add item"}
-      </button>
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="workspace-category-set">Category set</label>
+            {mode === "guided" && (
+              <p className="field-hint" id="workspace-category-set-hint">
+                Choose the DepEd grading rules that define how activity types are grouped and
+                weighted for this class record.
+              </p>
+            )}
+            <select
+              id="workspace-category-set"
+              aria-describedby={mode === "guided" ? "workspace-category-set-hint" : undefined}
+              value={categorySetId}
+              onChange={(event) => setCategorySetId(event.target.value)}
+            >
+              {categorySets.map((set) => (
+                <option key={set.id} value={set.id}>
+                  {set.name}
+                  {set.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="workspace-category">Category</label>
+            {mode === "guided" && (
+              <p className="field-hint" id="workspace-category-hint">
+                Choose the activity type, such as Written Works or Performance Tasks. This decides
+                which grading weight the scores use.
+              </p>
+            )}
+            <select
+              id="workspace-category"
+              aria-describedby={mode === "guided" ? "workspace-category-hint" : undefined}
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="workspace-item-name">Item name</label>
+            <input
+              id="workspace-item-name"
+              type="text"
+              placeholder="e.g. Quiz 1"
+              value={itemName}
+              onChange={(event) => setItemName(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="workspace-max-score">Max score</label>
+            <input
+              id="workspace-max-score"
+              type="number"
+              min="1"
+              value={maxScore}
+              onChange={(event) => setMaxScore(event.target.value)}
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
+          onClick={handleCreateItem}
+        >
+          {creatingItem ? "Adding…" : "Add item"}
+        </button>
+      </div>
 
       {itemActionError && <Alert tone="error">{itemActionError}</Alert>}
 
@@ -1051,21 +1093,23 @@ export function ClassRecordWorkspace({
                 if this subject is Senior High School, Grade 12, or Key Stage 1, neither option is
                 DepEd-compliant for it yet.
               </p>
-              <button
-                type="button"
-                className="button-primary"
-                aria-disabled={exportingReportCard}
-                onClick={handleExportReportCard}
-              >
-                {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
-              </button>
-              <button
-                type="button"
-                aria-disabled={exportingClassSummary}
-                onClick={handleExportClassSummary}
-              >
-                {exportingClassSummary ? "Exporting…" : "Export class summary (CSV)"}
-              </button>
+              <div className="worksheet-actions">
+                <button
+                  type="button"
+                  className="button-primary"
+                  aria-disabled={exportingReportCard}
+                  onClick={handleExportReportCard}
+                >
+                  {exportingReportCard ? "Exporting…" : "Export report card (CSV)"}
+                </button>
+                <button
+                  type="button"
+                  aria-disabled={exportingClassSummary}
+                  onClick={handleExportClassSummary}
+                >
+                  {exportingClassSummary ? "Exporting…" : "Export class summary (CSV)"}
+                </button>
+              </div>
 
               {classSummaryResult && (
                 <Alert tone="success">
