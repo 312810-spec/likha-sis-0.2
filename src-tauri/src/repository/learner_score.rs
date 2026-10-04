@@ -118,6 +118,9 @@ pub fn record(
     if !roster.iter().any(|m| m.learner_id == learner_id) {
         return Ok(None);
     }
+    if !assessment_item::eligible_for_item(conn, school_id, assessment_item_id, learner_id)? {
+        return Ok(None);
+    }
     match (status, score) {
         (LearnerScoreStatus::Scored, Some(value)) => {
             if !(0.0..=item.max_score).contains(&value) {
@@ -228,6 +231,11 @@ pub fn roster_for_item(
     else {
         return Ok(None);
     };
+
+    let Some(meta) = assessment_item::lifecycle(conn, school_id, assessment_item_id)? else { return Ok(None); };
+    if meta.state == "planned" { return Ok(Some(Vec::new())); }
+    let starts_on = meta.event_starts_on.unwrap_or(starts_on);
+    let ends_on = meta.event_ends_on.unwrap_or(ends_on);
 
     let mut stmt = conn.prepare(
         "SELECT DISTINCT l.id, l.given_name, l.family_name, ls.status, ls.score, ls.updated_at \

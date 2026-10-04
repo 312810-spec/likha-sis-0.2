@@ -1,0 +1,9 @@
+[package]
+name = "tauri-plugin-likha-keystore"
+version = "0.1.0"
+edition = "2021"
+links = "tauri-plugin-likha-keystore"
+[dependencies]
+tauri = "2.12.1"
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

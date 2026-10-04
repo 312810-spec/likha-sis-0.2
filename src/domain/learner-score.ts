@@ -35,7 +35,17 @@ export interface LearnerScoreRosterEntry {
  * research record. `initialGrade` is the weighted-sum percentage before
  * transmutation/rounding; `termGrade` is the final whole-number grade
  * actually reported. */
+export interface GradeCompleteness {
+  expectedItems: number;
+  scoredItems: number;
+  excusedItems: number;
+  notApplicableItems: number;
+  unresolvedItems: number;
+  isComplete: boolean;
+}
+
 export interface ComputedTermGrade {
+  completeness?: GradeCompleteness;
   initialGrade: number;
   termGrade: number;
   /** True if the SY 2026-2027 Adjusted Transmutation Table was applied.

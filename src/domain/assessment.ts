@@ -46,3 +46,10 @@ export interface AssessmentItemDetail {
   recordedCount: number;
   totalEligible: number;
 }
+
+export interface AssessmentLifecycle {
+  state: "planned" | "closed";
+  eventStartsOn: string | null;
+  eventEndsOn: string | null;
+  dueOn: string | null;
+}

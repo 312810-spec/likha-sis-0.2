@@ -422,3 +422,20 @@ mod tests {
         );
     }
 }
+
+#[tauri::command]
+pub fn get_assessment_lifecycle(db: State<'_, Mutex<Connection>>, sessions: State<'_, SessionManager>, id: String) -> AppResult<Option<assessment_item::AssessmentLifecycle>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    assessment_item::lifecycle(&conn, &school_id, &id)
+}
+
+#[tauri::command]
+pub fn set_assessment_lifecycle(db: State<'_, Mutex<Connection>>, sessions: State<'_, SessionManager>, id: String, value: assessment_item::AssessmentLifecycle) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let (actor, school_id) = sessions.require_active_session(&conn)?;
+    let Some(item) = assessment_item::find_by_id_in_school(&conn, &school_id, &id)? else { return Ok(false); };
+    let authorized: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM class_records cr JOIN teaching_assignments ta ON ta.section_id=cr.section_id AND ta.subject_id=cr.subject_id AND ta.school_id=cr.school_id WHERE cr.id=?1 AND cr.school_id=?2 AND ta.teacher_user_id=?3)", (&item.class_record_id,&school_id,&actor), |r| r.get(0))?;
+    if !authorized { return Err(AppError::Unauthorized); }
+    assessment_item::set_lifecycle(&conn, &school_id, &id, &value)
+}

@@ -99,8 +99,8 @@ pub fn build_class_summary_export(
     for row in rows {
         let name = format!("{}, {}", row.family_name, row.given_name);
         let average = match &row.grade {
-            Some(grade) => grade.term_grade.to_string(),
-            None => "No grade yet".to_string(),
+            Some(grade) if grade.completeness.is_complete => grade.term_grade.to_string(),
+            None | Some(_) => "No grade yet".to_string(),
         };
         lines.push(csv::row(&[name, average]));
     }
@@ -155,6 +155,7 @@ mod tests {
 
     fn a_grade() -> ComputedTermGrade {
         ComputedTermGrade {
+            completeness: crate::repository::grading_computation::GradeCompleteness { expected_items: 1, scored_items: 1, excused_items: 0, not_applicable_items: 0, unresolved_items: 0, is_complete: true },
             initial_grade: 85.8,
             term_grade: 88,
             was_transmuted: true,

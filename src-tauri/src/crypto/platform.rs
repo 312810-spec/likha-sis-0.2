@@ -7,7 +7,11 @@ pub(crate) fn key_store() -> AppResult<Box<dyn KeyStore>> {
     {
         Ok(Box::new(super::DpapiKeyStore))
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "android")]
+    {
+        Ok(Box::new(super::android::AndroidKeyStore))
+    }
+    #[cfg(not(any(windows, target_os = "android")))]
     {
         Err(AppError::key_store(
             "no encryption key store is implemented for this platform",

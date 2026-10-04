@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::class_record;
 
 /// One learner's computed grade for a class record's grading period, per
@@ -11,7 +11,19 @@ use crate::repository::class_record;
 /// the final whole-number grade actually reported (DepEd's "TG").
 #[derive(Debug, Clone, Copy, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct GradeCompleteness {
+    pub expected_items: u32,
+    pub scored_items: u32,
+    pub excused_items: u32,
+    pub not_applicable_items: u32,
+    pub unresolved_items: u32,
+    pub is_complete: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ComputedTermGrade {
+    pub completeness: GradeCompleteness,
     pub initial_grade: f64,
     pub term_grade: u32,
     /// True if the Adjusted Transmutation Table (Annex D, Table 4 — valid
@@ -80,28 +92,18 @@ const ADJUSTED_TRANSMUTATION_TABLE: &[(f64, f64, u32)] = &[
     (0.00, 4.67, 60),
 ];
 
-/// Looks up `ig` in the Adjusted Transmutation Table. `ig` outside
-/// `0.00..=100.00` is clamped to the nearest end of the table rather than
-/// panicking or erroring — a genuinely out-of-range IG should be
-/// impossible given `learner_score::record`'s own `0..=max_score` bound,
-/// but this keeps the function total rather than assuming that invariant
-/// holds all the way through a future refactor.
-fn transmute_adjusted(ig: f64) -> u32 {
-    if ig >= 100.00 {
-        return 100;
-    }
-    if ig <= 0.00 {
-        return 60;
+/// Uses the published two-decimal table without inventing a rounding rule.
+/// Fractional values between its printed ranges require a confirmed rule.
+fn transmute_adjusted(ig: f64) -> AppResult<u32> {
+    if !ig.is_finite() || !(0.0..=100.0).contains(&ig) {
+        return Err(AppError::GradeCalculation("initial grade is outside the valid range".into()));
     }
     for &(min, max, tg) in ADJUSTED_TRANSMUTATION_TABLE {
-        if ig >= min && ig <= max {
-            return tg;
+        if ig >= min - 1e-10 && ig <= max + 1e-10 {
+            return Ok(tg);
         }
     }
-    // Unreachable in practice: the table's ranges are contiguous across
-    // 0.00..=100.00 (verified by `transmutation_table_ranges_are_contiguous`
-    // below). A defensive fallback, not a silent wrong answer.
-    60
+    Err(AppError::GradeCalculation("initial grade falls between the published transmutation ranges; confirm the rounding rule".into()))
 }
 
 /// SY 2027-2028 onward: the Term Grade is the Initial Grade rounded to the
@@ -201,7 +203,14 @@ fn leaf_percentage_score(
          JOIN learner_scores ls ON ls.assessment_item_id = ai.id \
          WHERE ai.class_record_id = ?1 AND ai.category_id = ?2 \
            AND ls.learner_id = ?3 AND ls.status = 'scored' \
-           AND ai.school_id = ?4 AND ls.school_id = ?4",
+           AND ai.school_id = ?4 AND ls.school_id = ?4 \
+           AND NOT EXISTS (SELECT 1 FROM assessment_lifecycle al WHERE al.assessment_item_id=ai.id AND al.state='planned') \
+           AND EXISTS (SELECT 1 FROM class_records cr JOIN grading_periods gp ON gp.id=cr.grading_period_id \
+             JOIN section_memberships sm ON sm.section_id=cr.section_id AND sm.school_id=ai.school_id \
+             LEFT JOIN assessment_lifecycle al ON al.assessment_item_id=ai.id \
+             WHERE cr.id=ai.class_record_id AND sm.learner_id=?3 \
+             AND sm.starts_on <= COALESCE(al.event_ends_on,gp.ends_on) \
+             AND (sm.ends_on IS NULL OR sm.ends_on > COALESCE(al.event_starts_on,gp.starts_on)))",
         (class_record_id, category_id, learner_id, school_id),
         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     )?;
@@ -209,6 +218,34 @@ fn leaf_percentage_score(
         return Ok(None);
     }
     Ok(Some(raw_sum / max_sum * 100.0))
+}
+
+/// Counts every defined weighted item, including unresolved work. A draft
+/// numerical grade must not conceal blanks as if they were recorded zeros.
+pub fn completeness_for_learner(
+    conn: &Connection, school_id: &str, class_record_id: &str, learner_id: &str,
+) -> AppResult<GradeCompleteness> {
+    let (expected, scored, excused, not_applicable): (u32, u32, u32, u32) = conn.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(ls.status = 'scored'),0), \
+         COALESCE(SUM(ls.status = 'excused'),0), COALESCE(SUM(ls.status = 'not_applicable'),0) \
+         FROM assessment_items ai JOIN class_records cr ON cr.id = ai.class_record_id \
+         LEFT JOIN learner_scores ls ON ls.assessment_item_id = ai.id AND ls.learner_id = ?3 AND ls.school_id = ?1 \
+         WHERE ai.school_id = ?1 AND ai.class_record_id = ?2 \
+         AND EXISTS (SELECT 1 FROM grading_weight_components wc WHERE wc.policy_id = cr.weight_policy_id AND wc.category_id = ai.category_id) \
+           AND NOT EXISTS (SELECT 1 FROM assessment_lifecycle al WHERE al.assessment_item_id=ai.id AND al.state='planned') \
+           AND EXISTS (SELECT 1 FROM class_records cr JOIN grading_periods gp ON gp.id=cr.grading_period_id \
+             JOIN section_memberships sm ON sm.section_id=cr.section_id AND sm.school_id=ai.school_id \
+             LEFT JOIN assessment_lifecycle al ON al.assessment_item_id=ai.id \
+             WHERE cr.id=ai.class_record_id AND sm.learner_id=?3 \
+             AND sm.starts_on <= COALESCE(al.event_ends_on,gp.ends_on) \
+             AND (sm.ends_on IS NULL OR sm.ends_on > COALESCE(al.event_starts_on,gp.starts_on)))",
+        (school_id, class_record_id, learner_id),
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+    )?;
+    let unresolved = expected.saturating_sub(scored + excused + not_applicable);
+    Ok(GradeCompleteness { expected_items: expected, scored_items: scored,
+        excused_items: excused, not_applicable_items: not_applicable,
+        unresolved_items: unresolved, is_complete: expected > 0 && unresolved == 0 })
 }
 
 struct WeightRow {
@@ -323,11 +360,13 @@ pub fn compute_term_grade(
     let raw_tg = if zero_based {
         round_zero_based(initial_grade)
     } else {
-        transmute_adjusted(initial_grade)
+        transmute_adjusted(initial_grade)?
     };
     let (term_grade, was_floored) = apply_minimum_floor(raw_tg);
 
+    let completeness = completeness_for_learner(conn, school_id, class_record_id, learner_id)?;
     Ok(Some(ComputedTermGrade {
+        completeness,
         initial_grade,
         term_grade,
         was_transmuted: !zero_based,
@@ -355,17 +394,24 @@ mod tests {
     // most direct proof the transcribed table/formulas match the Order.
 
     #[test]
+    fn fractional_table_gaps_and_non_finite_values_are_explicit_errors() {
+        assert!(transmute_adjusted(99.495).is_err());
+        assert!(transmute_adjusted(4.675).is_err());
+        assert!(transmute_adjusted(f64::NAN).is_err());
+        assert!(transmute_adjusted(-1.0).is_err());
+    }
+
+    #[test]
     fn transmutation_table_ranges_are_contiguous_across_the_full_scale() {
         // Every IG from 0.00 to 100.00 must land in exactly one bucket —
         // proves the table was transcribed without a gap or overlap.
-        let mut ig = 0.0;
-        while ig <= 100.0 {
-            let tg = transmute_adjusted(ig);
+        for hundredths in 0..=10000 {
+            let ig = hundredths as f64 / 100.0;
+            let tg = transmute_adjusted(ig).unwrap();
             assert!(
                 (60..=100).contains(&tg),
                 "IG {ig} produced out-of-range TG {tg}"
             );
-            ig += 0.01;
         }
     }
 
@@ -375,19 +421,19 @@ mod tests {
         // to a transmuted passing grade of 75" — the single fact DepEd
         // states in prose, not just in the table, so it's worth its own
         // dedicated assertion independent of the full-table transcription.
-        assert_eq!(transmute_adjusted(70.00), 75);
+        assert_eq!(transmute_adjusted(70.00).unwrap(), 75);
     }
 
     #[test]
     fn transmute_matches_both_boundaries_and_midpoints_of_spot_checked_rows() {
-        assert_eq!(transmute_adjusted(100.00), 100);
-        assert_eq!(transmute_adjusted(99.50), 100);
-        assert_eq!(transmute_adjusted(99.49), 99);
-        assert_eq!(transmute_adjusted(85.34), 88);
-        assert_eq!(transmute_adjusted(85.33), 87);
-        assert_eq!(transmute_adjusted(0.00), 60);
-        assert_eq!(transmute_adjusted(4.67), 60);
-        assert_eq!(transmute_adjusted(4.68), 61);
+        assert_eq!(transmute_adjusted(100.00).unwrap(), 100);
+        assert_eq!(transmute_adjusted(99.50).unwrap(), 100);
+        assert_eq!(transmute_adjusted(99.49).unwrap(), 99);
+        assert_eq!(transmute_adjusted(85.34).unwrap(), 88);
+        assert_eq!(transmute_adjusted(85.33).unwrap(), 87);
+        assert_eq!(transmute_adjusted(0.00).unwrap(), 60);
+        assert_eq!(transmute_adjusted(4.67).unwrap(), 60);
+        assert_eq!(transmute_adjusted(4.68).unwrap(), 61);
     }
 
     #[test]

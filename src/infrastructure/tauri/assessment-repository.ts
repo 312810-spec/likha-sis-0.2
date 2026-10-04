@@ -1,5 +1,6 @@
 import { invoke } from "./invoke";
 import type {
+  AssessmentLifecycle,
   AssessmentCategory,
   AssessmentCategorySet,
   AssessmentItem,
@@ -9,6 +10,14 @@ import type { AssessmentRepository } from "../../domain/ports/assessment-reposit
 
 /** Tauri/SQLite implementation of {@link AssessmentRepository}. */
 export class TauriAssessmentRepository implements AssessmentRepository {
+  getLifecycle(id: string): Promise<AssessmentLifecycle | null> {
+    return invoke("get_assessment_lifecycle", { id });
+  }
+
+  setLifecycle(id: string, value: AssessmentLifecycle): Promise<boolean> {
+    return invoke("set_assessment_lifecycle", { id, value });
+  }
+
   listCategorySets(): Promise<AssessmentCategorySet[]> {
     return invoke<AssessmentCategorySet[]>("list_assessment_category_sets");
   }
