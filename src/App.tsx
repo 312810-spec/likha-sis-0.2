@@ -68,7 +68,7 @@ import { TeachingAssignmentsScreen } from "./ui/TeachingAssignmentsScreen";
 import { TodaysClassesScreen } from "./ui/TodaysClassesScreen";
 import type { AdvisoryWorkContext, TeacherClassWorkContext } from "./ui/work-context";
 import { AppLayout } from "./ui/shell/AppLayout";
-import { TAB_LABELS, type SignedInTab } from "./ui/components/workbench-nav-data";
+import { TAB_LABELS, canNavigateTab, type SignedInTab } from "./ui/components/workbench-nav-data";
 import { ModeProvider } from "./ui/theme/ModeContext";
 import "./ui/theme/styles.css";
 import { NewSchoolWorkspace, type NewSchoolDestination } from "./ui/NewSchoolWorkspace";
@@ -277,15 +277,15 @@ function App() {
           )
         ).some((s) => s.id === id),
     }),
-    [session?.userId],
+    [session],
   );
   useEffect(() => {
     if (session && classWorkContext) writeClassResumePointer(session.userId, classWorkContext);
-  }, [session?.userId, classWorkContext]);
+  }, [session, classWorkContext]);
   useEffect(() => {
     if (session && advisoryWorkContext)
       writeAdvisoryResumePointer(session.userId, advisoryWorkContext);
-  }, [session?.userId, advisoryWorkContext]);
+  }, [session, advisoryWorkContext]);
   const openPublishedClass = (id: string) => {
     setSubjectAttendanceAssignmentId(id);
     setActiveTab("subject-attendance");
@@ -355,7 +355,9 @@ function App() {
           key={`${session.schoolId}:${session.userId}`}
           session={session}
           activeTab={activeTab}
-          onNavigate={setActiveTab}
+          onNavigate={(tab) => {
+            if (canNavigateTab(tab, session.roles)) setActiveTab(tab);
+          }}
           onLogout={handleLogout}
           schoolLogoService={schoolLogoService}
         >
@@ -400,9 +402,19 @@ function App() {
               onOpenSf1Import={() => setActiveTab("sf1-import")}
             />
           ) : activeTab === "school-forms" ? (
-            <SchoolFormsScreen onNavigate={setActiveTab} roles={session.roles} />
+            <SchoolFormsScreen
+              onNavigate={(tab) => {
+                if (canNavigateTab(tab, session.roles)) setActiveTab(tab);
+              }}
+              roles={session.roles}
+            />
           ) : activeTab === "more" ? (
-            <MoreScreen onNavigate={setActiveTab} roles={session.roles} />
+            <MoreScreen
+              onNavigate={(tab) => {
+                if (canNavigateTab(tab, session.roles)) setActiveTab(tab);
+              }}
+              roles={session.roles}
+            />
           ) : activeTab === "calendar" ? (
             <PublishedScheduleScreen
               service={schedulePlanService}

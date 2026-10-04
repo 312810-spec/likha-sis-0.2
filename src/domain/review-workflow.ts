@@ -7,7 +7,7 @@ export type ReviewIndicator =
       denominator: number;
       provenance: string;
     };
-export interface SourceSnapshot {
+interface SourceSnapshot {
   cutoff: string;
   capturedAt: string;
   fingerprint: string;

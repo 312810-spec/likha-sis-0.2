@@ -63,7 +63,7 @@ pub(crate) fn execute(
         let output = env.cast_local::<JByteArray>(output)?;
         let bytes = env.convert_byte_array(&output)?;
         // Returned key material must not linger in the JVM heap after JNI copies it.
-        env.set_byte_array_region(&output, 0, &vec![0; bytes.len()])?;
+        output.set_region(env, 0, &vec![0; bytes.len()])?;
         Ok(bytes)
     });
     result.map_err(|_| AppError::key_store("Android native protected storage failed"))

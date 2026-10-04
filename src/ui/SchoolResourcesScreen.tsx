@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SchoolResourcesApplicationService } from "../application/school-resources-service";
 import type { ResourceIssue, SupportPlan, SupportSession } from "../domain/school-resources";
 export function SchoolResourcesScreen({
@@ -10,7 +10,12 @@ export function SchoolResourcesScreen({
 }) {
   const [issues, setIssues] = useState<ResourceIssue[]>([]);
   const [plans, setPlans] = useState<SupportPlan[]>([]);
-  const [sessions, setSessions] = useState<SupportSession[]>([]);
+  const [sessionResult, setSessionResult] = useState<{
+    planId: string;
+    service: SchoolResourcesApplicationService;
+    items: SupportSession[];
+  } | null>(null);
+  const sessionEpoch = useRef(0);
   const [learner, setLearner] = useState("");
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -42,12 +47,13 @@ export function SchoolResourcesScreen({
   }, [service]);
   useEffect(() => {
     let live = true;
-    setSessions([]);
+    const epoch = ++sessionEpoch.current;
     if (plan)
       void service
         .listSupportSessions(plan)
         .then((v) => {
-          if (live) setSessions(v);
+          if (live && epoch === sessionEpoch.current)
+            setSessionResult({ planId: plan, service, items: v });
         })
         .catch((e) => {
           if (live) setError(String(e));
@@ -57,19 +63,26 @@ export function SchoolResourcesScreen({
     };
   }, [service, plan]);
   async function run(action: () => Promise<unknown>) {
+    const startingEpoch = sessionEpoch.current;
     setBusy(true);
     setError("");
     try {
       await action();
       setIssues(await service.listIssues());
       setPlans(await service.listSupportPlans());
-      if (plan) setSessions(await service.listSupportSessions(plan));
+      if (plan && startingEpoch === sessionEpoch.current) {
+        const epoch = ++sessionEpoch.current;
+        const items = await service.listSupportSessions(plan);
+        if (epoch === sessionEpoch.current) setSessionResult({ planId: plan, service, items });
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
   }
+  const sessions =
+    sessionResult?.planId === plan && sessionResult.service === service ? sessionResult.items : [];
   return (
     <section>
       <h2>Resources and learning support</h2>

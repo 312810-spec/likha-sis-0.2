@@ -1,0 +1,17 @@
+.school-planning-editor {
+  min-width: 0;
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border, #aaa);
+  border-radius: 12px;
+}
+.school-planning-editor .field {
+  min-width: 0;
+}
+.school-planning-editor input,
+.school-planning-editor select,
+.school-planning-editor textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}

@@ -1,0 +1,5 @@
+# Generated Tauri Android API sources and Gradle output.
+.tauri/
+.gradle/
+build/
+local.properties

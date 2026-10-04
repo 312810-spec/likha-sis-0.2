@@ -37,6 +37,13 @@ impl KeyStore for DpapiKeyStore {
     }
 
     fn load_or_create_key(&self, key_file: &Path) -> AppResult<[u8; KEY_LEN]> {
+        // A copied Android backup envelope is still key evidence. Windows
+        // cannot unwrap it, and must not mint a replacement beside it.
+        if !key_file.exists() && crate::db::protected_key_exists(key_file) {
+            return Err(AppError::key_store(
+                "protected key backup requires recovery",
+            ));
+        }
         match create_new_key_file(key_file) {
             Ok(key) => Ok(key),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => load_key(key_file),
@@ -242,6 +249,15 @@ mod tests {
         let second = store.load_or_create_key(&key_file).unwrap();
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn backup_only_envelope_never_mints_a_windows_replacement() {
+        let dir = tempfile::tempdir().unwrap();
+        let key_file = dir.path().join("likha-sis.key");
+        std::fs::write(dir.path().join("likha-sis.key.bak"), b"synthetic envelope").unwrap();
+        assert!(DpapiKeyStore.load_or_create_key(&key_file).is_err());
+        assert!(!key_file.exists());
     }
 
     #[test]

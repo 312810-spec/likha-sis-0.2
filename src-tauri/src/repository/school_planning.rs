@@ -58,14 +58,11 @@ pub fn list(conn: &Connection, school_id: &str) -> AppResult<Vec<SchoolPlanningI
     let rows = stmt.query_map([school_id], read)?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
-pub fn save(
+fn validate_input(
     conn: &Connection,
     school_id: &str,
-    actor_id: &str,
     input: &SchoolPlanningInput,
-    id: Option<&str>,
-    expected_revision: Option<u32>,
-) -> AppResult<SchoolPlanningItem> {
+) -> AppResult<()> {
     if !matches!(
         input.calendar_decision.as_str(),
         "noChange" | "instructional" | "nonInstructional"
@@ -112,6 +109,17 @@ pub fn save(
             return Err(AppError::Unauthorized);
         }
     }
+    Ok(())
+}
+pub fn save(
+    conn: &Connection,
+    school_id: &str,
+    actor_id: &str,
+    input: &SchoolPlanningInput,
+    id: Option<&str>,
+    expected_revision: Option<u32>,
+) -> AppResult<SchoolPlanningItem> {
+    validate_input(conn, school_id, input)?;
     let item_id = id
         .map(str::to_owned)
         .unwrap_or_else(|| Uuid::now_v7().to_string());
@@ -147,6 +155,139 @@ pub fn save(
         Err(error) => {
             let _ = conn
                 .execute_batch("ROLLBACK TO school_planning_save; RELEASE school_planning_save");
+            Err(error)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PlanningHistoryPublication {
+    pub snapshot: SchoolPlanningItem,
+    pub changed_by: String,
+    pub changed_at: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SchoolPlanningPublication {
+    pub school_id: String,
+    pub item: SchoolPlanningItem,
+    pub history: Vec<PlanningHistoryPublication>,
+}
+pub fn publication(
+    conn: &Connection,
+    school_id: &str,
+    item: SchoolPlanningItem,
+) -> AppResult<SchoolPlanningPublication> {
+    let mut stmt=conn.prepare("SELECT snapshot_json,changed_by,changed_at FROM school_planning_history WHERE item_id=?1 AND school_id=?2 ORDER BY revision")?;
+    let rows = stmt.query_map(params![item.id, school_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+        ))
+    })?;
+    let mut history = Vec::new();
+    for row in rows {
+        let (snapshot, changed_by, changed_at) = row?;
+        history.push(PlanningHistoryPublication {
+            snapshot: serde_json::from_str(&snapshot).map_err(|_| invalid())?,
+            changed_by,
+            changed_at,
+        });
+    }
+    Ok(SchoolPlanningPublication {
+        school_id: school_id.into(),
+        item,
+        history,
+    })
+}
+pub fn receive_publication(
+    conn: &Connection,
+    school_id: &str,
+    actor_id: &str,
+    entity_id: &str,
+    incoming: &SchoolPlanningPublication,
+) -> AppResult<()> {
+    use rusqlite::OptionalExtension;
+    if incoming.school_id != school_id
+        || incoming.item.id != entity_id
+        || incoming.item.revision == 0
+        || incoming.history.len() != incoming.item.revision as usize
+    {
+        return Err(invalid());
+    }
+    if !crate::repository::role::list_roles(conn, actor_id, school_id)?
+        .iter()
+        .any(|r| r == "school_head")
+    {
+        return Err(AppError::Unauthorized);
+    }
+    for (index, entry) in incoming.history.iter().enumerate() {
+        if entry.snapshot.id != entity_id
+            || entry.snapshot.revision as usize != index + 1
+            || entry.snapshot.input.kind != incoming.item.input.kind
+            || !crate::repository::user::is_member_of_school(conn, &entry.changed_by, school_id)?
+        {
+            return Err(invalid());
+        }
+        validate_input(conn, school_id, &entry.snapshot.input)?;
+    }
+    let last = incoming.history.last().ok_or_else(invalid)?;
+    if last.changed_by != actor_id
+        || serde_json::to_value(&last.snapshot).map_err(|_| invalid())?
+            != serde_json::to_value(&incoming.item).map_err(|_| invalid())?
+    {
+        return Err(invalid());
+    }
+    if crate::repository::sync_outbox::has_pending_for_entity(
+        conn,
+        school_id,
+        crate::sync::EntityKind::SchoolPlanning,
+        entity_id,
+    )? {
+        return Err(invalid());
+    }
+    let existing = conn
+        .query_row(
+            "SELECT school_id,revision FROM school_planning_items WHERE id=?1",
+            [entity_id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, u32>(1)?)),
+        )
+        .optional()?;
+    if let Some((school, revision)) = &existing {
+        if school != school_id || *revision > incoming.item.revision {
+            return Err(invalid());
+        }
+    }
+    conn.execute_batch("SAVEPOINT receive_school_planning")?;
+    let result = (|| -> AppResult<()> {
+        for entry in &incoming.history {
+            let local:Option<String>=conn.query_row("SELECT snapshot_json FROM school_planning_history WHERE item_id=?1 AND revision=?2 AND school_id=?3",params![entity_id,entry.snapshot.revision,school_id],|r|r.get(0)).optional()?;
+            if let Some(local) = local {
+                if serde_json::from_str::<serde_json::Value>(&local).map_err(|_| invalid())?
+                    != serde_json::to_value(&entry.snapshot).map_err(|_| invalid())?
+                {
+                    return Err(invalid());
+                }
+            }
+        }
+        let i = &incoming.item.input;
+        conn.execute("INSERT INTO school_planning_items(id,school_id,kind,title,details,source_reference,effective_on,coordinator_user_id,status,revision,updated_by,updated_at,calendar_decision,affected_area) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14) ON CONFLICT(id) DO UPDATE SET title=excluded.title,details=excluded.details,source_reference=excluded.source_reference,effective_on=excluded.effective_on,coordinator_user_id=excluded.coordinator_user_id,status=excluded.status,revision=excluded.revision,updated_by=excluded.updated_by,updated_at=excluded.updated_at,calendar_decision=excluded.calendar_decision,affected_area=excluded.affected_area",params![entity_id,school_id,i.kind,i.title,i.details,i.source_reference,i.effective_on,i.coordinator_user_id,i.status,incoming.item.revision,actor_id,incoming.item.updated_at,i.calendar_decision,i.affected_area])?;
+        for entry in &incoming.history {
+            conn.execute("INSERT OR IGNORE INTO school_planning_history(item_id,revision,school_id,snapshot_json,changed_by,changed_at) VALUES(?1,?2,?3,?4,?5,?6)",params![entity_id,entry.snapshot.revision,school_id,serde_json::to_string(&entry.snapshot).map_err(|_|invalid())?,entry.changed_by,entry.changed_at])?;
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => {
+            conn.execute_batch("RELEASE receive_school_planning")?;
+            Ok(())
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO receive_school_planning; RELEASE receive_school_planning",
+            );
             Err(error)
         }
     }

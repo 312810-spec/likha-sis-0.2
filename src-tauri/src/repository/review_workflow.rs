@@ -193,6 +193,9 @@ fn validate_content(c: &DraftContent, approval: bool) -> AppResult<()> {
     if !["form", "tanaw"].contains(&c.kind.as_str())
         || c.title.trim().is_empty()
         || c.title.len() > 200
+        || c.source_cutoff.len() > 10
+        || c.dictionary_version.len() > 200
+        || c.form_code.len() > 100
         || c.notes.len() > 20000
         || c.indicators.len() > 100
         || c.discrepancies.len() > 100
@@ -311,7 +314,7 @@ fn act_in_transaction(
             .section_id
             .as_deref()
             .ok_or_else(|| invalid("Choose your advisory section."))?;
-        require_preparer(&tx, school, actor, section)?;
+        require_preparer(tx, school, actor, section)?;
         let mut content = req
             .content
             .ok_or_else(|| invalid("Draft content is required."))?;
@@ -336,8 +339,8 @@ fn act_in_transaction(
             .id
             .as_deref()
             .ok_or_else(|| invalid("Choose a draft."))?;
-        packet = get(&tx, school, id)?;
-        accessible(&tx, school, actor, &packet)?;
+        packet = get(tx, school, id)?;
+        accessible(tx, school, actor, &packet)?;
         if req.expected_revision != Some(packet.revision) {
             return Err(invalid("This draft changed. Refresh before continuing."));
         }
@@ -346,7 +349,7 @@ fn act_in_transaction(
                 if packet.owner_user_id != actor {
                     return Err(AppError::Unauthorized);
                 }
-                require_preparer(&tx, school, actor, &packet.section_id)?;
+                require_preparer(tx, school, actor, &packet.section_id)?;
                 if !["draft", "returned"].contains(&packet.status.as_str()) {
                     return Err(invalid(
                         "Only draft or returned packets can be edited or submitted.",
@@ -371,7 +374,7 @@ fn act_in_transaction(
                         invalid("The School Head must designate a reviewer first.")
                     })?;
                     if !has_role(
-                        &tx,
+                        tx,
                         school,
                         reviewer,
                         &["teacher", "registrar", "school_head"],
@@ -379,9 +382,9 @@ fn act_in_transaction(
                         return Err(invalid("The designated reviewer is no longer eligible."));
                     }
                     validate_content(&packet.content, true)?;
-                    require_current_snapshot(&tx, school, &packet.section_id, &packet.content)?;
+                    require_current_snapshot(tx, school, &packet.section_id, &packet.content)?;
                     packet.content.attachment_manifest =
-                        attachment_manifest(&tx, school, &packet.id)?;
+                        attachment_manifest(tx, school, &packet.id)?;
                     packet.status = "submitted".into();
                 }
             }
@@ -391,9 +394,9 @@ fn act_in_transaction(
                 {
                     return Err(AppError::Unauthorized);
                 }
-                require_preparer(&tx, school, actor, &packet.section_id)?;
+                require_preparer(tx, school, actor, &packet.section_id)?;
                 packet.content.source_snapshot = Some(capture_source_snapshot(
-                    &tx,
+                    tx,
                     school,
                     &packet.section_id,
                     &packet.content.source_cutoff,
@@ -401,7 +404,7 @@ fn act_in_transaction(
                 packet.content.sources_confirmed = false;
             }
             "designate" => {
-                if !head(&tx, school, actor)? {
+                if !head(tx, school, actor)? {
                     return Err(AppError::Unauthorized);
                 }
                 if packet.status == "approved" {
@@ -413,7 +416,7 @@ fn act_in_transaction(
                     .ok_or_else(|| invalid("Choose a reviewer."))?;
                 if reviewer == packet.owner_user_id
                     || !has_role(
-                        &tx,
+                        tx,
                         school,
                         reviewer,
                         &["teacher", "registrar", "school_head"],
@@ -430,7 +433,7 @@ fn act_in_transaction(
             "return" | "approve" => {
                 if packet.reviewer_user_id.as_deref() != Some(actor)
                     || packet.owner_user_id == actor
-                    || !has_role(&tx, school, actor, &["teacher", "registrar", "school_head"])?
+                    || !has_role(tx, school, actor, &["teacher", "registrar", "school_head"])?
                 {
                     return Err(AppError::Unauthorized);
                 }
@@ -442,8 +445,8 @@ fn act_in_transaction(
                 }
                 if req.action == "approve" {
                     validate_content(&packet.content, true)?;
-                    require_current_snapshot(&tx, school, &packet.section_id, &packet.content)?;
-                    if attachment_manifest(&tx, school, &packet.id)?
+                    require_current_snapshot(tx, school, &packet.section_id, &packet.content)?;
+                    if attachment_manifest(tx, school, &packet.id)?
                         != packet.content.attachment_manifest
                     {
                         return Err(invalid("Evidence attachments changed after submission. Return the packet for a fresh review."));
@@ -461,7 +464,7 @@ fn act_in_transaction(
                 if req.reason.trim().is_empty() {
                     return Err(invalid("Record why a correction is needed."));
                 }
-                require_preparer(&tx, school, actor, &packet.section_id)?;
+                require_preparer(tx, school, actor, &packet.section_id)?;
                 packet.parent_packet_id = Some(packet.id.clone());
                 packet.id = Uuid::now_v7().to_string();
                 packet.owner_user_id = actor.into();
@@ -548,7 +551,7 @@ fn canonical_rows(
     section: &str,
     cutoff: &str,
 ) -> AppResult<Vec<Vec<serde_json::Value>>> {
-    let mut stmt = conn.prepare(sql)?;
+    let mut stmt = conn.prepare(&format!("{sql} LIMIT 20001"))?;
     let columns = stmt.column_count();
     let rows = stmt
         .query_map((school, section, cutoff), |r| {
@@ -586,11 +589,17 @@ fn capture_source_snapshot(
     if cutoff > today.as_str() {
         return Err(invalid("A source cutoff cannot be in the future."));
     }
-    let roster=canonical_rows(conn,"SELECT m.id,m.learner_id,m.starts_on,m.ends_on,l.lrn,l.given_name,l.family_name FROM section_memberships m JOIN learners l ON l.id=m.learner_id WHERE m.school_id=?1 AND m.section_id=?2 AND m.starts_on<=?3 AND (m.ends_on IS NULL OR m.ends_on>?3) ORDER BY m.learner_id,m.id",school,section,cutoff)?;
-    let attendance=canonical_rows(conn,"SELECT a.id,a.learner_id,a.attendance_date,a.status,a.recorded_at FROM attendance_records a WHERE a.school_id=?1 AND a.section_id=?2 AND a.attendance_date<=?3 ORDER BY a.attendance_date,a.learner_id,a.id",school,section,cutoff)?;
-    let records=canonical_rows(conn,"SELECT id,subject_id,grading_period_id,weight_policy_id,created_at FROM class_records WHERE school_id=?1 AND section_id=?2 AND ?3 IS NOT NULL ORDER BY id",school,section,cutoff)?;
-    let scores=canonical_rows(conn,"SELECT c.id,a.id,a.category_id,a.max_score,s.learner_id,s.status,s.score,s.recorded_at FROM class_records c JOIN assessment_items a ON a.class_record_id=c.id LEFT JOIN learner_scores s ON s.assessment_item_id=a.id WHERE c.school_id=?1 AND c.section_id=?2 AND ?3 IS NOT NULL ORDER BY c.id,a.id,s.learner_id",school,section,cutoff)?;
+    let roster=canonical_rows(conn,"SELECT m.id,m.learner_id,m.starts_on,m.ends_on,l.lrn,l.given_name,l.family_name,l.* FROM section_memberships m JOIN learners l ON l.id=m.learner_id WHERE m.school_id=?1 AND m.section_id=?2 AND m.starts_on<=?3 AND (m.ends_on IS NULL OR m.ends_on>?3) ORDER BY m.learner_id,m.id",school,section,cutoff)?;
+    let attendance=canonical_rows(conn,"SELECT a.* FROM attendance_records a WHERE a.school_id=?1 AND a.section_id=?2 AND a.attendance_date<=?3 ORDER BY a.attendance_date,a.learner_id,a.id",school,section,cutoff)?;
+    let records=canonical_rows(conn,"SELECT c.*,gp.* FROM class_records c JOIN grading_periods gp ON gp.id=c.grading_period_id WHERE c.school_id=?1 AND c.section_id=?2 AND ?3 IS NOT NULL ORDER BY c.id",school,section,cutoff)?;
+    let scores=canonical_rows(conn,"SELECT c.id,a.*,s.* FROM class_records c JOIN assessment_items a ON a.class_record_id=c.id LEFT JOIN learner_scores s ON s.assessment_item_id=a.id WHERE c.school_id=?1 AND c.section_id=?2 AND ?3 IS NOT NULL ORDER BY c.id,a.id,s.learner_id",school,section,cutoff)?;
     let mut discrepancies = Vec::new();
+    let unique_learners: std::collections::BTreeSet<_> =
+        roster.iter().map(|r| r[1].to_string()).collect();
+    if unique_learners.len() != roster.len() {
+        discrepancies
+            .push("Overlapping cutoff memberships duplicate a learner in the roster.".into());
+    }
     let missing_lrn = roster
         .iter()
         .filter(|r| r[4].is_null() || r[4].as_str().is_none_or(|v| v.trim().is_empty()))
@@ -607,18 +616,34 @@ fn capture_source_snapshot(
     let mut computed = Vec::new();
     let mut complete = 0;
     let mut incomplete = 0;
-    if records.len().saturating_mul(roster.len()) > 2000 {
-        return Err(invalid(
-            "There are too many grade observations for one packet.",
-        ));
-    }
     for record in &records {
-        for learner in &roster {
+        let Some((grade_section, starts, ends)) =
+            crate::repository::class_record::section_and_period_range_in_school(
+                conn,
+                school,
+                record[0].as_str().unwrap_or(""),
+            )?
+        else {
+            continue;
+        };
+        let grade_roster = crate::repository::section_membership::roster_for_section_over_range(
+            conn,
+            school,
+            &grade_section,
+            &starts,
+            &ends,
+        )?;
+        for learner in &grade_roster {
+            if computed.len() >= 2000 {
+                return Err(invalid(
+                    "There are too many grade observations for one packet.",
+                ));
+            }
             let result = crate::repository::grading_computation::compute_term_grade(
                 conn,
                 school,
                 record[0].as_str().unwrap_or(""),
-                learner[1].as_str().unwrap_or(""),
+                &learner.learner_id,
             );
             let value = match result {
                 Ok(Some(g)) => {
@@ -638,7 +663,7 @@ fn capture_source_snapshot(
                     serde_json::json!({"unresolved":e.to_string()})
                 }
             };
-            computed.push(serde_json::json!({"classRecordId":record[0],"learnerId":learner[1],"currentObservation":value}));
+            computed.push(serde_json::json!({"classRecordId":record[0],"learnerId":learner.learner_id,"periodStartsOn":starts,"periodEndsOn":ends,"currentObservation":value}));
         }
     }
     if incomplete > 0 {
@@ -678,7 +703,22 @@ fn require_current_snapshot(
             "Source records changed. Refresh the source comparison and review again.",
         ));
     }
-    if !fresh.discrepancies.is_empty() {
+    let needs_complete_grades = ["SF5", "SF6", "SF9", "SF10"].contains(&content.form_code.as_str())
+        || content.indicators.iter().any(|i| match i {
+            Indicator::Count { name, .. } | Indicator::Percentage { name, .. } => {
+                name == "Complete current grades"
+            }
+        });
+    if needs_complete_grades && fresh.roster_count > 0 && fresh.complete_grade_count == 0 {
+        return Err(invalid(
+            "No complete current grades are available for this grade-dependent packet.",
+        ));
+    }
+    if fresh
+        .discrepancies
+        .iter()
+        .any(|d| needs_complete_grades || !d.contains("current grade observations"))
+    {
         return Err(invalid(
             "Resolve native source discrepancies before submitting or approving.",
         ));
@@ -717,14 +757,19 @@ pub fn export_sample(conn: &Connection, school: &str, actor: &str, id: &str) -> 
     if packet.content.kind != "tanaw" {
         return Err(invalid("Only TANAW samples use this exchange format."));
     }
+    let mut content = packet.content;
+    if let Some(snapshot) = content.source_snapshot.as_mut() {
+        snapshot.canonical_sources.clear();
+    }
+    let transfer_hash = encode(&content)?.1;
     serde_json::to_string_pretty(&TanawSample {
         schema_version: 1,
         source_school_id: school.into(),
         source_packet_id: packet.id,
         source_revision: packet.revision,
-        source_content_hash: encode(&packet.content)?.1,
+        source_content_hash: transfer_hash,
         section_id: packet.section_id,
-        content: packet.content,
+        content,
     })
     .map_err(|_| invalid("Could not encode the TANAW sample."))
 }

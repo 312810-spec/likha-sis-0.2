@@ -259,11 +259,18 @@ try {
     ["school-planning", "School notices and programs"],
     ["reviews", "Forms and TANAW review"],
     ["attachments", "Evidence and attachments"],
-    ["offerings", "School subject offerings"],
+    ["offerings", "Subjects and curriculum offerings"],
     ["resources", "Resources and learning support"],
   ]) {
     await page.getByLabel("Synthetic feature workspace").selectOption(destination);
     if (title) await page.getByRole("heading", { name: title, exact: true }).waitFor();
+    if (destination === "schedule-planner") {
+      await page.getByRole("button", { name: "Add room", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Add unavailable time for room 1", exact: true })
+        .click();
+      await page.getByRole("button", { name: "Add fixed meeting", exact: true }).click();
+    }
     await page.addScriptTag({ content: axe.source });
     const violations = await page.evaluate(async () =>
       (await window.axe.run(document, { runOnly: ["wcag2a", "wcag2aa"] })).violations.map((v) => ({
@@ -273,9 +280,15 @@ try {
     );
     if (violations.length)
       throw new Error(`${destination} accessibility: ${JSON.stringify(violations)}`);
+    for (const width of [1280, 390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+      if (overflow) throw new Error(`${destination} overflows at ${width}px`);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
   }
   console.log(
-    "quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, zero axe WCAG A/AA findings.",
+    "quality:ui PASS — assigned class selection/context, score entry, Forms/Calendar/Account/More, enrollment history, both appearances × three densities × four widths, footer clearance, remembered preference, keyboard score saving, sticky class index, short-screen Account, seven new workspaces and mobile overflow checks, zero axe WCAG A/AA findings.",
   );
 } finally {
   if (browser) await browser.close();

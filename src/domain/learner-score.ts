@@ -35,7 +35,7 @@ export interface LearnerScoreRosterEntry {
  * research record. `initialGrade` is the weighted-sum percentage before
  * transmutation/rounding; `termGrade` is the final whole-number grade
  * actually reported. */
-export interface GradeCompleteness {
+interface GradeCompleteness {
   expectedItems: number;
   scoredItems: number;
   excusedItems: number;
@@ -58,5 +58,19 @@ export interface ComputedTermGrade {
   wasFloored: boolean;
 }
 
-export interface ScoreImportPreview { rows: { learnerId: string; status: LearnerScoreStatus; score: number | null }[]; issues: string[]; contentHash: string; snapshot: string; alreadyImported: boolean; }
-export interface ScoreHistoryEntry { id: string; learnerId: string; actorUserId: string; previousJson: string | null; nextJson: string; reason: string; changedAt: string; }
+export interface ScoreImportPreview {
+  rows: { learnerId: string; status: LearnerScoreStatus; score: number | null }[];
+  issues: string[];
+  contentHash: string;
+  snapshot: string;
+  alreadyImported: boolean;
+}
+export interface ScoreHistoryEntry {
+  id: string;
+  learnerId: string;
+  actorUserId: string;
+  previousJson: string | null;
+  nextJson: string;
+  reason: string;
+  changedAt: string;
+}

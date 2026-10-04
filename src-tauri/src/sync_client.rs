@@ -639,6 +639,18 @@ pub(crate) fn apply_decrypted_change(
     }
 
     match change.entity_kind {
+        EntityKind::SchoolPlanning => {
+            let incoming: crate::repository::school_planning::SchoolPlanningPublication =
+                serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+            crate::repository::school_planning::receive_publication(
+                conn,
+                school_id,
+                &change.actor_user_id.to_string(),
+                &change.entity_id.to_string(),
+                &incoming,
+            )
+            .map_err(classify_repository_rejection)
+        }
         EntityKind::SchedulePlan => {
             let incoming: crate::repository::schedule_plan::SchedulePublication =
                 serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;

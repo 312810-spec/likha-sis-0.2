@@ -166,19 +166,18 @@ pub fn set_lifecycle(
     else {
         return Ok(false);
     };
-    let valid_date = |date: &str| valid_iso_date(date);
     match (&value.event_starts_on, &value.event_ends_on) {
         (None, None) => {}
         (Some(start), Some(end))
-            if valid_date(start)
-                && valid_date(end)
+            if valid_iso_date(start)
+                && valid_iso_date(end)
                 && start <= end
                 && start >= &period_start
                 && end <= &period_end => {}
         _ => return Ok(false),
     }
     if value.due_on.as_ref().is_some_and(|due| {
-        !valid_date(due)
+        !valid_iso_date(due)
             || due < &period_start
             || due > &period_end
             || value

@@ -3,7 +3,7 @@ import type { AdvisoryWorkContext, TeacherClassWorkContext } from "./work-contex
 const RESUME_POINTER_KEY = "likha.resume-pointer.v1";
 const RESUME_POINTER_VERSION = 1 as const;
 
-export type ResumeDestination = "class" | "advisory";
+type ResumeDestination = "class" | "advisory";
 
 export interface ResumePointer {
   version: typeof RESUME_POINTER_VERSION;

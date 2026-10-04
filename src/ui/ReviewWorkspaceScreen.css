@@ -26,3 +26,19 @@
     grid-template-columns: 1fr;
   }
 }
+.review-workspace > *,
+.review-workspace fieldset,
+.review-workspace label,
+.review-workspace input,
+.review-workspace textarea,
+.review-workspace select {
+  min-width: 0;
+  max-width: 100%;
+}
+.review-workspace fieldset {
+  box-sizing: border-box;
+}
+.review-workspace aside button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

@@ -49,7 +49,7 @@ The current generated Tauri Android project uses Gradle 9.6.1, Android Gradle
 Plugin 9.3.1 and API 37. The restored build environment uses official SDK
 platform 37.0, build tools 37.0.0, NDK 30.0.16248370 and Rust's
 `aarch64-linux-android` target. Archive checksums were checked against Google's
-SDK repository metadata. Generated Android files remain reproducible build
+SDK repository metadata. Generated Android files and the plugin’s `.tauri` API copy remain reproducible build
 output; the Kotlin plugin, configuration and consumer rules are committed.
 
 To rebuild after restoring the toolchains:
@@ -69,3 +69,18 @@ npm run tauri -- android build --debug --target aarch64 --apk --ci
 These commands generate a debug build for testing. Production release requires
 the school's retained signing key and a tested upgrade path. Never substitute a
 new signing key for an existing installed school's release certificate.
+
+### Checks actually run on the restored source
+
+The ARM64 native library crosscompiled with Rust 1.99 and NDK
+30.0.16248370. `llvm-readelf -lW` reports `0x4000` alignment on every load
+segment (16 KiB). This verifies the produced native library's segment alignment,
+not installation, SQLCipher startup or packaged APK alignment on a device.
+The build required `CARGO_INCREMENTAL=0` after a corrupted zero-byte incremental
+object was found. Dependencies remained unchanged; the cache was rebuilt.
+
+APK assembly reached Gradle. Its next observed blocker was a Java runtime that
+lacked `javac`: `JAVA_COMPILER` was unavailable in the selected toolchain. A full JDK 17.0.20 was then restored in a temporary build prefix, and Gradle
+progressed through buildSrc Kotlin compilation. Use a full compatible JDK at
+`JAVA_HOME` when rerunning packaging. A successful native crosscompile
+must not be reported as a successful APK build.

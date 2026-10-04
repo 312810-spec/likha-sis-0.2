@@ -55,6 +55,7 @@ pub fn roster_for_assessment_item(
 /// rarely-changing reference data (`Subject`, `GradingPeriod`,
 /// `TeachingAssignment`).
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn record_learner_score(
     app: AppHandle,
     db: State<'_, Mutex<Connection>>,

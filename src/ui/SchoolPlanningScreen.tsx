@@ -1,3 +1,4 @@
+import "./school-planning.css";
 import { useEffect, useState } from "react";
 import type { SchoolPlanningApplicationService } from "../application/school-planning-service";
 import type { SchoolPlanningInput, SchoolPlanningItem } from "../domain/school-planning";
@@ -57,7 +58,7 @@ export function SchoolPlanningScreen({
       setSelected(saved);
       setInput(saved.input);
       setItems((old) => [saved, ...old.filter((i) => i.id !== saved.id)]);
-      setMessage("Saved on this device. Transfer separately to share this version.");
+      setMessage("Saved on this device.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed. Your entries are still here.");
     } finally {
@@ -98,7 +99,7 @@ export function SchoolPlanningScreen({
           ))}
         </select>
       </label>
-      <fieldset disabled={busy || !canManage}>
+      <fieldset className="school-planning-editor" disabled={busy || !canManage}>
         <legend>School Head review</legend>
         <label className="field">
           Type
