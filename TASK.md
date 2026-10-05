@@ -1,3 +1,15 @@
+# Current task — CTOS v3
+
+Updated: 2026-10-06.
+
+Use CTOS.md as the controlling plan. Current milestone: M00 — Source truth + autonomous execution substrate.
+
+Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. M00 must create the CTOS integration branch from current main, reconcile PR #103 deliberately, establish runtime capabilities and baseline verification, create the eval registry, and implement checkpoint/resume automation. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+---
+
+# Historical baseline retained for evidence
+
 # Current task
 
 Updated: 2026-10-03.
