@@ -1,3 +1,13 @@
+# CTOS current program
+
+The current product program is **CTOS — Calm Teacher Operating System**. For substantial work, read `CTOS.md` first, then `CTOS-STATE.md`, then the latest CTOS checkpoint if present. Apply the project adapter in `docs/ctos/FORGE-V3-ADAPTER.md`.
+
+CTOS supersedes older broad planning/harness instructions where they conflict. Keep active context small: do not reload all historical plans merely because they exist. PR #103 is a salvage/reconciliation source, not a branch to mass-merge.
+
+During CTOS execution, use milestone output contracts, applicable deterministic verification, regression capture, durable GitHub checkpoints, and truthful acceptance states. Clear the terminal only after the checkpoint is pushed and remote durability is confirmed, then continue automatically.
+
+---
+
 # LIKHA-SIS development
 
 Build a teacher's dependable Windows workstation and focused Android companion.
