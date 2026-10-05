@@ -22,7 +22,7 @@
 
 - Frontend quality: 132 files / 1,233 tests pass; typecheck, lint, format:check,
   architecture, deadcode all pass (1 pre-existing lint warning in App.tsx)
-- Native Rust tests: result recorded in docs/ctos/checkpoints/m00.md
+- Native Rust tests: 1,303 tests / 0 failed (source commit 659fb0d)
 - Toolchain repairs made at M00: npm install (typescript-compiler),
   rustup to 1.99 (removed a vendored rust-src blocking the update),
   Strawberry Perl prioritized for the openssl-src vendored build
