@@ -6,25 +6,38 @@
 
 ## Current execution state
 
-- Execution branch: not yet created
+- Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M00 — Source truth + autonomous execution substrate
-- Last completed milestone: none
-- Last pushed CTOS execution checkpoint: none
-- Next action: create the CTOS integration branch from latest main, reconcile PR #103, establish runtime capability profile, baseline evidence, eval registry, and checkpoint/resume automation
-- Risk tier: High-Fidelity for M00 source reconciliation and execution substrate
-- Open implementation PR to reconcile: #103
+- Current milestone: M01 — Academic trust (grading, completeness, historical integrity)
+- Last completed milestone: M00
+- Last pushed CTOS execution checkpoint: M00 (see docs/ctos/checkpoints/m00.md)
+- Next action: execute M01 — verify grading/transmutation thresholds, edge attainable scores, blank≠zero≠excused, provisional vs complete, grading policy applicability/version, historical issued snapshot stability, correction/amend behavior
+- Risk tier: High-Fidelity for M01 (grading/finality)
+- Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
-- Android native evidence: unsupported as a release claim until M14 acceptance passes
-- Dirty/unpushed warning: must be checked by Atria at runtime
+- Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
+- Dirty/unpushed warning: none at the M00 checkpoint
 
-## Known source truth before M00
+## M00 baseline truth (source commit 659fb0d)
 
-- main contains PR #102 class-folio redesign
-- main contains CTOS v3 planning documents
-- PR #103 is open/draft and diverged from main
-- PR #103 contains substantial candidate implementation and must be reconciled, not mass-merged
-- HANDOFF.md currently exists on the PR103 branch history, not as main source truth
+- Frontend quality: 132 files / 1,233 tests pass; typecheck, lint, format:check,
+  architecture, deadcode all pass (1 pre-existing lint warning in App.tsx)
+- Native Rust tests: result recorded in docs/ctos/checkpoints/m00.md
+- Toolchain repairs made at M00: npm install (typescript-compiler),
+  rustup to 1.99 (removed a vendored rust-src blocking the update),
+  Strawberry Perl prioritized for the openssl-src vendored build
+
+## Known source truth after M00
+
+- main contains PR #102 class-folio redesign and the CTOS v3 planning documents
+- PR #103 is draft, diverged, and classified as salvage (see
+  docs/ctos/checkpoints/m00.md for the full salvage map)
+- PR #103 has two structural defects that block a direct merge: a split
+  migration convention (db/ vs db/sql/) and runtime execute_batch re-applying
+  migration-owned SQL that is not idempotent
+- PR #103's layering and server-side school-scope derivation were verified
+  correct and are reusable; its verification claims are not
+- PR #100 conflicts with main and overlaps PR #103's resume-pointer work
 
 ## Parked external dependencies
 
