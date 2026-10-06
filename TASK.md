@@ -2,9 +2,30 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: **M03 — CTOS design system**.
+Use CTOS.md as the controlling plan. Current milestone: **M04 — Today**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+## M03 — CTOS design system: COMPLETE (PASS)
+
+Four structural gaps fixed: a typography and spacing scale derived from their
+bases (so density now rescales all type, not just body text), three duplicate
+table definitions consolidated into one `.ledger` primitive, six ad-hoc
+breakpoints collapsed onto three sanctioned widths, and the shared copy
+vocabulary in `src/ui/theme/copy.ts`. The one missing component — a React error
+boundary, of which `src/` had none — is added and wraps the tab switch, so a
+render failure no longer takes down the shell and navigation.
+
+`emptyCopy` was drafted and removed: all 45 `<EmptyState>` call sites carry real
+context a generic string would discard, so the module ships no entry it cannot
+justify. The regression fixture is a ten-test static token guard
+(`scripts/design-tokens.test.mjs`), deliberately not a pixel baseline — the repo
+has no image-comparison dependency, and pixels are not the property CTOS names.
+
+Accessibility is provably intact: the real-browser smoke ran after the refactor
+and reports zero axe WCAG A/AA findings across four widths × both appearances ×
+three densities, with a no-horizontal-overflow assertion at every width. See
+`docs/ctos/checkpoints/m03.md`.
 
 ## M02 — Work access and session integrity: COMPLETE (PASS)
 
@@ -19,19 +40,18 @@ Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
 provisional on screen and in both exports. All seven verification items have
 executable tests. See `docs/ctos/checkpoints/m01.md`.
 
-## M03 in progress
+## M04 in progress
 
-Required: semantic tokens, typography/rhythm, table patterns, light/dark/system,
-density modes, loading/empty/error/offline, focus, motion/reduced motion,
-responsive rules, shared copy vocabulary, visual regression fixtures.
+Outcome: the teacher understands the day and opens the next meaningful task
+immediately.
 
-Acceptance: no material screen-specific visual island; accessibility primitives
-remain intact. Unlike M01/M02 this is not a High-Fidelity logic milestone — the
-risk is visual fragmentation and accessibility regression, so the verification
-mode shifts toward the UI gate (`npm run quality:ui`) and regression fixtures.
+Verify: one-action next-class entry, no schedule, stale offline schedule,
+changed schedule, no classes today, pending assignment, unfinished attendance,
+returned review.
 
-Next step: inventory the existing theme tokens in `src/ui/theme/` and find which
-screens already carry one-off styling instead of shared tokens.
+Next step: read the Today screen (`src/ui/HomeScreen.tsx` and its services) and
+establish which of the eight verification items already have coverage, so the
+milestone separates verification from real gaps as M02 did.
 
 ---
 

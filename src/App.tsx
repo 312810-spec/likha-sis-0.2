@@ -49,6 +49,7 @@ import { AssignedClassFolio } from "./ui/AssignedClassFolio";
 import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "./ui/WorkspaceHubs";
 import { ShellAccountPreferences } from "./ui/shell/ShellAccountPreferences";
 import { Page } from "./ui/components/Page";
+import { ErrorBoundary } from "./ui/components/ErrorBoundary";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
@@ -307,331 +308,336 @@ function App() {
           schoolLogoService={schoolLogoService}
         >
           <IdleTimeoutWarning authService={authService} onExpired={handleSessionExpired} />
-          {activeTab === "workspace" ? (
-            <HomeScreen
-              teachingWorkspace={folio}
-              roles={session.roles}
-              displayName={session.displayName}
-              schoolName={session.schoolName}
-              attendanceService={attendanceService}
-              authService={authService}
-              gradingService={gradingService}
-              learnerService={learnerService}
-              sectionService={sectionService}
-              sf1ImportService={sf1ImportService}
-              schoolAttendanceService={schoolAttendanceService}
-              sectionAdvisoryService={sectionAdvisoryService}
-              schoolMemberService={schoolMemberService}
-              teachingAssignmentService={teachingAssignmentService}
-              onOpenAttendance={(sectionId) => {
-                setAttendanceSectionId(sectionId);
-                setActiveTab("attendance");
-              }}
-              onManageSections={() => setActiveTab("sections")}
-              onViewAuditLog={() => setActiveTab("audit-log")}
-              onOpenSf1Import={() => setActiveTab("sf1-import")}
-            />
-          ) : activeTab === "school-forms" ? (
-            <SchoolFormsScreen onNavigate={setActiveTab} />
-          ) : activeTab === "more" ? (
-            <MoreScreen onNavigate={setActiveTab} />
-          ) : activeTab === "calendar" ? (
-            <CalendarScreen
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-              onOpenClass={(context) => {
-                setClassWorkContext(context);
-                setActiveTab("workspace");
-              }}
-            />
-          ) : activeTab === "account" ? (
-            <Page title="Account">
-              <ShellAccountPreferences session={session} onLogout={handleLogout} />
-              <button type="button" onClick={() => setActiveTab("more")}>
-                More tools and settings
-              </button>
-            </Page>
-          ) : activeTab === "learners" ? (
-            <LearnerListScreen
-              learnerService={learnerService}
-              exportService={exportService}
-              enrollmentHistoryService={enrollmentHistoryService}
-            />
-          ) : activeTab === "sections" ? (
-            <SectionsScreen
-              sectionService={sectionService}
-              learnerService={learnerService}
-              exportService={exportService}
-              onOpenRoster={(sectionId) => {
-                setRosterSectionId(sectionId);
-                setActiveTab("section-roster");
-              }}
-              onManageAssignments={(sectionId, sectionName) => {
-                setTeachingAssignmentsSection({ sectionId, sectionName });
-                setActiveTab("teaching-assignments");
-              }}
-              onManageAdviser={(sectionId, sectionName) => {
-                setSectionAdviserSection({ sectionId, sectionName });
-                setActiveTab("section-adviser");
-              }}
-            />
-          ) : activeTab === "section-roster" ? (
-            rosterSectionId ? (
-              <SectionRosterScreen
+          <ErrorBoundary message="This screen could not be shown.">
+            {activeTab === "workspace" ? (
+              <HomeScreen
+                teachingWorkspace={folio}
+                roles={session.roles}
+                displayName={session.displayName}
+                schoolName={session.schoolName}
+                attendanceService={attendanceService}
+                authService={authService}
+                gradingService={gradingService}
+                learnerService={learnerService}
                 sectionService={sectionService}
-                formGenerationService={formGenerationService}
-                exportService={exportService}
-                sectionId={rosterSectionId}
-                onBack={() => setActiveTab("sections")}
+                sf1ImportService={sf1ImportService}
+                schoolAttendanceService={schoolAttendanceService}
+                sectionAdvisoryService={sectionAdvisoryService}
+                schoolMemberService={schoolMemberService}
+                teachingAssignmentService={teachingAssignmentService}
                 onOpenAttendance={(sectionId) => {
                   setAttendanceSectionId(sectionId);
                   setActiveTab("attendance");
                 }}
+                onManageSections={() => setActiveTab("sections")}
+                onViewAuditLog={() => setActiveTab("audit-log")}
+                onOpenSf1Import={() => setActiveTab("sf1-import")}
               />
-            ) : (
-              <SectionsScreen
-                sectionService={sectionService}
-                learnerService={learnerService}
-                exportService={exportService}
-                onOpenRoster={(sectionId) => {
-                  setRosterSectionId(sectionId);
-                  setActiveTab("section-roster");
-                }}
-                onManageAssignments={(sectionId, sectionName) => {
-                  setTeachingAssignmentsSection({ sectionId, sectionName });
-                  setActiveTab("teaching-assignments");
-                }}
-                onManageAdviser={(sectionId, sectionName) => {
-                  setSectionAdviserSection({ sectionId, sectionName });
-                  setActiveTab("section-adviser");
-                }}
-              />
-            )
-          ) : activeTab === "teaching-assignments" ? (
-            teachingAssignmentsSection ? (
-              <TeachingAssignmentsScreen
-                teachingAssignmentService={teachingAssignmentService}
-                subjectService={subjectService}
-                schoolMemberService={schoolMemberService}
-                sectionId={teachingAssignmentsSection.sectionId}
-                sectionName={teachingAssignmentsSection.sectionName}
-                onBack={() => setActiveTab("sections")}
-                onManageSchedule={(teachingAssignmentId, subjectName) => {
-                  setScheduleMeetingsAssignment({ teachingAssignmentId, subjectName });
-                  setActiveTab("schedule-meetings");
-                }}
-              />
-            ) : (
-              <SectionsScreen
-                sectionService={sectionService}
-                learnerService={learnerService}
-                exportService={exportService}
-                onOpenRoster={(sectionId) => {
-                  setRosterSectionId(sectionId);
-                  setActiveTab("section-roster");
-                }}
-                onManageAssignments={(sectionId, sectionName) => {
-                  setTeachingAssignmentsSection({ sectionId, sectionName });
-                  setActiveTab("teaching-assignments");
-                }}
-                onManageAdviser={(sectionId, sectionName) => {
-                  setSectionAdviserSection({ sectionId, sectionName });
-                  setActiveTab("section-adviser");
-                }}
-              />
-            )
-          ) : activeTab === "section-adviser" ? (
-            sectionAdviserSection ? (
-              <SectionAdviserScreen
-                sectionAdvisoryService={sectionAdvisoryService}
-                schoolMemberService={schoolMemberService}
-                sectionId={sectionAdviserSection.sectionId}
-                sectionName={sectionAdviserSection.sectionName}
-                onBack={() => setActiveTab("sections")}
-              />
-            ) : (
-              <SectionsScreen
-                sectionService={sectionService}
-                learnerService={learnerService}
-                exportService={exportService}
-                onOpenRoster={(sectionId) => {
-                  setRosterSectionId(sectionId);
-                  setActiveTab("section-roster");
-                }}
-                onManageAssignments={(sectionId, sectionName) => {
-                  setTeachingAssignmentsSection({ sectionId, sectionName });
-                  setActiveTab("teaching-assignments");
-                }}
-                onManageAdviser={(sectionId, sectionName) => {
-                  setSectionAdviserSection({ sectionId, sectionName });
-                  setActiveTab("section-adviser");
-                }}
-              />
-            )
-          ) : activeTab === "schedule-meetings" ? (
-            scheduleMeetingsAssignment && teachingAssignmentsSection ? (
-              <ScheduleMeetingsScreen
-                teachingAssignmentService={teachingAssignmentService}
-                teachingAssignmentId={scheduleMeetingsAssignment.teachingAssignmentId}
-                subjectName={scheduleMeetingsAssignment.subjectName}
-                sectionName={teachingAssignmentsSection.sectionName}
-                onBack={() => setActiveTab("teaching-assignments")}
-              />
-            ) : (
-              <SectionsScreen
-                sectionService={sectionService}
-                learnerService={learnerService}
-                exportService={exportService}
-                onOpenRoster={(sectionId) => {
-                  setRosterSectionId(sectionId);
-                  setActiveTab("section-roster");
-                }}
-                onManageAssignments={(sectionId, sectionName) => {
-                  setTeachingAssignmentsSection({ sectionId, sectionName });
-                  setActiveTab("teaching-assignments");
-                }}
-                onManageAdviser={(sectionId, sectionName) => {
-                  setSectionAdviserSection({ sectionId, sectionName });
-                  setActiveTab("section-adviser");
-                }}
-              />
-            )
-          ) : activeTab === "sf1-import" ? (
-            <Sf1ImportScreen sf1ImportService={sf1ImportService} sectionService={sectionService} />
-          ) : activeTab === "attendance" ? (
-            <AttendanceScreen
-              attendanceService={attendanceService}
-              sectionService={sectionService}
-              initialSectionId={attendanceSectionId ?? undefined}
-              onViewMonthlySummary={(sectionId, year, month) => {
-                setMonthlySummaryContext({ sectionId, year, month });
-                setActiveTab("monthly-summary");
-              }}
-            />
-          ) : activeTab === "my-day" ? (
-            folio
-          ) : activeTab === "daily-planner" ? (
-            classWorkContext && classRecordAssignmentId ? (
-              <ClassRecordJourneyScreen
-                key={JSON.stringify([session.userId, classRecordAssignmentId])}
-                learnerScoreSyncStatusService={learnerScoreSyncStatusService}
-                teachingAssignmentId={classRecordAssignmentId}
-                classContext={classWorkContext}
-                teacherUserId={session.userId}
+            ) : activeTab === "school-forms" ? (
+              <SchoolFormsScreen onNavigate={setActiveTab} />
+            ) : activeTab === "more" ? (
+              <MoreScreen onNavigate={setActiveTab} />
+            ) : activeTab === "calendar" ? (
+              <CalendarScreen
                 subjectAttendanceService={subjectAttendanceService}
-                gradingService={gradingService}
-                classRecordService={classRecordService}
-                assessmentService={assessmentService}
-                learnerScoreService={learnerScoreService}
-                exportService={exportService}
-                onBackToClass={() => setClassRecordAssignmentId(null)}
+                teacherUserId={session.userId}
+                onOpenClass={(context) => {
+                  setClassWorkContext(context);
+                  setActiveTab("workspace");
+                }}
               />
-            ) : (
-              <MyDayScreen
-                myDayService={myDayService}
-                selectedClassContext={classWorkContext}
-                onOpenClassContext={setClassWorkContext}
-                onBackToToday={() => setClassWorkContext(null)}
+            ) : activeTab === "account" ? (
+              <Page title="Account">
+                <ShellAccountPreferences session={session} onLogout={handleLogout} />
+                <button type="button" onClick={() => setActiveTab("more")}>
+                  More tools and settings
+                </button>
+              </Page>
+            ) : activeTab === "learners" ? (
+              <LearnerListScreen
+                learnerService={learnerService}
+                exportService={exportService}
+                enrollmentHistoryService={enrollmentHistoryService}
+              />
+            ) : activeTab === "sections" ? (
+              <SectionsScreen
+                sectionService={sectionService}
+                learnerService={learnerService}
+                exportService={exportService}
+                onOpenRoster={(sectionId) => {
+                  setRosterSectionId(sectionId);
+                  setActiveTab("section-roster");
+                }}
+                onManageAssignments={(sectionId, sectionName) => {
+                  setTeachingAssignmentsSection({ sectionId, sectionName });
+                  setActiveTab("teaching-assignments");
+                }}
+                onManageAdviser={(sectionId, sectionName) => {
+                  setSectionAdviserSection({ sectionId, sectionName });
+                  setActiveTab("section-adviser");
+                }}
+              />
+            ) : activeTab === "section-roster" ? (
+              rosterSectionId ? (
+                <SectionRosterScreen
+                  sectionService={sectionService}
+                  formGenerationService={formGenerationService}
+                  exportService={exportService}
+                  sectionId={rosterSectionId}
+                  onBack={() => setActiveTab("sections")}
+                  onOpenAttendance={(sectionId) => {
+                    setAttendanceSectionId(sectionId);
+                    setActiveTab("attendance");
+                  }}
+                />
+              ) : (
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  exportService={exportService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
+                />
+              )
+            ) : activeTab === "teaching-assignments" ? (
+              teachingAssignmentsSection ? (
+                <TeachingAssignmentsScreen
+                  teachingAssignmentService={teachingAssignmentService}
+                  subjectService={subjectService}
+                  schoolMemberService={schoolMemberService}
+                  sectionId={teachingAssignmentsSection.sectionId}
+                  sectionName={teachingAssignmentsSection.sectionName}
+                  onBack={() => setActiveTab("sections")}
+                  onManageSchedule={(teachingAssignmentId, subjectName) => {
+                    setScheduleMeetingsAssignment({ teachingAssignmentId, subjectName });
+                    setActiveTab("schedule-meetings");
+                  }}
+                />
+              ) : (
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  exportService={exportService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
+                />
+              )
+            ) : activeTab === "section-adviser" ? (
+              sectionAdviserSection ? (
+                <SectionAdviserScreen
+                  sectionAdvisoryService={sectionAdvisoryService}
+                  schoolMemberService={schoolMemberService}
+                  sectionId={sectionAdviserSection.sectionId}
+                  sectionName={sectionAdviserSection.sectionName}
+                  onBack={() => setActiveTab("sections")}
+                />
+              ) : (
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  exportService={exportService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
+                />
+              )
+            ) : activeTab === "schedule-meetings" ? (
+              scheduleMeetingsAssignment && teachingAssignmentsSection ? (
+                <ScheduleMeetingsScreen
+                  teachingAssignmentService={teachingAssignmentService}
+                  teachingAssignmentId={scheduleMeetingsAssignment.teachingAssignmentId}
+                  subjectName={scheduleMeetingsAssignment.subjectName}
+                  sectionName={teachingAssignmentsSection.sectionName}
+                  onBack={() => setActiveTab("teaching-assignments")}
+                />
+              ) : (
+                <SectionsScreen
+                  sectionService={sectionService}
+                  learnerService={learnerService}
+                  exportService={exportService}
+                  onOpenRoster={(sectionId) => {
+                    setRosterSectionId(sectionId);
+                    setActiveTab("section-roster");
+                  }}
+                  onManageAssignments={(sectionId, sectionName) => {
+                    setTeachingAssignmentsSection({ sectionId, sectionName });
+                    setActiveTab("teaching-assignments");
+                  }}
+                  onManageAdviser={(sectionId, sectionName) => {
+                    setSectionAdviserSection({ sectionId, sectionName });
+                    setActiveTab("section-adviser");
+                  }}
+                />
+              )
+            ) : activeTab === "sf1-import" ? (
+              <Sf1ImportScreen
+                sf1ImportService={sf1ImportService}
+                sectionService={sectionService}
+              />
+            ) : activeTab === "attendance" ? (
+              <AttendanceScreen
+                attendanceService={attendanceService}
+                sectionService={sectionService}
+                initialSectionId={attendanceSectionId ?? undefined}
+                onViewMonthlySummary={(sectionId, year, month) => {
+                  setMonthlySummaryContext({ sectionId, year, month });
+                  setActiveTab("monthly-summary");
+                }}
+              />
+            ) : activeTab === "my-day" ? (
+              folio
+            ) : activeTab === "daily-planner" ? (
+              classWorkContext && classRecordAssignmentId ? (
+                <ClassRecordJourneyScreen
+                  key={JSON.stringify([session.userId, classRecordAssignmentId])}
+                  learnerScoreSyncStatusService={learnerScoreSyncStatusService}
+                  teachingAssignmentId={classRecordAssignmentId}
+                  classContext={classWorkContext}
+                  teacherUserId={session.userId}
+                  subjectAttendanceService={subjectAttendanceService}
+                  gradingService={gradingService}
+                  classRecordService={classRecordService}
+                  assessmentService={assessmentService}
+                  learnerScoreService={learnerScoreService}
+                  exportService={exportService}
+                  onBackToClass={() => setClassRecordAssignmentId(null)}
+                />
+              ) : (
+                <MyDayScreen
+                  myDayService={myDayService}
+                  selectedClassContext={classWorkContext}
+                  onOpenClassContext={setClassWorkContext}
+                  onBackToToday={() => setClassWorkContext(null)}
+                  onCheckAttendance={(teachingAssignmentId) => {
+                    setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                    setActiveTab("subject-attendance");
+                  }}
+                  onOpenClassRecord={(teachingAssignmentId) => {
+                    setClassRecordAssignmentId(teachingAssignmentId);
+                  }}
+                  onReviewConflicts={() => setActiveTab("conflict-review")}
+                />
+              )
+            ) : activeTab === "today-classes" ? (
+              <TodaysClassesScreen
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
                 onCheckAttendance={(teachingAssignmentId) => {
+                  setClassWorkContext(null);
                   setSubjectAttendanceAssignmentId(teachingAssignmentId);
                   setActiveTab("subject-attendance");
                 }}
-                onOpenClassRecord={(teachingAssignmentId) => {
-                  setClassRecordAssignmentId(teachingAssignmentId);
-                }}
+              />
+            ) : activeTab === "subject-attendance" ? (
+              <SubjectAttendanceJourneyScreen
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
+                initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
+                classContext={classWorkContext}
+                onBackToClass={classWorkContext ? handleReturnToClass : undefined}
+              />
+            ) : activeTab === "subject-monitor" ? (
+              <SubjectMonitorScreen
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
+              />
+            ) : activeTab === "adviser-view" ? (
+              <AdviserViewScreen
+                subjectAttendanceService={subjectAttendanceService}
+                initialContext={advisoryWorkContext}
+                onContextChange={setAdvisoryWorkContext}
+              />
+            ) : activeTab === "teacher-load" ? (
+              <TeacherLoadScreen
+                teachingAssignmentService={teachingAssignmentService}
+                subjectAttendanceService={subjectAttendanceService}
+                schoolMemberService={schoolMemberService}
+                teacherUserId={session.userId}
+              />
+            ) : activeTab === "monthly-summary" ? (
+              <MonthlySummaryScreen
+                attendanceService={attendanceService}
+                sectionService={sectionService}
+                exportService={exportService}
+                schoolName={session.schoolName}
+                initialSectionId={monthlySummaryContext?.sectionId}
+                initialYearMonth={
+                  monthlySummaryContext
+                    ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
+                    : undefined
+                }
+              />
+            ) : activeTab === "grading-periods" ? (
+              <GradingPeriodsScreen gradingService={gradingService} />
+            ) : activeTab === "class-records" ? (
+              folio
+            ) : activeTab === "record-library" ? (
+              <ClassRecordsScreen
+                classRecordService={classRecordService}
+                sectionService={sectionService}
+                subjectService={subjectService}
+                gradingService={gradingService}
+                assessmentService={assessmentService}
+                learnerScoreService={learnerScoreService}
+                exportService={exportService}
+              />
+            ) : activeTab === "lesson-plans" ? (
+              <LessonPlanScreen
+                lessonPlanService={lessonPlanService}
+                subjectAttendanceService={subjectAttendanceService}
+                teacherUserId={session.userId}
+              />
+            ) : activeTab === "audit-log" ? (
+              <AuditLogScreen authService={authService} />
+            ) : activeTab === "admin-password-reset" ? (
+              <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+            ) : activeTab === "school-members" ? (
+              <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
+            ) : activeTab === "devices" ? (
+              <DeviceManagementScreen
+                deviceSyncService={deviceSyncService}
+                backupService={backupService}
+              />
+            ) : activeTab === "school-branding" ? (
+              <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
+            ) : activeTab === "conflict-review" ? (
+              <ConflictReviewScreen conflictReviewService={conflictReviewService} />
+            ) : activeTab === "sync-status" ? (
+              <SyncStatusScreen
+                syncStatusService={syncStatusService}
                 onReviewConflicts={() => setActiveTab("conflict-review")}
               />
-            )
-          ) : activeTab === "today-classes" ? (
-            <TodaysClassesScreen
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-              onCheckAttendance={(teachingAssignmentId) => {
-                setClassWorkContext(null);
-                setSubjectAttendanceAssignmentId(teachingAssignmentId);
-                setActiveTab("subject-attendance");
-              }}
-            />
-          ) : activeTab === "subject-attendance" ? (
-            <SubjectAttendanceJourneyScreen
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-              initialAssignmentId={subjectAttendanceAssignmentId ?? undefined}
-              classContext={classWorkContext}
-              onBackToClass={classWorkContext ? handleReturnToClass : undefined}
-            />
-          ) : activeTab === "subject-monitor" ? (
-            <SubjectMonitorScreen
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-            />
-          ) : activeTab === "adviser-view" ? (
-            <AdviserViewScreen
-              subjectAttendanceService={subjectAttendanceService}
-              initialContext={advisoryWorkContext}
-              onContextChange={setAdvisoryWorkContext}
-            />
-          ) : activeTab === "teacher-load" ? (
-            <TeacherLoadScreen
-              teachingAssignmentService={teachingAssignmentService}
-              subjectAttendanceService={subjectAttendanceService}
-              schoolMemberService={schoolMemberService}
-              teacherUserId={session.userId}
-            />
-          ) : activeTab === "monthly-summary" ? (
-            <MonthlySummaryScreen
-              attendanceService={attendanceService}
-              sectionService={sectionService}
-              exportService={exportService}
-              schoolName={session.schoolName}
-              initialSectionId={monthlySummaryContext?.sectionId}
-              initialYearMonth={
-                monthlySummaryContext
-                  ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
-                  : undefined
-              }
-            />
-          ) : activeTab === "grading-periods" ? (
-            <GradingPeriodsScreen gradingService={gradingService} />
-          ) : activeTab === "class-records" ? (
-            folio
-          ) : activeTab === "record-library" ? (
-            <ClassRecordsScreen
-              classRecordService={classRecordService}
-              sectionService={sectionService}
-              subjectService={subjectService}
-              gradingService={gradingService}
-              assessmentService={assessmentService}
-              learnerScoreService={learnerScoreService}
-              exportService={exportService}
-            />
-          ) : activeTab === "lesson-plans" ? (
-            <LessonPlanScreen
-              lessonPlanService={lessonPlanService}
-              subjectAttendanceService={subjectAttendanceService}
-              teacherUserId={session.userId}
-            />
-          ) : activeTab === "audit-log" ? (
-            <AuditLogScreen authService={authService} />
-          ) : activeTab === "admin-password-reset" ? (
-            <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
-          ) : activeTab === "school-members" ? (
-            <SchoolMembershipScreen schoolMemberService={schoolMemberService} />
-          ) : activeTab === "devices" ? (
-            <DeviceManagementScreen
-              deviceSyncService={deviceSyncService}
-              backupService={backupService}
-            />
-          ) : activeTab === "school-branding" ? (
-            <SchoolBrandingScreen schoolLogoService={schoolLogoService} />
-          ) : activeTab === "conflict-review" ? (
-            <ConflictReviewScreen conflictReviewService={conflictReviewService} />
-          ) : activeTab === "sync-status" ? (
-            <SyncStatusScreen
-              syncStatusService={syncStatusService}
-              onReviewConflicts={() => setActiveTab("conflict-review")}
-            />
-          ) : null}
+            ) : null}
+          </ErrorBoundary>
         </AppLayout>
       ) : (
         <div className="app-boot">

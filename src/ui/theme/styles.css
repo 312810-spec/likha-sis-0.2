@@ -32,13 +32,50 @@
   --color-warning: #8a4b00;
   --color-warning-surface: #fff4de;
   --color-focus: var(--color-primary);
-  --spacing-unit: 12px;
+  --spacing-unit: var(--space-4);
+  /* Spacing scale. Every value derives from --spacing-unit, so the
+     efficient/guided density overrides below rescale all spacing, not
+     just the values that happen to name the unit directly. Hardcoded px
+     padding/gap anywhere else is a visual island. */
+  --space-1: calc(var(--spacing-unit) * 0.25);
+  --space-2: calc(var(--spacing-unit) * 0.5);
+  --space-3: calc(var(--spacing-unit) * 0.75);
+  --space-4: var(--spacing-unit);
+  --space-5: calc(var(--spacing-unit) * 1.5);
+  --space-6: calc(var(--spacing-unit) * 2);
+  --space-7: calc(var(--spacing-unit) * 3);
+  --space-8: calc(var(--spacing-unit) * 4);
   --font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-numeric: var(--font-family);
+  /* Type scale, as ratios of --font-size-base so a density override
+     rescales the whole scale together. Before M03 the scale was three
+     sizes and every other size was a per-screen literal — headings did
+     not respond to density at all while body text did. */
   --font-size-base: 15px;
-  --font-size-large: 1.25rem;
-  --font-size-small: 0.875rem;
+  --font-size-2xs: calc(var(--font-size-base) * 0.7);
+  --font-size-xs: calc(var(--font-size-base) * 0.8);
+  --font-size-sm: calc(var(--font-size-base) * 0.9);
+  --font-size-md: calc(var(--font-size-base) * 1.13);
+  --font-size-lg: calc(var(--font-size-base) * 1.22);
+  --font-size-xl: calc(var(--font-size-base) * 1.33);
+  --font-size-2xl: calc(var(--font-size-base) * 1.5);
+  --font-size-3xl: calc(var(--font-size-base) * 1.8);
+  --font-size-4xl: calc(var(--font-size-base) * 2);
+  /* Legacy names kept as aliases so existing rules keep working. */
+  --font-size-large: var(--font-size-xl);
+  --font-size-small: var(--font-size-sm);
   --line-height-base: 1.5;
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.3;
+  --line-height-none: 1;
+  /* Named breakpoints. CSS custom properties cannot appear inside a
+     @media query, so these are the sanctioned vocabulary for JS-side
+     reasoning and for the token guard test; the media queries themselves
+     use the literal px. Two canonical widths only: phone (640) and
+     tablet (860). Anything else needs a reason recorded where it is
+     used. */
+  --breakpoint-phone: 640px;
+  --breakpoint-tablet: 860px;
   --control-height: 40px;
   --content-width: 720px;
   --content-width-wide: 1440px;
@@ -77,9 +114,9 @@
 }
 
 :root[data-teacher-mode="guided"] {
-  --spacing-unit: 18px;
+  --spacing-unit: var(--space-5);
   --font-size-base: 17px;
-  --control-height: 48px;
+  --control-height: var(--space-8);
 }
 
 /* The provider resolves System once and listens for OS changes. Explicit
@@ -300,6 +337,34 @@ label {
   text-align: center;
 }
 
+/* ErrorBoundary (M03): a screen whose render threw. Uses the same
+   danger-surface pair the error Alert uses so a component failure reads like
+   any other failure, not like a crash page. The detail line carries the
+   actual error text (a local workstation has no telemetry path, so surfacing
+   it is the only way the teacher can report what broke). */
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-large);
+  background: var(--color-danger-surface);
+}
+.error-boundary-message {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+.error-boundary-detail {
+  margin: 0;
+  font-family: var(--font-numeric);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
 .status-chip {
   display: inline-block;
   padding: 0.15em 0.6em;
@@ -416,19 +481,6 @@ label {
   z-index: 3;
 }
 
-.attendance-roster {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: var(--spacing-unit);
-}
-
-.attendance-roster th,
-.attendance-roster td {
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  text-align: left;
-  border-top: 1px solid var(--color-border);
-}
-
 .attendance-roster [role="group"] {
   display: flex;
   gap: calc(var(--spacing-unit) * 0.5);
@@ -527,22 +579,53 @@ label {
   margin-bottom: calc(var(--spacing-unit) * 0.5);
 }
 
-.section-roster {
+/* Ledger base (M03). The roster table families -- .attendance-roster,
+   .section-roster, .sf1-comparison-table -- had each redefined the same
+   width/collapse/cell-padding/border rules with subtly different values
+   (.data-table's cells use --color-border-soft and a 0.6 padding ratio;
+   the ledgers use --color-border and 0.5). They are one visual primitive,
+   so they now share one definition; only genuine per-table differences
+   are declared below. */
+.ledger,
+.attendance-roster,
+.section-roster,
+.sf1-comparison-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: var(--spacing-unit);
 }
 
+.ledger th,
+.ledger td,
+.attendance-roster th,
+.attendance-roster td,
 .section-roster th,
-.section-roster td {
+.section-roster td,
+.sf1-comparison-table th,
+.sf1-comparison-table td {
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   text-align: left;
   border-top: 1px solid var(--color-border);
 }
 
-.section-roster thead th {
+.ledger thead th,
+.attendance-roster thead th,
+.section-roster thead th,
+.sf1-comparison-table thead th {
   border-top: none;
   border-bottom: 2px solid var(--color-border);
+}
+
+/* .sf1-comparison-table additionally tops-align dense comparison cells. */
+.sf1-comparison-table {
+  margin: var(--spacing-unit) 0;
+}
+.sf1-comparison-table th,
+.sf1-comparison-table td {
+  vertical-align: top;
+}
+.sf1-comparison-table thead th {
+  font-weight: 700;
 }
 
 .section-roster tbody tr:focus-within {
@@ -1109,25 +1192,8 @@ label {
 /* The side-by-side duplicate comparison table -- two data columns
    sharing one field-label column, so "Same"/"Different"/"Missing from
    X" always sits directly beside the two values it describes. */
-.sf1-comparison-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: var(--spacing-unit) 0;
-}
-
-.sf1-comparison-table th,
-.sf1-comparison-table td {
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  text-align: left;
-  border-top: 1px solid var(--color-border);
-  vertical-align: top;
-}
-
-.sf1-comparison-table thead th {
-  border-top: none;
-  font-weight: 700;
-}
-
+/* Ledger base rules live with .section-roster above (M03); only the
+   comparison table's own differences are declared here. */
 .sf1-review-progress {
   display: flex;
   align-items: center;
@@ -1470,7 +1536,7 @@ label {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-height: 48px;
+  min-height: var(--space-8);
   padding: calc(var(--spacing-unit) * 0.4) 0;
   border: 0;
   background: none;
@@ -1645,7 +1711,7 @@ label {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--spacing-unit);
 }
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .kpi-strip {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1666,7 +1732,7 @@ label {
   color: var(--color-text-muted);
 }
 .kpi-value {
-  font-size: 1.7rem;
+  font-size: var(--font-size-3xl);
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1;
@@ -1725,14 +1791,14 @@ label {
 }
 .card-header > :first-child {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--font-size-md);
 }
 .card-actions {
   display: flex;
   gap: calc(var(--spacing-unit) * 0.5);
   flex-wrap: wrap;
 }
-@media (max-width: 1080px) {
+@media (min-width: 861px) and (max-width: 1080px) {
   .card[data-span] {
     grid-column: span 12;
   }
@@ -1740,7 +1806,7 @@ label {
     grid-column: span 6;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .card[data-keep-half] {
     grid-column: span 12;
   }
@@ -2059,20 +2125,20 @@ label {
 /* Class folio: one persistent index and one opaque working sheet. */
 .app-sidebar-brand {
   color: var(--color-text);
-  padding: 24px 20px 16px;
-  font-size: 19px;
+  padding: var(--space-6) var(--space-5) var(--space-4);
+  font-size: var(--font-size-lg);
   letter-spacing: -0.03em;
   border-bottom: 0;
 }
 .app-sidebar-logo {
-  width: 36px;
-  height: 36px;
+  width: var(--space-7);
+  height: var(--space-7);
   border-radius: 50%;
   background: white;
 }
 .app-sidebar-identity {
   display: block;
-  margin: 0 20px 20px;
+  margin: 0 var(--space-5) var(--space-5);
 }
 .app-sidebar-identity strong {
   display: none;
@@ -2104,7 +2170,7 @@ label {
 }
 .app-topbar-identity {
   max-width: 200px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 .app-topbar-modes {
   gap: 0;
@@ -2116,8 +2182,8 @@ label {
   border: 0;
   background: transparent;
   min-height: 32px;
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
 }
 .app-topbar-modes button[aria-pressed="true"] {
   background: var(--color-primary-wash);
@@ -2128,31 +2194,31 @@ label {
   flex-direction: column;
   gap: 2px;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
 }
 .appearance-control select {
   min-height: 32px;
-  padding: 3px 24px 3px 8px;
-  font-size: 13px;
+  padding: 3px var(--space-6) 3px var(--space-2);
+  font-size: var(--font-size-sm);
   width: auto;
 }
 .app-sidebar-appearance {
   display: none;
-  padding: 12px 20px;
+  padding: var(--space-4) var(--space-5);
 }
 .app-canvas {
-  padding: 32px;
+  padding: var(--space-7);
 }
 .page-header h2,
 .teacher-folio .page-header h2 {
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   font-weight: 600;
   letter-spacing: -0.045em;
 }
 .workspace-summary {
   color: var(--color-text-muted);
   margin-top: -4px;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 .class-folio {
   display: grid;
@@ -2166,26 +2232,26 @@ label {
 .folio-index {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border-soft);
-  padding: 20px 12px;
+  padding: var(--space-5) var(--space-4);
 }
 .folio-index-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
 }
 .folio-index-heading h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-base);
 }
 .folio-index-heading > span {
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 .folio-index > .field-hint {
-  padding: 0 8px;
-  margin: 4px 0 16px;
-  font-size: 12px;
+  padding: 0 var(--space-2);
+  margin: var(--space-1) 0 var(--space-5);
+  font-size: var(--font-size-xs);
 }
 .folio-section-list {
   margin: 0;
@@ -2196,13 +2262,13 @@ label {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: var(--space-2);
   width: 100%;
   border: 0;
   border-radius: 8px;
   background: transparent;
   text-align: left;
-  padding: 14px 12px;
+  padding: var(--space-3) var(--space-4);
   position: relative;
 }
 .folio-section-choice[aria-pressed="true"] {
@@ -2221,55 +2287,55 @@ label {
 }
 .folio-section-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
 }
 .folio-section-state {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 .folio-section-choice .field-hint {
-  font-size: 11px;
+  font-size: var(--font-size-2xs);
   margin: 0;
 }
 .folio-sheet {
   min-width: 0;
-  padding: 28px;
+  padding: var(--space-7);
 }
 .folio-sheet-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 24px;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
   border-bottom: 1px solid var(--color-border-soft);
 }
 .folio-eyebrow {
   color: var(--color-text-muted);
-  font-size: 12px;
-  margin: 0 0 8px;
+  font-size: var(--font-size-xs);
+  margin: 0 0 var(--space-2);
 }
 .folio-sheet-heading h3 {
   margin: 0;
-  font-size: 28px;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.04em;
   font-weight: 600;
 }
 .folio-sheet-heading .field-hint {
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
 }
 .folio-register-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 24px 0 18px;
+  gap: var(--space-4);
+  padding: var(--space-6) 0 var(--space-5);
 }
 .folio-register-heading h4 {
-  margin: 0 0 4px;
-  font-size: 15px;
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-base);
 }
 .folio-register-heading time {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 .folio-register-scroll {
@@ -2282,21 +2348,21 @@ label {
 .folio-register th {
   background: var(--color-surface-2);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .folio-register td,
 .folio-register th {
   border-bottom-color: var(--color-border-soft);
-  padding: 12px 8px;
+  padding: var(--space-4) var(--space-2);
 }
 .folio-activity {
-  margin-top: 24px;
-  font-size: 13px;
+  margin-top: var(--space-6);
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 .folio-activity summary {
   cursor: pointer;
-  padding: 12px 0;
+  padding: var(--space-4) 0;
 }
 .class-work-actions {
   display: flex;
@@ -2307,31 +2373,31 @@ label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 24px 0;
+  gap: var(--space-5);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--color-border-soft);
 }
 .class-work-row h4 {
-  margin: 0 0 6px;
-  font-size: 16px;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-md);
 }
 .class-work-row p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
-@media (max-width: 1200px) and (min-width: 861px) {
+@media (min-width: 861px) and (max-width: 1080px) {
   .app-topbar-identity {
     display: none;
   }
   .app-canvas {
-    padding: 24px;
+    padding: var(--space-6);
   }
   .class-folio {
     grid-template-columns: 220px minmax(0, 1fr);
   }
   .folio-sheet {
-    padding: 20px;
+    padding: var(--space-5);
   }
   .folio-sheet-heading {
     align-items: flex-start;
@@ -2344,7 +2410,7 @@ label {
   }
   .app-topbar {
     min-height: 64px;
-    padding: 8px 16px;
+    padding: var(--space-2) var(--space-5);
   }
   .app-topbar-appearance {
     display: none;
@@ -2358,11 +2424,11 @@ label {
   .folio-index {
     border-right: 0;
     border-bottom: 1px solid var(--color-border-soft);
-    padding: 16px 12px;
+    padding: var(--space-5) var(--space-4);
   }
   .folio-section-list {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     overflow-x: auto;
     padding-bottom: 4px;
   }
@@ -2377,7 +2443,7 @@ label {
     border-color: var(--color-primary);
   }
   .folio-sheet {
-    padding: 20px 16px;
+    padding: var(--space-5) var(--space-5);
   }
   .folio-sheet-heading {
     flex-direction: column;
@@ -2385,7 +2451,7 @@ label {
   }
   .folio-sheet-heading button {
     width: 100%;
-    min-height: 48px;
+    min-height: var(--space-8);
   }
   .class-work-row {
     flex-direction: column;
@@ -2393,14 +2459,14 @@ label {
   }
   .class-work-row button {
     width: 100%;
-    min-height: 48px;
+    min-height: var(--space-8);
   }
   .app-sidebar-modes {
     flex-wrap: wrap;
   }
   .app-sidebar-modes button,
   .appearance-control select {
-    min-height: 48px;
+    min-height: var(--space-8);
   }
 }
 @media print {
@@ -2452,20 +2518,20 @@ label {
 
 .preview-boundary {
   color: var(--color-text-muted);
-  font-size: 12px;
-  padding: 0 0 20px;
+  font-size: var(--font-size-xs);
+  padding: 0 0 var(--space-5);
 }
 .folio-pending {
-  margin-top: 24px;
+  margin-top: var(--space-6);
 }
 .folio-pending summary {
   cursor: pointer;
-  padding: 12px 0;
+  padding: var(--space-4) 0;
   font-weight: 600;
 }
 .app-sidebar-identity span {
   white-space: normal;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .folio-section-choice:hover {
   background: var(--color-primary-wash);
@@ -2475,11 +2541,11 @@ label {
   display: none;
 }
 .folio-section-name {
-  font-size: max(14px, var(--font-size-base));
+  font-size: max(var(--font-size-sm), var(--font-size-base));
 }
 .folio-section-state,
 .folio-section-choice .field-hint {
-  font-size: max(12px, calc(var(--font-size-base) * 0.85));
+  font-size: max(var(--font-size-2xs), calc(var(--font-size-base) * 0.85));
 }
 @media (max-width: 860px) {
   .folio-section-list {
@@ -2488,18 +2554,18 @@ label {
   .folio-mobile-picker {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
     font-size: var(--font-size-small);
   }
   .folio-mobile-picker select {
     width: 100%;
     min-width: 0;
-    min-height: 48px;
+    min-height: var(--space-8);
   }
   .app-sidebar-identity strong {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-2);
   }
   .class-folio {
     min-height: 0;
@@ -2516,8 +2582,8 @@ label {
 .app-sidebar-brand {
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  padding: 32px 24px 26px;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-6) var(--space-6);
   border: 0;
   color: var(--color-text);
 }
@@ -2527,27 +2593,27 @@ label {
   border-radius: 0;
 }
 .app-sidebar-school {
-  font-size: 1.2rem;
+  font-size: var(--font-size-lg);
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .app-sidebar-wordmark {
   letter-spacing: 0.24em;
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 .app-sidebar-scroll {
-  padding: 8px 14px;
+  padding: var(--space-2) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-4);
 }
 .app-nav-item {
-  min-height: 48px;
-  padding: 12px;
-  font-size: 1rem;
-  border-radius: 9px;
-  gap: 14px;
+  min-height: var(--space-8);
+  padding: var(--space-4);
+  font-size: var(--font-size-md);
+  border-radius: var(--space-3);
+  gap: var(--space-4);
 }
 .app-nav-item[aria-current="page"] {
   background: var(--color-primary-wash);
@@ -2561,7 +2627,7 @@ label {
 }
 .app-topbar {
   min-height: 110px;
-  padding: 24px 32px;
+  padding: var(--space-6) var(--space-7);
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-border-soft);
   position: relative;
@@ -2574,7 +2640,7 @@ label {
   min-width: 0;
 }
 .app-topbar-title strong {
-  font-size: 1.85rem;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.035em;
   line-height: 1.2;
 }
@@ -2586,15 +2652,15 @@ label {
   background: transparent;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px;
+  gap: var(--space-3);
+  padding: var(--space-2);
   color: var(--color-text);
 }
 .app-account-avatar {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: var(--space-7);
+  height: var(--space-7);
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text-muted);
@@ -2608,7 +2674,7 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
 .app-account-chevron svg {
   width: 16px;
@@ -2622,40 +2688,40 @@ label {
   max-width: calc(100vw - 32px);
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: var(--space-4);
+  padding: var(--space-5);
   box-shadow: var(--elevation-2);
 }
 .app-account-preferences {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--space-5);
   max-width: 460px;
 }
 .app-account-identity {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   padding-bottom: 14px;
   border-bottom: 1px solid var(--color-border-soft);
   overflow-wrap: anywhere;
 }
 .app-account-identity span {
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 .app-account-modes {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 .app-account-modes > div {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .app-account-modes button {
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   flex: 1;
 }
 .app-account-modes button[aria-pressed="true"] {
@@ -2674,11 +2740,11 @@ label {
 }
 .app-canvas > .page,
 .app-canvas > .home-view-toggle {
-  margin: 32px;
+  margin: var(--space-7);
 }
 .preview-boundary {
-  padding: 6px 32px;
-  font-size: 0.75rem;
+  padding: var(--space-2) var(--space-7);
+  font-size: var(--font-size-xs);
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-border-soft);
   color: var(--color-text-muted);
@@ -2689,15 +2755,15 @@ label {
   min-height: calc(100vh - 145px);
 }
 .concept-folio-index {
-  padding: 22px 16px;
+  padding: var(--space-5) var(--space-5);
   border-right: 1px solid var(--color-border-soft);
   min-width: 0;
 }
 .concept-folio-index h2 {
-  font-size: 1rem;
+  font-size: var(--font-size-md);
   font-weight: 400;
   color: var(--color-text-muted);
-  margin: 0 12px 12px;
+  margin: 0 var(--space-4) var(--space-4);
 }
 .concept-folio-class-list {
   margin: 0;
@@ -2705,7 +2771,7 @@ label {
   list-style: none;
 }
 .concept-folio-class-list li {
-  padding: 6px 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border-soft);
 }
 .concept-folio-class-list li:last-child {
@@ -2720,18 +2786,18 @@ label {
   gap: 3px;
   border: 0;
   border-radius: 8px;
-  padding: 14px 12px;
+  padding: var(--space-3) var(--space-4);
   position: relative;
   background: transparent;
   overflow-wrap: anywhere;
   color: var(--color-text);
 }
 .concept-folio-class strong {
-  font-size: 1rem;
+  font-size: var(--font-size-md);
   font-weight: 600;
 }
 .concept-folio-class span {
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
   color: var(--color-text-muted);
 }
 .concept-folio-class[aria-pressed="true"] {
@@ -2746,38 +2812,38 @@ label {
   position: absolute;
   right: -8px;
   top: calc(50% - 9px);
-  border-top: 9px solid transparent;
-  border-bottom: 9px solid transparent;
-  border-left: 9px solid var(--color-primary);
+  border-top: var(--space-3) solid transparent;
+  border-bottom: var(--space-3) solid transparent;
+  border-left: var(--space-3) solid var(--color-primary);
 }
 .concept-folio-sheet {
-  padding: 26px 32px 48px;
+  padding: var(--space-6) var(--space-7) var(--space-8);
   min-width: 0;
   background: var(--color-surface-2);
 }
 .concept-folio-heading h2 {
   margin: 0;
-  font-size: 1.9rem;
+  font-size: var(--font-size-3xl);
   letter-spacing: -0.035em;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
 .concept-folio-heading p {
-  margin: 4px 0 18px;
+  margin: var(--space-1) 0 var(--space-5);
   color: var(--color-text-muted);
 }
 .concept-folio-tabs {
   display: flex;
-  gap: 16px;
+  gap: var(--space-5);
   border-bottom: 1px solid var(--color-border-soft);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-4);
 }
 .concept-folio-tabs button {
   background: transparent;
   border: 0;
   border-radius: 0;
   color: var(--color-text-muted);
-  padding: 12px 8px;
+  padding: var(--space-4) var(--space-2);
   border-bottom: 3px solid transparent;
 }
 .concept-folio-tabs button[aria-selected="true"] {
@@ -2786,47 +2852,47 @@ label {
   font-weight: 600;
 }
 .concept-folio-panel {
-  outline-offset: 4px;
+  outline-offset: var(--focus-ring-offset);
 }
 .concept-folio-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 20px 0;
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
   border-bottom: 1px solid var(--color-border-soft);
 }
 .concept-folio-row h3,
 .concept-folio-links h3,
 .concept-folio-roster h3 {
-  font-size: 1.15rem;
-  margin: 0 0 4px;
+  font-size: var(--font-size-lg);
+  margin: 0 0 var(--space-1);
   letter-spacing: -0.02em;
 }
 .concept-folio-row p {
   color: var(--color-text-muted);
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--font-size-base);
 }
 .concept-folio-row button {
   flex-shrink: 0;
 }
 .concept-folio-links,
 .concept-folio-roster {
-  margin-top: 24px;
+  margin-top: var(--space-6);
 }
 .concept-folio-links button,
 .workspace-links button {
   width: 100%;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-5);
   border: 0;
   border-bottom: 1px solid var(--color-border-soft);
   border-radius: 0;
   background: transparent;
   text-align: left;
-  padding: 12px 0;
+  padding: var(--space-4) 0;
 }
 .concept-folio-table-wrap {
   overflow: auto;
@@ -2835,12 +2901,12 @@ label {
 .concept-folio-roster table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
 .concept-folio-roster th,
 .concept-folio-roster td {
   text-align: left;
-  padding: 10px 8px;
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border-soft);
 }
 .concept-folio-roster th {
@@ -2857,37 +2923,37 @@ label {
   box-shadow: none;
 }
 .concept-folio-scores .page-header h2 {
-  font-size: 1.25rem;
+  font-size: var(--font-size-xl);
 }
 .concept-folio-state {
-  padding: 0 12px;
+  padding: 0 var(--space-4);
 }
 .workspace-directory {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px 48px;
+  gap: var(--space-6) var(--space-8);
   max-width: 1000px;
 }
 .workspace-directory h3,
 .workspace-form-list h3 {
-  font-size: 1.1rem;
+  font-size: var(--font-size-lg);
 }
 .workspace-form-list {
   max-width: 1000px;
 }
 .workspace-form-list section {
-  padding: 16px 0;
+  padding: var(--space-5) 0;
   border-bottom: 1px solid var(--color-border-soft);
 }
 .workspace-link-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 16px 0;
+  gap: var(--space-6);
+  padding: var(--space-5) 0;
 }
 .workspace-link-row p {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   color: var(--color-text-muted);
 }
 .workspace-link-row button {
@@ -2896,9 +2962,9 @@ label {
 .calendar-controls {
   display: flex;
   align-items: end;
-  gap: 12px;
+  gap: var(--space-4);
   flex-wrap: wrap;
-  margin: 24px 0;
+  margin: var(--space-6) 0;
 }
 .calendar-controls .field {
   margin: 0;
@@ -2912,19 +2978,19 @@ label {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 20px;
-  padding: 20px 0;
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
   border-bottom: 1px solid var(--color-border-soft);
 }
 .calendar-agenda p {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   color: var(--color-text-muted);
 }
 .calendar-time {
   color: var(--color-text-muted);
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
-@media (max-width: 1100px) and (min-width: 861px) {
+@media (min-width: 861px) and (max-width: 1080px) {
   :root {
     --sidebar-width: 210px;
   }
@@ -2932,29 +2998,29 @@ label {
     grid-template-columns: 230px minmax(0, 1fr);
   }
   .concept-folio-sheet {
-    padding: 24px;
+    padding: var(--space-6);
   }
   .concept-folio-row {
     align-items: flex-start;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-4);
   }
 }
 @media (max-width: 860px) {
   .app-topbar {
     min-height: 90px;
-    padding: 16px;
-    gap: 8px;
+    padding: var(--space-5);
+    gap: var(--space-2);
   }
   .app-topbar-menu {
-    padding: 6px;
+    padding: var(--space-2);
     min-width: 44px;
     min-height: 44px;
   }
   .app-topbar-school {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
     flex: 1;
   }
@@ -2970,13 +3036,13 @@ label {
     min-width: 0;
   }
   .app-topbar-school strong {
-    font-size: 0.85rem;
+    font-size: var(--font-size-sm);
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
   .app-topbar-school small {
     letter-spacing: 0.18em;
-    font-size: 0.65rem;
+    font-size: var(--font-size-2xs);
     margin-top: 3px;
   }
   .app-topbar-title,
@@ -2990,7 +3056,7 @@ label {
   .app-account-trigger {
     min-height: 44px;
     min-width: 44px;
-    padding: 4px;
+    padding: var(--space-1);
   }
   .app-account-panel {
     right: 0;
@@ -3001,18 +3067,18 @@ label {
   }
   .app-canvas > .page,
   .app-canvas > .home-view-toggle {
-    margin: 20px;
+    margin: var(--space-5);
   }
   .preview-boundary {
-    padding: 5px 20px;
-    font-size: 0.7rem;
+    padding: var(--space-1) var(--space-5);
+    font-size: var(--font-size-2xs);
   }
   .concept-folio {
     display: block;
     min-height: 0;
   }
   .concept-folio-index {
-    padding: 20px 20px 0;
+    padding: var(--space-5) var(--space-5) 0;
     border: 0;
   }
   .concept-folio-index h2 {
@@ -3020,7 +3086,7 @@ label {
   }
   .concept-folio-class {
     min-height: 64px;
-    padding: 10px 12px;
+    padding: var(--space-3) var(--space-4);
   }
   .concept-folio-class[aria-pressed="true"] {
     background: var(--color-primary-wash);
@@ -3034,31 +3100,31 @@ label {
     display: none;
   }
   .concept-folio-sheet {
-    padding: 26px 20px 24px;
+    padding: var(--space-6) var(--space-5) var(--space-6);
   }
   .concept-folio-heading h2 {
-    font-size: 1.5rem;
+    font-size: var(--font-size-2xl);
   }
   .concept-folio-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: var(--space-4);
   }
   .concept-folio-row button {
-    min-height: 48px;
+    min-height: var(--space-8);
   }
   .workspace-directory {
     grid-template-columns: 1fr;
-    gap: 24px;
+    gap: var(--space-6);
   }
   .workspace-link-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: var(--space-4);
   }
   .calendar-agenda li {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: var(--space-2);
   }
   .app-bottomnav {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3102,12 +3168,12 @@ label {
 @media (max-width: 860px) {
   .app-mobile-title {
     display: block;
-    font-size: 1.7rem;
+    font-size: var(--font-size-3xl);
     letter-spacing: -0.035em;
-    margin: 16px 20px 0;
+    margin: var(--space-5) var(--space-5) 0;
   }
   .concept-folio-index {
-    padding-top: 12px;
+    padding-top: var(--space-4);
   }
   .concept-folio-class-list {
     max-height: 220px;
@@ -3123,7 +3189,7 @@ label {
 .concept-folio-index {
   align-self: start;
   position: sticky;
-  top: 12px;
+  top: var(--space-4);
   max-height: calc(100dvh - 24px);
   overflow: auto;
   scrollbar-width: thin;
@@ -3173,10 +3239,10 @@ label {
 .app-account-close {
   display: grid;
   place-items: center;
-  font-size: 1.4rem;
+  font-size: var(--font-size-2xl);
   font-weight: 400;
-  width: 36px;
-  height: 36px;
+  width: var(--space-7);
+  height: var(--space-7);
   padding: 0;
   border: 0;
   background: transparent;
@@ -3220,7 +3286,7 @@ label {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-2, 8px);
+  gap: var(--space-2);
 }
 .assessment-toolbar {
   justify-content: space-between;
@@ -3230,10 +3296,10 @@ label {
   margin: 0;
 }
 .assessment-composer:not([hidden]) {
-  padding: 16px;
+  padding: var(--space-5);
   margin-block-end: 20px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--space-4);
 }
 .assessment-item-list {
   list-style: none;
@@ -3244,8 +3310,8 @@ label {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding-block: 12px;
+  gap: var(--space-2);
+  padding-block: var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 .assessment-item-list > li > button {
@@ -3261,7 +3327,7 @@ label {
 .assessment-item-list [role="group"] {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .item-edit-form {
   width: 100%;
@@ -3280,7 +3346,7 @@ label {
     flex-basis: 100%;
   }
   .assessment-composer:not([hidden]) {
-    padding: 12px;
+    padding: var(--space-4);
   }
   .worksheet-actions > button {
     width: 100%;

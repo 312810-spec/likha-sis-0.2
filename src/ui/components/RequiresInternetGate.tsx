@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { ConnectivityChecker } from "../../domain/ports/connectivity-checker";
+import { offlineCopy, loadingCopy } from "../theme/copy";
 import { Alert } from "./Alert";
 import { Loading } from "./Loading";
 
@@ -54,18 +55,15 @@ export function RequiresInternetGate({ connectivityChecker, children }: Requires
   }, [check]);
 
   if (state === "checking") {
-    return <Loading label="Checking your connection…" />;
+    return <Loading label={loadingCopy.checkingConnection} />;
   }
 
   if (state === "offline") {
     return (
       <Alert tone="error">
-        <p>
-          This tool needs an internet connection to generate content, and no internet connection was
-          found right now.
-        </p>
+        <p>{offlineCopy.needsConnection}</p>
         <button type="button" onClick={check}>
-          Try again
+          {offlineCopy.tryAgain}
         </button>
       </Alert>
     );
