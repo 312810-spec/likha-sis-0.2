@@ -1,6 +1,6 @@
-# CTOS State
+﻿# CTOS State
 
-**Updated:** 2026-10-06  
+**Updated:** 2026-10-06
 **Program:** CTOS v3 / FORGE-UHF  
 **Repository:** 312810-spec/likha-sis-0.2
 
@@ -8,15 +8,28 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M01 — Academic trust (grading, completeness, historical integrity)
-- Last completed milestone: M00
-- Last pushed CTOS execution checkpoint: M00 (see docs/ctos/checkpoints/m00.md)
-- Next action: execute M01 — verify grading/transmutation thresholds, edge attainable scores, blank≠zero≠excused, provisional vs complete, grading policy applicability/version, historical issued snapshot stability, correction/amend behavior
-- Risk tier: High-Fidelity for M01 (grading/finality)
+- Current milestone: M02 — Work access and session integrity
+- Last completed milestone: M01 (PASS — see docs/ctos/checkpoints/m01.md)
+- Last pushed CTOS execution checkpoint: M01
+- Next action: execute M02 — account switch, stale async response, spoofed ID, reassignment, revocation, adviser vs subject scope, offline last-confirmed assignment, handover of pending work, sync queue scope
+- Risk tier: M01 was High-Fidelity (grading/finality) and closed PASS
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none at the M00 checkpoint
+- Dirty/unpushed warning: none at the M00 checkpoint; M01 work is committed and
+  pushed at the `ctos-m01-complete` tag
+
+## M01 result (checkpoint m01.md)
+
+- Native Rust tests: 1,320 passed / 0 failed (18 suites, full `cargo test`)
+- Frontend quality: 132 files / 1,242 tests pass; typecheck, lint,
+  format:check, architecture, deadcode all pass
+- `cargo clippy --all-targets -- -D warnings` clean
+- New: `ComputedTermGrade.complete` — provisional grades are now visibly
+  provisional on screen and in both exports
+- Two M00 record corrections recorded in the M01 checkpoint: the M00 clippy
+  gate did not actually pass, and the M00 eval registry listed
+  `grading-cases.md` as automated before the file existed
 
 ## M00 baseline truth (source commit 659fb0d)
 
@@ -53,3 +66,4 @@
 ## Rule
 
 This file is intentionally compact. Historical detail belongs in Git and docs/ctos/checkpoints/.
+

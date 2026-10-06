@@ -26,6 +26,17 @@ pub struct ComputedTermGrade {
     /// (rather than just at the floor) should compare `initial_grade`
     /// directly, not rely on `term_grade` alone once this flag is set.
     pub was_floored: bool,
+    /// True only if every assessment item this class record holds under a
+    /// category the resolved weight policy actually pools has a recorded
+    /// status for this learner — no blanks remaining. False means the grade
+    /// is real but provisional: it is computed exactly as DepEd specifies
+    /// from what has been entered so far, and it will change once the
+    /// outstanding items are recorded. CTOS §5 requires a provisional value
+    /// be visibly provisional, so a caller must never present this number as
+    /// final when this flag is false. An unscored item under a category the
+    /// policy does not pool cannot move the number and is deliberately not
+    /// counted against completeness.
+    pub complete: bool,
 }
 
 /// The DepEd-verified Adjusted Transmutation Table (Annex D, Table 4),
@@ -327,12 +338,69 @@ pub fn compute_term_grade(
     };
     let (term_grade, was_floored) = apply_minimum_floor(raw_tg);
 
+    // Every weighted category resolved, so a real number exists. Whether it
+    // is *complete* is a separate question: it is complete only when no
+    // assessment item the policy pools is still blank for this learner.
+    // Without this flag a teacher reading "88" cannot distinguish a fully
+    // entered grade from one that will move once the remaining items are
+    // scored, and CTOS §5 forbids presenting the former as the latter.
+    let complete =
+        all_weighted_items_recorded(conn, school_id, class_record_id, learner_id, &rows)?;
+
     Ok(Some(ComputedTermGrade {
         initial_grade,
         term_grade,
         was_transmuted: !zero_based,
         was_floored,
+        complete,
     }))
+}
+
+/// True when every assessment item in `class_record_id` whose category the
+/// resolved policy pools has a recorded status for `learner_id` — a blank
+/// being the absence of any `learner_scores` row at all, per this app's
+/// "absence of a row means not yet recorded" idiom. An `Excused` or
+/// `NotApplicable` row counts as recorded: the teacher has made an explicit
+/// decision about that item, and neither contributes to the pooled
+/// denominator either way (`leaf_percentage_score` pools `Scored` only), so
+/// the grade will not move when one is entered.
+///
+/// Categories the policy does not pool are excluded from both counts. An
+/// unscored item under such a category cannot change the term grade, so
+/// counting it against completeness would flag a stable, correct grade as
+/// provisional — the exact false alarm this flag exists to prevent.
+fn all_weighted_items_recorded(
+    conn: &Connection,
+    school_id: &str,
+    class_record_id: &str,
+    learner_id: &str,
+    rows: &[WeightRow],
+) -> AppResult<bool> {
+    let weighted_category_ids: Vec<String> = rows.iter().map(|r| r.category_id.clone()).collect();
+    if weighted_category_ids.is_empty() {
+        return Ok(false);
+    }
+    // Build the `IN (...)` placeholder list to match the bound category ids
+    // exactly, so the completeness set can't drift from what was weighted.
+    let placeholders = (0..weighted_category_ids.len())
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT COUNT(DISTINCT ai.id), COUNT(DISTINCT ls.assessment_item_id) \
+         FROM assessment_items ai \
+         LEFT JOIN learner_scores ls \
+           ON ls.assessment_item_id = ai.id AND ls.learner_id = ?1 AND ls.school_id = ?2 \
+         WHERE ai.class_record_id = ?3 AND ai.school_id = ?2 AND ai.category_id IN ({placeholders})"
+    );
+    let mut params: Vec<&dyn rusqlite::ToSql> = vec![&learner_id, &school_id, &class_record_id];
+    for id in &weighted_category_ids {
+        params.push(id);
+    }
+    let (total, recorded): (i64, i64) = conn.query_row(&sql, params.as_slice(), |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?;
+    Ok(total > 0 && recorded == total)
 }
 
 #[cfg(test)]
@@ -495,6 +563,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(score),
             teacher_id,
+            None,
         )
         .unwrap();
     }
@@ -962,6 +1031,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Excused,
             None,
             &teacher_id,
+            None,
         )
         .unwrap();
         add_item_and_score(
@@ -1030,6 +1100,546 @@ mod tests {
         // excused item as a missed 0-of-20.
         assert!((result.initial_grade - 100.0).abs() < 0.01);
         assert_eq!(result.term_grade, 100);
+    }
+
+    #[test]
+    fn compute_term_grade_ignores_not_applicable_items_in_the_denominator() {
+        // CTOS §5: blank ≠ zero ≠ excused ≠ not applicable. An item marked
+        // NotApplicable is an explicit decision that this item does not apply
+        // to this learner, so it must be excluded from the pooled denominator
+        // exactly as an Excused item is — not silently held against them as a
+        // missed zero.
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
+        let na_item = assessment_item::create(&conn, &school_id, &cr, WRITTEN_WORKS, "WW-na", 20.0)
+            .unwrap()
+            .unwrap();
+        learner_score::record(
+            &conn,
+            &school_id,
+            &na_item.id,
+            &learner_id,
+            learner_score::LearnerScoreStatus::NotApplicable,
+            None,
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            25.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            40.0,
+        );
+
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        assert!((result.initial_grade - 100.0).abs() < 0.01);
+        assert_eq!(result.term_grade, 100);
+    }
+
+    #[test]
+    fn a_recorded_zero_scores_zero_but_an_unrecorded_item_scores_nothing() {
+        // The other half of CTOS §5's blank ≠ zero: a genuinely recorded 0.0
+        // is a real zero the learner earned and must depress the percentage
+        // score, while an item with no row at all is "not yet recorded" and
+        // must contribute nothing to either side of the fraction. Both
+        // behaviours are asserted against the same fixture so the distinction
+        // is proven, not assumed.
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
+
+        // A real zero in Written Works.
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW-zero",
+            20.0,
+            0.0,
+        );
+        // A second Written Works item the teacher simply has not reached yet
+        // — no learner_scores row exists for it.
+        assessment_item::create(&conn, &school_id, &cr, WRITTEN_WORKS, "WW-blank", 20.0)
+            .unwrap()
+            .unwrap();
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            25.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            40.0,
+        );
+
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        // PS_WW = 0/20 = 0% (the recorded zero counts); the unrecorded 20
+        // points stay out of the denominator entirely.
+        // PS_PT = 25/25 = 100%. PS_EX = (20/20 + 20/20 + 40/40)/3 = 100%.
+        // IG = 0*0.20 + 100*0.50 + 100*0.30 = 80.0.
+        assert!((result.initial_grade - 80.0).abs() < 0.01);
+        // The grade is real (every weighted category has a scored item) but
+        // one item is still blank, so it must be flagged provisional — a
+        // teacher reading 80 must be able to tell it is not final.
+        assert!(
+            !result.complete,
+            "a grade with an unrecorded weighted item must be provisional"
+        );
+    }
+
+    #[test]
+    fn compute_term_grade_marks_a_fully_recorded_class_record_complete() {
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            35.0,
+        );
+
+        let result = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        assert!(
+            result.complete,
+            "every weighted item recorded means complete"
+        );
+    }
+
+    #[test]
+    fn compute_term_grade_stays_stable_when_the_default_weight_policy_changes() {
+        // CTOS §5: historical issued records are not silently recalculated
+        // using new defaults. A class record pins the policy it was created
+        // with; flipping which policy the school marks default afterwards
+        // must not move that record's already-computed grade by a hundredth.
+        let conn = open_test_db();
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2026-2027");
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            18.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            15.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            35.0,
+        );
+
+        let before = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        // Retire the K-10 policy the class record pinned and promote the
+        // EPP/TLE/MAPEH group to default — a real school changing policy.
+        conn.execute(
+            "UPDATE grading_weight_policies SET is_default = 0 WHERE is_default = 1",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE grading_weight_policies SET is_default = 1 WHERE id = ?1",
+            [EPP_TLE_MAPEH_POLICY],
+        )
+        .unwrap();
+
+        let after = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            before, after,
+            "a pinned policy must keep a historical grade stable when the default changes"
+        );
+    }
+
+    #[test]
+    fn transmute_adjusted_clamps_out_of_range_initial_grades_instead_of_panicking() {
+        // `learner_score::record` bounds scores to 0..=max_score, so an IG
+        // outside 0..=100 should be unreachable — but a future refactor that
+        // breaks that invariant must find a total function here, not a
+        // panic that turns a bad grade into a crashed export.
+        assert_eq!(transmute_adjusted(100.0), 100);
+        assert_eq!(transmute_adjusted(f64::INFINITY), 100);
+        assert_eq!(transmute_adjusted(-5.0), 60);
+    }
+
+    #[test]
+    fn round_zero_based_rounds_half_up_and_clamps_to_the_reportable_range() {
+        // Round-half-up matches the Order's own worked example (IG 83.6 ->
+        // TG 84); boundaries either side of .5 and the reportable range are
+        // pinned so a later "round half to even" or unclamped replacement
+        // fails loudly instead of quietly shifting grades.
+        assert_eq!(round_zero_based(0.4), 0);
+        assert_eq!(round_zero_based(0.5), 1);
+        assert_eq!(round_zero_based(0.6), 1);
+        assert_eq!(round_zero_based(99.5), 100);
+        assert_eq!(round_zero_based(100.4), 100);
+        assert_eq!(round_zero_based(-0.5), 0);
+    }
+
+    #[test]
+    fn a_score_of_exactly_zero_and_exactly_max_score_both_compute() {
+        // The two attainable edges: a learner who scored nothing at all, and
+        // one who scored perfectly. Both are real, recorded states (not
+        // blanks) and must produce the two ends of the scale. The zero case
+        // runs under the Zero-Based regime (SY 2027-2028) specifically so it
+        // exercises `apply_minimum_floor`'s explicit clamp — under the
+        // transmutation table the floor is structural (its lowest band is 60
+        // by construction) and the clamp never fires, as the neighbouring
+        // `..._under_the_transmutation_table` test already proves.
+        let conn = open_test_db();
+
+        // Zero case.
+        let (school_id, cr, learner_id, teacher_id) = setup(&conn, "2027-2028");
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            0.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            0.0,
+        );
+        let zero = compute_term_grade(&conn, &school_id, &cr, &learner_id)
+            .unwrap()
+            .unwrap();
+        assert!(
+            (zero.initial_grade - 0.0).abs() < 0.01,
+            "a real recorded zero is an IG of 0.0, not a blank excluded from the fraction"
+        );
+        assert_eq!(zero.term_grade, 60);
+        assert!(
+            zero.was_floored,
+            "zero-based grading reaches the floor only through the explicit clamp"
+        );
+        assert!(!zero.was_transmuted);
+
+        // Perfect case, on a second class record in the same school for the
+        // same learner and teacher. A fresh `setup()` would collide on the
+        // fixture's hardcoded teacher username inside one shared in-memory
+        // database, and reusing the school keeps the zero case's rows
+        // strictly partitioned by class record so neither can leak into the
+        // other's computation.
+        let sec2 = section::create(&conn, &school_id, "2026-2027", "7", "Rizal").unwrap();
+        let sub2 = subject::create(&conn, &school_id, "Science 2").unwrap();
+        let period2 = grading::create(
+            &conn,
+            &school_id,
+            "2026-2027",
+            TERM_1,
+            "2026-10-05",
+            "2026-12-19",
+        )
+        .unwrap()
+        .unwrap();
+        let cr2 = class_record::create(
+            &conn,
+            &school_id,
+            &sec2.id,
+            &sub2.id,
+            &period2.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        section_membership::enroll(&conn, &school_id, &sec2.id, &learner_id, "2026-10-05").unwrap();
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr2.id,
+            WRITTEN_WORKS,
+            &learner_id,
+            &teacher_id,
+            "WW1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr2.id,
+            PERFORMANCE_TASKS,
+            &learner_id,
+            &teacher_id,
+            "PT1",
+            25.0,
+            25.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr2.id,
+            ST1,
+            &learner_id,
+            &teacher_id,
+            "ST1",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr2.id,
+            ST2,
+            &learner_id,
+            &teacher_id,
+            "ST2",
+            20.0,
+            20.0,
+        );
+        add_item_and_score(
+            &conn,
+            &school_id,
+            &cr2.id,
+            TE,
+            &learner_id,
+            &teacher_id,
+            "TE",
+            40.0,
+            40.0,
+        );
+        let perfect = compute_term_grade(&conn, &school_id, &cr2.id, &learner_id)
+            .unwrap()
+            .unwrap();
+        assert!((perfect.initial_grade - 100.0).abs() < 0.01);
+        assert_eq!(perfect.term_grade, 100);
+        assert!(!perfect.was_floored);
     }
 
     #[test]

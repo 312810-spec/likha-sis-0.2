@@ -154,6 +154,7 @@ pub fn run() {
             commands::assessment_item::delete_assessment_item,
             commands::learner_score::roster_for_assessment_item,
             commands::learner_score::record_learner_score,
+            commands::learner_score::learner_score_correction_history,
             commands::learner_score::get_learner_score_sync_status,
             commands::learner_score::compute_learner_term_grade,
             commands::teaching_assignment::create_teaching_assignment,

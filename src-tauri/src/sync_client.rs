@@ -3667,6 +3667,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();

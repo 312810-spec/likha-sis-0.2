@@ -90,6 +90,19 @@ export function ClassRecordWorkspace({
   const [savingLearnerIds, setSavingLearnerIds] = useState<ReadonlySet<string>>(new Set());
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const scoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // CTOS M01: changing a score that is already recorded is a correction,
+  // and a correction must carry a reason before it is written (CTOS.md
+  // §5: "corrections preserve previous values, reason, author, and time
+  // where required"). Rather than reject the teacher's keystroke, the row
+  // holds the attempted change and asks for the reason inline — the same
+  // two-step pattern as the item-delete confirmation above. The pending
+  // change is replayed verbatim once a reason is given, so the keyboard
+  // flow is: type the new score, Enter, type the reason, Enter.
+  const [pendingCorrections, setPendingCorrections] = useState<
+    Record<string, { status: LearnerScoreStatus; scoreText: string | null }>
+  >({});
+  const [correctionReasons, setCorrectionReasons] = useState<Record<string, string>>({});
+  const correctionReasonRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Moving focus programmatically (after Enter/arrow-navigation) fires a
   // synchronous native `blur` on the field being left, which re-enters
   // commitScoreDraft for that same learner before this first call's
@@ -387,6 +400,26 @@ export function ClassRecordWorkspace({
       return true;
     }
 
+    // CTOS M01: a live row already exists, so this write is a correction,
+    // not a first recording — and a correction needs a reason before it
+    // reaches the boundary. Hold the attempted change and ask for one
+    // inline instead of letting the boundary reject the teacher's edit.
+    const isCorrection = Boolean(currentEntry && currentEntry.status !== null);
+    const reason = (correctionReasons[learnerId] ?? "").trim();
+    if (isCorrection && reason === "") {
+      setPendingCorrections((current) => ({
+        ...current,
+        [learnerId]: { status, scoreText },
+      }));
+      setRowErrors((current) => ({
+        ...current,
+        [learnerId]: "A reason is required to change a recorded score.",
+      }));
+      // Focus the reason field once it renders.
+      window.setTimeout(() => correctionReasonRefs.current[learnerId]?.focus(), 0);
+      return false;
+    }
+
     setRowErrors((current) => ({ ...current, [learnerId]: "" }));
     const rosterRequest = rosterRequestRef.current;
     const generation = (writeGenerationRef.current.get(learnerId) ?? 0) + 1;
@@ -400,6 +433,7 @@ export function ClassRecordWorkspace({
         status,
         score,
         selectedItem.maxScore,
+        isCorrection ? reason : null,
       );
       // An older write's response must never overwrite a newer one's
       // result -- only apply this response if nothing newer started for
@@ -413,6 +447,9 @@ export function ClassRecordWorkspace({
         setRowErrors((current) => ({ ...current, [learnerId]: "Could not save this score." }));
         return false;
       }
+      // The correction is written; the held change and its reason are no
+      // longer pending.
+      clearPendingCorrection(learnerId);
       setRoster((current) =>
         current.map((entry) =>
           entry.learnerId === learnerId
@@ -473,6 +510,64 @@ export function ClassRecordWorkspace({
    * their own buttons, not implied by a blank box). Only moves focus to
    * `moveFocusTo` when the save actually succeeded, so a validation error
    * keeps focus on the row that needs fixing. */
+  /** CTOS M01: replays a held correction with the reason the teacher just
+   * entered. Called from the inline reason field's Enter/blur, so the
+   * keyboard flow through a correction stays unbroken. */
+  async function commitPendingCorrection(entry: LearnerScoreRosterEntry, moveFocusTo?: string) {
+    const pending = pendingCorrections[entry.learnerId];
+    if (!pending) return;
+    const reason = (correctionReasons[entry.learnerId] ?? "").trim();
+    if (reason === "") {
+      setRowErrors((current) => ({
+        ...current,
+        [entry.learnerId]: "A reason is required to change a recorded score.",
+      }));
+      return;
+    }
+    const saved =
+      pending.status === "scored"
+        ? await handleRecord(entry.learnerId, "scored", pending.scoreText)
+        : await handleRecord(entry.learnerId, pending.status, null);
+    if (saved) focusScoreInput(moveFocusTo);
+  }
+
+  /** CTOS M01: drops a held correction and its draft reason, restoring the
+   * row to the still-recorded value. The recorded score is unchanged —
+   * nothing was written — so the abandoned score draft is discarded too,
+   * otherwise the field would keep showing the number the teacher walked
+   * away from. */
+  function cancelPendingCorrection(learnerId: string) {
+    clearPendingCorrection(learnerId);
+    setScoreDrafts((current) => {
+      if (current[learnerId] === undefined) return current;
+      const next = { ...current };
+      delete next[learnerId];
+      return next;
+    });
+    focusScoreInput(learnerId);
+  }
+
+  function clearPendingCorrection(learnerId: string) {
+    setPendingCorrections((current) => {
+      if (current[learnerId] === undefined) return current;
+      const next = { ...current };
+      delete next[learnerId];
+      return next;
+    });
+    setCorrectionReasons((current) => {
+      if (current[learnerId] === undefined) return current;
+      const next = { ...current };
+      delete next[learnerId];
+      return next;
+    });
+    setRowErrors((current) => {
+      if (current[learnerId] === undefined) return current;
+      const next = { ...current };
+      delete next[learnerId];
+      return next;
+    });
+  }
+
   async function commitScoreDraft(entry: LearnerScoreRosterEntry, moveFocusTo?: string) {
     if (committingRef.current.has(entry.learnerId)) {
       return;
@@ -884,109 +979,201 @@ export function ClassRecordWorkspace({
                             {entry.givenName} {entry.familyName}
                           </th>
                           <td>
-                            <label htmlFor={`score-${entry.learnerId}`} className="visually-hidden">
-                              Score for {entry.givenName} {entry.familyName}
-                            </label>
-                            <input
-                              id={`score-${entry.learnerId}`}
-                              ref={(el) => {
-                                scoreInputRefs.current[entry.learnerId] = el;
-                              }}
-                              className="score-entry-input"
-                              type="number"
-                              inputMode="decimal"
-                              min="0"
-                              max={selectedItem.maxScore}
-                              aria-invalid={hasRowError}
-                              aria-describedby={
-                                hasRowError ? `score-error-${entry.learnerId}` : undefined
-                              }
-                              placeholder={
-                                entry.status === "excused"
-                                  ? "Excused"
-                                  : entry.status === "not_applicable"
-                                    ? "N/A"
-                                    : "—"
-                              }
-                              value={draftScoreFor(entry.learnerId, entry.score)}
-                              onChange={(event) =>
-                                setScoreDrafts((current) => ({
-                                  ...current,
-                                  [entry.learnerId]: event.target.value,
-                                }))
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === "ArrowDown") {
-                                  event.preventDefault();
-                                  void commitScoreDraft(
-                                    entry,
-                                    neighborLearnerId(entry.learnerId, 1),
-                                  );
-                                } else if (event.key === "ArrowUp") {
-                                  event.preventDefault();
-                                  void commitScoreDraft(
-                                    entry,
-                                    neighborLearnerId(entry.learnerId, -1),
-                                  );
-                                } else if (event.key === "Escape") {
-                                  event.preventDefault();
-                                  setScoreDrafts((current) => {
-                                    const next = { ...current };
-                                    delete next[entry.learnerId];
-                                    return next;
-                                  });
-                                }
-                              }}
-                              onBlur={() => void commitScoreDraft(entry)}
-                            />
-                            {entry.status === null && !isSaving && (
-                              <StatusChip tone="neutral">Not recorded</StatusChip>
-                            )}
-                            {isSaving && (
-                              <span className="field-hint" role="status">
-                                Saving…
-                              </span>
-                            )}
-                            {hasRowError && (
-                              <p
-                                id={`score-error-${entry.learnerId}`}
-                                className="field-error"
-                                role="alert"
-                              >
-                                {rowErrors[entry.learnerId]}
-                              </p>
-                            )}
-                            {scoreDrafts[entry.learnerId] === undefined && (
-                              <ClassRecordLocalSaveStatus
-                                savedAt={entry.updatedAt}
-                                hasError={hasRowError}
-                                isSaving={isSaving}
-                              />
-                            )}
-                            {teachingAssignmentId &&
-                              learnerScoreSyncStatusService &&
-                              entry.updatedAt &&
-                              entry.status !== null &&
-                              !isSaving &&
-                              !hasRowError &&
-                              scoreDrafts[entry.learnerId] === undefined && (
-                                <ScoreSyncEvidence
-                                  key={JSON.stringify([
-                                    classRecordId,
-                                    teachingAssignmentId,
-                                    selectedItem.id,
-                                    entry.learnerId,
-                                    entry.updatedAt,
-                                    entry.status,
-                                    entry.score,
-                                    syncCheckRevision,
-                                  ])}
-                                  service={learnerScoreSyncStatusService}
-                                  teachingAssignmentId={teachingAssignmentId}
-                                  assessmentItemId={selectedItem.id}
-                                  learnerId={entry.learnerId}
+                            {pendingCorrections[entry.learnerId] ? (
+                              <div className="correction-reason">
+                                <label
+                                  htmlFor={`correction-reason-${entry.learnerId}`}
+                                  className="visually-hidden"
+                                >
+                                  Reason for changing {entry.givenName} {entry.familyName}'s
+                                  recorded score
+                                </label>
+                                <input
+                                  id={`correction-reason-${entry.learnerId}`}
+                                  ref={(el) => {
+                                    correctionReasonRefs.current[entry.learnerId] = el;
+                                  }}
+                                  className="score-entry-input"
+                                  type="text"
+                                  placeholder="Reason for the change"
+                                  aria-invalid={hasRowError}
+                                  aria-describedby={
+                                    hasRowError ? `score-error-${entry.learnerId}` : undefined
+                                  }
+                                  value={correctionReasons[entry.learnerId] ?? ""}
+                                  onChange={(event) =>
+                                    setCorrectionReasons((current) => ({
+                                      ...current,
+                                      [entry.learnerId]: event.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === "ArrowDown") {
+                                      event.preventDefault();
+                                      void commitPendingCorrection(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, 1),
+                                      );
+                                    } else if (event.key === "ArrowUp") {
+                                      event.preventDefault();
+                                      void commitPendingCorrection(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, -1),
+                                      );
+                                    } else if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      cancelPendingCorrection(entry.learnerId);
+                                    }
+                                  }}
+                                  onBlur={() => void commitPendingCorrection(entry)}
                                 />
-                              )}
+                                <button
+                                  type="button"
+                                  // Prevents the reason field's blur-commit
+                                  // from racing this click — the click is the
+                                  // only thing that should act here.
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() =>
+                                    void commitPendingCorrection(
+                                      entry,
+                                      neighborLearnerId(entry.learnerId, 1),
+                                    )
+                                  }
+                                >
+                                  Save correction
+                                </button>
+                                <button
+                                  type="button"
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() => cancelPendingCorrection(entry.learnerId)}
+                                >
+                                  Cancel
+                                </button>
+                                {isSaving && (
+                                  <span className="field-hint" role="status">
+                                    Saving…
+                                  </span>
+                                )}
+                                {hasRowError && (
+                                  <p
+                                    id={`score-error-${entry.learnerId}`}
+                                    className="field-error"
+                                    role="alert"
+                                  >
+                                    {rowErrors[entry.learnerId]}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <label
+                                  htmlFor={`score-${entry.learnerId}`}
+                                  className="visually-hidden"
+                                >
+                                  Score for {entry.givenName} {entry.familyName}
+                                </label>
+                                <input
+                                  id={`score-${entry.learnerId}`}
+                                  ref={(el) => {
+                                    scoreInputRefs.current[entry.learnerId] = el;
+                                  }}
+                                  className="score-entry-input"
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  max={selectedItem.maxScore}
+                                  aria-invalid={hasRowError}
+                                  aria-describedby={
+                                    hasRowError ? `score-error-${entry.learnerId}` : undefined
+                                  }
+                                  placeholder={
+                                    entry.status === "excused"
+                                      ? "Excused"
+                                      : entry.status === "not_applicable"
+                                        ? "N/A"
+                                        : "—"
+                                  }
+                                  value={draftScoreFor(entry.learnerId, entry.score)}
+                                  onChange={(event) =>
+                                    setScoreDrafts((current) => ({
+                                      ...current,
+                                      [entry.learnerId]: event.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === "ArrowDown") {
+                                      event.preventDefault();
+                                      void commitScoreDraft(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, 1),
+                                      );
+                                    } else if (event.key === "ArrowUp") {
+                                      event.preventDefault();
+                                      void commitScoreDraft(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, -1),
+                                      );
+                                    } else if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      setScoreDrafts((current) => {
+                                        const next = { ...current };
+                                        delete next[entry.learnerId];
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                  onBlur={() => void commitScoreDraft(entry)}
+                                />
+                                {entry.status === null && !isSaving && (
+                                  <StatusChip tone="neutral">Not recorded</StatusChip>
+                                )}
+                                {isSaving && (
+                                  <span className="field-hint" role="status">
+                                    Saving…
+                                  </span>
+                                )}
+                                {hasRowError && (
+                                  <p
+                                    id={`score-error-${entry.learnerId}`}
+                                    className="field-error"
+                                    role="alert"
+                                  >
+                                    {rowErrors[entry.learnerId]}
+                                  </p>
+                                )}
+                                {scoreDrafts[entry.learnerId] === undefined && (
+                                  <ClassRecordLocalSaveStatus
+                                    savedAt={entry.updatedAt}
+                                    hasError={hasRowError}
+                                    isSaving={isSaving}
+                                  />
+                                )}
+                                {teachingAssignmentId &&
+                                  learnerScoreSyncStatusService &&
+                                  entry.updatedAt &&
+                                  entry.status !== null &&
+                                  !isSaving &&
+                                  !hasRowError &&
+                                  scoreDrafts[entry.learnerId] === undefined && (
+                                    <ScoreSyncEvidence
+                                      key={JSON.stringify([
+                                        classRecordId,
+                                        teachingAssignmentId,
+                                        selectedItem.id,
+                                        entry.learnerId,
+                                        entry.updatedAt,
+                                        entry.status,
+                                        entry.score,
+                                        syncCheckRevision,
+                                      ])}
+                                      service={learnerScoreSyncStatusService}
+                                      teachingAssignmentId={teachingAssignmentId}
+                                      assessmentItemId={selectedItem.id}
+                                      learnerId={entry.learnerId}
+                                    />
+                                  )}
+                              </>
+                            )}
                           </td>
                           <td>
                             <div
@@ -1068,6 +1255,13 @@ export function ClassRecordWorkspace({
                             ) : (
                               <>
                                 {grade.termGrade}
+                                {!grade.complete && (
+                                  <span className="field-hint">
+                                    {" "}
+                                    (provisional — some scores in this grading period are not yet
+                                    recorded)
+                                  </span>
+                                )}
                                 {grade.wasFloored && (
                                   <span className="field-hint"> (raised to the minimum of 60)</span>
                                 )}

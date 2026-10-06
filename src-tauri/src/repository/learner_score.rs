@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -74,7 +74,7 @@ pub struct LearnerScoreRosterEntry {
     pub updated_at: Option<String>,
 }
 
-/// Records (or overwrites) `learner_id`'s score for `assessment_item_id`,
+/// Records (or corrects) `learner_id`'s score for `assessment_item_id`,
 /// scoped to `school_id`. Verifies, in order: the item belongs to this
 /// school, the learner held an active membership in the item's class
 /// record's section at some point during the class record's grading
@@ -89,6 +89,19 @@ pub struct LearnerScoreRosterEntry {
 /// here and is tested directly). Every rejection reason returns `Ok(None)`
 /// without distinguishing which one, matching
 /// `attendance::record`'s established convention.
+///
+/// **CTOS M01 correction history:** when a `learner_scores` row already
+/// exists for this item/learner pair, the overwrite is not silent — the
+/// superseded state (previous value, its author, its time) plus a
+/// teacher-supplied `reason` is appended to `learner_score_corrections`
+/// before the live row is updated, per CTOS.md section 5 ("corrections
+/// preserve previous values, reason, author, and time where required").
+/// A first-time recording writes no correction row: there is no prior
+/// state to preserve. The `reason` is required for a correction and an
+/// empty one is rejected, since a history that records *why* in the schema
+/// but lets callers omit it would not actually satisfy the invariant. A
+/// no-op correction (identical status and score) writes no history row and
+/// returns the existing row unchanged.
 #[allow(clippy::too_many_arguments)]
 pub fn record(
     conn: &Connection,
@@ -98,6 +111,7 @@ pub fn record(
     status: LearnerScoreStatus,
     score: Option<f64>,
     recorded_by_user_id: &str,
+    correction_reason: Option<&str>,
 ) -> AppResult<Option<LearnerScore>> {
     let Some(item) = assessment_item::find_by_id_in_school(conn, school_id, assessment_item_id)?
     else {
@@ -129,6 +143,58 @@ pub fn record(
         (_, None) => {}
     }
 
+    // CTOS M01: if a live row already exists, this is a correction, not a
+    // first recording. Preserve the superseded state before overwriting.
+    let existing = conn
+        .query_row(
+            "SELECT id, status, score, recorded_by_user_id, recorded_at \
+             FROM learner_scores \
+             WHERE assessment_item_id = ?1 AND learner_id = ?2 AND school_id = ?3",
+            (assessment_item_id, learner_id, school_id),
+            |row| {
+                Ok(LearnerScoreCorrectionTarget {
+                    id: row.get(0)?,
+                    previous_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(1)?)?,
+                    previous_score: row.get(2)?,
+                    previous_recorded_by_user_id: row.get(3)?,
+                    previous_recorded_at: row.get(4)?,
+                })
+            },
+        )
+        .optional()?;
+
+    if let Some(existing) = existing {
+        // A no-op correction changes nothing and records nothing.
+        let unchanged = existing.previous_status == status
+            && match (existing.previous_score, score) {
+                (Some(a), Some(b)) => (a - b).abs() < f64::EPSILON,
+                (None, None) => true,
+                _ => false,
+            };
+        if unchanged {
+            return existing_row(conn, school_id, assessment_item_id, learner_id);
+        }
+
+        // CTOS.md section 5: a correction must carry a reason. An empty or
+        // missing reason is rejected rather than silently persisted as "".
+        let reason = correction_reason.map(str::trim).filter(|r| !r.is_empty());
+        let Some(reason) = reason else {
+            return Err(AppError::validation("A correction reason is required"));
+        };
+
+        append_correction(
+            conn,
+            school_id,
+            assessment_item_id,
+            learner_id,
+            &existing,
+            status,
+            score,
+            recorded_by_user_id,
+            reason,
+        )?;
+    }
+
     let id = Uuid::now_v7().to_string();
     conn.execute(
         "INSERT INTO learner_scores \
@@ -150,6 +216,78 @@ pub fn record(
         ),
     )?;
 
+    existing_row(conn, school_id, assessment_item_id, learner_id)
+}
+
+/// The live `learner_scores` row being superseded by a correction —
+/// captured *before* the overwrite so the prior state survives.
+struct LearnerScoreCorrectionTarget {
+    #[allow(dead_code)]
+    id: String,
+    previous_status: LearnerScoreStatus,
+    previous_score: Option<f64>,
+    previous_recorded_by_user_id: String,
+    previous_recorded_at: String,
+}
+
+/// Appends one row to `learner_score_corrections` recording the state a
+/// correction replaced. The live `learner_scores` row stays the current
+/// truth; this table is the immutable lineage.
+#[allow(clippy::too_many_arguments)]
+fn append_correction(
+    conn: &Connection,
+    school_id: &str,
+    assessment_item_id: &str,
+    learner_id: &str,
+    existing: &LearnerScoreCorrectionTarget,
+    new_status: LearnerScoreStatus,
+    new_score: Option<f64>,
+    corrected_by_user_id: &str,
+    reason: &str,
+) -> AppResult<()> {
+    // Chain to the most recent prior correction of this score, so the full
+    // lineage is walkable. NULL when this is the first correction.
+    let previous_id: Option<String> = conn
+        .query_row(
+            "SELECT id FROM learner_score_corrections \
+             WHERE school_id = ?1 AND assessment_item_id = ?2 AND learner_id = ?3 \
+             ORDER BY corrected_at DESC, id DESC LIMIT 1",
+            (school_id, assessment_item_id, learner_id),
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    conn.execute(
+        "INSERT INTO learner_score_corrections \
+             (id, school_id, assessment_item_id, learner_id, \
+              previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+              new_status, new_score, corrected_by_user_id, reason, previous_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        (
+            &Uuid::now_v7().to_string(),
+            school_id,
+            assessment_item_id,
+            learner_id,
+            existing.previous_status.as_db_str(),
+            existing.previous_score,
+            &existing.previous_recorded_by_user_id,
+            &existing.previous_recorded_at,
+            new_status.as_db_str(),
+            new_score,
+            corrected_by_user_id,
+            reason,
+            previous_id,
+        ),
+    )?;
+    Ok(())
+}
+
+fn existing_row(
+    conn: &Connection,
+    school_id: &str,
+    assessment_item_id: &str,
+    learner_id: &str,
+) -> AppResult<Option<LearnerScore>> {
     conn.query_row(
         "SELECT id, school_id, assessment_item_id, learner_id, status, score, \
                 recorded_by_user_id, recorded_at, updated_at \
@@ -160,6 +298,64 @@ pub fn record(
     )
     .map(Some)
     .map_err(AppError::from)
+}
+
+/// CTOS M01: the correction lineage for one learner's score on one item,
+/// newest first. Every entry preserves the superseded value, who recorded
+/// it, when, who corrected it, and why — the four facts CTOS.md section 5
+/// requires a correction to preserve.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnerScoreCorrection {
+    pub id: String,
+    pub assessment_item_id: String,
+    pub learner_id: String,
+    pub previous_status: LearnerScoreStatus,
+    pub previous_score: Option<f64>,
+    pub previous_recorded_by_user_id: String,
+    pub previous_recorded_at: String,
+    pub new_status: LearnerScoreStatus,
+    pub new_score: Option<f64>,
+    pub corrected_by_user_id: String,
+    pub reason: String,
+    pub corrected_at: String,
+}
+
+/// Lists the correction history for `learner_id`'s score on
+/// `assessment_item_id`, newest first. Returns `Ok(vec![])` when the score
+/// has never been corrected — a first recording has no lineage. `school_id`
+/// scopes every row so a caller cannot read another school's history.
+pub fn correction_history(
+    conn: &Connection,
+    school_id: &str,
+    assessment_item_id: &str,
+    learner_id: &str,
+) -> AppResult<Vec<LearnerScoreCorrection>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, assessment_item_id, learner_id, \
+                previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                new_status, new_score, corrected_by_user_id, reason, corrected_at \
+         FROM learner_score_corrections \
+         WHERE school_id = ?1 AND assessment_item_id = ?2 AND learner_id = ?3 \
+         ORDER BY corrected_at DESC, id DESC",
+    )?;
+    let rows = stmt.query_map((school_id, assessment_item_id, learner_id), |row| {
+        Ok(LearnerScoreCorrection {
+            id: row.get(0)?,
+            assessment_item_id: row.get(1)?,
+            learner_id: row.get(2)?,
+            previous_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(3)?)?,
+            previous_score: row.get(4)?,
+            previous_recorded_by_user_id: row.get(5)?,
+            previous_recorded_at: row.get(6)?,
+            new_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(7)?)?,
+            new_score: row.get(8)?,
+            corrected_by_user_id: row.get(9)?,
+            reason: row.get(10)?,
+            corrected_at: row.get(11)?,
+        })
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(AppError::from)
 }
 
 /// ADR-0067/0069 sync wiring: applies a pulled `LearnerScore` row exactly
@@ -414,6 +610,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -452,6 +649,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -559,6 +757,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -686,6 +885,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -707,6 +907,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(15.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -718,6 +919,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(19.0),
             &teacher_id,
+            Some("Rechecked the paper; original 15 was a transcription error"),
         )
         .unwrap()
         .unwrap();
@@ -728,6 +930,341 @@ mod tests {
             .unwrap();
         assert_eq!(roster.len(), 1);
         assert_eq!(roster[0].score, Some(19.0));
+    }
+
+    /// CTOS M01 — the superseded value, its author, its time, and a reason
+    /// must all survive the correction. Before M01 `record` overwrote the
+    /// row in place and the prior state was destroyed.
+    #[test]
+    fn a_correction_preserves_the_previous_value_author_time_and_reason() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        let before = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &teacher_id,
+            Some("Rechecked after a recount of the written work"),
+        )
+        .unwrap();
+
+        let history = correction_history(&conn, &school_id, &item_id, &learner_id).unwrap();
+        assert_eq!(
+            history.len(),
+            1,
+            "exactly one correction should be recorded"
+        );
+        let entry = &history[0];
+        assert_eq!(entry.previous_score, Some(15.0));
+        assert_eq!(entry.previous_status, LearnerScoreStatus::Scored);
+        assert_eq!(
+            entry.previous_recorded_by_user_id, teacher_id,
+            "the correction must preserve who recorded the superseded value"
+        );
+        assert!(
+            entry.previous_recorded_at < entry.corrected_at,
+            "the correction must preserve when the superseded value was recorded"
+        );
+        assert_eq!(entry.new_score, Some(19.0));
+        assert_eq!(
+            entry.reason, "Rechecked after a recount of the written work",
+            "the correction must preserve its reason"
+        );
+        // `before` is the live row the correction replaced; its recorded_at
+        // is exactly what the history entry must have preserved.
+        assert_eq!(entry.previous_recorded_at, before.recorded_at);
+    }
+
+    /// CTOS M01 — a correction that carries no reason is rejected rather
+    /// than recorded with an empty string. The invariant is "preserve the
+    /// reason", not "have a nullable reason column".
+    #[test]
+    fn a_correction_without_a_reason_is_rejected() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        let result = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &teacher_id,
+            None,
+        );
+
+        assert!(matches!(result, Err(AppError::Validation(_))));
+
+        // The live row is unchanged and no history was written.
+        let live = roster_for_item(&conn, &school_id, &item_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(live[0].score, Some(15.0));
+        assert!(correction_history(&conn, &school_id, &item_id, &learner_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// CTOS M01 — a whitespace-only reason is not a reason.
+    #[test]
+    fn a_correction_with_a_blank_reason_is_rejected() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        let result = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &teacher_id,
+            Some("   "),
+        );
+
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    /// CTOS M01 — a first-time recording writes no correction row: there is
+    /// no prior state to preserve, and inventing one would misrepresent the
+    /// record's history.
+    #[test]
+    fn a_first_time_recording_creates_no_correction_history() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        assert!(correction_history(&conn, &school_id, &item_id, &learner_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// CTOS M01 — re-recording the identical value is a no-op, not a
+    /// correction. A teacher tabbing away and back must not manufacture
+    /// history that implies a correction happened.
+    #[test]
+    fn re_recording_the_identical_value_records_no_correction() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        let again = record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            Some("this reason should never be used"),
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(again.score, Some(15.0));
+        assert!(correction_history(&conn, &school_id, &item_id, &learner_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// CTOS M01 — multiple corrections chain into a walkable lineage, and
+    /// the newest-first ordering holds.
+    #[test]
+    fn repeated_corrections_chain_into_a_lineage_newest_first() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(10.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(12.0),
+            &teacher_id,
+            Some("first correction"),
+        )
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(14.0),
+            &teacher_id,
+            Some("second correction"),
+        )
+        .unwrap();
+
+        let history = correction_history(&conn, &school_id, &item_id, &learner_id).unwrap();
+        assert_eq!(history.len(), 2);
+        // newest first
+        assert_eq!(history[0].reason, "second correction");
+        assert_eq!(history[0].previous_score, Some(12.0));
+        assert_eq!(history[1].reason, "first correction");
+        assert_eq!(history[1].previous_score, Some(10.0));
+    }
+
+    /// CTOS M01 — changing only the status (scored → excused) is a real
+    /// correction and must preserve the prior scored value.
+    #[test]
+    fn changing_status_from_scored_to_excused_preserves_the_prior_score() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Excused,
+            None,
+            &teacher_id,
+            Some("Learner was absent for the school's remediation window"),
+        )
+        .unwrap();
+
+        let history = correction_history(&conn, &school_id, &item_id, &learner_id).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].previous_score, Some(15.0));
+        assert_eq!(history[0].previous_status, LearnerScoreStatus::Scored);
+        assert_eq!(history[0].new_status, LearnerScoreStatus::Excused);
+        assert!(history[0].new_score.is_none());
+    }
+
+    /// CTOS M01 — correction history is school-scoped: one school cannot
+    /// read another school's corrections.
+    #[test]
+    fn correction_history_is_scoped_to_the_callers_school() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &teacher_id,
+            Some("recount"),
+        )
+        .unwrap();
+
+        // A different school id sees nothing, even for a real item/learner.
+        let foreign = correction_history(
+            &conn,
+            "00000000-0000-7000-8000-000000000099",
+            &item_id,
+            &learner_id,
+        )
+        .unwrap();
+        assert!(foreign.is_empty());
     }
 
     #[test]
@@ -743,6 +1280,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(25.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -765,6 +1303,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(-1.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -784,6 +1323,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             None,
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -803,6 +1343,7 @@ mod tests {
             LearnerScoreStatus::Excused,
             Some(10.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -822,6 +1363,7 @@ mod tests {
             LearnerScoreStatus::Excused,
             None,
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();
@@ -844,6 +1386,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(10.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -864,6 +1407,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(10.0),
             &teacher_a,
+            None,
         )
         .unwrap();
 
@@ -891,6 +1435,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(20.0),
             &teacher_id,
+            None,
         )
         .unwrap();
 
@@ -960,6 +1505,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(10.0),
             &teacher_id,
+            None,
         )
         .unwrap()
         .unwrap();

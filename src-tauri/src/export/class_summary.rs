@@ -99,6 +99,9 @@ pub fn build_class_summary_export(
     for row in rows {
         let name = format!("{}, {}", row.family_name, row.given_name);
         let average = match &row.grade {
+            Some(grade) if !grade.complete => {
+                format!("{} (provisional)", grade.term_grade)
+            }
             Some(grade) => grade.term_grade.to_string(),
             None => "No grade yet".to_string(),
         };
@@ -159,6 +162,7 @@ mod tests {
             term_grade: 88,
             was_transmuted: true,
             was_floored: false,
+            complete: true,
         }
     }
 

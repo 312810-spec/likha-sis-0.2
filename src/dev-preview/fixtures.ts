@@ -53,6 +53,7 @@ import type { CreateLearnerResult, Learner } from "../domain/learner";
 import type {
   ComputedTermGrade,
   LearnerScore,
+  LearnerScoreCorrection,
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
@@ -729,7 +730,28 @@ interface FixtureLearnerScoreRecord {
   updatedAt: string;
 }
 
+interface FixtureLearnerScoreCorrection {
+  id: string;
+  assessmentItemId: string;
+  learnerId: string;
+  previousStatus: LearnerScoreStatus;
+  previousScore: number | null;
+  previousRecordedByUserId: string;
+  previousRecordedAt: string;
+  newStatus: LearnerScoreStatus;
+  newScore: number | null;
+  correctedByUserId: string;
+  reason: string;
+  correctedAt: string;
+}
+
 let nextScoreSeq = 1;
+let nextCorrectionSeq = 1;
+
+/** The dev preview mirrors the Rust boundary's append-only correction
+ * lineage in memory, so a correction made during a preview session shows
+ * up in its own history view the way a real one would. */
+const LEARNER_SCORE_CORRECTIONS: FixtureLearnerScoreCorrection[] = [];
 
 function buildFullScoreSet(
   assessmentItemId: string,
@@ -1032,6 +1054,7 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
     learnerId: string,
     status: LearnerScoreStatus,
     score: number | null,
+    correctionReason: string | null,
   ): Promise<LearnerScore | null> {
     const found = findItem(assessmentItemId);
     if (!found) return null;
@@ -1043,6 +1066,22 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
       (s) => s.assessmentItemId === assessmentItemId && s.learnerId === learnerId,
     );
     const existing = existingIndex === -1 ? null : LEARNER_SCORES[existingIndex];
+    if (existing && correctionReason !== null) {
+      LEARNER_SCORE_CORRECTIONS.unshift({
+        id: `correction-fixture-${nextCorrectionSeq++}`,
+        assessmentItemId,
+        learnerId,
+        previousStatus: existing.status,
+        previousScore: existing.score,
+        previousRecordedByUserId: "fixture-user",
+        previousRecordedAt: existing.recordedAt,
+        newStatus: status,
+        newScore: score,
+        correctedByUserId: "fixture-user",
+        reason: correctionReason,
+        correctedAt: now,
+      });
+    }
     const updated: FixtureLearnerScoreRecord = {
       id: existing?.id ?? `score-fixture-${nextScoreSeq++}`,
       assessmentItemId,
@@ -1069,6 +1108,15 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
       recordedAt: updated.recordedAt,
       updatedAt: updated.updatedAt,
     };
+  }
+
+  async correctionHistory(
+    assessmentItemId: string,
+    learnerId: string,
+  ): Promise<LearnerScoreCorrection[]> {
+    return LEARNER_SCORE_CORRECTIONS.filter(
+      (c) => c.assessmentItemId === assessmentItemId && c.learnerId === learnerId,
+    );
   }
 
   /** A simplified stand-in for visual testing only -- this is NOT the
@@ -1098,11 +1146,23 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
 
     const initialGrade = percentages.reduce((a, b) => a + b, 0) / percentages.length;
     const termGrade = Math.max(60, Math.round(initialGrade));
+    // `complete` mirrors the real boundary's rule: every item in this class
+    // record has a recorded status for this learner (any status -- an
+    // Excused/N/A row is a decision, not a blank). The fixture's own
+    // "not worth reproducing the per-category rule" caveat above applies
+    // here too: this is the whole-record shape, good enough to show the
+    // provisional marker visually.
+    const complete =
+      items.length > 0 &&
+      items.every((item) =>
+        LEARNER_SCORES.some((s) => s.assessmentItemId === item.id && s.learnerId === learnerId),
+      );
     return {
       initialGrade,
       termGrade,
       wasTransmuted: false,
       wasFloored: termGrade === 60 && initialGrade < 60,
+      complete,
     };
   }
 }

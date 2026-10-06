@@ -2010,6 +2010,56 @@ pub fn migrations() -> Migrations<'static> {
             CHECK (review_reason IN ('concurrent_edit', 'apply_rejected'));
         "#,
         ),
+        M::up(
+            r#"
+        -- CTOS M01 — score correction history (schema version 42).
+        -- CTOS.md section 5: "corrections preserve previous values, reason,
+        -- author, and time where required." Until now `learner_score::record`
+        -- was an INSERT ... ON CONFLICT DO UPDATE that destroyed the prior
+        -- value, its author, and its time. This migration adds an
+        -- append-only audit table; the live `learner_scores` row stays the
+        -- current truth, and every superseded state is retained here.
+        --
+        -- Append-only is enforced structurally: there is no UPDATE or DELETE
+        -- path in the repository, and no trigger is needed because the table
+        -- is only ever written by `learner_score::record`'s correction
+        -- branch. `previous_id` chains consecutive corrections of the same
+        -- score so a full correction lineage can be walked.
+        CREATE TABLE learner_score_corrections (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            assessment_item_id TEXT NOT NULL REFERENCES assessment_items(id) ON DELETE CASCADE,
+            learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+            -- The state being superseded: exactly what the live row held
+            -- before this correction. `previous_score` is NULL when the
+            -- prior state was 'excused' or 'not_applicable', matching
+            -- learner_scores' own CHECK convention.
+            previous_status TEXT NOT NULL CHECK (previous_status IN ('scored', 'excused', 'not_applicable')),
+            previous_score REAL,
+            previous_recorded_by_user_id TEXT NOT NULL REFERENCES users(id),
+            previous_recorded_at TEXT NOT NULL,
+            -- The incoming state that replaced it.
+            new_status TEXT NOT NULL CHECK (new_status IN ('scored', 'excused', 'not_applicable')),
+            new_score REAL,
+            corrected_by_user_id TEXT NOT NULL REFERENCES users(id),
+            -- CTOS.md section 5 requires the correction reason be preserved.
+            reason TEXT NOT NULL,
+            corrected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            previous_id TEXT REFERENCES learner_score_corrections(id),
+            CHECK (
+                (previous_status = 'scored' AND previous_score IS NOT NULL) OR
+                (previous_status <> 'scored' AND previous_score IS NULL)
+            ),
+            CHECK (
+                (new_status = 'scored' AND new_score IS NOT NULL) OR
+                (new_status <> 'scored' AND new_score IS NULL)
+            )
+        );
+
+        CREATE INDEX idx_learner_score_corrections_item_learner
+            ON learner_score_corrections(school_id, assessment_item_id, learner_id, corrected_at);
+        "#,
+        ),
     ])
 }
 
@@ -2051,6 +2101,94 @@ mod tests {
                 []
             )
             .is_err());
+    }
+
+    #[test]
+    fn migration_42_creates_an_append_only_correction_history_with_status_score_consistency() {
+        // The correction table's foreign-key graph (schools / assessment_items
+        // / learners / users) is exercised end-to-end by `repository::
+        // learner_score`'s correction tests, which build real rows. What only
+        // this test can prove cheaply is the table's own structural
+        // guarantees — so foreign_keys is deliberately turned off and the
+        // CHECK constraints are probed directly.
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.pragma_update(None, "foreign_keys", "OFF").unwrap();
+        migrations().to_latest(&mut conn).unwrap();
+
+        // A valid correction row: a 'scored' superseded state carries a
+        // score, and so does the incoming 'scored' state.
+        conn.execute(
+            "INSERT INTO learner_score_corrections \
+             (id, school_id, assessment_item_id, learner_id, \
+              previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+              new_status, new_score, corrected_by_user_id, reason) \
+             VALUES ('c1', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                     'scored', 19.0, 'u1', 'Rechecked the paper')",
+            [],
+        )
+        .unwrap();
+
+        // The status/score consistency CHECK mirrors learner_scores' own: a
+        // non-'scored' status must not carry a score, in either direction.
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c2', 's1', 'ai1', 'l1', 'excused', 12.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'scored', 19.0, 'u1', 'Should have no previous score')",
+                [],
+            )
+            .is_err());
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c3', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'excused', 19.0, 'u1', 'Should have no new score')",
+                [],
+            )
+            .is_err());
+
+        // The schema's structural guarantee on the reason is NOT NULL; a
+        // reason that is merely blank is rejected one layer up, at the
+        // repository boundary, where the rule is also tested.
+        assert!(conn
+            .execute(
+                "INSERT INTO learner_score_corrections \
+                 (id, school_id, assessment_item_id, learner_id, \
+                  previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+                  new_status, new_score, corrected_by_user_id, reason) \
+                 VALUES ('c4', 's1', 'ai1', 'l1', 'scored', 15.0, 'u1', '2026-10-01T00:00:00Z', \
+                         'scored', 19.0, 'u1', NULL)",
+                [],
+            )
+            .is_err());
+
+        // The lineage chain is self-referential and walkable.
+        conn.execute(
+            "INSERT INTO learner_score_corrections \
+             (id, school_id, assessment_item_id, learner_id, \
+              previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
+              new_status, new_score, corrected_by_user_id, reason, previous_id) \
+             VALUES ('c5', 's1', 'ai1', 'l1', 'scored', 19.0, 'u1', '2026-10-02T00:00:00Z', \
+                     'scored', 20.0, 'u1', 'Graded the missing item', 'c1')",
+            [],
+        )
+        .unwrap();
+        let chained: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM learner_score_corrections c1 \
+                 JOIN learner_score_corrections c2 ON c2.previous_id = c1.id \
+                 WHERE c1.id = 'c1' AND c2.id = 'c5'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(chained, 1);
     }
 
     #[test]

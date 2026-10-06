@@ -28,6 +28,30 @@ export interface LearnerScoreRosterEntry {
   updatedAt: string | null;
 }
 
+/** One entry in a score's correction lineage — CTOS M01 (CTOS.md §5:
+ * "corrections preserve previous values, reason, author, and time where
+ * required"). The live `LearnerScore` row stays the current truth; this is
+ * the immutable record of every state it replaced, newest first.
+ *
+ * A first recording has no correction history — there is no prior state to
+ * preserve. */
+export interface LearnerScoreCorrection {
+  id: string;
+  assessmentItemId: string;
+  learnerId: string;
+  /** The state this correction replaced. */
+  previousStatus: LearnerScoreStatus;
+  previousScore: number | null;
+  previousRecordedByUserId: string;
+  previousRecordedAt: string;
+  /** The state that replaced it. */
+  newStatus: LearnerScoreStatus;
+  newScore: number | null;
+  correctedByUserId: string;
+  /** Required — a correction with no reason is rejected at the boundary. */
+  reason: string;
+  correctedAt: string;
+}
 /** A learner's computed grade for a class record's grading period, per
  * DepEd Order No. 015, s. 2026 — see
  * `src-tauri/src/repository/grading_computation.rs` for the full
@@ -46,4 +70,12 @@ export interface ComputedTermGrade {
    * explicit floor. When true, `initialGrade` (not `termGrade`) reflects
    * the learner's true raw performance. */
   wasFloored: boolean;
+  /** True only when every assessment item this class record holds under a
+   * category the resolved weight policy actually pools has a recorded
+   * status — no blanks remaining. False means the grade is real but
+   * provisional: it is computed exactly as DepEd specifies from what has
+   * been entered so far, and it will move once the outstanding items are
+   * recorded. A provisional value must never be presented as final
+   * (CTOS §5). */
+  complete: boolean;
 }

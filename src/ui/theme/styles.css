@@ -721,6 +721,22 @@ label {
   width: 5rem;
 }
 
+/* CTOS M01: the inline correction-reason capture. Same cell as the score
+ * input it temporarily replaces, so the row never grows a second control
+ * the teacher has to aim for — the reason field takes over the Score
+ * column until the correction is saved or cancelled. */
+.correction-reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.correction-reason .score-entry-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 .field-error {
   margin: calc(var(--spacing-unit) * 0.25) 0 0 0;
   color: var(--color-danger);

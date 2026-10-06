@@ -57,13 +57,20 @@ describe("TauriLearnerScoreRepository", () => {
     };
     mockInvoke.mockResolvedValueOnce(score);
 
-    const result = await new TauriLearnerScoreRepository().record("ai-1", "l1", "scored", 18);
+    const result = await new TauriLearnerScoreRepository().record(
+      "ai-1",
+      "l1",
+      "scored",
+      18,
+      "Rechecked the paper",
+    );
 
     expect(mockInvoke).toHaveBeenCalledWith("record_learner_score", {
       assessmentItemId: "ai-1",
       learnerId: "l1",
       status: "scored",
       score: 18,
+      correctionReason: "Rechecked the paper",
     });
     expect(result).toEqual(score);
   });
@@ -71,7 +78,7 @@ describe("TauriLearnerScoreRepository", () => {
   it("record returns null when a referenced id doesn't resolve or the learner isn't eligible", async () => {
     mockInvoke.mockResolvedValueOnce(null);
 
-    const result = await new TauriLearnerScoreRepository().record("ai-1", "l1", "scored", 18);
+    const result = await new TauriLearnerScoreRepository().record("ai-1", "l1", "scored", 18, null);
 
     expect(result).toBeNull();
   });
@@ -82,6 +89,7 @@ describe("TauriLearnerScoreRepository", () => {
       termGrade: 88,
       wasTransmuted: true,
       wasFloored: false,
+      complete: true,
     };
     mockInvoke.mockResolvedValueOnce(grade);
 

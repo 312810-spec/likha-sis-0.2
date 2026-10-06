@@ -11,7 +11,7 @@ use crate::db;
 use crate::error::{AppError, AppResult};
 use crate::repository::grading_computation::{self, ComputedTermGrade};
 use crate::repository::learner_score::{
-    self, LearnerScore, LearnerScoreRosterEntry, LearnerScoreStatus,
+    self, LearnerScore, LearnerScoreCorrection, LearnerScoreRosterEntry, LearnerScoreStatus,
 };
 use crate::repository::{
     device_credential, device_identity, entity_sync_status, sync_outbox, sync_version_cache,
@@ -54,6 +54,10 @@ pub fn roster_for_assessment_item(
 /// before running `compute_learner_term_grade` on another device -- unlike
 /// rarely-changing reference data (`Subject`, `GradingPeriod`,
 /// `TeachingAssignment`).
+/// CTOS M01: `correction_reason` is required only when this call *replaces*
+/// an existing score. `learner_score::record` rejects a real correction that
+/// omits it and ignores it for a first-time recording.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub fn record_learner_score(
     app: AppHandle,
@@ -63,6 +67,7 @@ pub fn record_learner_score(
     learner_id: String,
     status: LearnerScoreStatus,
     score: Option<f64>,
+    correction_reason: Option<String>,
 ) -> AppResult<Option<LearnerScore>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
@@ -76,6 +81,7 @@ pub fn record_learner_score(
         &learner_id,
         status,
         score,
+        correction_reason.as_deref(),
         sspk.as_ref(),
     )
 }
@@ -140,6 +146,7 @@ fn record_learner_score_with_optional_sync(
     learner_id: &str,
     status: LearnerScoreStatus,
     score: Option<f64>,
+    correction_reason: Option<&str>,
     sspk: Option<&[u8; PAYLOAD_KEY_LEN]>,
 ) -> AppResult<Option<LearnerScore>> {
     let Some(sspk) = sspk else {
@@ -151,6 +158,7 @@ fn record_learner_score_with_optional_sync(
             status,
             score,
             recorded_by_user_id,
+            correction_reason,
         );
     };
 
@@ -164,6 +172,7 @@ fn record_learner_score_with_optional_sync(
             status,
             score,
             recorded_by_user_id,
+            correction_reason,
         )?;
         if let Some(recorded) = &recorded {
             enqueue_learner_score_sync_change(
@@ -253,6 +262,23 @@ pub fn compute_learner_term_grade(
     grading_computation::compute_term_grade(&conn, &school_id, &class_record_id, &learner_id)
 }
 
+/// CTOS M01: the correction lineage for one learner's score on one
+/// assessment item, newest first. `school_id` comes only from the session;
+/// the ids are client-supplied the same legitimate way they are above, and
+/// `correction_history` scopes every row to the caller's school so a
+/// cross-school id yields an empty list, not another school's history.
+#[tauri::command]
+pub fn learner_score_correction_history(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    assessment_item_id: String,
+    learner_id: String,
+) -> AppResult<Vec<LearnerScoreCorrection>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    learner_score::correction_history(&conn, &school_id, &assessment_item_id, &learner_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,6 +351,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(18.0),
+            None,
             Some(&sspk),
         )
         .unwrap()
@@ -389,6 +416,7 @@ mod tests {
                     &learner_id,
                     LearnerScoreStatus::Scored,
                     Some(10.0),
+                    None,
                     Some(&sspk),
                 )
                 .unwrap()
@@ -413,6 +441,7 @@ mod tests {
                 &learner_id,
                 LearnerScoreStatus::Scored,
                 Some(19.0),
+                Some("synthetic correction reason for the enqueue-failure fixture"),
                 Some(&sspk),
             )
             .unwrap_err();
@@ -441,6 +470,7 @@ mod tests {
                 &learner_id,
                 LearnerScoreStatus::Scored,
                 Some(19.0),
+                Some("recount after reopen"),
                 Some(&sspk),
             )
             .unwrap()
@@ -471,6 +501,7 @@ mod tests {
             LearnerScoreStatus::Scored,
             Some(18.0),
             None,
+            None,
         )
         .unwrap();
 
@@ -495,6 +526,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(18.0),
+            None,
             Some(&sspk),
         )
         .unwrap()
@@ -528,6 +560,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(10.0),
+            None,
             Some(&sspk),
         )
         .unwrap();
@@ -555,6 +588,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(19.0),
+            Some("recount after reopen"),
             Some(&sspk),
         )
         .unwrap();
@@ -577,6 +611,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(18.0),
+            None,
             Some(&sspk),
         )
         .unwrap();
@@ -601,6 +636,7 @@ mod tests {
             &learner_id,
             LearnerScoreStatus::Scored,
             Some(999.0),
+            None,
             Some(&sspk),
         )
         .unwrap();

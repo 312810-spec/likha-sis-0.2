@@ -108,7 +108,21 @@ $checkpointPath = Join-Path $checkpointDir "$($Milestone.ToLower()).md"
 $stamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
 
 # Milestone checkpoint document — historical detail lives here, not in CTOS-STATE.
-$checkpointBody = @"
+# A hand-authored checkpoint is preserved verbatim: it carries the milestone's
+# evidence, and this template would erase it (the M00 checkpoint was authored
+# this way). Only -Note is appended, and only when not already present.
+if (Test-Path $checkpointPath) {
+    Write-Step "checkpoint document already exists, preserved: $checkpointPath"
+    if ($Note) {
+        $existingCkpt = Get-Content -Path $checkpointPath -Raw -Encoding utf8
+        if ($existingCkpt -notlike "*$Note*") {
+            $existingCkpt = $existingCkpt.TrimEnd() + "`r`n`r`n## Note`r`n`r`n$Note`r`n"
+            Set-Content -Path $checkpointPath -Value $existingCkpt -Encoding utf8
+            Write-Step 'note appended to the existing checkpoint document'
+        }
+    }
+} else {
+    $checkpointBody = @"
 # CTOS checkpoint — $Milestone
 
 **Recorded:** $stamp
@@ -134,19 +148,28 @@ _None recorded at this checkpoint. See CTOS-STATE.md._
 
 _Automatically determined by the runner after this checkpoint._
 "@
-Set-Content -Path $checkpointPath -Value $checkpointBody -Encoding utf8
-Write-Step "checkpoint document written: $checkpointPath"
+    Set-Content -Path $checkpointPath -Value $checkpointBody -Encoding utf8
+    Write-Step "checkpoint document written: $checkpointPath"
+}
 
 # Update CTOS-STATE compact fields without rewriting history sections wholesale.
 if (Test-Path $statePath) {
     $state = Get-Content -Path $statePath -Raw -Encoding utf8
     $state = $state -replace '(?m)^\*\*Updated:\*\* .*$', "**Updated:** $((Get-Date).ToString('yyyy-MM-dd'))"
-    $state = $state -replace '(?m)^- Current milestone: .*$', "- Current milestone: $Milestone"
-    if ($Complete) {
-        $state = $state -replace '(?m)^- Last completed milestone: .*$', "- Last completed milestone: $Milestone"
+    # A state file that already records this milestone as complete was authored
+    # with the next milestone already in hand (as M01's was) — refreshing the
+    # date is all it needs. Rewriting the fields would regress "Current
+    # milestone" back to the one just completed.
+    if ($state -match "- Last completed milestone: $Milestone\b") {
+        Write-Step 'CTOS-STATE already records this milestone complete; date refreshed only'
+    } else {
+        $state = $state -replace '(?m)^- Current milestone: .*$', "- Current milestone: $Milestone"
+        if ($Complete) {
+            $state = $state -replace '(?m)^- Last completed milestone: .*$', "- Last completed milestone: $Milestone"
+        }
+        $state = $state -replace '(?m)^- Last pushed CTOS execution checkpoint: .*$', "- Last pushed CTOS execution checkpoint: $Milestone ($head)"
+        $state = $state -replace '(?m)^- Next action: .*$', "- Next action: continue CTOS execution after $Milestone"
     }
-    $state = $state -replace '(?m)^- Last pushed CTOS execution checkpoint: .*$', "- Last pushed CTOS execution checkpoint: $Milestone ($head)"
-    $state = $state -replace '(?m)^- Next action: .*$', "- Next action: continue CTOS execution after $Milestone"
     Set-Content -Path $statePath -Value $state -Encoding utf8
     Write-Step 'CTOS-STATE updated'
 }
