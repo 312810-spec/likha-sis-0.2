@@ -119,6 +119,22 @@ function App() {
   // ids in this file, not a router/global store. Cleared alongside
   // classWorkContext everywhere that context is cleared.
   const [classRecordAssignmentId, setClassRecordAssignmentId] = useState<string | null>(null);
+  // Remembers the grading period and DepEd weighting this teacher explicitly
+  // chose for one class, so the class record does not ask for them again on
+  // every visit — the Class Folio remounts when the teacher moves between
+  // Dashboard, My Classes and Class Record, and each remount would otherwise
+  // discard the choice. Keyed by the assignment: `ClassRecordJourneyScreen`
+  // revalidates both ids against the lists the school publishes and drops any
+  // that no longer match, so a removed period never means a different term.
+  // Cleared with the session rather than with the class context — going back
+  // to Today and reopening the same class should not re-ask an answered
+  // question. Same narrowly-typed handoff pattern as the ids above, not a
+  // router/global store.
+  const [classRecordSelection, setClassRecordSelection] = useState<{
+    teachingAssignmentId: string;
+    gradingPeriodId: string;
+    weightPolicyId: string;
+  } | null>(null);
   // Set only by SectionsScreen's "Manage assignments" action, so
   // TeachingAssignmentsScreen opens for that section -- same
   // narrowly-typed handoff pattern as rosterSectionId above, not a
@@ -153,6 +169,7 @@ function App() {
   function clearSessionWorkContexts() {
     clearClassWorkContext();
     setAdvisoryWorkContext(null);
+    setClassRecordSelection(null);
   }
 
   function handleSessionExpired() {
@@ -242,6 +259,13 @@ function App() {
 
   const bootBrand = <h1 className="app-boot-brand">LIKHA-SIS</h1>;
 
+  function selectionFor(teachingAssignmentId: string) {
+    return classRecordSelection &&
+      classRecordSelection.teachingAssignmentId === teachingAssignmentId
+      ? classRecordSelection
+      : null;
+  }
+
   const folio = session ? (
     <AssignedClassFolio
       key={activeTab === "class-records" ? "scores" : "overview"}
@@ -261,25 +285,36 @@ function App() {
       }}
       onOpenAdvisory={() => setActiveTab("adviser-view")}
       onOpenForms={() => setActiveTab("school-forms")}
-      renderScores={(context, onBackToOverview) => (
-        <ClassRecordJourneyScreen
-          embedded
-          teachingAssignmentId={context.teachingAssignmentId}
-          classContext={context}
-          teacherUserId={session.userId}
-          subjectAttendanceService={subjectAttendanceService}
-          gradingService={gradingService}
-          classRecordService={classRecordService}
-          assessmentService={assessmentService}
-          learnerScoreService={learnerScoreService}
-          learnerScoreSyncStatusService={learnerScoreSyncStatusService}
-          exportService={exportService}
-          onBackToClass={() => {
-            onBackToOverview();
-            if (activeTab === "class-records") setActiveTab("workspace");
-          }}
-        />
-      )}
+      renderScores={(context, onBackToOverview) => {
+        const selection = selectionFor(context.teachingAssignmentId);
+        return (
+          <ClassRecordJourneyScreen
+            embedded
+            teachingAssignmentId={context.teachingAssignmentId}
+            classContext={context}
+            teacherUserId={session.userId}
+            subjectAttendanceService={subjectAttendanceService}
+            gradingService={gradingService}
+            classRecordService={classRecordService}
+            assessmentService={assessmentService}
+            learnerScoreService={learnerScoreService}
+            learnerScoreSyncStatusService={learnerScoreSyncStatusService}
+            exportService={exportService}
+            initialGradingPeriodId={selection?.gradingPeriodId}
+            initialWeightPolicyId={selection?.weightPolicyId}
+            onRecordSelection={(chosen) =>
+              setClassRecordSelection({
+                teachingAssignmentId: context.teachingAssignmentId,
+                ...chosen,
+              })
+            }
+            onBackToClass={() => {
+              onBackToOverview();
+              if (activeTab === "class-records") setActiveTab("workspace");
+            }}
+          />
+        );
+      }}
     />
   ) : null;
 
@@ -529,6 +564,14 @@ function App() {
                   assessmentService={assessmentService}
                   learnerScoreService={learnerScoreService}
                   exportService={exportService}
+                  initialGradingPeriodId={selectionFor(classRecordAssignmentId)?.gradingPeriodId}
+                  initialWeightPolicyId={selectionFor(classRecordAssignmentId)?.weightPolicyId}
+                  onRecordSelection={(chosen) =>
+                    setClassRecordSelection({
+                      teachingAssignmentId: classRecordAssignmentId,
+                      ...chosen,
+                    })
+                  }
                   onBackToClass={() => setClassRecordAssignmentId(null)}
                 />
               ) : (

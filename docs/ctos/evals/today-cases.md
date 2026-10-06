@@ -19,7 +19,7 @@ action rather than scanning a sorted list.
   starts exactly now: it is still next, not already past.
 - **next class skips a meeting that has already started** — `Verified`.
   `my_day.rs:538`. With meetings at 07:00 and 08:00 and the time 07:30, the first
-  row is 07:00 but the *next* is 08:00 — the two are deliberately not the same.
+  row is 07:00 but the _next_ is 08:00 — the two are deliberately not the same.
 - **no class is next once every class today has started** — `Verified`.
   `my_day.rs:581`. The day is still listed; it just has nothing upcoming.
 - **the marked class opens in one action** — `Verified`.
@@ -62,7 +62,7 @@ absence of meeting rows.
 ## changed schedule
 
 Schedule meetings are local to the device (they are absent from the sync
-allowlist at `src-tauri/src/sync/mod.rs`), so a *meeting-level* change cannot
+allowlist at `src-tauri/src/sync/mod.rs`), so a _meeting-level_ change cannot
 arrive from elsewhere today; that transport is M13's scope. The one channel that
 does exist is a `teaching_assignments` delete, which cascades.
 
@@ -83,7 +83,7 @@ freshness property it cannot demonstrate.
 ## stale offline schedule
 
 Same root cause: with meetings local-only, "stale" has no transport to arrive
-through. What M04 does guarantee is that the view never *claims* to be current
+through. What M04 does guarantee is that the view never _claims_ to be current
 when it is not — the summary is computed fresh on every call, and the screen
 reloads on every tab return because tabs are conditionally rendered and therefore
 unmount. No freshness timestamp is shown, because none exists to show honestly;

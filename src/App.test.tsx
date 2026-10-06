@@ -199,6 +199,99 @@ describe("App", () => {
     expect(await screen.findByRole("region", { name: "Learners" })).toBeInTheDocument();
   });
 
+  it("remembers the grading period and weighting chosen for a class across destinations", async () => {
+    // M05's acceptance clause: the teacher should not repeatedly reselect
+    // grade/section/subject/term when the active class already determines
+    // them. The Class Folio remounts when the teacher moves between
+    // Dashboard, My Classes and Class Record; without App-held state each
+    // remount would blank the grading period and weighting the teacher
+    // already chose for that class.
+    const assignment = {
+      id: "ta-1",
+      sectionId: "sec-1",
+      sectionName: "Grade 8 – Joy",
+      schoolYear: "2026-2027",
+      subjectId: "subj-1",
+      subjectName: "Filipino",
+    };
+    const savedRecord = {
+      id: "cr-1",
+      schoolId: "s1",
+      sectionId: "sec-1",
+      sectionName: "Grade 8 – Joy",
+      subjectId: "subj-1",
+      subjectName: "Filipino",
+      gradingPeriodId: "gp-1",
+      gradingPeriodLabel: "Term 1",
+      schoolYear: "2026-2027",
+      weightPolicyId: "wp-1",
+      weightPolicyName: "Core Weighting",
+      createdAt: "now",
+      itemCount: 0,
+      recordedCount: 0,
+      totalEligible: 0,
+    };
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "list_teacher_assignments") return Promise.resolve([assignment]);
+      if (command === "list_learners_by_school") return Promise.resolve([]);
+      if (command === "list_sections_by_school") return Promise.resolve([]);
+      if (command === "list_audit_log") return Promise.resolve([]);
+      if (command === "subject_attendance_monitor") return Promise.resolve({ rows: [] });
+      if (command === "list_grading_periods_by_school_year")
+        return Promise.resolve([
+          {
+            id: "gp-1",
+            schoolId: "s1",
+            schoolYear: "2026-2027",
+            policyPeriodId: "pp-1",
+            label: "Term 1",
+            startsOn: "2026-06-01",
+            endsOn: "2026-09-30",
+            createdAt: "now",
+          },
+        ]);
+      if (command === "list_grading_weight_policies")
+        return Promise.resolve([
+          {
+            id: "wp-1",
+            name: "Core Weighting",
+            sourceCitation: "Synthetic fixture",
+            isDefault: true,
+          },
+        ]);
+      if (command === "list_class_records_by_school") return Promise.resolve([savedRecord]);
+      if (command === "list_assessment_items_by_class_record") return Promise.resolve([]);
+      if (command === "list_assessment_category_sets") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected command: ${String(command)}`));
+    });
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByRole("button", { name: "Filipino · Grade 8 – Joy" });
+
+    // Open the Scores worksheet for the one authorized class and choose the
+    // term and weighting explicitly — the academic choice this test is about.
+    await user.click(screen.getByRole("button", { name: "View scores" }));
+    await user.selectOptions(await screen.findByLabelText("Grading period"), "gp-1");
+    await user.selectOptions(screen.getByLabelText("DepEd grading weighting"), "wp-1");
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+
+    // Leaving and returning to the Class Record destination remounts the
+    // folio. The teacher should not be asked for the term again.
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    await user.click(within(nav).getByRole("button", { name: "Dashboard" }));
+    await user.click(within(nav).getByRole("button", { name: "Class Record" }));
+
+    expect(await screen.findByLabelText("Grading period")).toHaveValue("gp-1");
+    expect(screen.getByLabelText("DepEd grading weighting")).toHaveValue("wp-1");
+    expect(screen.getByRole("button", { name: "Open class record" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
   it("returns to sign-in with a clear notice when a command fails because the session expired", async () => {
     // The client believed it had an active session (current_session
     // returned one), but the backend has since idle-timed it out, been

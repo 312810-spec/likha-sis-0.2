@@ -101,8 +101,11 @@ function renderScreen(overrides?: {
   policies?: GradingWeightPolicy[];
   created?: ClassRecord | null;
   records?: ClassRecordDetail[];
+  initialGradingPeriodId?: string;
+  initialWeightPolicyId?: string;
 }) {
   const onBackToClass = vi.fn();
+  const onRecordSelection = vi.fn();
   const subjectAttendance = subjectAttendanceServiceWith(overrides?.assignments ?? [ASSIGNMENT]);
   const grading = gradingServiceWith(overrides?.periods ?? [PERIOD]);
   const classRecord = classRecordServiceWith(
@@ -124,10 +127,13 @@ function renderScreen(overrides?: {
         learnerScoreService={learnerScoreService()}
         exportService={exportService()}
         onBackToClass={onBackToClass}
+        initialGradingPeriodId={overrides?.initialGradingPeriodId}
+        initialWeightPolicyId={overrides?.initialWeightPolicyId}
+        onRecordSelection={onRecordSelection}
       />
     </ModeProvider>,
   );
-  return { ...rendered, onBackToClass, subjectAttendance, grading, classRecord };
+  return { ...rendered, onBackToClass, onRecordSelection, subjectAttendance, grading, classRecord };
 }
 
 async function openRecord(user: ReturnType<typeof userEvent.setup>) {
@@ -197,6 +203,48 @@ describe("ClassRecordJourneyScreen", () => {
     expect(classRecord.createClassRecord).toHaveBeenCalledWith("sec-1", "subj-1", "gp-1", "wp-1");
     expect(await screen.findByText(/Term 1/)).toBeInTheDocument();
     expect(screen.getByText(/Core Weighting/)).toBeInTheDocument();
+  });
+
+  it("recalls the grading period and weighting chosen earlier instead of asking again", async () => {
+    const user = userEvent.setup();
+    const { classRecord } = renderScreen({
+      initialGradingPeriodId: "gp-1",
+      initialWeightPolicyId: "wp-1",
+    });
+
+    const openButton = await screen.findByRole("button", { name: "Open class record" });
+    // The choice is already made, so the record is openable in one action
+    // rather than after two more selections.
+    expect(openButton).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByLabelText("Grading period")).toHaveValue("gp-1");
+    expect(screen.getByLabelText("DepEd grading weighting")).toHaveValue("wp-1");
+
+    await user.click(openButton);
+
+    expect(classRecord.createClassRecord).toHaveBeenCalledWith("sec-1", "subj-1", "gp-1", "wp-1");
+    expect(await screen.findByText(/Term 1/)).toBeInTheDocument();
+  });
+
+  it("does not recall a grading period the school no longer publishes", async () => {
+    renderScreen({ initialGradingPeriodId: "gp-retired", initialWeightPolicyId: "wp-1" });
+
+    const openButton = await screen.findByRole("button", { name: "Open class record" });
+    // A retired term falls back to an explicit choice rather than being
+    // clamped onto whichever period happens to be first.
+    expect(openButton).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByLabelText("Grading period")).toHaveValue("");
+  });
+
+  it("reports the chosen period and weighting so the app can recall them", async () => {
+    const user = userEvent.setup();
+    const { onRecordSelection } = renderScreen();
+
+    await openRecord(user);
+
+    expect(onRecordSelection).toHaveBeenCalledWith({
+      gradingPeriodId: "gp-1",
+      weightPolicyId: "wp-1",
+    });
   });
 
   it("continues into Creation Studio and returns to the same class record", async () => {
