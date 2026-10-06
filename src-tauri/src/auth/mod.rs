@@ -214,6 +214,19 @@ pub fn login(
     )?;
 
     let session = new_session(session_id, user.id, school_id.to_string());
+    // An account switch supersedes any session this process already held.
+    // `SessionManager` tracks exactly one session, so without this the prior
+    // row stays live in the persisted `sessions` table until it expires on
+    // its own (up to `SESSION_DURATION`) -- a zombie the superseded account
+    // could still present to any code path that ever accepted a raw session
+    // id. Revoking it here keeps the persisted table as truthful as the
+    // in-memory one: after a switch, exactly one session for this process is
+    // live, and it is the new one. Idempotent (`session_repo::revoke` overwrites
+    // `revoked_at` harmlessly), and a no-op on a first login, where nothing is
+    // held.
+    if let Some(superseded) = sessions.current() {
+        session_repo::revoke(conn, &superseded.id)?;
+    }
     sessions.set(session.clone());
     Ok(session)
 }
@@ -1301,6 +1314,57 @@ mod tests {
 
         assert!(matches!(result, Err(AppError::Unauthorized)));
         assert_eq!(sessions.current(), None);
+    }
+
+    #[test]
+    fn an_account_switch_revokes_the_session_it_supersedes() {
+        // M02 "account switch": the persisted sessions table must be as
+        // truthful as the in-memory manager after a switch. Before this fix,
+        // `sessions.set` replaced the held session but left the prior row
+        // live until it expired on its own -- a zombie a superseded account
+        // could still present to any code path accepting a raw session id.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let ana = user::create_user(&conn, "ana.cruz", "pw", "Ana Cruz").unwrap();
+        let bembol = user::create_user(&conn, "bembol.perez", "pw", "Bembol Perez").unwrap();
+        user::add_school_membership(&conn, &ana.id, &s.id).unwrap();
+        user::add_school_membership(&conn, &bembol.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+
+        let first = login(&conn, &sessions, "ana.cruz", "pw", &s.id).unwrap();
+        assert!(!session_repo::is_revoked(&conn, &first.id).unwrap());
+
+        let second = login(&conn, &sessions, "bembol.perez", "pw", &s.id).unwrap();
+
+        // The manager holds exactly one session, and it is the new one.
+        assert_eq!(sessions.current().map(|s| s.id), Some(second.id.clone()));
+        assert_ne!(first.id, second.id);
+        // The superseded session is now revoked, and could not be used even
+        // if it were handed to the authorization path directly.
+        assert!(session_repo::is_revoked(&conn, &first.id).unwrap());
+        assert!(!session_repo::is_revoked(&conn, &second.id).unwrap());
+    }
+
+    #[test]
+    fn a_failed_switch_attempt_leaves_the_existing_session_live() {
+        // The revocation must be a consequence of a *successful* login, not
+        // of the attempt: a wrong password at the switch prompt must not
+        // sign the already-authenticated teacher out.
+        let conn = open_test_db();
+        let s = school::create(&conn, "Rizal Elementary").unwrap();
+        let ana = user::create_user(&conn, "ana.cruz", "pw", "Ana Cruz").unwrap();
+        let bembol = user::create_user(&conn, "bembol.perez", "pw", "Bembol Perez").unwrap();
+        user::add_school_membership(&conn, &ana.id, &s.id).unwrap();
+        user::add_school_membership(&conn, &bembol.id, &s.id).unwrap();
+        let sessions = SessionManager::new();
+
+        let first = login(&conn, &sessions, "ana.cruz", "pw", &s.id).unwrap();
+
+        let result = login(&conn, &sessions, "bembol.perez", "wrong pw", &s.id);
+
+        assert!(matches!(result, Err(AppError::AuthenticationFailed)));
+        assert_eq!(sessions.current().map(|s| s.id), Some(first.id.clone()));
+        assert!(!session_repo::is_revoked(&conn, &first.id).unwrap());
     }
 
     #[test]

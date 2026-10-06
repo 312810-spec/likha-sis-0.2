@@ -2,9 +2,16 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: **M02 — Work access and session integrity**.
+Use CTOS.md as the controlling plan. Current milestone: **M03 — CTOS design system**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+## M02 — Work access and session integrity: COMPLETE (PASS)
+
+One real defect fixed (`auth::login` left a zombie session on account switch);
+the other eight items were proven rather than built — recorded work transfers on
+reassignment by construction, and the sync queue is school-scoped by design.
+See `docs/ctos/checkpoints/m02.md` and `docs/ctos/evals/access-cases.md`.
 
 ## M01 — Academic trust: COMPLETE (PASS, tag `ctos-m01-complete`)
 
@@ -12,18 +19,19 @@ Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
 provisional on screen and in both exports. All seven verification items have
 executable tests. See `docs/ctos/checkpoints/m01.md`.
 
-## M02 in progress
+## M03 in progress
 
-Required verification: account switch, stale async response, spoofed ID,
-reassignment, revocation, adviser vs subject scope, offline last-confirmed
-assignment, handover of pending work, sync queue scope.
+Required: semantic tokens, typography/rhythm, table patterns, light/dark/system,
+density modes, loading/empty/error/offline, focus, motion/reduced motion,
+responsive rules, shared copy vocabulary, visual regression fixtures.
 
-M02's areas (access control, sync scope) are in the adapter's High-Fidelity
-list, so it takes the strongest verification mode, including an independent
-verifier pass rather than the generator agreeing with itself.
+Acceptance: no material screen-specific visual island; accessibility primitives
+remain intact. Unlike M01/M02 this is not a High-Fidelity logic milestone — the
+risk is visual fragmentation and accessibility regression, so the verification
+mode shifts toward the UI gate (`npm run quality:ui`) and regression fixtures.
 
-Next step: map the existing school-scope enforcement surface, then decide which
-of the nine items already have code and which are greenfield.
+Next step: inventory the existing theme tokens in `src/ui/theme/` and find which
+screens already carry one-off styling instead of shared tokens.
 
 ---
 

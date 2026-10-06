@@ -1357,6 +1357,95 @@ mod tests {
     }
 
     #[test]
+    fn a_reassignment_hands_write_access_to_the_incoming_teacher_and_revokes_the_former_one() {
+        // M02 "handover of pending work": `replace_teacher` deletes the old
+        // assignment row and creates a new one, so the former teacher's held
+        // assignment id simply stops resolving -- `authorize_own_assignment`
+        // fails closed on it, and the incoming teacher's new id is what opens.
+        // A reassignment is therefore also an access revocation: the departed
+        // teacher cannot keep recording against the id they held, and nothing
+        // had to be revoked separately for that to hold.
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let incoming = user::create_user(
+            &conn,
+            "teacher.b",
+            "correct horse battery staple",
+            "Teacher B",
+        )
+        .unwrap();
+        user::add_school_membership(&conn, &incoming.id, &f.school_id).unwrap();
+
+        // The former teacher can write before the reassignment.
+        assert!(
+            authorize_own_assignment(&conn, &f.teacher_id, &f.school_id, &f.assignment_id).is_ok()
+        );
+
+        // `seed`'s fixture does not carry the section/subject ids, so resolve
+        // them from the assignment the fixture already holds.
+        let held = teaching_assignment::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .unwrap();
+        let outcome = teaching_assignment::replace_teacher(
+            &conn,
+            &f.school_id,
+            &held.section_id,
+            &held.subject_id,
+            &incoming.id,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(outcome.assignment.teacher_user_id, incoming.id);
+
+        // The former teacher's held id no longer resolves -- denied.
+        assert!(
+            matches!(
+                authorize_own_assignment(&conn, &f.teacher_id, &f.school_id, &f.assignment_id,),
+                Err(AppError::Unauthorized)
+            ),
+            "the departed teacher must not keep write access to the id they held"
+        );
+        // The incoming teacher's new id is what authorizes now.
+        assert!(authorize_own_assignment(
+            &conn,
+            &incoming.id,
+            &f.school_id,
+            &outcome.assignment.id
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn a_revocation_that_arrives_over_sync_denies_write_access_even_while_offline() {
+        // M02 "offline last-confirmed assignment": `authorize_own_assignment`
+        // reads the *local* `teaching_assignments` table, which is itself
+        // sync-populated -- so while offline, authorization falls back to the
+        // last state this device confirmed from the hub. A revocation made on
+        // the hub reaches this device as a delete, and `delete_from_sync`
+        // applies it to the local table; the next authorization then fails
+        // closed because the row is gone. Nothing about being offline keeps a
+        // revoked assignment writable.
+        let conn = open_test_db();
+        let f = seed(&conn);
+
+        assert!(
+            authorize_own_assignment(&conn, &f.teacher_id, &f.school_id, &f.assignment_id).is_ok()
+        );
+
+        // The hub-side revocation, replayed on reconnect.
+        teaching_assignment::delete_from_sync(&conn, &f.school_id, &f.assignment_id).unwrap();
+
+        assert!(
+            matches!(
+                authorize_own_assignment(&conn, &f.teacher_id, &f.school_id, &f.assignment_id),
+                Err(AppError::Unauthorized)
+            ),
+            "a sync-applied revocation must deny the write, not rely on the teacher noticing"
+        );
+    }
+
+    #[test]
     fn list_sessions_for_assignment_never_leaks_a_different_schools_sessions() {
         let conn = open_test_db();
         let f = seed(&conn);

@@ -8,16 +8,29 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M02 — Work access and session integrity
-- Last completed milestone: M01 (PASS — see docs/ctos/checkpoints/m01.md)
-- Last pushed CTOS execution checkpoint: M01
-- Next action: execute M02 — account switch, stale async response, spoofed ID, reassignment, revocation, adviser vs subject scope, offline last-confirmed assignment, handover of pending work, sync queue scope
-- Risk tier: M01 was High-Fidelity (grading/finality) and closed PASS
+- Current milestone: M03 — CTOS design system
+- Last completed milestone: M02 (PASS — see docs/ctos/checkpoints/m02.md)
+- Last pushed CTOS execution checkpoint: M02
+- Next action: execute M03 — semantic tokens, typography/rhythm, table patterns, light/dark/system, density modes, loading/empty/error/offline, focus, motion/reduced motion, responsive rules, shared copy vocabulary, visual regression fixtures
+- Risk tier: M01/M02 were High-Fidelity and closed PASS
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
 - Dirty/unpushed warning: none at the M00 checkpoint; M01 work is committed and
   pushed at the `ctos-m01-complete` tag
+
+## M02 result (checkpoint m02.md)
+
+- Native Rust tests: 1,325 passed / 0 failed (full `cargo test`), clippy clean
+- Frontend quality: unchanged at 132 files / 1,242 tests; M02 was Rust-only
+- One real defect fixed: `auth::login` now revokes the session it supersedes,
+  so an account switch no longer leaves a zombie session row live for up to 8h
+- Recorded as deliberate, not as gaps: the sync queue is school-scoped by
+  design (a departed member's recorded work is the school's data), and
+  handover of pending work holds by construction (scores are keyed to the
+  class record, not the teacher)
+- Eval registry file `access-cases.md` written from the real test names —
+  the M00 registry row had claimed it was automated before it existed
 
 ## M01 result (checkpoint m01.md)
 
@@ -66,4 +79,3 @@
 ## Rule
 
 This file is intentionally compact. Historical detail belongs in Git and docs/ctos/checkpoints/.
-
