@@ -8,16 +8,41 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M03 — CTOS design system
-- Last completed milestone: M02 (PASS — see docs/ctos/checkpoints/m02.md)
-- Last pushed CTOS execution checkpoint: M02
-- Next action: execute M03 — semantic tokens, typography/rhythm, table patterns, light/dark/system, density modes, loading/empty/error/offline, focus, motion/reduced motion, responsive rules, shared copy vocabulary, visual regression fixtures
-- Risk tier: M01/M02 were High-Fidelity and closed PASS
+- Current milestone: M04 — Today
+- Last completed milestone: M03 (PASS — see docs/ctos/checkpoints/m03.md)
+- Last pushed CTOS execution checkpoint: M03 (tag `ctos-m03-complete`, f0432da)
+- Next action: execute M04 — one-action next-class entry, no schedule, stale
+  offline schedule, changed schedule, no classes today, pending assignment,
+  unfinished attendance, returned review
+- Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
+  not High-Fidelity, and closed PASS on the UI gate plus a static token guard
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none at the M00 checkpoint; M01 work is committed and
-  pushed at the `ctos-m01-complete` tag
+- Dirty/unpushed warning: none; M03 is committed and pushed at the
+  `ctos-m03-complete` tag
+
+## M03 result (checkpoint m03.md)
+
+- Frontend quality: 133 files / 1,252 tests pass (up from 132 / 1,242 — the delta
+  is exactly the ten-test token guard); typecheck, lint, format:check,
+  architecture, deadcode all pass
+- `npm run quality:ui` PASS after the CSS refactor: zero axe WCAG A/AA findings
+  across four widths × both appearances × three densities, with a
+  no-horizontal-overflow assertion at every width
+- No Rust touched this milestone; the Rust suite's last verified state is M02's
+  1,325 passed
+- Four structural gaps fixed: a type and spacing scale derived from their bases
+  (density now rescales all type, not just body text), three duplicate table
+  definitions consolidated into one `.ledger` primitive, six ad-hoc breakpoints
+  collapsed onto three sanctioned widths, and the shared copy vocabulary in
+  `src/ui/theme/copy.ts`
+- The app previously had no React error boundary at all; `ErrorBoundary` now
+  wraps the tab switch so a render failure is scoped to one screen
+- Recorded as deliberate, not as a gap: `emptyCopy` was drafted and removed
+  because all 45 `<EmptyState>` call sites carry context a generic string would
+  discard, and the regression fixture is a static token guard rather than a
+  pixel baseline because the repo has no image-comparison dependency
 
 ## M02 result (checkpoint m02.md)
 
