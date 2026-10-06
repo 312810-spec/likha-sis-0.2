@@ -107,6 +107,13 @@ $checkpointPath = Join-Path $checkpointDir "$($Milestone.ToLower()).md"
 
 $stamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
 
+# PowerShell 5.1's `Set-Content -Encoding utf8` prepends a UTF-8 BOM; every
+# write below uses byte-clean UTF-8 so the committed files carry no stray BOM.
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+function Write-File([string]$path, [string]$content) {
+    [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+}
+
 # Milestone checkpoint document — historical detail lives here, not in CTOS-STATE.
 # A hand-authored checkpoint is preserved verbatim: it carries the milestone's
 # evidence, and this template would erase it (the M00 checkpoint was authored
@@ -117,7 +124,7 @@ if (Test-Path $checkpointPath) {
         $existingCkpt = Get-Content -Path $checkpointPath -Raw -Encoding utf8
         if ($existingCkpt -notlike "*$Note*") {
             $existingCkpt = $existingCkpt.TrimEnd() + "`r`n`r`n## Note`r`n`r`n$Note`r`n"
-            Set-Content -Path $checkpointPath -Value $existingCkpt -Encoding utf8
+            Write-File $checkpointPath $existingCkpt
             Write-Step 'note appended to the existing checkpoint document'
         }
     }
@@ -148,7 +155,7 @@ _None recorded at this checkpoint. See CTOS-STATE.md._
 
 _Automatically determined by the runner after this checkpoint._
 "@
-    Set-Content -Path $checkpointPath -Value $checkpointBody -Encoding utf8
+    Write-File $checkpointPath $checkpointBody
     Write-Step "checkpoint document written: $checkpointPath"
 }
 
@@ -170,7 +177,7 @@ if (Test-Path $statePath) {
         $state = $state -replace '(?m)^- Last pushed CTOS execution checkpoint: .*$', "- Last pushed CTOS execution checkpoint: $Milestone ($head)"
         $state = $state -replace '(?m)^- Next action: .*$', "- Next action: continue CTOS execution after $Milestone"
     }
-    Set-Content -Path $statePath -Value $state -Encoding utf8
+    Write-File $statePath $state
     Write-Step 'CTOS-STATE updated'
 }
 
@@ -184,7 +191,10 @@ git add -A
 $commitMsg = @("chore(ctos): checkpoint $Milestone [$Status]", '', "CTOS v3 durable checkpoint.", "Source commit: $head")
 if ($Note) { $commitMsg += @('', $Note) }
 $commitMsg += @('', 'Co-Authored-By: Claude Code <noreply@anthropic.com>')
-$commitMsg | Set-Content -Path (Join-Path $env:TEMP "ctos-commit-msg.txt") -Encoding utf8
+# Set-Content -Encoding utf8 under PowerShell 5.1 prepends a UTF-8 BOM, which
+# then becomes the first byte of the commit message (M01's checkpoint commit
+# carries that stray BOM). Write-File above is byte-clean UTF-8.
+Write-File (Join-Path $env:TEMP "ctos-commit-msg.txt") ($commitMsg -join "`r`n")
 git commit -F (Join-Path $env:TEMP "ctos-commit-msg.txt") | Out-Null
 $newHead = git rev-parse HEAD
 Write-Step "committed $newHead"

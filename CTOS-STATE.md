@@ -1,4 +1,4 @@
-﻿# CTOS State
+# CTOS State
 
 **Updated:** 2026-10-06
 **Program:** CTOS v3 / FORGE-UHF  
