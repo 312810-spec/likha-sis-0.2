@@ -2,9 +2,33 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: **M04 — Today**.
+Use CTOS.md as the controlling plan. Current milestone: **M05 — Class Folio**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+## M04 — Today: COMPLETE (PASS, tag `ctos-m04-complete`)
+
+Seven of eight verification items met. Three needed real implementation: the next
+class is now derived in Rust (first sorted meeting at or after `now_time`, with a
+"Next up" marker making it one action), `has_any_assignments` separates "not assigned
+to any class" from "no classes today", and a pending assignment reads as an assignment
+with no `schedule_meetings` — computed from existing data, with no new table or status
+column, surfaced in the attention rail with no action button because no scheduling
+screen exists yet. Three more (no classes today, unfinished attendance, returned
+review) were already implemented and re-verified.
+
+Two things recorded rather than claimed. **Stale offline schedule is `Unknown`:**
+`schedule_meetings` is absent from the sync allowlist, so a stale schedule has no
+transport to arrive through — that is M13's scope, and no freshness timestamp is
+shown because none exists to show honestly. And the investigation found a real
+staleness bug the item list does not name: `ClassWorkspaceScreen` renders inside
+`MyDayScreen` without a tab change, so returning from it never remounted and the
+attention rail kept showing an item the teacher had just cleared. `onBackToToday` now
+re-fetches, mirroring `ClassRecordsScreen.handleBackToList`.
+
+1,331 Rust tests (delta from M02 is exactly the six new `my_day` tests) and 1,257
+frontend tests; zero axe findings. See `docs/ctos/checkpoints/m04.md` and
+`docs/ctos/evals/today-cases.md`.
 
 ## M03 — CTOS design system: COMPLETE (PASS)
 
@@ -40,18 +64,23 @@ Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
 provisional on screen and in both exports. All seven verification items have
 executable tests. See `docs/ctos/checkpoints/m01.md`.
 
-## M04 in progress
+## M05 in progress
 
-Outcome: the teacher understands the day and opens the next meaningful task
-immediately.
+Outcome: one persistent authorized class context supports the majority of teacher work.
 
-Verify: one-action next-class entry, no schedule, stale offline schedule,
-changed schedule, no classes today, pending assignment, unfinished attendance,
-returned review.
+Required: unmistakable identity, internal state retention, keyboard-first desktop
+flow, touch-safe narrow flow, authorized command/search routing, progressive
+disclosure.
 
-Next step: read the Today screen (`src/ui/HomeScreen.tsx` and its services) and
-establish which of the eight verification items already have coverage, so the
-milestone separates verification from real gaps as M02 did.
+Acceptance: the teacher should not repeatedly reselect grade/section/subject/term
+when the active class already determines them.
+
+Next step: read the existing class-context code (`ClassWorkspaceScreen`, the class
+records list, and whatever already persists an active class) and establish which of
+the six required properties already hold, so the milestone separates verification
+from real gaps as M02 and M04 did. Note the duplication M04 recorded but did not
+touch — `TodaysClassesScreen` re-implements the join `my_day` computes — in case M05's
+single-class-context work is the natural place to merge it.
 
 ---
 

@@ -8,19 +8,45 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M04 — Today
-- Last completed milestone: M03 (PASS — see docs/ctos/checkpoints/m03.md)
-- Last pushed CTOS execution checkpoint: M03 (tag `ctos-m03-complete`, f0432da)
-- Next action: execute M04 — one-action next-class entry, no schedule, stale
-  offline schedule, changed schedule, no classes today, pending assignment,
-  unfinished attendance, returned review
+- Current milestone: M05 — Class Folio
+- Last completed milestone: M04 (PASS — see docs/ctos/checkpoints/m04.md)
+- Last pushed CTOS execution checkpoint: M04 (tag `ctos-m04-complete`, 795ec60)
+- Next action: execute M05 — unmistakable identity, internal state retention,
+  keyboard-first desktop flow, touch-safe narrow flow, authorized command/search
+  routing, progressive disclosure; the teacher should not repeatedly reselect
+  grade/section/subject/term when the active class already determines them
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
-  not High-Fidelity, and closed PASS on the UI gate plus a static token guard
+  not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
+  M04 closed PASS as a screen-and-read-model milestone
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none; M03 is committed and pushed at the
-  `ctos-m03-complete` tag
+- Dirty/unpushed warning: none; M04 is committed and pushed at the
+  `ctos-m04-complete` tag
+
+## M04 result (checkpoint m04.md)
+
+- Native Rust tests: 1,331 passed / 0 failed (full `cargo test`), clippy clean,
+  fmt clean. The delta from M02's 1,325 is exactly the six new `my_day` tests
+- Frontend quality: 133 files / 1,257 tests pass (up from 133 / 1,252 — five net
+  new screen/service tests); typecheck, lint, format:check, architecture, deadcode
+  all pass
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings across four widths ×
+  both appearances × three densities
+- New: `MyDaySummary.next` derived in Rust after the sort it depends on;
+  `has_any_assignments` separating "not assigned" from "no classes today";
+  pending unscheduled assignments computed from the absence of meeting rows
+- Recorded as out of scope, not as a gap: **stale offline schedule is `Unknown`** —
+  `schedule_meetings` is absent from the sync allowlist so a stale schedule has no
+  transport to arrive through (M13 owns sync, M09 owns publication), and no
+  freshness timestamp is shown because none exists to show honestly
+- Real defect found and fixed that the item list did not name:
+  `ClassWorkspaceScreen` renders inside `MyDayScreen` without a tab change, so
+  returning from it never remounted and the attention rail stayed stale;
+  `onBackToToday` now re-fetches, mirroring `ClassRecordsScreen.handleBackToList`
+- Recorded as a remaining risk, deliberately untouched: `TodaysClassesScreen`
+  re-implements the join `my_day` computes, so the two screens can disagree about
+  the same day; there are three separate "what day is it" implementations
 
 ## M03 result (checkpoint m03.md)
 
