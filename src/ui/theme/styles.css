@@ -2297,6 +2297,22 @@ label {
   font-size: var(--font-size-2xs);
   margin: 0;
 }
+/* The one class still upcoming today. `--color-primary-wash` is the same
+ * tinted surface the selected state's accent uses elsewhere, so "next" reads
+ * as emphasis rather than as a different kind of thing. */
+.folio-schedule-item.is-next .folio-section-choice {
+  background: var(--color-primary-wash);
+}
+.folio-next-badge {
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  background: var(--color-primary-wash);
+  border-radius: var(--radius-large);
+  padding: var(--space-1) var(--space-2);
+}
 .folio-sheet {
   min-width: 0;
   padding: var(--space-7);

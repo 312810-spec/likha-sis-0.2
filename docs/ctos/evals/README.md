@@ -13,6 +13,7 @@ acceptance criterion, and — where feasible — an automated regression test.
 | `golden-path.md`     | 0–6  | login → Today → class → classroom → record → review readiness                                                          | partial          |
 | `grading-cases.md`   | 1    | thresholds, edge attainable scores, blank≠zero, provisional vs complete, policy versioning, historical stability       | yes (Rust + TS)  |
 | `access-cases.md`    | 1    | account switch, stale async, spoofed ID, reassignment, revocation, adviser vs subject scope                            | yes (Rust)       |
+| `today-cases.md`      | 4    | next-class selection, no schedule vs free day, pending unscheduled assignment, changed schedule via assignment cascade, no classes today, unfinished attendance, returned review | yes (Rust + TS)  |
 | `schedule-cases.md`  | 3    | solver states, conflict fixtures, stale-generation publication rejection, atomic publication                           | planned          |
 | `reporting-cases.md` | 4    | readiness preview, missing-data explanation, issued snapshot immutability, amendment history                           | planned          |
 | `recovery-cases.md`  | 5    | lost ack, process kill, hub restart, network change, long queue, concurrent edits, stale backup, interrupted migration | planned          |

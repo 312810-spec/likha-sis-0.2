@@ -27,13 +27,16 @@ interface MyDayScreenProps {
 }
 
 /** `0 = Sunday … 6 = Saturday`, matching `domain/schedule-meeting.ts`'s
- * established convention and JavaScript's own `Date.prototype.getDay()`. */
-function todayWeekdayAndIsoDate(): { weekday: number; date: string } {
+ * established convention and JavaScript's own `Date.prototype.getDay()`.
+ * `nowTime` is local "HH:MM", the same wall-clock text shape
+ * `ScheduleMeeting.startsAt` uses, so the two compare directly. */
+function todayWeekdayAndIsoDate(): { weekday: number; date: string; nowTime: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
-  return { weekday: now.getDay(), date: `${year}-${month}-${day}` };
+  const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return { weekday: now.getDay(), date: `${year}-${month}-${day}`, nowTime };
 }
 
 /**
@@ -66,10 +69,10 @@ export function MyDayScreen({
     const requestId = ++requestRef.current;
     setLoading(true);
     setError(null);
-    const { weekday, date } = todayWeekdayAndIsoDate();
+    const { weekday, date, nowTime } = todayWeekdayAndIsoDate();
 
     myDayService
-      .getSummary(weekday, date)
+      .getSummary(weekday, date, nowTime)
       .then((result) => {
         if (requestRef.current !== requestId) return;
         setSummary(result);
@@ -97,9 +100,21 @@ export function MyDayScreen({
       context={selectedClassContext}
       onCheckAttendance={onCheckAttendance}
       onOpenClassRecord={onOpenClassRecord}
-      onBackToToday={onBackToToday}
+      onBackToToday={handleBackToToday}
     />
   ) : null;
+
+  /** Returning from a class workspace re-fetches the summary so the "Needs
+   * your attention" rail reflects any attendance recorded while that
+   * workspace was open. Without this, a teacher who checks attendance then
+   * goes back sees the same pending item they just cleared -- the class
+   * workspace renders inside this screen rather than on its own tab, so
+   * nothing unmounts and the mount-time fetch alone would stay stale. This
+   * mirrors `ClassRecordsScreen.handleBackToList`'s own reasoning. */
+  function handleBackToToday() {
+    onBackToToday();
+    load();
+  }
 
   return (
     <Page
@@ -168,44 +183,55 @@ export function MyDayScreen({
                 </label>
               )}
               {summary.schedule.length === 0 ? (
-                <EmptyState>No classes scheduled for you today.</EmptyState>
+                <EmptyState>
+                  {summary.hasAnyAssignments
+                    ? "No classes scheduled for you today."
+                    : "You are not assigned to any classes yet."}
+                </EmptyState>
               ) : (
                 <ul className="folio-section-list">
-                  {summary.schedule.map((item, index) => (
-                    <li
-                      key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
-                      className="folio-schedule-item"
-                    >
-                      <button
-                        type="button"
-                        className="folio-section-choice"
-                        aria-pressed={
-                          selectedClassContext?.teachingAssignmentId ===
-                            item.teachingAssignmentId &&
-                          selectedClassContext?.startsAt === item.startsAt
-                        }
-                        onClick={() =>
-                          onOpenClassContext({
-                            teachingAssignmentId: item.teachingAssignmentId,
-                            subjectName: item.subjectName,
-                            sectionName: item.sectionName,
-                            startsAt: item.startsAt,
-                            endsAt: item.endsAt,
-                            room: item.room,
-                          })
-                        }
+                  {summary.schedule.map((item, index) => {
+                    const isNext =
+                      summary.next !== null &&
+                      item.teachingAssignmentId === summary.next.teachingAssignmentId &&
+                      item.startsAt === summary.next.startsAt;
+                    return (
+                      <li
+                        key={`${item.teachingAssignmentId}-${item.startsAt}-${index}`}
+                        className={isNext ? "folio-schedule-item is-next" : "folio-schedule-item"}
                       >
-                        <span className="folio-section-name">
-                          {item.subjectName} — {item.sectionName}
-                        </span>
-                        <span className="folio-section-state">
-                          {item.startsAt}–{item.endsAt}
-                          {item.room ? ` · ${item.room}` : ""}
-                        </span>
-                        <span className="field-hint">Open class</span>
-                      </button>
-                    </li>
-                  ))}
+                        <button
+                          type="button"
+                          className="folio-section-choice"
+                          aria-pressed={
+                            selectedClassContext?.teachingAssignmentId ===
+                              item.teachingAssignmentId &&
+                            selectedClassContext?.startsAt === item.startsAt
+                          }
+                          onClick={() =>
+                            onOpenClassContext({
+                              teachingAssignmentId: item.teachingAssignmentId,
+                              subjectName: item.subjectName,
+                              sectionName: item.sectionName,
+                              startsAt: item.startsAt,
+                              endsAt: item.endsAt,
+                              room: item.room,
+                            })
+                          }
+                        >
+                          {isNext && <span className="folio-next-badge">Next up</span>}
+                          <span className="folio-section-name">
+                            {item.subjectName} — {item.sectionName}
+                          </span>
+                          <span className="folio-section-state">
+                            {item.startsAt}–{item.endsAt}
+                            {item.room ? ` · ${item.room}` : ""}
+                          </span>
+                          <span className="field-hint">Open class</span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </aside>
@@ -227,10 +253,25 @@ export function MyDayScreen({
           </div>
           <details className="folio-pending" open={!selectedClassContext}>
             <summary>Needs your attention today</summary>
-            {summary.pendingAttendance.length === 0 && summary.pendingConflicts.length === 0 ? (
+            {summary.pendingAttendance.length === 0 &&
+            summary.pendingAssignments.length === 0 &&
+            summary.pendingConflicts.length === 0 ? (
               <EmptyState>Nothing pending — you&rsquo;re all caught up for today.</EmptyState>
             ) : (
               <ul className="workspace-priority-rail">
+                {summary.pendingAssignments.map((task) => (
+                  <li
+                    key={task.teachingAssignmentId}
+                    className="workspace-priority-item is-not-started"
+                  >
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.subjectName} — {task.sectionName}
+                      </span>
+                      <span className="field-hint">no schedule given to this class yet</span>
+                    </div>
+                  </li>
+                ))}
                 {summary.pendingAttendance.map((task) => (
                   <li
                     key={task.teachingAssignmentId}

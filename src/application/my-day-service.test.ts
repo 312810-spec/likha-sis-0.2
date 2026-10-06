@@ -14,18 +14,25 @@ const SUMMARY: MyDaySummary = {
       room: "Room 101",
     },
   ],
+  next: null,
   pendingAttendance: [
     { teachingAssignmentId: "ta-1", subjectName: "Mathematics", sectionName: "Mabini" },
   ],
+  pendingAssignments: [],
   pendingConflicts: [{ id: "c-1", entityKind: "learner" }],
+  hasAnyAssignments: true,
 };
 
 class FakeMyDayRepository implements MyDayRepository {
-  calls: Array<[number, string]> = [];
+  calls: Array<[number, string, string]> = [];
   result: MyDaySummary | "reject" = SUMMARY;
 
-  async getSummary(todayWeekday: number, todayDate: string): Promise<MyDaySummary> {
-    this.calls.push([todayWeekday, todayDate]);
+  async getSummary(
+    todayWeekday: number,
+    todayDate: string,
+    nowTime: string,
+  ): Promise<MyDaySummary> {
+    this.calls.push([todayWeekday, todayDate, nowTime]);
     if (this.result === "reject") {
       throw new Error("could not load My Day");
     }
@@ -38,9 +45,9 @@ describe("MyDayApplicationService", () => {
     const repo = new FakeMyDayRepository();
     const service = new MyDayApplicationService(repo);
 
-    const result = await service.getSummary(3, "2026-09-09");
+    const result = await service.getSummary(3, "2026-09-09", "07:30");
 
-    expect(repo.calls).toEqual([[3, "2026-09-09"]]);
+    expect(repo.calls).toEqual([[3, "2026-09-09", "07:30"]]);
     expect(result).toEqual(SUMMARY);
   });
 
@@ -49,6 +56,8 @@ describe("MyDayApplicationService", () => {
     repo.result = "reject";
     const service = new MyDayApplicationService(repo);
 
-    await expect(service.getSummary(3, "2026-09-09")).rejects.toThrow("could not load My Day");
+    await expect(service.getSummary(3, "2026-09-09", "07:30")).rejects.toThrow(
+      "could not load My Day",
+    );
   });
 });

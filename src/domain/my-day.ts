@@ -40,8 +40,32 @@ export interface MyDayPendingConflict {
   entityKind: string;
 }
 
+/** A teaching assignment that has no recurring slot on any weekday — the class
+ * exists on this teacher's load but has never been given a schedule. It is
+ * surfaced as pending because "this class needs a schedule" is a real next
+ * action, and because it is the one reason a schedule can be empty other than
+ * "nothing meets today".
+ *
+ * @public Consumed structurally, as `MyDaySummary.pendingAssignments`'s
+ * element type -- see `MyDayScheduleItem`'s identical note. */
+export interface MyDayPendingAssignment {
+  teachingAssignmentId: string;
+  subjectName: string;
+  sectionName: string;
+}
+
 export interface MyDaySummary {
   schedule: MyDayScheduleItem[];
+  /** The next class still upcoming today, or `null` once every class has
+   * already started. Derived in Rust, next to the sort it depends on, so the
+   * UI has one authoritative answer rather than re-deriving an order only the
+   * repository guarantees. */
+  next: MyDayScheduleItem | null;
   pendingAttendance: MyDayPendingAttendance[];
+  pendingAssignments: MyDayPendingAssignment[];
   pendingConflicts: MyDayPendingConflict[];
+  /** Whether this teacher has any teaching assignment at all. This is what
+   * separates "no classes scheduled today" from "you are not assigned to any
+   * class yet" — two situations that both leave `schedule` empty. */
+  hasAnyAssignments: boolean;
 }
