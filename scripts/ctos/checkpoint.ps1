@@ -190,19 +190,24 @@ $newHead = git rev-parse HEAD
 Write-Step "committed $newHead"
 
 # 10. push current branch
+# NOTE: no `2>&1` on these native calls. Under PowerShell 5.1, redirecting a
+# native command's stderr wraps each line in an ErrorRecord (NativeCommandError),
+# which this script's $ErrorActionPreference = 'Stop' turns into a terminating
+# error even when git exits 0 — the M01 checkpoint aborted this way after a
+# push that had in fact succeeded. stderr is captured by the host regardless.
 if (-not $upstream) {
-    git push -u origin $branch 2>&1 | Out-Null
-    $upstream = git rev-parse --abbrev-ref '@{u}' 2>$null
+    git push -u origin $branch | Out-Null
+    $upstream = git rev-parse --abbrev-ref '@{u}'
 } else {
-    git push origin $branch 2>&1 | Out-Null
+    git push origin $branch | Out-Null
 }
 if ($LASTEXITCODE -ne 0) { throw "[ctos:checkpoint] push failed for branch $branch" }
 
 # 11. completion tag
 if ($Complete) {
     $tagName = "ctos-$($Milestone.ToLower())-complete"
-    git tag -a $tagName -m "CTOS $Milestone complete" 2>&1 | Out-Null
-    git push origin $tagName 2>&1 | Out-Null
+    git tag -a $tagName -m "CTOS $Milestone complete" | Out-Null
+    git push origin $tagName | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "[ctos:checkpoint] failed to push tag $tagName" }
     Write-Step "tag pushed: $tagName"
 }
