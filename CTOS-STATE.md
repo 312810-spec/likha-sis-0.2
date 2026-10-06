@@ -8,21 +8,48 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M05 — Class Folio
-- Last completed milestone: M04 (PASS — see docs/ctos/checkpoints/m04.md)
-- Last pushed CTOS execution checkpoint: M04 (tag `ctos-m04-complete`, 795ec60)
-- Next action: execute M05 — unmistakable identity, internal state retention,
-  keyboard-first desktop flow, touch-safe narrow flow, authorized command/search
-  routing, progressive disclosure; the teacher should not repeatedly reselect
-  grade/section/subject/term when the active class already determines them
+- Current milestone: M06 — Classroom Mode
+- Last completed milestone: M05 (PASS — see docs/ctos/checkpoints/m05.md)
+- Last pushed CTOS execution checkpoint: M05 (tag `ctos-m05-complete`, 0d45ee1)
+- Next action: execute M06 — start/finish session, actual occurrence state,
+  attendance, current learning target, quick evidence, notes, learner follow-up
+  marker, summary/review; planned, changed, cancelled, and delivered occurrences
+  must remain distinguishable
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
-  M04 closed PASS as a screen-and-read-model milestone
+  M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
+  session-state-retention milestone in the web layer
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none; M04 is committed and pushed at the
-  `ctos-m04-complete` tag
+- Dirty/unpushed warning: none; M05 is committed and pushed at the
+  `ctos-m05-complete` tag
+
+## M05 result (checkpoint m05.md)
+
+- Frontend quality: 133 files / 1,261 tests pass (up from 133 / 1,257 — the delta
+  is exactly four new tests); typecheck, lint, format:check, architecture, deadcode
+  all pass
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings across four widths ×
+  both appearances × three densities
+- No Rust touched this milestone; the Rust suite's last verified state is M04's
+  1,331 passed
+- New: the grading period and DepEd weighting chosen for a class are held in App
+  session state keyed by the assignment and recalled on the next visit, so the
+  teacher is no longer re-asked for the term on every folio remount
+- The recall is revalidated rather than guessed — a period the school no longer
+  publishes falls back to an explicit choice rather than being clamped onto a
+  different term; the class record id is still re-derived on every visit so a
+  deleted record is never silently restored
+- Five of M05's six required properties were already held by the PR #102 redesign
+  and are named with real tests in `folio-cases.md`; only internal state retention
+  needed building
+- **Correction to the M04 checkpoint: `format:check` was not actually clean at the
+  `ctos-m04-complete` tag.** Two M04 case files failed Prettier. The M04 code, test
+  and lint gates were real, but the checkpoint's "all five gates pass" claim was
+  wrong for that one gate; both files are formatted in the M05 commit. Cause was
+  running `npm run quality` through a `| grep` pipeline whose exit status was
+  `tail`'s
 
 ## M04 result (checkpoint m04.md)
 

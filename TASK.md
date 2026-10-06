@@ -2,9 +2,35 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: **M05 — Class Folio**.
+Use CTOS.md as the controlling plan. Current milestone: **M06 — Classroom Mode**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+## M05 — Class Folio: COMPLETE (PASS, tag `ctos-m05-complete`)
+
+Five of the six required properties already held and are named with real tests;
+one did not, and it is the one the acceptance clause names. The grading period and
+DepEd weighting were blanked on every mount of `ClassRecordJourneyScreen`, and the
+Class Folio remounts whenever the teacher moves between Dashboard, My Classes and
+Class Record — so the term was re-asked every time. They are now held in App
+session state keyed by the assignment and recalled on the next visit.
+
+The recall is revalidated rather than guessed: a grading period the school no longer
+publishes falls back to an explicit choice instead of being clamped onto whichever
+period happens to be first, which is what keeps the recall from silently meaning a
+different term. The class record id is still re-derived on every visit, so a deleted
+record is never silently restored and a matching record is reopened rather than
+duplicated.
+
+Also corrects an M04 evidence claim: **`format:check` was not actually clean at the
+`ctos-m04-complete` tag.** Two M04 case files failed Prettier — a table not
+re-padded after a row was added, and `*emphasis*` that Prettier writes as
+`_emphasis_`. The M04 code, test and lint gates were real and unaffected (1,331
+Rust / 1,257 frontend tests), but the checkpoint's "all five gates pass" was wrong
+for that one gate. Both files are formatted in the M05 commit.
+
+133 files / 1,261 tests (the delta from M04 is exactly the four new tests); zero axe
+findings. See `docs/ctos/checkpoints/m05.md` and `docs/ctos/evals/folio-cases.md`.
 
 ## M04 — Today: COMPLETE (PASS, tag `ctos-m04-complete`)
 
@@ -64,23 +90,23 @@ Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
 provisional on screen and in both exports. All seven verification items have
 executable tests. See `docs/ctos/checkpoints/m01.md`.
 
-## M05 in progress
+## M06 in progress
 
-Outcome: one persistent authorized class context supports the majority of teacher work.
+Outcome: LIKHA supports the actual teaching session rather than only post-class
+administration.
 
-Required: unmistakable identity, internal state retention, keyboard-first desktop
-flow, touch-safe narrow flow, authorized command/search routing, progressive
-disclosure.
+Required: start/finish session, actual occurrence state, attendance, current learning
+target, quick evidence, notes, learner follow-up marker, summary/review.
 
-Acceptance: the teacher should not repeatedly reselect grade/section/subject/term
-when the active class already determines them.
+Acceptance: planned, changed, cancelled, and delivered occurrences remain
+distinguishable.
 
-Next step: read the existing class-context code (`ClassWorkspaceScreen`, the class
-records list, and whatever already persists an active class) and establish which of
-the six required properties already hold, so the milestone separates verification
-from real gaps as M02 and M04 did. Note the duplication M04 recorded but did not
-touch — `TodaysClassesScreen` re-implements the join `my_day` computes — in case M05's
-single-class-context work is the natural place to merge it.
+Next step: read the existing occurrence/session code (`SubjectAttendanceScreen` and
+the session lifecycle in Rust) and establish which occurrence states already exist,
+so the milestone separates verification from real gaps as M02, M04 and M05 did.
+M04's record of `ClassWorkspaceScreen` rendering inside `MyDayScreen` without a tab
+change is likely relevant — a classroom session opened from Today must return to a
+Today view that reflects what happened in it.
 
 ---
 
