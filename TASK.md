@@ -2,9 +2,28 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: M00 — Source truth + autonomous execution substrate.
+Use CTOS.md as the controlling plan. Current milestone: **M02 — Work access and session integrity**.
 
-Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. M00 must create the CTOS integration branch from current main, reconcile PR #103 deliberately, establish runtime capabilities and baseline verification, create the eval registry, and implement checkpoint/resume automation. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
+
+## M01 — Academic trust: COMPLETE (PASS, tag `ctos-m01-complete`)
+
+Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
+provisional on screen and in both exports. All seven verification items have
+executable tests. See `docs/ctos/checkpoints/m01.md`.
+
+## M02 in progress
+
+Required verification: account switch, stale async response, spoofed ID,
+reassignment, revocation, adviser vs subject scope, offline last-confirmed
+assignment, handover of pending work, sync queue scope.
+
+M02's areas (access control, sync scope) are in the adapter's High-Fidelity
+list, so it takes the strongest verification mode, including an independent
+verifier pass rather than the generator agreeing with itself.
+
+Next step: map the existing school-scope enforcement surface, then decide which
+of the nine items already have code and which are greenfield.
 
 ---
 
