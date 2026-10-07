@@ -3379,3 +3379,239 @@ label {
     transform: rotate(-90deg);
   }
 }
+
+
+/* FORGE premium teacher workspace primitives. */
+:root {
+  --surface-canvas: var(--color-bg);
+  --surface-navigation: var(--color-bg);
+  --surface-working: var(--color-surface-2);
+  --surface-subtle: var(--color-surface);
+  --surface-selected: var(--color-primary-wash);
+  --border-subtle: var(--color-border-soft);
+  --border-control: var(--color-border);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-muted);
+  --accent: var(--color-primary);
+  --accent-contrast: var(--color-primary-text);
+  --chart-present: var(--color-productive);
+  --chart-absent: var(--color-danger);
+  --chart-late: var(--color-warning);
+  --chart-excused: var(--color-primary);
+  --overlay-scrim: rgb(10 14 20 / 42%);
+  --radius-small: 6px;
+  --radius-medium: 10px;
+  --radius-pill: 999px;
+}
+
+.empty-state-structured {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: calc(var(--spacing-unit) * 0.45);
+  text-align: left;
+}
+
+.empty-state-structured[data-tone="success"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-success) 36%, var(--color-border-soft));
+  background: var(--color-success-surface);
+  color: var(--color-text);
+}
+
+.empty-state-structured h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.empty-state-description {
+  color: var(--color-text-muted);
+}
+
+.empty-state-action {
+  margin-top: calc(var(--spacing-unit) * 0.35);
+}
+
+.skeleton {
+  display: grid;
+  gap: calc(var(--spacing-unit) * 0.55);
+  padding: calc(var(--spacing-unit) * 0.2) 0;
+  overflow: hidden;
+}
+
+.skeleton-compact {
+  min-width: 120px;
+  gap: calc(var(--spacing-unit) * 0.35);
+}
+
+.skeleton-heading,
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+}
+
+.skeleton-heading {
+  width: min(58%, 260px);
+  height: 0.95rem;
+}
+
+.skeleton-line {
+  width: var(--skeleton-line, 80%);
+  height: 0.72rem;
+}
+
+.skeleton-heading::after,
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-surface-2) 72%, transparent),
+    transparent
+  );
+  animation: skeleton-sweep 1.5s var(--motion-easing-standard) infinite;
+}
+
+@keyframes skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.folio-overview {
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.folio-signal-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+  margin: 4px 0 8px;
+}
+
+.folio-signal {
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--color-border-soft);
+}
+
+.folio-signal:last-child {
+  border-right: 0;
+}
+
+.folio-signal-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.folio-signal-value {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.attendance-snapshot {
+  margin: 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.attendance-snapshot figcaption {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.attendance-snapshot-bars {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.attendance-snapshot-row {
+  display: grid;
+  grid-template-columns: 72px minmax(100px, 1fr) minmax(2ch, auto);
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.attendance-snapshot-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.attendance-snapshot-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  transform-origin: left;
+  animation: attendance-bar-enter var(--motion-duration-meaningful) var(--motion-easing-standard)
+    both;
+}
+
+.attendance-snapshot-fill[data-tone="present"] {
+  background: var(--chart-present);
+}
+
+.attendance-snapshot-fill[data-tone="absent"] {
+  background: var(--chart-absent);
+}
+
+.attendance-snapshot-fill[data-tone="late"] {
+  background: var(--chart-late);
+}
+
+.attendance-snapshot-fill[data-tone="excused"] {
+  background: var(--chart-excused);
+}
+
+@keyframes attendance-bar-enter {
+  from {
+    transform: scaleX(0);
+    opacity: 0.45;
+  }
+
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1040px) {
+  .folio-signal-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .folio-signal {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+
+  .folio-signal:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-heading::after,
+  .skeleton-line::after,
+  .attendance-snapshot-fill {
+    animation: none;
+  }
+}
