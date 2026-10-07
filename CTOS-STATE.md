@@ -25,6 +25,7 @@
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
 - Dirty/unpushed warning: none after the M08 commit and tag are pushed
+- M09 research checkpoint: DepEd Mandaue site/archive, official Division seal, DO 005 s.2024, DM 053 s.2024, and eSF7 national/current operational evidence recorded in `docs/research/deped-mandaue-teacher-load-2026.md` (commit `0fef68e`); no local Mandaue memo number or deadline was invented
 
 ## M08 result (checkpoint m08.md)
 
@@ -235,13 +236,13 @@
 
 ## Parked external dependencies
 
-- current Mandaue form-checking evidence
+- current Mandaue form-checking memorandum/checking schedule (official archive verified; current 2026 register remains unreadable through the Looker Studio embed)
 - current anonymized LIS SF1–SF4 samples
 - official West 1 TANAW indicator dictionary
 - TANAW Lock authority
-- current eSF7 official details
+- current Mandaue-specific eSF7 implementation details (national eSF7 authority and 2026 cross-division operational evidence verified)
 - SF8 health workflow/rules
-- actual school production roster/offerings/schedules
+- actual school production roster/offerings/bell times/room constraints/schedules
 - final real-device/printer/user acceptance
 
 ## Rule
