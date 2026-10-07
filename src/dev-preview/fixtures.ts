@@ -737,10 +737,12 @@ interface FixtureLearnerScoreCorrection {
   previousStatus: LearnerScoreStatus;
   previousScore: number | null;
   previousRecordedByUserId: string;
+  previousRecordedByName: string | null;
   previousRecordedAt: string;
   newStatus: LearnerScoreStatus;
   newScore: number | null;
   correctedByUserId: string;
+  correctedByName: string | null;
   reason: string;
   correctedAt: string;
 }
@@ -1074,10 +1076,12 @@ export class FixtureLearnerScoreRepository implements LearnerScoreRepository {
         previousStatus: existing.status,
         previousScore: existing.score,
         previousRecordedByUserId: "fixture-user",
+        previousRecordedByName: "Fixture Teacher",
         previousRecordedAt: existing.recordedAt,
         newStatus: status,
         newScore: score,
         correctedByUserId: "fixture-user",
+        correctedByName: "Fixture Teacher",
         reason: correctionReason,
         correctedAt: now,
       });

@@ -304,6 +304,13 @@ fn existing_row(
 /// newest first. Every entry preserves the superseded value, who recorded
 /// it, when, who corrected it, and why — the four facts CTOS.md section 5
 /// requires a correction to preserve.
+///
+/// CTOS M07: `*_by_name` carry the `users.display_name` for each author id,
+/// resolved server-side by the same LEFT JOIN `audit_log` uses for its
+/// `actor_username`. A review surface has to name a person, not an id, and
+/// resolving here keeps the UI from needing a second command per row. Both
+/// are `None` only if the user row has since been deleted — the id is still
+/// authoritative, the name is for reading.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LearnerScoreCorrection {
@@ -313,10 +320,12 @@ pub struct LearnerScoreCorrection {
     pub previous_status: LearnerScoreStatus,
     pub previous_score: Option<f64>,
     pub previous_recorded_by_user_id: String,
+    pub previous_recorded_by_name: Option<String>,
     pub previous_recorded_at: String,
     pub new_status: LearnerScoreStatus,
     pub new_score: Option<f64>,
     pub corrected_by_user_id: String,
+    pub corrected_by_name: Option<String>,
     pub reason: String,
     pub corrected_at: String,
 }
@@ -332,12 +341,16 @@ pub fn correction_history(
     learner_id: &str,
 ) -> AppResult<Vec<LearnerScoreCorrection>> {
     let mut stmt = conn.prepare(
-        "SELECT id, assessment_item_id, learner_id, \
-                previous_status, previous_score, previous_recorded_by_user_id, previous_recorded_at, \
-                new_status, new_score, corrected_by_user_id, reason, corrected_at \
-         FROM learner_score_corrections \
-         WHERE school_id = ?1 AND assessment_item_id = ?2 AND learner_id = ?3 \
-         ORDER BY corrected_at DESC, id DESC",
+        "SELECT c.id, c.assessment_item_id, c.learner_id, \
+                c.previous_status, c.previous_score, c.previous_recorded_by_user_id, \
+                prev.display_name, c.previous_recorded_at, \
+                c.new_status, c.new_score, c.corrected_by_user_id, \
+                actor.display_name, c.reason, c.corrected_at \
+         FROM learner_score_corrections c \
+         LEFT JOIN users prev ON prev.id = c.previous_recorded_by_user_id \
+         LEFT JOIN users actor ON actor.id = c.corrected_by_user_id \
+         WHERE c.school_id = ?1 AND c.assessment_item_id = ?2 AND c.learner_id = ?3 \
+         ORDER BY c.corrected_at DESC, c.id DESC",
     )?;
     let rows = stmt.query_map((school_id, assessment_item_id, learner_id), |row| {
         Ok(LearnerScoreCorrection {
@@ -347,12 +360,14 @@ pub fn correction_history(
             previous_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(3)?)?,
             previous_score: row.get(4)?,
             previous_recorded_by_user_id: row.get(5)?,
-            previous_recorded_at: row.get(6)?,
-            new_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(7)?)?,
-            new_score: row.get(8)?,
-            corrected_by_user_id: row.get(9)?,
-            reason: row.get(10)?,
-            corrected_at: row.get(11)?,
+            previous_recorded_by_name: row.get(6)?,
+            previous_recorded_at: row.get(7)?,
+            new_status: LearnerScoreStatus::from_db_str(&row.get::<_, String>(8)?)?,
+            new_score: row.get(9)?,
+            corrected_by_user_id: row.get(10)?,
+            corrected_by_name: row.get(11)?,
+            reason: row.get(12)?,
+            corrected_at: row.get(13)?,
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(AppError::from)
@@ -1001,6 +1016,100 @@ mod tests {
         // `before` is the live row the correction replaced; its recorded_at
         // is exactly what the history entry must have preserved.
         assert_eq!(entry.previous_recorded_at, before.recorded_at);
+    }
+
+    /// CTOS M07 — the lineage a teacher reviews has to name the people who
+    /// made each change, not their ids. Both authors resolve through the
+    /// same `users` join, and they can legitimately differ: one teacher
+    /// records, a different one corrects.
+    #[test]
+    fn correction_history_names_both_authors() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        let other = user::create_user(&conn, "teacher.b", "password", "B Teacher").unwrap();
+
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &other.id,
+            Some("Coteacher rechecked during co-planning"),
+        )
+        .unwrap();
+
+        let history = correction_history(&conn, &school_id, &item_id, &learner_id).unwrap();
+        assert_eq!(history.len(), 1);
+        let entry = &history[0];
+        assert_eq!(
+            entry.previous_recorded_by_name.as_deref(),
+            Some("A Teacher"),
+            "the superseded value's author must be named, not just keyed"
+        );
+        assert_eq!(
+            entry.corrected_by_name.as_deref(),
+            Some("B Teacher"),
+            "the correcting author must be named, and can differ from the original"
+        );
+    }
+
+    /// CTOS M07 — the schema itself protects the lineage: the correction's
+    /// author columns are plain `REFERENCES users(id)` with no cascade, so a
+    /// user who has made or corrected a recording cannot be deleted while
+    /// that lineage exists. The review surface can rely on every author being
+    /// named; the `LEFT JOIN` is defensive parity with `audit_log`, not a
+    /// state this database can actually reach.
+    #[test]
+    fn the_schema_forbids_deleting_an_author_of_a_correction() {
+        let conn = open_test_db();
+        let (school_id, item_id, learner_id, teacher_id) = setup(&conn);
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(15.0),
+            &teacher_id,
+            None,
+        )
+        .unwrap();
+        record(
+            &conn,
+            &school_id,
+            &item_id,
+            &learner_id,
+            LearnerScoreStatus::Scored,
+            Some(19.0),
+            &teacher_id,
+            Some("Rechecked"),
+        )
+        .unwrap();
+
+        // foreign_keys is ON, and the correction still references this user.
+        let deletion = conn.execute("DELETE FROM users WHERE id = ?1", (&teacher_id,));
+        assert!(
+            deletion.is_err(),
+            "deleting a user the correction lineage names must be refused, not cascaded"
+        );
+
+        let history = correction_history(&conn, &school_id, &item_id, &learner_id).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].corrected_by_name.as_deref(), Some("A Teacher"));
     }
 
     /// CTOS M01 — a correction that carries no reason is rejected rather

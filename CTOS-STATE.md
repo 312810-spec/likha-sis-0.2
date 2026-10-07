@@ -8,19 +8,49 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M06 — Classroom Mode (COMPLETE, PASS)
-- Last completed milestone: M06 (PASS — see docs/ctos/checkpoints/m06.md)
-- Last pushed CTOS execution checkpoint: M06 (tag `ctos-m06-complete`)
-- Next action: execute M07 — Fast evidence capture and review (CTOS.md §M07)
+- Current milestone: M07 — Fast evidence capture and review (COMPLETE, PASS)
+- Last completed milestone: M07 (PASS — see docs/ctos/checkpoints/m07.md)
+- Last pushed CTOS execution checkpoint: M07 (tag `ctos-m07-complete`)
+- Next action: execute M08 — Attention + Learning Support (CTOS.md §M08)
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
   session-state-retention milestone in the web layer; M06 closed PASS as the
-  occurrence-semantics milestone that made the Rust stack reachable from the UI
+  occurrence-semantics milestone that made the Rust stack reachable from the UI;
+  M07 closed PASS as the interaction-speed milestone that made daily attendance
+  and scoring one keystroke per learner and made the correction lineage visible
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none after the M06 commit and tag are pushed
+- Dirty/unpushed warning: none after the M07 commit and tag are pushed
+
+## M07 result (checkpoint m07.md)
+
+- Frontend quality: 136 files / 1,301 tests pass (up from 135 / 1,284 — the delta
+  is exactly 17 new tests: 7 in the new `ScoreCorrectionHistory.test.tsx`, 4 in
+  `ClassRecordWorkspace.test.tsx`, 4 in `SubjectAttendanceScreen.test.tsx` and 2 in
+  `AttendanceScreen.test.tsx`; no other file changed count)
+- Native Rust: 1,364 passed / 0 failed (up from M06's 1,362 — exactly the two new
+  lineage tests), `cargo fmt --check` clean, `cargo clippy --all-targets --
+-D warnings` clean
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings. The browser harness sees
+  the history panel collapsed (fetch on expand); the expanded panel is axe-checked
+  by the component's own a11y test, which opens it first
+- Three partial items in CTOS.md §M07 were closed: letter shortcuts plus
+  success-conditional focus advance on both attendance rosters, Tab/Shift+Tab in
+  the score grid, and the correction-history review surface wired to the existing
+  command. The other ten verify items were already implemented and are re-verified
+  and named in `capture-cases.md`
+- Author names in the lineage are resolved at the repository by a double
+  `LEFT JOIN users`, following the `audit_log.actor_username` precedent — never
+  client-supplied. The schema's non-cascading `REFERENCES users(id)` means the join
+  cannot be orphaned, proved by a test that asserts the DELETE is rejected
+- Two defects found and fixed: `setState` in an effect body (rejected by
+  `react-hooks/set-state-in-effect`; the reset moved to the toggle handler, which is
+  also where the immediate "Loading…" feedback belongs), and `getByText` unable to
+  match text spanning an element boundary — the change line renders
+  `15 → <strong>19</strong>` as separate text nodes, so the tests read the
+  paragraph's `textContent` instead
 
 ## M06 result (checkpoint m06.md)
 

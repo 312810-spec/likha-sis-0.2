@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
@@ -57,6 +57,10 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   markNoClassCalls = 0;
   markAllPresentCalls = 0;
   recordEntryCalls = 0;
+  /** CTOS M07: injected failure, so the auto-advance invariant — focus moves
+   * only on a successful save — can be exercised against a real rejection
+   * rather than a hang. */
+  rejectRecordEntry = false;
 
   constructor(
     sessions: SubjectAttendanceSession[] = [],
@@ -106,6 +110,7 @@ class FakeSubjectAttendanceRepository implements SubjectAttendanceRepository {
   ): Promise<RecordEntryOutcome> {
     this.recordEntryCalls += 1;
     if (this.pending) return new Promise<RecordEntryOutcome>(() => {});
+    if (this.rejectRecordEntry) throw new Error("the hub is unreachable");
     const roster = this.rosterBySessionId[sessionId] ?? [];
     const existing = roster.find((row) => row.membershipId === membershipId);
     if (!existing) return { kind: "membershipNotInSession" };
@@ -495,5 +500,137 @@ describe("SubjectAttendanceScreen", () => {
     await screen.findByRole("button", { name: "Check attendance" });
 
     expect(screen.getByRole("combobox", { name: "Class" })).toHaveValue("ta-2");
+  });
+
+  it("marks a learner from the keyboard with P/A/L/E", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    await screen.findByText("Ana Cruz");
+
+    screen.getByRole("button", { name: "Late" }).focus();
+    await user.keyboard("l");
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Late" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    expect(subjectAttendance.recordEntryCalls).toBe(1);
+  });
+
+  it("moves focus to the next learner after a keyboard mark, so a roster is one keystroke per learner", async () => {
+    const user = userEvent.setup();
+    renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+          {
+            membershipId: "mem-2",
+            learnerId: "l-2",
+            givenName: "Bo",
+            familyName: "Reyes",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    await screen.findByText("Ana Cruz");
+    const anaGroup = screen.getByRole("group", {
+      name: /subject attendance status for ana cruz/i,
+    });
+    const boGroup = screen.getByRole("group", { name: /subject attendance status for bo reyes/i });
+
+    within(anaGroup).getByRole("button", { name: "Excused" }).focus();
+    await user.keyboard("e");
+
+    await waitFor(() =>
+      expect(within(boGroup).getByRole("button", { name: "Excused" })).toHaveFocus(),
+    );
+    expect(within(anaGroup).getByRole("button", { name: "Excused" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("does not advance focus when the mark fails, so the teacher stays on the row that needs them", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+          {
+            membershipId: "mem-2",
+            learnerId: "l-2",
+            givenName: "Bo",
+            familyName: "Reyes",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    subjectAttendance.rejectRecordEntry = true;
+    await screen.findByText("Ana Cruz");
+    const anaGroup = screen.getByRole("group", {
+      name: /subject attendance status for ana cruz/i,
+    });
+    const boGroup = screen.getByRole("group", { name: /subject attendance status for bo reyes/i });
+
+    const anaPresent = within(anaGroup).getByRole("button", { name: "Present" });
+    anaPresent.focus();
+    await user.keyboard("p");
+
+    // The row's inline error renders beside the status group, not inside it.
+    await waitFor(() => expect(screen.getByText(/could not save this mark/i)).toBeInTheDocument());
+    expect(anaPresent).toHaveFocus();
+    expect(within(boGroup).getByRole("button", { name: "Present" })).not.toHaveFocus();
+  });
+
+  it("does not intercept a letter typed with a modifier held", async () => {
+    const user = userEvent.setup();
+    const { subjectAttendance } = renderScreen({
+      sessions: [makeSession()],
+      rosterBySessionId: {
+        "session-1": [
+          {
+            membershipId: "mem-1",
+            learnerId: "l-1",
+            givenName: "Ana",
+            familyName: "Cruz",
+            entryStatus: null,
+          },
+        ],
+      },
+    });
+    await screen.findByText("Ana Cruz");
+
+    screen.getByRole("button", { name: "Present" }).focus();
+    await user.keyboard("{Control>}p{/Control}");
+
+    expect(subjectAttendance.recordEntryCalls).toBe(0);
   });
 });

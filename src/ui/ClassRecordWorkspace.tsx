@@ -16,6 +16,7 @@ import type {
 } from "../domain/learner-score";
 import type { LearnerScoreSyncStatusApplicationService } from "../application/learner-score-sync-status-service";
 import { ScoreSyncEvidence } from "./components/ScoreSyncEvidence";
+import { ScoreCorrectionHistory } from "./components/ScoreCorrectionHistory";
 import { Alert } from "./components/Alert";
 import { ClassRecordLocalSaveStatus } from "./components/ClassRecordLocalSaveStatus";
 import { EmptyState } from "./components/EmptyState";
@@ -1020,6 +1021,16 @@ export function ClassRecordWorkspace({
                                         entry,
                                         neighborLearnerId(entry.learnerId, -1),
                                       );
+                                    } else if (event.key === "Tab") {
+                                      // CTOS M07: Tab commits the held
+                                      // correction and continues down the
+                                      // roster, so correcting a score mid-run
+                                      // costs no extra navigation.
+                                      event.preventDefault();
+                                      void commitPendingCorrection(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, event.shiftKey ? -1 : 1),
+                                      );
                                     } else if (event.key === "Escape") {
                                       event.preventDefault();
                                       cancelPendingCorrection(entry.learnerId);
@@ -1113,6 +1124,21 @@ export function ClassRecordWorkspace({
                                         entry,
                                         neighborLearnerId(entry.learnerId, -1),
                                       );
+                                    } else if (event.key === "Tab") {
+                                      // CTOS M07: without this, native Tab
+                                      // leaves the score grid and walks the
+                                      // row's Excused/N/A buttons instead of
+                                      // the next learner's score — a
+                                      // gradebook that costs a keystroke plus
+                                      // a mouse per row. Like Enter, this
+                                      // commits the draft first and only moves
+                                      // focus on a successful save, so Tab
+                                      // never silently drops an entry.
+                                      event.preventDefault();
+                                      void commitScoreDraft(
+                                        entry,
+                                        neighborLearnerId(entry.learnerId, event.shiftKey ? -1 : 1),
+                                      );
                                     } else if (event.key === "Escape") {
                                       event.preventDefault();
                                       setScoreDrafts((current) => {
@@ -1172,6 +1198,19 @@ export function ClassRecordWorkspace({
                                       learnerId={entry.learnerId}
                                     />
                                   )}
+                                {entry.status !== null && !isSaving && !hasRowError && (
+                                  <ScoreCorrectionHistory
+                                    // Keyed by saved-row identity so a fresh
+                                    // correction remounts the panel and the
+                                    // lineage it shows can never be stale —
+                                    // same reasoning as ScoreSyncEvidence.
+                                    key={`history-${selectedItem.id}-${entry.learnerId}-${entry.updatedAt}`}
+                                    service={learnerScoreService}
+                                    assessmentItemId={selectedItem.id}
+                                    learnerId={entry.learnerId}
+                                    learnerName={`${entry.givenName} ${entry.familyName}`}
+                                  />
+                                )}
                               </>
                             )}
                           </td>

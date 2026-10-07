@@ -832,6 +832,47 @@ label {
   font-size: 0.9em;
 }
 
+/* CTOS M07: the correction-lineage review surface. Lives inside a score
+   cell, so it is deliberately quieter than the row it documents — a teacher
+   expanding it is asking "what was this before, and who changed it", and
+   the answer should read as a footnote, not a second table. */
+.correction-history-toggle {
+  margin-top: calc(var(--spacing-unit) * 0.25);
+}
+
+.correction-history-panel {
+  margin-top: calc(var(--spacing-unit) * 0.25);
+  padding-left: calc(var(--spacing-unit) * 0.5);
+  border-left: 2px solid var(--color-border);
+}
+
+.correction-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.4);
+}
+
+.correction-history-entry > p {
+  margin: 0;
+}
+
+.correction-history-change {
+  font-size: 0.9em;
+}
+
+.correction-history-reason {
+  font-size: 0.9em;
+  color: var(--color-text);
+}
+
+.correction-history-meta {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+}
+
 /* Narrow (phone-width) layout: a dense multi-column grid becomes hard to
    scan and hard to hit accurately with a finger. Rather than shrinking the
    desktop table further (tiny cells nobody can tap reliably), each roster

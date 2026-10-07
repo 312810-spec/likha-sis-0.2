@@ -33,6 +33,13 @@ export interface LearnerScoreRosterEntry {
  * required"). The live `LearnerScore` row stays the current truth; this is
  * the immutable record of every state it replaced, newest first.
  *
+ * The `*ByName` fields are M07 — a teacher reviewing a class record needs to
+ * read a person's name, not their user id. They are resolved server-side by
+ * joining `users`, mirroring how `AuditLogEntry.actorUsername` is resolved,
+ * and are optional only for defensive parity with that join: the schema's
+ * non-cascading `REFERENCES users(id)` means an author of a correction
+ * cannot be deleted while the lineage exists.
+ *
  * A first recording has no correction history — there is no prior state to
  * preserve. */
 export interface LearnerScoreCorrection {
@@ -43,11 +50,13 @@ export interface LearnerScoreCorrection {
   previousStatus: LearnerScoreStatus;
   previousScore: number | null;
   previousRecordedByUserId: string;
+  previousRecordedByName: string | null;
   previousRecordedAt: string;
   /** The state that replaced it. */
   newStatus: LearnerScoreStatus;
   newScore: number | null;
   correctedByUserId: string;
+  correctedByName: string | null;
   /** Required — a correction with no reason is rejected at the boundary. */
   reason: string;
   correctedAt: string;

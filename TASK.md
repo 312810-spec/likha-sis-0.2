@@ -1,8 +1,8 @@
 # Current task — CTOS v3
 
-Updated: 2026-10-06.
+Updated: 2026-10-07.
 
-Use CTOS.md as the controlling plan. Current milestone: **M07 — Fast evidence capture and review**.
+Use CTOS.md as the controlling plan. Current milestone: **M08 — Attention + Learning Support**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
 
@@ -113,7 +113,53 @@ Verification: 135 files / 1,284 frontend tests; 1,362 Rust tests; `cargo fmt --c
 and `cargo clippy --all-targets -- -D warnings` clean; `npm run quality:ui` zero axe
 findings. See `docs/ctos/checkpoints/m06.md` and `docs/ctos/evals/classroom-cases.md`.
 
-Next step: execute **M07 — Fast evidence capture and review** (CTOS.md §M07). The
+## M07 complete — PASS
+
+Outcome: attendance and scoring are fast enough for real daily use without
+sacrificing academic meaning.
+
+Of CTOS.md §M07's thirteen verify items, ten were already implemented and are
+re-verified and named in `capture-cases.md`. Three were partial and are what this
+milestone closed:
+
+1. **Keyboard attendance.** `SubjectAttendanceScreen` — the surface Classroom Mode
+   routes into when attendance is unsettled — had arrow keys but no letter shortcuts;
+   it now takes `P`/`A`/`L`/`E`. Neither roster advanced focus after a mark, so a
+   keyboard session cost two keystrokes per learner. `handleMark` now returns
+   `Promise<boolean>` and focus advances only on success, so a failed save leaves the
+   teacher on the row that needs them.
+2. **Tab in the score grid.** Native Tab left the grid for the row's Excused/N/A
+   buttons. Tab now commits and moves to the next learner, Shift+Tab moves back up,
+   on the reason input as well.
+3. **Correction history.** The append-only lineage and its whole read stack existed
+   since M01, but nothing called `correctionHistory` outside tests — a teacher could
+   correct a score and give a reason, then had no way to see any of it back.
+   `ScoreCorrectionHistory` is that surface, fetched on expand so a class of forty
+   pays zero queries until one is opened.
+
+Author names in the lineage are resolved at the repository by a double
+`LEFT JOIN users`, following the `audit_log.actor_username` precedent — never
+client-supplied. The schema's non-cascading `REFERENCES users(id)` means the join
+cannot be orphaned; a test asserts the DELETE is rejected.
+
+Two defects found and fixed: `setState` in an effect body (rejected by
+`react-hooks/set-state-in-effect`; the reset moved to the toggle handler, which is
+also where the immediate "Loading…" feedback belongs), and `getByText` unable to
+match text spanning an element boundary — the change line renders
+`15 → <strong>19</strong>` as separate text nodes, so the tests read the paragraph's
+`textContent` instead.
+
+Verification: 136 files / 1,301 frontend tests (up from 135 / 1,284 — exactly the 17
+new tests); 1,364 Rust tests (up from 1,362 — exactly the two new lineage tests);
+`cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` clean;
+`npm run quality:ui` zero axe findings. See `docs/ctos/checkpoints/m07.md` and
+`docs/ctos/evals/capture-cases.md`.
+
+Deliberately out of scope: the class-record `markFinal` state machine, which
+`grading-cases.md` assigns to M11. "Fast" is claimed as interaction shape (one
+keystroke per learner, no per-row fetch), not as a measured latency.
+
+Next step: execute **M08 — Attention + Learning Support** (CTOS.md §M08). The
 M04-recorded duplicated schedule read path remains deliberately untouched and is still
 open as a risk.
 

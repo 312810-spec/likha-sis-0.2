@@ -36,6 +36,18 @@ const STATUS_LABELS: Record<EntryStatus, string> = {
   excused: "Excused",
 };
 
+// CTOS M07: the letter keys a fast keyboard pass uses. Daily Attendance has
+// P/A/T for present/absent/tardy; this surface has a fourth status (Excused)
+// and calls the third one "Late", so its map is its own — but the shape is
+// deliberately the same, so a teacher moving between the two screens is
+// never surprised by the interaction, only by which letter means which mark.
+const LETTER_SHORTCUTS: Record<string, EntryStatus> = {
+  p: "present",
+  a: "absent",
+  l: "late",
+  e: "excused",
+};
+
 function todayAsIsoDate(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -224,10 +236,17 @@ export function SubjectAttendanceScreen({
     }
   }
 
-  async function handleMark(row: SubjectAttendanceRosterRow, status: EntryStatus) {
-    if (!sessionForDate) return;
-    if (bulkMarking) return;
-    if (row.entryStatus === status) return;
+  /** CTOS M07: resolves to whether the mark actually landed. Keyboard
+   * auto-advance depends on this — focus moves to the next learner only when
+   * the write succeeded, so a failed mark leaves the teacher on the row that
+   * needs attention, with its inline error, rather than two rows past it. */
+  async function handleMark(
+    row: SubjectAttendanceRosterRow,
+    status: EntryStatus,
+  ): Promise<boolean> {
+    if (!sessionForDate) return false;
+    if (bulkMarking) return false;
+    if (row.entryStatus === status) return false;
 
     setConfirmation(null);
     setRowErrors((current) => {
@@ -247,7 +266,7 @@ export function SubjectAttendanceScreen({
         row.membershipId,
         status,
       );
-      if (writeGenerationRef.current.get(row.membershipId) !== generation) return;
+      if (writeGenerationRef.current.get(row.membershipId) !== generation) return false;
       if (outcome.kind === "recorded") {
         setRoster((current) =>
           current.map((candidate) =>
@@ -256,6 +275,7 @@ export function SubjectAttendanceScreen({
               : candidate,
           ),
         );
+        return true;
       } else {
         const message =
           outcome.kind === "sessionIsNoClass"
@@ -264,9 +284,10 @@ export function SubjectAttendanceScreen({
               ? "This learner is no longer on the roster for this date."
               : "This session could not be found. Try reloading the page.";
         setRowErrors((current) => ({ ...current, [row.membershipId]: { message, status } }));
+        return false;
       }
     } catch (err) {
-      if (writeGenerationRef.current.get(row.membershipId) !== generation) return;
+      if (writeGenerationRef.current.get(row.membershipId) !== generation) return false;
       setRowErrors((current) => ({
         ...current,
         [row.membershipId]: {
@@ -274,6 +295,7 @@ export function SubjectAttendanceScreen({
           status,
         },
       }));
+      return false;
     } finally {
       if (writeGenerationRef.current.get(row.membershipId) === generation) {
         setSavingLearnerIds((current) => {
@@ -312,18 +334,39 @@ export function SubjectAttendanceScreen({
     }
   }
 
+  function focusNeighborStatus(
+    row: SubjectAttendanceRosterRow,
+    status: EntryStatus,
+    direction: 1 | -1,
+  ) {
+    const index = roster.findIndex((candidate) => candidate.membershipId === row.membershipId);
+    const target = roster[index + direction];
+    if (!target) return;
+    buttonRefs.current.get(buttonKey(target.membershipId, status))?.focus();
+  }
+
   function handleRosterKeyDown(
     event: React.KeyboardEvent<HTMLButtonElement>,
     row: SubjectAttendanceRosterRow,
     status: EntryStatus,
   ) {
     const key = event.key;
-    if (key === "ArrowDown" || key === "ArrowUp") {
+    // CTOS M07: a letter marks the learner without leaving the keyboard, and
+    // — the half that was missing — moves focus to the same status button on
+    // the next learner once the write lands. Before this, a keyboard pass
+    // cost two keystrokes per learner (the letter, then ArrowDown), and this
+    // screen is the one Classroom Mode routes into when attendance is
+    // unsettled, so the in-class path was the slow one.
+    const letter = LETTER_SHORTCUTS[key.toLowerCase()];
+    if (letter) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       event.preventDefault();
-      const index = roster.findIndex((candidate) => candidate.membershipId === row.membershipId);
-      const target = roster[key === "ArrowDown" ? index + 1 : index - 1];
-      if (!target) return;
-      buttonRefs.current.get(buttonKey(target.membershipId, status))?.focus();
+      void handleMark(row, letter).then((marked) => {
+        if (marked) focusNeighborStatus(row, status, 1);
+      });
+    } else if (key === "ArrowDown" || key === "ArrowUp") {
+      event.preventDefault();
+      focusNeighborStatus(row, status, key === "ArrowDown" ? 1 : -1);
     }
   }
 
@@ -471,6 +514,11 @@ export function SubjectAttendanceScreen({
                   <p className="field-hint">
                     Only fills in learners with no mark yet — never changes a mark you've already
                     made.
+                  </p>
+                  <p className="field-hint">
+                    Keyboard: P Present · A Absent · L Late · E Excused · ↑/↓ move between learners.
+                    A letter marks the learner and moves to the next one, so a full roster is one
+                    keystroke per learner (while focus is on a status button).
                   </p>
                   <table className="attendance-roster">
                     <thead>
