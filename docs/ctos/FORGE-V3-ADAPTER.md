@@ -27,6 +27,7 @@ If a capability is absent, degrade gracefully and label evidence accordingly.
 | ------------------ | ---------------------------------------------------------------------- |
 | RETRIEVE_CONTEXT   | Git files, targeted source search, CTOS-STATE, latest checkpoint       |
 | RESEARCH           | official/primary sources first when freshness or policy matters        |
+| TECHNICAL_DOCS     | `context7-docs` for version-aware APIs; official-doc fallback          |
 | EXECUTE_CODE       | Atria shell/IDE/runtime                                                |
 | TEST_BEHAVIOR      | unit, integration, browser, native, migration, recovery scenarios      |
 | VERIFY_FACT        | authoritative source, source code, runtime observation                 |
@@ -119,3 +120,10 @@ Every completed CTOS milestone must:
 - confirm remote durability
 - clear the screen only afterward
 - continue automatically
+
+### Technical evidence boundary
+
+Context7 is a FORGE technical-upstream source, not a project-memory, policy, curriculum, or
+runtime-proof source. Resolve the installed dependency version first, pass only a sanitized technical
+query, prefer a matching version-specific library ID, then verify generated changes with LIKHA's
+deterministic/native checks.
