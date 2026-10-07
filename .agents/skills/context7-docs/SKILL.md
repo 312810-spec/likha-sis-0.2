@@ -35,7 +35,7 @@ retrieval.
    ```
    If registry access is unavailable, verify the current command surface from Context7's official
    CLI/release documentation.
-3. The last upstream checkpoint re-verified on **2026-10-07** observed `ctx7@0.5.12`. Treat that
+3. The last upstream checkpoint re-verified on **2026-10-07** observed `ctx7@0.5.13`. Treat that
    only as a dated checkpoint; never assume it is still current.
 4. If the current release differs, inspect the official Context7 CLI changelog/docs before using
    changed commands or flags.
