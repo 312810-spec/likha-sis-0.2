@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   classify:
@@ -76,8 +76,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Node.js
         if: needs.classify.outputs.docs_only == 'true' || needs.classify.outputs.harness == 'true' || needs.classify.outputs.javascript == 'true' || needs.classify.outputs.ui == 'true'
@@ -100,33 +98,6 @@ jobs:
       - name: Verify harness contract
         if: needs.classify.outputs.harness == 'true'
         run: npm run harness:verify
-
-      - name: Apply formatter to this branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx prettier --write \
-            CTOS.md \
-            docs/ctos/FORGE-V3-ADAPTER.md \
-            src/ui/AssignedClassFolio.tsx \
-            src/ui/components/EmptyState.tsx \
-            src/ui/components/Skeleton.tsx \
-            src/ui/theme/styles.css
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add \
-              CTOS.md \
-              docs/ctos/FORGE-V3-ADAPTER.md \
-              src/ui/AssignedClassFolio.tsx \
-              src/ui/components/EmptyState.tsx \
-              src/ui/components/Skeleton.tsx \
-              src/ui/theme/styles.css
-            git commit -m "style: apply repository prettier formatting"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
-          exit 1
 
       - name: Run JavaScript and TypeScript quality gate
         if: needs.classify.outputs.javascript == 'true'
