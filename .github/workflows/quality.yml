@@ -99,7 +99,7 @@ jobs:
         if: needs.classify.outputs.harness == 'true'
         run: npm run harness:verify
 
-      - name: Diagnose formatting drift
+      - name: Prepare formatted diagnostic output
         if: needs.classify.outputs.javascript == 'true'
         run: |
           npx prettier --write \
@@ -109,8 +109,25 @@ jobs:
             src/ui/components/EmptyState.tsx \
             src/ui/components/Skeleton.tsx \
             src/ui/theme/styles.css
-          git diff -- CTOS.md docs/ctos/FORGE-V3-ADAPTER.md src/ui/AssignedClassFolio.tsx src/ui/components/EmptyState.tsx src/ui/components/Skeleton.tsx src/ui/theme/styles.css
-          exit 1
+
+      - name: Upload formatted diagnostic output
+        if: needs.classify.outputs.javascript == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prettier-diagnostic-output
+          path: |
+            CTOS.md
+            docs/ctos/FORGE-V3-ADAPTER.md
+            src/ui/AssignedClassFolio.tsx
+            src/ui/components/EmptyState.tsx
+            src/ui/components/Skeleton.tsx
+            src/ui/theme/styles.css
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Stop after formatting diagnostic
+        if: needs.classify.outputs.javascript == 'true'
+        run: exit 1
 
       - name: Run JavaScript and TypeScript quality gate
         if: needs.classify.outputs.javascript == 'true'
