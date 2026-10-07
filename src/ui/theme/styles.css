@@ -3447,10 +3447,9 @@ label {
 
 .skeleton-heading,
 .skeleton-line {
-  position: relative;
-  overflow: hidden;
   border-radius: var(--radius-small);
   background: var(--color-surface);
+  animation: skeleton-pulse 1.4s var(--motion-easing-standard) infinite alternate;
 }
 
 .skeleton-heading {
@@ -3463,24 +3462,13 @@ label {
   height: 0.72rem;
 }
 
-.skeleton-heading::after,
-.skeleton-line::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--color-surface-2) 72%, transparent),
-    transparent
-  );
-  animation: skeleton-sweep 1.5s var(--motion-easing-standard) infinite;
-}
+@keyframes skeleton-pulse {
+  from {
+    opacity: 0.62;
+  }
 
-@keyframes skeleton-sweep {
   to {
-    transform: translateX(100%);
+    opacity: 1;
   }
 }
 
@@ -3609,8 +3597,8 @@ label {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-heading::after,
-  .skeleton-line::after,
+  .skeleton-heading,
+  .skeleton-line,
   .attendance-snapshot-fill {
     animation: none;
   }
