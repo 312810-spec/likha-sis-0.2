@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
@@ -223,8 +223,9 @@ describe("AssignedClassFolio", () => {
 
     expect(await screen.findByText(/1 learner with an active absence streak/)).toBeInTheDocument();
     expect(screen.getByText(/4 held sessions · 1 learner/)).toBeInTheDocument();
-    expect(screen.getByText("Present")).toBeInTheDocument();
-    expect(screen.getByText("Absent")).toBeInTheDocument();
+    const snapshot = screen.getByRole("figure", { name: /Attendance snapshot/ });
+    expect(within(snapshot).getByText("Present")).toBeInTheDocument();
+    expect(within(snapshot).getByText("Absent")).toBeInTheDocument();
     expect(listMeetings).toHaveBeenCalledWith("ta-1");
   });
 
