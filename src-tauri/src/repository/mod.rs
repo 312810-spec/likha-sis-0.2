@@ -2,6 +2,7 @@ pub mod assessment_category;
 pub mod assessment_item;
 pub mod attendance;
 pub mod audit_log;
+pub mod class_occurrence;
 pub mod class_record;
 pub mod curriculum;
 pub mod device_credential;

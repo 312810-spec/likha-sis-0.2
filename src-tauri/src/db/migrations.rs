@@ -2060,6 +2060,110 @@ pub fn migrations() -> Migrations<'static> {
             ON learner_score_corrections(school_id, assessment_item_id, learner_id, corrected_at);
         "#,
         ),
+        M::up(
+            r#"
+        -- CTOS M06 — classroom occurrences (schema version 43).
+        -- CTOS.md §5's scheduling invariant names three distinct things --
+        -- assignment ≠ planned meeting ≠ actual class occurrence. The first
+        -- two already exist (`teaching_assignments`, `schedule_meetings`).
+        -- The third did not: nothing in this schema recorded that a class
+        -- *actually occurred*, let alone that it deviated from the recurring
+        -- plan or was called off. `subject_attendance_sessions` is an
+        -- *attendance* record ("was a mark taken?"), not an occurrence
+        -- record ("did this class happen?") -- a held session with zero
+        -- entries is not proof a class was delivered, and `no_class` is an
+        -- attendance decision, not a schedule fact. This table is that
+        -- third term.
+        --
+        -- `status` stores exactly the four states M06's acceptance clause
+        -- names, so the distinction is enforced by the schema rather than by
+        -- whichever query happens to be reading it:
+        --   planned    — opened, on its recurring slot, not yet deviated
+        --   changed    — an actual slot is recorded and it does not match the
+        --                recurring plan (including a class recorded with no
+        --                plan row at all: an off-schedule class)
+        --   cancelled  — the class did not occur
+        --   delivered  — the class occurred and the teacher finished it
+        CREATE TABLE class_occurrences (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            occurrence_date TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN (
+                'planned', 'changed', 'cancelled', 'delivered'
+            )),
+            -- The recurring-plan snapshot taken when this occurrence was
+            -- started. NULL when no `schedule_meetings` row existed for this
+            -- weekday at all (an ad-hoc class). Snapshotted rather than
+            -- live-joined because a later schedule edit must not rewrite what
+            -- this occurrence was planned as; full versioned/effective-dated
+            -- schedules are CTOS M09's scope, and a snapshot is the honest
+            -- minimum until then.
+            planned_starts_at TEXT,
+            planned_ends_at TEXT,
+            planned_room TEXT,
+            -- What actually happened. NULL until the teacher records it.
+            actual_starts_at TEXT,
+            actual_ends_at TEXT,
+            actual_room TEXT,
+            -- M06's required capture fields. All free-text teacher input;
+            -- `learning_target` is seeded from `lesson_plans` for this
+            -- assignment+date when one exists (a snapshot, not a join -- the
+            -- plan can be edited later, and this occurrence records what was
+            -- targeted *in this class*).
+            learning_target TEXT NOT NULL DEFAULT '',
+            quick_evidence TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            summary TEXT NOT NULL DEFAULT '',
+            -- CTOS.md §5: "weather/advisory information does not
+            -- automatically cancel class". A cancellation is a human
+            -- decision, so it records its reason. NOT NULL DEFAULT '' rather
+            -- than nullable so the column always exists; the repository
+            -- requires a non-empty reason to make the transition at all.
+            cancelled_reason TEXT NOT NULL DEFAULT '',
+            started_at TEXT,
+            finished_at TEXT,
+            cancelled_at TEXT,
+            -- Bumped each time a delivered/cancelled occurrence is reopened.
+            -- M06's occurrence is working data, not an issued record: a full
+            -- amendment history (issued-snapshot immutability) is M11's
+            -- scope. The attendance entries underneath are untouched by a
+            -- reopen and remain the real per-learner audit trail.
+            revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+            created_by_user_id TEXT NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (teaching_assignment_id, occurrence_date)
+        );
+
+        CREATE INDEX idx_class_occurrences_school_date
+            ON class_occurrences(school_id, occurrence_date);
+
+        -- CTOS M06 — the learner follow-up marker. CTOS.md §6.1 lists
+        -- "learner follow-up due where appropriate" and §6.4 asks "What
+        -- requires learner follow-up?" -- a question about history, not just
+        -- the current moment, so a marker is *cleared* (`cleared_at`) rather
+        -- than deleted. `subject_attendance`'s computed absence streak is a
+        -- derived signal and deliberately stays one; this is the teacher's
+        -- explicit, persisted decision, keyed to one occurrence and one
+        -- enrollment membership (the span, not a bare `learner_id`, matching
+        -- `subject_attendance_entries`'s own keying).
+        CREATE TABLE learner_followup_markers (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_occurrence_id TEXT NOT NULL REFERENCES class_occurrences(id) ON DELETE CASCADE,
+            section_membership_id TEXT NOT NULL REFERENCES section_memberships(id) ON DELETE CASCADE,
+            reason TEXT NOT NULL DEFAULT '',
+            cleared_at TEXT,
+            marked_by_user_id TEXT NOT NULL REFERENCES users(id),
+            marked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (class_occurrence_id, section_membership_id)
+        );
+
+        CREATE INDEX idx_learner_followup_markers_occurrence
+            ON learner_followup_markers(class_occurrence_id);
+        "#,
+        ),
     ])
 }
 

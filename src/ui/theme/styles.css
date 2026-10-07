@@ -2402,6 +2402,40 @@ label {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
+
+/* CTOS M06 — Classroom Mode (src/ui/ClassroomModeScreen.tsx). The cockpit's
+   own layout primitives; it reuses .class-work-row, .field and the priority
+   rail rather than restating them. */
+.classroom-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.classroom-headline h3 {
+  margin: 0;
+}
+
+.classroom-capture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--spacing-unit);
+}
+
+.classroom-save-state {
+  min-height: 1.2em;
+}
+
+.classroom-marker-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
 @media (min-width: 861px) and (max-width: 1080px) {
   .app-topbar-identity {
     display: none;

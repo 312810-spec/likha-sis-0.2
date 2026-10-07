@@ -22,6 +22,9 @@ interface MyDayScreenProps {
    * callback shape as `onCheckAttendance`, passed through unchanged to
    * `ClassWorkspaceScreen`. */
   onOpenClassRecord: (teachingAssignmentId: string) => void;
+  /** Opens Classroom Mode for this teaching assignment -- CTOS.md §6.3's
+   * teaching cockpit. Passed through unchanged to `ClassWorkspaceScreen`. */
+  onStartClassroom: (teachingAssignmentId: string) => void;
   /** Opens the sync conflict review queue -- see `ConflictReviewScreen`. */
   onReviewConflicts: () => void;
 }
@@ -57,6 +60,7 @@ export function MyDayScreen({
   onBackToToday,
   onCheckAttendance,
   onOpenClassRecord,
+  onStartClassroom,
   onReviewConflicts,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
@@ -100,6 +104,7 @@ export function MyDayScreen({
       context={selectedClassContext}
       onCheckAttendance={onCheckAttendance}
       onOpenClassRecord={onOpenClassRecord}
+      onStartClassroom={onStartClassroom}
       onBackToToday={handleBackToToday}
     />
   ) : null;

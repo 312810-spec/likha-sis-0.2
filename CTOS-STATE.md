@@ -1,6 +1,6 @@
 # CTOS State
 
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 **Program:** CTOS v3 / FORGE-UHF  
 **Repository:** 312810-spec/likha-sis-0.2
 
@@ -8,22 +8,46 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M06 — Classroom Mode
-- Last completed milestone: M05 (PASS — see docs/ctos/checkpoints/m05.md)
-- Last pushed CTOS execution checkpoint: M05 (tag `ctos-m05-complete`, 0d45ee1)
-- Next action: execute M06 — start/finish session, actual occurrence state,
-  attendance, current learning target, quick evidence, notes, learner follow-up
-  marker, summary/review; planned, changed, cancelled, and delivered occurrences
-  must remain distinguishable
+- Current milestone: M06 — Classroom Mode (COMPLETE, PASS)
+- Last completed milestone: M06 (PASS — see docs/ctos/checkpoints/m06.md)
+- Last pushed CTOS execution checkpoint: M06 (tag `ctos-m06-complete`)
+- Next action: execute M07 — Fast evidence capture and review (CTOS.md §M07)
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
-  session-state-retention milestone in the web layer
+  session-state-retention milestone in the web layer; M06 closed PASS as the
+  occurrence-semantics milestone that made the Rust stack reachable from the UI
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none; M05 is committed and pushed at the
-  `ctos-m05-complete` tag
+- Dirty/unpushed warning: none after the M06 commit and tag are pushed
+
+## M06 result (checkpoint m06.md)
+
+- Frontend quality: 135 files / 1,284 tests pass (up from 133 / 1,261 — the delta
+  is exactly 15 new cockpit tests plus 8 new adapter tests, in two new files;
+  `MyDayScreen.test.tsx` and `ClassWorkspaceScreen.test.tsx` keep their pre-existing
+  counts, their diffs being the `onStartClassroom` prop threading only)
+- Native Rust: 1,362 passed / 0 failed (up from M04's 1,331 — exactly the 31
+  occurrence tests), `cargo fmt --check` clean, `cargo clippy --all-targets --
+-D warnings` clean. M05 correctly recorded no Rust touched; M06 is where that
+  Rust became reachable from the UI
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings
+- Acceptance clause met by a test: planned, changed, cancelled and delivered
+  occurrences render as four distinct status chips side by side in the history
+- The occurrence stack — Rust repository, ten Tauri commands, migration 0043, and
+  the TypeScript domain/port/service/adapter — was already present and uncommitted
+  in the working tree, and is claimed as verified here, not built here. This
+  milestone built `ClassroomModeScreen`, the navigation handoff, and the
+  conformance/verification record
+- Four real defects found and fixed in the new screen: an always-false
+  object-identity guard looping the debounced save forever; a blank slot sent as
+  `Some("")` counting as a deviation so clearing it flipped the class to `changed`;
+  a throw past the first `await` escaping the load path and leaving the cockpit
+  stuck on "Loading…"; and the status text rendered twice per history row
+- Command-construction lesson applied: `npm run quality` and `cargo clippy` were
+  run outside a `| grep` pipeline with exit statuses read directly, which is how
+  the M04 `format:check` false-negative and its M05 re-occurrence were caused
 
 ## M05 result (checkpoint m05.md)
 

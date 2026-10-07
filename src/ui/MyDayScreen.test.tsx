@@ -85,6 +85,7 @@ function renderScreen(
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
   const onOpenClassRecord = vi.fn();
+  const onStartClassroom = vi.fn();
   const onReviewConflicts = vi.fn();
 
   function Host() {
@@ -98,6 +99,7 @@ function renderScreen(
           onBackToToday={() => setContext(null)}
           onCheckAttendance={onCheckAttendance}
           onOpenClassRecord={onOpenClassRecord}
+          onStartClassroom={onStartClassroom}
           onReviewConflicts={onReviewConflicts}
         />
       </ModeProvider>
@@ -105,7 +107,14 @@ function renderScreen(
   }
 
   const rendered = render(<Host />);
-  return { ...rendered, repo, onCheckAttendance, onOpenClassRecord, onReviewConflicts };
+  return {
+    ...rendered,
+    repo,
+    onCheckAttendance,
+    onOpenClassRecord,
+    onStartClassroom,
+    onReviewConflicts,
+  };
 }
 
 describe("MyDayScreen", () => {

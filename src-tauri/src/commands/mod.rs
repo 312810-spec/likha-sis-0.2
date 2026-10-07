@@ -4,6 +4,7 @@ pub mod assessment_item;
 pub mod attendance;
 pub mod auth;
 pub mod backup;
+pub mod class_occurrence;
 pub mod class_record;
 pub mod conflict_review;
 pub mod device_sync;

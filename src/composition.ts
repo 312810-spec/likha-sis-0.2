@@ -17,6 +17,7 @@ import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
 import { LearnerScoreSyncStatusApplicationService } from "./application/learner-score-sync-status-service";
 import { MyDayApplicationService } from "./application/my-day-service";
+import { ClassOccurrenceApplicationService } from "./application/class-occurrence-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
 import { SchoolLogoApplicationService } from "./application/school-logo-service";
@@ -48,6 +49,7 @@ import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repositor
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriLearnerScoreSyncStatusRepository } from "./infrastructure/tauri/learner-score-sync-status-repository";
 import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
+import { TauriClassOccurrenceRepository } from "./infrastructure/tauri/class-occurrence-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
 import { TauriSchoolLogoRepository } from "./infrastructure/tauri/school-logo-repository";
@@ -130,3 +132,6 @@ export const conflictReviewService = new ConflictReviewApplicationService(
 );
 export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());
 export const myDayService = new MyDayApplicationService(new TauriMyDayRepository());
+export const classOccurrenceService = new ClassOccurrenceApplicationService(
+  new TauriClassOccurrenceRepository(),
+);

@@ -5,6 +5,7 @@ import {
   authService,
   backupService,
   classRecordService,
+  classOccurrenceService,
   conflictReviewService,
   deviceSyncService,
   enrollmentHistoryService,
@@ -36,6 +37,7 @@ import { AdminPasswordResetScreen } from "./ui/AdminPasswordResetScreen";
 import { AdviserViewScreen } from "./ui/AdviserViewScreen";
 import { AuditLogScreen } from "./ui/AuditLogScreen";
 import { ClassRecordJourneyScreen } from "./ui/ClassRecordJourneyScreen";
+import { ClassroomModeScreen } from "./ui/ClassroomModeScreen";
 import { ClassRecordsScreen } from "./ui/ClassRecordsScreen";
 import { ConflictReviewScreen } from "./ui/ConflictReviewScreen";
 import { DeviceManagementScreen } from "./ui/DeviceManagementScreen";
@@ -119,6 +121,13 @@ function App() {
   // ids in this file, not a router/global store. Cleared alongside
   // classWorkContext everywhere that context is cleared.
   const [classRecordAssignmentId, setClassRecordAssignmentId] = useState<string | null>(null);
+  // Set only by ClassWorkspaceScreen's "Start class" action (via
+  // MyDayScreen), so My Day can swap in ClassroomModeScreen for the same
+  // preserved class context without switching tabs or asking for the class
+  // again -- same narrowly-typed handoff pattern as the ids above, not a
+  // router/global store. Cleared alongside classWorkContext everywhere that
+  // context is cleared.
+  const [classroomAssignmentId, setClassroomAssignmentId] = useState<string | null>(null);
   // Remembers the grading period and DepEd weighting this teacher explicitly
   // chose for one class, so the class record does not ask for them again on
   // every visit — the Class Folio remounts when the teacher moves between
@@ -164,6 +173,7 @@ function App() {
     setClassWorkContext(null);
     setSubjectAttendanceAssignmentId(null);
     setClassRecordAssignmentId(null);
+    setClassroomAssignmentId(null);
   }
 
   function clearSessionWorkContexts() {
@@ -551,7 +561,20 @@ function App() {
             ) : activeTab === "my-day" ? (
               folio
             ) : activeTab === "daily-planner" ? (
-              classWorkContext && classRecordAssignmentId ? (
+              classWorkContext && classroomAssignmentId ? (
+                <ClassroomModeScreen
+                  key={classroomAssignmentId}
+                  teachingAssignmentId={classroomAssignmentId}
+                  classContext={classWorkContext}
+                  classOccurrenceService={classOccurrenceService}
+                  subjectAttendanceService={subjectAttendanceService}
+                  onCheckAttendance={(teachingAssignmentId) => {
+                    setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                    setActiveTab("subject-attendance");
+                  }}
+                  onBackToClass={() => setClassroomAssignmentId(null)}
+                />
+              ) : classWorkContext && classRecordAssignmentId ? (
                 <ClassRecordJourneyScreen
                   key={JSON.stringify([session.userId, classRecordAssignmentId])}
                   learnerScoreSyncStatusService={learnerScoreSyncStatusService}
@@ -586,6 +609,9 @@ function App() {
                   }}
                   onOpenClassRecord={(teachingAssignmentId) => {
                     setClassRecordAssignmentId(teachingAssignmentId);
+                  }}
+                  onStartClassroom={(teachingAssignmentId) => {
+                    setClassroomAssignmentId(teachingAssignmentId);
                   }}
                   onReviewConflicts={() => setActiveTab("conflict-review")}
                 />

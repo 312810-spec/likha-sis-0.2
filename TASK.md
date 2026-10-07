@@ -2,7 +2,7 @@
 
 Updated: 2026-10-06.
 
-Use CTOS.md as the controlling plan. Current milestone: **M06 — Classroom Mode**.
+Use CTOS.md as the controlling plan. Current milestone: **M07 — Fast evidence capture and review**.
 
 Read CTOS.md, CTOS-STATE.md, docs/ctos/FORGE-V3-ADAPTER.md, and AGENTS.md before the historical baseline below. Do not mass-merge historical branches and do not convert unverified evidence into readiness claims.
 
@@ -90,7 +90,7 @@ Closed with `ComputedTermGrade.complete`: a provisional grade is now visibly
 provisional on screen and in both exports. All seven verification items have
 executable tests. See `docs/ctos/checkpoints/m01.md`.
 
-## M06 in progress
+## M06 complete — PASS
 
 Outcome: LIKHA supports the actual teaching session rather than only post-class
 administration.
@@ -99,14 +99,23 @@ Required: start/finish session, actual occurrence state, attendance, current lea
 target, quick evidence, notes, learner follow-up marker, summary/review.
 
 Acceptance: planned, changed, cancelled, and delivered occurrences remain
-distinguishable.
+distinguishable — met by a test rendering all four status chips side by side.
 
-Next step: read the existing occurrence/session code (`SubjectAttendanceScreen` and
-the session lifecycle in Rust) and establish which occurrence states already exist,
-so the milestone separates verification from real gaps as M02, M04 and M05 did.
-M04's record of `ClassWorkspaceScreen` rendering inside `MyDayScreen` without a tab
-change is likely relevant — a classroom session opened from Today must return to a
-Today view that reflects what happened in it.
+What was actually built this milestone: `ClassroomModeScreen` (the §6.3 cockpit) and
+the navigation handoff into it from `ClassWorkspaceScreen`, plus the conformance and
+verification record. The occurrence stack — Rust repository, ten Tauri commands,
+migration 0043, TypeScript domain/port/service/adapter — was already present and
+uncommitted in the working tree, and is claimed as verified here, not built here.
+Four real defects were found and fixed in the new screen (save loop, blank-slot
+deviation, escaped throw, duplicated status text); details in the checkpoint.
+
+Verification: 135 files / 1,284 frontend tests; 1,362 Rust tests; `cargo fmt --check`
+and `cargo clippy --all-targets -- -D warnings` clean; `npm run quality:ui` zero axe
+findings. See `docs/ctos/checkpoints/m06.md` and `docs/ctos/evals/classroom-cases.md`.
+
+Next step: execute **M07 — Fast evidence capture and review** (CTOS.md §M07). The
+M04-recorded duplicated schedule read path remains deliberately untouched and is still
+open as a risk.
 
 ---
 
