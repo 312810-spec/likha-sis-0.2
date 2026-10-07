@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use serde::Serialize;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::class_record;
 
 /// One learner's computed grade for a class record's grading period, per
@@ -80,28 +80,23 @@ const ADJUSTED_TRANSMUTATION_TABLE: &[(f64, f64, u32)] = &[
     (0.00, 4.67, 60),
 ];
 
-/// Looks up `ig` in the Adjusted Transmutation Table. `ig` outside
-/// `0.00..=100.00` is clamped to the nearest end of the table rather than
-/// panicking or erroring — a genuinely out-of-range IG should be
-/// impossible given `learner_score::record`'s own `0..=max_score` bound,
-/// but this keeps the function total rather than assuming that invariant
-/// holds all the way through a future refactor.
-fn transmute_adjusted(ig: f64) -> u32 {
-    if ig >= 100.00 {
-        return 100;
-    }
-    if ig <= 0.00 {
-        return 60;
+/// Uses the published two-decimal table without inventing a rounding rule.
+/// Fractional values between its printed ranges require a confirmed rule.
+fn transmute_adjusted(ig: f64) -> AppResult<u32> {
+    if !ig.is_finite() || !(0.0..=100.0).contains(&ig) {
+        return Err(AppError::GradeCalculation(
+            "initial grade is outside the valid range".into(),
+        ));
     }
     for &(min, max, tg) in ADJUSTED_TRANSMUTATION_TABLE {
-        if ig >= min && ig <= max {
-            return tg;
+        if ig >= min - 1e-10 && ig <= max + 1e-10 {
+            return Ok(tg);
         }
     }
-    // Unreachable in practice: the table's ranges are contiguous across
-    // 0.00..=100.00 (verified by `transmutation_table_ranges_are_contiguous`
-    // below). A defensive fallback, not a silent wrong answer.
-    60
+    Err(AppError::GradeCalculation(
+        "initial grade falls between the published transmutation ranges; confirm the rounding rule"
+            .into(),
+    ))
 }
 
 /// SY 2027-2028 onward: the Term Grade is the Initial Grade rounded to the
@@ -323,7 +318,7 @@ pub fn compute_term_grade(
     let raw_tg = if zero_based {
         round_zero_based(initial_grade)
     } else {
-        transmute_adjusted(initial_grade)
+        transmute_adjusted(initial_grade)?
     };
     let (term_grade, was_floored) = apply_minimum_floor(raw_tg);
 
@@ -355,17 +350,24 @@ mod tests {
     // most direct proof the transcribed table/formulas match the Order.
 
     #[test]
-    fn transmutation_table_ranges_are_contiguous_across_the_full_scale() {
-        // Every IG from 0.00 to 100.00 must land in exactly one bucket —
-        // proves the table was transcribed without a gap or overlap.
-        let mut ig = 0.0;
-        while ig <= 100.0 {
-            let tg = transmute_adjusted(ig);
+    fn fractional_table_gaps_and_non_finite_values_are_explicit_errors() {
+        assert!(transmute_adjusted(99.495).is_err());
+        assert!(transmute_adjusted(4.675).is_err());
+        assert!(transmute_adjusted(f64::NAN).is_err());
+        assert!(transmute_adjusted(-1.0).is_err());
+    }
+
+    #[test]
+    fn transmutation_table_ranges_cover_every_published_hundredth() {
+        // The source table is published to hundredths. Every published
+        // hundredth from 0.00 through 100.00 must resolve to one grade.
+        for hundredths in 0..=10000 {
+            let ig = hundredths as f64 / 100.0;
+            let tg = transmute_adjusted(ig).unwrap();
             assert!(
                 (60..=100).contains(&tg),
                 "IG {ig} produced out-of-range TG {tg}"
             );
-            ig += 0.01;
         }
     }
 
@@ -375,19 +377,19 @@ mod tests {
         // to a transmuted passing grade of 75" — the single fact DepEd
         // states in prose, not just in the table, so it's worth its own
         // dedicated assertion independent of the full-table transcription.
-        assert_eq!(transmute_adjusted(70.00), 75);
+        assert_eq!(transmute_adjusted(70.00).unwrap(), 75);
     }
 
     #[test]
     fn transmute_matches_both_boundaries_and_midpoints_of_spot_checked_rows() {
-        assert_eq!(transmute_adjusted(100.00), 100);
-        assert_eq!(transmute_adjusted(99.50), 100);
-        assert_eq!(transmute_adjusted(99.49), 99);
-        assert_eq!(transmute_adjusted(85.34), 88);
-        assert_eq!(transmute_adjusted(85.33), 87);
-        assert_eq!(transmute_adjusted(0.00), 60);
-        assert_eq!(transmute_adjusted(4.67), 60);
-        assert_eq!(transmute_adjusted(4.68), 61);
+        assert_eq!(transmute_adjusted(100.00).unwrap(), 100);
+        assert_eq!(transmute_adjusted(99.50).unwrap(), 100);
+        assert_eq!(transmute_adjusted(99.49).unwrap(), 99);
+        assert_eq!(transmute_adjusted(85.34).unwrap(), 88);
+        assert_eq!(transmute_adjusted(85.33).unwrap(), 87);
+        assert_eq!(transmute_adjusted(0.00).unwrap(), 60);
+        assert_eq!(transmute_adjusted(4.67).unwrap(), 60);
+        assert_eq!(transmute_adjusted(4.68).unwrap(), 61);
     }
 
     #[test]

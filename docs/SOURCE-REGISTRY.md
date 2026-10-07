@@ -1,3 +1,28 @@
+# DepEd Mandaue / school-forms evidence — 2026-10-08
+
+- **Schools Division of Mandaue City public website**
+  - URL: `https://www.depedmandaue.net/`
+  - Purpose: primary local Division web surface for memoranda, resources, public-school directory, organizational information and official contacts.
+  - Status: **PRIMARY LOCAL SOURCE — VERIFIED**.
+- **Division Memoranda page / file repository**
+  - URLs: `https://www.depedmandaue.net/memo.html`, `https://filerepository.depedmandaue.net/MEMO.HTM`
+  - Purpose: local issuance discovery.
+  - Status: **PRIMARY LOCAL SOURCE — PARTIAL ACCESS**. The live list is embedded through Looker Studio and the current 2026 school-form memorandum body was not retrievable in the 2026-10-08 research environment. Do not infer a memorandum number, checking schedule, deadline, TANAW indicator dictionary, or TANAW Lock authority from older issuances.
+- **Mandaue Division seal**
+  - URL: `https://hris.depedmandaue.net/mandaue_logo.png`
+  - Purpose: verified Division branding source.
+  - Status: **VERIFIED BRAND ASSET / RESTRICTED USE**. Public hosting does not authorize LIKHA/TANAW branding use. DepEd's current Project Bukas terms prohibit use of the Department's name/trademark/official mark/emblem/logo/insignia without prior written consent. Preserve only when an authoritative approved template already includes/requires it or written authority is documented.
+- **DepEd Order No. 11, s. 2018**
+  - Purpose: preparation/checking of school forms and LIS-generated electronic forms.
+  - Status: **PRIMARY NATIONAL POLICY**. Software must preserve the LIS-generated-form boundary; a LIKHA projection must not be misrepresented as the LIS original.
+- **DepEd Order No. 006, s. 2025**
+  - Purpose: ancillary-task workload evidence, including SF1, SF2, SF3, SF5, SF5A, SF8, SF9, SF10 and LIS updating/finalization.
+  - Status: **PRIMARY NATIONAL POLICY**.
+- **DepEd Memorandum No. 029, s. 2026**
+  - Purpose: National Technical Working Group for the Digitization of School Forms.
+  - Status: **PRIMARY NATIONAL ISSUANCE / DIRECTIONAL EVIDENCE**. Supports the digitization direction but does not authorize LIKHA to replace official DepEd/LIS forms.
+- Full research note: `docs/research/deped-mandaue-2026-source-note.md`.
+
 # Context7 technical documentation gateway — 2026-10-07
 
 - **Context7 / `ctx7` CLI (`upstash/context7`)**

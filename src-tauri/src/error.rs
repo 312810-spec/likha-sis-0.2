@@ -55,6 +55,11 @@ pub enum AppError {
     /// error text — a malformed/corrupted workbook's internal error
     /// detail must never cross the Tauri IPC boundary.
     FormGeneration(String),
+    /// A grade cannot be resolved from the pinned grading policy without
+    /// inventing a rule that is absent from the authoritative source.
+    /// The message is internal context; serialization exposes only the
+    /// stable category below.
+    GradeCalculation(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -70,6 +75,7 @@ impl std::fmt::Display for AppError {
             AppError::AlreadyInitialized => write!(f, "already initialized"),
             AppError::Import(msg) => write!(f, "import error: {msg}"),
             AppError::FormGeneration(msg) => write!(f, "form generation error: {msg}"),
+            AppError::GradeCalculation(msg) => write!(f, "grade calculation error: {msg}"),
         }
     }
 }
@@ -125,6 +131,7 @@ impl Serialize for AppError {
             AppError::AlreadyInitialized => "already_initialized",
             AppError::Import(_) => "import_error",
             AppError::FormGeneration(_) => "form_generation_error",
+            AppError::GradeCalculation(_) => "grade_calculation_error",
         };
         serializer.serialize_str(category)
     }
