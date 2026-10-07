@@ -148,7 +148,7 @@ export function AssignedClassFolio({
           </div>
         ) : assignments.length === 0 ? (
           <EmptyState
-            title="No teaching assignments yet"
+            title="No teaching assignments yet."
             description="Your assigned subject classes will appear here after they are added by an authorized school administrator."
           />
         ) : (
@@ -517,7 +517,7 @@ function ClassRosterSummary({
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No learners in this class roster"
+          title="No learners are currently in this class roster."
           description="Learners will appear here after an authorized enrollment or class assignment is available."
         />
       ) : (
