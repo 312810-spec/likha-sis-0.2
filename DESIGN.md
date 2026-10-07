@@ -6,6 +6,16 @@ The product owner approved the class-folio concept on 2026-10-03 and requested d
 
 The interface is a teacher's working register: a persistent class or section index beside an opaque working sheet. Use the school seal sparingly for identity; take its royal blue into the global action theme. Apple guidance supplies restraint, hierarchy, alignment, and clarity. Windows and Android conventions, teacher comprehension, and existing workflows determine the controls.
 
+## FORGE premium refinement
+
+[ADR-0073](docs/adr/0073-forge-premium-ui-program.md) refines the approved class-folio direction without replacing it. The shell now supports a persistent desktop icon-rail collapse, content-shaped loading states, intentional empty/success states, and a task-first information hierarchy.
+
+For a teacher's selected class, the overview orders verified read-model information as **Next → Attention → Insight**, while the selected class header remains the working context. "Now" is only shown when a saved schedule proves a meeting is currently in progress; the UI never invents a current class from time alone. Attendance visualization uses the real subject-attendance monitor and keeps numeric values visible beside decorative bars.
+
+For a school head, the overview uses a compact summary rail followed by operational sections (needs attention, workload, recent activity, quick actions) rather than a bento-card dashboard. This keeps real school decisions ahead of ornamental metrics.
+
+Loading skeletons use opacity motion only; there are no decorative gradients. All motion is disabled through the existing `prefers-reduced-motion` path. Structured success states are reserved for claims the underlying read model can prove, such as an empty sync-conflict queue.
+
 ## Shared theme
 
 All screens use semantic CSS variables in `src/ui/theme/styles.css`, not individual hardcoded palettes. Light, Dark, and System appearance are independent of Efficient, Comfortable, and Guided density. Appearance is a local device preference, never academic or synchronized data.
