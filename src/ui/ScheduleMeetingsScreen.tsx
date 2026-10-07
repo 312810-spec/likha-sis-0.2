@@ -5,7 +5,7 @@ import { WEEKDAY_LABELS } from "../domain/schedule-meeting";
 import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
-import { Loading } from "./components/Loading";
+import { Skeleton } from "./components/Skeleton";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -165,11 +165,14 @@ export function ScheduleMeetingsScreen({
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {loading ? (
-        <Loading label="Loading this class's schedule…" />
+        <Skeleton label="Loading this class's schedule…" lines={4} />
       ) : loadError ? null : (
         <>
           {meetings.length === 0 ? (
-            <EmptyState>No meetings scheduled for this class yet.</EmptyState>
+            <EmptyState
+              title="No meetings scheduled yet"
+              description="Add the recurring day and time below when this class schedule is ready."
+            />
           ) : (
             <table className="attendance-roster">
               <thead>
