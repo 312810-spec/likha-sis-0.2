@@ -378,10 +378,15 @@ pub fn get_teacher_load(
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     teacher_user_id: String,
+    date: Option<String>,
 ) -> AppResult<TeacherLoad> {
     let conn = lock_db(&db);
     let school_id = auth::authorize_view_teacher_load(&conn, &sessions, &teacher_user_id)?;
-    teaching_assignment::teacher_load(&conn, &school_id, &teacher_user_id)
+    let date = match date {
+        Some(date) => date,
+        None => conn.query_row("SELECT date('now','+8 hours')", [], |row| row.get(0))?,
+    };
+    teaching_assignment::teacher_load_on_date(&conn, &school_id, &teacher_user_id, &date)
 }
 
 /// `weekday`/`starts_at`/`ends_at`/`room` are client-supplied;

@@ -1,3 +1,4 @@
+import { ScoreImportPanel } from "./ScoreImportPanel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssessmentApplicationService } from "../application/assessment-service";
 import type { ExportApplicationService } from "../application/export-service";
@@ -66,6 +67,7 @@ export function ClassRecordWorkspace({
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [itemName, setItemName] = useState("");
+  const [scoreReason, setScoreReason] = useState("");
   const [maxScore, setMaxScore] = useState("20");
   const [creatingItem, setCreatingItem] = useState(false);
   const composerToggleRef = useRef<HTMLButtonElement>(null);
@@ -82,6 +84,13 @@ export function ClassRecordWorkspace({
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
+  const [activityState, setActivityState] = useState<"planned" | "closed">("closed");
+  const [activityStart, setActivityStart] = useState("");
+  const [activityEnd, setActivityEnd] = useState("");
+  const [activityDue, setActivityDue] = useState("");
+  const [activitySaving, setActivitySaving] = useState(false);
+  const [activityAvailable, setActivityAvailable] = useState(false);
+  const [activityReload, setActivityReload] = useState(0);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [roster, setRoster] = useState<LearnerScoreRosterEntry[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
@@ -220,7 +229,55 @@ export function ClassRecordWorkspace({
       rosterRequestRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnerScoreService, selectedItemId]);
+  }, [learnerScoreService, selectedItemId, activityReload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedItemId) return;
+    assessmentService
+      .getLifecycle(selectedItemId)
+      .then((meta) => {
+        if (cancelled) return;
+        setActivityAvailable(meta !== null);
+        if (!meta) return;
+        setActivityState(meta.state);
+        setActivityStart(meta.eventStartsOn ?? "");
+        setActivityEnd(meta.eventEndsOn ?? "");
+        setActivityDue(meta.dueOn ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setActivityAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentService, selectedItemId]);
+
+  async function saveActivityDates() {
+    if (!selectedItemId || activitySaving) return;
+    setActivitySaving(true);
+    setError(null);
+    try {
+      const saved = await assessmentService.setLifecycle(selectedItemId, {
+        state: activityState,
+        eventStartsOn: activityStart || null,
+        eventEndsOn: activityEnd || null,
+        dueOn: activityDue || null,
+      });
+      if (!saved)
+        setError(
+          "Activity dates cannot change after scores are recorded. Check that both dates are inside this grading period.",
+        );
+      else {
+        setActivityReload((value) => value + 1);
+        setConfirmation("Activity dates saved on this device.");
+      }
+    } catch {
+      setError("Could not save activity dates. Try again.");
+    } finally {
+      setActivitySaving(false);
+    }
+  }
 
   async function handleCreateItem() {
     if (creatingItem || itemName.trim().length === 0 || !categoryId) return;
@@ -400,6 +457,7 @@ export function ClassRecordWorkspace({
         status,
         score,
         selectedItem.maxScore,
+        scoreReason,
       );
       // An older write's response must never overwrite a newer one's
       // result -- only apply this response if nothing newer started for
@@ -521,8 +579,8 @@ export function ClassRecordWorkspace({
         }),
       );
       setTermGrades(Object.fromEntries(entries));
-    } catch {
-      setError("Could not compute term grades.");
+    } catch (error) {
+      setError(error instanceof ValidationError ? error.message : "Could not compute term grades.");
     } finally {
       setTermGradesLoading(false);
     }
@@ -707,6 +765,83 @@ export function ClassRecordWorkspace({
         </button>
       </div>
 
+      {selectedItemId && (
+        <>
+          <label>
+            Reason for corrections or exceptions
+            <input
+              value={scoreReason}
+              maxLength={1000}
+              onChange={(event) => setScoreReason(event.target.value)}
+            />
+          </label>
+          <ScoreImportPanel
+            key={selectedItemId}
+            service={learnerScoreService}
+            itemId={selectedItemId}
+            roster={roster}
+            onImported={() => setActivityReload((value) => value + 1)}
+          />
+        </>
+      )}
+
+      {selectedItemId && activityAvailable && (
+        <section className="panel" aria-label="Activity timing">
+          <h3>Activity timing</h3>
+          <p>
+            Planned work is excluded from grades. Close the activity when it is ready for scoring.
+            Dates select learners enrolled during the activity. Leave dates blank to use the full
+            grading period.
+          </p>
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="activity-state">State</label>
+              <select
+                id="activity-state"
+                value={activityState}
+                onChange={(event) => setActivityState(event.target.value as "planned" | "closed")}
+              >
+                <option value="planned">Planned</option>
+                <option value="closed">Closed for scoring</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="activity-start">Activity starts</label>
+              <input
+                id="activity-start"
+                type="date"
+                value={activityStart}
+                onChange={(event) => setActivityStart(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="activity-end">Activity ends</label>
+              <input
+                id="activity-end"
+                type="date"
+                value={activityEnd}
+                onChange={(event) => setActivityEnd(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="activity-due">Due date (optional)</label>
+              <input
+                id="activity-due"
+                type="date"
+                value={activityDue}
+                onChange={(event) => setActivityDue(event.target.value)}
+              />
+            </div>
+          </div>
+          <button type="button" disabled={activitySaving} onClick={() => void saveActivityDates()}>
+            {activitySaving ? "Saving…" : "Save activity timing"}
+          </button>
+          <p className="field-hint">
+            Activity timing is saved locally. Keep timing changes on this device until their
+            transfer is supported.
+          </p>
+        </section>
+      )}
       {itemActionError && <Alert tone="error">{itemActionError}</Alert>}
 
       {itemsLoading ? (
@@ -851,7 +986,10 @@ export function ClassRecordWorkspace({
           {rosterLoading ? (
             <Loading label="Loading roster…" />
           ) : rosterError ? null : roster.length === 0 ? (
-            <EmptyState>No learners eligible for this item's grading period.</EmptyState>
+            <EmptyState>
+              No eligible score rows. Planned activities accept scores after you close them; dated
+              activities use the learners enrolled on their activity dates.
+            </EmptyState>
           ) : (
             <>
               <p className="attendance-count">
@@ -1068,6 +1206,12 @@ export function ClassRecordWorkspace({
                             ) : (
                               <>
                                 {grade.termGrade}
+                                {grade.completeness && !grade.completeness.isComplete && (
+                                  <span className="field-hint">
+                                    {" "}
+                                    (draft: {grade.completeness.unresolvedItems} unresolved items)
+                                  </span>
+                                )}
                                 {grade.wasFloored && (
                                   <span className="field-hint"> (raised to the minimum of 60)</span>
                                 )}

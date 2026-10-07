@@ -1,4 +1,11 @@
 export type SignedInTab =
+  | "schedule-planner"
+  | "published-schedule"
+  | "attachments"
+  | "school-resources"
+  | "review-workspace"
+  | "school-planning"
+  | "school-offerings"
   | "daily-planner"
   | "record-library"
   | "workspace"
@@ -40,6 +47,13 @@ export type SignedInTab =
  * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
+  "schedule-planner": "Teacher Load Planner",
+  "published-schedule": "My Published Schedule",
+  attachments: "Attachments",
+  "school-resources": "Resources and Learner Support",
+  "review-workspace": "Forms and TANAW Review",
+  "school-planning": "School Notices and Programs",
+  "school-offerings": "Subject Offerings",
   "daily-planner": "Daily teaching planner",
   "record-library": "Record management",
   workspace: "Dashboard",
@@ -93,6 +107,19 @@ function tab(id: SignedInTab): { id: SignedInTab; label: string } {
  * (`src/ui/shell/Sidebar.tsx`, `BottomNav.tsx`), so those files stay
  * component-only for React Fast Refresh. */
 export const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    label: "School Planning",
+    tabs: [
+      tab("schedule-planner"),
+      tab("published-schedule"),
+      tab("school-planning"),
+      tab("school-offerings"),
+    ],
+  },
+  {
+    label: "Evidence and Support",
+    tabs: [tab("review-workspace"), tab("attachments"), tab("school-resources")],
+  },
   {
     label: "Daily Teaching",
     tabs: [
@@ -163,7 +190,8 @@ export function primaryTabFor(tab: SignedInTab): SignedInTab {
   if (["adviser-view", "attendance", "section-adviser"].includes(tab)) return "adviser-view";
   if (["class-records", "grading-periods"].includes(tab)) return "class-records";
   if (["school-forms", "monthly-summary", "sf1-import"].includes(tab)) return "school-forms";
-  if (["calendar", "schedule-meetings"].includes(tab)) return "calendar";
+  if (["calendar", "schedule-meetings", "schedule-planner", "published-schedule"].includes(tab))
+    return "calendar";
   return "more";
 }
 
@@ -190,4 +218,44 @@ export function groupLabelForTab(tab: SignedInTab): string | null {
     if (group.tabs.some((t) => t.id === id)) return group.label;
   }
   return null;
+}
+
+/** Navigation visibility complements independently enforced native authority. */
+export function canNavigateTab(tab: SignedInTab, roles: readonly string[] = ["teacher"]): boolean {
+  const head = roles.includes("school_head");
+  const registrar = roles.includes("registrar");
+  if (
+    [
+      "schedule-planner",
+      "admin-password-reset",
+      "school-members",
+      "devices",
+      "school-branding",
+      "grading-periods",
+      "school-offerings",
+      "teaching-assignments",
+      "section-adviser",
+      "schedule-meetings",
+    ].includes(tab)
+  )
+    return head;
+  if (
+    [
+      "learners",
+      "sections",
+      "section-roster",
+      "sf1-import",
+      "record-library",
+      "attendance",
+      "monthly-summary",
+    ].includes(tab)
+  )
+    return head || registrar;
+  return true;
+}
+export function visibleNavGroups(roles?: readonly string[]): readonly NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    tabs: group.tabs.filter((tab) => canNavigateTab(tab.id, roles)),
+  })).filter((group) => group.tabs.length > 0);
 }

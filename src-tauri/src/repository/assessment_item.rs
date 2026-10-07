@@ -44,6 +44,180 @@ pub struct AssessmentItemDetail {
     pub total_eligible: i64,
 }
 
+/// Historical items have no metadata row and keep their original closed,
+/// grading-period-wide eligibility. New date rules never rewrite old scores.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentLifecycle {
+    pub state: String,
+    pub event_starts_on: Option<String>,
+    pub event_ends_on: Option<String>,
+    pub due_on: Option<String>,
+}
+
+pub fn lifecycle(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+) -> AppResult<Option<AssessmentLifecycle>> {
+    if find_by_id_in_school(conn, school_id, id)?.is_none() {
+        return Ok(None);
+    }
+    let mut stmt = conn.prepare("SELECT state,event_starts_on,event_ends_on,due_on FROM assessment_lifecycle WHERE assessment_item_id=?1")?;
+    let mut rows = stmt.query([id])?;
+    if let Some(row) = rows.next()? {
+        Ok(Some(AssessmentLifecycle {
+            state: row.get(0)?,
+            event_starts_on: row.get(1)?,
+            event_ends_on: row.get(2)?,
+            due_on: row.get(3)?,
+        }))
+    } else {
+        Ok(Some(AssessmentLifecycle {
+            state: "closed".into(),
+            event_starts_on: None,
+            event_ends_on: None,
+            due_on: None,
+        }))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssessmentLifecycleChange {
+    pub id: String,
+    pub school_id: String,
+    pub value: AssessmentLifecycle,
+}
+
+pub fn upsert_lifecycle_from_sync(
+    conn: &Connection,
+    school_id: &str,
+    actor_user_id: &str,
+    change: &AssessmentLifecycleChange,
+) -> AppResult<()> {
+    if school_id != change.school_id {
+        return Err(crate::error::AppError::Unauthorized);
+    }
+    crate::repository::score_import::authorize(conn, school_id, actor_user_id, &change.id)?;
+    if lifecycle(conn, &change.school_id, &change.id)?.as_ref() == Some(&change.value) {
+        return Ok(());
+    }
+    if !set_lifecycle(conn, &change.school_id, &change.id, &change.value)? {
+        return Err(crate::error::AppError::Import(
+            "Assessment dates were rejected; review scored work before changing them.".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn valid_iso_date(date: &str) -> bool {
+    let bytes = date.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || !bytes
+            .iter()
+            .enumerate()
+            .all(|(i, b)| i == 4 || i == 7 || b.is_ascii_digit())
+    {
+        return false;
+    }
+    let year: u32 = date[..4].parse().unwrap_or(0);
+    let month: usize = date[5..7].parse().unwrap_or(0);
+    let day: u32 = date[8..].parse().unwrap_or(0);
+    if year == 0 || !(1..=12).contains(&month) {
+        return false;
+    }
+    let leap = year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    day > 0 && day <= days[month - 1]
+}
+
+pub fn set_lifecycle(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+    value: &AssessmentLifecycle,
+) -> AppResult<bool> {
+    let Some(item) = find_by_id_in_school(conn, school_id, id)? else {
+        return Ok(false);
+    };
+    // Metadata influences the denominator and eligibility, so reject changes
+    // after any score or exception has been recorded.
+    if has_any_scores(conn, id)? || !matches!(value.state.as_str(), "planned" | "closed") {
+        return Ok(false);
+    }
+    let Some((_, period_start, period_end)) =
+        class_record::section_and_period_range_in_school(conn, school_id, &item.class_record_id)?
+    else {
+        return Ok(false);
+    };
+    match (&value.event_starts_on, &value.event_ends_on) {
+        (None, None) => {}
+        (Some(start), Some(end))
+            if valid_iso_date(start)
+                && valid_iso_date(end)
+                && start <= end
+                && start >= &period_start
+                && end <= &period_end => {}
+        _ => return Ok(false),
+    }
+    if value.due_on.as_ref().is_some_and(|due| {
+        !valid_iso_date(due)
+            || due < &period_start
+            || due > &period_end
+            || value
+                .event_starts_on
+                .as_ref()
+                .is_some_and(|start| due < start)
+    }) {
+        return Ok(false);
+    }
+    conn.execute("INSERT INTO assessment_lifecycle (assessment_item_id,state,event_starts_on,event_ends_on,due_on) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(assessment_item_id) DO UPDATE SET state=excluded.state,event_starts_on=excluded.event_starts_on,event_ends_on=excluded.event_ends_on,due_on=excluded.due_on", (id, &value.state, &value.event_starts_on, &value.event_ends_on, &value.due_on))?;
+    Ok(true)
+}
+
+/// A planned item cannot accept grades. Dated assessments use actual
+/// half-open membership intervals rather than today's roster.
+pub fn eligible_for_item(
+    conn: &Connection,
+    school_id: &str,
+    id: &str,
+    learner_id: &str,
+) -> AppResult<bool> {
+    let Some(item) = find_by_id_in_school(conn, school_id, id)? else {
+        return Ok(false);
+    };
+    let Some(meta) = lifecycle(conn, school_id, id)? else {
+        return Ok(false);
+    };
+    if meta.state == "planned" {
+        return Ok(false);
+    }
+    let Some((section_id, period_start, period_end)) =
+        class_record::section_and_period_range_in_school(conn, school_id, &item.class_record_id)?
+    else {
+        return Ok(false);
+    };
+    let start = meta.event_starts_on.as_deref().unwrap_or(&period_start);
+    let end = meta.event_ends_on.as_deref().unwrap_or(&period_end);
+    conn.query_row("SELECT EXISTS(SELECT 1 FROM section_memberships WHERE school_id=?1 AND section_id=?2 AND learner_id=?3 AND starts_on <= ?5 AND (ends_on IS NULL OR ends_on > ?4))", (school_id,section_id,learner_id,start,end), |row| row.get(0)).map_err(Into::into)
+}
+
 /// Creates an assessment item under `class_record_id`, verified to belong
 /// to `school_id`, categorized under `category_id` (fixed reference data,
 /// existence-checked but not school-scoped — same convention as
@@ -109,6 +283,26 @@ pub fn create(
 /// than insert-only so a future wiring of `rename`/`update` round-trips
 /// correctly without a second materializer needing to be written later.
 pub fn upsert_from_sync(conn: &Connection, item: &AssessmentItem) -> AppResult<()> {
+    let foreign_identity: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM assessment_items WHERE id=?1 AND school_id!=?2)",
+        (&item.id, &item.school_id),
+        |row| row.get(0),
+    )?;
+    if foreign_identity {
+        return Err(crate::error::AppError::Unauthorized);
+    }
+    if let Some(existing) = find_by_id_in_school(conn, &item.school_id, &item.id)? {
+        if has_any_scores(conn, &item.id)?
+            && (existing.max_score != item.max_score
+                || existing.category_id != item.category_id
+                || existing.class_record_id != item.class_record_id)
+        {
+            return Err(crate::error::AppError::Import(
+                "A scored assessment definition cannot be replaced.".into(),
+            ));
+        }
+    }
+
     conn.execute(
         "INSERT INTO assessment_items \
              (id, school_id, class_record_id, category_id, name, max_score, created_at) \
@@ -316,7 +510,31 @@ pub fn list_by_class_record(
             total_eligible,
         })
     })?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    let mut items = rows.collect::<Result<Vec<_>, _>>()?;
+    for item in &mut items {
+        let meta = lifecycle(conn, school_id, &item.id)?;
+        if let Some(meta) = meta {
+            if meta.state == "planned" {
+                item.total_eligible = 0;
+            } else if meta.event_starts_on.is_some() {
+                if let Some((section_id, _, _)) = class_record::section_and_period_range_in_school(
+                    conn,
+                    school_id,
+                    class_record_id,
+                )? {
+                    item.total_eligible = section_membership::roster_for_section_over_range(
+                        conn,
+                        school_id,
+                        &section_id,
+                        meta.event_starts_on.as_deref().unwrap_or(""),
+                        meta.event_ends_on.as_deref().unwrap_or(""),
+                    )?
+                    .len() as i64;
+                }
+            }
+        }
+    }
+    Ok(items)
 }
 
 fn row_to_item(row: &rusqlite::Row) -> rusqlite::Result<AssessmentItem> {
@@ -843,5 +1061,57 @@ mod tests {
         assert!(find_by_id_in_school(&conn, &school_id, &item.id)
             .unwrap()
             .is_some());
+    }
+    #[test]
+    fn planned_work_dated_eligibility_and_scored_definition_are_preserved() {
+        let conn = open_test_db();
+        let (school, record) = setup(&conn);
+        let item = create(&conn, &school, &record, WRITTEN_WORKS, "Quiz", 20.0)
+            .unwrap()
+            .unwrap();
+        let student = learner::create(&conn, &school, "New", "Learner", None, None).unwrap();
+        let (section, _, _) =
+            class_record::section_and_period_range_in_school(&conn, &school, &record)
+                .unwrap()
+                .unwrap();
+        section_membership::enroll(&conn, &school, &section, &student.id, "2026-07-01").unwrap();
+        let mut dates = AssessmentLifecycle {
+            state: "planned".into(),
+            event_starts_on: Some("2026-06-20".into()),
+            event_ends_on: Some("2026-06-20".into()),
+            due_on: None,
+        };
+        assert!(set_lifecycle(&conn, &school, &item.id, &dates).unwrap());
+        assert!(!eligible_for_item(&conn, &school, &item.id, &student.id).unwrap());
+        dates.state = "closed".into();
+        assert!(set_lifecycle(&conn, &school, &item.id, &dates).unwrap());
+        assert!(!eligible_for_item(&conn, &school, &item.id, &student.id).unwrap());
+        dates.event_starts_on = Some("2026-07-02".into());
+        dates.event_ends_on = dates.event_starts_on.clone();
+        assert!(set_lifecycle(&conn, &school, &item.id, &dates).unwrap());
+        let teacher = user::create_user(&conn, "teacher.dates", "password", "Teacher").unwrap();
+        learner_score::record(
+            &conn,
+            &school,
+            &item.id,
+            &student.id,
+            learner_score::LearnerScoreStatus::Scored,
+            Some(10.0),
+            &teacher.id,
+        )
+        .unwrap()
+        .unwrap();
+        dates.state = "planned".into();
+        assert!(!set_lifecycle(&conn, &school, &item.id, &dates).unwrap());
+        let mut replacement = item.clone();
+        replacement.max_score = 50.0;
+        assert!(upsert_from_sync(&conn, &replacement).is_err());
+        assert_eq!(
+            find_by_id_in_school(&conn, &school, &item.id)
+                .unwrap()
+                .unwrap()
+                .max_score,
+            20.0
+        );
     }
 }

@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+pub(crate) mod android;
 #[cfg(windows)]
 mod dpapi;
 pub mod payload_key;

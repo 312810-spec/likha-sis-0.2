@@ -1,0 +1,68 @@
+.schedule-editor {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.schedule-editor fieldset {
+  min-width: 0;
+  border: 1px solid var(--color-border, #c6c6c6);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.schedule-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.schedule-choices label,
+.schedule-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.schedule-confirm {
+  margin-block: 1rem;
+}
+.schedule-table-wrap {
+  overflow-x: auto;
+  margin-block: 1rem;
+}
+.schedule-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.schedule-table-wrap th,
+.schedule-table-wrap td {
+  padding: 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #c6c6c6);
+}
+.schedule-editor .field {
+  min-width: 130px;
+  flex: 1;
+}
+.schedule-editor input,
+.schedule-editor select {
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .schedule-editor .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .schedule-editor fieldset {
+    padding: 0.6rem;
+  }
+}
+@media print {
+  .schedule-editor,
+  .page-actions,
+  .schedule-confirm {
+    display: none;
+  }
+  .schedule-table-wrap {
+    overflow: visible;
+  }
+}

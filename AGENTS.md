@@ -65,3 +65,20 @@ Use latest stable releases regardless of earlier preferences. Verify official
 metadata and adapt source for compatibility. Preserve reproducible lockfiles.
 Do not force invalid peer resolutions; document real upstream compatibility
 constraints while using the latest supported compiler and tools.
+
+## Durable checkpoints and handoffs
+
+Standing user instruction from 4 October 2026: during active work, at least every
+five minutes save the current work durably on the authorized development branch
+and update `HANDOFF.md`. Also checkpoint before a long verification step and
+before ending or pausing. A local commit alone is not durable in this environment.
+
+The handoff must record the current branch and saved commit, completed changes,
+checks actually run on that source, failures, missing evidence, in-progress work,
+and exact next commands/actions. Mark draft checkpoints as unverified. Never
+merge a broken draft merely to save it. Preserve user choices and untransferred
+work. If saving fails, report the failure and prioritize recovery over new edits.
+
+Start each resumed run by reading `HANDOFF.md` and inspecting the saved branch.
+Do not reuse earlier test results after rebuilding lost edits or changing source.
+The cadence applies during active work; it does not claim unattended execution.

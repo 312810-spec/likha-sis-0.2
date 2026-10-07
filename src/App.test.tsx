@@ -104,7 +104,8 @@ describe("App", () => {
   it("keeps six primary destinations and preserves specialist tools in More", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
-      if (command === "current_session") return Promise.resolve(session);
+      if (command === "current_session")
+        return Promise.resolve({ ...session, roles: ["school_head", "teacher"] });
       if (command === "list_teacher_assignments") return Promise.resolve([]);
       return Promise.reject(new Error(`unexpected command: ${String(command)}`));
     });
@@ -157,7 +158,8 @@ describe("App", () => {
   it("sets the browser tab title to the active destination", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
-      if (command === "current_session") return Promise.resolve(session);
+      if (command === "current_session")
+        return Promise.resolve({ ...session, roles: ["school_head", "teacher"] });
       if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);
@@ -181,7 +183,8 @@ describe("App", () => {
   it("shows the learner screen after switching to the Learners tab", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
-      if (command === "current_session") return Promise.resolve(session);
+      if (command === "current_session")
+        return Promise.resolve({ ...session, roles: ["school_head", "teacher"] });
       if (command === "list_teacher_assignments") return Promise.resolve([]);
       if (command === "list_learners_by_school") return Promise.resolve([]);
       if (command === "list_sections_by_school") return Promise.resolve([]);

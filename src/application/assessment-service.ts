@@ -1,5 +1,6 @@
 import { ValidationError } from "../domain/errors";
 import type {
+  AssessmentLifecycle,
   AssessmentCategory,
   AssessmentCategorySet,
   AssessmentItem,
@@ -18,6 +19,15 @@ const MAX_NAME_LENGTH = 100;
  */
 export class AssessmentApplicationService {
   constructor(private readonly assessments: AssessmentRepository) {}
+
+  getLifecycle(id: string): Promise<AssessmentLifecycle | null> {
+    return this.assessments.getLifecycle?.(id) ?? Promise.resolve(null);
+  }
+
+  setLifecycle(id: string, value: AssessmentLifecycle): Promise<boolean> {
+    if (!id.trim()) throw new ValidationError("Assessment item is required.");
+    return this.assessments.setLifecycle?.(id, value) ?? Promise.resolve(false);
+  }
 
   listCategorySets(): Promise<AssessmentCategorySet[]> {
     return this.assessments.listCategorySets();

@@ -24,6 +24,43 @@ fn category(error: BackupError) -> String {
     .to_owned()
 }
 
+/// Android document URIs are streamed through a private encrypted archive file.
+/// Desktop paths keep the existing direct file workflow.
+fn with_archive_path<T>(
+    file_path: &str,
+    private_dir: &Path,
+    importing: bool,
+    action: impl FnOnce(&Path) -> Result<T, String>,
+) -> Result<T, String> {
+    if !file_path.starts_with("content://") {
+        return action(Path::new(file_path));
+    }
+    #[cfg(target_os = "android")]
+    {
+        let staging =
+            tempfile::tempdir_in(private_dir).map_err(|_| "backup_storage_error".to_owned())?;
+        let path = staging.path().join("portable.likhabackup");
+        let path_string = path
+            .to_str()
+            .ok_or_else(|| "backup_storage_error".to_owned())?;
+        if importing {
+            crate::crypto::android::execute(3, file_path, &[], path_string)
+                .map_err(|_| "backup_storage_error".to_owned())?;
+        }
+        let result = action(&path)?;
+        if !importing {
+            crate::crypto::android::execute(4, file_path, &[], path_string)
+                .map_err(|_| "backup_storage_error".to_owned())?;
+        }
+        Ok(result)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = (private_dir, importing);
+        Err("backup_storage_error".to_owned())
+    }
+}
+
 /// Installation snapshot includes every tenant. Require School Head authority
 /// in EVERY school, not merely the active school. Never trust a caller's role.
 fn authorize_backup(conn: &Connection, sessions: &SessionManager) -> AppResult<()> {
@@ -52,7 +89,7 @@ pub async fn create_portable_backup(
         let key_path = dir.join(db::SSPK_KEY_FILE_NAME);
         // Do not mint a replacement SSPK during backup: unreadable existing keys
         // must fail, and a non-syncing installation has no SSPK to include.
-        let sspk = if key_path.exists() {
+        let sspk = if db::protected_key_exists(&key_path) {
             let store =
                 crypto::platform::key_store().map_err(|_| "backup_storage_error".to_owned())?;
             Some(Zeroizing::new(
@@ -63,7 +100,9 @@ pub async fn create_portable_backup(
         } else {
             None
         };
-        backup::create(&conn, Path::new(&file_path), &password, sspk.as_deref()).map_err(category)
+        with_archive_path(&file_path, &dir, false, |archive| {
+            backup::create(&conn, archive, &password, sspk.as_deref()).map_err(category)
+        })
     })
     .await
     .map_err(|_| "backup_storage_error".to_owned())?
@@ -91,13 +130,9 @@ pub async fn stage_portable_recovery(
         let id = uuid::Uuid::now_v7();
         let destination = base.join(format!("recovery-{id}"));
         let store = crypto::platform::key_store().map_err(|_| "backup_storage_error".to_owned())?;
-        backup::restore(
-            Path::new(&file_path),
-            &destination,
-            &password,
-            store.as_ref(),
-        )
-        .map_err(category)?;
+        with_archive_path(&file_path, &base, true, |archive| {
+            backup::restore(archive, &destination, &password, store.as_ref()).map_err(category)
+        })?;
         let publish = (|| -> std::io::Result<()> {
             use std::io::Write;
             let mut pointer = tempfile::NamedTempFile::new_in(&base)?;

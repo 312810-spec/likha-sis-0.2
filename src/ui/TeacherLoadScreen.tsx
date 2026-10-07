@@ -19,6 +19,7 @@ interface TeacherLoadScreenProps {
    * server-side by `auth::authorize_view_teacher_load`, not by this
    * picker being hidden). */
   teacherUserId: string;
+  canViewColleagues?: boolean;
 }
 
 function formatMinutes(totalMinutes: number): string {
@@ -49,6 +50,7 @@ export function TeacherLoadScreen({
   subjectAttendanceService,
   schoolMemberService,
   teacherUserId,
+  canViewColleagues = false,
 }: TeacherLoadScreenProps) {
   const { mode } = useTeacherMode();
 
@@ -68,7 +70,7 @@ export function TeacherLoadScreen({
     Promise.all([
       teachingAssignmentService.getLoad(viewedTeacherId),
       subjectAttendanceService.listMyAssignments(viewedTeacherId),
-      schoolMemberService.listMembers(),
+      canViewColleagues ? schoolMemberService.listMembers() : Promise.resolve([]),
     ])
       .then(([loadResult, assignmentResult, memberResult]) => {
         if (requestRef.current !== requestId) return;

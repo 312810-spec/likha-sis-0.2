@@ -422,3 +422,82 @@ mod tests {
         );
     }
 }
+
+#[tauri::command]
+pub fn get_assessment_lifecycle(
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+) -> AppResult<Option<assessment_item::AssessmentLifecycle>> {
+    let conn = lock_db(&db);
+    let school_id = sessions.require_active_school_scope(&conn)?;
+    assessment_item::lifecycle(&conn, &school_id, &id)
+}
+
+#[tauri::command]
+pub fn set_assessment_lifecycle(
+    app: AppHandle,
+    db: State<'_, Mutex<Connection>>,
+    sessions: State<'_, SessionManager>,
+    id: String,
+    value: assessment_item::AssessmentLifecycle,
+) -> AppResult<bool> {
+    let conn = lock_db(&db);
+    let (actor, school_id) = sessions.require_active_session(&conn)?;
+    let Some(item) = assessment_item::find_by_id_in_school(&conn, &school_id, &id)? else {
+        return Ok(false);
+    };
+    let authorized: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM class_records cr JOIN teaching_assignments ta ON ta.section_id=cr.section_id AND ta.subject_id=cr.subject_id AND ta.school_id=cr.school_id WHERE cr.id=?1 AND cr.school_id=?2 AND ta.teacher_user_id=?3)", (&item.class_record_id,&school_id,&actor), |r| r.get(0))?;
+    if !authorized {
+        return Err(AppError::Unauthorized);
+    }
+    let sspk = resolve_sspk_if_enrolled(&app, &conn, &school_id)?;
+    conn.execute_batch("SAVEPOINT save_assessment_lifecycle")?;
+    let result = (|| -> AppResult<bool> {
+        if !assessment_item::set_lifecycle(&conn, &school_id, &id, &value)? {
+            return Ok(false);
+        }
+        if let Some(sspk) = sspk {
+            let payload = assessment_item::AssessmentLifecycleChange {
+                id: id.clone(),
+                school_id: school_id.clone(),
+                value,
+            };
+            let encrypted_payload = payload_key::encrypt_payload(
+                &sspk,
+                &serde_json::to_vec(&payload).map_err(|_| {
+                    AppError::Import("Cannot prepare activity dates for transfer.".into())
+                })?,
+            )?;
+            let change = PendingChange {
+                change_id: Uuid::now_v7(),
+                device_id: parse_sync_uuid(&device_identity::current_or_create(&conn)?, "device")?,
+                actor_user_id: parse_sync_uuid(&actor, "actor")?,
+                entity_kind: EntityKind::AssessmentLifecycle,
+                entity_id: parse_sync_uuid(&id, "assessment")?,
+                base_version: crate::repository::sync_version_cache::known_version(
+                    &conn,
+                    &school_id,
+                    EntityKind::AssessmentLifecycle,
+                    &id,
+                )?,
+                operation: ChangeOperation::Upsert,
+                encrypted_payload,
+            };
+            sync_outbox::enqueue(&conn, &school_id, &change)?;
+        }
+        Ok(true)
+    })();
+    match result {
+        Ok(value) => {
+            conn.execute_batch("RELEASE save_assessment_lifecycle")?;
+            Ok(value)
+        }
+        Err(error) => {
+            let _ = conn.execute_batch(
+                "ROLLBACK TO save_assessment_lifecycle; RELEASE save_assessment_lifecycle",
+            );
+            Err(error)
+        }
+    }
+}

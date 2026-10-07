@@ -69,19 +69,66 @@ pub fn summary_for_teacher(
     today_weekday: i64,
     today_date: &str,
 ) -> AppResult<MyDaySummary> {
+    if !crate::scheduling::valid_date(today_date) || !(0..=6).contains(&today_weekday) {
+        return Err(crate::error::AppError::Import(
+            "Choose a valid schedule date".into(),
+        ));
+    }
+    let actual_weekday: i64 = conn.query_row(
+        "SELECT CAST(strftime('%w', ?1) AS INTEGER)",
+        [today_date],
+        |row| row.get(0),
+    )?;
+    if actual_weekday != today_weekday {
+        return Err(crate::error::AppError::Import(
+            "Schedule date and weekday disagree".into(),
+        ));
+    }
+    let published =
+        crate::repository::schedule_plan::mine(conn, school_id, teacher_user_id, today_date)?;
+    let has_publication = crate::repository::schedule_plan::list(conn, school_id)?
+        .iter()
+        .any(|p| {
+            p.status == "published"
+                && p.input.effective_from.as_str() <= today_date
+                && p.input.effective_until.as_str() >= today_date
+        });
     let assignments =
         teaching_assignment::list_by_teacher_in_school(conn, school_id, teacher_user_id)?;
 
     let mut schedule = Vec::new();
     let mut pending_attendance = Vec::new();
 
+    let instructional =
+        crate::repository::school_planning::confirmed_day_decision(conn, school_id, today_date)?
+            != Some(false);
+
     for assignment in &assignments {
-        let meetings =
-            schedule_meeting::list_by_assignment_in_school(conn, school_id, &assignment.id)?;
-        let todays_meetings: Vec<_> = meetings
-            .into_iter()
-            .filter(|meeting| meeting.weekday == today_weekday)
-            .collect();
+        if !instructional {
+            continue;
+        }
+        let todays_meetings: Vec<_> = if has_publication {
+            published
+                .iter()
+                .filter(|m| {
+                    m.teaching_assignment_id == assignment.id
+                        && i64::from(m.weekday) == today_weekday
+                })
+                .map(|m| {
+                    (
+                        m.starts_at.clone(),
+                        m.ends_at.clone(),
+                        Some(m.room_id.clone()),
+                    )
+                })
+                .collect()
+        } else {
+            schedule_meeting::list_by_assignment_in_school(conn, school_id, &assignment.id)?
+                .into_iter()
+                .filter(|m| m.weekday == today_weekday)
+                .map(|m| (m.starts_at, m.ends_at, m.room))
+                .collect()
+        };
         if todays_meetings.is_empty() {
             continue;
         }
@@ -91,9 +138,9 @@ pub fn summary_for_teacher(
                 teaching_assignment_id: assignment.id.clone(),
                 subject_name: assignment.subject_name.clone(),
                 section_name: assignment.section_name.clone(),
-                starts_at: meeting.starts_at.clone(),
-                ends_at: meeting.ends_at.clone(),
-                room: meeting.room.clone(),
+                starts_at: meeting.0.clone(),
+                ends_at: meeting.1.clone(),
+                room: meeting.2.clone(),
             });
         }
 
@@ -143,8 +190,10 @@ fn attendance_is_pending(
         None => Ok(true),
         Some(session) if session.status == SessionStatus::NoClass => Ok(false),
         Some(session) => {
-            let entry_count = subject_attendance::count_entries_for_session(conn, &session.id)?;
-            Ok(entry_count == 0)
+            let roster = subject_attendance::roster_for_session(conn, school_id, &session.id)?
+                .unwrap_or_default();
+            // A partial check remains pending until every dated roster member is marked.
+            Ok(roster.is_empty() || roster.iter().any(|row| row.entry_status.is_none()))
         }
     }
 }
@@ -290,7 +339,25 @@ mod tests {
 
         assert!(
             summary.pending_attendance.is_empty(),
-            "at least one recorded entry means this is no longer pending"
+            "every roster member has a recorded decision"
+        );
+        let second =
+            crate::repository::learner::create(&conn, &f.school_id, "Ben", "Cruz", None, None)
+                .unwrap();
+        crate::repository::section_membership::enroll(
+            &conn,
+            &f.school_id,
+            &section_id,
+            &second.id,
+            "2026-06-01",
+        )
+        .unwrap();
+        let partial =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09").unwrap();
+        assert_eq!(
+            partial.pending_attendance.len(),
+            1,
+            "a newly enrolled unmarked learner keeps attendance pending"
         );
     }
 

@@ -138,7 +138,7 @@ pub fn build_report_card_export(
         let name = format!("{}, {}", row.family_name, row.given_name);
         let lrn = row.lrn.clone().unwrap_or_default();
         let fields = match &row.grade {
-            Some(grade) => vec![
+            Some(grade) if grade.completeness.is_complete => vec![
                 name,
                 lrn,
                 format!("{:.1}", grade.initial_grade),
@@ -154,7 +154,7 @@ pub fn build_report_card_export(
                     String::new()
                 },
             ],
-            None => vec![
+            None | Some(_) => vec![
                 name,
                 lrn,
                 "Not yet available".to_string(),
@@ -217,6 +217,14 @@ mod tests {
 
     fn a_grade() -> ComputedTermGrade {
         ComputedTermGrade {
+            completeness: crate::repository::grading_computation::GradeCompleteness {
+                expected_items: 1,
+                scored_items: 1,
+                excused_items: 0,
+                not_applicable_items: 0,
+                unresolved_items: 0,
+                is_complete: true,
+            },
             initial_grade: 85.8,
             term_grade: 88,
             was_transmuted: true,
@@ -272,6 +280,14 @@ mod tests {
             family_name: "Cruz".to_string(),
             lrn: None,
             grade: Some(ComputedTermGrade {
+                completeness: crate::repository::grading_computation::GradeCompleteness {
+                    expected_items: 1,
+                    scored_items: 1,
+                    excused_items: 0,
+                    not_applicable_items: 0,
+                    unresolved_items: 0,
+                    is_complete: true,
+                },
                 initial_grade: 3.0,
                 term_grade: 60,
                 was_transmuted: false,

@@ -2,7 +2,7 @@ use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repository::{schedule_meeting, section, subject, user};
 
 /// Who teaches what, for a whole school year. Stores no `school_year` of
@@ -125,20 +125,79 @@ pub fn replace_teacher(
     subject_id: &str,
     new_teacher_user_id: &str,
 ) -> AppResult<Option<TeacherReplacementOutcome>> {
-    let previous: Option<TeachingAssignment> = conn
-        .query_row(
-            "DELETE FROM teaching_assignments \
-             WHERE school_id = ?1 AND section_id = ?2 AND subject_id = ?3 \
-             RETURNING id, school_id, teacher_user_id, section_id, subject_id, created_at",
-            (school_id, section_id, subject_id),
-            row_to_teaching_assignment,
-        )
-        .optional()?;
-    let assignment = create(conn, school_id, new_teacher_user_id, section_id, subject_id)?;
-    Ok(assignment.map(|assignment| TeacherReplacementOutcome {
-        previous,
-        assignment,
-    }))
+    if section::find_by_id_in_school(conn, school_id, section_id)?.is_none()
+        || subject::find_by_id_in_school(conn, school_id, subject_id)?.is_none()
+        || !user::is_member_of_school(conn, new_teacher_user_id, school_id)?
+    {
+        return Ok(None);
+    }
+    let previous: Option<TeachingAssignment> = conn.query_row(
+        "SELECT id, school_id, teacher_user_id, section_id, subject_id, created_at FROM teaching_assignments WHERE school_id=?1 AND section_id=?2 AND subject_id=?3",
+        (school_id, section_id, subject_id), row_to_teaching_assignment,
+    ).optional()?;
+    if let Some(old) = &previous {
+        ensure_removable(conn, school_id, &old.id)?;
+    }
+    conn.execute_batch("SAVEPOINT replace_assignment")?;
+    let result = (|| {
+        if let Some(old) = &previous {
+            conn.execute(
+                "DELETE FROM teaching_assignments WHERE school_id=?1 AND id=?2",
+                (school_id, &old.id),
+            )?;
+        }
+        let assignment = create(conn, school_id, new_teacher_user_id, section_id, subject_id)?;
+        Ok(assignment.map(|assignment| TeacherReplacementOutcome {
+            previous,
+            assignment,
+        }))
+    })();
+    match result {
+        Ok(value) => {
+            conn.execute_batch("RELEASE replace_assignment")?;
+            Ok(value)
+        }
+        Err(error) => {
+            let _ =
+                conn.execute_batch("ROLLBACK TO replace_assignment; RELEASE replace_assignment");
+            Err(error)
+        }
+    }
+}
+
+/// Retain assignments with teacher work or unpublished outgoing changes until a handover.
+fn ensure_removable(conn: &Connection, school_id: &str, id: &str) -> AppResult<()> {
+    let occupied: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM subject_attendance_sessions WHERE school_id=?1 AND teaching_assignment_id=?2)
+         OR EXISTS(SELECT 1 FROM lesson_plans WHERE school_id=?1 AND teaching_assignment_id=?2)
+         OR EXISTS(SELECT 1 FROM class_records cr JOIN teaching_assignments ta ON cr.section_id=ta.section_id AND cr.subject_id=ta.subject_id WHERE ta.school_id=?1 AND ta.id=?2)",
+        (school_id, id), |row| row.get(0),
+    )?;
+    let pending = crate::repository::sync_outbox::has_pending_for_entity(
+        conn,
+        school_id,
+        crate::sync::EntityKind::TeachingAssignment,
+        id,
+    )?;
+    let published = if let Some(assignment) = find_by_id_in_school(conn, school_id, id)? {
+        crate::repository::schedule_plan::list(conn, school_id)?
+            .iter()
+            .any(|p| {
+                p.status == "published"
+                    && p.input.courses.iter().any(|c| {
+                        c.section_id == assignment.section_id
+                            && c.subject_id == assignment.subject_id
+                    })
+            })
+    } else {
+        false
+    };
+    if occupied || pending || published {
+        return Err(AppError::Import(
+            "Teacher work exists; complete a handover before removing this assignment".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// ADR-0067/0069 sync wiring counterpart to `upsert_from_sync`: the first
@@ -155,6 +214,7 @@ pub fn replace_teacher(
 /// existed) is a silent no-op, not an error -- a delete's whole point is
 /// "this row should not exist," which a missing row already satisfies.
 pub fn delete_from_sync(conn: &Connection, school_id: &str, id: &str) -> AppResult<()> {
+    ensure_removable(conn, school_id, id)?;
     conn.execute(
         "DELETE FROM teaching_assignments WHERE id = ?1 AND school_id = ?2",
         (id, school_id),
@@ -173,6 +233,7 @@ pub fn remove(
     school_id: &str,
     id: &str,
 ) -> AppResult<Option<TeachingAssignment>> {
+    ensure_removable(conn, school_id, id)?;
     conn.query_row(
         "DELETE FROM teaching_assignments WHERE id = ?1 AND school_id = ?2 \
          RETURNING id, school_id, teacher_user_id, section_id, subject_id, created_at",
@@ -205,6 +266,21 @@ pub fn remove(
 /// round-trips correctly without a second materializer needing to be
 /// written later.
 pub fn upsert_from_sync(conn: &Connection, assignment: &TeachingAssignment) -> AppResult<()> {
+    if section::find_by_id_in_school(conn, &assignment.school_id, &assignment.section_id)?.is_none()
+        || subject::find_by_id_in_school(conn, &assignment.school_id, &assignment.subject_id)?
+            .is_none()
+        || !user::is_member_of_school(conn, &assignment.teacher_user_id, &assignment.school_id)?
+    {
+        return Err(AppError::Unauthorized);
+    }
+    if let Some(old) = find_by_id_in_school(conn, &assignment.school_id, &assignment.id)? {
+        if old.teacher_user_id != assignment.teacher_user_id
+            || old.section_id != assignment.section_id
+            || old.subject_id != assignment.subject_id
+        {
+            ensure_removable(conn, &assignment.school_id, &assignment.id)?;
+        }
+    }
     conn.execute(
         "INSERT INTO teaching_assignments (id, school_id, teacher_user_id, section_id, subject_id, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -341,7 +417,7 @@ mod tests {
 
     /// A school, one member (`teacher_user_id`), one section, one subject
     /// -- the happy-path fixture most tests build on.
-    fn setup(conn: &Connection) -> (String, String, String, String) {
+    pub(super) fn setup(conn: &Connection) -> (String, String, String, String) {
         let s = school::create(conn, "Rizal Elementary").unwrap();
         let teacher = user::create_user(conn, "teacher.a", "password", "Teacher A").unwrap();
         user::add_school_membership(conn, &teacher.id, &s.id).unwrap();
@@ -688,5 +764,103 @@ mod tests {
         assert_eq!(found.teacher_user_id, other_teacher.id);
         let all = list_by_section_in_school(&conn, &school_id, &original.section_id).unwrap();
         assert_eq!(all.len(), 1, "an upsert must never insert a second row");
+    }
+}
+
+/// A published timetable supersedes undated legacy meetings for its effective date.
+pub fn teacher_load_on_date(
+    conn: &Connection,
+    school: &str,
+    teacher: &str,
+    date: &str,
+) -> AppResult<TeacherLoad> {
+    if !crate::scheduling::valid_date(date) {
+        return Err(AppError::Import("Choose a valid load date".into()));
+    }
+    let active = crate::repository::schedule_plan::list(conn, school)?
+        .into_iter()
+        .any(|p| {
+            p.status == "published"
+                && p.input.effective_from.as_str() <= date
+                && p.input.effective_until.as_str() >= date
+        });
+    if !active {
+        return teacher_load(conn, school, teacher);
+    }
+    let rows = crate::repository::schedule_plan::mine(conn, school, teacher, date)?;
+    let assignments: std::collections::HashSet<_> =
+        rows.iter().map(|m| &m.teaching_assignment_id).collect();
+    let subjects: std::collections::HashSet<_> = rows.iter().map(|m| &m.subject_id).collect();
+    let minutes = |time: &str| -> i64 {
+        let (h, m) = time.split_once(':').unwrap_or(("0", "0"));
+        h.parse::<i64>().unwrap_or(0) * 60 + m.parse::<i64>().unwrap_or(0)
+    };
+    Ok(TeacherLoad {
+        assignment_count: assignments.len() as i64,
+        distinct_subject_count: subjects.len() as i64,
+        weekly_instructional_minutes: rows
+            .iter()
+            .map(|m| minutes(&m.ends_at) - minutes(&m.starts_at))
+            .sum(),
+    })
+}
+
+#[cfg(test)]
+mod handover_safety_tests {
+    use super::*;
+    #[test]
+    fn invalid_replacement_retains_original_assignment_and_schedule() {
+        let conn = crate::db::open(
+            std::path::Path::new(":memory:"),
+            &crate::crypto::generate_key(),
+        )
+        .unwrap();
+        let (school, teacher, section, subject) = super::tests::setup(&conn);
+        let original = create(&conn, &school, &teacher, &section, &subject)
+            .unwrap()
+            .unwrap();
+        schedule_meeting::create(&conn, &school, &original.id, 3, "08:00", "09:00", None).unwrap();
+        assert!(
+            replace_teacher(&conn, &school, &section, &subject, "unknown-teacher")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            find_by_id_in_school(&conn, &school, &original.id)
+                .unwrap()
+                .unwrap(),
+            original
+        );
+        assert_eq!(
+            schedule_meeting::list_by_assignment_in_school(&conn, &school, &original.id)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+    #[test]
+    fn attendance_work_rejects_remove_and_incoming_delete() {
+        let conn = crate::db::open(
+            std::path::Path::new(":memory:"),
+            &crate::crypto::generate_key(),
+        )
+        .unwrap();
+        let (school, teacher, section, subject) = super::tests::setup(&conn);
+        let original = create(&conn, &school, &teacher, &section, &subject)
+            .unwrap()
+            .unwrap();
+        crate::repository::subject_attendance::open_or_get_session(
+            &conn,
+            &school,
+            &original.id,
+            "2026-09-09",
+            &teacher,
+        )
+        .unwrap();
+        assert!(remove(&conn, &school, &original.id).is_err());
+        assert!(delete_from_sync(&conn, &school, &original.id).is_err());
+        assert!(find_by_id_in_school(&conn, &school, &original.id)
+            .unwrap()
+            .is_some());
     }
 }

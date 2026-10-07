@@ -1,0 +1,44 @@
+.review-workspace {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr);
+  gap: 1.5rem;
+}
+.review-workspace aside,
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-content: start;
+}
+.review-workspace aside {
+  flex-direction: column;
+}
+.review-workspace label {
+  display: grid;
+  gap: 0.3rem;
+  margin-block: 0.6rem;
+}
+.review-workspace code {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .review-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+.review-workspace > *,
+.review-workspace fieldset,
+.review-workspace label,
+.review-workspace input,
+.review-workspace textarea,
+.review-workspace select {
+  min-width: 0;
+  max-width: 100%;
+}
+.review-workspace fieldset {
+  box-sizing: border-box;
+}
+.review-workspace aside button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

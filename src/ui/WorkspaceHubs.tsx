@@ -3,14 +3,24 @@ import type { SubjectAttendanceApplicationService } from "../application/subject
 import type { TeachingAssignmentSummary } from "../domain/subject-attendance";
 import type { ScheduleMeeting } from "../domain/schedule-meeting";
 import { WEEKDAY_LABELS } from "../domain/schedule-meeting";
-import { NAV_GROUPS, type SignedInTab } from "./components/workbench-nav-data";
+import {
+  canNavigateTab,
+  visibleNavGroups,
+  type SignedInTab,
+} from "./components/workbench-nav-data";
 import { Page } from "./components/Page";
 import { Alert } from "./components/Alert";
 import { Skeleton } from "./components/Skeleton";
 import { EmptyState } from "./components/EmptyState";
 import type { TeacherClassWorkContext } from "./work-context";
 
-export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => void }) {
+export function MoreScreen({
+  onNavigate,
+  roles,
+}: {
+  onNavigate: (tab: SignedInTab) => void;
+  roles?: readonly string[];
+}) {
   return (
     <Page title="More">
       <p className="field-hint">School records, teaching tools, and device settings.</p>
@@ -33,7 +43,7 @@ export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => v
             ))}
           </div>
         </section>
-        {NAV_GROUPS.map((group) => (
+        {visibleNavGroups(roles).map((group) => (
           <section key={group.label}>
             <h3>{group.label}</h3>
             <div className="workspace-links">
@@ -51,7 +61,13 @@ export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => v
   );
 }
 
-export function SchoolFormsScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => void }) {
+export function SchoolFormsScreen({
+  onNavigate,
+  roles,
+}: {
+  onNavigate: (tab: SignedInTab) => void;
+  roles?: readonly string[];
+}) {
   return (
     <Page title="School Forms">
       <p className="field-hint">Choose a record to review before creating an export.</p>
@@ -91,26 +107,38 @@ export function SchoolFormsScreen({ onNavigate }: { onNavigate: (tab: SignedInTa
           </p>
         </section>
         <section>
-          <h3>Learners</h3>
-          <div className="workspace-link-row">
-            <div>
-              <strong>SF1 · School register</strong>
-              <p>Import learners from an SF1 file and review matches before saving.</p>
-            </div>
-            <button type="button" onClick={() => onNavigate("sf1-import")}>
-              Import learners
-            </button>
-          </div>
-          <div className="workspace-link-row">
-            <div>
-              <strong>Class roster</strong>
-              <p>Review enrollment and available roster exports.</p>
-            </div>
-            <button type="button" onClick={() => onNavigate("sections")}>
-              Open sections
-            </button>
-          </div>
+          <h3>Drafts and evidence</h3>
+          <p>
+            Prepare school form drafts and TANAW samples, attach evidence, and track school review.
+            SF8 remains inactive.
+          </p>
+          <button type="button" onClick={() => onNavigate("review-workspace")}>
+            Open forms and TANAW review
+          </button>
         </section>
+        {canNavigateTab("sf1-import", roles) && (
+          <section>
+            <h3>Learners</h3>
+            <div className="workspace-link-row">
+              <div>
+                <strong>SF1 · School register</strong>
+                <p>Import learners from an SF1 file and review matches before saving.</p>
+              </div>
+              <button type="button" onClick={() => onNavigate("sf1-import")}>
+                Import learners
+              </button>
+            </div>
+            <div className="workspace-link-row">
+              <div>
+                <strong>Class roster</strong>
+                <p>Review enrollment and available roster exports.</p>
+              </div>
+              <button type="button" onClick={() => onNavigate("sections")}>
+                Open sections
+              </button>
+            </div>
+          </section>
+        )}
       </div>
     </Page>
   );

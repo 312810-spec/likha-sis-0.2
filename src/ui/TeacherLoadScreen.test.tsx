@@ -138,6 +138,7 @@ function renderScreen(
     loadByTeacher?: Record<string, TeacherLoad | "reject">;
     assignmentsByTeacher?: Record<string, TeachingAssignmentSummary[]>;
     members?: SchoolMember[];
+    canViewColleagues?: boolean;
   } = {},
 ) {
   const teachingAssignmentRepo = new FakeTeachingAssignmentRepository(
@@ -161,6 +162,7 @@ function renderScreen(
         subjectAttendanceService={subjectAttendanceService}
         schoolMemberService={schoolMemberService}
         teacherUserId="teacher-1"
+        canViewColleagues={options.canViewColleagues ?? true}
       />
     </ModeProvider>,
   );
@@ -168,6 +170,12 @@ function renderScreen(
 }
 
 describe("TeacherLoadScreen", () => {
+  it("keeps the teacher view scoped to the signed-in teacher", async () => {
+    const { teachingAssignmentRepo } = renderScreen({ canViewColleagues: false });
+    await screen.findByText("2h 10m");
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(teachingAssignmentRepo.loadCalls).toEqual(["teacher-1"]);
+  });
   it("shows the three derived load numbers for the signed-in teacher by default", async () => {
     renderScreen();
 

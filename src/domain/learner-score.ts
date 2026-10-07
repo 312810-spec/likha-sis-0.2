@@ -35,7 +35,17 @@ export interface LearnerScoreRosterEntry {
  * research record. `initialGrade` is the weighted-sum percentage before
  * transmutation/rounding; `termGrade` is the final whole-number grade
  * actually reported. */
+interface GradeCompleteness {
+  expectedItems: number;
+  scoredItems: number;
+  excusedItems: number;
+  notApplicableItems: number;
+  unresolvedItems: number;
+  isComplete: boolean;
+}
+
 export interface ComputedTermGrade {
+  completeness?: GradeCompleteness;
   initialGrade: number;
   termGrade: number;
   /** True if the SY 2026-2027 Adjusted Transmutation Table was applied.
@@ -46,4 +56,21 @@ export interface ComputedTermGrade {
    * explicit floor. When true, `initialGrade` (not `termGrade`) reflects
    * the learner's true raw performance. */
   wasFloored: boolean;
+}
+
+export interface ScoreImportPreview {
+  rows: { learnerId: string; status: LearnerScoreStatus; score: number | null }[];
+  issues: string[];
+  contentHash: string;
+  snapshot: string;
+  alreadyImported: boolean;
+}
+export interface ScoreHistoryEntry {
+  id: string;
+  learnerId: string;
+  actorUserId: string;
+  previousJson: string | null;
+  nextJson: string;
+  reason: string;
+  changedAt: string;
 }

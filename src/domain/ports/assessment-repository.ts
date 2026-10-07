@@ -1,4 +1,5 @@
 import type {
+  AssessmentLifecycle,
   AssessmentCategory,
   AssessmentCategorySet,
   AssessmentItem,
@@ -10,6 +11,8 @@ import type {
  * applicable — no `schoolId` parameter anywhere here, same convention as
  * {@link SectionRepository}. */
 export interface AssessmentRepository {
+  getLifecycle?(id: string): Promise<AssessmentLifecycle | null>;
+  setLifecycle?(id: string, value: AssessmentLifecycle): Promise<boolean>;
   listCategorySets(): Promise<AssessmentCategorySet[]>;
   listCategoriesForSet(setId: string): Promise<AssessmentCategory[]>;
   listItemsByClassRecord(classRecordId: string): Promise<AssessmentItemDetail[]>;

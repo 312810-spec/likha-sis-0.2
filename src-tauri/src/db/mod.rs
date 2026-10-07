@@ -94,7 +94,14 @@ pub(crate) fn selected_data_dir(base: &Path) -> AppResult<std::path::PathBuf> {
     let id = uuid::Uuid::parse_str(&id)
         .map_err(|_| crate::error::AppError::key_store("invalid recovery pointer"))?;
     let dir = base.join(format!("recovery-{id}"));
-    if !dir.join(DB_FILE_NAME).is_file() || !dir.join(KEY_FILE_NAME).is_file() {
+    // A valid UUID must not redirect startup through a replacement symlink.
+    // This is also useful when recovery folders were copied manually.
+    if dir.exists() && dir.canonicalize()?.parent() != Some(base.canonicalize()?.as_path()) {
+        return Err(crate::error::AppError::key_store(
+            "invalid recovery directory",
+        ));
+    }
+    if !dir.join(DB_FILE_NAME).is_file() || !protected_key_exists(&dir.join(KEY_FILE_NAME)) {
         return Err(crate::error::AppError::key_store(
             "recovery installation is incomplete",
         ));
@@ -108,10 +115,26 @@ pub(crate) fn app_data_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
 
 /// Opens using a platform adapter. A key failure must not replace the existing database.
 pub(crate) fn open_with_key_store(dir: &Path, store: &dyn KeyStore) -> AppResult<Connection> {
-    let mut key = store.load_or_create_key(&dir.join(KEY_FILE_NAME))?;
+    let key_path = dir.join(KEY_FILE_NAME);
+    if dir.join(DB_FILE_NAME).exists() && !protected_key_exists(&key_path) {
+        return Err(crate::error::AppError::key_store(
+            "existing database encryption key is missing",
+        ));
+    }
+    let mut key = store.load_or_create_key(&key_path)?;
     let result = open(&dir.join(DB_FILE_NAME), &key);
     key.zeroize();
     result
+}
+
+pub(crate) fn protected_key_exists(path: &Path) -> bool {
+    path.exists()
+        || path
+            .with_file_name(format!(
+                "{}.bak",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ))
+            .exists()
 }
 
 pub fn open_app_db(app: &AppHandle) -> AppResult<Connection> {
@@ -159,6 +182,7 @@ mod tests {
             if self.fail {
                 Err(crate::error::AppError::key_store("injected unwrap failure"))
             } else {
+                std::fs::write(_path, b"synthetic protected key")?;
                 Ok([0x27; KEY_LEN])
             }
         }
@@ -194,6 +218,43 @@ mod tests {
             std::fs::read(dir.path().join(DB_FILE_NAME)).unwrap(),
             before
         );
+    }
+
+    #[test]
+    fn missing_key_does_not_mint_over_existing_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(DB_FILE_NAME);
+        std::fs::write(&file, b"existing encrypted database").unwrap();
+        assert!(open_with_key_store(dir.path(), &TestKeyStore { fail: false }).is_err());
+        assert!(!dir.path().join(KEY_FILE_NAME).exists());
+        assert_eq!(std::fs::read(file).unwrap(), b"existing encrypted database");
+    }
+
+    #[test]
+    fn atomic_backup_envelope_counts_as_an_existing_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = dir.path().join(KEY_FILE_NAME);
+        assert!(!protected_key_exists(&key));
+        std::fs::write(
+            dir.path().join(format!("{KEY_FILE_NAME}.bak")),
+            b"synthetic envelope",
+        )
+        .unwrap();
+        assert!(protected_key_exists(&key));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recovery_directory_cannot_redirect_outside_installation() {
+        let base = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let id = uuid::Uuid::now_v7();
+        std::fs::write(base.path().join(RECOVERY_POINTER), id.to_string()).unwrap();
+        std::fs::write(outside.path().join(DB_FILE_NAME), b"synthetic database").unwrap();
+        std::fs::write(outside.path().join(KEY_FILE_NAME), b"synthetic envelope").unwrap();
+        std::os::unix::fs::symlink(outside.path(), base.path().join(format!("recovery-{id}")))
+            .unwrap();
+        assert!(selected_data_dir(base.path()).is_err());
     }
 
     #[test]

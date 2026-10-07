@@ -1,3 +1,4 @@
+pub mod attachments;
 pub mod auth;
 pub mod backup;
 mod commands;
@@ -9,6 +10,9 @@ pub mod formgen;
 pub mod hub_server;
 pub mod import;
 pub mod repository;
+pub mod scheduling;
+pub mod school_offerings;
+pub mod school_resources;
 pub mod sync;
 pub mod sync_client;
 
@@ -19,6 +23,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_likha_keystore::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -80,6 +85,36 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::schedule_plan::list_schedule_plans,
+            commands::schedule_plan::save_schedule_plan,
+            commands::schedule_plan::copy_schedule_plan,
+            commands::schedule_plan::generate_schedule_plan,
+            commands::schedule_plan::publish_schedule_plan,
+            commands::schedule_plan::list_my_published_schedule,
+            commands::assessment_item::get_assessment_lifecycle,
+            commands::assessment_item::set_assessment_lifecycle,
+            attachments::save_attachment,
+            attachments::list_attachments,
+            attachments::read_attachment,
+            school_resources::issue_learning_resource,
+            school_resources::list_resource_issues,
+            school_resources::return_learning_resource,
+            school_resources::create_support_plan,
+            school_resources::list_support_plans,
+            school_resources::record_support_session,
+            school_resources::list_support_sessions,
+            commands::review_workflow::list_review_packets,
+            commands::review_workflow::export_tanaw_sample,
+            commands::review_workflow::import_tanaw_sample,
+            commands::score_import::preview_score_import,
+            commands::score_import::commit_score_import,
+            commands::score_import::list_score_history,
+            school_offerings::save_school_offering,
+            school_offerings::list_school_offerings,
+            commands::review_workflow::act_review_packet,
+            commands::review_workflow::review_packet_history,
+            commands::school_planning::list_school_planning_items,
+            commands::school_planning::save_school_planning_item,
             commands::school::list_schools,
             commands::school::create_school,
             commands::school::set_school_logo,
