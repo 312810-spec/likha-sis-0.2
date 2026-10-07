@@ -18,6 +18,7 @@ The public-school directory lists Tingub NHS as School ID 312810.
 The current Division Memoranda page embeds its issuance list through Looker Studio. The public host and archive are verified, but the current 2026 list/body could not be extracted from the embed in this execution environment.
 
 Therefore:
+
 - do not invent a current Mandaue Division Memorandum number, school-form deadline or checking schedule;
 - do not assume an old Division memo remains current merely because the national policy remains in force;
 - keep Mandaue-specific form-checking schedule/routing configurable and marked PENDING until the exact issuance is obtained.
@@ -25,15 +26,19 @@ Therefore:
 ## National evidence relevant to TANAW
 
 ### DepEd Order No. 11, s. 2018
+
 Primary national rule for preparation/checking of school forms. Important software invariant: LIS-generated electronic school forms are system-generated records whose official format/data must not be silently rewritten by a third-party app.
 
 ### DepEd Order No. 006, s. 2025
+
 Its ancillary-task school-form list explicitly includes SF1, SF2, SF3, SF5, SF5A, SF8, SF9, SF10 and LIS updating/finalization. This supports designing LIKHA as a work-reduction layer around maintained source records, not as an additional duplicate-encoding burden.
 
 ### DepEd Memorandum No. 029, s. 2026
+
 Establishes a National Technical Working Group for the Digitization of School Forms. This is directionally consistent with TANAW/LIKHA, but it is not evidence that LIKHA-generated forms are official replacements.
 
 ### Current LIS operational evidence
+
 The LIS public login/update page published current 2026 BOSY/EOSY/BEIS notices, confirming LIS remains an active authoritative workflow surface.
 
 ## Product implications

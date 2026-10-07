@@ -20,6 +20,7 @@ For every overlapping UI file, prefer current main and port only a narrowly iden
 ## Reusable candidates — verify and adapt
 
 ### M01 Academic trust
+
 - assessment lifecycle migration and commands
 - grading computation changes
 - learner score correction/history support
@@ -29,6 +30,7 @@ For every overlapping UI file, prefer current main and port only a narrowly iden
 Risk: High-Fidelity. Re-check grading applicability, blank/zero semantics, completeness/finality and historical snapshots before reuse.
 
 ### M02 Access/session/sync integrity
+
 - teaching-assignment repository changes
 - resume pointer/recovery primitives
 - sync allowlist/routing additions
@@ -36,6 +38,7 @@ Risk: High-Fidelity. Re-check grading applicability, blank/zero semantics, compl
 Risk: High-Fidelity. Reject UI-only authorization. Re-test account switch, reassignment, stale IDs and pending-work handover.
 
 ### M09 Scheduling / school planning
+
 - scheduling engine
 - schedule-plan repository/commands
 - school-planning domain/repository/services
@@ -45,6 +48,7 @@ Risk: High-Fidelity. Reject UI-only authorization. Re-test account switch, reass
 Risk: High-Fidelity. Preserve assignment ≠ draft schedule ≠ published schedule ≠ actual occurrence. Require an independent validity checker and atomic publication.
 
 ### M11 Reporting / review
+
 - review workflow domain/repository/commands/UI
 - attachments/evidence handling
 - class summary / report-card/SF9 projection edits
@@ -52,11 +56,13 @@ Risk: High-Fidelity. Preserve assignment ≠ draft schedule ≠ published schedu
 Risk: High-Fidelity. Reconcile against current official-form evidence; never label generated output official without provenance.
 
 ### M12 TANAW exchange
+
 - TANAW receipt migration/sample exchange concepts
 
 Status: prototype/adapt only until authoritative indicator dictionary and Lock authority exist.
 
 ### M13 Recovery/resources
+
 - attachments
 - school resources / offerings
 - backup command changes
@@ -65,6 +71,7 @@ Status: prototype/adapt only until authoritative indicator dictionary and Lock a
 Verify with migration/reopen and recovery scenarios before any readiness claim.
 
 ### M14 Android
+
 - Android keystore plugin scaffold
 - Android crypto adapter
 - related Cargo/Gradle configuration
@@ -82,6 +89,7 @@ Status: reusable scaffold only. No release claim until actual Android Keystore +
 ## Salvage protocol
 
 For each CTOS milestone:
+
 1. Compare current CTOS source to the specific PR #103 files for that milestone.
 2. Extract the smallest coherent candidate behavior.
 3. Reject stale wiring or UI that conflicts with current main.

@@ -3,6 +3,7 @@
 This registry converts CTOS product invariants into repeatable acceptance cases. Synthetic data only; no learner or personnel PII.
 
 Each case should record:
+
 - case ID
 - milestone
 - invariant
@@ -17,6 +18,7 @@ Each case should record:
 A case is not passed because the expected answer looks plausible. It passes only when the named validator ran on the exact source under test.
 
 ## Suites
+
 - golden-path.md — end-to-end teacher journey
 - grading-cases.md — calculation, completeness, finality, history
 - access-cases.md — assignment, session, revocation, sync scope
