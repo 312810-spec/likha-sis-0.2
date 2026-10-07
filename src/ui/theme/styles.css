@@ -3615,3 +3615,57 @@ label {
     animation: none;
   }
 }
+
+
+/* FORGE school-head operations layout. */
+.school-operations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--color-border-soft);
+  margin-top: calc(var(--spacing-unit) * 1.25);
+}
+
+.school-operation-section {
+  min-width: 0;
+  padding: calc(var(--spacing-unit) * 1.5);
+  border-right: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.school-operation-section:nth-child(2n) {
+  border-right: 0;
+}
+
+.school-operation-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+}
+
+.school-operation-heading h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: -0.015em;
+}
+
+.school-operation-eyebrow {
+  margin: 0 0 3px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 860px) {
+  .school-operations {
+    grid-template-columns: 1fr;
+  }
+
+  .school-operation-section,
+  .school-operation-section:nth-child(2n) {
+    border-right: 0;
+  }
+}
