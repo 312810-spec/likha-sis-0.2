@@ -11,7 +11,7 @@
 - **Mandaue Division seal**
   - URL: `https://hris.depedmandaue.net/mandaue_logo.png`
   - Purpose: verified Division branding source.
-  - Status: **VERIFIED BRAND ASSET**. Registration as an official-site asset does not by itself authorize placement on a generated official report; follow the approved template/branding requirement for that artifact.
+  - Status: **VERIFIED BRAND ASSET / RESTRICTED USE**. Public hosting does not authorize LIKHA/TANAW branding use. DepEd's current Project Bukas terms prohibit use of the Department's name/trademark/official mark/emblem/logo/insignia without prior written consent. Preserve only when an authoritative approved template already includes/requires it or written authority is documented.
 - **DepEd Order No. 11, s. 2018**
   - Purpose: preparation/checking of school forms and LIS-generated electronic forms.
   - Status: **PRIMARY NATIONAL POLICY**. Software must preserve the LIS-generated-form boundary; a LIKHA projection must not be misrepresented as the LIS original.
