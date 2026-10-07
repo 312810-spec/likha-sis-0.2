@@ -3657,3 +3657,57 @@ label {
     border-right: 0;
   }
 }
+
+
+/* FORGE compact school summary rail. */
+.kpi-strip {
+  gap: 0;
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.kpi {
+  border: 0;
+  border-right: 1px solid var(--color-border-soft);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: calc(var(--spacing-unit) * 1.2);
+}
+
+.kpi:last-child {
+  border-right: 0;
+}
+
+.kpi[data-tone="productive"],
+.kpi[data-tone="success"],
+.kpi[data-tone="warning"],
+.kpi[data-tone="danger"] {
+  border-left: 0;
+}
+
+.kpi[data-tone="productive"] .kpi-value {
+  color: var(--color-productive);
+}
+
+.kpi[data-tone="success"] .kpi-value {
+  color: var(--color-success);
+}
+
+.kpi[data-tone="warning"] .kpi-value {
+  color: var(--color-warning);
+}
+
+.kpi[data-tone="danger"] .kpi-value {
+  color: var(--color-danger);
+}
+
+@media (max-width: 520px) {
+  .kpi:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-border-soft);
+  }
+}
