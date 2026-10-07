@@ -210,7 +210,7 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
         <EmptyState
           tone="success"
           title="No sync conflicts need review"
-          description="There are no unresolved conflicts waiting for a teacher decision right now."
+          description="There are no sync conflicts to review right now."
         />
       ) : (
         <ul className="conflict-review-list" aria-label="Sync conflicts">
