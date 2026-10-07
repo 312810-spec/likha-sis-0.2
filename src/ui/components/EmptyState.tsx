@@ -28,7 +28,9 @@ export function EmptyState({
   return (
     <section className="empty-state empty-state-structured" data-tone={tone} aria-label={title}>
       {title ? <h3>{title}</h3> : null}
-      {description !== undefined ? <div className="empty-state-description">{description}</div> : null}
+      {description !== undefined ? (
+        <div className="empty-state-description">{description}</div>
+      ) : null}
       {children ? <div className="empty-state-description">{children}</div> : null}
       {action ? <div className="empty-state-action">{action}</div> : null}
     </section>

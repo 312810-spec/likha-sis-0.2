@@ -356,7 +356,10 @@ function describeNextMeeting(meetings: ScheduleMeeting[], now = new Date()): str
       if (daysAway === 0 && !isCurrent && start !== null && start <= minute) daysAway = 7;
       return { meeting, daysAway, start: start ?? 24 * 60, isCurrent };
     })
-    .sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent) || a.daysAway - b.daysAway || a.start - b.start);
+    .sort(
+      (a, b) =>
+        Number(b.isCurrent) - Number(a.isCurrent) || a.daysAway - b.daysAway || a.start - b.start,
+    );
 
   const next = ranked[0];
   if (!next) return null;
@@ -364,7 +367,12 @@ function describeNextMeeting(meetings: ScheduleMeeting[], now = new Date()): str
   if (next.isCurrent) {
     return `Now · until ${next.meeting.endsAt}${room}`;
   }
-  const day = next.daysAway === 0 ? "Today" : next.daysAway === 1 ? "Tomorrow" : WEEKDAY_LABELS[next.meeting.weekday];
+  const day =
+    next.daysAway === 0
+      ? "Today"
+      : next.daysAway === 1
+        ? "Tomorrow"
+        : WEEKDAY_LABELS[next.meeting.weekday];
   return `${day} · ${next.meeting.startsAt}–${next.meeting.endsAt}${room}`;
 }
 
@@ -463,7 +471,8 @@ function ClassRosterSummary({
             <span className="folio-signal-value">Attendance insight unavailable</span>
           ) : learnersWithAbsenceStreak > 0 ? (
             <span className="folio-signal-value">
-              {learnersWithAbsenceStreak} learner{learnersWithAbsenceStreak === 1 ? "" : "s"} with an active absence streak
+              {learnersWithAbsenceStreak} learner{learnersWithAbsenceStreak === 1 ? "" : "s"} with
+              an active absence streak
             </span>
           ) : (
             <span className="folio-signal-value">No active absence streaks</span>
@@ -478,7 +487,9 @@ function ClassRosterSummary({
             <span className="folio-signal-value">Class insight unavailable</span>
           ) : (
             <span className="folio-signal-value">
-              {result?.heldSessionCount ?? 0} held session{(result?.heldSessionCount ?? 0) === 1 ? "" : "s"} · {rows.length} learner{rows.length === 1 ? "" : "s"}
+              {result?.heldSessionCount ?? 0} held session
+              {(result?.heldSessionCount ?? 0) === 1 ? "" : "s"} · {rows.length} learner
+              {rows.length === 1 ? "" : "s"}
             </span>
           )}
         </div>
@@ -511,7 +522,10 @@ function ClassRosterSummary({
         />
       ) : (
         <>
-          <figure className="attendance-snapshot" aria-labelledby={`attendance-snapshot-${assignmentId}`}>
+          <figure
+            className="attendance-snapshot"
+            aria-labelledby={`attendance-snapshot-${assignmentId}`}
+          >
             <figcaption id={`attendance-snapshot-${assignmentId}`}>
               Attendance snapshot across recorded subject sessions
             </figcaption>

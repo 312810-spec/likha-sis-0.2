@@ -3272,7 +3272,6 @@ label {
   }
 }
 
-
 /* FORGE premium shell — persistent desktop sidebar collapse. */
 .app-layout {
   transition: grid-template-columns var(--motion-duration-meaningful) var(--motion-easing-standard);
@@ -3379,7 +3378,6 @@ label {
     transform: rotate(-90deg);
   }
 }
-
 
 /* FORGE premium teacher workspace primitives. */
 :root {
@@ -3604,7 +3602,6 @@ label {
   }
 }
 
-
 /* FORGE school-head operations layout. */
 .school-operations {
   display: grid;
@@ -3657,7 +3654,6 @@ label {
     border-right: 0;
   }
 }
-
 
 /* FORGE compact school summary rail. */
 .kpi-strip {

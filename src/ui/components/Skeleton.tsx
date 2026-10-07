@@ -14,7 +14,11 @@ interface SkeletonProps {
 export function Skeleton({ label, lines = 3, compact = false }: SkeletonProps) {
   const safeLines = Math.max(1, Math.min(lines, 8));
   return (
-    <div className={compact ? "skeleton skeleton-compact" : "skeleton"} role="status" aria-label={label}>
+    <div
+      className={compact ? "skeleton skeleton-compact" : "skeleton"}
+      role="status"
+      aria-label={label}
+    >
       <span className="visually-hidden">{label}</span>
       <div className="skeleton-heading" aria-hidden="true" />
       {Array.from({ length: safeLines }, (_, index) => (
