@@ -80,6 +80,30 @@ describe("Sidebar", () => {
     expect(onNavigate).toHaveBeenCalledWith("school-forms");
   });
 
+  it("keeps icon-only destinations accessible when collapsed", async () => {
+    const onNavigate = vi.fn();
+    const onToggleCollapse = vi.fn();
+
+    render(
+      <ModeProvider>
+        <Sidebar
+          session={session}
+          activeTab="workspace"
+          onNavigate={onNavigate}
+          collapsed
+          collapsible
+          onToggleCollapse={onToggleCollapse}
+        />
+      </ModeProvider>,
+    );
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Calendar" }));
+    expect(onNavigate).toHaveBeenCalledWith("calendar");
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Expand navigation" }));
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+  });
+
   it("has no axe violations on a default render", async () => {
     const { container } = renderSidebar();
     await expectNoAccessibilityViolations(container);
