@@ -59,6 +59,10 @@ Retry with a changed hypothesis and new evidence; stop repeating unchanged failu
 Report what changed, what actually ran and the next unresolved step. A browser
 mock, compiled package or green scan alone does not establish native readiness.
 
+## Context7 technical docs
+
+For current/version-sensitive external library or framework facts, load `.agents/skills/context7-docs/SKILL.md` (or the Claude mirror) after inspecting the actual package/crate version. Context7 is development evidence only: sanitize queries, prefer version-specific docs, fall back to official upstream docs, and still run the normal LIKHA verification ladder. Never route learner/school records through it and never add it to the teacher app runtime by implication.
+
 ## Current stable tools
 
 Use latest stable releases regardless of earlier preferences. Verify official
