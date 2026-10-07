@@ -44,4 +44,4 @@ The LIS public login/update page published current 2026 BOSY/EOSY/BEIS notices, 
 - Never label a generated form official from styling alone.
 - Keep SF8 inactive until the project obtains confirmed health workflow/rules.
 - Keep TANAW Lock authority and West 1 indicator mapping PENDING until authoritative evidence is obtained.
-- The Mandaue Division seal may be registered as a verified branding asset from an official Division host; do not automatically place it on official reports unless an approved template requires/allows it.
+- The Mandaue Division seal is a verified official-site asset, but do **not** bundle, reproduce, or use it as LIKHA/TANAW branding merely because it is publicly hosted. DepEd's current Project Bukas terms state that the Department's name, trademark, official mark, official emblem, logo, or insignia shall not be used without prior written consent. Preserve a seal only when an authoritative approved template already requires it or written permission/authority is documented.
