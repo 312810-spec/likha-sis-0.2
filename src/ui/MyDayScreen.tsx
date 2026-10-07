@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MyDayApplicationService } from "../application/my-day-service";
-import type { MyDaySummary } from "../domain/my-day";
+import type { MyDayPendingFollowup, MyDaySummary } from "../domain/my-day";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -27,6 +27,12 @@ interface MyDayScreenProps {
   onStartClassroom: (teachingAssignmentId: string) => void;
   /** Opens the sync conflict review queue -- see `ConflictReviewScreen`. */
   onReviewConflicts: () => void;
+  /** Opens the learning-support plan for one standing follow-up marker --
+   * CTOS.md §M08's loop, the action CTOS.md §6.1's "learner follow-up due
+   * where appropriate" has been pointing at. Same narrow callback shape as
+   * `onCheckAttendance`: the marker's own row is the only thing passed,
+   * and the screen it opens re-derives everything authoritative. */
+  onPlanSupport: (followup: MyDayPendingFollowup) => void;
 }
 
 /** `0 = Sunday … 6 = Saturday`, matching `domain/schedule-meeting.ts`'s
@@ -62,6 +68,7 @@ export function MyDayScreen({
   onOpenClassRecord,
   onStartClassroom,
   onReviewConflicts,
+  onPlanSupport,
 }: MyDayScreenProps) {
   const { mode } = useTeacherMode();
   const [summary, setSummary] = useState<MyDaySummary | null>(null);
@@ -260,7 +267,9 @@ export function MyDayScreen({
             <summary>Needs your attention today</summary>
             {summary.pendingAttendance.length === 0 &&
             summary.pendingAssignments.length === 0 &&
-            summary.pendingConflicts.length === 0 ? (
+            summary.pendingConflicts.length === 0 &&
+            summary.pendingScoring.length === 0 &&
+            summary.pendingFollowups.length === 0 ? (
               <EmptyState>Nothing pending — you&rsquo;re all caught up for today.</EmptyState>
             ) : (
               <ul className="workspace-priority-rail">
@@ -311,6 +320,45 @@ export function MyDayScreen({
                     </button>
                   </li>
                 )}
+                {summary.pendingScoring.map((task) => (
+                  <li key={task.classRecordId} className="workspace-priority-item is-partial">
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.subjectName} — {task.sectionName}
+                      </span>
+                      <span className="field-hint">
+                        {task.recordedCount} of {task.totalCount} scores recorded in{" "}
+                        {task.gradingPeriodLabel}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={() => onOpenClassRecord(task.teachingAssignmentId)}
+                    >
+                      Open class record
+                    </button>
+                  </li>
+                ))}
+                {summary.pendingFollowups.map((task) => (
+                  <li key={task.markerId} className="workspace-priority-item is-partial">
+                    <div className="workspace-priority-main">
+                      <span className="workspace-priority-section">
+                        {task.learnerGivenName} {task.learnerFamilyName}
+                      </span>
+                      <span className="field-hint">
+                        follow-up in {task.subjectName} — {task.sectionName} · {task.reason}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-primary"
+                      onClick={() => onPlanSupport(task)}
+                    >
+                      Plan support
+                    </button>
+                  </li>
+                ))}
               </ul>
             )}
           </details>

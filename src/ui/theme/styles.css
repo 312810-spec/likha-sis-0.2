@@ -2477,6 +2477,48 @@ label {
   gap: var(--space-2);
   margin-top: var(--space-2);
 }
+
+/* CTOS M08 — the learning-support plan. The case list reuses the priority
+   rail (`.workspace-priority-*`), which lays its spans out as one flowing
+   row; a plan's labeled fields need to stack into readable lines instead,
+   and the plan form needs its own column direction so the three textareas
+   sit under their labels rather than beside each other. */
+.support-plan-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--spacing-unit);
+}
+
+.support-plan-form > h3 {
+  margin: 0;
+}
+
+.support-plan-field {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.support-plan-label {
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-right: calc(var(--spacing-unit) * 0.4);
+}
+
+.support-plan-status {
+  flex-basis: 100%;
+}
+
+.support-step-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: calc(var(--spacing-unit) * 0.5);
+  flex-basis: 100%;
+}
 @media (min-width: 861px) and (max-width: 1080px) {
   .app-topbar-identity {
     display: none;

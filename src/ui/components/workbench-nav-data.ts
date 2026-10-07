@@ -30,7 +30,8 @@ export type SignedInTab =
   | "devices"
   | "conflict-review"
   | "sync-status"
-  | "school-branding";
+  | "school-branding"
+  | "learning-support";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -72,6 +73,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "conflict-review": "Review Sync Conflicts",
   "sync-status": "Sync Status",
   "school-branding": "School Logo",
+  "learning-support": "Learning Support",
 };
 
 interface NavGroup {
@@ -159,7 +161,13 @@ export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
 
 /** Keeps a meaningful primary destination selected while using its tools. */
 export function primaryTabFor(tab: SignedInTab): SignedInTab {
-  if (tab === "workspace" || tab === "my-day" || tab === "today-classes") return "workspace";
+  if (
+    tab === "workspace" ||
+    tab === "my-day" ||
+    tab === "today-classes" ||
+    tab === "learning-support"
+  )
+    return "workspace";
   if (["adviser-view", "attendance", "section-adviser"].includes(tab)) return "adviser-view";
   if (["class-records", "grading-periods"].includes(tab)) return "class-records";
   if (["school-forms", "monthly-summary", "sf1-import"].includes(tab)) return "school-forms";
@@ -172,6 +180,9 @@ const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
   "teaching-assignments": "sections",
   "section-adviser": "sections",
   "schedule-meetings": "sections",
+  // Reached only from My Day's attention rail, with the occurrence and the
+  // marker already selected — see `App.tsx`'s `supportContext`.
+  "learning-support": "my-day",
 };
 
 /** Collapses a contextual sub-screen tab to the group destination it was

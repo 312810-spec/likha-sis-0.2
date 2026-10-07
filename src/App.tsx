@@ -14,6 +14,7 @@ import {
   gradingService,
   learnerScoreService,
   learnerScoreSyncStatusService,
+  learnerSupportService,
   lessonPlanService,
   myDayService,
   learnerService,
@@ -55,6 +56,7 @@ import { ErrorBoundary } from "./ui/components/ErrorBoundary";
 import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
+import { LearningSupportScreen } from "./ui/LearningSupportScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
@@ -168,12 +170,34 @@ function App() {
     teachingAssignmentId: string;
     subjectName: string;
   } | null>(null);
+  // Set only by MyDayScreen's "Plan support" action on a standing follow-up
+  // marker, so LearningSupportScreen opens for that marker's class
+  // occurrence -- same narrowly-typed handoff pattern as the ids above, not
+  // a router/global store. The occurrence id is canonical; the subject,
+  // section and date are display hints copied from an already-authorized
+  // read model (`MyDaySummary.pendingFollowups`), and every support command
+  // re-derives school and teacher server-side from the occurrence itself.
+  // The marker travels along so the plan form can draft the need from its
+  // reason; the screen clears it locally once a plan is written.
+  const [supportContext, setSupportContext] = useState<{
+    classOccurrenceId: string;
+    subjectName: string;
+    sectionName: string;
+    occurrenceDate: string;
+    marker: {
+      sectionMembershipId: string;
+      learnerGivenName: string;
+      learnerFamilyName: string;
+      reason: string;
+    };
+  } | null>(null);
 
   function clearClassWorkContext() {
     setClassWorkContext(null);
     setSubjectAttendanceAssignmentId(null);
     setClassRecordAssignmentId(null);
     setClassroomAssignmentId(null);
+    setSupportContext(null);
   }
 
   function clearSessionWorkContexts() {
@@ -186,6 +210,33 @@ function App() {
     clearSessionWorkContexts();
     setSession(null);
     setSessionExpiredNotice("Your session has expired. Please sign in again.");
+  }
+
+  /** Opens the learning-support plan for one follow-up marker — the one
+   * `MyDayScreen` handoff used by both My Day entry points. */
+  function planSupportFor(followup: {
+    classOccurrenceId: string;
+    subjectName: string;
+    sectionName: string;
+    occurrenceDate: string;
+    sectionMembershipId: string;
+    learnerGivenName: string;
+    learnerFamilyName: string;
+    reason: string;
+  }) {
+    setSupportContext({
+      classOccurrenceId: followup.classOccurrenceId,
+      subjectName: followup.subjectName,
+      sectionName: followup.sectionName,
+      occurrenceDate: followup.occurrenceDate,
+      marker: {
+        sectionMembershipId: followup.sectionMembershipId,
+        learnerGivenName: followup.learnerGivenName,
+        learnerFamilyName: followup.learnerFamilyName,
+        reason: followup.reason,
+      },
+    });
+    setActiveTab("learning-support");
   }
 
   useEffect(() => {
@@ -614,6 +665,7 @@ function App() {
                     setClassroomAssignmentId(teachingAssignmentId);
                   }}
                   onReviewConflicts={() => setActiveTab("conflict-review")}
+                  onPlanSupport={planSupportFor}
                 />
               )
             ) : activeTab === "today-classes" ? (
@@ -705,6 +757,41 @@ function App() {
                 syncStatusService={syncStatusService}
                 onReviewConflicts={() => setActiveTab("conflict-review")}
               />
+            ) : activeTab === "learning-support" ? (
+              supportContext ? (
+                <LearningSupportScreen
+                  key={supportContext.classOccurrenceId}
+                  learnerSupportService={learnerSupportService}
+                  classOccurrenceService={classOccurrenceService}
+                  classOccurrenceId={supportContext.classOccurrenceId}
+                  subjectName={supportContext.subjectName}
+                  sectionName={supportContext.sectionName}
+                  occurrenceDate={supportContext.occurrenceDate}
+                  targetMarker={supportContext.marker}
+                  onBack={() => {
+                    setSupportContext(null);
+                    setActiveTab("my-day");
+                  }}
+                />
+              ) : (
+                <MyDayScreen
+                  myDayService={myDayService}
+                  onOpenClassContext={setClassWorkContext}
+                  onBackToToday={() => setClassWorkContext(null)}
+                  onCheckAttendance={(teachingAssignmentId) => {
+                    setSubjectAttendanceAssignmentId(teachingAssignmentId);
+                    setActiveTab("subject-attendance");
+                  }}
+                  onOpenClassRecord={(teachingAssignmentId) => {
+                    setClassRecordAssignmentId(teachingAssignmentId);
+                  }}
+                  onStartClassroom={(teachingAssignmentId) => {
+                    setClassroomAssignmentId(teachingAssignmentId);
+                  }}
+                  onReviewConflicts={() => setActiveTab("conflict-review")}
+                  onPlanSupport={planSupportFor}
+                />
+              )
             ) : null}
           </ErrorBoundary>
         </AppLayout>

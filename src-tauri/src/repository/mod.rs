@@ -14,6 +14,7 @@ pub mod grading_computation;
 pub mod installation;
 pub mod learner;
 pub mod learner_score;
+pub mod learner_support;
 pub mod lesson_plan;
 pub mod my_day;
 pub mod reference_geo;

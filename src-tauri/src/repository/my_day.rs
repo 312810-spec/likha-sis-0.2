@@ -1,9 +1,11 @@
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::Serialize;
 
 use crate::error::AppResult;
 use crate::repository::subject_attendance::{self, SessionStatus};
-use crate::repository::{schedule_meeting, sync_conflict_review, teaching_assignment};
+use crate::repository::{
+    class_record, schedule_meeting, sync_conflict_review, teaching_assignment,
+};
 
 /// One occurrence of a class meeting today, ready for display -- a flat
 /// projection of a `TeachingAssignmentDetail` joined with one of today's
@@ -58,6 +60,68 @@ pub struct MyDayPendingAssignment {
     pub section_name: String,
 }
 
+/// One of this teacher's class records that has assessment items set up but
+/// not every eligible learner scored yet — CTOS.md §6.1's "unfinished
+/// assessment work", the one item on that list `MyDaySummary` did not used
+/// to surface. Derived, never stored: a class record already carries
+/// `item_count`/`recorded_count`/`total_eligible`, so this is the same
+/// completion readout the class-record workspace shows, lifted to where the
+/// teacher plans the day instead of only where they open the record.
+///
+/// @public Consumed structurally, as `MyDaySummary.pendingScoring`'s
+/// element type -- see `MyDayScheduleItem`'s identical note. */
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MyDayPendingScoring {
+    /// The teaching assignment this class record belongs to, so the "open
+    /// the class record" action can reuse the same assignment-keyed handoff
+    /// every other pending item uses.
+    pub teaching_assignment_id: String,
+    pub class_record_id: String,
+    pub subject_name: String,
+    pub section_name: String,
+    pub grading_period_label: String,
+    pub recorded_count: i64,
+    /// `item_count * total_eligible` — the maximum `recorded_count` could
+    /// reach once every item is fully scored, the same product
+    /// `ClassRecordDetail` documents. Shown alongside `recorded_count`
+    /// because "3 of 12 recorded" is actionable and "3 recorded" is not.
+    pub total_count: i64,
+}
+
+/// One still-open follow-up marker on one of this teacher's class
+/// occurrences — CTOS.md §6.1's "learner follow-up due where appropriate",
+/// and CTOS M08's loop staring back at the teacher: this marker is the
+/// evidence step, and the support case it can become (§M08) is the rest. A
+/// marker is cleared, never deleted, so this list is only ever the
+/// *standing* ones — once a teacher clears a marker it stays answerable in
+/// the occurrence's own history but stops demanding the day's attention.
+///
+/// The learner's name is joined here, at the repository, never
+/// client-supplied: the whole point of the list is a teacher reading "who
+/// needs me today", and a membership id says nothing.
+///
+/// @public Consumed structurally, as `MyDaySummary.pendingFollowups`'s
+/// element type -- see `MyDayScheduleItem`'s identical note. */
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MyDayPendingFollowup {
+    pub marker_id: String,
+    pub class_occurrence_id: String,
+    /// The enrollment span the marker was raised on — the key
+    /// `open_learner_support_case` needs so the plan the teacher writes from
+    /// this row lands on the same learner. Carried through rather than
+    /// re-derived in the UI because the UI never knows enrollments.
+    pub section_membership_id: String,
+    pub occurrence_date: String,
+    pub subject_name: String,
+    pub section_name: String,
+    pub learner_given_name: String,
+    pub learner_family_name: String,
+    pub reason: String,
+    pub marked_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MyDaySummary {
@@ -70,6 +134,12 @@ pub struct MyDaySummary {
     pub pending_attendance: Vec<MyDayPendingAttendance>,
     pub pending_assignments: Vec<MyDayPendingAssignment>,
     pub pending_conflicts: Vec<MyDayPendingConflict>,
+    /// Class records with items set up but not fully scored — CTOS.md §6.1's
+    /// "unfinished assessment work".
+    pub pending_scoring: Vec<MyDayPendingScoring>,
+    /// Standing follow-up markers on this teacher's own classes — CTOS.md
+    /// §6.1's "learner follow-up due where appropriate".
+    pub pending_followups: Vec<MyDayPendingFollowup>,
     /// Whether this teacher has any `teaching_assignments` at all. This is what
     /// separates "no classes scheduled today" (a schedule exists, today is just
     /// free) from "you are not assigned to any class yet" (nothing to display,
@@ -170,14 +240,107 @@ pub fn summary_for_teacher(
         })
         .collect();
 
+    // Unfinished assessment work and standing follow-up markers — the two
+    // CTOS.md §6.1 items that were not part of this aggregate before M08.
+    // Both are read-only derivations over data that already exists; neither
+    // invents a task table.
+    let pending_scoring = pending_scoring_for(conn, school_id, &assignments)?;
+    let pending_followups = pending_followups_for(conn, school_id, teacher_user_id)?;
+
     Ok(MyDaySummary {
         schedule,
         next,
         pending_attendance,
         pending_assignments,
         pending_conflicts,
+        pending_scoring,
+        pending_followups,
         has_any_assignments: !assignments.is_empty(),
     })
+}
+
+/// Every one of this teacher's class records that has assessment items set
+/// up but is not fully scored yet. Deliberately conservatively scoped: a
+/// class record with no items at all is *not* listed here — that is "nothing
+/// set up yet", which the class-records screen already distinguishes, and
+/// it is not a piece of unfinished scoring work.
+fn pending_scoring_for(
+    conn: &Connection,
+    school_id: &str,
+    assignments: &[teaching_assignment::TeachingAssignmentDetail],
+) -> AppResult<Vec<MyDayPendingScoring>> {
+    let mut pending = Vec::new();
+    for assignment in assignments {
+        for record in
+            class_record::list_by_section_in_school(conn, school_id, &assignment.section_id)?
+        {
+            if record.subject_id != assignment.subject_id {
+                continue;
+            }
+            let total = record.item_count * record.total_eligible;
+            if record.item_count > 0 && record.recorded_count < total {
+                pending.push(MyDayPendingScoring {
+                    teaching_assignment_id: assignment.id.clone(),
+                    class_record_id: record.id,
+                    subject_name: record.subject_name,
+                    section_name: record.section_name,
+                    grading_period_label: record.grading_period_label,
+                    recorded_count: record.recorded_count,
+                    total_count: total,
+                });
+            }
+        }
+    }
+    Ok(pending)
+}
+
+/// Every follow-up marker this teacher has set on one of their own classes
+/// and not yet cleared, joined to the names a "who needs me today" list has
+/// to show. One indexed query rather than a per-occurrence round trip: the
+/// marker table carries no teacher of its own, so the join through
+/// `class_occurrences` → `teaching_assignments` is what scopes it to this
+/// teacher's classes, and that scoping belongs in SQL, not in Rust after
+/// reading the whole school's markers.
+fn pending_followups_for(
+    conn: &Connection,
+    school_id: &str,
+    teacher_user_id: &str,
+) -> AppResult<Vec<MyDayPendingFollowup>> {
+    let mut stmt = conn.prepare(
+        "SELECT m.id, m.class_occurrence_id, m.section_membership_id, \
+                o.occurrence_date, \
+                subj.name, sec.name, l.given_name, l.family_name, \
+                m.reason, m.marked_at \
+         FROM learner_followup_markers m \
+         JOIN class_occurrences o ON o.id = m.class_occurrence_id \
+         JOIN teaching_assignments ta ON ta.id = o.teaching_assignment_id \
+         JOIN subjects subj ON subj.id = ta.subject_id \
+         JOIN sections sec ON sec.id = ta.section_id \
+         JOIN section_memberships sm ON sm.id = m.section_membership_id \
+         JOIN learners l ON l.id = sm.learner_id \
+         WHERE m.school_id = ?1 AND ta.teacher_user_id = ?2 \
+           AND m.cleared_at IS NULL \
+         ORDER BY o.occurrence_date DESC, l.family_name, l.given_name",
+    )?;
+    let rows = stmt.query_map(params![school_id, teacher_user_id], |row| {
+        Ok(MyDayPendingFollowup {
+            marker_id: row.get(0)?,
+            class_occurrence_id: row.get(1)?,
+            section_membership_id: row.get(2)?,
+            occurrence_date: row.get(3)?,
+            subject_name: row.get(4)?,
+            section_name: row.get(5)?,
+            learner_given_name: row.get(6)?,
+            learner_family_name: row.get(7)?,
+            reason: row.get(8)?,
+            marked_at: row.get(9)?,
+        })
+    })?;
+    let mut pending = Vec::new();
+    for row in rows {
+        pending.push(row?);
+    }
+    Ok(pending)
 }
 
 /// True when today's session for this assignment either hasn't been opened
@@ -688,5 +851,278 @@ mod tests {
                 .unwrap();
         assert!(off_day.has_any_assignments);
         assert!(off_day.schedule.is_empty());
+    }
+
+    /// The reference-data ids `assessment_item`'s own tests established:
+    /// a K-10 weight policy, term 1, and the Written Works category.
+    const TERM_1: &str = "00000000-0000-7000-8000-000000000011";
+    const WRITTEN_WORKS: &str = "00000000-0000-7000-8000-000000000311";
+    const K10_POLICY: &str = "00000000-0000-7000-8000-000000000041";
+
+    #[test]
+    fn pending_scoring_lists_a_class_record_with_items_that_is_not_fully_scored() {
+        use crate::repository::{
+            assessment_item, class_record, grading, learner, learner_score, section_membership,
+        };
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let section_id = ta_repo::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .unwrap()
+            .section_id;
+        let period = grading::create(
+            &conn,
+            &f.school_id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        let record = class_record::create(
+            &conn,
+            &f.school_id,
+            &section_id,
+            // The assignment's own subject, which is what scopes a class
+            // record to this teacher's day.
+            &ta_repo::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+                .unwrap()
+                .unwrap()
+                .subject_id,
+            &period.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assessment_item::create(
+            &conn,
+            &f.school_id,
+            &record.id,
+            WRITTEN_WORKS,
+            "Quiz 1",
+            20.0,
+        )
+        .unwrap()
+        .unwrap();
+        let learner = learner::create(&conn, &f.school_id, "Ana", "Cruz", None, None).unwrap();
+        section_membership::enroll(&conn, &f.school_id, &section_id, &learner.id, "2026-06-01")
+            .unwrap();
+
+        let summary =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+
+        assert_eq!(summary.pending_scoring.len(), 1);
+        assert_eq!(summary.pending_scoring[0].class_record_id, record.id);
+        assert_eq!(summary.pending_scoring[0].recorded_count, 0);
+        assert_eq!(
+            summary.pending_scoring[0].total_count, 1,
+            "one item times one eligible learner"
+        );
+        assert_eq!(summary.pending_scoring[0].grading_period_label, "1st Term");
+
+        // Recording the one outstanding score clears the item.
+        learner_score::record(
+            &conn,
+            &f.school_id,
+            &assessment_item::list_by_class_record(&conn, &f.school_id, &record.id).unwrap()[0].id,
+            &learner.id,
+            learner_score::LearnerScoreStatus::Scored,
+            Some(18.0),
+            &f.teacher_id,
+            None,
+        )
+        .unwrap();
+
+        let after =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+        assert!(
+            after.pending_scoring.is_empty(),
+            "once every eligible learner is scored this is not unfinished work"
+        );
+    }
+
+    #[test]
+    fn pending_scoring_ignores_a_class_record_with_no_items_set_up_yet() {
+        use crate::repository::{class_record, grading};
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment = ta_repo::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .unwrap();
+        let period = grading::create(
+            &conn,
+            &f.school_id,
+            "2026-2027",
+            TERM_1,
+            "2026-06-08",
+            "2026-09-15",
+        )
+        .unwrap()
+        .unwrap();
+        class_record::create(
+            &conn,
+            &f.school_id,
+            &assignment.section_id,
+            &assignment.subject_id,
+            &period.id,
+            K10_POLICY,
+            None,
+        )
+        .unwrap()
+        .unwrap();
+
+        let summary =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+
+        assert!(
+            summary.pending_scoring.is_empty(),
+            "a record with no items is not-yet-set-up, not unfinished scoring"
+        );
+    }
+
+    #[test]
+    fn pending_followups_lists_standing_markers_with_the_learners_name() {
+        use crate::repository::{class_occurrence, learner, section_membership};
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let assignment = ta_repo::find_by_id_in_school(&conn, &f.school_id, &f.assignment_id)
+            .unwrap()
+            .unwrap();
+        let learner = learner::create(&conn, &f.school_id, "Ana", "Cruz", None, None).unwrap();
+        let membership = section_membership::enroll(
+            &conn,
+            &f.school_id,
+            &assignment.section_id,
+            &learner.id,
+            "2026-06-01",
+        )
+        .unwrap()
+        .unwrap();
+        let occurrence = match class_occurrence::start(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            &f.teacher_id,
+        )
+        .unwrap()
+        {
+            class_occurrence::OccurrenceOutcome::Started(o) => o,
+            other => panic!("expected Started, got {other:?}"),
+        };
+        class_occurrence::mark_followup(
+            &conn,
+            &f.school_id,
+            &occurrence.id,
+            &membership.id,
+            "Needs the makeup quiz",
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let summary =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+
+        assert_eq!(summary.pending_followups.len(), 1);
+        let pending = &summary.pending_followups[0];
+        assert_eq!(pending.learner_given_name, "Ana");
+        assert_eq!(pending.learner_family_name, "Cruz");
+        assert_eq!(pending.reason, "Needs the makeup quiz");
+        assert_eq!(pending.subject_name, "Mathematics");
+        assert_eq!(pending.section_name, "Mabini");
+        assert_eq!(pending.occurrence_date, "2026-09-09");
+
+        // Clearing the marker — never deleting it — takes it out of the
+        // day's attention while keeping it answerable in history.
+        class_occurrence::clear_followup(
+            &conn,
+            &f.school_id,
+            &occurrence.id,
+            &membership.id,
+            &f.teacher_id,
+        )
+        .unwrap()
+        .unwrap();
+        let after =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+        assert!(
+            after.pending_followups.is_empty(),
+            "a cleared marker is answered, not outstanding"
+        );
+    }
+
+    #[test]
+    fn pending_followups_are_scoped_to_this_teachers_own_classes() {
+        use crate::repository::{
+            class_occurrence, learner, section_membership, teaching_assignment,
+        };
+        let conn = open_test_db();
+        let f = seed(&conn);
+        let other = user::create_user(&conn, "teacher.b", "password", "Teacher B").unwrap();
+        user::add_school_membership(&conn, &other.id, &f.school_id).unwrap();
+
+        // Give the *other* teacher their own assignment on a different
+        // section, so the two teachers' markers cannot be confused by
+        // school-scoping alone.
+        let other_section = section::create(&conn, &f.school_id, "2026-2027", "8", "Luna").unwrap();
+        let other_subject = subject::create(&conn, &f.school_id, "Science").unwrap();
+        let other_assignment = teaching_assignment::create(
+            &conn,
+            &f.school_id,
+            &other.id,
+            &other_section.id,
+            &other_subject.id,
+        )
+        .unwrap()
+        .unwrap();
+        let learner = learner::create(&conn, &f.school_id, "Ana", "Cruz", None, None).unwrap();
+        let membership = section_membership::enroll(
+            &conn,
+            &f.school_id,
+            &other_section.id,
+            &learner.id,
+            "2026-06-01",
+        )
+        .unwrap()
+        .unwrap();
+        let occurrence = match class_occurrence::start(
+            &conn,
+            &f.school_id,
+            &other_assignment.id,
+            "2026-09-09",
+            &other.id,
+        )
+        .unwrap()
+        {
+            class_occurrence::OccurrenceOutcome::Started(o) => o,
+            other => panic!("expected Started, got {other:?}"),
+        };
+        class_occurrence::mark_followup(
+            &conn,
+            &f.school_id,
+            &occurrence.id,
+            &membership.id,
+            "Someone else's learner",
+            &other.id,
+        )
+        .unwrap()
+        .unwrap();
+
+        let summary =
+            summary_for_teacher(&conn, &f.school_id, &f.teacher_id, 3, "2026-09-09", "07:00")
+                .unwrap();
+
+        assert!(
+            summary.pending_followups.is_empty(),
+            "another teacher's marker is not this teacher's attention"
+        );
     }
 }

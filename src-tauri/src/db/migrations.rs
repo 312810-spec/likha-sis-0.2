@@ -2164,6 +2164,64 @@ pub fn migrations() -> Migrations<'static> {
             ON learner_followup_markers(class_occurrence_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- CTOS M08 — the learning-support case: what a teacher decided to
+        -- *do* about a learner they marked for follow-up. CTOS.md §M08's
+        -- required loop is Evidence → identified need → goal → intervention
+        -- → participation → follow-up → outcome. The evidence and the
+        -- follow-up marker already existed (migration 43/44); this table is
+        -- the middle of that loop, and its outcome end.
+        --
+        -- Every case is anchored to the one class occurrence whose evidence
+        -- gave rise to it, so the same ownership rule that protects a
+        -- follow-up marker (the occurrence's own teacher) protects a case,
+        -- and the authorization re-derives it on every transition rather
+        -- than trusting a client-supplied case id. Keyed to the enrollment
+        -- membership, not a bare learner_id, matching the marker's own
+        -- convention -- the span is who was actually in the section.
+        --
+        -- The status CHECK is the loop's spine, and it is the schema that
+        -- enforces it, not whichever query happens to be writing: `open`
+        -- (need/goal/intervention recorded) can only move to `in_progress`
+        -- once the teacher has recorded `participation`, and only
+        -- `in_progress` can move to `resolved`, which requires `outcome`.
+        -- A resolved case is immutable — the outcome is a historical fact
+        -- about that intervention, not a value a later edit may reinterpret.
+        CREATE TABLE learner_support_cases (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            class_occurrence_id TEXT NOT NULL REFERENCES class_occurrences(id) ON DELETE CASCADE,
+            section_membership_id TEXT NOT NULL REFERENCES section_memberships(id) ON DELETE CASCADE,
+            need TEXT NOT NULL CHECK (length(trim(need)) > 0),
+            goal TEXT NOT NULL CHECK (length(trim(goal)) > 0),
+            intervention TEXT NOT NULL CHECK (length(trim(intervention)) > 0),
+            status TEXT NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open', 'in_progress', 'resolved')),
+            participation TEXT
+                CHECK (participation IS NULL OR length(trim(participation)) > 0),
+            outcome TEXT
+                CHECK (outcome IS NULL OR length(trim(outcome)) > 0),
+            opened_by_user_id TEXT NOT NULL REFERENCES users(id),
+            opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            resolved_at TEXT,
+            -- The loop's ordering is expressed in the data, not inferred:
+            -- participation belongs to an in_progress case only, and an
+            -- outcome only to a resolved one. A CHECK can reference another
+            -- column's value, which is what makes this enforceable at the
+            -- schema rather than only in Rust.
+            CHECK (participation IS NULL OR status <> 'open'),
+            CHECK (outcome IS NULL OR status = 'resolved'),
+            CHECK (resolved_at IS NULL OR status = 'resolved')
+        );
+
+        CREATE INDEX idx_learner_support_cases_occurrence
+            ON learner_support_cases(class_occurrence_id);
+        CREATE INDEX idx_learner_support_cases_membership
+            ON learner_support_cases(section_membership_id);
+        "#,
+        ),
     ])
 }
 

@@ -20,6 +20,8 @@ const SUMMARY: MyDaySummary = {
   ],
   pendingAssignments: [],
   pendingConflicts: [{ id: "c-1", entityKind: "learner" }],
+  pendingScoring: [],
+  pendingFollowups: [],
   hasAnyAssignments: true,
 };
 

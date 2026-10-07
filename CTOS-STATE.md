@@ -1,6 +1,6 @@
 # CTOS State
 
-**Updated:** 2026-10-07
+**Updated:** 2026-10-08
 **Program:** CTOS v3 / FORGE-UHF  
 **Repository:** 312810-spec/likha-sis-0.2
 
@@ -8,21 +8,57 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M07 — Fast evidence capture and review (COMPLETE, PASS)
-- Last completed milestone: M07 (PASS — see docs/ctos/checkpoints/m07.md)
-- Last pushed CTOS execution checkpoint: M07 (tag `ctos-m07-complete`)
-- Next action: execute M08 — Attention + Learning Support (CTOS.md §M08)
+- Current milestone: M08 — Attention + Learning Support (COMPLETE, PASS)
+- Last completed milestone: M08 (PASS — see docs/ctos/checkpoints/m08.md)
+- Last pushed CTOS execution checkpoint: M08 (tag `ctos-m08-complete`)
+- Next action: execute M09 — Teacher Load Maker + Smart Scheduling (CTOS.md §M09)
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
   session-state-retention milestone in the web layer; M06 closed PASS as the
   occurrence-semantics milestone that made the Rust stack reachable from the UI;
   M07 closed PASS as the interaction-speed milestone that made daily attendance
-  and scoring one keystroke per learner and made the correction lineage visible
+  and scoring one keystroke per learner and made the correction lineage visible;
+  M08 closed PASS as the loop-milestone that carried learning evidence to an
+  outcome and surfaced the last two §6.1 attention items
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none after the M07 commit and tag are pushed
+- Dirty/unpushed warning: none after the M08 commit and tag are pushed
+
+## M08 result (checkpoint m08.md)
+
+- Frontend quality: 139 files / 1,321 tests pass (up from 136 / 1,301 — the delta
+  is exactly 20 new tests: 9 in the new `LearningSupportScreen.test.tsx`, 4 in
+  `MyDayScreen.test.tsx`, 4 in the new `learner-support-service.test.ts` and 3 in
+  the new `learner-support-repository.test.ts`; two existing fixtures gained the
+  two new `MyDaySummary` fields without changing any test count)
+- Native Rust: 1,378 passed / 0 failed (up from M07's 1,364 — exactly 14 new
+  tests: 10 in the new `learner_support` module and 4 in `my_day`), `cargo fmt
+--check` clean, `cargo clippy --all-targets -- -D warnings` clean
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings. The new screen is
+  axe-checked in jsdom by its own a11y test, not by the browser harness — the
+  synthetic dev preview renders `AssignedClassFolio` for the "Classes" tab and
+  seeds no occurrences or markers, so there is no fixture path to reach it through
+- CTOS.md §M08's required loop is traversable end to end. The evidence and
+  follow-up ends already existed (M06/M07); M08 built the middle — the need → goal
+  → intervention plan, participation, and outcome — as a persisted case anchored to
+  the occurrence and the enrollment, which is what lets `authorize_own_assignment`
+  protect it. The loop's one-order rule is the schema's property, not the query's:
+  three cross-column CHECK constraints in migration 45, mirroring
+  `OccurrenceStatus`'s M06 precedent
+- The last two CTOS.md §6.1 attention items that were never surfaced now are:
+  `pendingScoring` ("unfinished assessment work") and `pendingFollowups` ("learner
+  follow-up due where appropriate"). Both derived, never stored — no new table and
+  no status column, which is what `my_day.rs`'s docstring commits to
+- Ownership is re-derived from the occurrence on every write; learner names are
+  resolved at the repository by JOIN, never client-supplied. The marker is cleared
+  after the plan is written, in that order, so a failed clear cannot lose the plan
+- Two defects found and fixed: an `ORDER BY opened_at DESC` that was
+  nondeterministic across same-millisecond cases (fixed with an `id DESC`
+  tie-break, since UUIDv7's leading bytes are the generating timestamp), and a
+  `getByText` that matched the marker's reason in both the drafting hint and the
+  prefilled textarea — the same element-boundary trap M06 and M07 hit
 
 ## M07 result (checkpoint m07.md)
 

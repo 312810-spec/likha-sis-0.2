@@ -27,6 +27,8 @@ const SUMMARY: MyDaySummary = {
   ],
   pendingAssignments: [],
   pendingConflicts: [{ id: "c-1", entityKind: "learner" }],
+  pendingScoring: [],
+  pendingFollowups: [],
   hasAnyAssignments: true,
 };
 
@@ -37,6 +39,8 @@ const FREE_DAY_SUMMARY: MyDaySummary = {
   pendingAttendance: [],
   pendingAssignments: [],
   pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
   hasAnyAssignments: true,
 };
 
@@ -47,6 +51,8 @@ const UNASSIGNED_SUMMARY: MyDaySummary = {
   pendingAttendance: [],
   pendingAssignments: [],
   pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
   hasAnyAssignments: false,
 };
 
@@ -59,6 +65,8 @@ const UNSCHEDULED_SUMMARY: MyDaySummary = {
     { teachingAssignmentId: "ta-2", subjectName: "Filipino", sectionName: "Aguinaldo" },
   ],
   pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
   hasAnyAssignments: true,
 };
 
@@ -87,6 +95,7 @@ function renderScreen(
   const onOpenClassRecord = vi.fn();
   const onStartClassroom = vi.fn();
   const onReviewConflicts = vi.fn();
+  const onPlanSupport = vi.fn();
 
   function Host() {
     const [context, setContext] = useState<TeacherClassWorkContext | null>(initialContext);
@@ -101,6 +110,7 @@ function renderScreen(
           onOpenClassRecord={onOpenClassRecord}
           onStartClassroom={onStartClassroom}
           onReviewConflicts={onReviewConflicts}
+          onPlanSupport={onPlanSupport}
         />
       </ModeProvider>
     );
@@ -114,6 +124,7 @@ function renderScreen(
     onOpenClassRecord,
     onStartClassroom,
     onReviewConflicts,
+    onPlanSupport,
   };
 }
 
@@ -234,6 +245,61 @@ describe("MyDayScreen", () => {
     const { onReviewConflicts } = renderScreen();
     await user.click(await screen.findByRole("button", { name: "Review conflicts" }));
     expect(onReviewConflicts).toHaveBeenCalled();
+  });
+
+  it("surfaces unfinished scoring with the class record it belongs to", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecord } = renderScreen({
+      ...SUMMARY,
+      pendingScoring: [
+        {
+          teachingAssignmentId: "ta-1",
+          classRecordId: "cr-1",
+          subjectName: "Mathematics",
+          sectionName: "Mabini",
+          gradingPeriodLabel: "1st Term",
+          recordedCount: 3,
+          totalCount: 12,
+        },
+      ],
+    });
+
+    expect(await screen.findByText("3 of 12 scores recorded in 1st Term")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
+  });
+
+  it("hands a standing follow-up to the learning-support plan with its own enrollment key", async () => {
+    const user = userEvent.setup();
+    const { onPlanSupport } = renderScreen({
+      ...SUMMARY,
+      pendingFollowups: [
+        {
+          markerId: "m-1",
+          classOccurrenceId: "occ-1",
+          sectionMembershipId: "mem-1",
+          occurrenceDate: "2026-09-09",
+          subjectName: "Mathematics",
+          sectionName: "Mabini",
+          learnerGivenName: "Ana",
+          learnerFamilyName: "Cruz",
+          reason: "Left the exit slip blank",
+          markedAt: "2026-09-09T01:30:00.000Z",
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/Left the exit slip blank/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Plan support" }));
+    expect(onPlanSupport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        markerId: "m-1",
+        classOccurrenceId: "occ-1",
+        sectionMembershipId: "mem-1",
+        learnerGivenName: "Ana",
+        learnerFamilyName: "Cruz",
+      }),
+    );
   });
 
   it("retains previously selected class work when the schedule refresh fails", async () => {

@@ -838,7 +838,12 @@ pub fn list_for_assignment(
     Ok(occurrences)
 }
 
-fn find_by_id_in_school(
+/// The one occurrence with this id in this school, or `None`. The
+/// school-scoped lookup M08's support-case module needs to re-derive a
+/// case's owning assignment from its `class_occurrence_id` — same
+/// convention every other repository module's own `find_by_id_in_school`
+/// (`class_record`, `section`, `teaching_assignment`) already follows.
+pub fn find_by_id_in_school(
     conn: &Connection,
     school_id: &str,
     occurrence_id: &str,

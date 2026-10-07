@@ -54,6 +54,59 @@ export interface MyDayPendingAssignment {
   sectionName: string;
 }
 
+/** One of this teacher's class records that has assessment items set up but
+ * not every eligible learner scored yet — CTOS.md §6.1's "unfinished
+ * assessment work", the one item on that list this aggregate did not used to
+ * surface. Derived, never stored: a class record already carries
+ * `itemCount`/`recordedCount`/`totalEligible`, so this is the same completion
+ * readout the class-record workspace shows, lifted to where the teacher plans
+ * the day instead of only where they open the record.
+ *
+ * @public Consumed structurally, as `MyDaySummary.pendingScoring`'s element
+ * type -- see `MyDayScheduleItem`'s identical note. */
+export interface MyDayPendingScoring {
+  /** The teaching assignment this class record belongs to, so the "open the
+   * class record" action can reuse the same assignment-keyed handoff every
+   * other pending item uses. */
+  teachingAssignmentId: string;
+  classRecordId: string;
+  subjectName: string;
+  sectionName: string;
+  gradingPeriodLabel: string;
+  recordedCount: number;
+  /** `itemCount * totalEligible` — the maximum `recordedCount` could reach
+   * once every item is fully scored, the same product `ClassRecordDetail`
+   * documents. Shown alongside `recordedCount` because "3 of 12 recorded" is
+   * actionable and "3 recorded" is not. */
+  totalCount: number;
+}
+
+/** One still-open follow-up marker on one of this teacher's class occurrences
+ * — CTOS.md §6.1's "learner follow-up due where appropriate", and CTOS M08's
+ * loop staring back at the teacher: this marker is the evidence step, and the
+ * support case it can become (§M08) is the rest. A marker is cleared, never
+ * deleted, so this list is only ever the *standing* ones — once a teacher
+ * clears a marker it stays answerable in the occurrence's own history but
+ * stops demanding the day's attention.
+ *
+ * @public Consumed structurally, as `MyDaySummary.pendingFollowups`' element
+ * type -- see `MyDayScheduleItem`'s identical note. */
+export interface MyDayPendingFollowup {
+  markerId: string;
+  classOccurrenceId: string;
+  /** The enrollment span the marker was raised on — the key the plan form
+   * hands to `learnerSupportService.openCase` so the case lands on the same
+   * learner this row names. */
+  sectionMembershipId: string;
+  occurrenceDate: string;
+  subjectName: string;
+  sectionName: string;
+  learnerGivenName: string;
+  learnerFamilyName: string;
+  reason: string;
+  markedAt: string;
+}
+
 export interface MyDaySummary {
   schedule: MyDayScheduleItem[];
   /** The next class still upcoming today, or `null` once every class has
@@ -64,6 +117,12 @@ export interface MyDaySummary {
   pendingAttendance: MyDayPendingAttendance[];
   pendingAssignments: MyDayPendingAssignment[];
   pendingConflicts: MyDayPendingConflict[];
+  /** Class records with items set up but not fully scored — CTOS.md §6.1's
+   * "unfinished assessment work". */
+  pendingScoring: MyDayPendingScoring[];
+  /** Standing follow-up markers on this teacher's own classes — CTOS.md
+   * §6.1's "learner follow-up due where appropriate". */
+  pendingFollowups: MyDayPendingFollowup[];
   /** Whether this teacher has any teaching assignment at all. This is what
    * separates "no classes scheduled today" from "you are not assigned to any
    * class yet" — two situations that both leave `schedule` empty. */
