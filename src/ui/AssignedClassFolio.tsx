@@ -403,7 +403,6 @@ function ClassRosterSummary({
 
   useEffect(() => {
     let active = true;
-    setScheduleStatus("loading");
     void service.listMeetings(assignmentId).then(
       (value) => {
         if (active) {
