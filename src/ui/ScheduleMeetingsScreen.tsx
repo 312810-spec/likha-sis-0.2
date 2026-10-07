@@ -170,7 +170,7 @@ export function ScheduleMeetingsScreen({
         <>
           {meetings.length === 0 ? (
             <EmptyState
-              title="No meetings scheduled yet"
+              title="No meetings scheduled for this class yet."
               description="Add the recurring day and time below when this class schedule is ready."
             />
           ) : (
