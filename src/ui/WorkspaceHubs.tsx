@@ -6,7 +6,7 @@ import { WEEKDAY_LABELS } from "../domain/schedule-meeting";
 import { NAV_GROUPS, type SignedInTab } from "./components/workbench-nav-data";
 import { Page } from "./components/Page";
 import { Alert } from "./components/Alert";
-import { Loading } from "./components/Loading";
+import { Skeleton } from "./components/Skeleton";
 import { EmptyState } from "./components/EmptyState";
 import type { TeacherClassWorkContext } from "./work-context";
 
@@ -212,7 +212,7 @@ export function CalendarScreen({
         {chosen.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
       </h3>
       {loading ? (
-        <Loading label="Loading class schedule…" />
+        <Skeleton label="Loading class schedule…" lines={4} />
       ) : error ? (
         <Alert tone="error">
           <p>{error}</p>
@@ -221,9 +221,10 @@ export function CalendarScreen({
           </button>
         </Alert>
       ) : occurrences.length === 0 ? (
-        <EmptyState>
-          No scheduled classes for this day. Choose another date to view your weekly schedule.
-        </EmptyState>
+        <EmptyState
+          title="No scheduled classes for this day"
+          description="Choose another date to view your saved weekly class schedule."
+        />
       ) : (
         <ol className="calendar-agenda">
           {occurrences.map(({ assignment, meeting }) => (
