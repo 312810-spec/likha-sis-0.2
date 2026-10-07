@@ -1,3 +1,14 @@
+# Context7 technical documentation gateway — 2026-10-07
+
+- **Context7 / `ctx7` CLI (`upstash/context7`)**
+  - Purpose: optional development-time retrieval of current/version-aware external library documentation for Tauri, React, Vite, Playwright, Rust crates, and similar dependencies.
+  - Status: **ADOPT — OPTIONAL / DEVELOPMENT ONLY**.
+  - Upstream re-verification: official Context7 CLI/privacy/pricing/release documentation checked 2026-10-07; observed CLI release `0.5.12` at that checkpoint. The skill must re-check freshness before material use.
+  - Integration: repository-local `context7-docs` skill; no app runtime dependency and no required persistent MCP.
+  - Privacy: send only sanitized technical queries; never learner/personnel records, credentials, proprietary source, logs, or full prompts.
+  - Fallback: official upstream library docs/repository/release notes.
+  - Switch condition: remove/re-evaluate if privacy, quota/cost, freshness, or retrieval quality no longer fits LIKHA.
+
 # Source Registry
 
 ## Grade 12 legacy SHS grading carryover — 2026-09-04
