@@ -13,10 +13,9 @@ import type { Section } from "../../domain/section";
 import type { Sf1ImportHistoryEntry } from "../../domain/sf1-import";
 import type { TeacherLoad } from "../../domain/teacher-load";
 import { Alert } from "../components/Alert";
-import { BentoGrid, Card } from "../components/Card";
 import { EmptyState } from "../components/EmptyState";
 import { Kpi, KpiStrip, type KpiTone } from "../components/KpiStrip";
-import { Loading } from "../components/Loading";
+import { Skeleton } from "../components/Skeleton";
 import { Page } from "../components/Page";
 
 interface SchoolHeadHomeProps {
@@ -255,7 +254,7 @@ export function SchoolHeadHome({
       )}
 
       {loading ? (
-        <Loading label="Loading school overview…" />
+        <Skeleton label="Loading school overview…" lines={7} />
       ) : error ? null : (
         <>
           <KpiStrip>
@@ -274,56 +273,23 @@ export function SchoolHeadHome({
             />
           </KpiStrip>
 
-          <BentoGrid>
-            <Card
-              title="Recent SF1 imports"
-              span={6}
-              keepHalf
-              actions={
-                <button type="button" onClick={onOpenSf1Import}>
-                  History
-                </button>
-              }
-            >
-              {history.length === 0 ? (
-                <EmptyState>No imports yet.</EmptyState>
-              ) : (
-                <ul className="learner-list">
-                  {history.slice(0, RECENT_IMPORT_LIMIT).map((entry) => (
-                    <li key={entry.id}>
-                      {entry.sourceFilename} · {entry.rowsCommitted}{" "}
-                      {entry.rowsCommitted === 1 ? "learner" : "learners"} ·{" "}
-                      {formatImportDate(entry.createdAt)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-
-            <Card title="Manage" span={6} keepHalf>
-              <p className="field-hint">Open the two most common school-record setup tasks.</p>
-              <div className="card-actions">
-                <button type="button" onClick={onManageSections}>
-                  Manage sections
-                </button>
-                <button type="button" onClick={onOpenSf1Import}>
-                  Import learners (SF1)
-                </button>
-              </div>
-            </Card>
-
-            <Card
-              title="Sections without an adviser"
-              span={6}
-              keepHalf
-              actions={
+          <div className="school-operations">
+            <section className="school-operation-section" aria-labelledby="school-attention-title">
+              <div className="school-operation-heading">
+                <div>
+                  <p className="school-operation-eyebrow">Needs attention</p>
+                  <h3 id="school-attention-title">Sections without an adviser</h3>
+                </div>
                 <button type="button" onClick={onManageSections}>
                   Assign
                 </button>
-              }
-            >
+              </div>
               {sectionsWithoutAdviser.length === 0 ? (
-                <EmptyState>Every section has an adviser.</EmptyState>
+                <EmptyState
+                  tone="success"
+                  title="Every section has an adviser."
+                  description="No adviser assignment needs attention right now."
+                />
               ) : (
                 <ul className="learner-list">
                   {sectionsWithoutAdviser.map((section) => (
@@ -333,9 +299,15 @@ export function SchoolHeadHome({
                   ))}
                 </ul>
               )}
-            </Card>
+            </section>
 
-            <Card title="Teaching load" span={6} keepHalf>
+            <section className="school-operation-section" aria-labelledby="school-load-title">
+              <div className="school-operation-heading">
+                <div>
+                  <p className="school-operation-eyebrow">Workload</p>
+                  <h3 id="school-load-title">Teaching load</h3>
+                </div>
+              </div>
               {teachingLoad.length === 0 ? (
                 <EmptyState>No teachers on record.</EmptyState>
               ) : (
@@ -358,8 +330,51 @@ export function SchoolHeadHome({
                   })}
                 </ul>
               )}
-            </Card>
-          </BentoGrid>
+            </section>
+
+            <section className="school-operation-section" aria-labelledby="school-imports-title">
+              <div className="school-operation-heading">
+                <div>
+                  <p className="school-operation-eyebrow">Recent activity</p>
+                  <h3 id="school-imports-title">Recent SF1 imports</h3>
+                </div>
+                <button type="button" onClick={onOpenSf1Import}>
+                  History
+                </button>
+              </div>
+              {history.length === 0 ? (
+                <EmptyState>No imports yet.</EmptyState>
+              ) : (
+                <ul className="learner-list">
+                  {history.slice(0, RECENT_IMPORT_LIMIT).map((entry) => (
+                    <li key={entry.id}>
+                      {entry.sourceFilename} · {entry.rowsCommitted}{" "}
+                      {entry.rowsCommitted === 1 ? "learner" : "learners"} ·{" "}
+                      {formatImportDate(entry.createdAt)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="school-operation-section" aria-labelledby="school-manage-title">
+              <div className="school-operation-heading">
+                <div>
+                  <p className="school-operation-eyebrow">Quick actions</p>
+                  <h3 id="school-manage-title">Manage</h3>
+                </div>
+              </div>
+              <p className="field-hint">Open the two most common school-record setup tasks.</p>
+              <div className="card-actions">
+                <button type="button" onClick={onManageSections}>
+                  Manage sections
+                </button>
+                <button type="button" onClick={onOpenSf1Import}>
+                  Import learners (SF1)
+                </button>
+              </div>
+            </section>
+          </div>
         </>
       )}
     </Page>

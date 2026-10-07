@@ -111,7 +111,8 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(within(nav).getAllByRole("button")).toHaveLength(6);
+    expect(nav.querySelectorAll(".app-nav-item")).toHaveLength(6);
+    expect(within(nav).getByRole("button", { name: "Collapse navigation" })).toBeInTheDocument();
     for (const destination of [
       "Dashboard",
       "My Advisory",

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
@@ -29,6 +29,7 @@ const ASSIGNMENTS: TeachingAssignmentSummary[] = [
 function setup(
   listMyAssignments = vi.fn().mockResolvedValue(ASSIGNMENTS),
   monitor = vi.fn().mockResolvedValue({ heldSessionCount: 0, rows: [] }),
+  listMeetings = vi.fn().mockResolvedValue([]),
 ) {
   const callbacks = {
     onCheckAttendance: vi.fn(),
@@ -39,6 +40,7 @@ function setup(
   const service = {
     listMyAssignments,
     monitor,
+    listMeetings,
   } as unknown as SubjectAttendanceApplicationService;
   const view = (teacherUserId = "teacher-1") => (
     <ModeProvider>
@@ -157,6 +159,7 @@ describe("AssignedClassFolio", () => {
     const service = {
       listMyAssignments: vi.fn().mockResolvedValue(ASSIGNMENTS),
       monitor: vi.fn().mockResolvedValue(null),
+      listMeetings: vi.fn().mockResolvedValue([]),
     } as unknown as SubjectAttendanceApplicationService;
     render(
       <ModeProvider>
@@ -188,6 +191,44 @@ describe("AssignedClassFolio", () => {
     });
   });
 
+  it("surfaces schedule, attention, and attendance insight from real read models", async () => {
+    const monitor = vi.fn().mockResolvedValue({
+      heldSessionCount: 4,
+      rows: [
+        {
+          membershipId: "m1",
+          learnerId: "l1",
+          givenName: "Ana",
+          familyName: "Cruz",
+          presentCount: 3,
+          absentCount: 1,
+          lateCount: 0,
+          excusedCount: 0,
+          currentConsecutiveAbsences: 1,
+        },
+      ],
+    });
+    const listMeetings = vi.fn().mockResolvedValue([
+      {
+        id: "meeting-1",
+        teachingAssignmentId: "ta-1",
+        weekday: 1,
+        startsAt: "08:00",
+        endsAt: "09:00",
+        room: "Room 10",
+      },
+    ]);
+
+    setup(vi.fn().mockResolvedValue(ASSIGNMENTS), monitor, listMeetings);
+
+    expect(await screen.findByText(/1 learner with an active absence streak/)).toBeInTheDocument();
+    expect(screen.getByText(/4 held sessions · 1 learner/)).toBeInTheDocument();
+    const snapshot = screen.getByRole("figure", { name: /Attendance snapshot/ });
+    expect(within(snapshot).getByText("Present")).toBeInTheDocument();
+    expect(within(snapshot).getByText("Absent")).toBeInTheDocument();
+    expect(listMeetings).toHaveBeenCalledWith("ta-1");
+  });
+
   it("has accessible class selection, tabs, and connected actions", async () => {
     const { container } = setup();
     await screen.findByRole("tab", { name: "Overview" });
@@ -199,7 +240,8 @@ it("preserves a score draft across worksheet tabs and returns to Overview locall
   const user = userEvent.setup();
   const service = {
     listMyAssignments: vi.fn().mockResolvedValue(ASSIGNMENTS),
-    monitor: vi.fn().mockResolvedValue({ rows: [] }),
+    monitor: vi.fn().mockResolvedValue({ heldSessionCount: 0, rows: [] }),
+    listMeetings: vi.fn().mockResolvedValue([]),
   } as unknown as SubjectAttendanceApplicationService;
   render(
     <ModeProvider>

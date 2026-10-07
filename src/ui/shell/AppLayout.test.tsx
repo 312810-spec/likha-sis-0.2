@@ -50,6 +50,7 @@ function emitViewportChange(matches: boolean) {
 
 beforeEach(() => {
   matchMediaResult = false;
+  window.localStorage.clear();
   stubMatchMedia();
 });
 
@@ -86,6 +87,36 @@ describe("AppLayout", () => {
   it("starts with the drawer closed", () => {
     const { container } = renderLayout();
     expect(container.querySelector(".app-layout")).toHaveAttribute("data-drawer", "closed");
+  });
+
+  it("collapses the desktop sidebar and remembers the preference", async () => {
+    const user = userEvent.setup();
+    const { container, unmount } = renderLayout();
+
+    expect(container.querySelector(".app-layout")).toHaveAttribute("data-sidebar", "expanded");
+    await user.click(screen.getByRole("button", { name: "Collapse navigation" }));
+
+    expect(container.querySelector(".app-layout")).toHaveAttribute("data-sidebar", "collapsed");
+    expect(window.localStorage.getItem("likha-sis:sidebar-collapsed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Expand navigation" })).toBeInTheDocument();
+
+    unmount();
+    const second = renderLayout();
+    expect(second.container.querySelector(".app-layout")).toHaveAttribute(
+      "data-sidebar",
+      "collapsed",
+    );
+  });
+
+  it("forces the navigation expanded at phone width even when desktop collapse is remembered", () => {
+    window.localStorage.setItem("likha-sis:sidebar-collapsed", "true");
+    matchMediaResult = true;
+
+    const { container } = renderLayout();
+
+    expect(container.querySelector(".app-layout")).toHaveAttribute("data-sidebar", "expanded");
+    expect(screen.queryByRole("button", { name: "Expand navigation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse navigation" })).not.toBeInTheDocument();
   });
 
   it("opens the drawer from the hamburger and closes it on Escape, restoring focus", async () => {

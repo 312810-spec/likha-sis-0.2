@@ -1,12 +1,38 @@
 import type { ReactNode } from "react";
 
+interface EmptyStateProps {
+  children?: ReactNode;
+  title?: string;
+  description?: ReactNode;
+  action?: ReactNode;
+  tone?: "empty" | "success";
+}
+
 /**
- * Consolidates this app's repeated "nothing here yet" plain-paragraph
- * pattern (8 screens before this component existed) into one component
- * with a consistent, deliberately quiet visual treatment -- distinct
- * from an error, so a teacher scanning the screen doesn't mistake "no
- * sections created yet" for something having gone wrong.
+ * A quiet no-data/successful-zero-state primitive. Existing children-only
+ * call sites keep their original paragraph semantics; richer screens can
+ * provide a title, explanation, and one purposeful next action without
+ * inventing data or making the absence look like an error.
  */
-export function EmptyState({ children }: { children: ReactNode }) {
-  return <p className="empty-state">{children}</p>;
+export function EmptyState({
+  children,
+  title,
+  description,
+  action,
+  tone = "empty",
+}: EmptyStateProps) {
+  if (!title && description === undefined && action === undefined && tone === "empty") {
+    return <p className="empty-state">{children}</p>;
+  }
+
+  return (
+    <section className="empty-state empty-state-structured" data-tone={tone} aria-label={title}>
+      {title ? <h3>{title}</h3> : null}
+      {description !== undefined ? (
+        <div className="empty-state-description">{description}</div>
+      ) : null}
+      {children ? <div className="empty-state-description">{children}</div> : null}
+      {action ? <div className="empty-state-action">{action}</div> : null}
+    </section>
+  );
 }

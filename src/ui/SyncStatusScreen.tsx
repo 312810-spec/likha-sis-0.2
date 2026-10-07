@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SyncStatusApplicationService } from "../application/sync-status-service";
 import type { SyncStatus } from "../domain/sync-status";
 import { Alert } from "./components/Alert";
-import { Loading } from "./components/Loading";
+import { Skeleton } from "./components/Skeleton";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -134,7 +134,7 @@ export function SyncStatusScreen({ syncStatusService, onReviewConflicts }: SyncS
       )}
 
       {loading && !status ? (
-        <Loading label="Loading sync status…" />
+        <Skeleton label="Loading sync status…" lines={4} />
       ) : !status ? null : !status.enrolled ? (
         <Alert tone="info">
           <p>
