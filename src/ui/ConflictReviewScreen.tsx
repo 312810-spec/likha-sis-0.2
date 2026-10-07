@@ -3,7 +3,7 @@ import type { ConflictReviewApplicationService } from "../application/conflict-r
 import type { ConflictEntityPreview, ConflictReviewSummary } from "../domain/conflict-review";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
-import { Loading } from "./components/Loading";
+import { Skeleton } from "./components/Skeleton";
 import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
@@ -205,9 +205,13 @@ export function ConflictReviewScreen({ conflictReviewService }: ConflictReviewSc
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
       {loading ? (
-        <Loading label="Loading sync conflicts…" />
+        <Skeleton label="Loading sync conflicts…" lines={4} />
       ) : loadError ? null : conflicts.length === 0 ? (
-        <EmptyState>There are no sync conflicts to review right now.</EmptyState>
+        <EmptyState
+          tone="success"
+          title="No sync conflicts need review"
+          description="There are no unresolved conflicts waiting for a teacher decision right now."
+        />
       ) : (
         <ul className="conflict-review-list" aria-label="Sync conflicts">
           {conflicts.map((conflict) => {
