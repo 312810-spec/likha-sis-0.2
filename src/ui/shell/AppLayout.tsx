@@ -24,6 +24,16 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const PHONE_QUERY = "(max-width: 860px)";
+const SIDEBAR_COLLAPSE_KEY = "likha-sis:sidebar-collapsed";
+
+function readSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 export function AppLayout({
   session,
@@ -34,6 +44,7 @@ export function AppLayout({
   children,
 }: AppLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +74,7 @@ export function AppLayout({
     return window.matchMedia(PHONE_QUERY).matches;
   });
   const sidebarWrapRef = useRef<HTMLDivElement>(null);
+  const effectiveSidebarCollapsed = sidebarCollapsed && !isPhone;
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
@@ -87,6 +99,18 @@ export function AppLayout({
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
+  }, []);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, String(next));
+      } catch {
+        // Non-fatal: collapse still applies for this session.
+      }
+      return next;
+    });
   }, []);
 
   // Return focus to the drawer toggle only AFTER the re-render that
@@ -149,7 +173,11 @@ export function AppLayout({
   const mainInert = isPhone && drawerOpen;
 
   return (
-    <div className="app-layout" data-drawer={drawerOpen ? "open" : "closed"}>
+    <div
+      className="app-layout"
+      data-drawer={drawerOpen ? "open" : "closed"}
+      data-sidebar={effectiveSidebarCollapsed ? "collapsed" : "expanded"}
+    >
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -160,7 +188,15 @@ export function AppLayout({
         inert={sidebarInert}
         aria-hidden={sidebarInert || undefined}
       >
-        <Sidebar session={session} activeTab={activeTab} onNavigate={navigate} logoUrl={logoUrl} />
+        <Sidebar
+          session={session}
+          activeTab={activeTab}
+          onNavigate={navigate}
+          logoUrl={logoUrl}
+          collapsed={effectiveSidebarCollapsed}
+          collapsible={!isPhone}
+          onToggleCollapse={toggleSidebarCollapsed}
+        />
       </div>
       <div className="app-layout-main" inert={mainInert} aria-hidden={mainInert || undefined}>
         <TopBar
