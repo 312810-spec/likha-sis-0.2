@@ -50,40 +50,43 @@ The hierarchy is therefore **Now → Attention → Next → Insight → Explore*
 - [x] Keep phone drawer fully expanded regardless of desktop preference.
 - [x] Preserve accessible destination names in icon-only mode.
 - [x] Add reduced-motion-compatible collapse transitions.
-- [ ] Run CI and repair any regression.
-- [ ] Perform rendered desktop/phone visual review.
+- [ ] Run final PR CI and repair any regression.
+- [ ] Inspect PR-captured desktop/phone screenshots in light and dark appearances.
 
 ### Milestone 2 — Design-token refinement
 
-- Expand semantic surface, border, interaction, and chart tokens.
-- Review light/dark contrast.
-- Define teacher-facing elevation and motion levels.
-- Eliminate remaining hardcoded UI colors where they bypass the theme system.
+- [x] Add semantic surface, border, interaction, and chart aliases over the existing verified palette.
+- [x] Preserve the existing light/dark token source of truth and contrast checks.
+- [x] Keep motion on the shared duration/easing tokens.
+- [x] Keep school identity restrained to the existing accent/brand surfaces.
 
 ### Milestone 3 — Intentional interface states
 
-- Replace generic loading text where layout is predictable with content-shaped skeletons.
-- Upgrade empty states to explain purpose, reason, and next action.
-- Distinguish successful zero-state (for example, no conflicts) from missing-data empty-state.
-- Keep exact-action retries for failed operations.
+- [x] Add reusable content-shaped skeletons.
+- [x] Upgrade major empty states with purpose/explanation where useful.
+- [x] Distinguish successful zero-state from missing-data state (for example, no sync conflicts).
+- [x] Preserve exact-action retries for failed operations.
 
 ### Milestone 4 — Today / attention hierarchy
 
-- Refine the teacher landing experience without replacing the approved folio.
-- Surface immediate work first: current/next class, incomplete attendance, pending records, conflicts, or local unsent changes only when supported by real services.
-- Avoid ornamental metrics.
+- [x] Keep the approved class-folio as the teacher workspace.
+- [x] Put verified Next, Attention, and Insight signals before secondary actions.
+- [x] Only label a meeting as Now when the saved schedule proves the current time is inside it.
+- [x] Replace the school-head bento with a compact summary rail and operational sections.
 
 ### Milestone 5 — Data visualization
 
-- Add charts only where they improve a teacher decision.
-- Animate initial/update transitions conservatively.
-- Provide textual/table alternatives and honor `prefers-reduced-motion`.
+- [x] Add an attendance snapshot only from the real subject-attendance monitor.
+- [x] Keep numeric values visible beside decorative bars.
+- [x] Animate entry conservatively and disable animation for reduced-motion users.
+- [x] Keep detailed roster/table data as the accessible, inspectable source.
 
 ### Milestone 6 — Theme and motion polish
 
-- Refine dark surfaces, control outlines, hover/pressed/focus states, and account overlays.
-- Verify school-logo-derived accent behavior remains restrained.
-- Normalize motion durations and easing around the shared tokens.
+- [x] Preserve semantic light/dark surfaces and add semantic aliases for new work.
+- [x] Remove decorative gradient treatment from loading motion.
+- [x] Keep school branding restrained rather than tinting every surface.
+- [x] Normalize new transitions and chart motion around the shared tokens.
 
 ### Milestone 7 — Verification and merge gate
 
@@ -107,6 +110,8 @@ The first implementation slice adds a desktop-only collapsible sidebar. The pref
 
 The collapsed shell keeps each destination's accessible name through `aria-label` and `title`, retains the six approved primary destinations, and uses the existing motion tokens so reduced-motion users receive effectively instant state changes.
 
-## Next implementation slice
+## Verification checkpoint
 
-After CI is green, implement **intentional loading + empty-state primitives** before changing dashboard content. This creates reusable quality improvements without coupling the redesign to unverified new data sources.
+The PR workflow captures UI screenshots while running the existing deterministic UI smoke suite. Final completion requires the latest PR head to pass security, JavaScript/TypeScript quality, accessibility/UI smoke, native checks, and Windows build/tests, followed by inspection of the captured light/dark desktop and phone screenshots.
+
+Merge remains a human approval step under the product rule: AI prepares; teacher reviews; teacher approves.
