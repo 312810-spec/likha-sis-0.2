@@ -99,6 +99,19 @@ jobs:
         if: needs.classify.outputs.harness == 'true'
         run: npm run harness:verify
 
+      - name: Diagnose formatting drift
+        if: needs.classify.outputs.javascript == 'true'
+        run: |
+          npx prettier --write \
+            CTOS.md \
+            docs/ctos/FORGE-V3-ADAPTER.md \
+            src/ui/AssignedClassFolio.tsx \
+            src/ui/components/EmptyState.tsx \
+            src/ui/components/Skeleton.tsx \
+            src/ui/theme/styles.css
+          git diff -- CTOS.md docs/ctos/FORGE-V3-ADAPTER.md src/ui/AssignedClassFolio.tsx src/ui/components/EmptyState.tsx src/ui/components/Skeleton.tsx src/ui/theme/styles.css
+          exit 1
+
       - name: Run JavaScript and TypeScript quality gate
         if: needs.classify.outputs.javascript == 'true'
         run: npm run quality
