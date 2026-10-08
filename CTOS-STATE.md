@@ -25,6 +25,7 @@
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
 - Dirty/unpushed warning: none after the M08 commit and tag are pushed
+- TANAW M11/M12 evidence checkpoint: connected Drive school/district/Division consolidators and recent SMEA PPT inventoried; indicator/source registry and reconciliation risks recorded in `docs/ctos/research/tanaw-smea-dmet-source-matrix-2026-10-08.md`. **Research only**; no DMET field dictionary or production feature is claimed. Lock authority = SMEA Coordinator only (product decision); no DMET API (product decision).
 - M09 research checkpoint: DepEd Mandaue site/archive, official Division seal, DO 005 s.2024, DM 053 s.2024, and eSF7 national/current operational evidence recorded in `docs/research/deped-mandaue-teacher-load-2026.md` (commit `0fef68e`); no local Mandaue memo number or deadline was invented
 
 ## M08 result (checkpoint m08.md)
