@@ -21,17 +21,17 @@ Division Memorandum 0439, s. 2026 (2026-09-29), paragraph 6: School Heads / scho
 
 ## Extracted representative indicator/source inventory
 
-| Family | Representative source evidence | Required model semantics | Formula / denominator status |
-| --- | --- | --- | --- |
-| Enrollment | School `7. Enrollment.xlsx`; Division `3.1 ENROLLMENT (JUNIOR HIGH).xlsx`, `3.2 ENROLLMENT (SENIOR HIGH).xlsx` | snapshot date, grade/program, sex aggregation if source supports, comparison baseline | PENDING official exact counting rule |
-| Dropouts / transfers / learners-at-risk | School `2&3. LARDOs, Failures (Per grade level), Dropouts & Transfers.xlsx`; Division `2.1 Dropouts JHS.xlsx`, `2.2 Dropouts SHS.xlsx` | distinguish learner-level sensitive working records from aggregate projection; intervention provenance | PENDING eligibility/cohort and event timing rules |
-| Failures | Division `1. Failures Per Grade Level_Sec.xlsx`; school LARDO/failures workbook | grade, subject, section, applicable term, assessment/finalization state | PENDING unit and denominator |
-| Academic achievement | Consolidation workbook and sample Q1 SMEA PPT: GSA, Written Works, Performance-Based Tasks, Term Assessment, MPS, proficiency/achievement measures | subject × grade × term; raw scores vs derived indicators; explicit sample size, complete vs provisional | PENDING official formula and aggregation/weighting |
-| Competency/curriculum coverage | `BOW files`; historical Q1 executive summary refers to coverage | cohort/version, learning area, term, planned vs delivered vs evidenced competencies | PENDING competency denominator and signoff source |
-| Nutrition | School `6. Learners with Poor Nutrition.xlsx` | restricted health data; aggregate-only district export | BLOCKED pending approved health definitions/workflow |
-| BLIC | `1. Crucial BLICs Reported.xlsx`; current DM 0439 paragraph 4 | issue type, supporting evidence, affected scope, actions, human review | descriptive; no inferred numeric formula |
-| Promising practice | `2. Promising Practices Reported.xlsx`; current DM 0439 paragraph 4 | practice, evidence, observed result, confirmation/attribution | narrative; no AI auto-certification |
-| Submission completion | `CONSO SMEA NO DATA 2025-2026.xlsx` | submitted/complete/missing and expected submissions, independent of academic values | PENDING exact denominator for completion percentage |
+| Family                                  | Representative source evidence                                                                                                                     | Required model semantics                                                                                | Formula / denominator status                         |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Enrollment                              | School `7. Enrollment.xlsx`; Division `3.1 ENROLLMENT (JUNIOR HIGH).xlsx`, `3.2 ENROLLMENT (SENIOR HIGH).xlsx`                                     | snapshot date, grade/program, sex aggregation if source supports, comparison baseline                   | PENDING official exact counting rule                 |
+| Dropouts / transfers / learners-at-risk | School `2&3. LARDOs, Failures (Per grade level), Dropouts & Transfers.xlsx`; Division `2.1 Dropouts JHS.xlsx`, `2.2 Dropouts SHS.xlsx`             | distinguish learner-level sensitive working records from aggregate projection; intervention provenance  | PENDING eligibility/cohort and event timing rules    |
+| Failures                                | Division `1. Failures Per Grade Level_Sec.xlsx`; school LARDO/failures workbook                                                                    | grade, subject, section, applicable term, assessment/finalization state                                 | PENDING unit and denominator                         |
+| Academic achievement                    | Consolidation workbook and sample Q1 SMEA PPT: GSA, Written Works, Performance-Based Tasks, Term Assessment, MPS, proficiency/achievement measures | subject × grade × term; raw scores vs derived indicators; explicit sample size, complete vs provisional | PENDING official formula and aggregation/weighting   |
+| Competency/curriculum coverage          | `BOW files`; historical Q1 executive summary refers to coverage                                                                                    | cohort/version, learning area, term, planned vs delivered vs evidenced competencies                     | PENDING competency denominator and signoff source    |
+| Nutrition                               | School `6. Learners with Poor Nutrition.xlsx`                                                                                                      | restricted health data; aggregate-only district export                                                  | BLOCKED pending approved health definitions/workflow |
+| BLIC                                    | `1. Crucial BLICs Reported.xlsx`; current DM 0439 paragraph 4                                                                                      | issue type, supporting evidence, affected scope, actions, human review                                  | descriptive; no inferred numeric formula             |
+| Promising practice                      | `2. Promising Practices Reported.xlsx`; current DM 0439 paragraph 4                                                                                | practice, evidence, observed result, confirmation/attribution                                           | narrative; no AI auto-certification                  |
+| Submission completion                   | `CONSO SMEA NO DATA 2025-2026.xlsx`                                                                                                                | submitted/complete/missing and expected submissions, independent of academic values                     | PENDING exact denominator for completion percentage  |
 
 The sampled 2025–2026 consolidation workbook includes separate expected/submitted tracking, section-level missing reports, grade/subject columns, and a completion proportion. These are **historical sample structures**, not a verified 2026–2027 DMET specification.
 
@@ -39,7 +39,7 @@ The sampled Q1 SMEA presentation provides performance-by-subject, grade and term
 
 ## Data quality warning
 
-The historical `Q1 Executive Summary Tingub NHS.docx` contains a declared count of 77 Filipino frustration-level readers but the listed Grade 7/8/9/10 subtotals (30+14+12+13) do not total 77. Do not import the narrative as authoritative aggregated data until reconciled against primary Phil-IRI source. An executive summary is a *derived reporting artifact*, not source-record authority.
+The historical `Q1 Executive Summary Tingub NHS.docx` contains a declared count of 77 Filipino frustration-level readers but the listed Grade 7/8/9/10 subtotals (30+14+12+13) do not total 77. Do not import the narrative as authoritative aggregated data until reconciled against primary Phil-IRI source. An executive summary is a _derived reporting artifact_, not source-record authority.
 
 ## Design consequences / minimal mechanism
 

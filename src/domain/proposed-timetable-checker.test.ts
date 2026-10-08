@@ -14,7 +14,9 @@ const a: ProposedMeeting = {
 describe("checkProposedTimetable", () => {
   it("accepts adjacent non-overlapping meetings", () => {
     const b = { ...a, id: "b", sectionId: "s2", startMinute: 540, endMinute: 600 };
-    expect(checkProposedTimetable({ meetings: [a, b], teacherDailyLimits: { t1: 120 } })).toEqual([]);
+    expect(checkProposedTimetable({ meetings: [a, b], teacherDailyLimits: { t1: 120 } })).toEqual(
+      [],
+    );
   });
 
   it("reports teacher, section and room conflicts independently", () => {
@@ -53,8 +55,6 @@ describe("checkProposedTimetable", () => {
   });
 
   it("does not invent a limit when school settings are absent", () => {
-    expect(
-      checkProposedTimetable({ meetings: [a], teacherDailyLimits: {} }),
-    ).toEqual([]);
+    expect(checkProposedTimetable({ meetings: [a], teacherDailyLimits: {} })).toEqual([]);
   });
 });

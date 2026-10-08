@@ -14,12 +14,8 @@ export interface ProposedMeeting {
   roomId: string | null;
 }
 
-export type TimetableIssueCode =
-  | "invalidInterval"
-  | "teacherConflict"
-  | "sectionConflict"
-  | "roomConflict"
-  | "teacherDailyLimit";
+type TimetableIssueCode =
+  "invalidInterval" | "teacherConflict" | "sectionConflict" | "roomConflict" | "teacherDailyLimit";
 
 export interface TimetableIssue {
   code: TimetableIssueCode;
@@ -52,15 +48,16 @@ export function checkProposedTimetable(input: TimetableCheckInput): TimetableIss
     valid.push(meeting);
   }
 
-  for (let i = 0; i < valid.length; i += 1) {
-    const a = valid[i];
-    for (let j = i + 1; j < valid.length; j += 1) {
-      const b = valid[j];
+  // Paired by element, not by index: `noUncheckedIndexedAccess` makes an
+  // indexed read `T | undefined`, and there is no index here that could be
+  // out of range once the loop is over the array itself.
+  valid.forEach((a, i) => {
+    for (const b of valid.slice(i + 1)) {
       if (
         a.weekday !== b.weekday ||
         !(a.startMinute < b.endMinute && b.startMinute < a.endMinute)
       ) {
-        continue;
+        return;
       }
       const meetingIds = [a.id, b.id];
       if (a.teacherId === b.teacherId) {
@@ -73,9 +70,12 @@ export function checkProposedTimetable(input: TimetableCheckInput): TimetableIss
         issues.push({ code: "roomConflict", meetingIds, weekday: a.weekday });
       }
     }
-  }
+  });
 
-  const days = new Map<string, { minutes: number; ids: string[]; weekday: number; teacherId: string }>();
+  const days = new Map<
+    string,
+    { minutes: number; ids: string[]; weekday: number; teacherId: string }
+  >();
   for (const meeting of valid) {
     const key = JSON.stringify([meeting.teacherId, meeting.weekday]);
     const day = days.get(key) ?? {
