@@ -8,10 +8,10 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M08 — Attention + Learning Support (COMPLETE, PASS)
+- Current milestone: M09 — Teacher Load Maker + Smart Scheduling (PARTIAL; isolated TS checker candidate, tests not run)
 - Last completed milestone: M08 (PASS — see docs/ctos/checkpoints/m08.md)
 - Last pushed CTOS execution checkpoint: M08 (tag `ctos-m08-complete`)
-- Next action: execute M09 — Teacher Load Maker + Smart Scheduling (CTOS.md §M09)
+- Next action: run M09 candidate tests/quality in a checkout; expand trusted Rust-backed validation and atomic publishing only with passing verification (CTOS.md §M09)
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
@@ -24,7 +24,7 @@
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Dirty/unpushed warning: none after the M08 commit and tag are pushed
+- Remote research/M09 candidate commits pushed via GitHub contents API; local worktree unavailable, no tests executed. See docs/ctos/checkpoints/m09-partial-2026-10-08.md.
 - TANAW M11/M12 evidence checkpoint: connected Drive school/district/Division consolidators and recent SMEA PPT inventoried; indicator/source registry and reconciliation risks recorded in `docs/ctos/research/tanaw-smea-dmet-source-matrix-2026-10-08.md`. **Research only**; no DMET field dictionary or production feature is claimed. Lock authority = SMEA Coordinator only (product decision); no DMET API (product decision).
 - M09 research checkpoint: DepEd Mandaue site/archive, official Division seal, DO 005 s.2024, DM 053 s.2024, and eSF7 national/current operational evidence recorded in `docs/research/deped-mandaue-teacher-load-2026.md` (commit `0fef68e`); no local Mandaue memo number or deadline was invented
 
