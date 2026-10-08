@@ -478,3 +478,82 @@ disclosed gap as Waves 2U/2W/2X/2Y/2Z); no overload-threshold
 warning/enforcement (unchanged non-goal); no independent (non-self)
 review dispatched for this bounded UI slice -- retained as debt,
 consistent with the pattern recent waves have established.
+
+---
+
+## Addendum — M09: the deferred hypothesis is tested
+
+CTOS milestone M09 (Teacher Load Maker + Smart Scheduling, `CTOS.md` §M09)
+is the first milestone to build the generator this ADR left as an explicit
+hypothesis. This addendum records what the decision became, and what did
+not change.
+
+**Still true, and now load-bearing.** The two records this ADR introduced —
+`teaching_assignments` and `schedule_meetings` — are exactly the surfaces
+M09 built on, unchanged in shape. `teaching_assignments` is the demand side
+of the generator and the unit of every placement; `schedule_meetings` is what
+a published plan writes into. No column on either table changed meaning. The
+ownership reasoning in this ADR's Decision section is why the M09 commands
+gate on `Capability::ManageTeachingAssignments` rather than on a new
+capability: scheduling authority was already this ADR's concern.
+
+**New, and why it is additive.** Migration 46 adds five tables and alters no
+existing one:
+
+- `schedule_settings` — one row per school, materialized server-side with
+  national-policy defaults (07:30–17:00, five days, 50-minute periods, a
+  10-minute passing buffer, and DepEd Order No. 005 s. 2024's six-hour daily
+  classroom-teaching ceiling). A school that has never opened the planner
+  still has a full grid.
+- `teacher_unavailability` — blocked windows, not free ones. A
+  fully-available teacher is simply absent from the table, which is the
+  common case and therefore costs nothing to represent.
+- `schedule_rooms`, with an `is_lab` flag. `schedule_meetings.room` predates
+  it and stays free text, so the registry never retroactively constrains rows
+  the school already wrote — the same "do not reinterpret history" discipline
+  this ADR applied to the assignment record.
+- `subject_schedule_requirements` — the weekly instructional minutes a subject
+  demands.
+- `schedule_plans` and `schedule_plan_meetings` — the draft/staged area,
+  which a published timetable is copied out of rather than written into.
+
+**The one write to an existing table, and its rule.** Publication writes into
+`schedule_meetings`. It replaces only the meetings a _previous plan_ owned
+(`plan_id = <old plan>`); meetings the school created by hand
+(`plan_id IS NULL`) are untouched, because they are the school's own existing
+valid schedule, not something a plan may discard. This is the M09 application
+of this ADR's existing-data preservation rule, and it is tested directly.
+
+**The Lock.** Every constraint input for a school is loaded into one struct
+and SHA-256'd (`scheduling/constraints.rs`). The fingerprint is stamped on a
+plan at creation and recomputed at publication; a mismatch refuses
+publication. This makes "the plan was built against the school as it stood
+then" a comparable fact rather than an assertion, and it is the mechanism that
+keeps a previous term's plan from silently becoming this term's live
+timetable.
+
+**The checker is deliberately not the generator.** An "independent checker" is
+§M09's first acceptance clause, and a checker that reused the generator's own
+interval bookkeeping would be the generator grading itself. `scheduling/check.rs`
+shares no code with `generate.rs`: it reads placements and inputs fresh and
+re-derives every constraint over the whole set. That independence is also what
+makes a _human_ repair validatable — the Compare → Repair → Validate half of
+the workflow — since a hand-moved placement is exactly the case the generator
+never produced.
+
+**Refusals are values, not errors.** `PublishOutcome` carries five variants
+(`published`, `stale`, `violations`, `notADraft`, `unknownPlan`) and
+`GenerationOutcome` carries three (`valid`, `impossible`, `stopped`). A stale
+or violating plan is the workflow telling the School Head something they need
+to act on, not a crash; the frontend switches on `outcome` the same way it
+already switches on `CreateMeetingOutcome`. An `impossible` outcome carries an
+arithmetic proof — required weekly minutes against available weekly minutes —
+rather than a timeout excuse.
+
+**Parked, disclosed.** Of §M09's eleven required constraints, ten are enforced
+by the checker. **Curriculum/term applicability is not**, because `subjects`
+carry no term and no grade-level applicability for a rule to bind to; a rule
+would require inventing its data. That is left to the milestone that owns the
+curriculum record, not silently approximated here. The generator also remains
+greedy rather than optimal: it proves _impossibility_ and reports a stopped
+search, and does not claim any schedule is the best one.

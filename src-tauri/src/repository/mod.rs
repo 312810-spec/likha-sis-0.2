@@ -20,6 +20,8 @@ pub mod my_day;
 pub mod reference_geo;
 pub mod role;
 pub mod schedule_meeting;
+pub mod schedule_plan;
+pub mod scheduling_inputs;
 pub mod school;
 pub mod section;
 pub mod section_advisory;

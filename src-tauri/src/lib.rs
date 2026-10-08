@@ -9,6 +9,7 @@ pub mod formgen;
 pub mod hub_server;
 pub mod import;
 pub mod repository;
+pub mod scheduling;
 pub mod sync;
 pub mod sync_client;
 
@@ -210,6 +211,25 @@ pub fn run() {
             commands::conflict_review::list_conflict_reviews,
             commands::conflict_review::resolve_conflict_review,
             commands::sync_status::get_sync_status,
+            commands::schedule_planning::get_schedule_settings,
+            commands::schedule_planning::update_schedule_settings,
+            commands::schedule_planning::list_teacher_unavailability,
+            commands::schedule_planning::add_teacher_unavailability,
+            commands::schedule_planning::remove_teacher_unavailability,
+            commands::schedule_planning::list_schedule_rooms,
+            commands::schedule_planning::create_schedule_room,
+            commands::schedule_planning::remove_schedule_room,
+            commands::schedule_planning::list_subject_schedule_requirements,
+            commands::schedule_planning::set_subject_schedule_requirement,
+            commands::schedule_planning::generate_schedule_plan,
+            commands::schedule_planning::list_schedule_plan_placements,
+            commands::schedule_planning::move_schedule_plan_placement,
+            commands::schedule_planning::remove_schedule_plan_placement,
+            commands::schedule_planning::validate_schedule_plan,
+            commands::schedule_planning::publish_schedule_plan,
+            commands::schedule_planning::list_published_schedule_views,
+            commands::schedule_planning::list_schedule_plans,
+            commands::schedule_planning::current_schedule_plan,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

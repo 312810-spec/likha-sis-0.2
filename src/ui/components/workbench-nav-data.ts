@@ -31,7 +31,8 @@ export type SignedInTab =
   | "conflict-review"
   | "sync-status"
   | "school-branding"
-  | "learning-support";
+  | "learning-support"
+  | "schedule-planner";
 
 /**
  * The display label for every tab. An explicit object literal, not a
@@ -74,6 +75,7 @@ export const TAB_LABELS: Record<SignedInTab, string> = {
   "sync-status": "Sync Status",
   "school-branding": "School Logo",
   "learning-support": "Learning Support",
+  "schedule-planner": "Teacher Load Maker",
 };
 
 interface NavGroup {
@@ -180,6 +182,7 @@ const CONTEXTUAL_PARENT: Partial<Record<SignedInTab, SignedInTab>> = {
   "teaching-assignments": "sections",
   "section-adviser": "sections",
   "schedule-meetings": "sections",
+  "schedule-planner": "sections",
   // Reached only from My Day's attention rail, with the occurrence and the
   // marker already selected — see `App.tsx`'s `supportContext`.
   "learning-support": "my-day",

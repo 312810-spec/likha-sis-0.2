@@ -36,7 +36,7 @@ Do not infer these from another Schools Division Office.
 
 ### DepEd Order No. 005, s. 2024
 
-Primary policy: *Rationalization of Teachers' Workload in Public Schools and Payment of Teaching Overload*.
+Primary policy: _Rationalization of Teachers' Workload in Public Schools and Payment of Teaching Overload_.
 
 Verified design implications:
 
@@ -79,4 +79,3 @@ Any parked local item may be promoted from PENDING only when one of the followin
 - the exact current DepEd Mandaue Division Memorandum/Office Memorandum from the official repository;
 - an approved current school/division template or signed local issuance;
 - written authority from the responsible Division/school office.
-

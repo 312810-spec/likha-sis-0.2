@@ -2222,6 +2222,192 @@ pub fn migrations() -> Migrations<'static> {
             ON learner_support_cases(section_membership_id);
         "#,
         ),
+        M::up(
+            r#"
+        -- CTOS M09 — Teacher Load Maker + Smart Scheduling. The
+        -- scheduling this codebase already had (migration 18) is
+        -- *manual* row-by-row placement with per-write conflict checks;
+        -- it has no constraint inputs, no generation, no validation
+        -- independent of the writer, and no notion of a published
+        -- revision. This migration supplies those four missing pieces.
+        --
+        -- Every constraint here is an explicit, human-confirmable input
+        -- (docs/research/deped-mandaue-teacher-load-2026.md §"M09 product
+        -- constraints derived from the evidence", item 3): the engine never
+        -- invents eligibility, availability, bell times or room limits. No
+        -- Mandaue-specific rule is encoded anywhere (item 8) — the one
+        -- numeric default that comes from national policy is
+        -- `max_daily_teaching_minutes` = 360, DepEd Order No. 005 s. 2024's
+        -- six-hour classroom-teaching ceiling, and it is an editable
+        -- school input, not an enforcement the engine imposes silently.
+        -- Advisory and ancillary duties remain out of instructional load
+        -- exactly as ADR-0039 decided; nothing in this migration counts
+        -- them.
+
+        -- The school's own scheduling parameters: one row per school,
+        -- created on first read (see `scheduling_inputs::ensure`). The
+        -- school day bounds, period length and `school_days` are the grid
+        -- the generator lays meetings onto; the two caps are the
+        -- weekly/daily minutes constraints; `passing_minutes` is the
+        -- break/setup/travel buffer that must separate two consecutive
+        -- meetings of the same teacher. `school_days` counts weekdays
+        -- starting from Monday (5 = Mon-Fri, 6 = Mon-Sat), so Saturday
+        -- make-up classes are an explicit input rather than a hidden
+        -- generator assumption.
+        CREATE TABLE schedule_settings (
+            school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+            day_starts_at TEXT NOT NULL DEFAULT '07:30'
+                CHECK (day_starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            day_ends_at TEXT NOT NULL DEFAULT '17:00'
+                CHECK (day_ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            school_days INTEGER NOT NULL DEFAULT 5
+                CHECK (school_days BETWEEN 1 AND 7),
+            period_minutes INTEGER NOT NULL DEFAULT 50
+                CHECK (period_minutes BETWEEN 5 AND 240),
+            passing_minutes INTEGER NOT NULL DEFAULT 10
+                CHECK (passing_minutes BETWEEN 0 AND 240),
+            max_daily_teaching_minutes INTEGER NOT NULL DEFAULT 360
+                CHECK (max_daily_teaching_minutes BETWEEN 30 AND 1440),
+            max_weekly_teaching_minutes INTEGER NOT NULL DEFAULT 1800
+                CHECK (max_weekly_teaching_minutes BETWEEN 30 AND 10080),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            -- A school day that ends at or before it starts has no grid to
+            -- place anything onto, so this is a schema-level rule, not a
+            -- repository-level hope.
+            CHECK (day_starts_at < day_ends_at)
+        );
+
+        -- Teacher availability, modelled as the *blocked* windows a
+        -- teacher is not scheduled for classroom teaching (a meeting,
+        -- a fixed ancillary duty, a plantilla obligation). Additive and
+        -- small — a fully-available teacher simply has no rows, which is
+        -- the common case, so the table stays empty rather than having to
+        -- be seeded with a full week for every teacher.
+        CREATE TABLE teacher_unavailability (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            teacher_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+            starts_at TEXT NOT NULL CHECK (starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            ends_at TEXT NOT NULL CHECK (ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            reason TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            CHECK (starts_at < ends_at),
+            UNIQUE (teacher_user_id, weekday, starts_at, ends_at)
+        );
+
+        CREATE INDEX idx_teacher_unavailability_teacher
+            ON teacher_unavailability(teacher_user_id);
+
+        -- The room/lab registry. Before M09 `schedule_meetings.room` was
+        -- free text with no list behind it, so a room conflict could only
+        -- ever be detected when a second class happened to type the same
+        -- string. A registry makes a room a real schedulable resource the
+        -- generator can pick from and the checker can reason about, and
+        -- `is_lab` carries the lab/room distinction the required-constraint
+        -- list names explicitly.
+        CREATE TABLE schedule_rooms (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            is_lab INTEGER NOT NULL DEFAULT 0 CHECK (is_lab IN (0, 1)),
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            UNIQUE (school_id, name)
+        );
+
+        CREATE INDEX idx_schedule_rooms_school_id ON schedule_rooms(school_id);
+
+        -- Subject requirements: how many weekly instructional minutes a
+        -- subject is scheduled for. Deliberately a *separate* table from
+        -- `subjects` rather than a new column on it — `subjects` is a
+        -- synced entity (EntityKind::Subject, ADR-0067/0069) and a column
+        -- added there without a payload mapping would silently fail to
+        -- propagate between a teacher's devices; scheduling inputs are
+        -- school-setup data that the plan's own fingerprint guards, not
+        -- per-device teacher work, so they stay local.
+        CREATE TABLE subject_schedule_requirements (
+            subject_id TEXT PRIMARY KEY REFERENCES subjects(id) ON DELETE CASCADE,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            required_weekly_minutes INTEGER NOT NULL
+                CHECK (required_weekly_minutes BETWEEN 0 AND 2400),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+
+        CREATE INDEX idx_subject_schedule_requirements_school_id
+            ON subject_schedule_requirements(school_id);
+
+        -- The publication ledger. One row per plan revision; `revision`
+        -- is monotonic per school and `input_fingerprint` is the Lock step
+        -- of CTOS.md §M09's workflow — the SHA-256 of the canonical form of
+        -- every constraint input the generation ran against, frozen at
+        -- plan creation. Publication recomputes it and refuses to write
+        -- when it no longer matches, which is the acceptance clause's
+        -- "stale-generation publication rejection".
+        CREATE TABLE schedule_plans (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            revision INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published', 'superseded')),
+            input_fingerprint TEXT NOT NULL,
+            generator_note TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            published_at TEXT,
+            published_by_user_id TEXT,
+            UNIQUE (school_id, revision)
+        );
+
+        -- At most one draft and at most one published plan per school.
+        -- These are partial unique indexes (SQLite 3.8+), and they are what
+        -- makes "version-consistent teacher/section/room views" a provable
+        -- schema property rather than a query convention: there is always
+        -- exactly zero or one live revision, so the three views cannot
+        -- disagree about which revision they resolved from.
+        CREATE UNIQUE INDEX idx_schedule_plans_one_draft
+            ON schedule_plans(school_id) WHERE status = 'draft';
+        CREATE UNIQUE INDEX idx_schedule_plans_one_published
+            ON schedule_plans(school_id) WHERE status = 'published';
+
+        -- The proposal: every placement a generation produced, staged
+        -- before it is live. Deliberately a separate table from
+        -- `schedule_meetings` — the live table is what My Day, Subject
+        -- Attendance and the occurrence stack already read, and staging
+        -- drafts there would mean a half-repaired plan was visible to
+        -- every teacher mid-edit. Publication copies these rows into
+        -- `schedule_meetings` inside one transaction; until then, nothing
+        -- else in the codebase can see them at all.
+        CREATE TABLE schedule_plan_meetings (
+            id TEXT PRIMARY KEY,
+            school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+            plan_id TEXT NOT NULL REFERENCES schedule_plans(id) ON DELETE CASCADE,
+            teaching_assignment_id TEXT NOT NULL
+                REFERENCES teaching_assignments(id) ON DELETE CASCADE,
+            weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+            starts_at TEXT NOT NULL CHECK (starts_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            ends_at TEXT NOT NULL CHECK (ends_at GLOB '[0-2][0-9]:[0-5][0-9]'),
+            room TEXT,
+            CHECK (starts_at < ends_at),
+            UNIQUE (plan_id, teaching_assignment_id, weekday, starts_at, ends_at)
+        );
+
+        CREATE INDEX idx_schedule_plan_meetings_plan_id
+            ON schedule_plan_meetings(plan_id);
+        CREATE INDEX idx_schedule_plan_meetings_assignment_id
+            ON schedule_plan_meetings(teaching_assignment_id);
+
+        -- Links a live meeting to the revision that published it. NULL for
+        -- every row created by the pre-M09 manual path, which is exactly
+        -- right: those rows are the school's existing valid schedule and
+        -- are never deleted by a plan. `REFERENCES` is registered on the
+        -- ADD COLUMN (verified: `pragma_foreign_key_list` reports it), and
+        -- it is deliberately non-cascading — deleting a *superseded* plan
+        -- row must not delete the meetings that were live under it, and
+        -- publication deletes the superseded plan's meetings explicitly
+        -- and in the same transaction.
+        ALTER TABLE schedule_meetings
+            ADD COLUMN plan_id TEXT REFERENCES schedule_plans(id);
+        "#,
+        ),
     ])
 }
 

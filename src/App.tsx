@@ -15,6 +15,7 @@ import {
   learnerScoreService,
   learnerScoreSyncStatusService,
   learnerSupportService,
+  schedulePlanningService,
   lessonPlanService,
   myDayService,
   learnerService,
@@ -57,6 +58,7 @@ import { HomeScreen } from "./ui/HomeScreen";
 import { IdleTimeoutWarning } from "./ui/IdleTimeoutWarning";
 import { LessonPlanScreen } from "./ui/LessonPlanScreen";
 import { LearningSupportScreen } from "./ui/LearningSupportScreen";
+import { SchedulePlannerScreen } from "./ui/SchedulePlannerScreen";
 import { MyDayScreen } from "./ui/MyDayScreen";
 import { MonthlySummaryScreen } from "./ui/MonthlySummaryScreen";
 import { ScheduleMeetingsScreen } from "./ui/ScheduleMeetingsScreen";
@@ -472,6 +474,7 @@ function App() {
                   setSectionAdviserSection({ sectionId, sectionName });
                   setActiveTab("section-adviser");
                 }}
+                onOpenPlanner={() => setActiveTab("schedule-planner")}
               />
             ) : activeTab === "section-roster" ? (
               rosterSectionId ? (
@@ -503,6 +506,7 @@ function App() {
                     setSectionAdviserSection({ sectionId, sectionName });
                     setActiveTab("section-adviser");
                   }}
+                  onOpenPlanner={() => setActiveTab("schedule-planner")}
                 />
               )
             ) : activeTab === "teaching-assignments" ? (
@@ -536,6 +540,7 @@ function App() {
                     setSectionAdviserSection({ sectionId, sectionName });
                     setActiveTab("section-adviser");
                   }}
+                  onOpenPlanner={() => setActiveTab("schedule-planner")}
                 />
               )
             ) : activeTab === "section-adviser" ? (
@@ -564,6 +569,7 @@ function App() {
                     setSectionAdviserSection({ sectionId, sectionName });
                     setActiveTab("section-adviser");
                   }}
+                  onOpenPlanner={() => setActiveTab("schedule-planner")}
                 />
               )
             ) : activeTab === "schedule-meetings" ? (
@@ -592,6 +598,7 @@ function App() {
                     setSectionAdviserSection({ sectionId, sectionName });
                     setActiveTab("section-adviser");
                   }}
+                  onOpenPlanner={() => setActiveTab("schedule-planner")}
                 />
               )
             ) : activeTab === "sf1-import" ? (
@@ -756,6 +763,11 @@ function App() {
               <SyncStatusScreen
                 syncStatusService={syncStatusService}
                 onReviewConflicts={() => setActiveTab("conflict-review")}
+              />
+            ) : activeTab === "schedule-planner" ? (
+              <SchedulePlannerScreen
+                schedulePlanningService={schedulePlanningService}
+                onBack={() => setActiveTab("sections")}
               />
             ) : activeTab === "learning-support" ? (
               supportContext ? (

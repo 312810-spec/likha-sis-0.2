@@ -8,10 +8,10 @@
 
 - Execution branch: ctos/integration (created from main 659fb0d)
 - Source branch: main
-- Current milestone: M09 — Teacher Load Maker + Smart Scheduling (PARTIAL; isolated TS checker candidate, tests not run)
-- Last completed milestone: M08 (PASS — see docs/ctos/checkpoints/m08.md)
-- Last pushed CTOS execution checkpoint: M08 (tag `ctos-m08-complete`)
-- Next action: run M09 candidate tests/quality in a checkout; expand trusted Rust-backed validation and atomic publishing only with passing verification (CTOS.md §M09)
+- Current milestone: M09 — Teacher Load Maker + Smart Scheduling (COMPLETE, PASS)
+- Last completed milestone: M09 (PASS — see docs/ctos/checkpoints/m09.md)
+- Last pushed CTOS execution checkpoint: M09 (tag `ctos-m09-complete`)
+- Next action: execute M10 — Curriculum, BOW, Teaching Flow, ILAW (CTOS.md §M10)
 - Risk tier: M01/M02 High-Fidelity closed PASS; M03 was a design-system milestone,
   not High-Fidelity, and closed PASS on the UI gate plus a static token guard;
   M04 closed PASS as a screen-and-read-model milestone; M05 closed PASS as a
@@ -20,13 +20,72 @@
   M07 closed PASS as the interaction-speed milestone that made daily attendance
   and scoring one keystroke per learner and made the correction lineage visible;
   M08 closed PASS as the loop-milestone that carried learning evidence to an
-  outcome and surfaced the last two §6.1 attention items
+  outcome and surfaced the last two §6.1 attention items; M09 closed PASS as the
+  constraint-aware planning milestone — ADR-0039's deferred generator hypothesis,
+  tested, with an independent checker and a transactional publication
 - Open implementation PRs to reconcile: #103 (salvage source, classified), #100 (M13 resume-pointer)
 - Windows native evidence: prior evidence exists in project history; must be revalidated on the exact CTOS source before release claims
 - Android native evidence: unsupported as a release claim until M14 acceptance passes; Android SDK absent from this runtime
-- Remote research/M09 candidate commits pushed via GitHub contents API; local worktree unavailable, no tests executed. See docs/ctos/checkpoints/m09-partial-2026-10-08.md.
 - TANAW M11/M12 evidence checkpoint: connected Drive school/district/Division consolidators and recent SMEA PPT inventoried; indicator/source registry and reconciliation risks recorded in `docs/ctos/research/tanaw-smea-dmet-source-matrix-2026-10-08.md`. **Research only**; no DMET field dictionary or production feature is claimed. Lock authority = SMEA Coordinator only (product decision); no DMET API (product decision).
+- Reconciled: the remote `ctos/integration` had also landed an isolated
+  `src/domain/proposed-timetable-checker.ts` candidate plus its test
+  (`docs/ctos/checkpoints/m09-partial-2026-10-08.md` records it as unexecuted at
+  the time). It is kept as an unwired proposal — it is not imported by
+  `composition.ts`, is not the M09 checker, and M09's acceptance is carried by
+  the trusted Rust checker documented in `docs/ctos/evals/schedule-cases.md`.
+  The full gate matrix was re-run on the reconciled tree before this checkpoint
+  was pushed
+- Dirty/unpushed warning: none after the M09 commit and tag are pushed
 - M09 research checkpoint: DepEd Mandaue site/archive, official Division seal, DO 005 s.2024, DM 053 s.2024, and eSF7 national/current operational evidence recorded in `docs/research/deped-mandaue-teacher-load-2026.md` (commit `0fef68e`); no local Mandaue memo number or deadline was invented
+
+## M09 result (checkpoint m09.md)
+
+- Frontend quality: 142 files / 1,352 tests pass (up from 139 / 1,321 — the delta
+  is exactly 31 new tests: 16 in the new `SchedulePlannerScreen.test.tsx`, 5 in
+  the new `schedule-planning-service.test.ts` and 10 in the new
+  `schedule-planning-repository.test.ts`); exit 0 across typecheck, lint,
+  format:check, check:architecture and check:deadcode
+- Native Rust: 1,378 → 1,388 total integration-and-lib tests pass / 0 failed
+  (the lib suite holds at 1,248; the new
+  `tests/schedule_planning_management.rs` target contributes 10
+  command-boundary tests, and `repository/schedule_plan.rs` plus the
+  `scheduling/` modules contribute 32 more). `cargo fmt --check` clean,
+  `cargo clippy --all-targets -- -D warnings` clean
+- `npm run quality:ui` PASS: zero axe WCAG A/AA findings across the preview's
+  surfaces. The planner screen is not among them — the dev preview cannot reach
+  the new tab — so the screen is axe-checked in jsdom by its own a11y test
+  (structure and ARIA only). Both runners ran; neither is claimed for the other
+- CTOS.md §M09's five acceptance clauses are each proven at the command
+  boundary, through the same `authorize_capability_with_actor` /
+  `require_active_session` shape the commands stand on: the independent checker
+  (a draft the generator never produced, re-derived after a human repair),
+  conflict fixtures (one teacher, one section, one room double-booked, plus a
+  class inside an unavailable window), stale-generation publication rejection
+  (both fingerprints returned, nothing live, draft intact), atomic publication
+  (a violating plan publishes nothing and returns the checker's findings), and
+  version-consistent views (teacher/section/room held up as the same set of
+  meetings, from one revision in one call). Full detail in
+  `docs/ctos/evals/schedule-cases.md`
+- The three required generation states are tagged-enum variants, so the screen
+  cannot render a state the backend did not report: `valid`, `impossible` (with
+  an arithmetic `ImpossibilityProof` — required vs. available weekly minutes, not
+  a timeout excuse) and `stopped` (steps used plus unplaced assignments). The
+  plan exists in all three; a partial timetable alongside a proof is still
+  repairable
+- The Lock is a SHA-256 over every constraint input, stamped at plan creation and
+  recomputed at publication. That is what keeps a plan built against last term's
+  assignments from silently becoming this term's live timetable
+- Ten of §M09's eleven required constraints are enforced by the checker.
+  **Curriculum/term applicability is not** — `subjects` carry no term and no
+  grade-level applicability for a rule to bind to, so it is parked with the
+  milestone that owns the curriculum record rather than approximated
+- Existing-data preservation: publication replaces only the meetings a previous
+  plan owned; meetings the school created by hand (`plan_id IS NULL`) are
+  untouched, proved by `publication_preserves_manually_created_meetings`. A
+  superseded plan becomes `superseded` history and is never deleted
+- One change outside M09's scope, disclosed: `docs/research/deped-mandaue-teacher-load-2026.md`
+  (from commit `0fef68e`) had never been through `prettier --check`; it was
+  formatted so the format gate could pass. No content changed
 
 ## M08 result (checkpoint m08.md)
 

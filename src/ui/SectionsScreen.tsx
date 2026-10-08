@@ -32,6 +32,10 @@ interface SectionsScreenProps {
   /** Open Section Adviser Management for one section (Wave 3G). Same
    * handoff pattern as `onManageAssignments`. */
   onManageAdviser: (sectionId: string, sectionName: string) => void;
+  /** Open the whole-school Teacher Load Maker (CTOS M09). Optional: the
+   * planner is a school-setup tool rather than a per-section action, so it
+   * lives on this screen's actions rather than in a section's row. */
+  onOpenPlanner?: () => void;
 }
 
 function todayAsIsoDate(): string {
@@ -49,6 +53,7 @@ export function SectionsScreen({
   onOpenRoster,
   onManageAssignments,
   onManageAdviser,
+  onOpenPlanner,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
   const [sections, setSections] = useState<Section[]>([]);
@@ -195,6 +200,14 @@ export function SectionsScreen({
     >
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+
+      {onOpenPlanner && (
+        <p className="section-list-actions">
+          <button type="button" aria-label="Open the Teacher Load Maker" onClick={onOpenPlanner}>
+            Plan the whole timetable…
+          </button>
+        </p>
+      )}
 
       {loading ? (
         <Loading label="Loading sections…" />
