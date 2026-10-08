@@ -40,17 +40,20 @@
 
 ## M09 result (checkpoint m09.md)
 
-- Frontend quality: 142 files / 1,352 tests pass (up from 139 / 1,321 — the delta
-  is exactly 31 new tests: 16 in the new `SchedulePlannerScreen.test.tsx`, 5 in
-  the new `schedule-planning-service.test.ts` and 10 in the new
-  `schedule-planning-repository.test.ts`); exit 0 across typecheck, lint,
+- Frontend quality: 143 files / 1,358 tests pass (142 files / 1,352 for M09's own
+  stack — the delta from M08's 139 / 1,321 is exactly 31 new tests: 16 in the new
+  `SchedulePlannerScreen.test.tsx`, 5 in the new
+  `schedule-planning-service.test.ts` and 10 in the new
+  `schedule-planning-repository.test.ts`; the reconciled tree adds the remote
+  candidate's own test file for the remaining 6); exit 0 across typecheck, lint,
   format:check, check:architecture and check:deadcode
-- Native Rust: 1,378 → 1,388 total integration-and-lib tests pass / 0 failed
-  (the lib suite holds at 1,248; the new
-  `tests/schedule_planning_management.rs` target contributes 10
+- Native Rust: 1,248 lib tests + every integration target pass / 0 failed
+  (the new `tests/schedule_planning_management.rs` target contributes 10
   command-boundary tests, and `repository/schedule_plan.rs` plus the
   `scheduling/` modules contribute 32 more). `cargo fmt --check` clean,
-  `cargo clippy --all-targets -- -D warnings` clean
+  `cargo clippy --all-targets -- -D warnings` clean. No Rust file was touched
+  by the remote reconciliation, so the Rust gates are unchanged on the
+  reconciled tree
 - `npm run quality:ui` PASS: zero axe WCAG A/AA findings across the preview's
   surfaces. The planner screen is not among them — the dev preview cannot reach
   the new tab — so the screen is axe-checked in jsdom by its own a11y test
