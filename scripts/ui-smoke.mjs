@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 import axe from "axe-core";
+import { uiBrowserExecutable } from "./ui-browser.mjs";
 
 const host = "127.0.0.1";
 const port = 1420;
@@ -32,7 +33,7 @@ try {
   await waitForServer();
   browser = await chromium.launch({
     headless: true,
-    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    executablePath: await uiBrowserExecutable(),
     args: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
       ? [
           "--no-sandbox",
