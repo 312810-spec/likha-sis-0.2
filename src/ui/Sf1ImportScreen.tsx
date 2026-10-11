@@ -15,6 +15,7 @@ import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { Sf1DuplicateReview } from "./components/Sf1DuplicateReview";
 import { StatusChip } from "./components/StatusChip";
+import { useSessionDraft } from "./useSessionDraft";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface Sf1ImportScreenProps {
@@ -86,9 +87,9 @@ export function Sf1ImportScreen({
   const [phase, setPhase] = useState<Phase>("setup");
   const [sections, setSections] = useState<Section[]>([]);
   const [loadingSections, setLoadingSections] = useState(true);
-  const [sectionId, setSectionId] = useState("");
-  const [startsOn, setStartsOn] = useState(todayAsIsoDate);
-  const [filePath, setFilePath] = useState<string | null>(null);
+  const [sectionId, setSectionId] = useSessionDraft("sf1:section", () => "");
+  const [startsOn, setStartsOn] = useSessionDraft("sf1:date", todayAsIsoDate);
+  const [filePath, setFilePath] = useSessionDraft<string | null>("sf1:path", () => null);
   const [preview, setPreview] = useState<Sf1ImportPreview | null>(null);
   const [decisions, setDecisions] = useState<Map<number, DuplicateDecision>>(new Map());
   const [activeReviewRow, setActiveReviewRow] = useState<number | null>(null);
@@ -99,26 +100,87 @@ export function Sf1ImportScreen({
   const [history, setHistory] = useState<Sf1ImportHistoryEntry[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
+  const importSource = useRef({
+    importer: sf1ImportService,
+    sections: sectionService,
+    mounted: true,
+  });
+
+  const isActiveImport = () =>
+    importSource.current.mounted &&
+    importSource.current.importer === sf1ImportService &&
+    importSource.current.sections === sectionService;
+  useEffect(() => {
+    importSource.current = { importer: sf1ImportService, sections: sectionService, mounted: true };
+    // A new service scope must never reuse a preview or duplicate decisions.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreview(null);
+    setDecisions(new Map());
+    setPhase("setup");
+    setBusy(false);
+    return () => {
+      importSource.current.mounted = false;
+    };
+  }, [sf1ImportService, sectionService]);
+  const sectionsRequest = useRef(0);
+  const [sectionsAttempt, setSectionsAttempt] = useState(0);
+  const [sectionsError, setSectionsError] = useState<string | null>(null);
+  const [sectionsSource, setSectionsSource] = useState<SectionApplicationService | null>(null);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const hasValidSection =
+    !loadingSections &&
+    !sectionsError &&
+    sectionsSource === sectionService &&
+    sections.some((section) => section.id === sectionId);
 
   useEffect(() => {
-    cancelledRef.current = false;
+    const request = ++sectionsRequest.current;
+    // Invalidate the old section source while the fresh read is pending.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadingSections(true);
+    setSectionsError(null);
+    setSectionsSource(null);
+    setSections([]);
     sectionService
       .listSections()
       .then((result) => {
-        if (cancelledRef.current) return;
+        if (sectionsRequest.current !== request) return;
         setSections(result);
+        setSectionsSource(sectionService);
       })
       .catch(() => {
-        if (!cancelledRef.current) setError("Could not load sections.");
+        if (sectionsRequest.current === request)
+          setSectionsError("Could not load sections. Your import setup is retained.");
       })
       .finally(() => {
-        if (!cancelledRef.current) setLoadingSections(false);
+        if (sectionsRequest.current === request) setLoadingSections(false);
       });
     return () => {
-      cancelledRef.current = true;
+      sectionsRequest.current += 1;
     };
-  }, [sectionService]);
+  }, [sectionService, sectionsAttempt]);
+
+  async function handleReadDraft() {
+    if (busy || !hasValidSection || !filePath) return;
+    setError(null);
+    setBusy(true);
+    setPhase("parsing");
+    setPreview(null);
+    setDecisions(new Map());
+    try {
+      const result = await sf1ImportService.previewImport(filePath);
+      if (!isActiveImport()) return;
+      setPreview(result);
+      setActiveReviewRow(result.needsReview[0]?.rowNumber ?? null);
+      setPhase("preview");
+    } catch (err) {
+      if (!isActiveImport()) return;
+      setError(describeError(err, "reading"));
+      setPhase("setup");
+    } finally {
+      if (isActiveImport()) setBusy(false);
+    }
+  }
 
   function resetToSetup() {
     setPhase("setup");
@@ -127,15 +189,17 @@ export function Sf1ImportScreen({
     setDecisions(new Map());
     setActiveReviewRow(null);
     setSummary(null);
+    setCompletionError(null);
     setError(null);
   }
 
   async function handleChooseFile() {
-    if (busy || sectionId.length === 0 || phase === "parsing") return;
+    if (busy || !hasValidSection || phase === "parsing") return;
     setError(null);
     setBusy(true);
     try {
       const chosenPath = await sf1ImportService.pickWorkbookFile();
+      if (!isActiveImport()) return;
       if (chosenPath === null) {
         setBusy(false);
         return;
@@ -143,16 +207,18 @@ export function Sf1ImportScreen({
       setFilePath(chosenPath);
       setPhase("parsing");
       const result = await sf1ImportService.previewImport(chosenPath);
+      if (!isActiveImport()) return;
       setPreview(result);
       setDecisions(new Map());
       const firstUnresolved = result.needsReview[0]?.rowNumber ?? null;
       setActiveReviewRow(firstUnresolved);
       setPhase("preview");
     } catch (err) {
+      if (!isActiveImport()) return;
       setError(describeError(err, "reading"));
       setPhase("setup");
     } finally {
-      setBusy(false);
+      if (isActiveImport()) setBusy(false);
     }
   }
 
@@ -182,22 +248,37 @@ export function Sf1ImportScreen({
   }
 
   async function handleCommit() {
-    if (!preview || busy || sectionId.length === 0 || !filePath) return;
+    if (!preview || busy || !hasValidSection || !filePath) return;
     setError(null);
     setBusy(true);
     setPhase("committing");
     try {
       const plans = sf1ImportService.buildCommitPlan(preview, decisions);
       const result = await sf1ImportService.commitImport(sectionId, startsOn, plans, filePath);
+      if (!isActiveImport()) return;
       setSummary(result);
       setPhase("success");
       setHistory(null);
-      onImportComplete?.();
+      try {
+        onImportComplete?.();
+      } catch {
+        setCompletionError(
+          "The import is confirmed, but the surrounding view could not refresh. Reopen that view to refresh it.",
+        );
+      }
     } catch (err) {
-      setError(describeError(err, "importing"));
+      if (!isActiveImport()) return;
+      if (err instanceof ValidationError) {
+        setError(err.message);
+        setPhase("preview");
+        return;
+      }
+      setError(
+        "The import result could not be confirmed. Some learners may already be saved. Re-read the workbook against current records before reviewing and importing again.",
+      );
       setPhase("failure");
     } finally {
-      setBusy(false);
+      if (isActiveImport()) setBusy(false);
     }
   }
 
@@ -208,7 +289,8 @@ export function Sf1ImportScreen({
       preview.exactMatches.length +
       preview.needsReview.filter((m) => decisions.has(m.rowNumber)).length
     : 0;
-  const canImport = preview !== null && unresolvedCount === 0 && readyRowCount > 0 && !busy;
+  const canImport =
+    preview !== null && unresolvedCount === 0 && readyRowCount > 0 && !busy && hasValidSection;
 
   const activeMatch =
     preview && activeReviewRow !== null
@@ -235,13 +317,20 @@ export function Sf1ImportScreen({
         ) : undefined
       }
     >
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && phase !== "failure" && <Alert tone="error">{error}</Alert>}
 
       {(phase === "setup" || phase === "parsing") && (
         <>
           <h3>Import existing SF1</h3>
           {loadingSections ? (
             <Loading label="Loading sections…" />
+          ) : sectionsError ? (
+            <Alert tone="error">
+              {sectionsError}
+              <button type="button" onClick={() => setSectionsAttempt((attempt) => attempt + 1)}>
+                Retry sections
+              </button>
+            </Alert>
           ) : sections.length === 0 ? (
             <EmptyState>
               Create a section first (under Sections), then come back here to import its SF1.
@@ -259,6 +348,11 @@ export function Sf1ImportScreen({
                   <option value="" disabled>
                     Select a section
                   </option>
+                  {sectionId && !sections.some((section) => section.id === sectionId) && (
+                    <option value={sectionId}>
+                      Previously selected section unavailable — choose a current section
+                    </option>
+                  )}
                   {sections.map((section) => (
                     <option key={section.id} value={section.id}>
                       {section.name} — Grade {section.gradeLevel} ({section.schoolYear})
@@ -283,10 +377,21 @@ export function Sf1ImportScreen({
             type="button"
             className="button-primary"
             onClick={handleChooseFile}
-            aria-disabled={sectionId.length === 0 || busy || phase === "parsing"}
+            aria-disabled={!hasValidSection || busy || phase === "parsing"}
           >
             {phase === "parsing" ? "Reading…" : "Choose Excel file"}
           </button>
+          {phase === "setup" && filePath && (
+            <div>
+              <p className="field-hint">
+                Draft file: {fileNameFromPath(filePath)}. Re-read it to check current learner
+                records; previous review decisions are not restored.
+              </p>
+              <button type="button" onClick={handleReadDraft} disabled={!hasValidSection || busy}>
+                Re-read draft file
+              </button>
+            </div>
+          )}
           {mode !== "efficient" && <p className="field-hint">Excel workbook (.xls or .xlsx)</p>}
 
           {phase === "parsing" && filePath && (
@@ -461,9 +566,8 @@ export function Sf1ImportScreen({
             <br />
             {preview.exactMatches.length} existing learners
             <br />
-            {preview.needsReview.length} duplicate{" "}
-            {preview.needsReview.length === 1 ? "decision" : "decisions"} resolved (
-            {preview.needsReview.length - unresolvedCount} of {preview.needsReview.length})
+            {preview.needsReview.length - unresolvedCount} of {preview.needsReview.length} duplicate
+            decisions reviewed
             <br />
             {errorRowCount} blocking {errorRowCount === 1 ? "error" : "errors"}
           </p>
@@ -495,6 +599,7 @@ export function Sf1ImportScreen({
       {phase === "success" && summary && (
         <>
           <Alert tone="success">SF1 import complete</Alert>
+          {completionError && <Alert tone="error">{completionError}</Alert>}
           <p>
             {summary.newLearnersCreated} learners added
             <br />
@@ -522,19 +627,15 @@ export function Sf1ImportScreen({
 
       {phase === "failure" && (
         <>
-          <Alert tone="error">
-            The import could not be completed. No partial learner import was saved.
-          </Alert>
+          <Alert tone="error">{error}</Alert>
           <div className="sf1-review-actions">
             <button
               type="button"
               className="button-primary"
-              onClick={() => {
-                setError(null);
-                setPhase("preview");
-              }}
+              onClick={handleReadDraft}
+              disabled={!hasValidSection || busy}
             >
-              Try again
+              Re-read workbook and review
             </button>
             <button type="button" onClick={resetToSetup}>
               Back to SF1: Enrollment

@@ -1,4 +1,5 @@
 export type SignedInTab =
+  | "today"
   | "daily-planner"
   | "record-library"
   | "workspace"
@@ -42,6 +43,7 @@ export type SignedInTab =
  * `NAV_GROUPS` entry, only a label for the document title (`App.tsx`).
  */
 export const TAB_LABELS: Record<SignedInTab, string> = {
+  today: "Today",
   "daily-planner": "Daily teaching planner",
   "record-library": "Record management",
   workspace: "Dashboard",
@@ -146,6 +148,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 /** The six deliberately small destinations of the class-folio shell. Detailed
  * tools remain in NAV_GROUPS and are reached through the More workspace. */
 export const PRIMARY_NAV: readonly { id: SignedInTab; label: string }[] = [
+  tab("today"),
   tab("workspace"),
   tab("adviser-view"),
   tab("class-records"),
@@ -155,7 +158,7 @@ export const PRIMARY_NAV: readonly { id: SignedInTab; label: string }[] = [
 ];
 export const HOME_DESTINATION = { id: "workspace" as const, label: "Dashboard" };
 export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
-  { id: "workspace", label: "Today" },
+  { id: "today", label: "Today" },
   { id: "my-day", label: "Classes" },
   { id: "school-forms", label: "Forms" },
   { id: "account", label: "Account" },
@@ -163,13 +166,8 @@ export const BOTTOM_NAV: readonly { id: SignedInTab; label: string }[] = [
 
 /** Keeps a meaningful primary destination selected while using its tools. */
 export function primaryTabFor(tab: SignedInTab): SignedInTab {
-  if (
-    tab === "workspace" ||
-    tab === "my-day" ||
-    tab === "today-classes" ||
-    tab === "learning-support"
-  )
-    return "workspace";
+  if (["today", "daily-planner", "learning-support"].includes(tab)) return "today";
+  if (tab === "workspace" || tab === "my-day" || tab === "today-classes") return "workspace";
   if (["adviser-view", "attendance", "section-adviser"].includes(tab)) return "adviser-view";
   if (["class-records", "grading-periods"].includes(tab)) return "class-records";
   if (["school-forms", "monthly-summary", "sf1-import"].includes(tab)) return "school-forms";

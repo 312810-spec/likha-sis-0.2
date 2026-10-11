@@ -1,3 +1,5 @@
+import { SessionDraftProvider } from "./SessionDraftProvider";
+import { clearSessionDrafts } from "./session-draft-store";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -233,5 +235,85 @@ describe("AssessmentAuthoringScreen", () => {
     await screen.findByText(/Written Works — Quiz 1/);
 
     await expectNoAccessibilityViolations(container);
+  });
+});
+
+describe("assessment recovery", () => {
+  it("blocks writes after a failed fresh read and reloads without erasing typed work", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    vi.spyOn(repo, "listItemsByClassRecord").mockRejectedValueOnce(new Error("offline"));
+    renderScreen(repo);
+    await screen.findByRole("button", { name: "Reload items" });
+    await user.type(screen.getByLabelText("Item name"), "Retained task");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    expect(repo.createCalls).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Reload items" }));
+    await screen.findByText(/Written Works — Quiz 1/);
+    expect(screen.getByLabelText("Item name")).toHaveValue("Retained task");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await waitFor(() => expect(repo.createCalls).toHaveLength(1));
+  });
+
+  it("requires an explicit choice before adding an exact duplicate", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    await user.type(screen.getByLabelText("Item name"), "Quiz 1");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    expect(repo.createCalls).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Review existing item" }));
+    expect(repo.createCalls).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await user.click(screen.getByRole("button", { name: "Save another item" }));
+    await waitFor(() => expect(repo.createCalls).toHaveLength(1));
+  });
+
+  it("clears a confirmed creation before a failing list refresh and offers read-only recovery", async () => {
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const list = vi.spyOn(repo, "listItemsByClassRecord");
+    renderScreen(repo);
+    await screen.findByText(/Written Works — Quiz 1/);
+    list.mockRejectedValueOnce(new Error("refresh offline"));
+    await user.type(screen.getByLabelText("Item name"), "Quiz 2");
+    await user.click(screen.getByRole("button", { name: /Add item and continue/ }));
+    await screen.findByText(/The change is saved, but the item list could not refresh/);
+    expect(screen.getByLabelText("Item name")).toHaveValue("");
+    expect(screen.getByText("Quiz 2 added.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reload items" }));
+    await screen.findByText(/Written Works — Quiz 2/);
+    expect(repo.createCalls).toHaveLength(1);
+  });
+});
+
+describe("authoring draft continuity", () => {
+  it("restores an unfinished composer for the same owner and class", async () => {
+    clearSessionDrafts();
+    const user = userEvent.setup();
+    const repo = new FakeAssessmentRepository();
+    const service = new AssessmentApplicationService(repo);
+    const element = (
+      <SessionDraftProvider owner="teacher:school">
+        <ModeProvider>
+          <AssessmentAuthoringScreen
+            classRecordId="cr-1"
+            classRecordLabel="Mabini"
+            assessmentService={service}
+            onBack={() => {}}
+          />
+        </ModeProvider>
+      </SessionDraftProvider>
+    );
+    const first = render(element);
+    await screen.findByText(/Written Works — Quiz 1/);
+    await user.type(screen.getByLabelText("Item name"), "Unfinished quiz");
+    first.unmount();
+    render(element);
+    await screen.findByText(/Written Works — Quiz 1/);
+    expect(screen.getByLabelText("Item name")).toHaveValue("Unfinished quiz");
+    expect(repo.createCalls).toHaveLength(0);
+    clearSessionDrafts();
   });
 });

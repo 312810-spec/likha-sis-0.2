@@ -10,6 +10,7 @@ import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
+import { useSessionDraft } from "./useSessionDraft";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface AssessmentAuthoringScreenProps {
@@ -46,23 +47,72 @@ export function AssessmentAuthoringScreen({
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsSource, setItemsSource] = useState<{
+    service: AssessmentApplicationService;
+    classId: string;
+  } | null>(null);
+  const [itemsAttempt, setItemsAttempt] = useState(0);
+  const [categoriesSource, setCategoriesSource] = useState<{
+    service: AssessmentApplicationService;
+    setId: string;
+  } | null>(null);
+  const [duplicateReview, setDuplicateReview] = useState(false);
+  const itemsReady =
+    !itemsLoading &&
+    itemsSource?.service === assessmentService &&
+    itemsSource.classId === classRecordId;
+  const activeSource = useRef({
+    service: assessmentService,
+    classId: classRecordId,
+    mounted: true,
+  });
+
+  useEffect(() => {
+    activeSource.current = { service: assessmentService, classId: classRecordId, mounted: true };
+    return () => {
+      activeSource.current.mounted = false;
+    };
+  }, [assessmentService, classRecordId]);
+  const isActiveSource = () =>
+    activeSource.current.mounted &&
+    activeSource.current.service === assessmentService &&
+    activeSource.current.classId === classRecordId;
+
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const [categorySets, setCategorySets] = useState<AssessmentCategorySet[]>([]);
-  const [categorySetId, setCategorySetId] = useState("");
+  const [categorySetId, setCategorySetId] = useSessionDraft(
+    `${classRecordId}:authoring:categorySetId`,
+    () => "",
+  );
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [categoryId, setCategoryId] = useState("");
-  const [itemName, setItemName] = useState("");
-  const [maxScore, setMaxScore] = useState("20");
+  const [categoryId, setCategoryId] = useSessionDraft(
+    `${classRecordId}:authoring:categoryId`,
+    () => "",
+  );
+  const [itemName, setItemName] = useSessionDraft(`${classRecordId}:authoring:itemName`, () => "");
+  const [maxScore, setMaxScore] = useSessionDraft(
+    `${classRecordId}:authoring:maxScore`,
+    () => "20",
+  );
   const [creatingItem, setCreatingItem] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editCategoryId, setEditCategoryId] = useState("");
-  const [editMaxScore, setEditMaxScore] = useState("");
+  const [editingItemId, setEditingItemId] = useSessionDraft<string | null>(
+    `${classRecordId}:authoring:editingItemId`,
+    () => null,
+  );
+  const [editName, setEditName] = useSessionDraft(`${classRecordId}:authoring:editName`, () => "");
+  const [editCategoryId, setEditCategoryId] = useSessionDraft(
+    `${classRecordId}:authoring:editCategoryId`,
+    () => "",
+  );
+  const [editMaxScore, setEditMaxScore] = useSessionDraft(
+    `${classRecordId}:authoring:editMaxScore`,
+    () => "",
+  );
   const [savingEdit, setSavingEdit] = useState(false);
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
@@ -70,6 +120,12 @@ export function AssessmentAuthoringScreen({
 
   useEffect(() => {
     let cancelled = false;
+    // Fresh reads invalidate actionable source state before awaiting the response.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setItemsLoading(true);
+    setItemsSource(null);
+    setItems([]);
+    setError(null);
     Promise.all([
       assessmentService.listItemsByClassRecord(classRecordId),
       assessmentService.listCategorySets(),
@@ -77,9 +133,12 @@ export function AssessmentAuthoringScreen({
       .then(([itemList, sets]) => {
         if (cancelled) return;
         setItems(itemList);
+        setItemsSource({ service: assessmentService, classId: classRecordId });
         setCategorySets(sets);
         const defaultSet = sets.find((s) => s.isDefault) ?? sets[0];
-        if (defaultSet) setCategorySetId(defaultSet.id);
+        if (!categorySetId && defaultSet) setCategorySetId(defaultSet.id);
+        else if (categorySetId && !sets.some((set) => set.id === categorySetId))
+          setCategorySetId("");
       })
       .catch(() => {
         if (!cancelled) setError("Could not load this class record's assessment items.");
@@ -90,9 +149,15 @@ export function AssessmentAuthoringScreen({
     return () => {
       cancelled = true;
     };
-  }, [assessmentService, classRecordId]);
+    // Retained draft values are reconciled with this fresh response.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentService, classRecordId, itemsAttempt]);
 
   useEffect(() => {
+    // Fresh reads invalidate actionable source state before awaiting the response.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCategories([]);
+    setCategoriesSource(null);
     if (!categorySetId) return;
     let cancelled = false;
     assessmentService
@@ -100,7 +165,10 @@ export function AssessmentAuthoringScreen({
       .then((result) => {
         if (cancelled) return;
         setCategories(result);
-        if (result[0]) setCategoryId(result[0].id);
+        setCategoriesSource({ service: assessmentService, setId: categorySetId });
+        if (!categoryId && result[0]) setCategoryId(result[0].id);
+        else if (categoryId && !result.some((category) => category.id === categoryId))
+          setCategoryId("");
       })
       .catch(() => {
         if (!cancelled) setError("Could not load categories for this set.");
@@ -108,7 +176,8 @@ export function AssessmentAuthoringScreen({
     return () => {
       cancelled = true;
     };
-  }, [assessmentService, categorySetId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentService, categorySetId, itemsAttempt]);
 
   /** Adds one item and keeps the form open with focus back on the name
    * field -- the whole point of a dedicated authoring screen is building
@@ -116,8 +185,40 @@ export function AssessmentAuthoringScreen({
    * modal or re-pick the category/max score between items. Category and
    * max score deliberately carry over to the next item (a quiz's items
    * usually share both); only the name field clears. */
-  async function handleAddItem() {
-    if (creatingItem || itemName.trim().length === 0 || !categoryId) return;
+  const categoryReady =
+    categoriesSource?.service === assessmentService &&
+    categoriesSource.setId === categorySetId &&
+    categories.some((category) => category.id === categoryId);
+  async function refreshItemsAfterWrite() {
+    setItemsSource(null);
+    try {
+      const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
+      if (!isActiveSource()) return;
+      setItems(refreshed);
+      setItemsSource({ service: assessmentService, classId: classRecordId });
+    } catch {
+      if (!isActiveSource()) return;
+      setError(
+        "The change is saved, but the item list could not refresh. Reload items before making another change.",
+      );
+    }
+  }
+
+  async function handleAddItem(allowDuplicate = false) {
+    if (creatingItem || itemName.trim().length === 0 || !itemsReady || !categoryReady) return;
+    if (
+      !allowDuplicate &&
+      items.some(
+        (item) =>
+          item.name.trim().toLowerCase() === itemName.trim().toLowerCase() &&
+          item.categoryId === categoryId &&
+          item.maxScore === Number(maxScore),
+      )
+    ) {
+      setDuplicateReview(true);
+      return;
+    }
+    setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
     setCreatingItem(true);
@@ -128,14 +229,14 @@ export function AssessmentAuthoringScreen({
         itemName,
         Number(maxScore),
       );
+      if (!isActiveSource()) return;
       if (created === null) {
         setError("Could not add this item — check the category and class record.");
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
         setItemName("");
         setAddedCount((count) => count + 1);
         setConfirmation(`${created.name} added.`);
+        await refreshItemsAfterWrite();
         nameInputRef.current?.focus();
       }
     } catch (err) {
@@ -159,7 +260,15 @@ export function AssessmentAuthoringScreen({
    * category or max score, since either would silently change grades
    * already computed from it. */
   async function handleSaveEdit(item: AssessmentItemDetail) {
-    if (savingEdit || editName.trim().length === 0) return;
+    if (
+      savingEdit ||
+      editName.trim().length === 0 ||
+      !itemsReady ||
+      !items.some((current) => current.id === item.id) ||
+      (item.recordedCount === 0 &&
+        (!categoriesSource || !categories.some((category) => category.id === editCategoryId)))
+    )
+      return;
     const isScored = item.recordedCount > 0;
     setSavingEdit(true);
     setItemActionError(null);
@@ -172,6 +281,7 @@ export function AssessmentAuthoringScreen({
             editCategoryId,
             Number(editMaxScore),
           );
+      if (!isActiveSource()) return;
       if (updated === null) {
         setItemActionError(
           isScored
@@ -179,10 +289,12 @@ export function AssessmentAuthoringScreen({
             : "Could not save changes — this item may already have recorded scores.",
         );
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
         setEditingItemId(null);
+        setEditName("");
+        setEditCategoryId("");
+        setEditMaxScore("");
         setConfirmation(`${updated.name} updated.`);
+        await refreshItemsAfterWrite();
       }
     } catch (err) {
       setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
@@ -194,19 +306,25 @@ export function AssessmentAuthoringScreen({
   /** Only ever reachable for an unscored item -- the confirm/delete
    * controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
-    if (deletingItemId === item.id) return;
+    if (
+      deletingItemId === item.id ||
+      !itemsReady ||
+      !items.some((current) => current.id === item.id)
+    )
+      return;
     setDeletingItemId(item.id);
     setItemActionError(null);
     try {
       const deleted = await assessmentService.deleteItem(item.id);
+      if (!isActiveSource()) return;
       if (!deleted) {
         setItemActionError("Could not delete this item — it may already have recorded scores.");
         setConfirmingDeleteItemId(null);
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
+        setItems((current) => current.filter((existing) => existing.id !== item.id));
         setConfirmingDeleteItemId(null);
         setConfirmation(`${item.name} deleted.`);
+        await refreshItemsAfterWrite();
       }
     } catch (err) {
       setItemActionError(
@@ -242,8 +360,32 @@ export function AssessmentAuthoringScreen({
         </>
       }
     >
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <Alert tone="error">
+          {error}
+          <button type="button" onClick={() => setItemsAttempt((attempt) => attempt + 1)}>
+            Reload items
+          </button>
+        </Alert>
+      )}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+      {duplicateReview && (
+        <Alert tone="warning">
+          An item with this name, category and maximum score already exists. Review the item list
+          before creating another.
+          <button
+            type="button"
+            onClick={() => {
+              setDuplicateReview(false);
+            }}
+          >
+            Review existing item
+          </button>
+          <button type="button" onClick={() => void handleAddItem(true)}>
+            Save another item
+          </button>
+        </Alert>
+      )}
 
       <div className="form-row">
         <div className="field">
@@ -253,6 +395,9 @@ export function AssessmentAuthoringScreen({
             value={categorySetId}
             onChange={(event) => setCategorySetId(event.target.value)}
           >
+            <option value="" disabled>
+              Select a current category set
+            </option>
             {categorySets.map((set) => (
               <option key={set.id} value={set.id}>
                 {set.name}
@@ -268,6 +413,9 @@ export function AssessmentAuthoringScreen({
             value={categoryId}
             onChange={(event) => setCategoryId(event.target.value)}
           >
+            <option value="" disabled>
+              Select a current category
+            </option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -306,7 +454,9 @@ export function AssessmentAuthoringScreen({
       <button
         type="button"
         className="button-primary"
-        aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
+        aria-disabled={
+          creatingItem || itemName.trim().length === 0 || !itemsReady || !categoryReady
+        }
         onClick={() => void handleAddItem()}
       >
         {creatingItem ? "Adding…" : "Add item and continue"}
@@ -322,6 +472,8 @@ export function AssessmentAuthoringScreen({
       <h3>Items in this class record</h3>
       {itemsLoading ? (
         <Loading label="Loading items…" />
+      ) : !itemsReady ? (
+        <EmptyState>Reload items to review current records. Your draft is retained.</EmptyState>
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above to start building this set.</EmptyState>
       ) : (
@@ -366,7 +518,10 @@ export function AssessmentAuthoringScreen({
                                 </option>
                               ))}
                               {!categories.some((category) => category.id === editCategoryId) && (
-                                <option value={editCategoryId}>{item.categoryName}</option>
+                                <option value={editCategoryId} disabled>
+                                  Previously selected category unavailable — choose a current
+                                  category
+                                </option>
                               )}
                             </select>
                           </div>
@@ -385,12 +540,26 @@ export function AssessmentAuthoringScreen({
                     </div>
                     <button
                       type="button"
-                      aria-disabled={savingEdit || editName.trim().length === 0}
+                      aria-disabled={
+                        savingEdit ||
+                        editName.trim().length === 0 ||
+                        !itemsReady ||
+                        (!isScored &&
+                          !categories.some((category) => category.id === editCategoryId))
+                      }
                       onClick={() => void handleSaveEdit(item)}
                     >
                       {savingEdit ? "Saving…" : "Save"}
                     </button>
-                    <button type="button" onClick={() => setEditingItemId(null)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingItemId(null);
+                        setEditName("");
+                        setEditCategoryId("");
+                        setEditMaxScore("");
+                      }}
+                    >
                       Cancel
                     </button>
                   </div>

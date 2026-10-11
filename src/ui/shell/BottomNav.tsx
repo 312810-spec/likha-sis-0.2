@@ -5,20 +5,23 @@ interface BottomNavProps {
   onNavigate: (tab: SignedInTab) => void;
 }
 const ICON: Record<string, IconName> = {
-  workspace: "home",
+  today: "home",
   "my-day": "document",
   "school-forms": "document",
   account: "learners",
 };
 export function BottomNav({ activeTab, onNavigate }: BottomNavProps) {
   const current =
+    activeTab === "workspace" ||
     activeTab === "today-classes" ||
     activeTab === "class-records" ||
     activeTab === "subject-attendance"
       ? "my-day"
       : activeTab === "monthly-summary" || activeTab === "sf1-import"
         ? "school-forms"
-        : activeTab;
+        : activeTab === "daily-planner" || activeTab === "learning-support"
+          ? "today"
+          : activeTab;
   return (
     <nav aria-label="Primary — quick access" className="app-bottomnav">
       {BOTTOM_NAV.map((destination) => (

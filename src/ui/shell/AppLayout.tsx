@@ -172,9 +172,7 @@ export function AppLayout({
         />
         <main id="main-content" tabIndex={-1} className="app-canvas">
           {(activeTab === "workspace" || activeTab === "my-day") && (
-            <h1 className="app-mobile-title">
-              {activeTab === "workspace" ? "Today" : TAB_LABELS[activeTab]}
-            </h1>
+            <h1 className="app-mobile-title">{TAB_LABELS[activeTab]}</h1>
           )}
           {children}
         </main>

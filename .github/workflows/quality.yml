@@ -111,6 +111,10 @@ jobs:
         if: needs.classify.outputs.ui == 'true'
         run: npm run quality:ui
 
+      - name: Verify UX recovery journeys
+        if: needs.classify.outputs.ui == 'true'
+        run: npm run quality:ui:recovery
+
       - name: Install Tauri Linux build dependencies
         if: needs.classify.outputs.native == 'true'
         run: |

@@ -47,13 +47,3 @@ export const offlineCopy = {
   /** Action label to re-check connectivity after the teacher reconnects. */
   tryAgain: "Try again",
 } as const;
-
-/**
- * Error copy for the generic failure shapes. Screen-specific failures keep
- * their own phrasing so they can name what failed and what the teacher can
- * salvage.
- */
-export const errorCopy = {
-  /** Something the teacher asked for could not be found, not their fault. */
-  notFound: "This could not be found.",
-} as const;

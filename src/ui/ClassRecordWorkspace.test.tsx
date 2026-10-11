@@ -1,4 +1,6 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { SessionDraftProvider } from "./SessionDraftProvider";
+import { clearSessionDrafts } from "./session-draft-store";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
@@ -299,23 +301,26 @@ function renderScreen(
     scoreRepo?: FakeLearnerScoreRepository;
     exportRepo?: FakeExportRepository;
     syncService?: LearnerScoreSyncStatusApplicationService;
+    owner?: string;
   } = {},
 ) {
   const assessmentRepo = options.assessmentRepo ?? new FakeAssessmentRepository();
   const scoreRepo = options.scoreRepo ?? new FakeLearnerScoreRepository();
   const exportRepo = options.exportRepo ?? new FakeExportRepository();
   const result = render(
-    <ModeProvider>
-      <ClassRecordWorkspace
-        classRecordId="cr-1"
-        teachingAssignmentId={options.syncService ? "ta-1" : undefined}
-        learnerScoreSyncStatusService={options.syncService}
-        weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
-        assessmentService={new AssessmentApplicationService(assessmentRepo)}
-        learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
-        exportService={new ExportApplicationService(exportRepo)}
-      />
-    </ModeProvider>,
+    <SessionDraftProvider owner={options.owner ?? null}>
+      <ModeProvider>
+        <ClassRecordWorkspace
+          classRecordId="cr-1"
+          teachingAssignmentId={options.syncService ? "ta-1" : undefined}
+          learnerScoreSyncStatusService={options.syncService}
+          weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+          assessmentService={new AssessmentApplicationService(assessmentRepo)}
+          learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
+          exportService={new ExportApplicationService(exportRepo)}
+        />
+      </ModeProvider>
+    </SessionDraftProvider>,
   );
   return { ...result, assessmentRepo, scoreRepo, exportRepo };
 }
@@ -1734,5 +1739,34 @@ describe("assignment-owned score sync evidence", () => {
     expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(null);
     expect(screen.queryByText(/Saved on this device|Last sync check/)).not.toBeInTheDocument();
     expect(getStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("score draft continuity", () => {
+  it("restores score text and selected item on remount without replaying a write", async () => {
+    clearSessionDrafts();
+    const user = userEvent.setup();
+    const first = renderScreen({ owner: "teacher:school" });
+    await screen.findByText(/Quiz 1/);
+    await user.click(screen.getByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText(/Score for Ana Cruz/i);
+    fireEvent.change(input, { target: { value: "13" } });
+    first.unmount();
+    const second = renderScreen({
+      owner: "teacher:school",
+      assessmentRepo: first.assessmentRepo,
+      scoreRepo: first.scoreRepo,
+    });
+    expect(await screen.findByLabelText(/Score for Ana Cruz/i)).toHaveValue(13);
+    expect(second.scoreRepo.recordCalls).toHaveLength(0);
+    second.unmount();
+    renderScreen({
+      owner: "other:school",
+      assessmentRepo: first.assessmentRepo,
+      scoreRepo: first.scoreRepo,
+    });
+    await screen.findByText(/Quiz 1/);
+    expect(screen.queryByLabelText(/Score for Ana Cruz/i)).not.toBeInTheDocument();
+    clearSessionDrafts();
   });
 });

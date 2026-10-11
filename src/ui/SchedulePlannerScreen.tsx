@@ -11,6 +11,7 @@ import type {
   ScheduleSettingsUpdate,
   Violation,
 } from "../domain/schedule-planning";
+import { useSessionDraft } from "./useSessionDraft";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -54,7 +55,33 @@ export function SchedulePlannerScreen({
   const [publishOutcome, setPublishOutcome] = useState<PublishOutcome | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"generate" | "validate" | "publish" | "remove" | null>(
+    null,
+  );
+  const busy = operation !== null;
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+  const [confirmation, setConfirmation] = useState<{
+    action: "generate" | "publish" | "remove";
+    placement?: PlanPlacement;
+    trigger: HTMLButtonElement;
+  } | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmation) cancelRef.current?.focus();
+  }, [confirmation]);
+  function closeConfirmation() {
+    const trigger = confirmation?.trigger;
+    setConfirmation(null);
+    trigger?.focus();
+  }
+  function confirmAction() {
+    const pending = confirmation;
+    closeConfirmation();
+    if (pending?.action === "generate") void handleGenerate();
+    if (pending?.action === "publish") void handlePublish();
+    if (pending?.action === "remove" && pending.placement)
+      void handleRemovePlacement(pending.placement);
+  }
   const requestRef = useRef(0);
 
   function load() {
@@ -73,14 +100,19 @@ export function SchedulePlannerScreen({
           return schedulePlanningService.listSchedulePlanPlacements(loadedPlan.id).then((rows) => {
             if (requestRef.current !== requestId) return;
             setPlacements(rows);
+            setNeedsRefresh(false);
           });
         }
         setPlacements(null);
+        setNeedsRefresh(false);
         return undefined;
       })
       .catch(() => {
         if (requestRef.current !== requestId) return;
-        setError("Could not load the school's scheduling setup.");
+        setNeedsRefresh(true);
+        setError(
+          "Could not refresh the school's scheduling setup. The last loaded plan may be out of date.",
+        );
       })
       .finally(() => {
         if (requestRef.current !== requestId) return;
@@ -91,68 +123,111 @@ export function SchedulePlannerScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schedulePlanningService]);
 
   async function handleGenerate() {
-    if (busy) return;
+    if (busy || needsRefresh) return;
+    const requestId = requestRef.current;
     setError(null);
     setPublishOutcome(null);
     setViolations(null);
-    setBusy(true);
+    setOperation("generate");
     try {
       const response = await schedulePlanningService.generateSchedulePlan();
+      if (requestRef.current !== requestId) return;
       setGeneration(response);
-      const rows = await schedulePlanningService.listSchedulePlanPlacements(response.planId);
-      setPlacements(rows);
-      setPlan(await schedulePlanningService.currentSchedulePlan());
+      setNeedsRefresh(true);
+      try {
+        const rows = await schedulePlanningService.listSchedulePlanPlacements(response.planId);
+        const current = await schedulePlanningService.currentSchedulePlan();
+        if (requestRef.current !== requestId) return;
+        setPlacements(rows);
+        setPlan(current);
+        setNeedsRefresh(false);
+      } catch {
+        if (requestRef.current !== requestId) return;
+        setError(
+          `Draft revision ${response.revision} was generated, but the updated schedule could not be loaded. Refresh the schedule before another change.`,
+        );
+      }
     } catch {
-      setError("Could not generate a plan. Nothing was staged — try again.");
+      if (requestRef.current !== requestId) return;
+      setNeedsRefresh(true);
+      setError(
+        "Generation was not confirmed. A draft may have been staged. Refresh the schedule before another change.",
+      );
     } finally {
-      setBusy(false);
+      if (requestRef.current === requestId) setOperation(null);
     }
   }
 
   async function handleValidate() {
-    if (!plan || busy) return;
+    if (!plan || busy || needsRefresh) return;
+    const requestId = requestRef.current;
     setError(null);
-    setBusy(true);
+    setOperation("validate");
     try {
-      setViolations(await schedulePlanningService.validateSchedulePlan(plan.id));
+      const result = await schedulePlanningService.validateSchedulePlan(plan.id);
+      if (requestRef.current !== requestId) return;
+      setViolations(result);
     } catch {
+      if (requestRef.current !== requestId) return;
       setError("Could not run the checker on this plan.");
     } finally {
-      setBusy(false);
+      if (requestRef.current === requestId) setOperation(null);
     }
   }
 
   async function handlePublish() {
-    if (!plan || busy) return;
+    if (!plan || busy || needsRefresh) return;
+    const requestId = requestRef.current;
     setError(null);
-    setBusy(true);
+    setOperation("publish");
     try {
       const outcome = await schedulePlanningService.publishSchedulePlan(plan.id);
+      if (requestRef.current !== requestId) return;
       setPublishOutcome(outcome);
       if (outcome.outcome === "published") {
         setViolations([]);
-        setPlan(await schedulePlanningService.currentSchedulePlan());
+        setNeedsRefresh(true);
+        try {
+          const current = await schedulePlanningService.currentSchedulePlan();
+          if (requestRef.current !== requestId) return;
+          setPlan(current);
+          setNeedsRefresh(false);
+        } catch {
+          if (requestRef.current !== requestId) return;
+          setError(
+            "Publication is confirmed, but the updated schedule could not be loaded. Refresh the schedule before another change.",
+          );
+        }
       }
     } catch {
-      setError("Could not publish this plan. Nothing went live — try again.");
+      if (requestRef.current !== requestId) return;
+      setNeedsRefresh(true);
+      setError(
+        "Publication was not confirmed. The plan may already be live. Refresh the schedule before another change.",
+      );
     } finally {
-      setBusy(false);
+      if (requestRef.current === requestId) setOperation(null);
     }
   }
 
   async function handleRemovePlacement(placement: PlanPlacement) {
-    if (!plan || busy) return;
+    if (!plan || busy || needsRefresh) return;
+    const requestId = requestRef.current;
     setError(null);
-    setBusy(true);
+    setOperation("remove");
     try {
       const removed = await schedulePlanningService.removeSchedulePlanPlacement(
         plan.id,
         placement.id,
       );
+      if (requestRef.current !== requestId) return;
       if (removed) {
         setPlacements((current) =>
           current ? current.filter((row) => row.id !== placement.id) : current,
@@ -162,12 +237,15 @@ export function SchedulePlannerScreen({
         setViolations(null);
         setPublishOutcome(null);
       } else {
-        setError("Could not remove that placement.");
+        setNeedsRefresh(true);
+        setError("Removal was not confirmed. Refresh the schedule before another change.");
       }
     } catch {
-      setError("Could not remove that placement.");
+      if (requestRef.current !== requestId) return;
+      setNeedsRefresh(true);
+      setError("Removal was not confirmed. Refresh the schedule before another change.");
     } finally {
-      setBusy(false);
+      if (requestRef.current === requestId) setOperation(null);
     }
   }
 
@@ -214,16 +292,59 @@ export function SchedulePlannerScreen({
       {error && (
         <Alert tone="error">
           <p>{error}</p>
-          <button type="button" onClick={load}>
-            Retry
+          <button type="button" onClick={load} disabled={busy}>
+            Refresh schedule
           </button>
         </Alert>
       )}
 
+      {confirmation && (
+        <section
+          className="card"
+          role="alertdialog"
+          aria-modal="false"
+          aria-labelledby="schedule-confirm-title"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closeConfirmation();
+            }
+          }}
+        >
+          <h3 id="schedule-confirm-title">
+            {confirmation.action === "generate"
+              ? "Replace the draft?"
+              : confirmation.action === "publish"
+                ? "Publish this schedule?"
+                : "Remove this placement?"}
+          </h3>
+          <p>
+            {confirmation.action === "generate"
+              ? "Generating again replaces the current draft. Published history remains available."
+              : confirmation.action === "publish"
+                ? "This makes the timetable live for the school after the checker accepts it."
+                : "The placement will be removed from this draft. Check the repaired plan before publication."}
+          </p>
+          <button type="button" ref={cancelRef} onClick={closeConfirmation}>
+            Cancel
+          </button>
+          <button type="button" className="button-primary" onClick={confirmAction}>
+            {confirmation.action === "generate"
+              ? "Confirm replacement"
+              : confirmation.action === "publish"
+                ? "Confirm publication"
+                : "Confirm removal"}
+          </button>
+        </section>
+      )}
+      {needsRefresh && (
+        <p role="status">Showing the last loaded schedule. Refresh before making changes.</p>
+      )}
       <SettingsSection
         schedulePlanningService={schedulePlanningService}
         settings={settings}
         onSaved={load}
+        disabled={busy || needsRefresh || confirmation !== null}
       />
 
       <section className="card">
@@ -234,17 +355,21 @@ export function SchedulePlannerScreen({
         </p>
         {plan && (
           <p className="field-hint">
-            Draft revision {plan.revision}
+            {plan.status === "draft" ? "Draft" : "Published"} revision {plan.revision}
             {plan.generatorNote ? ` — ${plan.generatorNote}` : ""}
           </p>
         )}
         <button
           type="button"
           className="button-primary"
-          aria-disabled={busy}
-          onClick={handleGenerate}
+          disabled={busy || needsRefresh}
+          onClick={(event) =>
+            plan
+              ? setConfirmation({ action: "generate", trigger: event.currentTarget })
+              : void handleGenerate()
+          }
         >
-          {busy ? "Generating…" : "Generate plan"}
+          {operation === "generate" ? "Generating…" : "Generate plan"}
         </button>
         {generation && <GenerationReport outcome={generation.outcome} />}
       </section>
@@ -285,9 +410,15 @@ export function SchedulePlannerScreen({
                   <td>
                     <button
                       type="button"
-                      aria-disabled={busy}
+                      disabled={busy || needsRefresh || plan.status !== "draft"}
                       aria-label={`Remove ${placement.teacherName}'s ${WEEKDAY_LABELS[placement.weekday]} ${placement.startsAt} placement`}
-                      onClick={() => handleRemovePlacement(placement)}
+                      onClick={(event) =>
+                        setConfirmation({
+                          action: "remove",
+                          placement,
+                          trigger: event.currentTarget,
+                        })
+                      }
                     >
                       Remove
                     </button>
@@ -304,8 +435,8 @@ export function SchedulePlannerScreen({
         <p className="field-hint">
           Runs the checker independently of the generator, over the draft exactly as it stands.
         </p>
-        <button type="button" aria-disabled={busy || !plan} onClick={handleValidate}>
-          Check this plan
+        <button type="button" disabled={busy || !plan || needsRefresh} onClick={handleValidate}>
+          {operation === "validate" ? "Checking…" : "Check this plan"}
         </button>
         {violations && <ViolationList violations={violations} />}
       </section>
@@ -319,10 +450,16 @@ export function SchedulePlannerScreen({
         <button
           type="button"
           className="button-primary"
-          aria-disabled={busy || !plan}
-          onClick={handlePublish}
+          disabled={
+            busy ||
+            !plan ||
+            needsRefresh ||
+            plan.status !== "draft" ||
+            publishOutcome?.outcome === "published"
+          }
+          onClick={(event) => setConfirmation({ action: "publish", trigger: event.currentTarget })}
         >
-          {busy ? "Publishing…" : "Publish plan"}
+          {operation === "publish" ? "Publishing…" : "Publish plan"}
         </button>
         {publishOutcome && <PublishReport outcome={publishOutcome} />}
       </section>
@@ -334,33 +471,46 @@ interface SettingsSectionProps {
   schedulePlanningService: SchedulePlanningApplicationService;
   settings: ScheduleSettings;
   onSaved: () => void;
+  disabled: boolean;
 }
 
 /** Prepare — the school's bell grid and workload limits, saved only on an
  * explicit submit because a partial grid is not a grid. */
-function SettingsSection({ schedulePlanningService, settings, onSaved }: SettingsSectionProps) {
-  const [draft, setDraft] = useState<ScheduleSettingsUpdate>({
-    dayStartsAt: settings.dayStartsAt,
-    dayEndsAt: settings.dayEndsAt,
-    schoolDays: settings.schoolDays,
-    periodMinutes: settings.periodMinutes,
-    passingMinutes: settings.passingMinutes,
-    maxDailyTeachingMinutes: settings.maxDailyTeachingMinutes,
-    maxWeeklyTeachingMinutes: settings.maxWeeklyTeachingMinutes,
-  });
+function SettingsSection({
+  schedulePlanningService,
+  settings,
+  onSaved,
+  disabled,
+}: SettingsSectionProps) {
+  const [draft, setDraft] = useSessionDraft<ScheduleSettingsUpdate>(
+    `schedule-settings:${settings.schoolId}`,
+    () => ({
+      dayStartsAt: settings.dayStartsAt,
+      dayEndsAt: settings.dayEndsAt,
+      schoolDays: settings.schoolDays,
+      periodMinutes: settings.periodMinutes,
+      passingMinutes: settings.passingMinutes,
+      maxDailyTeachingMinutes: settings.maxDailyTeachingMinutes,
+      maxWeeklyTeachingMinutes: settings.maxWeeklyTeachingMinutes,
+    }),
+  );
   const [saving, setSaving] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (saving) return;
+    if (saving || disabled || uncertain) return;
     setError(null);
     setSaving(true);
     try {
       await schedulePlanningService.updateScheduleSettings(draft);
       onSaved();
     } catch {
-      setError("Could not save these settings. Nothing was changed — try again.");
+      setUncertain(true);
+      setError(
+        "Saving was not confirmed. Keep your entries and refresh the settings to check what was recorded.",
+      );
     } finally {
       setSaving(false);
     }
@@ -455,9 +605,14 @@ function SettingsSection({ schedulePlanningService, settings, onSaved }: Setting
           {error}
         </p>
       )}
-      <button type="submit" className="button-primary" aria-disabled={saving}>
+      <button type="submit" className="button-primary" disabled={saving || disabled || uncertain}>
         {saving ? "Saving…" : "Save settings"}
       </button>
+      {uncertain && (
+        <button type="button" onClick={onSaved}>
+          Refresh settings
+        </button>
+      )}
     </form>
   );
 }

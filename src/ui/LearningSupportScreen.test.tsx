@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ClassOccurrenceApplicationService } from "../application/class-occurrence-service";
 import { LearnerSupportApplicationService } from "../application/learner-support-service";
 import type { LearnerSupportCase } from "../domain/learner-support";
@@ -135,7 +135,16 @@ class FakeOccurrenceRepository implements ClassOccurrenceRepository {
   async clearFollowup(classOccurrenceId: string, sectionMembershipId: string) {
     if (this.clearFailed) throw new Error("network");
     this.cleared.push([classOccurrenceId, sectionMembershipId]);
-    return null;
+    return {
+      id: "marker-1",
+      schoolId: "school-1",
+      classOccurrenceId,
+      sectionMembershipId,
+      reason: "Follow up",
+      clearedAt: "2026-09-09T01:00:00.000Z",
+      markedAt: "2026-09-09T00:00:00.000Z",
+      markedByUserId: "teacher-1",
+    };
   }
   async listFollowupMarkers(): Promise<LearnerFollowupMarker[]> {
     throw new Error("unused");
@@ -216,9 +225,7 @@ describe("LearningSupportScreen", () => {
 
     await waitFor(() => expect(support.opened).toHaveLength(1));
     // The plan was written; the form stays so the marker can be cleared again.
-    expect(
-      screen.getByRole("button", { name: /Save plan and clear the marker/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Retry clearing marker/i })).toBeInTheDocument();
   });
 
   it("says the plan was refused rather than silently saving nothing", async () => {
@@ -234,7 +241,7 @@ describe("LearningSupportScreen", () => {
     await waitFor(() => expect(save).not.toBeDisabled());
     await user.click(save);
 
-    await waitFor(() => expect(screen.getByText(/Could not open this plan/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Saving was not confirmed/i)).toBeInTheDocument());
     expect(occurrences.cleared).toEqual([]);
   });
 
@@ -301,7 +308,9 @@ describe("LearningSupportScreen", () => {
     );
     await user.click(screen.getByRole("button", { name: /Record participation/i }));
 
-    await waitFor(() => expect(screen.getByText(/no longer at that step/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/This step was not confirmed/i)).toBeInTheDocument(),
+    );
   });
 
   it("warns plainly when the case list cannot be loaded", async () => {
@@ -328,5 +337,59 @@ describe("LearningSupportScreen", () => {
 
     expect((await screen.findAllByText("Ana Cruz")).length).toBe(1);
     await expectNoAccessibilityViolations(container);
+  });
+  it("retries marker clearing without opening a duplicate plan", async () => {
+    const support = new FakeSupportRepository();
+    const occurrences = new FakeOccurrenceRepository();
+    occurrences.clearFailed = true;
+    const user = userEvent.setup();
+    renderScreen(support, occurrences);
+    await user.type(screen.getByPlaceholderText("What should change for this learner?"), "Goal");
+    await user.type(screen.getByPlaceholderText("What will you do?"), "Intervention");
+    await user.click(screen.getByRole("button", { name: "Save plan and clear the marker" }));
+    expect(await screen.findByText(/The support plan is saved/)).toBeInTheDocument();
+    occurrences.clearFailed = false;
+    await user.click(screen.getByRole("button", { name: "Retry clearing marker" }));
+    await waitFor(() => expect(occurrences.cleared).toHaveLength(1));
+    expect(support.opened).toHaveLength(1);
+  });
+
+  it("requires explicit choice before using an existing active plan", async () => {
+    const support = new FakeSupportRepository();
+    const occurrences = new FakeOccurrenceRepository();
+    support.listed = [
+      caseFixture({ need: "Left the exit slip blank", goal: "Goal", intervention: "Intervention" }),
+    ];
+    const user = userEvent.setup();
+    renderScreen(support, occurrences);
+    await user.type(screen.getByPlaceholderText("What should change for this learner?"), "Goal");
+    await user.type(screen.getByPlaceholderText("What will you do?"), "Intervention");
+    await user.click(screen.getByRole("button", { name: "Save plan and clear the marker" }));
+    expect(support.opened).toHaveLength(0);
+    expect(occurrences.cleared).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Use saved plan and clear marker" }));
+    await waitFor(() => expect(occurrences.cleared).toHaveLength(1));
+    expect(support.opened).toHaveLength(0);
+  });
+
+  it("requires a successful read after an ambiguous participation write", async () => {
+    const support = new FakeSupportRepository();
+    support.listed = [caseFixture()];
+    const user = userEvent.setup();
+    renderScreen(support, new FakeOccurrenceRepository(), null);
+    const field = await screen.findByPlaceholderText("Record participation to start this plan");
+    await user.type(field, "Joined activity");
+    const write = vi
+      .spyOn(support, "recordParticipation")
+      .mockRejectedValue(new Error("response lost"));
+    await user.click(screen.getByRole("button", { name: "Record participation" }));
+    expect(await screen.findByText(/This step may already be recorded/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record participation" })).toBeDisabled();
+    support.fail = true;
+    await user.click(screen.getByRole("button", { name: "Reload cases" }));
+    expect(await screen.findByText(/Could not load the support cases/)).toBeInTheDocument();
+    expect(field).toHaveValue("Joined activity");
+    expect(screen.getByRole("button", { name: "Record participation" })).toBeDisabled();
+    expect(write).toHaveBeenCalledTimes(1);
   });
 });

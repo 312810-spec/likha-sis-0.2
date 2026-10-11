@@ -11,6 +11,7 @@ class FakeAuthRepository implements AuthRepository {
   extendedSessionToReturn: CurrentSession | null = null;
   extendSessionCalls = 0;
   extendSessionShouldFail = false;
+  readShouldFail = false;
   /** When set, `extendSession` never resolves on its own -- the test
    * controls completion. Used to prove the in-flight guard blocks a
    * second click while the first extension is still pending. */
@@ -23,6 +24,7 @@ class FakeAuthRepository implements AuthRepository {
   async logout(): Promise<void> {}
 
   async currentSession(): Promise<CurrentSession | null> {
+    if (this.readShouldFail) throw new Error("device read failed");
     return this.sessionToReturn;
   }
 
@@ -149,7 +151,7 @@ describe("IdleTimeoutWarning", () => {
     await vi.waitFor(() => expect(onExpired).toHaveBeenCalledTimes(1));
   });
 
-  it("calls onExpired if extending the session itself fails", async () => {
+  it("keeps the session when extension fails but a fresh check still confirms it", async () => {
     const user = (await import("@testing-library/user-event")).default.setup({
       advanceTimers: vi.advanceTimersByTime,
     });
@@ -165,7 +167,27 @@ describe("IdleTimeoutWarning", () => {
 
     await user.click(screen.getByRole("button", { name: "Stay signed in" }));
 
-    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Stay signed in" })).toBeInTheDocument();
+  });
+
+  it("does not infer expiry from a failed session read and recovers on retry", async () => {
+    const repo = new FakeAuthRepository();
+    repo.readShouldFail = true;
+    repo.sessionToReturn = aSession(Date.now() + 60_000);
+    const onExpired = vi.fn();
+    render(
+      <IdleTimeoutWarning authService={new AuthApplicationService(repo)} onExpired={onExpired} />,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not check your session");
+    expect(onExpired).not.toHaveBeenCalled();
+    repo.readShouldFail = false;
+    const user = (await import("@testing-library/user-event")).default.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+    await user.click(screen.getByRole("button", { name: "Retry session check" }));
+    expect(await screen.findByRole("button", { name: "Stay signed in" })).toBeInTheDocument();
+    expect(onExpired).not.toHaveBeenCalled();
   });
 
   it("has no accessibility violations while the warning is shown", async () => {

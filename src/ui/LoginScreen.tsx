@@ -28,6 +28,8 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [schoolError, setSchoolError] = useState(false);
+  const [schoolAttempt, setSchoolAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
         setSchoolId((current) => current || (result[0]?.id ?? ""));
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load the list of schools.");
+        if (!cancelled) setSchoolError(true);
       })
       .finally(() => {
         if (!cancelled) setLoadingSchools(false);
@@ -56,11 +58,17 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
     return () => {
       cancelled = true;
     };
-  }, [schoolService]);
+  }, [schoolService, schoolAttempt]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (submitting) return;
+    if (
+      submitting ||
+      loadingSchools ||
+      schoolError ||
+      !schools.some((school) => school.id === schoolId)
+    )
+      return;
     setError(null);
     setSubmitting(true);
     try {
@@ -96,11 +104,27 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
 
       {notice && <Alert tone="success">{notice}</Alert>}
       {error && <Alert tone="error">{error}</Alert>}
+      {schoolError && (
+        <Alert tone="error">
+          <p>Could not load the list of schools.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSchoolError(false);
+              setLoadingSchools(true);
+              setSchoolAttempt((n) => n + 1);
+            }}
+          >
+            Retry schools
+          </button>
+        </Alert>
+      )}
 
       <div className="field">
         <label htmlFor="login-school">School</label>
         <select
           id="login-school"
+          disabled={loadingSchools || schoolError}
           value={schoolId}
           onChange={(event) => setSchoolId(event.target.value)}
           aria-describedby={mode === "guided" ? "login-school-hint" : undefined}
@@ -111,7 +135,7 @@ export function LoginScreen({ authService, schoolService, onLoggedIn, notice }: 
               Loading schools…
             </option>
           )}
-          {!loadingSchools && schools.length === 0 && (
+          {!loadingSchools && !schoolError && schools.length === 0 && (
             <option value="" disabled>
               No schools available
             </option>

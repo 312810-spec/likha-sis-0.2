@@ -10,6 +10,16 @@ function renderBottomNav(over: Partial<ComponentProps<typeof BottomNav>> = {}) {
 }
 
 describe("BottomNav", () => {
+  it("maps Today's teaching work and class folios to their real destinations", async () => {
+    const onNavigate = vi.fn();
+    const { rerender } = renderBottomNav({ activeTab: "daily-planner", onNavigate });
+    expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Today" }));
+    expect(onNavigate).toHaveBeenCalledWith("today");
+    rerender(<BottomNav activeTab="workspace" onNavigate={onNavigate} />);
+    expect(screen.getByRole("button", { name: "Classes" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("renders the four concept destinations", () => {
     renderBottomNav();
     for (const name of ["Today", "Classes", "Forms", "Account"]) {

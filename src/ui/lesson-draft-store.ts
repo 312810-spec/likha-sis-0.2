@@ -7,6 +7,7 @@ export interface LessonDraft {
   fields: LessonPlanFields;
 }
 interface Workspace {
+  confirmation?: string;
   active: LessonDraft;
   drafts: Record<string, LessonDraft>;
 }

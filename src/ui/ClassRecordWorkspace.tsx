@@ -23,6 +23,7 @@ import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 import { StatusChip } from "./components/StatusChip";
+import { useSessionDraft } from "./useSessionDraft";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface ClassRecordWorkspaceProps {
@@ -59,35 +60,90 @@ export function ClassRecordWorkspace({
 
   const [items, setItems] = useState<AssessmentItemDetail[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsSource, setItemsSource] = useState<{
+    service: AssessmentApplicationService;
+    classId: string;
+  } | null>(null);
+  const [itemsAttempt, setItemsAttempt] = useState(0);
+  const [categoriesSource, setCategoriesSource] = useState<{
+    service: AssessmentApplicationService;
+    setId: string;
+  } | null>(null);
+  const [duplicateReview, setDuplicateReview] = useState(false);
+  const itemsReady =
+    !itemsLoading &&
+    itemsSource?.service === assessmentService &&
+    itemsSource.classId === classRecordId;
+  const activeSource = useRef({
+    service: assessmentService,
+    classId: classRecordId,
+    mounted: true,
+  });
+
+  useEffect(() => {
+    activeSource.current = { service: assessmentService, classId: classRecordId, mounted: true };
+    return () => {
+      activeSource.current.mounted = false;
+    };
+  }, [assessmentService, classRecordId]);
+  const isActiveSource = () =>
+    activeSource.current.mounted &&
+    activeSource.current.service === assessmentService &&
+    activeSource.current.classId === classRecordId;
+
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const [categorySets, setCategorySets] = useState<AssessmentCategorySet[]>([]);
-  const [categorySetId, setCategorySetId] = useState("");
+  const [categorySetId, setCategorySetId] = useSessionDraft(
+    `${classRecordId}:record:categorySetId`,
+    () => "",
+  );
   const [categories, setCategories] = useState<AssessmentCategory[]>([]);
-  const [categoryId, setCategoryId] = useState("");
-  const [itemName, setItemName] = useState("");
-  const [maxScore, setMaxScore] = useState("20");
+  const [categoryId, setCategoryId] = useSessionDraft(
+    `${classRecordId}:record:categoryId`,
+    () => "",
+  );
+  const [itemName, setItemName] = useSessionDraft(`${classRecordId}:record:itemName`, () => "");
+  const [maxScore, setMaxScore] = useSessionDraft(`${classRecordId}:record:maxScore`, () => "20");
   const [creatingItem, setCreatingItem] = useState(false);
   const composerToggleRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
-  const [composerOpen, setComposerOpen] = useState<boolean | null>(null);
+  const [composerOpen, setComposerOpen] = useSessionDraft<boolean | null>(
+    `${classRecordId}:record:composer`,
+    () => null,
+  );
   const composerVisible = composerOpen ?? (!itemsLoading && items.length === 0);
 
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editCategoryId, setEditCategoryId] = useState("");
-  const [editMaxScore, setEditMaxScore] = useState("");
+  const [editingItemId, setEditingItemId] = useSessionDraft<string | null>(
+    `${classRecordId}:record:editingItemId`,
+    () => null,
+  );
+  const [editName, setEditName] = useSessionDraft(`${classRecordId}:record:editName`, () => "");
+  const [editCategoryId, setEditCategoryId] = useSessionDraft(
+    `${classRecordId}:record:editCategoryId`,
+    () => "",
+  );
+  const [editMaxScore, setEditMaxScore] = useSessionDraft(
+    `${classRecordId}:record:editMaxScore`,
+    () => "",
+  );
   const [savingEdit, setSavingEdit] = useState(false);
   const [itemActionError, setItemActionError] = useState<string | null>(null);
   const [confirmingDeleteItemId, setConfirmingDeleteItemId] = useState<string | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItemId, setSelectedItemId] = useSessionDraft<string | null>(
+    `${classRecordId}:record:selected`,
+    () => null,
+  );
   const [roster, setRoster] = useState<LearnerScoreRosterEntry[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
-  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [scoreDrafts, setScoreDrafts] = useSessionDraft<Record<string, string>>(
+    `${classRecordId}:${selectedItemId}:scoreDrafts`,
+    () => ({}),
+  );
   const [savingLearnerIds, setSavingLearnerIds] = useState<ReadonlySet<string>>(new Set());
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const scoreInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -99,10 +155,13 @@ export function ClassRecordWorkspace({
   // two-step pattern as the item-delete confirmation above. The pending
   // change is replayed verbatim once a reason is given, so the keyboard
   // flow is: type the new score, Enter, type the reason, Enter.
-  const [pendingCorrections, setPendingCorrections] = useState<
+  const [pendingCorrections, setPendingCorrections] = useSessionDraft<
     Record<string, { status: LearnerScoreStatus; scoreText: string | null }>
-  >({});
-  const [correctionReasons, setCorrectionReasons] = useState<Record<string, string>>({});
+  >(`${classRecordId}:${selectedItemId}:corrections`, () => ({}));
+  const [correctionReasons, setCorrectionReasons] = useSessionDraft<Record<string, string>>(
+    `${classRecordId}:${selectedItemId}:correctionReasons`,
+    () => ({}),
+  );
   const correctionReasonRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Moving focus programmatically (after Enter/arrow-navigation) fires a
   // synchronous native `blur` on the field being left, which re-enters
@@ -159,6 +218,11 @@ export function ClassRecordWorkspace({
 
   useEffect(() => {
     let cancelled = false;
+    // Fresh reads invalidate actionable source state before awaiting the response.
+    setItemsLoading(true);
+    setItemsSource(null);
+    setItems([]);
+    setError(null);
     Promise.all([
       assessmentService.listItemsByClassRecord(classRecordId),
       assessmentService.listCategorySets(),
@@ -166,9 +230,12 @@ export function ClassRecordWorkspace({
       .then(([itemList, sets]) => {
         if (cancelled) return;
         setItems(itemList);
+        setItemsSource({ service: assessmentService, classId: classRecordId });
         setCategorySets(sets);
         const defaultSet = sets.find((s) => s.isDefault) ?? sets[0];
-        if (defaultSet) setCategorySetId(defaultSet.id);
+        if (!categorySetId && defaultSet) setCategorySetId(defaultSet.id);
+        else if (categorySetId && !sets.some((set) => set.id === categorySetId))
+          setCategorySetId("");
       })
       .catch(() => {
         if (!cancelled) setError("Could not load this class record's assessment items.");
@@ -179,9 +246,14 @@ export function ClassRecordWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [assessmentService, classRecordId]);
+    // Retained draft values are reconciled with this fresh response.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentService, classRecordId, itemsAttempt]);
 
   useEffect(() => {
+    // Fresh reads invalidate actionable source state before awaiting the response.
+    setCategories([]);
+    setCategoriesSource(null);
     if (!categorySetId) return;
     let cancelled = false;
     assessmentService
@@ -189,7 +261,10 @@ export function ClassRecordWorkspace({
       .then((result) => {
         if (cancelled) return;
         setCategories(result);
-        if (result[0]) setCategoryId(result[0].id);
+        setCategoriesSource({ service: assessmentService, setId: categorySetId });
+        if (!categoryId && result[0]) setCategoryId(result[0].id);
+        else if (categoryId && !result.some((category) => category.id === categoryId))
+          setCategoryId("");
       })
       .catch(() => {
         if (!cancelled) setError("Could not load categories for this set.");
@@ -197,10 +272,11 @@ export function ClassRecordWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [assessmentService, categorySetId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assessmentService, categorySetId, itemsAttempt]);
 
   function loadRoster() {
-    if (!selectedItemId) return;
+    if (!selectedItemId || !itemsReady || !items.some((item) => item.id === selectedItemId)) return;
     const requestId = ++rosterRequestRef.current;
     setRosterLoading(true);
     setRosterError(null);
@@ -225,7 +301,6 @@ export function ClassRecordWorkspace({
     // never leave a different assessment item's roster rendered as if it
     // belongs to the newly selected item.
     setRoster([]);
-    setScoreDrafts({});
     setSavingLearnerIds(new Set());
     setRowErrors({});
     setTermGrades({});
@@ -234,10 +309,42 @@ export function ClassRecordWorkspace({
       rosterRequestRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnerScoreService, selectedItemId]);
+  }, [learnerScoreService, selectedItemId, itemsReady]);
 
-  async function handleCreateItem() {
-    if (creatingItem || itemName.trim().length === 0 || !categoryId) return;
+  const categoryReady =
+    categoriesSource?.service === assessmentService &&
+    categoriesSource.setId === categorySetId &&
+    categories.some((category) => category.id === categoryId);
+  async function refreshItemsAfterWrite() {
+    setItemsSource(null);
+    try {
+      const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
+      if (!isActiveSource()) return;
+      setItems(refreshed);
+      setItemsSource({ service: assessmentService, classId: classRecordId });
+    } catch {
+      if (!isActiveSource()) return;
+      setError(
+        "The change is saved, but the item list could not refresh. Reload items before making another change.",
+      );
+    }
+  }
+
+  async function handleCreateItem(allowDuplicate = false) {
+    if (creatingItem || itemName.trim().length === 0 || !itemsReady || !categoryReady) return;
+    if (
+      !allowDuplicate &&
+      items.some(
+        (item) =>
+          item.name.trim().toLowerCase() === itemName.trim().toLowerCase() &&
+          item.categoryId === categoryId &&
+          item.maxScore === Number(maxScore),
+      )
+    ) {
+      setDuplicateReview(true);
+      return;
+    }
+    setDuplicateReview(false);
     setError(null);
     setConfirmation(null);
     setCreatingItem(true);
@@ -248,11 +355,10 @@ export function ClassRecordWorkspace({
         itemName,
         Number(maxScore),
       );
+      if (!isActiveSource()) return;
       if (created === null) {
         setError("Could not create this item — check the category and class record.");
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
         setItemName("");
         setComposerOpen(false);
         if (
@@ -262,6 +368,7 @@ export function ClassRecordWorkspace({
           composerToggleRef.current?.focus();
         }
         setConfirmation(`${created.name} added.`);
+        await refreshItemsAfterWrite();
       }
     } catch (err) {
       setError(err instanceof ValidationError ? err.message : "Could not create this item.");
@@ -287,7 +394,15 @@ export function ClassRecordWorkspace({
    * which the Rust layer itself re-verifies is still unscored and
    * resolves to a valid leaf category before accepting the change. */
   async function handleSaveEdit(item: AssessmentItemDetail) {
-    if (savingEdit || editName.trim().length === 0) return;
+    if (
+      savingEdit ||
+      editName.trim().length === 0 ||
+      !itemsReady ||
+      !items.some((current) => current.id === item.id) ||
+      (item.recordedCount === 0 &&
+        (!categoriesSource || !categories.some((category) => category.id === editCategoryId)))
+    )
+      return;
     const isScored = item.recordedCount > 0;
     setSavingEdit(true);
     setItemActionError(null);
@@ -300,6 +415,7 @@ export function ClassRecordWorkspace({
             editCategoryId,
             Number(editMaxScore),
           );
+      if (!isActiveSource()) return;
       if (updated === null) {
         setItemActionError(
           isScored
@@ -307,10 +423,12 @@ export function ClassRecordWorkspace({
             : "Could not save changes — this item may already have recorded scores.",
         );
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
         setEditingItemId(null);
+        setEditName("");
+        setEditCategoryId("");
+        setEditMaxScore("");
         setConfirmation(`${updated.name} updated.`);
+        await refreshItemsAfterWrite();
       }
     } catch (err) {
       setItemActionError(err instanceof ValidationError ? err.message : "Could not save changes.");
@@ -323,20 +441,26 @@ export function ClassRecordWorkspace({
    * armed for this item's id. Only ever reachable for an unscored item --
    * the confirm/delete controls are not rendered once `recordedCount > 0`. */
   async function handleDeleteItem(item: AssessmentItemDetail) {
-    if (deletingItemId === item.id) return;
+    if (
+      deletingItemId === item.id ||
+      !itemsReady ||
+      !items.some((current) => current.id === item.id)
+    )
+      return;
     setDeletingItemId(item.id);
     setItemActionError(null);
     try {
       const deleted = await assessmentService.deleteItem(item.id);
+      if (!isActiveSource()) return;
       if (!deleted) {
         setItemActionError("Could not delete this item — it may already have recorded scores.");
         setConfirmingDeleteItemId(null);
       } else {
-        const refreshed = await assessmentService.listItemsByClassRecord(classRecordId);
-        setItems(refreshed);
+        setItems((current) => current.filter((existing) => existing.id !== item.id));
         if (selectedItemId === item.id) setSelectedItemId(null);
         setConfirmingDeleteItemId(null);
         setConfirmation(`${item.name} deleted.`);
+        await refreshItemsAfterWrite();
       }
     } catch (err) {
       setItemActionError(
@@ -389,8 +513,15 @@ export function ClassRecordWorkspace({
     status: LearnerScoreStatus,
     scoreText: string | null,
   ): Promise<boolean> {
-    if (!selectedItemId) return false;
-    const selectedItem = items.find((i) => i.id === selectedItemId);
+    if (
+      !selectedItemId ||
+      !itemsReady ||
+      rosterLoading ||
+      rosterError ||
+      !roster.some((entry) => entry.learnerId === learnerId)
+    )
+      return false;
+    const selectedItem = itemsReady ? items.find((i) => i.id === selectedItemId) : undefined;
     if (!selectedItem) return false;
 
     // Selecting the already-active exception status is a no-op, not a
@@ -690,7 +821,7 @@ export function ClassRecordWorkspace({
     }
   }
 
-  const selectedItem = items.find((i) => i.id === selectedItemId);
+  const selectedItem = itemsReady ? items.find((i) => i.id === selectedItemId) : undefined;
   const recordedCount = roster.filter((entry) => entry.status !== null).length;
   const remainingCount = roster.length - recordedCount;
 
@@ -707,8 +838,32 @@ export function ClassRecordWorkspace({
         ) : undefined
       }
     >
-      {error && <Alert tone="error">{error}</Alert>}
+      {error && (
+        <Alert tone="error">
+          {error}
+          <button type="button" onClick={() => setItemsAttempt((attempt) => attempt + 1)}>
+            Reload items
+          </button>
+        </Alert>
+      )}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
+      {duplicateReview && (
+        <Alert tone="warning">
+          An item with this name, category and maximum score already exists. Review the item list
+          before creating another.
+          <button
+            type="button"
+            onClick={() => {
+              setDuplicateReview(false);
+            }}
+          >
+            Review existing item
+          </button>
+          <button type="button" onClick={() => void handleCreateItem(true)}>
+            Save another item
+          </button>
+        </Alert>
+      )}
 
       <div className="assessment-toolbar">
         <h3>Assessment items</h3>
@@ -744,6 +899,9 @@ export function ClassRecordWorkspace({
               value={categorySetId}
               onChange={(event) => setCategorySetId(event.target.value)}
             >
+              <option value="" disabled>
+                Select a current category set
+              </option>
               {categorySets.map((set) => (
                 <option key={set.id} value={set.id}>
                   {set.name}
@@ -766,6 +924,9 @@ export function ClassRecordWorkspace({
               value={categoryId}
               onChange={(event) => setCategoryId(event.target.value)}
             >
+              <option value="" disabled>
+                Select a current category
+              </option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -796,8 +957,10 @@ export function ClassRecordWorkspace({
         </div>
         <button
           type="button"
-          aria-disabled={creatingItem || itemName.trim().length === 0 || !categoryId}
-          onClick={handleCreateItem}
+          aria-disabled={
+            creatingItem || itemName.trim().length === 0 || !itemsReady || !categoryReady
+          }
+          onClick={() => void handleCreateItem()}
         >
           {creatingItem ? "Adding…" : "Add item"}
         </button>
@@ -807,6 +970,8 @@ export function ClassRecordWorkspace({
 
       {itemsLoading ? (
         <Loading label="Loading items…" />
+      ) : !itemsReady ? (
+        <EmptyState>Reload items to review current records. Your draft is retained.</EmptyState>
       ) : items.length === 0 ? (
         <EmptyState>No assessment items yet. Add one above.</EmptyState>
       ) : (
@@ -851,7 +1016,10 @@ export function ClassRecordWorkspace({
                                 </option>
                               ))}
                               {!categories.some((category) => category.id === editCategoryId) && (
-                                <option value={editCategoryId}>{item.categoryName}</option>
+                                <option value={editCategoryId} disabled>
+                                  Previously selected category unavailable — choose a current
+                                  category
+                                </option>
                               )}
                             </select>
                           </div>
@@ -870,12 +1038,26 @@ export function ClassRecordWorkspace({
                     </div>
                     <button
                       type="button"
-                      aria-disabled={savingEdit || editName.trim().length === 0}
+                      aria-disabled={
+                        savingEdit ||
+                        editName.trim().length === 0 ||
+                        !itemsReady ||
+                        (!isScored &&
+                          !categories.some((category) => category.id === editCategoryId))
+                      }
                       onClick={() => void handleSaveEdit(item)}
                     >
                       {savingEdit ? "Saving…" : "Save"}
                     </button>
-                    <button type="button" onClick={() => setEditingItemId(null)}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingItemId(null);
+                        setEditName("");
+                        setEditCategoryId("");
+                        setEditMaxScore("");
+                      }}
+                    >
                       Cancel
                     </button>
                   </div>

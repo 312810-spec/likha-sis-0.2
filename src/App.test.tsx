@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { clearSessionDrafts } from "./ui/session-draft-store";
 import type { CurrentSession } from "./domain/session";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -28,9 +29,60 @@ const session: CurrentSession = {
 
 beforeEach(() => {
   mockInvoke.mockReset();
+  clearSessionDrafts();
 });
 
 describe("App", () => {
+  it("does not infer sign-in or first-run setup from a failed startup read and can retry", async () => {
+    let failed = true;
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status")
+        return failed
+          ? Promise.reject(new Error("private database path"))
+          : Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(null);
+      if (command === "list_schools") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+    render(<App />);
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private database path");
+    expect(screen.queryByRole("form", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Set up your school" })).not.toBeInTheDocument();
+    failed = false;
+    await userEvent.setup().click(screen.getByRole("button", { name: "Retry startup" }));
+    expect(await screen.findByRole("form", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("opens the real Today aggregate as the signed-in landing destination", async () => {
+    mockInvoke.mockImplementation((command) => {
+      if (command === "installation_status") return Promise.resolve({ needsSetup: false });
+      if (command === "current_session") return Promise.resolve(session);
+      if (command === "get_my_day_summary")
+        return Promise.resolve({
+          schedule: [],
+          next: null,
+          pendingAttendance: [],
+          pendingAssignments: [],
+          pendingConflicts: [],
+          pendingScoring: [],
+          pendingFollowups: [],
+          hasAnyAssignments: false,
+        });
+      return Promise.resolve(null);
+    });
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("get_my_day_summary", expect.anything()),
+    );
+    expect(document.title).toBe("Today · LIKHA-SIS");
+    expect(
+      within(screen.getByRole("navigation", { name: "Primary" })).getByRole("button", {
+        name: "Today",
+      }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
   it("shows the first-run setup screen when the backend reports the install needs setup", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: true });
@@ -58,7 +110,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "LIKHA-SIS" })).toBeInTheDocument();
   });
 
-  it("shows authorized assigned classes by default when there is an active session", async () => {
+  it("keeps authorized assigned classes available from Dashboard", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
@@ -71,6 +123,7 @@ describe("App", () => {
 
     render(<App />);
 
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     expect(await screen.findByRole("heading", { name: "My classes" })).toBeInTheDocument();
     expect(await screen.findByText("No teaching assignments yet.")).toBeInTheDocument();
     expect(mockInvoke).toHaveBeenCalledWith("list_teacher_assignments", expect.anything());
@@ -96,12 +149,13 @@ describe("App", () => {
 
     render(<App />);
 
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     const group = await screen.findByRole("group", { name: "Home view" });
     expect(within(group).getByRole("button", { name: "School overview" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "School overview" })).toBeInTheDocument();
   });
 
-  it("keeps six primary destinations and preserves specialist tools in More", async () => {
+  it("keeps Today and six primary destinations and preserves specialist tools in More", async () => {
     mockInvoke.mockImplementation((command) => {
       if (command === "installation_status") return Promise.resolve({ needsSetup: false });
       if (command === "current_session") return Promise.resolve(session);
@@ -109,10 +163,12 @@ describe("App", () => {
       return Promise.reject(new Error(`unexpected command: ${String(command)}`));
     });
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    expect(within(nav).getAllByRole("button")).toHaveLength(6);
+    expect(within(nav).getAllByRole("button")).toHaveLength(7);
     for (const destination of [
+      "Today",
       "Dashboard",
       "My Advisory",
       "Class Record",
@@ -166,6 +222,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     await waitFor(() => expect(document.title).toBe("Dashboard · LIKHA-SIS"));
 
@@ -190,6 +247,7 @@ describe("App", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Dashboard" }));
     await screen.findByRole("heading", { name: "My classes" });
     const nav = screen.getByRole("navigation", { name: "Primary" });
     await user.click(within(nav).getByRole("button", { name: "More" }));

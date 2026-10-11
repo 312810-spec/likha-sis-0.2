@@ -74,6 +74,32 @@ describe("typography scale", () => {
 });
 
 describe("spacing scale", () => {
+  it("custom-property dependencies have no cycle in the base theme or any density/appearance override", () => {
+    const declarations = tokenDeclarations().map(
+      (block) =>
+        new Map(
+          [...block.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value]),
+        ),
+    );
+    const base = declarations[0];
+    expect(base.size).toBeGreaterThan(0);
+    for (const overrides of [new Map(), ...declarations.slice(1)]) {
+      const resolved = new Map([...base, ...overrides]);
+      const cycles = [];
+      function visit(name, path) {
+        if (path.includes(name)) {
+          cycles.push([...path, name].join(" -> "));
+          return;
+        }
+        for (const [, dependency] of (resolved.get(name) ?? "").matchAll(/var\((--[\w-]+)/g)) {
+          visit(dependency, [...path, name]);
+        }
+      }
+      for (const name of resolved.keys()) visit(name, []);
+      expect(cycles).toEqual([]);
+    }
+  });
+
   it("no component declares literal pixel padding/gap/margin above the hairline threshold", () => {
     // 1-3px values are hairlines (1px borders, 2px gutters) and are exempt.
     // The one legitimate large literal is the phone safe-area inset, which is

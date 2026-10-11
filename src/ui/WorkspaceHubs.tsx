@@ -10,10 +10,22 @@ import { Loading } from "./components/Loading";
 import { EmptyState } from "./components/EmptyState";
 import type { TeacherClassWorkContext } from "./work-context";
 
-export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => void }) {
+export function MoreScreen({
+  onNavigate,
+  roles = [],
+}: {
+  onNavigate: (tab: SignedInTab) => void;
+  roles?: readonly string[];
+}) {
   return (
     <Page title="More">
       <p className="field-hint">School records, teaching tools, and device settings.</p>
+      {roles.includes("school_head") && (
+        <p className="field-hint">
+          For school administration, open Sections for the Teacher Load Maker, Learner Records for
+          imports, or Security for school and device access.
+        </p>
+      )}
       <div className="workspace-directory">
         <section>
           <h3>My teaching</h3>

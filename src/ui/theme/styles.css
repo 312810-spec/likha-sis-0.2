@@ -32,7 +32,7 @@
   --color-warning: #8a4b00;
   --color-warning-surface: #fff4de;
   --color-focus: var(--color-primary);
-  --spacing-unit: var(--space-4);
+  --spacing-unit: 12px;
   /* Spacing scale. Every value derives from --spacing-unit, so the
      efficient/guided density overrides below rescale all spacing, not
      just the values that happen to name the unit directly. Hardcoded px
@@ -114,7 +114,7 @@
 }
 
 :root[data-teacher-mode="guided"] {
-  --spacing-unit: var(--space-5);
+  --spacing-unit: 18px;
   --font-size-base: 17px;
   --control-height: var(--space-8);
 }
@@ -3483,5 +3483,65 @@ label {
   }
   .worksheet-actions > button {
     width: 100%;
+  }
+}
+
+/* Shared multiline fields follow the existing input tokens. */
+textarea {
+  display: block;
+  width: 100%;
+  min-height: calc(var(--control-height) * 2);
+  padding: calc(var(--spacing-unit) * 0.75);
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  resize: vertical;
+}
+textarea:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+label.field > span:first-child {
+  display: block;
+  margin-bottom: calc(var(--spacing-unit) * 0.35);
+}
+.support-step-form > .field {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .concept-folio-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .concept-folio-tabs button {
+    min-width: 0;
+    padding-inline: var(--space-1);
+    overflow-wrap: anywhere;
+  }
+  .sf1-comparison-table thead {
+    display: none;
+  }
+  .sf1-comparison-table tbody,
+  .sf1-comparison-table tr,
+  .sf1-comparison-table th,
+  .sf1-comparison-table td {
+    display: block;
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .sf1-comparison-table tr {
+    border-bottom: 1px solid var(--color-border);
+    padding-block: var(--space-2);
+  }
+  .sf1-comparison-table th,
+  .sf1-comparison-table td {
+    border: 0;
+    padding: var(--space-1);
+  }
+  .sf1-comparison-table td::before {
+    content: attr(data-label) ": ";
+    font-weight: 600;
   }
 }

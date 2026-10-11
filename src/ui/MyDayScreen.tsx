@@ -90,7 +90,7 @@ export function MyDayScreen({
       })
       .catch(() => {
         if (requestRef.current !== requestId) return;
-        setError("Could not load My Day.");
+        setError("Could not load Today.");
       })
       .finally(() => {
         if (requestRef.current !== requestId) return;
@@ -130,7 +130,7 @@ export function MyDayScreen({
 
   return (
     <Page
-      title="My Day"
+      title="Today"
       hint={
         mode === "guided" ? (
           <p className="field-hint">
@@ -151,7 +151,7 @@ export function MyDayScreen({
 
       {loading ? (
         <>
-          <Loading label="Loading My Day…" />
+          <Loading label="Loading Today…" />
           {classWorkspace}
         </>
       ) : error || !summary ? (

@@ -106,6 +106,30 @@ beforeEach(() => {
 });
 
 describe("LoginScreen", () => {
+  it("retries a failed school read without losing typed credentials or allowing an invalid sign-in", async () => {
+    const schoolRepo = new FakeSchoolRepository(seedSchools());
+    const load = vi
+      .spyOn(schoolRepo, "listAll")
+      .mockRejectedValueOnce(new Error("private database error"));
+    const user = userEvent.setup();
+    const { authRepo } = renderLoginScreen({ schoolRepo });
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private database error");
+    expect(screen.queryByRole("option", { name: "No schools available" })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Username"), "ana.cruz");
+    await user.type(screen.getByLabelText("Password"), "my-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(authRepo.loginCalls).toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Retry schools" }));
+    await waitFor(() => expect(screen.getByLabelText("School")).toHaveValue("s1"));
+    expect(screen.getByLabelText("Username")).toHaveValue("ana.cruz");
+    expect(screen.getByLabelText("Password")).toHaveValue("my-password");
+    expect(load).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(authRepo.loginCalls).toEqual([
+      { username: "ana.cruz", password: "my-password", schoolId: "s1" },
+    ]);
+  });
+
   it("loads schools and preselects the first one", async () => {
     renderLoginScreen({});
 

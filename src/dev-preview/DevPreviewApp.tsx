@@ -1,3 +1,10 @@
+import { recoveryServices } from "./ux-recovery-fixtures";
+import { SessionDraftProvider } from "../ui/SessionDraftProvider";
+import { LessonPlanScreen } from "../ui/LessonPlanScreen";
+import { LearningSupportScreen } from "../ui/LearningSupportScreen";
+import { SchedulePlannerScreen } from "../ui/SchedulePlannerScreen";
+import { Sf1ImportScreen } from "../ui/Sf1ImportScreen";
+import { MyDayScreen } from "../ui/MyDayScreen";
 import { ClassRecordJourneyScreen } from "../ui/ClassRecordJourneyScreen";
 import { AssignedClassFolio } from "../ui/AssignedClassFolio";
 import { CalendarScreen, MoreScreen, SchoolFormsScreen } from "../ui/WorkspaceHubs";
@@ -96,6 +103,16 @@ const FIXTURE_TEACHER_USER_ID = "teacher-ana";
  * message below, tracked as retained debt in `docs/VERIFICATION-DEBT.md`
  * rather than assumed covered.
  */
+const previewQuery = new URLSearchParams(window.location.search);
+const recovery = recoveryServices(previewQuery.get("state") ?? "healthy");
+const previewDestination = previewQuery.get("ux");
+const supportedRecoveryDestinations = new Set([
+  "lesson-plans",
+  "learning-support",
+  "schedule-planner",
+  "sf1-import",
+  "today",
+]);
 const attendanceService = new AttendanceApplicationService(new FixtureAttendanceRepository());
 const authService = new AuthApplicationService(new FixtureAuthRepository());
 const exportService = new ExportApplicationService(new FixtureExportRepository());
@@ -177,7 +194,11 @@ export function DevPreviewApp() {
     null,
   );
   const [attendanceAssignmentId, setAttendanceAssignmentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<SignedInTab>("workspace");
+  const [activeTab, setActiveTab] = useState<SignedInTab>(
+    supportedRecoveryDestinations.has(previewDestination ?? "")
+      ? (previewDestination as SignedInTab)
+      : "workspace",
+  );
   const [attendanceSectionId] = useState<string | null>(null);
   const [monthlySummaryContext, setMonthlySummaryContext] = useState<{
     sectionId: string;
@@ -200,195 +221,249 @@ export function DevPreviewApp() {
 
   return (
     <ModeProvider>
-      <AppLayout
-        session={{ ...FIXTURE_SESSION, schoolName: "Tingub NHS" }}
-        schoolLogoService={previewLogoService}
-        activeTab={activeTab}
-        onNavigate={(tab) => {
-          setActiveTab(tab);
-        }}
-        onLogout={() => {}}
-      >
-        <div className="preview-boundary" role="status">
-          Development preview · Synthetic records · School seal used as a design reference
-        </div>
-        {activeTab === "workspace" || activeTab === "my-day" || activeTab === "class-records" ? (
-          <AssignedClassFolio
-            key={activeTab === "class-records" ? "scores" : "overview"}
-            teacherUserId={FIXTURE_TEACHER_USER_ID}
-            subjectAttendanceService={subjectAttendanceService}
-            selectedClassContext={selectedClassContext}
-            onSelectClass={setSelectedClassContext}
-            initialTab={activeTab === "class-records" ? "scores" : "overview"}
-            onCheckAttendance={(context) => {
-              setSelectedClassContext(context);
-              setAttendanceAssignmentId(context.teachingAssignmentId);
-              setActiveTab("subject-attendance");
-            }}
-            onOpenClassRecord={(context) => {
-              setSelectedClassContext(context);
-              setActiveTab("class-records");
-            }}
-            onOpenAdvisory={() => setActiveTab("adviser-view")}
-            onOpenForms={() => setActiveTab("school-forms")}
-            renderScores={(context, onBackToOverview) => (
-              <ClassRecordJourneyScreen
-                embedded
-                teachingAssignmentId={context.teachingAssignmentId}
-                classContext={context}
-                teacherUserId={FIXTURE_TEACHER_USER_ID}
-                subjectAttendanceService={subjectAttendanceService}
-                gradingService={gradingService}
-                classRecordService={classRecordService}
-                assessmentService={assessmentService}
-                learnerScoreService={learnerScoreService}
-                exportService={exportService}
-                onBackToClass={() => {
-                  onBackToOverview();
-                  if (activeTab === "class-records") setActiveTab("workspace");
-                }}
-              />
-            )}
-          />
-        ) : activeTab === "school-forms" ? (
-          <SchoolFormsScreen onNavigate={setActiveTab} />
-        ) : activeTab === "more" ? (
-          <MoreScreen onNavigate={setActiveTab} />
-        ) : activeTab === "calendar" ? (
-          <CalendarScreen
-            subjectAttendanceService={subjectAttendanceService}
-            teacherUserId={FIXTURE_TEACHER_USER_ID}
-            onOpenClass={(context) => {
-              setSelectedClassContext(context);
-              setActiveTab("workspace");
-            }}
-          />
-        ) : activeTab === "account" ? (
-          <Page title="Account">
-            <ShellAccountPreferences session={FIXTURE_SESSION} onLogout={() => {}} />
-            <button type="button" onClick={() => setActiveTab("more")}>
-              More tools and settings
-            </button>
-          </Page>
-        ) : activeTab === "attendance" ? (
-          <AttendanceScreen
-            attendanceService={attendanceService}
-            sectionService={sectionService}
-            initialSectionId={attendanceSectionId ?? undefined}
-            onViewMonthlySummary={(sectionId, year, month) => {
-              setMonthlySummaryContext({ sectionId, year, month });
-              setActiveTab("monthly-summary");
-            }}
-          />
-        ) : activeTab === "monthly-summary" ? (
-          <MonthlySummaryScreen
-            attendanceService={attendanceService}
-            sectionService={sectionService}
-            exportService={exportService}
-            schoolName={FIXTURE_SESSION.schoolName}
-            initialSectionId={monthlySummaryContext?.sectionId}
-            initialYearMonth={
-              monthlySummaryContext
-                ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
-                : undefined
-            }
-          />
-        ) : activeTab === "learners" ? (
-          <LearnerListScreen
-            learnerService={learnerService}
-            exportService={exportService}
-            enrollmentHistoryService={enrollmentHistoryService}
-          />
-        ) : activeTab === "record-library" ? (
-          <ClassRecordsScreen
-            classRecordService={classRecordService}
-            sectionService={sectionService}
-            subjectService={subjectService}
-            gradingService={gradingService}
-            assessmentService={assessmentService}
-            learnerScoreService={learnerScoreService}
-            exportService={exportService}
-          />
-        ) : activeTab === "audit-log" ? (
-          <AuditLogScreen authService={authService} />
-        ) : activeTab === "sections" ? (
-          <SectionsScreen
-            sectionService={sectionService}
-            learnerService={learnerService}
-            exportService={exportService}
-            onOpenRoster={() => {}}
-            onManageAssignments={(sectionId, sectionName) => {
-              setAssignmentsSection({ sectionId, sectionName });
-              setActiveTab("teaching-assignments");
-            }}
-            onManageAdviser={(sectionId, sectionName) => {
-              setSectionAdviserSection({ sectionId, sectionName });
-              setActiveTab("section-adviser");
-            }}
-          />
-        ) : activeTab === "section-adviser" ? (
-          <SectionAdviserScreen
-            sectionAdvisoryService={sectionAdvisoryService}
-            schoolMemberService={schoolMemberService}
-            sectionId={sectionAdviserSection?.sectionId ?? "sec-not-started"}
-            sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
-            onBack={() => setActiveTab("sections")}
-          />
-        ) : activeTab === "teaching-assignments" ? (
-          <TeachingAssignmentsScreen
-            teachingAssignmentService={teachingAssignmentService}
-            subjectService={subjectService}
-            schoolMemberService={schoolMemberService}
-            sectionId={assignmentsSection?.sectionId ?? "sec-not-started"}
-            sectionName={assignmentsSection?.sectionName ?? "Mabini"}
-            onBack={() => setActiveTab("sections")}
-            onManageSchedule={(teachingAssignmentId, subjectName) => {
-              setScheduleContext({
-                teachingAssignmentId,
-                subjectName,
-                sectionName: assignmentsSection?.sectionName ?? "Mabini",
-              });
-              setActiveTab("schedule-meetings");
-            }}
-          />
-        ) : activeTab === "schedule-meetings" ? (
-          <ScheduleMeetingsScreen
-            teachingAssignmentService={teachingAssignmentService}
-            teachingAssignmentId={scheduleContext?.teachingAssignmentId ?? "ta-1"}
-            subjectName={scheduleContext?.subjectName ?? "Mathematics"}
-            sectionName={scheduleContext?.sectionName ?? "Mabini"}
-            onBack={() => setActiveTab("teaching-assignments")}
-          />
-        ) : activeTab === "subject-attendance" ? (
-          <SubjectAttendanceScreen
-            subjectAttendanceService={subjectAttendanceService}
-            teacherUserId={FIXTURE_TEACHER_USER_ID}
-            initialAssignmentId={attendanceAssignmentId ?? undefined}
-          />
-        ) : activeTab === "subject-monitor" ? (
-          <SubjectMonitorScreen
-            subjectAttendanceService={subjectAttendanceService}
-            teacherUserId={FIXTURE_TEACHER_USER_ID}
-          />
-        ) : activeTab === "adviser-view" ? (
-          <AdviserViewScreen
-            subjectAttendanceService={subjectAttendanceService}
-            adviserDailyAttendanceService={previewAdviserDailyService}
-            adviserMonthlyAttendanceService={previewAdviserMonthlyService}
-          />
-        ) : activeTab === "teacher-load" ? (
-          <TeacherLoadScreen
-            teachingAssignmentService={teachingAssignmentService}
-            subjectAttendanceService={subjectAttendanceService}
-            schoolMemberService={schoolMemberService}
-            teacherUserId={FIXTURE_TEACHER_USER_ID}
-          />
-        ) : (
-          <div className="alert alert-info" role="status">
-            <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
+      <SessionDraftProvider owner="fixture-user:fixture-school">
+        <AppLayout
+          session={{ ...FIXTURE_SESSION, schoolName: "Tingub NHS" }}
+          schoolLogoService={previewLogoService}
+          activeTab={activeTab}
+          onNavigate={(tab) => {
+            setActiveTab(tab);
+          }}
+          onLogout={() => {}}
+        >
+          <div className="preview-boundary" role="status">
+            Development preview · Synthetic records · School seal used as a design reference
           </div>
-        )}
-      </AppLayout>
+          {activeTab === "lesson-plans" ? (
+            <LessonPlanScreen
+              lessonPlanService={recovery.lessonPlanService}
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+            />
+          ) : activeTab === "learning-support" ? (
+            <LearningSupportScreen
+              learnerSupportService={recovery.learnerSupportService}
+              classOccurrenceService={recovery.classOccurrenceService}
+              classOccurrenceId="occurrence-1"
+              subjectName="Mathematics"
+              sectionName="Mabini"
+              occurrenceDate="2026-10-10"
+              targetMarker={
+                previewQuery.get("state") === "update-error"
+                  ? null
+                  : {
+                      sectionMembershipId: "membership-1",
+                      learnerGivenName: "Ana",
+                      learnerFamilyName: "Santos",
+                      reason: "Fraction evidence needs follow-up",
+                    }
+              }
+              onBack={() => setActiveTab("today")}
+            />
+          ) : activeTab === "schedule-planner" ? (
+            <SchedulePlannerScreen
+              schedulePlanningService={recovery.schedulePlanningService}
+              onBack={() => setActiveTab("more")}
+            />
+          ) : activeTab === "sf1-import" ? (
+            <Sf1ImportScreen
+              sf1ImportService={recovery.sf1ImportService}
+              sectionService={sectionService}
+            />
+          ) : activeTab === "today" ? (
+            <MyDayScreen
+              myDayService={recovery.myDayService}
+              onOpenClassContext={setSelectedClassContext}
+              onBackToToday={() => setSelectedClassContext(null)}
+              onCheckAttendance={(id) => {
+                setAttendanceAssignmentId(id);
+                setActiveTab("subject-attendance");
+              }}
+              onOpenClassRecord={() => setActiveTab("class-records")}
+              onStartClassroom={() => setActiveTab("workspace")}
+              onReviewConflicts={() => setActiveTab("more")}
+              onPlanSupport={() => setActiveTab("learning-support")}
+            />
+          ) : activeTab === "workspace" ||
+            activeTab === "my-day" ||
+            activeTab === "class-records" ? (
+            <AssignedClassFolio
+              key={activeTab === "class-records" ? "scores" : "overview"}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+              subjectAttendanceService={subjectAttendanceService}
+              selectedClassContext={selectedClassContext}
+              onSelectClass={setSelectedClassContext}
+              initialTab={activeTab === "class-records" ? "scores" : "overview"}
+              onCheckAttendance={(context) => {
+                setSelectedClassContext(context);
+                setAttendanceAssignmentId(context.teachingAssignmentId);
+                setActiveTab("subject-attendance");
+              }}
+              onOpenClassRecord={(context) => {
+                setSelectedClassContext(context);
+                setActiveTab("class-records");
+              }}
+              onOpenAdvisory={() => setActiveTab("adviser-view")}
+              onOpenForms={() => setActiveTab("school-forms")}
+              renderScores={(context, onBackToOverview) => (
+                <ClassRecordJourneyScreen
+                  embedded
+                  teachingAssignmentId={context.teachingAssignmentId}
+                  classContext={context}
+                  teacherUserId={FIXTURE_TEACHER_USER_ID}
+                  subjectAttendanceService={subjectAttendanceService}
+                  gradingService={gradingService}
+                  classRecordService={classRecordService}
+                  assessmentService={assessmentService}
+                  learnerScoreService={learnerScoreService}
+                  exportService={exportService}
+                  onBackToClass={() => {
+                    onBackToOverview();
+                    if (activeTab === "class-records") setActiveTab("workspace");
+                  }}
+                />
+              )}
+            />
+          ) : activeTab === "school-forms" ? (
+            <SchoolFormsScreen onNavigate={setActiveTab} />
+          ) : activeTab === "more" ? (
+            <MoreScreen onNavigate={setActiveTab} />
+          ) : activeTab === "calendar" ? (
+            <CalendarScreen
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+              onOpenClass={(context) => {
+                setSelectedClassContext(context);
+                setActiveTab("workspace");
+              }}
+            />
+          ) : activeTab === "account" ? (
+            <Page title="Account">
+              <ShellAccountPreferences session={FIXTURE_SESSION} onLogout={() => {}} />
+              <button type="button" onClick={() => setActiveTab("more")}>
+                More tools and settings
+              </button>
+            </Page>
+          ) : activeTab === "attendance" ? (
+            <AttendanceScreen
+              attendanceService={attendanceService}
+              sectionService={sectionService}
+              initialSectionId={attendanceSectionId ?? undefined}
+              onViewMonthlySummary={(sectionId, year, month) => {
+                setMonthlySummaryContext({ sectionId, year, month });
+                setActiveTab("monthly-summary");
+              }}
+            />
+          ) : activeTab === "monthly-summary" ? (
+            <MonthlySummaryScreen
+              attendanceService={attendanceService}
+              sectionService={sectionService}
+              exportService={exportService}
+              schoolName={FIXTURE_SESSION.schoolName}
+              initialSectionId={monthlySummaryContext?.sectionId}
+              initialYearMonth={
+                monthlySummaryContext
+                  ? { year: monthlySummaryContext.year, month: monthlySummaryContext.month }
+                  : undefined
+              }
+            />
+          ) : activeTab === "learners" ? (
+            <LearnerListScreen
+              learnerService={learnerService}
+              exportService={exportService}
+              enrollmentHistoryService={enrollmentHistoryService}
+            />
+          ) : activeTab === "record-library" ? (
+            <ClassRecordsScreen
+              classRecordService={classRecordService}
+              sectionService={sectionService}
+              subjectService={subjectService}
+              gradingService={gradingService}
+              assessmentService={assessmentService}
+              learnerScoreService={learnerScoreService}
+              exportService={exportService}
+            />
+          ) : activeTab === "audit-log" ? (
+            <AuditLogScreen authService={authService} />
+          ) : activeTab === "sections" ? (
+            <SectionsScreen
+              sectionService={sectionService}
+              learnerService={learnerService}
+              exportService={exportService}
+              onOpenRoster={() => {}}
+              onManageAssignments={(sectionId, sectionName) => {
+                setAssignmentsSection({ sectionId, sectionName });
+                setActiveTab("teaching-assignments");
+              }}
+              onManageAdviser={(sectionId, sectionName) => {
+                setSectionAdviserSection({ sectionId, sectionName });
+                setActiveTab("section-adviser");
+              }}
+            />
+          ) : activeTab === "section-adviser" ? (
+            <SectionAdviserScreen
+              sectionAdvisoryService={sectionAdvisoryService}
+              schoolMemberService={schoolMemberService}
+              sectionId={sectionAdviserSection?.sectionId ?? "sec-not-started"}
+              sectionName={sectionAdviserSection?.sectionName ?? "Mabini"}
+              onBack={() => setActiveTab("sections")}
+            />
+          ) : activeTab === "teaching-assignments" ? (
+            <TeachingAssignmentsScreen
+              teachingAssignmentService={teachingAssignmentService}
+              subjectService={subjectService}
+              schoolMemberService={schoolMemberService}
+              sectionId={assignmentsSection?.sectionId ?? "sec-not-started"}
+              sectionName={assignmentsSection?.sectionName ?? "Mabini"}
+              onBack={() => setActiveTab("sections")}
+              onManageSchedule={(teachingAssignmentId, subjectName) => {
+                setScheduleContext({
+                  teachingAssignmentId,
+                  subjectName,
+                  sectionName: assignmentsSection?.sectionName ?? "Mabini",
+                });
+                setActiveTab("schedule-meetings");
+              }}
+            />
+          ) : activeTab === "schedule-meetings" ? (
+            <ScheduleMeetingsScreen
+              teachingAssignmentService={teachingAssignmentService}
+              teachingAssignmentId={scheduleContext?.teachingAssignmentId ?? "ta-1"}
+              subjectName={scheduleContext?.subjectName ?? "Mathematics"}
+              sectionName={scheduleContext?.sectionName ?? "Mabini"}
+              onBack={() => setActiveTab("teaching-assignments")}
+            />
+          ) : activeTab === "subject-attendance" ? (
+            <SubjectAttendanceScreen
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+              initialAssignmentId={attendanceAssignmentId ?? undefined}
+            />
+          ) : activeTab === "subject-monitor" ? (
+            <SubjectMonitorScreen
+              subjectAttendanceService={subjectAttendanceService}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+            />
+          ) : activeTab === "adviser-view" ? (
+            <AdviserViewScreen
+              subjectAttendanceService={subjectAttendanceService}
+              adviserDailyAttendanceService={previewAdviserDailyService}
+              adviserMonthlyAttendanceService={previewAdviserMonthlyService}
+            />
+          ) : activeTab === "teacher-load" ? (
+            <TeacherLoadScreen
+              teachingAssignmentService={teachingAssignmentService}
+              subjectAttendanceService={subjectAttendanceService}
+              schoolMemberService={schoolMemberService}
+              teacherUserId={FIXTURE_TEACHER_USER_ID}
+            />
+          ) : (
+            <div className="alert alert-info" role="status">
+              <p>This destination isn't wired in the dev preview (out of scope for UX-02).</p>
+            </div>
+          )}
+        </AppLayout>
+      </SessionDraftProvider>
     </ModeProvider>
   );
 }

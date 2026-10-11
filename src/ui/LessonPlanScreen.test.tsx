@@ -318,5 +318,6 @@ describe("lesson pending-save navigation", () => {
       finish(PLAN);
     });
     expect(screen.getByLabelText("Learning competency")).toHaveValue("");
+    expect(screen.getByText(/Lesson plan saved on this device/)).toBeInTheDocument();
   });
 });

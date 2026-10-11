@@ -34,6 +34,10 @@ export function ShellAccountPreferences({
           ))}
         </div>
       </div>
+      <p className="field-hint">
+        Save unfinished work before logging out or closing LIKHA. Unsaved session drafts are cleared
+        on logout and are not kept after the app closes.
+      </p>
       <button className="app-account-logout" type="button" onClick={onLogout}>
         Log out
       </button>

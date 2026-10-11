@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SchedulePlanningApplicationService } from "../application/schedule-planning-service";
 import type {
   GenerationResponse,
@@ -224,6 +224,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    if (screen.queryByRole("button", { name: "Confirm replacement" }))
+      await user.click(screen.getByRole("button", { name: "Confirm replacement" }));
 
     await waitFor(() => expect(repository.generateCalls).toBe(1));
     expect(await screen.findByText(/1 meeting placed/)).toBeInTheDocument();
@@ -254,6 +256,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    if (screen.queryByRole("button", { name: "Confirm replacement" }))
+      await user.click(screen.getByRole("button", { name: "Confirm replacement" }));
 
     expect(await screen.findByText(/Proven impossible/)).toBeInTheDocument();
     expect(
@@ -287,6 +291,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    if (screen.queryByRole("button", { name: "Confirm replacement" }))
+      await user.click(screen.getByRole("button", { name: "Confirm replacement" }));
 
     expect(await screen.findByText(/Search stopped at 100 steps/)).toBeInTheDocument();
     expect(screen.getByText(/120 minutes still needed/)).toBeInTheDocument();
@@ -314,6 +320,7 @@ describe("SchedulePlannerScreen", () => {
       }),
     );
 
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
     await waitFor(() => expect(repository.removePlacementCalls).toBe(1));
     expect(screen.queryByText("Teacher A")).not.toBeInTheDocument();
   });
@@ -371,6 +378,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Publish plan" }));
+    if (screen.queryByRole("button", { name: "Confirm publication" }))
+      await user.click(screen.getByRole("button", { name: "Confirm publication" }));
 
     await waitFor(() => expect(repository.publishCalls).toBe(1));
     expect(await screen.findByText(/Published as revision 3/)).toBeInTheDocument();
@@ -389,6 +398,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Publish plan" }));
+    if (screen.queryByRole("button", { name: "Confirm publication" }))
+      await user.click(screen.getByRole("button", { name: "Confirm publication" }));
 
     expect(await screen.findByText(/This plan is stale/)).toBeInTheDocument();
   });
@@ -411,6 +422,8 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Publish plan" }));
+    if (screen.queryByRole("button", { name: "Confirm publication" }))
+      await user.click(screen.getByRole("button", { name: "Confirm publication" }));
 
     expect(await screen.findByText(/Publication refused/)).toBeInTheDocument();
     expect(
@@ -426,9 +439,13 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    if (screen.queryByRole("button", { name: "Confirm replacement" }))
+      await user.click(screen.getByRole("button", { name: "Confirm replacement" }));
 
     expect(
-      await screen.findByText("Could not generate a plan. Nothing was staged — try again."),
+      await screen.findByText(
+        "Generation was not confirmed. A draft may have been staged. Refresh the schedule before another change.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -440,9 +457,13 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await user.click(screen.getByRole("button", { name: "Publish plan" }));
+    if (screen.queryByRole("button", { name: "Confirm publication" }))
+      await user.click(screen.getByRole("button", { name: "Confirm publication" }));
 
     expect(
-      await screen.findByText("Could not publish this plan. Nothing went live — try again."),
+      await screen.findByText(
+        "Publication was not confirmed. The plan may already be live. Refresh the schedule before another change.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -452,5 +473,51 @@ describe("SchedulePlannerScreen", () => {
     await settled();
 
     await expectNoAccessibilityViolations(container);
+  });
+  it("cancels replacement without a write and restores focus", async () => {
+    const repository = new FakeRepository();
+    const user = userEvent.setup();
+    renderPlanner(repository);
+    await settled();
+    const trigger = screen.getByRole("button", { name: "Generate plan" });
+    await user.click(trigger);
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveFocus();
+    expect(repository.generateCalls).toBe(0);
+  });
+
+  it("retains confirmed generation when its refresh fails and blocks repeated writes", async () => {
+    const repository = new FakeRepository();
+    const user = userEvent.setup();
+    renderPlanner(repository);
+    await settled();
+    vi.spyOn(repository, "listSchedulePlanPlacements").mockRejectedValueOnce(
+      new Error("read failed"),
+    );
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    await user.click(screen.getByRole("button", { name: "Confirm replacement" }));
+    expect(await screen.findByText(/Draft revision 3 was generated, but/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate plan" })).toBeDisabled();
+    expect(repository.generateCalls).toBe(1);
+    await user.click(screen.getByRole("button", { name: "Refresh schedule" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Generate plan" })).toBeEnabled(),
+    );
+    expect(repository.generateCalls).toBe(1);
+  });
+
+  it("retains confirmed publication when its refresh fails", async () => {
+    const repository = new FakeRepository();
+    const user = userEvent.setup();
+    renderPlanner(repository);
+    await settled();
+    vi.spyOn(repository, "currentSchedulePlan").mockRejectedValueOnce(new Error("read failed"));
+    await user.click(screen.getByRole("button", { name: "Publish plan" }));
+    await user.click(screen.getByRole("button", { name: "Confirm publication" }));
+    expect(await screen.findByText(/Publication is confirmed, but/)).toBeInTheDocument();
+    expect(screen.getByText(/Published as revision 3/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish plan" })).toBeDisabled();
+    expect(repository.publishCalls).toBe(1);
   });
 });

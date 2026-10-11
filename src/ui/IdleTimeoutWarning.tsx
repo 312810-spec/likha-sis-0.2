@@ -45,6 +45,8 @@ function formatMinutes(msRemaining: number): string {
 export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarningProps) {
   const [msRemaining, setMsRemaining] = useState<number | null>(null);
   const [extending, setExtending] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const onExpiredRef = useRef(onExpired);
   useEffect(() => {
     onExpiredRef.current = onExpired;
@@ -54,8 +56,15 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
     let cancelled = false;
 
     async function poll() {
-      const session = await authService.currentSession().catch(() => null);
+      let session;
+      try {
+        session = await authService.currentSession();
+      } catch {
+        if (!cancelled) setCheckError("Could not check your session. Retry to confirm its status.");
+        return;
+      }
       if (cancelled) return;
+      setCheckError(null);
       if (!session) {
         onExpiredRef.current();
         return;
@@ -74,21 +83,39 @@ export function IdleTimeoutWarning({ authService, onExpired }: IdleTimeoutWarnin
       cancelled = true;
       clearInterval(interval);
     };
-  }, [authService]);
+  }, [authService, attempt]);
 
   async function handleStaySignedIn() {
     if (extending) return;
     setExtending(true);
     try {
-      await authService.extendSession();
-      setMsRemaining(null);
+      const session = await authService.extendSession();
+      const remaining = session.idleExpiresAtUnixMs - Date.now();
+      if (remaining <= 0) {
+        onExpiredRef.current();
+        return;
+      }
+      setCheckError(null);
+      setMsRemaining(remaining <= WARNING_THRESHOLD_MS ? remaining : null);
     } catch {
-      onExpiredRef.current();
+      setCheckError(
+        "Staying signed in was not confirmed. Retry checking your session before trying again.",
+      );
+      setAttempt((value) => value + 1);
     } finally {
       setExtending(false);
     }
   }
 
+  if (checkError)
+    return (
+      <Alert tone="error" inline>
+        <p>{checkError}</p>
+        <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+          Retry session check
+        </button>
+      </Alert>
+    );
   if (msRemaining === null) return null;
 
   return (

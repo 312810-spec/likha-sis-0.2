@@ -58,7 +58,7 @@ function LessonPlanWorkspace({
   owner,
 }: LessonPlanScreenProps & { owner: string }) {
   const { mode } = useTeacherMode();
-  const epoch = useRef(lessonDraftEpoch()).current;
+  const [epoch] = useState(lessonDraftEpoch);
   const [workspace, setWorkspace] = useState(
     () =>
       readLessonWorkspace(owner) ?? {
@@ -70,14 +70,6 @@ function LessonPlanWorkspace({
         },
         drafts: {} as Record<string, LessonDraft>,
       },
-  );
-  useEffect(
-    () =>
-      subscribeLessonWorkspace(owner, () => {
-        const retained = readLessonWorkspace(owner);
-        if (retained && lessonDraftEpoch() === epoch) setWorkspace(retained);
-      }),
-    [owner, epoch],
   );
   const { assignmentId, planDate, editingPlanId, fields } = workspace.active;
   const currentAssignment = useRef(assignmentId);
@@ -118,9 +110,23 @@ function LessonPlanWorkspace({
   const [plansError, setPlansError] = useState<string | null>(null);
   const [plansAttempt, setPlansAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(workspace.confirmation ?? null);
   const [saving, setSaving] = useState(false);
   const [discardPending, setDiscardPending] = useState(false);
+  useEffect(
+    () =>
+      subscribeLessonWorkspace(owner, () => {
+        const retained = readLessonWorkspace(owner);
+        if (retained && lessonDraftEpoch() === epoch) {
+          setWorkspace(retained);
+          if (retained.confirmation) {
+            setConfirmation(retained.confirmation);
+            setPlansAttempt((attempt) => attempt + 1);
+          }
+        }
+      }),
+    [owner, epoch],
+  );
   const discardTrigger = useRef<HTMLButtonElement>(null);
   const discardCancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -255,6 +261,7 @@ function LessonPlanWorkspace({
             owner,
             {
               drafts,
+              confirmation: `Lesson plan ${submitted.editingPlanId ? "updated" : "saved"} on this device for ${submitted.planDate}.`,
               active: sameSubmission
                 ? { ...retained.active, editingPlanId: null, fields: EMPTY_FIELDS }
                 : retained.active,

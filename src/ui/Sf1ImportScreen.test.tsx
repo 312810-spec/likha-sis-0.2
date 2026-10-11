@@ -1,6 +1,8 @@
+import { SessionDraftProvider } from "./SessionDraftProvider";
+import { clearSessionDrafts } from "./session-draft-store";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionApplicationService } from "../application/section-service";
 import { Sf1ImportApplicationService } from "../application/sf1-import-service";
 import type { Learner } from "../domain/learner";
@@ -140,7 +142,7 @@ function renderScreen(options?: { sections?: Section[] }) {
       <Sf1ImportScreen sf1ImportService={sf1ImportService} sectionService={sectionService} />
     </ModeProvider>,
   );
-  return { ...result, importRepo, filePicker };
+  return { ...result, importRepo, filePicker, sectionRepo, sectionService, sf1ImportService };
 }
 
 async function chooseSectionAndFile(user: ReturnType<typeof userEvent.setup>) {
@@ -459,7 +461,7 @@ describe("Sf1ImportScreen", () => {
     expect(importRepo.commitCalls).toHaveLength(1);
   });
 
-  it("a failed commit shows a no-partial-import message and allows retry without losing decisions", async () => {
+  it("an unconfirmed commit requires a fresh preview and new duplicate decisions", async () => {
     const user = userEvent.setup();
     const { importRepo } = renderScreen();
     importRepo.previewImpl = async () => ({
@@ -496,14 +498,14 @@ describe("Sf1ImportScreen", () => {
     await user.click(screen.getByRole("button", { name: /import learners/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/no partial learner import was saved/i)).toBeInTheDocument(),
+      expect(screen.getByText(/some learners may already be saved/i)).toBeInTheDocument(),
     );
 
-    await user.click(screen.getByRole("button", { name: /try again/i }));
+    await user.click(screen.getByRole("button", { name: /re-read workbook and review/i }));
 
-    // Back on the preview screen, the earlier decision is still recorded
-    // -- the teacher does not have to re-review row 10.
-    await waitFor(() => screen.getByText(/all duplicates reviewed/i));
+    await waitFor(() => expect(importRepo.previewCalls).toHaveLength(2));
+    expect(screen.getByRole("button", { name: /import learners/i })).toBeDisabled();
+    expect(importRepo.commitCalls).toHaveLength(1);
   });
 
   it("shows a generic, safe message for an authorization failure -- never raw error text", async () => {
@@ -928,5 +930,137 @@ describe("Sf1ImportScreen", () => {
     // is never rendered, and there is no learner name/LRN anywhere in this
     // list -- only the filename, actor, timestamp, and counts.
     expect(screen.queryByText(/abc/)).not.toBeInTheDocument();
+  });
+});
+
+describe("SF1 recovery", () => {
+  it("distinguishes failed section loading from a successful empty list and retries read only", async () => {
+    const user = userEvent.setup();
+    const repository = new FakeSectionRepository();
+    const list = vi.spyOn(repository, "list").mockRejectedValueOnce(new Error("offline"));
+    const importer = new FakeSf1ImportRepository();
+    const picker = new FakeFilePicker();
+    render(
+      <ModeProvider>
+        <Sf1ImportScreen
+          sectionService={new SectionApplicationService(repository)}
+          sf1ImportService={new Sf1ImportApplicationService(importer, picker)}
+        />
+      </ModeProvider>,
+    );
+    await screen.findByRole("button", { name: "Retry sections" });
+    expect(screen.queryByText(/create a section first/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /choose excel/i }));
+    expect(picker.callCount).toBe(0);
+    await user.click(screen.getByRole("button", { name: "Retry sections" }));
+    await screen.findByLabelText(/which section/i);
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a confirmed import successful when the surrounding callback fails", async () => {
+    const user = userEvent.setup();
+    const importer = new FakeSf1ImportRepository();
+    importer.previewImpl = async () => ({
+      ...emptyPreview(),
+      rows: [
+        {
+          rowNumber: 5,
+          givenName: "Ana",
+          familyName: "Santos",
+          lrn: null,
+          lrnWasPresentButInvalid: false,
+          sex: "F",
+          sexWasPresentButUnrecognized: false,
+          birthdate: null,
+          remarks: null,
+        },
+      ],
+      newRows: [5],
+    });
+    render(
+      <ModeProvider>
+        <Sf1ImportScreen
+          sectionService={new SectionApplicationService(new FakeSectionRepository())}
+          sf1ImportService={new Sf1ImportApplicationService(importer, new FakeFilePicker())}
+          onImportComplete={() => {
+            throw new Error("refresh failed");
+          }}
+        />
+      </ModeProvider>,
+    );
+    await chooseSectionAndFile(user);
+    await user.click(screen.getByRole("button", { name: /import learners/i }));
+    await screen.findByText("SF1 import complete");
+    expect(screen.getByText(/surrounding view could not refresh/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /re-read workbook and review/i }),
+    ).not.toBeInTheDocument();
+    expect(importer.commitCalls).toHaveLength(1);
+  });
+});
+
+describe("SF1 setup continuity", () => {
+  it("restores only setup and requires a fresh preview on remount", async () => {
+    clearSessionDrafts();
+    const user = userEvent.setup();
+    const importer = new FakeSf1ImportRepository();
+    const service = new Sf1ImportApplicationService(importer, new FakeFilePicker());
+    const sections = new SectionApplicationService(new FakeSectionRepository());
+    const element = (
+      <SessionDraftProvider owner="teacher:school">
+        <ModeProvider>
+          <Sf1ImportScreen sectionService={sections} sf1ImportService={service} />
+        </ModeProvider>
+      </SessionDraftProvider>
+    );
+    const first = render(element);
+    await chooseSectionAndFile(user);
+    await screen.findByText("Import preview");
+    first.unmount();
+    render(element);
+    await screen.findByRole("button", { name: "Re-read draft file" });
+    expect(screen.queryByText("Import preview")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/which section/i)).toHaveValue("sec-1");
+    expect(importer.previewCalls).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Re-read draft file" }));
+    await screen.findByText("Import preview");
+    expect(importer.previewCalls).toHaveLength(2);
+    expect(importer.commitCalls).toHaveLength(0);
+    clearSessionDrafts();
+  });
+});
+
+describe("SF1 comparison evidence", () => {
+  it("labels two missing LRNs as absent evidence instead of a successful identity match", async () => {
+    const user = userEvent.setup();
+    const { importRepo } = renderScreen();
+    importRepo.previewImpl = async () => ({
+      ...emptyPreview(),
+      rows: [
+        {
+          rowNumber: 10,
+          givenName: "Grace",
+          familyName: "Torres",
+          lrn: null,
+          lrnWasPresentButInvalid: false,
+          sex: "F",
+          sexWasPresentButUnrecognized: false,
+          birthdate: null,
+          remarks: null,
+        },
+      ],
+      needsReview: [
+        {
+          rowNumber: 10,
+          kind: "suspected_duplicate",
+          candidates: [{ ...EXISTING_LEARNER, lrn: null }],
+          reason: null,
+        },
+      ],
+    });
+    await chooseSectionAndFile(user);
+    const lrnRow = await screen.findByRole("rowheader", { name: "LRN" });
+    expect(within(lrnRow.closest("tr")!).getByText("Missing from both")).toBeInTheDocument();
+    expect(within(lrnRow.closest("tr")!).queryByText("Same")).not.toBeInTheDocument();
   });
 });
