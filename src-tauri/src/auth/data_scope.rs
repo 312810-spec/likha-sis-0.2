@@ -82,7 +82,7 @@ pub fn can_apply_incoming(
     }
     let (query, fields): (&str, &[&str]) = match kind {
         EntityKind::Attendance => ("SELECT section_id, learner_id FROM attendance_records WHERE school_id=?1 AND id=?2", &["sectionId", "learnerId"]),
-        EntityKind::SubjectAttendance => ("SELECT teaching_assignment_id FROM subject_attendance_sessions WHERE school_id=?1 AND id=?2", &["teachingAssignmentId"]),
+        EntityKind::SubjectAttendance => ("SELECT teaching_assignment_id, section_id, subject_id FROM subject_attendance_sessions WHERE school_id=?1 AND id=?2", &["teachingAssignmentId", "sectionId", "subjectId"]),
         EntityKind::SubjectAttendanceEntry => ("SELECT e.session_id, e.membership_id, e.learner_id FROM subject_attendance_entries e JOIN subject_attendance_sessions s ON s.id=e.session_id WHERE s.school_id=?1 AND e.id=?2", &["sessionId", "membershipId", "learnerId"]),
         EntityKind::AssessmentItem => ("SELECT class_record_id FROM assessment_items WHERE school_id=?1 AND id=?2", &["classRecordId"]),
         EntityKind::LearnerScore => ("SELECT assessment_item_id, learner_id FROM learner_scores WHERE school_id=?1 AND id=?2", &["assessmentItemId", "learnerId"]),
@@ -318,7 +318,7 @@ mod tests {
             &s.id,
             EntityKind::SubjectAttendance,
             "session",
-            &serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": assignment.id})
+            &serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": assignment.id, "sectionId": class.id, "subjectId": sub.id})
         )
         .unwrap());
         assert!(!can_apply_incoming(
@@ -327,7 +327,7 @@ mod tests {
             &s.id,
             EntityKind::SubjectAttendance,
             "session",
-            &serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": "another-assignment"})
+            &serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": "another-assignment", "sectionId": class.id, "subjectId": sub.id})
         )
         .unwrap());
         assert!(!can_apply_incoming(
@@ -337,6 +337,26 @@ mod tests {
             EntityKind::SubjectAttendance,
             "session",
             &serde_json::json!({"id": "another-session", "schoolId": s.id, "teachingAssignmentId": assignment.id})
+        )
+        .unwrap());
+        let moved_subject = serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": assignment.id, "sectionId": class.id, "subjectId": "another-subject"});
+        assert!(!can_apply_incoming(
+            &conn,
+            &u.id,
+            &s.id,
+            EntityKind::SubjectAttendance,
+            "session",
+            &moved_subject
+        )
+        .unwrap());
+        let moved_section = serde_json::json!({"id": "session", "schoolId": s.id, "teachingAssignmentId": assignment.id, "sectionId": "another-section", "subjectId": sub.id});
+        assert!(!can_apply_incoming(
+            &conn,
+            &u.id,
+            &s.id,
+            EntityKind::SubjectAttendance,
+            "session",
+            &moved_section
         )
         .unwrap());
         let new_session = serde_json::json!({"id": "fresh", "schoolId": s.id, "teachingAssignmentId": assignment.id, "sectionId": class.id, "subjectId": sub.id});
