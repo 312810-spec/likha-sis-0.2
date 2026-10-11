@@ -1,12 +1,12 @@
 # Current task — CTOS v3
 
-## Latest continuation — FORGE audit implementation, 11 October 2026
+## Latest continuation — FORGE audit implementation completed, 12 October 2026
 
-User authorized implementing the detailed UI/UX audit and merging after completion. All F01–F16 source fixes and bounded Review/encrypted recovery/provenance/token enhancements are implemented on local `fix/forge-audit-20261011`. Read `docs/ctos/checkpoints/forge-audit-implementation-2026-10-11.md` first.
+All F01–F16 source fixes and bounded Review/encrypted classroom recovery/provenance/shared-token enhancements are implemented and verified. PR #107 merged to main as `a46eba68f3ca36843d9f8bc34ee844993f9348c8`; verified head `684d2c0`, source tree `67d5b2c06e2f88fa223bab37067c5673083c7e88`. Read `docs/ctos/checkpoints/forge-audit-implementation-2026-10-11.md` first.
 
-Final local frontend quality passes: 149 files / 1,441 tests; browser smoke, 49 recovery checks, build and production fixture isolation pass. PR #107 head `13b648b` compiled on Ubuntu and built the Windows installer. CI passed Rust formatting and all frontend/UI/recovery/security checks. Native unit suites found one outdated unsupported-delete test: Ubuntu 1,245 passed / 1 failed, Windows 1,254 passed / 1 failed. The hub now rejects that deletion before pull; the test is replaced with ingress/outbox assertions plus independent client defensive rejection. Native integration suites and Clippy still need a passing run. Main merge remains pending verified CI.
+Quality Gate `38181491187` and Security Gate `38181491210` passed. Frontend: 149 files / 1,441 tests; responsive UI and 49 recovery checks pass. Ubuntu: Rust formatting, 1,452 native tests (1,247 unit + 205 integration), Clippy with warnings denied pass. Windows: app/installer build, 1,461 native tests (1,256 unit + 205 integration), installer artifact upload pass. Security: cargo-deny, gitleaks, osv-scanner pass. Local production build and preview isolation pass. No production records changed and no deployment performed.
 
-Continue PR #107 native CI, resolve actual failures, then perform the already authorized main merge. Local continuation is `fix/forge-audit-ci` based on the uploaded commit; original checkpoints remain on `fix/forge-audit-20261011`. Do not restart the audit or mass-merge other historical branches. Broader CTOS/M09 work below remains distinct from this audit implementation.
+Next acceptance work: installed Windows teacher journeys and upgrades/import/export/backup/printing; real two-device assignment changes and backfill; Android Keystore/encrypted startup/process death; manual screen-reader and teacher acceptance. These remain untested and are separate from the completed automated audit implementation. Resume the broader CTOS/M09 work below only as its own task; do not redo this audit or mass-merge historical branches.
 
 Updated: 2026-10-08.
 
