@@ -269,3 +269,25 @@ Account, with zero axe WCAG A/AA findings. Independent review caught and resolve
 a delayed-save focus leak across class changes.
 Next release check remains the installed Windows app workflow. No deployment or
 native Android support is implied by browser refinement.
+
+## FORGE UI + UX implementation checkpoint — 2026-10-11
+
+Latest owner instruction: continue audit and verified fixes; do not provide screenshots.
+The reconstructed audit implementation is local `1d1edc5`, remote equivalent
+`8529094ef1ed1545eb3a823a0cb9da8454e0c47f`, isolated
+`recovery/forge-ux-20261010`. Fetched source trees match exactly. Main is not merged.
+
+14 findings implemented: token cycles; truthful confirmed-write/refresh/marker
+recovery; scoped drafts; lesson stale-context/late-write protection; boot retry;
+private-safe keyed boundary; field read retries; planner operation-specific labels
+and confirmations; local dates; real Today routing; source-fresh score/assessment
+and SF1 review recovery; confirmed-only idle expiry; responsive shared fields.
+Current evidence: 146 files / 1,396 tests; frontend quality, core browser,
+49 recovery browser checks, production build and fixture-isolation all pass.
+See docs/ux/FORGE-UI-UX-Audit-2026-10-11.md and docs/ux/VERIFICATION.md.
+
+Next pending acceptance: installed Windows exact-source native flows, manual
+assistive-technology/teacher-school-head review, then native durable drafts and
+Android acceptance. Browser fixtures do not prove those. Cargo/Rust/Android tools
+are absent here. CTOS M10 remains a separate pending milestone; no curriculum,
+AI generation quality, official workbook or native readiness claim was added.

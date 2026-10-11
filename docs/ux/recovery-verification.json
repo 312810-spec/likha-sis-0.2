@@ -1,0 +1,781 @@
+{
+  "capturedAt": "2026-10-11T03:36:51.604Z",
+  "browser": "155.0.8059.39",
+  "sourceCommit": "1d1edc5faef6a408f6bb5657acebe2e70365aa26",
+  "sourceDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "checks": [
+    {
+      "label": "lesson-session-draft/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-session-draft/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-session-draft/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-session-draft/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 336,
+          "parentWidth": 336,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-session-draft/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-session-draft/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 266,
+          "parentWidth": 266,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "lesson-confirmed-refresh-failure",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 940,
+          "parentWidth": 940,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-partial-success/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "planner-confirmed-publication-refresh-failure",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 894.8125,
+          "parentWidth": 894.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 290.8125,
+          "parentWidth": 290.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-recovery/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        },
+        {
+          "height": 144,
+          "width": 220.8125,
+          "parentWidth": 220.8125,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-marker-cleared-on-retry",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 889,
+          "parentWidth": 889,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 889,
+          "parentWidth": 889,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 889,
+          "parentWidth": 889,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 285,
+          "parentWidth": 285,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 285,
+          "parentWidth": 285,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 215,
+          "parentWidth": 215,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-update-recovery/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 215,
+          "parentWidth": 215,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "support-transition-reconciled",
+      "overflow": false,
+      "violations": [],
+      "textareas": [
+        {
+          "height": 144,
+          "width": 889,
+          "parentWidth": 889,
+          "font": "17px"
+        }
+      ],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-duplicate-review/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-unconfirmed-import/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "sf1-fresh-review-required",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/1280/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/1280/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/390/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/390/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/320/light",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-pending-work/320/dark",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "17px"
+    },
+    {
+      "label": "today-200-percent-text",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "34px"
+    },
+    {
+      "label": "sf1-touch-success",
+      "overflow": false,
+      "violations": [],
+      "textareas": [],
+      "bodyFont": "15px"
+    }
+  ],
+  "limitations": "Synthetic repositories verify rendered recovery UX; native file dialogs, parsing, database transactions, and authorization are not exercised."
+}
