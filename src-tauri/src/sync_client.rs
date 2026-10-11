@@ -2857,45 +2857,67 @@ mod tests {
     }
 
     #[test]
-    fn pull_once_rejects_a_delete_operation_for_an_entity_that_does_not_support_it() {
-        // Defensive guard: only TeachingAssignment has a real Delete
-        // handler. A Delete claimed for any other entity kind (here,
-        // Subject) must never be silently treated as an upsert.
+    fn unsupported_delete_is_rejected_by_the_hub_without_acknowledging_the_outbox() {
         let fixture = setup();
         let entity_id = Uuid::now_v7();
         let config = config_for(&fixture);
         let client = http_client();
+        let mut change = make_subject_change(&fixture, entity_id, 0);
+        change.operation = ChangeOperation::Delete;
+        sync_outbox::enqueue(&fixture.conn, &fixture.school_id, &change).unwrap();
 
-        {
-            let conn = &fixture.conn;
-            let mut change = make_subject_change(&fixture, entity_id, 0);
-            change.operation = ChangeOperation::Delete;
-            sync_outbox::enqueue(conn, &fixture.school_id, &change).unwrap();
-            push_once(conn, &client, &config).unwrap();
-        }
-
-        let summary = {
-            let conn = &fixture.conn;
-            pull_once(conn, &client, &config).unwrap()
-        };
-
-        assert_eq!(summary.received, 1);
-        assert_eq!(summary.applied, 0);
-        assert_eq!(summary.rejected, 1);
-        assert!(
-            summary.failed,
-            "an unsupported Delete must be treated as untrusted, not silently ignored"
+        let pushed = push_once(&fixture.conn, &client, &config).unwrap();
+        assert_eq!(pushed.sent, 1);
+        assert_eq!(pushed.acknowledged, 0);
+        assert!(pushed.failed);
+        assert_eq!(
+            sync_outbox::count_pending_for_school(&fixture.conn, &fixture.school_id).unwrap(),
+            1,
+            "a rejected deletion must remain unacknowledged"
         );
 
-        let conn = &fixture.conn;
-        let subject_exists: bool = conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM subjects WHERE id = ?1)",
-                [entity_id.to_string()],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(!subject_exists);
+        let pulled = pull_once(&fixture.conn, &client, &config).unwrap();
+        assert_eq!(pulled.received, 0);
+        assert_eq!(pulled.applied, 0);
+        assert!(!pulled.failed);
+        assert_eq!(
+            sync_pull_cursor::get_cursor(&fixture.conn, &fixture.school_id).unwrap(),
+            SyncCursor(0)
+        );
+        assert!(subject::list_by_school(&fixture.conn, &fixture.school_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn client_defensively_rejects_an_unsupported_delete_from_an_older_hub() {
+        // Older hubs may contain an unsupported delete already accepted before
+        // the ingress guard existed. The client must still reject it locally.
+        let fixture = setup();
+        let entity_id = Uuid::now_v7();
+        let change = make_subject_change(&fixture, entity_id, 0);
+        let accepted = sync_hub::AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: change.change_id,
+            device_id: change.device_id,
+            actor_user_id: change.actor_user_id,
+            entity_kind: EntityKind::Subject,
+            entity_id,
+            version: 1,
+            operation: ChangeOperation::Delete,
+            encrypted_payload: change.encrypted_payload,
+        };
+        assert_eq!(
+            apply_decrypted_change(&fixture.conn, &fixture.school_id, &accepted, &fixture.sspk),
+            Err(ApplyRejection::Untrusted)
+        );
+        assert!(subject::list_by_school(&fixture.conn, &fixture.school_id)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            sync_pull_cursor::get_cursor(&fixture.conn, &fixture.school_id).unwrap(),
+            SyncCursor(0)
+        );
     }
 
     #[test]
