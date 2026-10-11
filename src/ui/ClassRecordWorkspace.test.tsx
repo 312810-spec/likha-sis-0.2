@@ -1,4 +1,6 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { SessionDraftProvider } from "./SessionDraftProvider";
+import { clearSessionDrafts } from "./session-draft-store";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssessmentApplicationService } from "../application/assessment-service";
@@ -22,6 +24,7 @@ import type {
 import type {
   ComputedTermGrade,
   LearnerScore,
+  LearnerScoreCorrection,
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
@@ -165,7 +168,10 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     learnerId: string;
     status: LearnerScoreStatus;
     score: number | null;
+    correctionReason: string | null;
   }> = [];
+  correctionHistoryResult: LearnerScoreCorrection[] = [];
+  correctionHistoryCalls = 0;
   recordResult: LearnerScore | null = {
     id: "ls-1",
     schoolId: "s1",
@@ -189,9 +195,15 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     learnerId: string,
     status: LearnerScoreStatus,
     score: number | null,
+    correctionReason: string | null,
   ): Promise<LearnerScore | null> {
-    this.recordCalls.push({ assessmentItemId, learnerId, status, score });
+    this.recordCalls.push({ assessmentItemId, learnerId, status, score, correctionReason });
     return this.recordResult;
+  }
+
+  async correctionHistory(): Promise<LearnerScoreCorrection[]> {
+    this.correctionHistoryCalls += 1;
+    return this.correctionHistoryResult;
   }
 
   computeTermGradeCalls: Array<{ classRecordId: string; learnerId: string }> = [];
@@ -200,6 +212,7 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     termGrade: 88,
     wasTransmuted: true,
     wasFloored: false,
+    complete: true,
   };
   computeTermGradePending = false;
 
@@ -288,23 +301,26 @@ function renderScreen(
     scoreRepo?: FakeLearnerScoreRepository;
     exportRepo?: FakeExportRepository;
     syncService?: LearnerScoreSyncStatusApplicationService;
+    owner?: string;
   } = {},
 ) {
   const assessmentRepo = options.assessmentRepo ?? new FakeAssessmentRepository();
   const scoreRepo = options.scoreRepo ?? new FakeLearnerScoreRepository();
   const exportRepo = options.exportRepo ?? new FakeExportRepository();
   const result = render(
-    <ModeProvider>
-      <ClassRecordWorkspace
-        classRecordId="cr-1"
-        teachingAssignmentId={options.syncService ? "ta-1" : undefined}
-        learnerScoreSyncStatusService={options.syncService}
-        weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
-        assessmentService={new AssessmentApplicationService(assessmentRepo)}
-        learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
-        exportService={new ExportApplicationService(exportRepo)}
-      />
-    </ModeProvider>,
+    <SessionDraftProvider owner={options.owner ?? null}>
+      <ModeProvider>
+        <ClassRecordWorkspace
+          classRecordId="cr-1"
+          teachingAssignmentId={options.syncService ? "ta-1" : undefined}
+          learnerScoreSyncStatusService={options.syncService}
+          weightPolicyName="DepEd K-10 Core Subjects Weighting (DO 015, s. 2026)"
+          assessmentService={new AssessmentApplicationService(assessmentRepo)}
+          learnerScoreService={new LearnerScoreApplicationService(scoreRepo)}
+          exportService={new ExportApplicationService(exportRepo)}
+        />
+      </ModeProvider>
+    </SessionDraftProvider>,
   );
   return { ...result, assessmentRepo, scoreRepo, exportRepo };
 }
@@ -515,6 +531,169 @@ describe("ClassRecordWorkspace", () => {
     expect(screen.getByRole("rowheader", { name: "Ana Cruz" })).toBeInTheDocument();
   });
 
+  it("asks for a reason before changing an already-recorded score, and writes nothing until one is given", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19");
+    await user.tab();
+
+    // The change is held, not written — the boundary requires a reason, and
+    // the row asks for one inline instead of surfacing a rejection.
+    expect(repo.recordCalls).toEqual([]);
+    expect(
+      await screen.findByLabelText("Reason for changing Ana Cruz's recorded score"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("A reason is required to change a recorded score."),
+    ).toBeInTheDocument();
+  });
+
+  it("writes the correction with its reason once the teacher provides one", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.clear(screen.getByLabelText("Score for Ana Cruz"));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19");
+    await user.tab();
+    const reasonField = await screen.findByLabelText(
+      "Reason for changing Ana Cruz's recorded score",
+    );
+    await user.type(reasonField, "Rechecked the written work{Enter}");
+
+    await waitFor(() =>
+      expect(repo.recordCalls).toEqual([
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "scored",
+          score: 19,
+          correctionReason: "Rechecked the written work",
+        },
+      ]),
+    );
+    // The row returns to normal score entry once the correction lands.
+    expect(screen.getByLabelText("Score for Ana Cruz")).toBeInTheDocument();
+  });
+
+  it("cancelling a held correction writes nothing and restores the recorded score", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.clear(screen.getByLabelText("Score for Ana Cruz"));
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "19");
+    await user.tab();
+    const reasonField = await screen.findByLabelText(
+      "Reason for changing Ana Cruz's recorded score",
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(repo.recordCalls).toEqual([]);
+    expect(reasonField).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(15);
+  });
+
+  it("shows a recorded score's correction history when the teacher opens it", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    scoreRepo.correctionHistoryResult = [
+      {
+        id: "corr-1",
+        assessmentItemId: "ai-1",
+        learnerId: "l1",
+        previousStatus: "scored",
+        previousScore: 12,
+        previousRecordedByUserId: "u-2",
+        previousRecordedByName: "Ben Reyes",
+        previousRecordedAt: "2026-10-01T09:00:00Z",
+        newStatus: "scored",
+        newScore: 15,
+        correctedByUserId: "u-1",
+        correctedByName: "Ana Santos",
+        reason: "Recounted the written work",
+        correctedAt: "2026-10-03T11:00:00Z",
+      },
+    ];
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    // M07: the command existed but nothing in production called it. This is
+    // the wiring — a recorded score carries its lineage one click away.
+    await user.click(screen.getByRole("button", { name: /correction history for ana cruz/i }));
+
+    expect(repo.correctionHistoryCalls).toBe(1);
+    expect(await screen.findByText(/recounted the written work/i)).toBeInTheDocument();
+    expect(screen.getByText(/ben reyes/i)).toBeInTheDocument();
+  });
+
+  it("offers no history affordance on a score that has never been recorded", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: null, score: null, updatedAt: null },
+    ]);
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    expect(
+      screen.queryByRole("button", { name: /correction history for ana cruz/i }),
+    ).not.toBeInTheDocument();
+    expect(repo.correctionHistoryCalls).toBe(0);
+  });
+
+  it("marks an exception on an already-recorded score as a correction that needs a reason", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      { ...ROSTER_ENTRY, status: "scored", score: 15, updatedAt: "2026-10-01T00:00:00Z" },
+    ]);
+    const { scoreRepo: repo } = renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Excused" }));
+
+    expect(repo.recordCalls).toEqual([]);
+    expect(
+      await screen.findByLabelText("Reason for changing Ana Cruz's recorded score"),
+    ).toBeInTheDocument();
+  });
+
   it("saves a score when the field loses focus (blur-commit)", async () => {
     const user = userEvent.setup();
     const { scoreRepo } = renderScreen();
@@ -529,7 +708,13 @@ describe("ClassRecordWorkspace", () => {
 
     await waitFor(() =>
       expect(scoreRepo.recordCalls).toEqual([
-        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 18 },
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "scored",
+          score: 18,
+          correctionReason: null,
+        },
       ]),
     );
   });
@@ -559,7 +744,13 @@ describe("ClassRecordWorkspace", () => {
 
     await waitFor(() =>
       expect(scoreRepo.recordCalls).toEqual([
-        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 18 },
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "scored",
+          score: 18,
+          correctionReason: null,
+        },
       ]),
     );
     expect(screen.getByLabelText("Score for Bo Reyes")).toHaveFocus();
@@ -593,9 +784,98 @@ describe("ClassRecordWorkspace", () => {
     await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveFocus());
 
     expect(scoreRepo.recordCalls).toEqual([
-      { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 18 },
-      { assessmentItemId: "ai-1", learnerId: "l2", status: "scored", score: 15 },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l1",
+        status: "scored",
+        score: 18,
+        correctionReason: null,
+      },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l2",
+        status: "scored",
+        score: 15,
+        correctionReason: null,
+      },
     ]);
+  });
+
+  it("Tab saves and moves focus to the next learner's score field, and Shift+Tab moves back up", async () => {
+    const user = userEvent.setup();
+    const { scoreRepo } = renderScreen({
+      scoreRepo: new FakeLearnerScoreRepository([
+        ROSTER_ENTRY,
+        {
+          learnerId: "l2",
+          givenName: "Bo",
+          familyName: "Reyes",
+          status: null,
+          score: null,
+          updatedAt: null,
+        },
+      ]),
+    });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    // Without Tab handling, native Tab leaves the score grid for the row's
+    // Excused/N/A buttons — a gradebook costing a mouse per row.
+    await user.type(screen.getByLabelText("Score for Ana Cruz"), "18{Tab}");
+    await waitFor(() => expect(screen.getByLabelText("Score for Bo Reyes")).toHaveFocus());
+
+    await user.type(screen.getByLabelText("Score for Bo Reyes"), "15{Shift>}{Tab}{/Shift}");
+    await waitFor(() => expect(screen.getByLabelText("Score for Ana Cruz")).toHaveFocus());
+
+    expect(scoreRepo.recordCalls).toEqual([
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l1",
+        status: "scored",
+        score: 18,
+        correctionReason: null,
+      },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l2",
+        status: "scored",
+        score: 15,
+        correctionReason: null,
+      },
+    ]);
+  });
+
+  it("Tab does not move focus away when the save is rejected, so the entry is not silently dropped", async () => {
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository([
+      ROSTER_ENTRY,
+      {
+        learnerId: "l2",
+        givenName: "Bo",
+        familyName: "Reyes",
+        status: null,
+        score: null,
+        updatedAt: null,
+      },
+    ]);
+    // The Rust boundary returns Ok(None) for an out-of-range score; the
+    // recordResult is what that surfaces as here.
+    scoreRepo.recordResult = null;
+    renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    const input = screen.getByLabelText("Score for Ana Cruz");
+    await user.type(input, "18{Tab}");
+
+    await waitFor(() => expect(scoreRepo.recordCalls).toHaveLength(1));
+    expect(input).toHaveFocus();
   });
 
   it("ArrowDown on the last learner's row does not move focus away (no next row to go to)", async () => {
@@ -730,7 +1010,13 @@ describe("ClassRecordWorkspace", () => {
 
     await waitFor(() =>
       expect(scoreRepo.recordCalls).toEqual([
-        { assessmentItemId: "ai-1", learnerId: "l1", status: "excused", score: null },
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "excused",
+          score: null,
+          correctionReason: null,
+        },
       ]),
     );
   });
@@ -788,6 +1074,48 @@ describe("ClassRecordWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Show term grades" }));
 
     expect(await screen.findByText("Not yet available")).toBeInTheDocument();
+  });
+
+  it("marks a computable grade provisional when not every score is recorded yet", async () => {
+    // CTOS §5: provisional values must be visibly provisional. A grade that
+    // is real but computed over a class record with blanks left must read
+    // differently from a finished one — a teacher deciding whether a 88 is
+    // final has no other signal on this screen.
+    const user = userEvent.setup();
+    const scoreRepo = new FakeLearnerScoreRepository();
+    scoreRepo.computeTermGradeResult = {
+      initialGrade: 85.8,
+      termGrade: 88,
+      wasTransmuted: true,
+      wasFloored: false,
+      complete: false,
+    };
+    renderScreen({ scoreRepo });
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+
+    expect(await screen.findByText("88")).toBeInTheDocument();
+    expect(screen.getByText(/provisional/)).toBeInTheDocument();
+  });
+
+  it("shows a complete grade with no provisional marker", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const itemButton = await screen.findByRole("button", {
+      name: "Written Works — Quiz 1 (max 20)",
+    });
+    await user.click(itemButton);
+    await screen.findByText("Quiz 1 scores");
+
+    await user.click(screen.getByRole("button", { name: "Show term grades" }));
+
+    expect(await screen.findByText("88")).toBeInTheDocument();
+    expect(screen.queryByText(/provisional/)).not.toBeInTheDocument();
   });
 
   it("exports a report card for the class record and shows the saved path", async () => {
@@ -891,6 +1219,9 @@ describe("ClassRecordWorkspace", () => {
       async record(): Promise<LearnerScore | null> {
         throw new Error("not used in this test");
       }
+      async correctionHistory(): Promise<LearnerScoreCorrection[]> {
+        throw new Error("not used in this test");
+      }
       async computeTermGrade(): Promise<ComputedTermGrade | null> {
         throw new Error("not used in this test");
       }
@@ -930,7 +1261,13 @@ describe("ClassRecordWorkspace", () => {
     const user = userEvent.setup();
 
     class OrderControlledLearnerScoreRepository implements LearnerScoreRepository {
-      calls: Array<{ learnerId: string; status: LearnerScoreStatus; score: number | null }> = [];
+      calls: Array<{
+        assessmentItemId: string;
+        learnerId: string;
+        status: LearnerScoreStatus;
+        score: number | null;
+        correctionReason: string | null;
+      }> = [];
       private pending: Array<(result: LearnerScore) => void> = [];
 
       async rosterForItem(): Promise<LearnerScoreRosterEntry[] | null> {
@@ -947,16 +1284,20 @@ describe("ClassRecordWorkspace", () => {
         ];
       }
       record(
-        _assessmentItemId: string,
+        assessmentItemId: string,
         learnerId: string,
         status: LearnerScoreStatus,
         score: number | null,
+        correctionReason: string | null,
       ): Promise<LearnerScore | null> {
-        this.calls.push({ learnerId, status, score });
+        this.calls.push({ assessmentItemId, learnerId, status, score, correctionReason });
         const index = this.calls.length - 1;
         return new Promise((resolve) => {
           this.pending[index] = resolve;
         });
+      }
+      async correctionHistory(): Promise<LearnerScoreCorrection[]> {
+        return [];
       }
       resolveCall(index: number) {
         const call = this.calls[index];
@@ -1009,9 +1350,27 @@ describe("ClassRecordWorkspace", () => {
     await user.click(within(anaGroup).getByRole("button", { name: "Excused" }));
 
     expect(repo.calls).toEqual([
-      { learnerId: "l1", status: "scored", score: 18 },
-      { learnerId: "l2", status: "scored", score: 15 },
-      { learnerId: "l1", status: "excused", score: null },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l1",
+        status: "scored",
+        score: 18,
+        correctionReason: null,
+      },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l2",
+        status: "scored",
+        score: 15,
+        correctionReason: null,
+      },
+      {
+        assessmentItemId: "ai-1",
+        learnerId: "l1",
+        status: "excused",
+        score: null,
+        correctionReason: null,
+      },
     ]);
 
     // Resolve out of order: the newer write (call 2, Excused) resolves first...
@@ -1079,11 +1438,18 @@ describe("ClassRecordWorkspace", () => {
       termGrade: 92,
       wasTransmuted: true,
       wasFloored: false,
+      complete: true,
     };
     await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
     await waitFor(() =>
       expect(scoreRepo.recordCalls).toEqual([
-        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 19 },
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "scored",
+          score: 19,
+          correctionReason: null,
+        },
       ]),
     );
 
@@ -1105,7 +1471,13 @@ describe("ClassRecordWorkspace", () => {
     await user.type(screen.getByLabelText("Score for Ana Cruz"), "19{Enter}");
     await waitFor(() =>
       expect(scoreRepo.recordCalls).toEqual([
-        { assessmentItemId: "ai-1", learnerId: "l1", status: "scored", score: 19 },
+        {
+          assessmentItemId: "ai-1",
+          learnerId: "l1",
+          status: "scored",
+          score: 19,
+          correctionReason: null,
+        },
       ]),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1367,5 +1739,34 @@ describe("assignment-owned score sync evidence", () => {
     expect(screen.getByLabelText("Score for Ana Cruz")).toHaveValue(null);
     expect(screen.queryByText(/Saved on this device|Last sync check/)).not.toBeInTheDocument();
     expect(getStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("score draft continuity", () => {
+  it("restores score text and selected item on remount without replaying a write", async () => {
+    clearSessionDrafts();
+    const user = userEvent.setup();
+    const first = renderScreen({ owner: "teacher:school" });
+    await screen.findByText(/Quiz 1/);
+    await user.click(screen.getByRole("button", { name: /Quiz 1 \(max 20\)/ }));
+    const input = await screen.findByLabelText(/Score for Ana Cruz/i);
+    fireEvent.change(input, { target: { value: "13" } });
+    first.unmount();
+    const second = renderScreen({
+      owner: "teacher:school",
+      assessmentRepo: first.assessmentRepo,
+      scoreRepo: first.scoreRepo,
+    });
+    expect(await screen.findByLabelText(/Score for Ana Cruz/i)).toHaveValue(13);
+    expect(second.scoreRepo.recordCalls).toHaveLength(0);
+    second.unmount();
+    renderScreen({
+      owner: "other:school",
+      assessmentRepo: first.assessmentRepo,
+      scoreRepo: first.scoreRepo,
+    });
+    await screen.findByText(/Quiz 1/);
+    expect(screen.queryByLabelText(/Score for Ana Cruz/i)).not.toBeInTheDocument();
+    clearSessionDrafts();
   });
 });

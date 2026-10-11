@@ -6,6 +6,7 @@ import { ValidationError } from "../domain/errors";
 import type { Sf6ExportResult } from "../domain/export";
 import type { Learner } from "../domain/learner";
 import type { Section } from "../domain/section";
+import { useSessionDraft } from "./useSessionDraft";
 import { Alert } from "./components/Alert";
 import { EmptyState } from "./components/EmptyState";
 import { Loading } from "./components/Loading";
@@ -13,6 +14,7 @@ import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface SectionsScreenProps {
+  roles?: readonly string[];
   sectionService: SectionApplicationService;
   learnerService: LearnerApplicationService;
   /** Generates the SF6 (Summarized Report on Promotion and Level of
@@ -32,6 +34,10 @@ interface SectionsScreenProps {
   /** Open Section Adviser Management for one section (Wave 3G). Same
    * handoff pattern as `onManageAssignments`. */
   onManageAdviser: (sectionId: string, sectionName: string) => void;
+  /** Open the whole-school Teacher Load Maker (CTOS M09). Optional: the
+   * planner is a school-setup tool rather than a per-section action, so it
+   * lives on this screen's actions rather than in a section's row. */
+  onOpenPlanner?: () => void;
 }
 
 function todayAsIsoDate(): string {
@@ -44,27 +50,38 @@ function todayAsIsoDate(): string {
 
 export function SectionsScreen({
   sectionService,
+  roles = [],
   learnerService,
   exportService,
   onOpenRoster,
   onManageAssignments,
   onManageAdviser,
+  onOpenPlanner,
 }: SectionsScreenProps) {
   const { mode } = useTeacherMode();
+  const canManageSections = roles.includes("school_head");
+  const canEnroll = canManageSections || roles.includes("registrar");
+  const [reload, setReload] = useState(0);
+  const [sectionReadError, setSectionReadError] = useState(false);
+  const [learnerReadError, setLearnerReadError] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [learners, setLearners] = useState<Learner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [learnerLoading, setLearnerLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
-  const [schoolYear, setSchoolYear] = useState("");
-  const [gradeLevel, setGradeLevel] = useState("");
-  const [sectionName, setSectionName] = useState("");
+  const [schoolYear, setSchoolYear] = useSessionDraft("sections:schoolYear", "");
+  const [gradeLevel, setGradeLevel] = useSessionDraft("sections:gradeLevel", "");
+  const [sectionName, setSectionName] = useSessionDraft("sections:sectionName", "");
   const [creatingSection, setCreatingSection] = useState(false);
 
-  const [enrollSectionId, setEnrollSectionId] = useState("");
-  const [enrollLearnerId, setEnrollLearnerId] = useState("");
-  const [enrollStartsOn, setEnrollStartsOn] = useState(todayAsIsoDate);
+  const [enrollSectionId, setEnrollSectionId] = useSessionDraft("sections:enrollSectionId", "");
+  const [enrollLearnerId, setEnrollLearnerId] = useSessionDraft("sections:enrollLearnerId", "");
+  const [enrollStartsOn, setEnrollStartsOn] = useSessionDraft(
+    "sections:enrollStartsOn",
+    todayAsIsoDate,
+  );
   const [enrolling, setEnrolling] = useState(false);
 
   // SF6 School Promotion Summary export state
@@ -77,26 +94,45 @@ export function SectionsScreen({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([sectionService.listSections(), learnerService.listLearners()])
-      .then(([sectionResult, learnerResult]) => {
-        if (cancelled) return;
-        setSections(sectionResult);
-        setLearners(learnerResult);
+    // Separate reads: a learner failure must not erase usable sections.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setLearnerLoading(canEnroll);
+    setSectionReadError(false);
+    setLearnerReadError(false);
+    void sectionService
+      .listSections()
+      .then((result) => {
+        if (!cancelled) setSections(result);
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load sections.");
+        if (!cancelled) setSectionReadError(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    void (
+      canEnroll
+        ? learnerService
+            .listLearners()
+            .then((result) => {
+              if (!cancelled) setLearners(result);
+            })
+            .catch(() => {
+              if (!cancelled) setLearnerReadError(true);
+            })
+        : Promise.resolve()
+    ).finally(() => {
+      if (!cancelled) setLearnerLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [sectionService, learnerService]);
+  }, [sectionService, learnerService, reload, canEnroll]);
 
   async function handleCreateSection(event: FormEvent) {
     event.preventDefault();
-    if (creatingSection) return;
+    if (creatingSection || !canManageSections || loading || sectionReadError) return;
     setError(null);
     setConfirmation(null);
     setCreatingSection(true);
@@ -116,7 +152,15 @@ export function SectionsScreen({
 
   async function handleEnroll(event: FormEvent) {
     event.preventDefault();
-    if (enrolling) return;
+    if (
+      enrolling ||
+      !canEnroll ||
+      loading ||
+      learnerLoading ||
+      sectionReadError ||
+      learnerReadError
+    )
+      return;
     setError(null);
     setConfirmation(null);
     setEnrolling(true);
@@ -185,7 +229,7 @@ export function SectionsScreen({
     <Page
       title="Sections"
       hint={
-        mode === "guided" ? (
+        mode === "guided" && canManageSections ? (
           <p className="field-hint">
             Create a section (e.g. Grade 7 - Mabini, 2025-2026), then enroll each learner into it.
             Attendance is recorded per section.
@@ -196,8 +240,23 @@ export function SectionsScreen({
       {error && <Alert tone="error">{error}</Alert>}
       {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
+      {canManageSections && onOpenPlanner && (
+        <p className="section-list-actions">
+          <button type="button" aria-label="Open the Teacher Load Maker" onClick={onOpenPlanner}>
+            Plan the whole timetable…
+          </button>
+        </p>
+      )}
+
       {loading ? (
         <Loading label="Loading sections…" />
+      ) : sectionReadError ? (
+        <Alert tone="error">
+          Could not load sections.{" "}
+          <button type="button" onClick={() => setReload((n) => n + 1)}>
+            Retry sections
+          </button>
+        </Alert>
       ) : sections.length === 0 ? (
         <EmptyState>No sections created yet.</EmptyState>
       ) : (
@@ -215,122 +274,154 @@ export function SectionsScreen({
                 >
                   Open roster
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onManageAssignments(section.id, section.name)}
-                  aria-label={`Manage teaching assignments for ${section.name}`}
-                >
-                  Manage assignments
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onManageAdviser(section.id, section.name)}
-                  aria-label={`Manage adviser for ${section.name}`}
-                >
-                  Manage adviser
-                </button>
+                {canManageSections && (
+                  <button
+                    type="button"
+                    onClick={() => onManageAssignments(section.id, section.name)}
+                    aria-label={`Manage teaching assignments for ${section.name}`}
+                  >
+                    Manage assignments
+                  </button>
+                )}
+                {canManageSections && (
+                  <button
+                    type="button"
+                    onClick={() => onManageAdviser(section.id, section.name)}
+                    aria-label={`Manage adviser for ${section.name}`}
+                  >
+                    Manage adviser
+                  </button>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      <form onSubmit={handleCreateSection} aria-label="Create a section">
-        <h3>Create a section</h3>
-        <div className="form-row">
-          <div className="field">
-            <label htmlFor="section-school-year">School year</label>
-            <input
-              id="section-school-year"
-              type="text"
-              placeholder="2025-2026"
-              value={schoolYear}
-              onChange={(event) => setSchoolYear(event.target.value)}
-              required
-            />
+      {!canManageSections && (
+        <p className="field-hint">
+          Section setup and teaching assignments are managed by your school head.
+        </p>
+      )}
+      {canManageSections && (
+        <form onSubmit={handleCreateSection} aria-label="Create a section">
+          <h3>Create a section</h3>
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="section-school-year">School year</label>
+              <input
+                id="section-school-year"
+                type="text"
+                placeholder="2025-2026"
+                value={schoolYear}
+                onChange={(event) => setSchoolYear(event.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="section-grade-level">Grade level</label>
+              <input
+                id="section-grade-level"
+                type="text"
+                placeholder="7"
+                value={gradeLevel}
+                onChange={(event) => setGradeLevel(event.target.value)}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="section-name">Section name</label>
+              <input
+                id="section-name"
+                type="text"
+                placeholder="Mabini"
+                value={sectionName}
+                onChange={(event) => setSectionName(event.target.value)}
+                required
+              />
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="section-grade-level">Grade level</label>
-            <input
-              id="section-grade-level"
-              type="text"
-              placeholder="7"
-              value={gradeLevel}
-              onChange={(event) => setGradeLevel(event.target.value)}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="section-name">Section name</label>
-            <input
-              id="section-name"
-              type="text"
-              placeholder="Mabini"
-              value={sectionName}
-              onChange={(event) => setSectionName(event.target.value)}
-              required
-            />
-          </div>
-        </div>
-        <button type="submit" className="button-primary" aria-disabled={creatingSection}>
-          {creatingSection ? "Creating…" : "Create section"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="button-primary"
+            disabled={creatingSection || loading || sectionReadError}
+          >
+            {creatingSection ? "Creating…" : "Create section"}
+          </button>
+        </form>
+      )}
 
-      <form onSubmit={handleEnroll} aria-label="Enroll a learner into a section">
-        <h3>Enroll a learner</h3>
-        <div className="form-row">
-          <div className="field">
-            <label htmlFor="enroll-section">Section</label>
-            <select
-              id="enroll-section"
-              value={enrollSectionId}
-              onChange={(event) => setEnrollSectionId(event.target.value)}
-              required
-            >
-              <option value="" disabled>
-                Select a section
-              </option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name} — Grade {section.gradeLevel}
+      {canEnroll && learnerLoading && <Loading label="Loading learners for enrollment…" />}
+      {canEnroll && learnerReadError && (
+        <Alert tone="error">
+          Could not load learners for enrollment.{" "}
+          <button type="button" onClick={() => setReload((n) => n + 1)}>
+            Retry learners
+          </button>
+        </Alert>
+      )}
+      {canEnroll && (
+        <form onSubmit={handleEnroll} aria-label="Enroll a learner into a section">
+          <h3>Enroll a learner</h3>
+          <div className="form-row">
+            <div className="field">
+              <label htmlFor="enroll-section">Section</label>
+              <select
+                id="enroll-section"
+                value={enrollSectionId}
+                onChange={(event) => setEnrollSectionId(event.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Select a section
                 </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="enroll-learner">Learner</label>
-            <select
-              id="enroll-learner"
-              value={enrollLearnerId}
-              onChange={(event) => setEnrollLearnerId(event.target.value)}
-              required
-            >
-              <option value="" disabled>
-                Select a learner
-              </option>
-              {learners.map((learner) => (
-                <option key={learner.id} value={learner.id}>
-                  {learner.givenName} {learner.familyName}
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name} — Grade {section.gradeLevel}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="enroll-learner">Learner</label>
+              <select
+                id="enroll-learner"
+                value={enrollLearnerId}
+                onChange={(event) => setEnrollLearnerId(event.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Select a learner
                 </option>
-              ))}
-            </select>
+                {learners.map((learner) => (
+                  <option key={learner.id} value={learner.id}>
+                    {learner.givenName} {learner.familyName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="enroll-starts-on">Start date</label>
+              <input
+                id="enroll-starts-on"
+                type="date"
+                value={enrollStartsOn}
+                onChange={(event) => setEnrollStartsOn(event.target.value)}
+                required
+              />
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="enroll-starts-on">Start date</label>
-            <input
-              id="enroll-starts-on"
-              type="date"
-              value={enrollStartsOn}
-              onChange={(event) => setEnrollStartsOn(event.target.value)}
-              required
-            />
-          </div>
-        </div>
-        <button type="submit" className="button-primary" aria-disabled={enrolling}>
-          {enrolling ? "Enrolling…" : "Enroll learner"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="button-primary"
+            disabled={
+              enrolling || loading || learnerLoading || sectionReadError || learnerReadError
+            }
+          >
+            {enrolling ? "Enrolling…" : "Enroll learner"}
+          </button>
+        </form>
+      )}
 
       {exportService && (
         <section

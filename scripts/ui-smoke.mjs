@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 import axe from "axe-core";
+import { uiBrowserExecutable } from "./ui-browser.mjs";
 
 const host = "127.0.0.1";
 const port = 1420;
@@ -32,7 +33,7 @@ try {
   await waitForServer();
   browser = await chromium.launch({
     headless: true,
-    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    executablePath: await uiBrowserExecutable(),
     args: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
       ? [
           "--no-sandbox",
@@ -76,6 +77,10 @@ try {
   await page.getByRole("button", { name: "Back to Science — Rizal", exact: true }).click();
   if ((await page.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")) !== "true")
     throw new Error("Back to class did not restore Overview");
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  if (await page.getByRole("button", { name: "Learners", exact: true }).count())
+    throw new Error("Ordinary teacher received global learner management navigation");
+  await page.goto(`${url}?role=school_head`);
   await page.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("button", { name: "Learners", exact: true }).click();
   await page.getByRole("button", { name: "View enrollment history for Ana Santos" }).click();
@@ -128,8 +133,8 @@ try {
   await page.getByRole("button", { name: "Export SF2-inspired CSV", exact: true }).waitFor();
   await page.getByRole("button", { name: "Calendar", exact: true }).click();
   await page.getByLabel("Date", { exact: true }).fill("2026-10-05");
-  await page.getByRole("button", { name: "Open class", exact: true }).first().waitFor();
-  await page.getByRole("button", { name: "Open class", exact: true }).first().click();
+  await page.getByRole("button", { name: "Open class workspace", exact: true }).first().waitFor();
+  await page.getByRole("button", { name: "Open class workspace", exact: true }).first().click();
   await page.getByRole("heading", { name: "My classes" }).waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await page

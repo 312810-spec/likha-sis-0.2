@@ -279,6 +279,21 @@ pub fn list_by_section_in_school(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+/// Every assignment in `school_id`, school-wide. CTOS M09's Teacher Load
+/// Maker needs the whole school's assignment set at once -- it schedules
+/// the school, not one section -- and before this every listing was
+/// scoped to one teacher or one section.
+pub fn list_all_in_school(
+    conn: &Connection,
+    school_id: &str,
+) -> AppResult<Vec<TeachingAssignmentDetail>> {
+    let mut stmt = conn.prepare(&format!(
+        "{DETAIL_SELECT} ORDER BY sec.school_year DESC, sec.name, sub.name"
+    ))?;
+    let rows = stmt.query_map([school_id], row_to_detail)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
 /// `assignment_count`/`distinct_subject_count` are plain aggregates over
 /// `teaching_assignments`; `weekly_instructional_minutes` sums every
 /// `schedule_meeting` duration across all of the teacher's assignments

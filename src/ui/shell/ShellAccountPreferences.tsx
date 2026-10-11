@@ -7,9 +7,13 @@ import { useTeacherMode } from "../theme/useTeacherMode";
 export function ShellAccountPreferences({
   session,
   onLogout,
+  logoutPending = false,
+  logoutError,
 }: {
   session: CurrentSession;
   onLogout: () => void;
+  logoutPending?: boolean;
+  logoutError?: string | null;
 }) {
   const { mode, setMode } = useTeacherMode();
   return (
@@ -34,8 +38,19 @@ export function ShellAccountPreferences({
           ))}
         </div>
       </div>
-      <button className="app-account-logout" type="button" onClick={onLogout}>
-        Log out
+      <p className="field-hint">
+        Save unfinished work before logging out or closing LIKHA. Memory-only session drafts clear
+        after successful logout or when the app closes. Classroom recovery drafts saved on this
+        device remain available for the same account to review and restore.
+      </p>
+      {logoutError && <p role="alert">{logoutError}</p>}
+      <button
+        className="app-account-logout"
+        type="button"
+        disabled={logoutPending}
+        onClick={onLogout}
+      >
+        {logoutPending ? "Logging out…" : "Log out"}
       </button>
     </div>
   );

@@ -19,7 +19,7 @@ use crate::repository::my_day::{self, MyDaySummary};
 /// `.claude/rules/architecture.md`'s tenant-scope rule -- never
 /// client-supplied.
 ///
-/// `today_weekday`/`today_date` ARE client-supplied, matching this
+/// `today_weekday`/`today_date`/`now_time` ARE client-supplied, matching this
 /// codebase's own established convention for "what day/time is it"
 /// (`open_subject_attendance_session`'s `session_date`,
 /// `create_schedule_meeting`'s `weekday`) -- these are wall-clock/calendar
@@ -30,15 +30,25 @@ use crate::repository::my_day::{self, MyDaySummary};
 /// `today_weekday` follows the `0 = Sunday … 6 = Saturday` convention
 /// `domain/schedule-meeting.ts` established, matching JavaScript's
 /// `Date.prototype.getDay()`, which is exactly what the frontend already
-/// computes for `TodaysClassesScreen`.
+/// computes for `TodaysClassesScreen`. `now_time` is local "HH:MM" and only
+/// selects which of today's classes is next; a tampered value cannot reach
+/// another teacher's data, only misorder this teacher's own day.
 #[tauri::command]
 pub fn get_my_day_summary(
     db: State<'_, Mutex<Connection>>,
     sessions: State<'_, SessionManager>,
     today_weekday: i64,
     today_date: String,
+    now_time: String,
 ) -> AppResult<MyDaySummary> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    my_day::summary_for_teacher(&conn, &school_id, &user_id, today_weekday, &today_date)
+    my_day::summary_for_teacher(
+        &conn,
+        &school_id,
+        &user_id,
+        today_weekday,
+        &today_date,
+        &now_time,
+    )
 }

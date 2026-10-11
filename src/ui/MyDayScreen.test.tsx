@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MyDayApplicationService } from "../application/my-day-service";
@@ -10,35 +10,76 @@ import { ModeProvider } from "./theme/ModeContext";
 import { MyDayScreen } from "./MyDayScreen";
 import type { TeacherClassWorkContext } from "./work-context";
 
+const SCHEDULE_ITEM = {
+  teachingAssignmentId: "ta-1",
+  subjectName: "Mathematics",
+  sectionName: "Mabini",
+  startsAt: "08:00",
+  endsAt: "08:50",
+  room: "Room 101",
+};
+
 const SUMMARY: MyDaySummary = {
-  schedule: [
-    {
-      teachingAssignmentId: "ta-1",
-      subjectName: "Mathematics",
-      sectionName: "Mabini",
-      startsAt: "08:00",
-      endsAt: "08:50",
-      room: "Room 101",
-    },
-  ],
+  schedule: [SCHEDULE_ITEM],
+  next: SCHEDULE_ITEM,
   pendingAttendance: [
     { teachingAssignmentId: "ta-1", subjectName: "Mathematics", sectionName: "Mabini" },
   ],
+  pendingAssignments: [],
   pendingConflicts: [{ id: "c-1", entityKind: "learner" }],
+  pendingScoring: [],
+  pendingFollowups: [],
+  hasAnyAssignments: true,
 };
 
-const EMPTY_SUMMARY: MyDaySummary = {
+/** A teacher who has classes, just none today. */
+const FREE_DAY_SUMMARY: MyDaySummary = {
   schedule: [],
+  next: null,
   pendingAttendance: [],
+  pendingAssignments: [],
   pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
+  hasAnyAssignments: true,
+};
+
+/** A teacher with no teaching assignments at all. */
+const UNASSIGNED_SUMMARY: MyDaySummary = {
+  schedule: [],
+  next: null,
+  pendingAttendance: [],
+  pendingAssignments: [],
+  pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
+  hasAnyAssignments: false,
+};
+
+/** A class on this teacher's load that has never been given a schedule slot. */
+const UNSCHEDULED_SUMMARY: MyDaySummary = {
+  schedule: [],
+  next: null,
+  pendingAttendance: [],
+  pendingAssignments: [
+    { teachingAssignmentId: "ta-2", subjectName: "Filipino", sectionName: "Aguinaldo" },
+  ],
+  pendingConflicts: [],
+  pendingScoring: [],
+  pendingFollowups: [],
+  hasAnyAssignments: true,
 };
 
 class FakeMyDayRepository implements MyDayRepository {
-  calls: Array<[number, string]> = [];
+  calls: Array<[number, string, string]> = [];
   constructor(private result: MyDaySummary | "reject" = SUMMARY) {}
 
-  async getSummary(todayWeekday: number, todayDate: string): Promise<MyDaySummary> {
-    this.calls.push([todayWeekday, todayDate]);
+  async getSummary(
+    todayWeekday: number,
+    todayDate: string,
+    nowTime: string,
+  ): Promise<MyDaySummary> {
+    this.calls.push([todayWeekday, todayDate, nowTime]);
     if (this.result === "reject") throw new Error("boom");
     return this.result;
   }
@@ -52,7 +93,9 @@ function renderScreen(
   const service = new MyDayApplicationService(repo);
   const onCheckAttendance = vi.fn();
   const onOpenClassRecord = vi.fn();
+  const onStartClassroom = vi.fn();
   const onReviewConflicts = vi.fn();
+  const onPlanSupport = vi.fn();
 
   function Host() {
     const [context, setContext] = useState<TeacherClassWorkContext | null>(initialContext);
@@ -65,17 +108,56 @@ function renderScreen(
           onBackToToday={() => setContext(null)}
           onCheckAttendance={onCheckAttendance}
           onOpenClassRecord={onOpenClassRecord}
+          onStartClassroom={onStartClassroom}
           onReviewConflicts={onReviewConflicts}
+          onPlanSupport={onPlanSupport}
         />
       </ModeProvider>
     );
   }
 
   const rendered = render(<Host />);
-  return { ...rendered, repo, onCheckAttendance, onOpenClassRecord, onReviewConflicts };
+  return {
+    ...rendered,
+    repo,
+    onCheckAttendance,
+    onOpenClassRecord,
+    onStartClassroom,
+    onReviewConflicts,
+    onPlanSupport,
+  };
 }
 
 describe("MyDayScreen", () => {
+  it("refreshes the date across midnight without remounting", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 9, 11, 23, 59, 30));
+      const { repo, unmount } = renderScreen();
+      await act(async () => {});
+      expect(repo.calls[0]?.[1]).toBe("2026-10-11");
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(repo.calls[1]?.[1]).toBe("2026-10-12");
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("refreshes on foreground resume and retains the last summary on failed refresh", async () => {
+    const { repo } = renderScreen();
+    await screen.findByText("attendance not yet checked");
+    vi.spyOn(repo, "getSummary").mockRejectedValueOnce(new Error("offline"));
+    act(() => window.dispatchEvent(new Event("focus")));
+    await screen.findByText(/Previously loaded information may be out of date/);
+    expect(screen.getByText("attendance not yet checked")).toBeInTheDocument();
+    expect(repo.calls).toHaveLength(1);
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await waitFor(() => expect(repo.calls).toHaveLength(2));
+  });
+
   it("shows today's schedule and pending tasks", async () => {
     renderScreen();
     expect((await screen.findAllByText(/Mathematics — Mabini/)).length).toBeGreaterThan(0);
@@ -83,10 +165,36 @@ describe("MyDayScreen", () => {
     expect(screen.getByText(/1 sync\s*conflict/)).toBeInTheDocument();
   });
 
-  it("shows an empty state when there is nothing scheduled or pending", async () => {
-    renderScreen(EMPTY_SUMMARY);
+  it("shows a free-day empty state when the teacher has classes but none today", async () => {
+    renderScreen(FREE_DAY_SUMMARY);
     expect(await screen.findByText("No classes scheduled for you today.")).toBeInTheDocument();
     expect(screen.getByText(/Nothing pending/)).toBeInTheDocument();
+  });
+
+  it("says when the teacher is not assigned to any class at all", async () => {
+    renderScreen(UNASSIGNED_SUMMARY);
+    expect(await screen.findByText("You are not assigned to any classes yet.")).toBeInTheDocument();
+  });
+
+  it("surfaces a class that has no schedule slot as pending", async () => {
+    renderScreen(UNSCHEDULED_SUMMARY);
+    expect(await screen.findByText("Filipino — Aguinaldo")).toBeInTheDocument();
+    expect(screen.getByText("no schedule given to this class yet")).toBeInTheDocument();
+  });
+
+  it("marks the next upcoming class so it can be opened in one action", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const next = await screen.findByRole("button", { name: /Next up/ });
+    expect(next).toHaveTextContent("Mathematics — Mabini");
+    await user.click(next);
+    expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
+  });
+
+  it("does not mark any class as next once the day's classes have started", async () => {
+    renderScreen({ ...SUMMARY, next: null });
+    await screen.findAllByText(/Mathematics — Mabini/);
+    expect(screen.queryByText("Next up")).not.toBeInTheDocument();
   });
 
   it("opens the scheduled class without asking for the class again", async () => {
@@ -121,8 +229,17 @@ describe("MyDayScreen", () => {
     renderScreen();
     await user.click(await screen.findByRole("button", { name: /Open class$/ }));
     await user.click(screen.getByRole("button", { name: "Back to Today" }));
-    expect(screen.getByRole("heading", { name: "My Day" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open class$/ })).toBeInTheDocument();
+  });
+
+  it("re-fetches the summary when returning from a class workspace", async () => {
+    const user = userEvent.setup();
+    const { repo } = renderScreen();
+    await user.click(await screen.findByRole("button", { name: /Open class$/ }));
+    const beforeReturn = repo.calls.length;
+    await user.click(screen.getByRole("button", { name: "Back to Today" }));
+    expect(repo.calls.length).toBeGreaterThan(beforeReturn);
   });
 
   it("opens subject attendance for the selected class from the class workspace", async () => {
@@ -159,10 +276,71 @@ describe("MyDayScreen", () => {
     expect(onReviewConflicts).toHaveBeenCalled();
   });
 
+  it("surfaces unfinished scoring with the class record it belongs to", async () => {
+    const user = userEvent.setup();
+    const { onOpenClassRecord } = renderScreen({
+      ...SUMMARY,
+      pendingScoring: [
+        {
+          teachingAssignmentId: "ta-1",
+          classRecordId: "cr-1",
+          subjectName: "Mathematics",
+          sectionName: "Mabini",
+          gradingPeriodLabel: "1st Term",
+          recordedCount: 3,
+          totalCount: 12,
+        },
+      ],
+    });
+
+    expect(await screen.findByText("3 of 12 scores recorded in 1st Term")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open class record" }));
+    expect(onOpenClassRecord).toHaveBeenCalledWith(
+      "ta-1",
+      "cr-1",
+      expect.objectContaining({ teachingAssignmentId: "ta-1" }),
+    );
+  });
+
+  it("hands a standing follow-up to the learning-support plan with its own enrollment key", async () => {
+    const user = userEvent.setup();
+    const { onPlanSupport } = renderScreen({
+      ...SUMMARY,
+      pendingFollowups: [
+        {
+          markerId: "m-1",
+          classOccurrenceId: "occ-1",
+          sectionMembershipId: "mem-1",
+          occurrenceDate: "2026-09-09",
+          subjectName: "Mathematics",
+          sectionName: "Mabini",
+          learnerGivenName: "Ana",
+          learnerFamilyName: "Cruz",
+          reason: "Left the exit slip blank",
+          markedAt: "2026-09-09T01:30:00.000Z",
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/Left the exit slip blank/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Plan support" }));
+    expect(onPlanSupport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        markerId: "m-1",
+        classOccurrenceId: "occ-1",
+        sectionMembershipId: "mem-1",
+        learnerGivenName: "Ana",
+        learnerFamilyName: "Cruz",
+      }),
+    );
+  });
+
   it("retains previously selected class work when the schedule refresh fails", async () => {
     const user = userEvent.setup();
     const { onOpenClassRecord } = renderScreen("reject", SUMMARY.schedule[0]);
-    await screen.findByText("Could not load My Day.");
+    await screen.findByText(
+      "Could not refresh Today. Previously loaded information may be out of date.",
+    );
     expect(screen.getByRole("heading", { name: "Mathematics — Mabini" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open class record" }));
     expect(onOpenClassRecord).toHaveBeenCalledWith("ta-1");
@@ -171,7 +349,11 @@ describe("MyDayScreen", () => {
   it("shows a retryable error when loading fails", async () => {
     const user = userEvent.setup();
     const { repo } = renderScreen("reject");
-    expect(await screen.findByText("Could not load My Day.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Could not refresh Today. Previously loaded information may be out of date.",
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(repo.calls.length).toBeGreaterThanOrEqual(2);
   });

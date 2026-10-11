@@ -1,3 +1,5 @@
+import { ClassroomDraftApplicationService } from "./application/classroom-draft-service";
+import { TauriClassroomDraftRepository } from "./infrastructure/tauri/classroom-draft-repository";
 import { AssessmentApplicationService } from "./application/assessment-service";
 import { BackupApplicationService } from "./application/backup-service";
 import { TauriBackupRepository } from "./infrastructure/tauri/backup-repository";
@@ -16,7 +18,10 @@ import { GradingApplicationService } from "./application/grading-service";
 import { LearnerApplicationService } from "./application/learner-service";
 import { LearnerScoreApplicationService } from "./application/learner-score-service";
 import { LearnerScoreSyncStatusApplicationService } from "./application/learner-score-sync-status-service";
+import { LearnerSupportApplicationService } from "./application/learner-support-service";
+import { SchedulePlanningApplicationService } from "./application/schedule-planning-service";
 import { MyDayApplicationService } from "./application/my-day-service";
+import { ClassOccurrenceApplicationService } from "./application/class-occurrence-service";
 import { SchoolApplicationService } from "./application/school-service";
 import { SchoolAttendanceApplicationService } from "./application/school-attendance-service";
 import { SchoolLogoApplicationService } from "./application/school-logo-service";
@@ -47,7 +52,10 @@ import { TauriGradingRepository } from "./infrastructure/tauri/grading-repositor
 import { TauriLearnerRepository } from "./infrastructure/tauri/learner-repository";
 import { TauriLearnerScoreRepository } from "./infrastructure/tauri/learner-score-repository";
 import { TauriLearnerScoreSyncStatusRepository } from "./infrastructure/tauri/learner-score-sync-status-repository";
+import { TauriLearnerSupportRepository } from "./infrastructure/tauri/learner-support-repository";
+import { TauriSchedulePlanningRepository } from "./infrastructure/tauri/schedule-planning-repository";
 import { TauriMyDayRepository } from "./infrastructure/tauri/my-day-repository";
+import { TauriClassOccurrenceRepository } from "./infrastructure/tauri/class-occurrence-repository";
 import { TauriSchoolRepository } from "./infrastructure/tauri/school-repository";
 import { TauriSchoolAttendanceRepository } from "./infrastructure/tauri/school-attendance-repository";
 import { TauriSchoolLogoRepository } from "./infrastructure/tauri/school-logo-repository";
@@ -130,3 +138,16 @@ export const conflictReviewService = new ConflictReviewApplicationService(
 );
 export const syncStatusService = new SyncStatusApplicationService(new TauriSyncStatusRepository());
 export const myDayService = new MyDayApplicationService(new TauriMyDayRepository());
+export const classOccurrenceService = new ClassOccurrenceApplicationService(
+  new TauriClassOccurrenceRepository(),
+);
+export const learnerSupportService = new LearnerSupportApplicationService(
+  new TauriLearnerSupportRepository(),
+);
+export const schedulePlanningService = new SchedulePlanningApplicationService(
+  new TauriSchedulePlanningRepository(),
+);
+
+export const classroomDraftService = new ClassroomDraftApplicationService(
+  new TauriClassroomDraftRepository(),
+);

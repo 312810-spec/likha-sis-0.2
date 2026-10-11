@@ -13,3 +13,6 @@ package-lock.json
 
 # Historical harness assets are retained verbatim, including upstream licenses.
 docs/harness/archive/
+
+# Reproducible browser downloads and transient captures
+.cache/

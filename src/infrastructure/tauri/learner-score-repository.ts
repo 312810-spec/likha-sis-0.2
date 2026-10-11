@@ -2,6 +2,7 @@ import { invoke } from "./invoke";
 import type {
   ComputedTermGrade,
   LearnerScore,
+  LearnerScoreCorrection,
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../../domain/learner-score";
@@ -20,12 +21,24 @@ export class TauriLearnerScoreRepository implements LearnerScoreRepository {
     learnerId: string,
     status: LearnerScoreStatus,
     score: number | null,
+    correctionReason: string | null,
   ): Promise<LearnerScore | null> {
     return invoke<LearnerScore | null>("record_learner_score", {
       assessmentItemId,
       learnerId,
       status,
       score,
+      correctionReason,
+    });
+  }
+
+  correctionHistory(
+    assessmentItemId: string,
+    learnerId: string,
+  ): Promise<LearnerScoreCorrection[]> {
+    return invoke<LearnerScoreCorrection[]>("learner_score_correction_history", {
+      assessmentItemId,
+      learnerId,
     });
   }
 

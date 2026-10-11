@@ -8,10 +8,20 @@ interface TopBarProps {
   session: CurrentSession;
   activeTab: SignedInTab;
   onLogout: () => void;
+  logoutPending?: boolean;
+  logoutError?: string | null;
   onOpenDrawer: () => void;
   logoUrl?: string | null;
 }
-export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: TopBarProps) {
+export function TopBar({
+  session,
+  activeTab,
+  onLogout,
+  logoutPending,
+  logoutError,
+  onOpenDrawer,
+  logoUrl,
+}: TopBarProps) {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -114,7 +124,12 @@ export function TopBar({ session, activeTab, onLogout, onOpenDrawer, logoUrl }: 
                 ×
               </button>
             </div>
-            <ShellAccountPreferences session={session} onLogout={onLogout} />
+            <ShellAccountPreferences
+              session={session}
+              onLogout={onLogout}
+              logoutPending={logoutPending}
+              logoutError={logoutError}
+            />
           </div>
         )}
       </div>

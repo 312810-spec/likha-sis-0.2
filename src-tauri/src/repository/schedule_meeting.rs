@@ -52,7 +52,13 @@ pub enum CreateMeetingOutcome {
 /// (`format!("{h:02}:{m:02}") == time`) catches that case in Rust,
 /// returning a clean `InvalidTime` outcome instead of letting a raw
 /// `CHECK` constraint error surface from the `INSERT` below.
-fn parse_minutes(time: &str) -> Option<u32> {
+///
+/// Shared with the M09 scheduling modules (`scheduling_inputs`,
+/// `scheduling::constraints`, `scheduling::check`) rather than
+/// duplicated — the one canonical "HH:MM" parser for the whole
+/// scheduling stack, so no second implementation can drift on the
+/// leading-zero rule this test pins.
+pub(crate) fn parse_minutes(time: &str) -> Option<u32> {
     let (h, m) = time.split_once(':')?;
     let h: u32 = h.parse().ok()?;
     let m: u32 = m.parse().ok()?;

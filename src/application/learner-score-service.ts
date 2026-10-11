@@ -2,6 +2,7 @@ import { ValidationError } from "../domain/errors";
 import type {
   ComputedTermGrade,
   LearnerScore,
+  LearnerScoreCorrection,
   LearnerScoreRosterEntry,
   LearnerScoreStatus,
 } from "../domain/learner-score";
@@ -33,6 +34,11 @@ export class LearnerScoreApplicationService {
     status: LearnerScoreStatus,
     score: number | null,
     maxScore: number,
+    /** CTOS M01: required when this call replaces an existing score. Pass
+     * `null` for a first-time recording. A blank reason is rejected here
+     * so the teacher gets an actionable message before the Rust boundary's
+     * own fail-closed rejection. */
+    correctionReason: string | null,
   ): Promise<LearnerScore | null> {
     const trimmedItemId = assessmentItemId.trim();
     const trimmedLearnerId = learnerId.trim();
@@ -52,8 +58,21 @@ export class LearnerScoreApplicationService {
     } else if (score !== null) {
       throw new ValidationError("Excused/Not Applicable entries must not have a score value.");
     }
+    const trimmedReason = correctionReason?.trim() ?? null;
+    if (trimmedReason !== null && trimmedReason.length === 0) {
+      throw new ValidationError("A correction reason cannot be blank.");
+    }
 
-    return this.scores.record(trimmedItemId, trimmedLearnerId, status, score);
+    return this.scores.record(trimmedItemId, trimmedLearnerId, status, score, trimmedReason);
+  }
+
+  /** CTOS M01: the correction lineage for one learner's score on one item,
+   * newest first. Empty when the score has never been corrected. */
+  correctionHistory(
+    assessmentItemId: string,
+    learnerId: string,
+  ): Promise<LearnerScoreCorrection[]> {
+    return this.scores.correctionHistory(assessmentItemId.trim(), learnerId.trim());
   }
 
   /** Computes a learner's DepEd term grade for a class record. Returns

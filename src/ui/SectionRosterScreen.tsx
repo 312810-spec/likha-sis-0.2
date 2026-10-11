@@ -1109,6 +1109,12 @@ export function SectionRosterScreen({
                 Saved to <code>{sf1Result.outputPath}</code> ({sf1Result.learnerCount} learner
                 {sf1Result.learnerCount === 1 ? "" : "s"}).
               </p>
+              <p>
+                Source: {section?.name} · school year {section?.schoolYear} · roster as of{" "}
+                {formatIsoDate(asOfDate)}. Template: {sf1Result.templateFormType} ·{" "}
+                {sf1Result.templateVersion}. Saved workbook requires teacher review; official
+                fidelity remains unverified.
+              </p>
             </Alert>
           )}
           {sf5Error && <Alert tone="error">{sf5Error}</Alert>}
@@ -1148,6 +1154,12 @@ export function SectionRosterScreen({
                 Report card for {sf9Result.member.familyName}, {sf9Result.member.givenName} saved to{" "}
                 <code>{sf9Result.result.outputPath}</code> ({sf9Result.result.subjectCount} subject
                 {sf9Result.result.subjectCount === 1 ? "" : "s"}).
+              </p>
+              <p>
+                Source: {section?.name} · school year {section?.schoolYear} · learner membership as
+                of {formatIsoDate(asOfDate)}. Template: {sf9Result.result.templateFormType} ·{" "}
+                {sf9Result.result.templateVersion}. Saved workbook requires teacher review; official
+                fidelity remains unverified.
               </p>
             </Alert>
           )}

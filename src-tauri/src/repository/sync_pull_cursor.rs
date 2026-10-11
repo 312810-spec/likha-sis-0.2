@@ -58,6 +58,30 @@ pub fn advance_cursor(conn: &Connection, school_id: &str, cursor: SyncCursor) ->
     Ok(())
 }
 
+/// The last authenticated hub scope token used by this local watermark.
+pub fn get_scope_token(conn: &Connection, school_id: &str) -> AppResult<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT scope_token FROM sync_pull_scope WHERE school_id=?1",
+            [school_id],
+            |row| row.get(0),
+        )
+        .optional()?)
+}
+
+/// Persist the new authority epoch and reset the cursor atomically before
+/// processing its first backfill page. A failed page can then resume safely.
+pub fn accept_scope_token(conn: &Connection, school_id: &str, token: &str) -> AppResult<()> {
+    if get_scope_token(conn, school_id)?.as_deref() == Some(token) {
+        return Ok(());
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("INSERT INTO sync_pull_scope (school_id, scope_token) VALUES (?1, ?2) ON CONFLICT(school_id) DO UPDATE SET scope_token=excluded.scope_token", (school_id, token))?;
+    tx.execute("INSERT INTO sync_pull_cursor (school_id, cursor) VALUES (?1, 0) ON CONFLICT(school_id) DO UPDATE SET cursor=0", [school_id])?;
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +147,22 @@ mod tests {
 
         assert_eq!(get_cursor(&conn, &school_b.id).unwrap(), SyncCursor(0));
         assert_eq!(get_cursor(&conn, &school_a.id).unwrap(), SyncCursor(7));
+    }
+    #[test]
+    fn scope_epoch_resets_cursor_once_and_retries_resume_in_that_epoch() {
+        let conn = open_test_db();
+        let school = school::create(&conn, "Synthetic scope school").unwrap();
+        advance_cursor(&conn, &school.id, SyncCursor(42)).unwrap();
+        accept_scope_token(&conn, &school.id, "scope-a").unwrap();
+        assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(0));
+        advance_cursor(&conn, &school.id, SyncCursor(5)).unwrap();
+        accept_scope_token(&conn, &school.id, "scope-a").unwrap();
+        assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(5));
+        accept_scope_token(&conn, &school.id, "scope-b").unwrap();
+        assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(0));
+        assert_eq!(
+            get_scope_token(&conn, &school.id).unwrap().as_deref(),
+            Some("scope-b")
+        );
     }
 }

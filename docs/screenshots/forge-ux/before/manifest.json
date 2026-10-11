@@ -1,0 +1,58 @@
+{
+  "stage": "before",
+  "capturedAt": "2026-10-10T11:51:29.596Z",
+  "source": "962340650fd531b23fc391bc661ad3f095a98ce7",
+  "sourceDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "browser": "155.0.8059.39",
+  "data": "Synthetic development preview; real application components, no native database or dialogs",
+  "captures": [
+    {
+      "file": "desktop-comfortable.png",
+      "width": 1440,
+      "height": 1000,
+      "appearance": "light",
+      "mode": "comfortable",
+      "spacing": {
+        "unit": "",
+        "space4": "",
+        "overflow": false
+      }
+    },
+    {
+      "file": "phone-comfortable.png",
+      "width": 390,
+      "height": 1000,
+      "appearance": "light",
+      "mode": "comfortable",
+      "spacing": {
+        "unit": "",
+        "space4": "",
+        "overflow": false
+      }
+    },
+    {
+      "file": "desktop-guided.png",
+      "width": 1440,
+      "height": 1000,
+      "appearance": "light",
+      "mode": "guided",
+      "spacing": {
+        "unit": "",
+        "space4": "",
+        "overflow": false
+      }
+    },
+    {
+      "file": "phone-guided.png",
+      "width": 390,
+      "height": 1000,
+      "appearance": "light",
+      "mode": "guided",
+      "spacing": {
+        "unit": "",
+        "space4": "",
+        "overflow": false
+      }
+    }
+  ]
+}

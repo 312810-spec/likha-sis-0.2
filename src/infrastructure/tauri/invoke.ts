@@ -57,6 +57,16 @@ const COMMANDS_EXEMPT_FROM_SESSION_EXPIRY_HANDLING = new Set([
   "list_schedule_meetings_by_assignment",
   "set_school_logo",
   "clear_school_logo",
+  "update_schedule_settings",
+  "add_teacher_unavailability",
+  "remove_teacher_unavailability",
+  "create_schedule_room",
+  "remove_schedule_room",
+  "set_subject_schedule_requirement",
+  "generate_schedule_plan",
+  "move_schedule_plan_placement",
+  "remove_schedule_plan_placement",
+  "publish_schedule_plan",
 ]);
 
 export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {

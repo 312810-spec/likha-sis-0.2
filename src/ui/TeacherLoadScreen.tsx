@@ -11,6 +11,7 @@ import { Page } from "./components/Page";
 import { useTeacherMode } from "./theme/useTeacherMode";
 
 interface TeacherLoadScreenProps {
+  roles?: readonly string[];
   teachingAssignmentService: TeachingAssignmentApplicationService;
   subjectAttendanceService: SubjectAttendanceApplicationService;
   schoolMemberService: SchoolMemberApplicationService;
@@ -38,22 +39,21 @@ function formatMinutes(totalMinutes: number): string {
  *
  * Wave 3C: a School Head may also view a colleague's load, matching
  * `auth::authorize_view_teacher_load`'s own self-or-School-Head rule.
- * Every authenticated school member sees the same "View" picker
- * (`list_school_members`, reused from Wave 2Y's Teaching Assignments
- * picker) -- security must not rely on UI hiding, so a Teacher session
- * that picks a colleague simply gets the backend's own denial surfaced
- * as a local message (safe now that Wave 3B closed the false-positive
- * global-logout bug this exact path would otherwise have hit). */
+ * Only School Heads receive the colleague picker; native authorization remains authoritative. */
 export function TeacherLoadScreen({
   teachingAssignmentService,
   subjectAttendanceService,
   schoolMemberService,
   teacherUserId,
+  roles = [],
 }: TeacherLoadScreenProps) {
   const { mode } = useTeacherMode();
+  const canViewOthers = roles.includes("school_head");
 
   const [members, setMembers] = useState<SchoolMember[]>([]);
-  const [viewedTeacherId, setViewedTeacherId] = useState(teacherUserId);
+  const [selection, setSelection] = useState({ owner: teacherUserId, id: teacherUserId });
+  const viewedTeacherId =
+    canViewOthers && selection.owner === teacherUserId ? selection.id : teacherUserId;
   const [teacherLoad, setTeacherLoad] = useState<TeacherLoad | null>(null);
   const [assignments, setAssignments] = useState<TeachingAssignmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +68,7 @@ export function TeacherLoadScreen({
     Promise.all([
       teachingAssignmentService.getLoad(viewedTeacherId),
       subjectAttendanceService.listMyAssignments(viewedTeacherId),
-      schoolMemberService.listMembers(),
+      canViewOthers ? schoolMemberService.listMembers() : Promise.resolve([]),
     ])
       .then(([loadResult, assignmentResult, memberResult]) => {
         if (requestRef.current !== requestId) return;
@@ -93,8 +93,18 @@ export function TeacherLoadScreen({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teachingAssignmentService, subjectAttendanceService, schoolMemberService, viewedTeacherId]);
+  }, [
+    teachingAssignmentService,
+    subjectAttendanceService,
+    schoolMemberService,
+    viewedTeacherId,
+    teacherUserId,
+    canViewOthers,
+  ]);
 
   const teachers = members.filter((member) => member.roles.includes("teacher"));
   const otherTeachers = teachers.filter((member) => member.id !== teacherUserId);
@@ -114,13 +124,13 @@ export function TeacherLoadScreen({
         ) : undefined
       }
     >
-      {otherTeachers.length > 0 && (
+      {canViewOthers && otherTeachers.length > 0 && (
         <div className="field">
           <label htmlFor="teacher-load-viewed">View</label>
           <select
             id="teacher-load-viewed"
             value={viewedTeacherId}
-            onChange={(event) => setViewedTeacherId(event.target.value)}
+            onChange={(event) => setSelection({ owner: teacherUserId, id: event.target.value })}
           >
             <option value={teacherUserId}>Myself</option>
             {otherTeachers.map((teacher) => (

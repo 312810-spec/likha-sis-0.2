@@ -52,7 +52,11 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
 }
 
 function renderScreen(
-  options: { members?: SchoolMember[]; resetPasswordResult?: boolean | "reject" } = {},
+  options: {
+    roles?: string[];
+    members?: SchoolMember[];
+    resetPasswordResult?: boolean | "reject";
+  } = {},
 ) {
   const repo = new FakeSchoolMemberRepository(options.members ?? MEMBERS);
   if (options.resetPasswordResult !== undefined) {
@@ -62,14 +66,17 @@ function renderScreen(
 
   const result = render(
     <ModeProvider>
-      <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+      <AdminPasswordResetScreen
+        roles={options.roles ?? ["school_head"]}
+        schoolMemberService={schoolMemberService}
+      />
     </ModeProvider>,
   );
   return { ...result, repo };
 }
 
 describe("AdminPasswordResetScreen", () => {
-  it("shows the same form to every school member -- no client-side role gating", async () => {
+  it("offers the reset form to a School Head", async () => {
     renderScreen();
 
     expect(await screen.findByRole("combobox", { name: "Teacher" })).toBeInTheDocument();
@@ -99,7 +106,10 @@ describe("AdminPasswordResetScreen", () => {
     const schoolMemberService = new SchoolMemberApplicationService(repo);
     render(
       <ModeProvider>
-        <AdminPasswordResetScreen schoolMemberService={schoolMemberService} />
+        <AdminPasswordResetScreen
+          roles={["school_head"]}
+          schoolMemberService={schoolMemberService}
+        />
       </ModeProvider>,
     );
     await screen.findByRole("combobox", { name: "Teacher" });
@@ -167,4 +177,11 @@ describe("AdminPasswordResetScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("gives teachers an explanatory help path without password inputs", () => {
+  renderScreen({ roles: ["teacher"] });
+  expect(screen.getByText(/Ask your school head/)).toBeInTheDocument();
+  expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reset password" })).not.toBeInTheDocument();
 });

@@ -579,6 +579,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher.id,
+            None,
         )
         .unwrap();
 
@@ -621,6 +622,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher.id,
+            None,
         )
         .unwrap();
 
@@ -715,6 +717,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher.id,
+            None,
         )
         .unwrap();
 
@@ -807,6 +810,7 @@ mod tests {
             learner_score::LearnerScoreStatus::Scored,
             Some(18.0),
             &teacher.id,
+            None,
         )
         .unwrap();
 

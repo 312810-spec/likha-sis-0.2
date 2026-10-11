@@ -26,6 +26,7 @@ import type { GradingPeriod, GradingPolicy, GradingPolicyPeriod } from "../domai
 import type {
   ComputedTermGrade,
   LearnerScore,
+  LearnerScoreCorrection,
   LearnerScoreRosterEntry,
 } from "../domain/learner-score";
 import type { AssessmentRepository } from "../domain/ports/assessment-repository";
@@ -109,6 +110,9 @@ class FakeLearnerScoreRepository implements LearnerScoreRepository {
     return [];
   }
   async record(): Promise<LearnerScore | null> {
+    throw new Error("not used in this test");
+  }
+  async correctionHistory(): Promise<LearnerScoreCorrection[]> {
     throw new Error("not used in this test");
   }
   async computeTermGrade(): Promise<ComputedTermGrade | null> {

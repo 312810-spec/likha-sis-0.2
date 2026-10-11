@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BOTTOM_NAV,
+  bottomTabFor,
+  primaryTabFor,
   HOME_DESTINATION,
   NAV_GROUPS,
   TAB_LABELS,
@@ -9,6 +11,15 @@ import {
 } from "./workbench-nav-data";
 
 describe("workbench-nav-data", () => {
+  it("keeps every destination under a visible phone parent", () => {
+    for (const tab of Object.keys(TAB_LABELS) as Array<keyof typeof TAB_LABELS>) {
+      expect(BOTTOM_NAV.map((entry) => entry.id)).toContain(bottomTabFor(tab));
+    }
+    expect(primaryTabFor("subject-attendance")).toBe("workspace");
+    expect(bottomTabFor("attendance")).toBe("my-day");
+    expect(bottomTabFor("more")).toBe("account");
+  });
+
   it("labels the workspace destination as Dashboard", () => {
     expect(TAB_LABELS.workspace).toBe("Dashboard");
   });
@@ -33,7 +44,7 @@ describe("workbench-nav-data", () => {
   });
 
   it("exposes the four concept phone destinations", () => {
-    expect(BOTTOM_NAV.map((d) => d.id)).toEqual(["workspace", "my-day", "school-forms", "account"]);
+    expect(BOTTOM_NAV.map((d) => d.id)).toEqual(["today", "my-day", "school-forms", "account"]);
   });
 
   it("normalizes contextual tabs to their parent list tab", () => {

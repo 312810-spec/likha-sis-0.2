@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SchoolMemberApplicationService } from "../application/school-member-service";
 import { SubjectAttendanceApplicationService } from "../application/subject-attendance-service";
 import { TeachingAssignmentApplicationService } from "../application/teaching-assignment-service";
@@ -135,6 +135,7 @@ class FakeSchoolMemberRepository implements SchoolMemberRepository {
 
 function renderScreen(
   options: {
+    roles?: string[];
     loadByTeacher?: Record<string, TeacherLoad | "reject">;
     assignmentsByTeacher?: Record<string, TeachingAssignmentSummary[]>;
     members?: SchoolMember[];
@@ -157,6 +158,7 @@ function renderScreen(
   const result = render(
     <ModeProvider>
       <TeacherLoadScreen
+        roles={options.roles ?? ["school_head"]}
         teachingAssignmentService={teachingAssignmentService}
         subjectAttendanceService={subjectAttendanceService}
         schoolMemberService={schoolMemberService}
@@ -164,7 +166,13 @@ function renderScreen(
       />
     </ModeProvider>,
   );
-  return { ...result, teachingAssignmentRepo };
+  return {
+    ...result,
+    teachingAssignmentRepo,
+    teachingAssignmentService,
+    subjectAttendanceService,
+    schoolMemberService,
+  };
 }
 
 describe("TeacherLoadScreen", () => {
@@ -265,4 +273,34 @@ describe("TeacherLoadScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("keeps ordinary teachers on their own load without a colleague picker", async () => {
+  const { teachingAssignmentRepo, schoolMemberService } = renderScreen({ roles: ["teacher"] });
+  const members = vi.spyOn(schoolMemberService, "listMembers");
+  await screen.findByText("Assignments");
+  expect(screen.queryByRole("combobox", { name: "View" })).not.toBeInTheDocument();
+  expect(teachingAssignmentRepo.loadCalls).toEqual(["teacher-1"]);
+  expect(members).not.toHaveBeenCalled();
+});
+it("drops a colleague view immediately when school-head capability is revoked", async () => {
+  const user = userEvent.setup();
+  const result = renderScreen();
+  await user.selectOptions(await screen.findByRole("combobox", { name: "View" }), "teacher-2");
+  await waitFor(() => expect(result.teachingAssignmentRepo.loadCalls).toContain("teacher-2"));
+  result.rerender(
+    <ModeProvider>
+      <TeacherLoadScreen
+        roles={["teacher"]}
+        teacherUserId="teacher-1"
+        teachingAssignmentService={result.teachingAssignmentService}
+        subjectAttendanceService={result.subjectAttendanceService}
+        schoolMemberService={result.schoolMemberService}
+      />
+    </ModeProvider>,
+  );
+  await screen.findByText("Assignments");
+  expect(screen.getByRole("heading", { name: "My Teaching Load" })).toBeInTheDocument();
+  expect(screen.queryByRole("combobox", { name: "View" })).not.toBeInTheDocument();
+  expect(result.teachingAssignmentRepo.loadCalls.at(-1)).toBe("teacher-1");
 });

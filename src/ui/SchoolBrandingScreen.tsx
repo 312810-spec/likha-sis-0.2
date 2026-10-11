@@ -7,6 +7,7 @@ import { Loading } from "./components/Loading";
 import { Page } from "./components/Page";
 
 interface SchoolBrandingScreenProps {
+  roles?: readonly string[];
   schoolLogoService: SchoolLogoApplicationService;
 }
 
@@ -29,14 +30,11 @@ function logoObjectUrl(logo: SchoolLogo): string {
  * with other lockups, so that half stays out of scope pending further
  * DepEd clarification (see `docs/CURRENT-HANDOFF.md`).
  *
- * Any authenticated school member sees this screen (matching
- * `DeviceManagementScreen`/`AdminPasswordResetScreen`'s established
- * convention of not hiding a screen behind client-side role checks);
- * the backend alone enforces that only a School Head
- * (`ManageSchoolBranding`) may actually change the logo -- security must
- * not rely on UI hiding.
+ * Non-admin users can view the logo; only School Heads see change controls.
+ * Native authorization remains authoritative.
  */
-export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreenProps) {
+export function SchoolBrandingScreen({ schoolLogoService, roles = [] }: SchoolBrandingScreenProps) {
+  const canManage = roles.includes("school_head");
   const [logo, setLogo] = useState<SchoolLogo | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,8 +69,11 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
+    return () => {
+      requestRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [schoolLogoService]);
 
   useEffect(() => {
     if (!logo) {
@@ -86,6 +87,7 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
   }, [logo]);
 
   async function handleFileChosen(file: File) {
+    if (!canManage || saving || loadError) return;
     setError(null);
     setConfirmation(null);
     setSaving(true);
@@ -107,6 +109,7 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
   }
 
   async function handleRemove() {
+    if (!canManage || saving || loadError) return;
     setError(null);
     setConfirmation(null);
     setSaving(true);
@@ -135,39 +138,50 @@ export function SchoolBrandingScreen({ schoolLogoService }: SchoolBrandingScreen
         <Loading label="Loading school logo…" />
       ) : (
         <>
-          {loadError && <Alert tone="error">{loadError}</Alert>}
+          {loadError && (
+            <Alert tone="error">
+              {loadError}
+              <button type="button" onClick={load}>
+                Retry school logo
+              </button>
+            </Alert>
+          )}
           {error && <Alert tone="error">{error}</Alert>}
           {confirmation && <Alert tone="success">{confirmation}</Alert>}
 
-          <div className="school-branding-preview">
-            {previewUrl ? (
-              <img src={previewUrl} alt="Current school logo" width={96} height={96} />
-            ) : (
-              <div className="school-branding-placeholder" aria-hidden="true">
-                No logo
-              </div>
-            )}
-          </div>
+          {!loadError && (
+            <div className="school-branding-preview">
+              {previewUrl ? (
+                <img src={previewUrl} alt="Current school logo" width={96} height={96} />
+              ) : (
+                <div className="school-branding-placeholder" aria-hidden="true">
+                  No logo
+                </div>
+              )}
+            </div>
+          )}
 
-          <div className="school-branding-actions">
-            <label htmlFor="school-logo-file">Upload a new logo (PNG, JPEG, or WebP)</label>
-            <input
-              id="school-logo-file"
-              ref={fileInputRef}
-              type="file"
-              accept={ALLOWED_LOGO_MIME_TYPES.join(",")}
-              disabled={saving}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void handleFileChosen(file);
-              }}
-            />
-            {logo && (
-              <button type="button" onClick={handleRemove} disabled={saving}>
-                Remove logo
-              </button>
-            )}
-          </div>
+          {canManage && !loadError && (
+            <div className="school-branding-actions">
+              <label htmlFor="school-logo-file">Upload a new logo (PNG, JPEG, or WebP)</label>
+              <input
+                id="school-logo-file"
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_LOGO_MIME_TYPES.join(",")}
+                disabled={saving}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleFileChosen(file);
+                }}
+              />
+              {logo && (
+                <button type="button" onClick={handleRemove} disabled={saving}>
+                  Remove logo
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
     </Page>

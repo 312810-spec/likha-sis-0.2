@@ -80,12 +80,15 @@ class FakeTeachingAssignmentRepository implements TeachingAssignmentRepository {
   }
 }
 
-function renderScreen(options: { meetings?: ScheduleMeeting[]; onBack?: () => void } = {}) {
+function renderScreen(
+  options: { roles?: string[]; meetings?: ScheduleMeeting[]; onBack?: () => void } = {},
+) {
   const repo = new FakeTeachingAssignmentRepository(options.meetings ?? []);
   const service = new TeachingAssignmentApplicationService(repo);
   const result = render(
     <ModeProvider>
       <ScheduleMeetingsScreen
+        roles={options.roles ?? ["school_head"]}
         teachingAssignmentService={service}
         teachingAssignmentId="ta-1"
         subjectName="Mathematics"
@@ -171,6 +174,7 @@ describe("ScheduleMeetingsScreen", () => {
 
     const removeButton = screen.getByRole("button", { name: "Remove the Monday 08:00 meeting" });
     await user.click(removeButton);
+    await user.click(screen.getByRole("button", { name: "Confirm remove" }));
     await waitFor(() => expect(repo.removeMeetingCalls).toBe(1));
 
     expect(removeButton).toHaveAttribute("aria-disabled", "true");
@@ -185,6 +189,7 @@ describe("ScheduleMeetingsScreen", () => {
     await screen.findByRole("rowheader", { name: "Monday" });
 
     await user.click(screen.getByRole("button", { name: "Remove the Monday 08:00 meeting" }));
+    await user.click(screen.getByRole("button", { name: "Confirm remove" }));
 
     await waitFor(() =>
       expect(screen.getByText("No meetings scheduled for this class yet.")).toBeInTheDocument(),
@@ -215,4 +220,23 @@ describe("ScheduleMeetingsScreen", () => {
 
     await expectNoAccessibilityViolations(container);
   });
+});
+
+it("requires deliberate confirmation and allows cancelling without a write", async () => {
+  const user = userEvent.setup();
+  const { repo } = renderScreen({ meetings: [MEETING] });
+  await screen.findByRole("rowheader", { name: "Monday" });
+  await user.click(screen.getByRole("button", { name: "Remove the Monday 08:00 meeting" }));
+  expect(repo.removeMeetingCalls).toBe(0);
+  await user.click(screen.getByRole("button", { name: "Cancel removal" }));
+  expect(repo.removeMeetingCalls).toBe(0);
+  expect(screen.queryByRole("button", { name: "Confirm remove" })).not.toBeInTheDocument();
+});
+it("does not offer management mutations to teachers", async () => {
+  renderScreen({ meetings: [MEETING], roles: ["teacher"] });
+  await screen.findByRole("rowheader", { name: "Monday" });
+  expect(screen.queryByRole("form", { name: "Schedule a meeting" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Remove the Monday 08:00 meeting" }),
+  ).not.toBeInTheDocument();
 });

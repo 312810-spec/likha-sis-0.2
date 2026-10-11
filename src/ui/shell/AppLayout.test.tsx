@@ -260,3 +260,18 @@ describe("AppLayout", () => {
     });
   });
 });
+
+it("shows logout pending and failure recovery in the account panel", async () => {
+  const user = userEvent.setup();
+  const logout = vi.fn();
+  renderLayout({
+    logoutPending: true,
+    logoutError: "Could not log out. Your work is still available.",
+    onLogout: logout,
+  });
+  await user.click(screen.getByRole("button", { name: "Account preferences for Ana Cruz" }));
+  expect(screen.getByRole("button", { name: "Logging out…" })).toBeDisabled();
+  expect(screen.getByRole("alert")).toHaveTextContent("Could not log out");
+  await user.click(screen.getByRole("button", { name: "Logging out…" }));
+  expect(logout).not.toHaveBeenCalled();
+});

@@ -148,7 +148,10 @@ pub fn build_report_card_export(
                 } else {
                     "Zero-Based".to_string()
                 },
-                if grade.was_floored {
+                if !grade.complete {
+                    "Provisional — some scores in this grading period are not yet recorded"
+                        .to_string()
+                } else if grade.was_floored {
                     "Raised to the minimum of 60".to_string()
                 } else {
                     String::new()
@@ -221,6 +224,7 @@ mod tests {
             term_grade: 88,
             was_transmuted: true,
             was_floored: false,
+            complete: true,
         }
     }
 
@@ -276,12 +280,43 @@ mod tests {
                 term_grade: 60,
                 was_transmuted: false,
                 was_floored: true,
+                complete: true,
             }),
         }];
         let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
 
         assert!(export.csv.contains("Raised to the minimum of 60"));
         assert!(export.csv.contains("Zero-Based"));
+    }
+
+    #[test]
+    fn a_provisional_grade_is_marked_so_it_cannot_be_read_as_final() {
+        // CTOS §5: provisional values must be visibly provisional. A real,
+        // computable grade over a class record that still has blanks must
+        // reach the CSV with that fact stated — a teacher reading a printed
+        // report card has no other way to tell it from a finished one.
+        let rows = vec![ReportCardRow {
+            learner_id: "l1".to_string(),
+            given_name: "Ana".to_string(),
+            family_name: "Cruz".to_string(),
+            lrn: None,
+            grade: Some(ComputedTermGrade {
+                initial_grade: 85.8,
+                term_grade: 88,
+                was_transmuted: true,
+                was_floored: false,
+                complete: false,
+            }),
+        }];
+        let export = build_report_card_export(&a_school(), &a_class_record(), None, &rows);
+
+        assert!(export.csv.contains("Provisional"));
+        assert!(
+            export.csv.contains("not yet recorded"),
+            "the note must say what is missing, not just flag it"
+        );
+        // The number is still emitted — disclosure, not suppression.
+        assert!(export.csv.contains("88"));
     }
 
     #[test]

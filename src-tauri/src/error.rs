@@ -55,6 +55,12 @@ pub enum AppError {
     /// error text — a malformed/corrupted workbook's internal error
     /// detail must never cross the Tauri IPC boundary.
     FormGeneration(String),
+    /// Caller-supplied input failed a domain validation that the repository
+    /// layer enforces (not the UI). Same discipline as `Import`: the message
+    /// is a fixed, generic category string chosen by the caller, never
+    /// derived from user content, so it is safe in `Display` and never needs
+    /// the log-then-generic-serialize split `KeyStore` has.
+    Validation(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -70,6 +76,7 @@ impl std::fmt::Display for AppError {
             AppError::AlreadyInitialized => write!(f, "already initialized"),
             AppError::Import(msg) => write!(f, "import error: {msg}"),
             AppError::FormGeneration(msg) => write!(f, "form generation error: {msg}"),
+            AppError::Validation(msg) => write!(f, "validation error: {msg}"),
         }
     }
 }
@@ -81,6 +88,15 @@ impl AppError {
         let msg = msg.into();
         log::error!("key store error: {msg}");
         AppError::KeyStore(msg)
+    }
+
+    /// A caller-supplied value failed a domain rule the repository enforces.
+    /// `msg` must be a fixed generic category string, never derived from
+    /// user content (see the `Validation` variant's doc comment).
+    pub fn validation(msg: impl Into<String>) -> Self {
+        let msg = msg.into();
+        log::error!("validation error: {msg}");
+        AppError::Validation(msg)
     }
 }
 
@@ -125,6 +141,7 @@ impl Serialize for AppError {
             AppError::AlreadyInitialized => "already_initialized",
             AppError::Import(_) => "import_error",
             AppError::FormGeneration(_) => "form_generation_error",
+            AppError::Validation(_) => "validation_error",
         };
         serializer.serialize_str(category)
     }

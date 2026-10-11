@@ -10,10 +10,29 @@ import { Skeleton } from "./components/Skeleton";
 import { EmptyState } from "./components/EmptyState";
 import type { TeacherClassWorkContext } from "./work-context";
 
-export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => void }) {
+export function MoreScreen({
+  onNavigate,
+  roles = [],
+}: {
+  onNavigate: (tab: SignedInTab) => void;
+  roles?: readonly string[];
+}) {
+  const canManageLearners = roles.includes("registrar") || roles.includes("school_head");
+  const head = roles.includes("school_head");
+  const allowed = (tab: SignedInTab) => {
+    if (["learners", "sf1-import"].includes(tab)) return canManageLearners;
+    if (["admin-password-reset", "school-members", "school-branding"].includes(tab)) return head;
+    return true;
+  };
   return (
     <Page title="More">
       <p className="field-hint">School records, teaching tools, and device settings.</p>
+      {roles.includes("school_head") && (
+        <p className="field-hint">
+          For school administration, open Sections for the Teacher Load Maker, Learner Records for
+          imports, or Security for school and device access.
+        </p>
+      )}
       <div className="workspace-directory">
         <section>
           <h3>My teaching</h3>
@@ -37,12 +56,14 @@ export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => v
           <section key={group.label}>
             <h3>{group.label}</h3>
             <div className="workspace-links">
-              {group.tabs.map((tab) => (
-                <button key={tab.id} type="button" onClick={() => onNavigate(tab.id)}>
-                  <span>{tab.label}</span>
-                  <span aria-hidden="true">›</span>
-                </button>
-              ))}
+              {group.tabs
+                .filter((tab) => allowed(tab.id))
+                .map((tab) => (
+                  <button key={tab.id} type="button" onClick={() => onNavigate(tab.id)}>
+                    <span>{tab.label}</span>
+                    <span aria-hidden="true">›</span>
+                  </button>
+                ))}
             </div>
           </section>
         ))}
@@ -51,7 +72,14 @@ export function MoreScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => v
   );
 }
 
-export function SchoolFormsScreen({ onNavigate }: { onNavigate: (tab: SignedInTab) => void }) {
+export function SchoolFormsScreen({
+  onNavigate,
+  roles = [],
+}: {
+  onNavigate: (tab: SignedInTab) => void;
+  roles?: readonly string[];
+}) {
+  const canImport = roles.includes("school_head") || roles.includes("registrar");
   return (
     <Page title="School Forms">
       <p className="field-hint">Choose a record to review before creating an export.</p>
@@ -92,15 +120,17 @@ export function SchoolFormsScreen({ onNavigate }: { onNavigate: (tab: SignedInTa
         </section>
         <section>
           <h3>Learners</h3>
-          <div className="workspace-link-row">
-            <div>
-              <strong>SF1 · School register</strong>
-              <p>Import learners from an SF1 file and review matches before saving.</p>
+          {canImport && (
+            <div className="workspace-link-row">
+              <div>
+                <strong>SF1 · School register</strong>
+                <p>Import learners from an SF1 file and review matches before saving.</p>
+              </div>
+              <button type="button" onClick={() => onNavigate("sf1-import")}>
+                Import learners
+              </button>
             </div>
-            <button type="button" onClick={() => onNavigate("sf1-import")}>
-              Import learners
-            </button>
-          </div>
+          )}
           <div className="workspace-link-row">
             <div>
               <strong>Class roster</strong>
@@ -185,6 +215,7 @@ export function CalendarScreen({
     <Page title="Calendar">
       <p className="field-hint">
         Your assigned weekly class schedule. School holidays and cancellations are not included.
+        Schedule preview for {date}; classroom work uses today.
       </p>
       <div className="calendar-controls">
         <button type="button" onClick={() => move(-1)} disabled={!date}>
@@ -249,10 +280,11 @@ export function CalendarScreen({
                     startsAt: meeting.startsAt,
                     endsAt: meeting.endsAt,
                     room: meeting.room,
+                    scheduleDate: date,
                   })
                 }
               >
-                Open class
+                Open class workspace
               </button>
             </li>
           ))}

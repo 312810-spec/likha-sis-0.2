@@ -11,6 +11,8 @@ export interface TeacherClassWorkContext {
   sectionName: string;
 
   /** Optional schedule occurrence that led the teacher into the workspace. */
+  /** Date of a schedule preview; never an implicit occurrence mutation date. */
+  scheduleDate?: string;
   startsAt?: string;
   endsAt?: string;
   room?: string | null;
