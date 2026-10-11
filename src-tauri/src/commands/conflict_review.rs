@@ -276,7 +276,15 @@ pub fn list_conflict_reviews(
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
     let mut rows = Vec::new();
     for row in sync_conflict_review::list_open_for_school(&conn, &school_id)? {
-        if crate::auth::data_scope::can_resolve_entity(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id)? { rows.push(row); }
+        if crate::auth::data_scope::can_resolve_entity(
+            &conn,
+            &user_id,
+            &school_id,
+            row.entity_kind,
+            &row.entity_id,
+        )? {
+            rows.push(row);
+        }
     }
     let sspk = resolve_sspk_for_school(&conn, &school_id);
     rows.iter()
@@ -383,7 +391,13 @@ pub fn resolve_conflict_review(
         return Ok(false);
     };
 
-    if !crate::auth::data_scope::can_resolve_entity(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id)? {
+    if !crate::auth::data_scope::can_resolve_entity(
+        &conn,
+        &user_id,
+        &school_id,
+        row.entity_kind,
+        &row.entity_id,
+    )? {
         return Err(AppError::Unauthorized);
     }
 
@@ -428,9 +442,16 @@ pub fn resolve_conflict_review(
 
             let plaintext = payload_key::decrypt_payload(&sspk, &row.encrypted_payload)
                 .map_err(|_| AppError::Unauthorized)?;
-            let payload: serde_json::Value = serde_json::from_slice(&plaintext)
-                .map_err(|_| AppError::Unauthorized)?;
-            if !crate::auth::data_scope::can_apply_incoming(&conn, &user_id, &school_id, row.entity_kind, &row.entity_id, &payload)? {
+            let payload: serde_json::Value =
+                serde_json::from_slice(&plaintext).map_err(|_| AppError::Unauthorized)?;
+            if !crate::auth::data_scope::can_apply_incoming(
+                &conn,
+                &user_id,
+                &school_id,
+                row.entity_kind,
+                &row.entity_id,
+                &payload,
+            )? {
                 return Err(AppError::Unauthorized);
             }
             apply_incoming_review(&conn, &school_id, &row, &sspk)

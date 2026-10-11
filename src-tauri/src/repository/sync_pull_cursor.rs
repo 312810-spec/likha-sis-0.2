@@ -60,13 +60,21 @@ pub fn advance_cursor(conn: &Connection, school_id: &str, cursor: SyncCursor) ->
 
 /// The last authenticated hub scope token used by this local watermark.
 pub fn get_scope_token(conn: &Connection, school_id: &str) -> AppResult<Option<String>> {
-    Ok(conn.query_row("SELECT scope_token FROM sync_pull_scope WHERE school_id=?1", [school_id], |row| row.get(0)).optional()?)
+    Ok(conn
+        .query_row(
+            "SELECT scope_token FROM sync_pull_scope WHERE school_id=?1",
+            [school_id],
+            |row| row.get(0),
+        )
+        .optional()?)
 }
 
 /// Persist the new authority epoch and reset the cursor atomically before
 /// processing its first backfill page. A failed page can then resume safely.
 pub fn accept_scope_token(conn: &Connection, school_id: &str, token: &str) -> AppResult<()> {
-    if get_scope_token(conn, school_id)?.as_deref() == Some(token) { return Ok(()); }
+    if get_scope_token(conn, school_id)?.as_deref() == Some(token) {
+        return Ok(());
+    }
     let tx = conn.unchecked_transaction()?;
     tx.execute("INSERT INTO sync_pull_scope (school_id, scope_token) VALUES (?1, ?2) ON CONFLICT(school_id) DO UPDATE SET scope_token=excluded.scope_token", (school_id, token))?;
     tx.execute("INSERT INTO sync_pull_cursor (school_id, cursor) VALUES (?1, 0) ON CONFLICT(school_id) DO UPDATE SET cursor=0", [school_id])?;
@@ -152,7 +160,9 @@ mod tests {
         assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(5));
         accept_scope_token(&conn, &school.id, "scope-b").unwrap();
         assert_eq!(get_cursor(&conn, &school.id).unwrap(), SyncCursor(0));
-        assert_eq!(get_scope_token(&conn, &school.id).unwrap().as_deref(), Some("scope-b"));
+        assert_eq!(
+            get_scope_token(&conn, &school.id).unwrap().as_deref(),
+            Some("scope-b")
+        );
     }
-
 }

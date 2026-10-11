@@ -27,11 +27,16 @@ pub fn list_learners_by_school(
 ) -> AppResult<Vec<Learner>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    learner::list_by_school(&conn, &school_id)?.into_iter().filter_map(|learner| {
-        match auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner.id) {
-            Ok(true) => Some(Ok(learner)), Ok(false) => None, Err(error) => Some(Err(error)),
-        }
-    }).collect()
+    learner::list_by_school(&conn, &school_id)?
+        .into_iter()
+        .filter_map(|learner| {
+            match auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner.id) {
+                Ok(true) => Some(Ok(learner)),
+                Ok(false) => None,
+                Err(error) => Some(Err(error)),
+            }
+        })
+        .collect()
 }
 
 /// WAVE 1A RBAC Foundation's representative authorization proof: only a
@@ -206,7 +211,9 @@ pub fn get_learner(
 ) -> AppResult<Option<Learner>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    if !auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner_id)? { return Ok(None); }
+    if !auth::data_scope::can_read_learner(&conn, &user_id, &school_id, &learner_id)? {
+        return Ok(None);
+    }
     learner::find_by_id_in_school(&conn, &school_id, &learner_id)
 }
 

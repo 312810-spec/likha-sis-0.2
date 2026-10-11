@@ -81,8 +81,17 @@ pub fn list_learner_support_cases(
 ) -> AppResult<Vec<LearnerSupportCase>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    let occurrence = crate::repository::class_occurrence::find_by_id_in_school(&conn, &school_id, &class_occurrence_id)?
-        .ok_or(crate::error::AppError::Unauthorized)?;
-    crate::repository::class_occurrence::authorize_own_assignment(&conn, &user_id, &school_id, &occurrence.teaching_assignment_id)?;
+    let occurrence = crate::repository::class_occurrence::find_by_id_in_school(
+        &conn,
+        &school_id,
+        &class_occurrence_id,
+    )?
+    .ok_or(crate::error::AppError::Unauthorized)?;
+    crate::repository::class_occurrence::authorize_own_assignment(
+        &conn,
+        &user_id,
+        &school_id,
+        &occurrence.teaching_assignment_id,
+    )?;
     learner_support::list_for_occurrence(&conn, &school_id, &class_occurrence_id)
 }

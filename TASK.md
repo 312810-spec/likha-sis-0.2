@@ -4,9 +4,9 @@
 
 User authorized implementing the detailed UI/UX audit and merging after completion. All F01–F16 source fixes and bounded Review/encrypted recovery/provenance/token enhancements are implemented on local `fix/forge-audit-20261011`. Read `docs/ctos/checkpoints/forge-audit-implementation-2026-10-11.md` first.
 
-Final local frontend quality passes: 149 files / 1,441 tests; browser smoke, 49 recovery checks, build and production fixture isolation pass. Native Rust/installed-device checks remain unexecuted. Automatic review rejected branch upload twice, including after confirmed owned/public repository verification; explicit source-upload approval is now required. No push, PR, remote merge, or deployment succeeded. Remote main is still `86d7ecd`.
+Final local frontend quality passes: 149 files / 1,441 tests; browser smoke, 49 recovery checks, build and production fixture isolation pass. Native Rust/installed-device checks remain unexecuted locally. User explicitly authorized source upload on 11 October. Connected GitHub publication succeeded; PR #107 is open with identical source tree `29cf1e28aec1680c2797ce0859fa0fc7825f0464`, head `acd860f`. Ubuntu/Windows quality and security CI are running. Main merge remains pending verified CI.
 
-Resume from the existing local branch after upload approval; push, run native CI, resolve any actual failures, then perform the already authorized main merge. Do not restart the audit or mass-merge other historical branches. Broader CTOS/M09 work below remains distinct from this audit implementation.
+Continue PR #107 native CI, resolve actual failures, then perform the already authorized main merge. Local continuation is `fix/forge-audit-ci` based on the uploaded commit; original checkpoints remain on `fix/forge-audit-20261011`. Do not restart the audit or mass-merge other historical branches. Broader CTOS/M09 work below remains distinct from this audit implementation.
 
 Updated: 2026-10-08.
 

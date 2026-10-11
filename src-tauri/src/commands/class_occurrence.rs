@@ -85,7 +85,11 @@ pub fn capture_class_occurrence(
         learning_target.as_deref(),
         quick_evidence.as_deref(),
         notes.as_deref(),
-        expected_revision.ok_or_else(|| crate::error::AppError::Validation("class revision is required; reload before saving".into()))?,
+        expected_revision.ok_or_else(|| {
+            crate::error::AppError::Validation(
+                "class revision is required; reload before saving".into(),
+            )
+        })?,
     )
 }
 
@@ -237,8 +241,14 @@ pub fn list_learner_followup_markers(
 ) -> AppResult<Vec<LearnerFollowupMarker>> {
     let conn = lock_db(&db);
     let (user_id, school_id) = sessions.require_active_session(&conn)?;
-    let occurrence = class_occurrence::find_by_id_in_school(&conn, &school_id, &class_occurrence_id)?
-        .ok_or(crate::error::AppError::Unauthorized)?;
-    class_occurrence::authorize_own_assignment(&conn, &user_id, &school_id, &occurrence.teaching_assignment_id)?;
+    let occurrence =
+        class_occurrence::find_by_id_in_school(&conn, &school_id, &class_occurrence_id)?
+            .ok_or(crate::error::AppError::Unauthorized)?;
+    class_occurrence::authorize_own_assignment(
+        &conn,
+        &user_id,
+        &school_id,
+        &occurrence.teaching_assignment_id,
+    )?;
     class_occurrence::list_markers_for_occurrence(&conn, &school_id, &class_occurrence_id)
 }

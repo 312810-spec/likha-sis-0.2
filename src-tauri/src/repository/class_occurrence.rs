@@ -407,18 +407,40 @@ pub fn start(
 /// A stale draft cannot write into a later explicit reopening of the class.
 #[allow(clippy::too_many_arguments)]
 pub fn capture_at_revision(
-    conn: &Connection, school_id: &str, teaching_assignment_id: &str,
-    occurrence_date: &str, actual_starts_at: Option<&str>, actual_ends_at: Option<&str>,
-    actual_room: Option<&str>, learning_target: Option<&str>, quick_evidence: Option<&str>,
-    notes: Option<&str>, expected_revision: i64,
+    conn: &Connection,
+    school_id: &str,
+    teaching_assignment_id: &str,
+    occurrence_date: &str,
+    actual_starts_at: Option<&str>,
+    actual_ends_at: Option<&str>,
+    actual_room: Option<&str>,
+    learning_target: Option<&str>,
+    quick_evidence: Option<&str>,
+    notes: Option<&str>,
+    expected_revision: i64,
 ) -> AppResult<Option<ClassOccurrence>> {
-    let occurrence = find_for_assignment_on_date(conn, school_id, teaching_assignment_id, occurrence_date)?
-        .ok_or_else(|| AppError::Validation("class is not open; reload before saving".into()))?;
+    let occurrence =
+        find_for_assignment_on_date(conn, school_id, teaching_assignment_id, occurrence_date)?
+            .ok_or_else(|| {
+                AppError::Validation("class is not open; reload before saving".into())
+            })?;
     if occurrence.revision != expected_revision {
-        return Err(AppError::Validation("class revision changed; reload before saving".into()));
+        return Err(AppError::Validation(
+            "class revision changed; reload before saving".into(),
+        ));
     }
-    capture(conn, school_id, teaching_assignment_id, occurrence_date, actual_starts_at,
-        actual_ends_at, actual_room, learning_target, quick_evidence, notes)
+    capture(
+        conn,
+        school_id,
+        teaching_assignment_id,
+        occurrence_date,
+        actual_starts_at,
+        actual_ends_at,
+        actual_room,
+        learning_target,
+        quick_evidence,
+        notes,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -439,8 +461,13 @@ pub fn capture(
     else {
         return Ok(None);
     };
-    if matches!(occurrence.status, OccurrenceStatus::Cancelled | OccurrenceStatus::Delivered) {
-        return Err(AppError::Validation("class is closed; explicitly reopen before editing".into()));
+    if matches!(
+        occurrence.status,
+        OccurrenceStatus::Cancelled | OccurrenceStatus::Delivered
+    ) {
+        return Err(AppError::Validation(
+            "class is closed; explicitly reopen before editing".into(),
+        ));
     }
 
     let mut updated = occurrence;
@@ -1123,19 +1150,83 @@ mod tests {
         let conn = open_test_db();
         let f = seed(&conn);
         let open = started_occurrence(&conn, &f, "2026-09-09");
-        conn.execute("UPDATE class_occurrences SET status='delivered', notes='Final note' WHERE id=?1", [&open.id]).unwrap();
-        assert!(capture(&conn, &f.school_id, &f.assignment_id, "2026-09-09", None, None, None, None, None, Some("Late draft")).is_err());
-        let final_record = find_by_id_in_school(&conn, &f.school_id, &open.id).unwrap().unwrap();
+        conn.execute(
+            "UPDATE class_occurrences SET status='delivered', notes='Final note' WHERE id=?1",
+            [&open.id],
+        )
+        .unwrap();
+        assert!(capture(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("Late draft")
+        )
+        .is_err());
+        let final_record = find_by_id_in_school(&conn, &f.school_id, &open.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(final_record.status, OccurrenceStatus::Delivered);
         assert_eq!(final_record.notes, "Final note");
         reopen(&conn, &f.school_id, &f.assignment_id, "2026-09-09").unwrap();
-        assert!(capture_at_revision(&conn, &f.school_id, &f.assignment_id, "2026-09-09", None, None, None, None, None, Some("Stale draft"), open.revision).is_err());
-        let reopened = find_by_id_in_school(&conn, &f.school_id, &open.id).unwrap().unwrap();
+        assert!(capture_at_revision(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("Stale draft"),
+            open.revision
+        )
+        .is_err());
+        let reopened = find_by_id_in_school(&conn, &f.school_id, &open.id)
+            .unwrap()
+            .unwrap();
         assert_eq!(reopened.notes, "Final note");
-        let saved = capture_at_revision(&conn, &f.school_id, &f.assignment_id, "2026-09-09", None, None, None, None, None, Some("Reviewed correction"), reopened.revision).unwrap().unwrap();
+        let saved = capture_at_revision(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("Reviewed correction"),
+            reopened.revision,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(saved.notes, "Reviewed correction");
-        conn.execute("UPDATE class_occurrences SET status='cancelled' WHERE id=?1", [&open.id]).unwrap();
-        assert!(capture_at_revision(&conn, &f.school_id, &f.assignment_id, "2026-09-09", None, None, None, None, None, Some("Late draft"), reopened.revision).is_err());
+        conn.execute(
+            "UPDATE class_occurrences SET status='cancelled' WHERE id=?1",
+            [&open.id],
+        )
+        .unwrap();
+        assert!(capture_at_revision(
+            &conn,
+            &f.school_id,
+            &f.assignment_id,
+            "2026-09-09",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("Late draft"),
+            reopened.revision
+        )
+        .is_err());
     }
 
     #[test]

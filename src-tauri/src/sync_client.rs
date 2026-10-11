@@ -84,7 +84,7 @@ use crate::repository::{
     sync_conflict_review, sync_hub, sync_outbox, sync_pull_cursor, sync_version_cache,
     teaching_assignment,
 };
-use crate::sync::{ChangeOperation, EntityKind, PendingChange};
+use crate::sync::{ChangeOperation, EntityKind, PendingChange, SyncCursor};
 
 const CREDENTIAL_ID_HEADER: &str = "x-likha-credential-id";
 const DEVICE_SECRET_HEADER: &str = "x-likha-device-secret";
@@ -409,7 +409,8 @@ pub fn pull_once(
     config: &SyncClientConfig,
 ) -> AppResult<PullRunSummary> {
     let after = sync_pull_cursor::get_cursor(conn, &config.school_id)?;
-    let scope_token = sync_pull_cursor::get_scope_token(conn, &config.school_id)?.unwrap_or_default();
+    let scope_token =
+        sync_pull_cursor::get_scope_token(conn, &config.school_id)?.unwrap_or_default();
     let response = client
         .get(format!("{}/sync/pull", config.base_url))
         .header(CREDENTIAL_ID_HEADER, &config.credential_id)
@@ -545,10 +546,8 @@ pub fn pull_once(
             }
         }
     }
-    if !summary.failed {
-        if let Some(scanned_through) = body.scanned_through {
-            sync_pull_cursor::advance_cursor(conn, &config.school_id, scanned_through)?;
-        }
+    if let Some(scanned_through) = body.scanned_through.filter(|_| !summary.failed) {
+        sync_pull_cursor::advance_cursor(conn, &config.school_id, scanned_through)?;
     }
     Ok(summary)
 }
@@ -637,6 +636,12 @@ pub(crate) fn apply_decrypted_change(
 ) -> Result<(), ApplyRejection> {
     let plaintext = payload_key::decrypt_payload(sspk, &change.encrypted_payload)
         .map_err(|_| ApplyRejection::Untrusted)?;
+    let identity: serde_json::Value =
+        serde_json::from_slice(&plaintext).map_err(|_| ApplyRejection::Untrusted)?;
+    let expected_id = change.entity_id.to_string();
+    if identity.get("id").and_then(serde_json::Value::as_str) != Some(expected_id.as_str()) {
+        return Err(ApplyRejection::Untrusted);
+    }
 
     // Only `TeachingAssignment` has a real `Delete` handler wired below --
     // every other entity kind's arm only ever calls `upsert_from_sync`. A
@@ -886,13 +891,48 @@ mod tests {
         sspk: [u8; PAYLOAD_KEY_LEN],
     }
 
+    #[test]
+    fn authenticated_payload_cannot_apply_to_another_envelope_entity() {
+        let conn = crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
+        let school = school::create(&conn, "Synthetic identity school").unwrap();
+        let learner =
+            learner::create(&conn, &school.id, "Synthetic", "Learner", None, None).unwrap();
+        let sspk = payload_key::generate_payload_key();
+        let change = sync_hub::AcceptedChange {
+            cursor: SyncCursor(1),
+            change_id: Uuid::now_v7(),
+            device_id: Uuid::now_v7(),
+            actor_user_id: Uuid::now_v7(),
+            entity_kind: EntityKind::Learner,
+            entity_id: Uuid::now_v7(),
+            version: 1,
+            operation: ChangeOperation::Upsert,
+            encrypted_payload: payload_key::encrypt_payload(
+                &sspk,
+                &serde_json::to_vec(&learner).unwrap(),
+            )
+            .unwrap(),
+        };
+        assert_eq!(
+            apply_decrypted_change(&conn, &school.id, &change, &sspk),
+            Err(ApplyRejection::Untrusted)
+        );
+        assert_eq!(learner::list_by_school(&conn, &school.id).unwrap().len(), 1);
+    }
+
     fn setup() -> TestFixture {
         let hub_conn =
             crate::db::open(Path::new(":memory:"), &crate::crypto::generate_key()).unwrap();
         let school = school::create(&hub_conn, "Rizal Elementary").unwrap();
         let user = user::create_user(&hub_conn, "ana.cruz", "password", "Ana Cruz").unwrap();
         user::add_school_membership(&hub_conn, &user.id, &school.id).unwrap();
-        crate::repository::role::grant(&hub_conn, &user.id, &school.id, crate::repository::role::SCHOOL_HEAD).unwrap();
+        crate::repository::role::grant(
+            &hub_conn,
+            &user.id,
+            &school.id,
+            crate::repository::role::SCHOOL_HEAD,
+        )
+        .unwrap();
         let device_id = Uuid::now_v7();
         let credential = device_credential::enroll(
             &hub_conn,

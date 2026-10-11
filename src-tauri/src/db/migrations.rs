@@ -2408,7 +2408,8 @@ pub fn migrations() -> Migrations<'static> {
             ADD COLUMN plan_id TEXT REFERENCES schedule_plans(id);
         "#,
         ),
-        M::up(r#"
+        M::up(
+            r#"
         -- Device-local drafts live inside the existing encrypted SQLCipher database.
         -- No sync-outbox entry: these are private unconfirmed work, not school records.
         CREATE TABLE classroom_drafts (
@@ -2421,15 +2422,18 @@ pub fn migrations() -> Migrations<'static> {
             saved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
             PRIMARY KEY (owner_user_id, school_id, teaching_assignment_id, occurrence_date, occurrence_revision)
         );
-        "#),
-        M::up(r#"
+        "#,
+        ),
+        M::up(
+            r#"
         -- Scope changes reset the transport scan, enabling newly authorized
         -- history to backfill without disclosing previously filtered records.
         CREATE TABLE sync_pull_scope (
             school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
             scope_token TEXT NOT NULL
         );
-        "#),
+        "#,
+        ),
     ])
 }
 
